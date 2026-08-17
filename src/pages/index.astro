@@ -2,16 +2,546 @@
 import "@/styles/tailwind.css";
 ---
 
-<html lang="en">
+<!doctype html>
+<html lang="en" class="scroll-smooth bg-ink">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
+    <meta
+      name="description"
+      content="Volunteer-based evening street outreach providing practical care and overdose response in Vancouver's Downtown Eastside."
+    />
+    <meta name="theme-color" content="#050608" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Public+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <title>After Hours Outreach Initiative</title>
   </head>
-  <body>
-    <h1>After Hours Outreach Initiative</h1>
+  <body
+    class="m-0 overflow-x-hidden bg-ink font-body text-base leading-relaxed text-zinc-100 antialiased"
+  >
+    <a
+      class="fixed top-4 left-4 z-[100] -translate-y-40 rounded-lg bg-blue px-5 py-3 text-base font-bold text-white transition-transform focus:translate-y-0"
+      href="#main-content">Skip to main content</a
+    >
+
+    <div
+      class="sticky top-0 z-[60] flex h-6 items-center justify-center gap-2 bg-[repeating-linear-gradient(135deg,#facc15_0,#facc15_14px,#111827_14px,#111827_28px)] px-4 text-xs text-zinc-900 shadow-md"
+      aria-label="Prototype controls"
+    >
+      <div class="flex h-full items-center gap-5 bg-zinc-950 px-2">
+        <span class="font-bold tracking-[0.1em] text-yellow-300 uppercase"
+          >Work in progress</span
+        >
+        <button
+          class="inline-flex cursor-pointer items-center gap-2 rounded-full bg-zinc-950 px-2 py-0.5 font-bold text-yellow-300 hover:bg-zinc-800 focus-visible:outline-yellow-300"
+          type="button"
+          aria-pressed="true"
+          data-prototype-toggle
+        >
+          Toggle Comments
+          <span
+            class="relative h-5 w-9 rounded-full bg-emerald-500 shadow-inner transition-colors"
+            aria-hidden="true"
+            data-prototype-toggle-track
+          >
+            <span
+              class="absolute top-0.5 left-0.5 size-4 translate-x-4 rounded-full bg-white shadow-sm transition-transform"
+              data-prototype-toggle-thumb></span>
+          </span>
+          <span class="sr-only" data-prototype-toggle-state>on</span>
+        </button>
+      </div>
+    </div>
+
+    <header class="sticky top-6 z-50 bg-black text-white">
+      <div
+        class="relative mx-auto flex min-h-22 w-full max-w-[1248px] items-center gap-10 px-6 max-sm:min-h-19 max-sm:px-4"
+      >
+        <a
+          class="flex shrink-0 items-center gap-3.5"
+          href="#top"
+          aria-label="After Hours Outreach Initiative, home"
+        >
+          <img
+            class="h-16 w-[105px] shrink-0 object-contain max-sm:h-13 max-sm:w-[86px]"
+            src="/logo-header.png"
+            alt=""
+            width="420"
+            height="280"
+            decoding="async"
+          />
+          <span class="flex flex-col leading-tight">
+            <strong
+              class="font-heading text-[19px] font-bold max-sm:text-[17px]"
+              >After Hours</strong
+            >
+            <span class="text-sm text-zinc-400">Outreach Initiative</span>
+          </span>
+        </a>
+
+        <aside
+          class="font-comment pointer-events-none absolute top-[calc(100%+1rem)] left-6 z-10 w-[min(21rem,calc(100vw-2rem))] -rotate-1 border border-amber-300/70 bg-amber-100 px-3.5 py-2.5 text-sm leading-[1.4] text-zinc-900 shadow-[3px_4px_0_rgba(0,0,0,0.35)] max-sm:left-4"
+          aria-label="Work in progress note"
+          data-prototype-comment
+        >
+          <svg
+            class="absolute bottom-full left-10 h-10 w-16 overflow-visible text-amber-300"
+            viewBox="0 0 64 40"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M55 38C54 24 43 16 17 10"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-dasharray="4 4"></path>
+            <path d="m22 5-7 5 5 7" stroke="currentColor" stroke-width="2"
+            ></path>
+          </svg>
+          <strong class="font-bold uppercase tracking-[0.08em]"
+            >Work In Progress:</strong
+          > we were trying to make a smaller image-only logo since the text was not
+          readable at this size
+        </aside>
+
+        <nav
+          class="ml-auto hidden items-center gap-8 lg:flex"
+          aria-label="Primary navigation"
+        >
+          <a
+            class="py-2.5 text-[15px] font-medium text-zinc-300 transition-colors hover:text-white"
+            href="#about">About</a
+          >
+          <a
+            class="py-2.5 text-[15px] font-medium text-zinc-300 transition-colors hover:text-white"
+            href="#services">What we do</a
+          >
+          <a
+            class="py-2.5 text-[15px] font-medium text-zinc-300 transition-colors hover:text-white"
+            href="#get-involved">Get involved</a
+          >
+        </nav>
+
+        <aside
+          class="font-comment pointer-events-none absolute top-[calc(100%+1rem)] right-44 z-10 hidden w-72 rotate-1 border border-amber-300/70 bg-amber-100 px-3.5 py-2.5 text-sm leading-[1.4] text-zinc-900 shadow-[3px_4px_0_rgba(0,0,0,0.35)] lg:block"
+          aria-label="Work in progress note"
+          data-prototype-comment
+        >
+          <svg
+            class="absolute right-12 bottom-full h-10 w-20 overflow-visible text-amber-300"
+            viewBox="0 0 80 40"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M10 38C14 24 32 14 62 9"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-dasharray="4 4"></path>
+            <path d="m56 4 8 4-5 7" stroke="currentColor" stroke-width="2"
+            ></path>
+          </svg>
+          What info should we put on these pages/sections?
+        </aside>
+
+        <a
+          class="hidden min-h-12 items-center justify-center rounded-lg border-2 border-blue px-5 py-3 text-[15px] font-bold transition-colors hover:bg-blue lg:inline-flex"
+          href="#support">Donate</a
+        >
+
+        <details class="mobile-nav group ml-auto lg:hidden">
+          <summary
+            class="flex size-12 cursor-pointer list-none flex-col items-center justify-center gap-1.5 rounded-lg"
+            aria-label="Open navigation"
+          >
+            <span
+              class="h-0.5 w-5 bg-white transition-transform group-open:translate-y-2 group-open:rotate-45"
+            ></span>
+            <span
+              class="h-0.5 w-5 bg-white transition-opacity group-open:opacity-0"
+            ></span>
+            <span
+              class="h-0.5 w-5 bg-white transition-transform group-open:-translate-y-2 group-open:-rotate-45"
+            ></span>
+          </summary>
+          <nav
+            class="absolute inset-x-0 top-full flex w-full flex-col border-y border-zinc-600 bg-ink"
+            aria-label="Mobile navigation"
+          >
+            <a
+              class="border-b border-zinc-800 px-5 py-4 text-base"
+              href="#about">About</a
+            >
+            <a
+              class="border-b border-zinc-800 px-5 py-4 text-base"
+              href="#services">What we do</a
+            >
+            <a class="bg-blue px-5 py-4 text-base" href="#get-involved"
+              >Get involved</a
+            >
+          </nav>
+        </details>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="bg-black text-white" id="top">
+        <div
+          class="mx-auto grid min-h-[720px] w-full max-w-[1248px] items-center gap-12 px-6 max-sm:px-4 lg:grid-cols-[minmax(0,1fr)_420px]"
+        >
+          <div class="flex w-full max-w-[760px] flex-col justify-center py-20">
+            <h1
+              class="font-heading text-[clamp(2.5rem,5vw,4.5rem)] leading-[1.06] font-bold tracking-[-0.04em]"
+            >
+              <span class="block text-blue">After Hours</span>
+              <span class="block">Outreach Initiative</span>
+            </h1>
+            <p
+              class="mt-8 max-w-2xl text-[clamp(1.1rem,1.5vw,1.3rem)] leading-[1.65]"
+            >
+              Volunteer teams provide food, water, clothing, harm reduction
+              supplies, naloxone, first aid, and immediate overdose response in
+              Vancouver's Downtown Eastside.
+            </p>
+            <div class="mt-9 flex flex-wrap gap-3.5 max-sm:flex-col">
+              <a
+                class="inline-flex min-h-13 items-center justify-center rounded-lg border-2 border-blue bg-blue px-6 py-3 text-[15px] font-bold text-white transition-colors hover:bg-blue-dark"
+                href="#volunteer">Volunteer with us</a
+              >
+              <a
+                class="inline-flex min-h-13 items-center justify-center rounded-lg border-2 border-white/60 px-6 py-3 text-[15px] font-bold text-white transition-colors hover:border-white hover:bg-white/10"
+                href="#services">See what we do</a
+              >
+            </div>
+          </div>
+
+          <div class="relative hidden items-center justify-center lg:flex">
+            <img
+              class="w-full max-w-[420px] object-contain"
+              src="/logo-blue.jpg"
+              alt="After Hours Outreach Initiative logo"
+              width="1280"
+              height="1280"
+              decoding="async"
+            />
+            <aside
+              class="font-comment pointer-events-none absolute top-[calc(50%+155px)] right-0 z-10 w-80 rotate-1 border border-amber-300/70 bg-amber-100 px-4 py-3 text-sm leading-[1.4] text-zinc-900 shadow-[3px_4px_0_rgba(0,0,0,0.35)]"
+              aria-label="Work in progress note"
+              data-prototype-comment
+            >
+              <svg
+                class="absolute bottom-full left-12 h-12 w-20 overflow-visible text-amber-300"
+                viewBox="0 0 80 48"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M10 46C14 29 32 16 62 9"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-dasharray="4 4"></path>
+                <path d="m56 4 8 4-5 7" stroke="currentColor" stroke-width="2"
+                ></path>
+              </svg>
+              <strong class="font-bold">changes:</strong>
+              <ul class="m-0 list-disc pl-5">
+                <li>removed small text</li>
+                <li>replaced purple with the royal blue</li>
+              </ul>
+              <strong class="mt-2 block font-bold"
+                >some ideas for further changes:</strong
+              >
+              <ul class="m-0 list-disc pl-5">
+                <li>turn the off white into pure white #000000</li>
+                <li>make the "AFTER HOURS" text bigger</li>
+                <li>
+                  maybe remove the hands and emphasize the moon, as it seems to
+                  be common among non-profits
+                </li>
+              </ul>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="border-t border-zinc-800 bg-black py-20 lg:py-24"
+        aria-labelledby="logo-variations-heading"
+      >
+        <div class="mx-auto w-full max-w-[1248px] px-6 max-sm:px-4">
+          <h2
+            class="font-heading text-[clamp(2.5rem,5vw,4rem)] leading-none font-bold tracking-[-0.04em]"
+            id="logo-variations-heading"
+          >
+            Logo variations that AI came up with lol
+          </h2>
+
+          <aside
+            class="font-comment relative z-10 mt-8 ml-auto w-full max-w-2xl rotate-1 border border-amber-300/70 bg-amber-100 px-4 py-3 text-base leading-[1.4] text-zinc-900 shadow-[3px_4px_0_rgba(0,0,0,0.35)]"
+            aria-label="Work in progress note"
+            data-prototype-comment
+          >
+            Tudor and Ivan were also thinking of ways to add AH or AHOI to the
+            moon as a monogram in the logo, in case the moon by itself isn't
+            unique enough for our org (AI not very creative/good artist)
+            <svg
+              class="absolute top-full right-16 h-10 w-16 overflow-visible text-amber-300"
+              viewBox="0 0 64 40"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M32 2V34"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-dasharray="4 4"></path>
+              <path d="m25 28 7 7 7-7" stroke="currentColor" stroke-width="2"
+              ></path>
+            </svg>
+          </aside>
+
+          <div class="mt-8 grid gap-px bg-zinc-700 sm:grid-cols-2">
+            <figure class="m-0 bg-black">
+              <div class="flex min-h-70 items-center justify-center p-6">
+                <img
+                  class="h-auto w-full max-w-[420px] object-contain"
+                  src="/logo-variation-01.png"
+                  alt="AH logo variation 1 with a cutout A and blue H integrated into the crescent moon"
+                  width="420"
+                  height="280"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <figcaption
+                class="border-t border-zinc-700 px-5 py-4 text-sm font-semibold"
+              >
+                Variation 01
+              </figcaption>
+            </figure>
+
+            <figure class="m-0 bg-black">
+              <div class="flex min-h-70 items-center justify-center p-6">
+                <img
+                  class="h-auto w-full max-w-[420px] object-contain"
+                  src="/logo-variation-02.png"
+                  alt="AH logo variation 2 with a royal-blue shared-stem monogram across the crescent moon"
+                  width="420"
+                  height="280"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <figcaption
+                class="border-t border-zinc-700 px-5 py-4 text-sm font-semibold"
+              >
+                Variation 02
+              </figcaption>
+            </figure>
+
+            <figure class="m-0 bg-black">
+              <div class="flex min-h-70 items-center justify-center p-6">
+                <img
+                  class="h-auto w-full max-w-[420px] object-contain"
+                  src="/logo-variation-03.png"
+                  alt="AH logo variation 3 with a white monogram inside a royal-blue eclipse"
+                  width="420"
+                  height="280"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <figcaption
+                class="border-t border-zinc-700 px-5 py-4 text-sm font-semibold"
+              >
+                Variation 03
+              </figcaption>
+            </figure>
+
+            <figure class="m-0 bg-black">
+              <div class="flex min-h-70 items-center justify-center p-6">
+                <img
+                  class="h-auto w-full max-w-[420px] object-contain"
+                  src="/logo-variation-04.png"
+                  alt="AH logo variation 4 with a horizontal white-and-blue monogram extending from the crescent moon"
+                  width="420"
+                  height="280"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <figcaption
+                class="border-t border-zinc-700 px-5 py-4 text-sm font-semibold"
+              >
+                Variation 04
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="bg-black text-white" id="contact">
+      <div
+        class="mx-auto grid w-full max-w-[1248px] items-center gap-x-16 gap-y-10 px-6 py-20 max-sm:grid-cols-1 max-sm:px-4 md:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_auto_auto]"
+      >
+        <div>
+          <a
+            class="flex shrink-0 items-center gap-8 max-sm:flex-col max-sm:items-start max-sm:gap-5"
+            href="#top"
+            aria-label="After Hours Outreach Initiative, home"
+          >
+            <img
+              class="size-40 shrink-0 object-contain"
+              src="/logo-blue.jpg"
+              alt=""
+              width="1280"
+              height="1280"
+              loading="lazy"
+              decoding="async"
+            />
+            <span class="flex flex-col leading-tight">
+              <strong class="font-heading text-[30px] leading-none font-bold"
+                >After Hours</strong
+              >
+              <span class="mt-1.5 text-xl leading-tight text-zinc-400"
+                >Outreach Initiative</span
+              >
+            </span>
+          </a>
+        </div>
+
+        <nav
+          class="flex flex-col items-start gap-3 text-[15px] text-zinc-300 md:justify-self-end"
+          aria-label="Footer navigation"
+        >
+          <a class="hover:text-white" href="#about">About</a>
+          <a class="hover:text-white" href="#services">What we do</a>
+          <a class="hover:text-white" href="#get-involved">Get involved</a>
+        </nav>
+
+        <nav
+          class="flex flex-col items-start gap-3 text-[15px] text-zinc-300 max-lg:col-span-full max-lg:flex-row lg:justify-self-end"
+          aria-label="Social media"
+        >
+          <a
+            class="inline-flex items-center gap-2.5 border-b border-zinc-600 pb-0.5 hover:border-white hover:text-white"
+            href="https://www.instagram.com/afterhoursoutreach"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <svg
+              class="size-5 shrink-0 text-blue"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="5"></rect>
+              <circle cx="12" cy="12" r="4"></circle>
+              <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"
+              ></circle>
+            </svg>
+            Instagram</a
+          >
+          <a
+            class="inline-flex items-center gap-2.5 border-b border-zinc-600 pb-0.5 hover:border-white hover:text-white"
+            href="https://discord.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <svg
+              class="size-5 shrink-0 fill-current text-blue"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                d="M19.5 5.3A16.4 16.4 0 0 0 15.4 4l-.5 1a15.2 15.2 0 0 0-5.8 0l-.5-1a16.4 16.4 0 0 0-4.1 1.3C1.9 9.2 1.2 12.9 1.5 16.6a16.7 16.7 0 0 0 5 2.5l1.2-1.6a11 11 0 0 1-1.9-.9l.5-.4a13.3 13.3 0 0 0 11.4 0l.5.4c-.6.4-1.3.7-1.9.9l1.2 1.6a16.7 16.7 0 0 0 5-2.5c.4-4.3-.7-8-3-11.3ZM8.7 14.4c-1.1 0-2-1-2-2.3s.9-2.3 2-2.3 2 1 2 2.3-.9 2.3-2 2.3Zm6.6 0c-1.1 0-2-1-2-2.3s.9-2.3 2-2.3 2 1 2 2.3-.9 2.3-2 2.3Z"
+              ></path>
+            </svg>
+            Discord</a
+          >
+        </nav>
+      </div>
+
+      <div
+        class="mx-auto flex min-h-20 w-full max-w-[1248px] items-center border-t border-zinc-800 px-6 text-sm text-zinc-400 max-sm:px-4 max-sm:py-5"
+      >
+        <p class="m-0">
+          &copy; {new Date().getFullYear()} After Hours Outreach Initiative
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      const mobileNav =
+        document.querySelector<HTMLDetailsElement>(".mobile-nav");
+      const mobileNavToggle = mobileNav?.querySelector("summary");
+
+      mobileNav?.addEventListener("toggle", () => {
+        mobileNavToggle?.setAttribute(
+          "aria-label",
+          mobileNav.open ? "Close navigation" : "Open navigation",
+        );
+      });
+
+      document.querySelectorAll(".mobile-nav a").forEach((link) => {
+        link.addEventListener("click", () =>
+          link.closest("details")?.removeAttribute("open"),
+        );
+      });
+
+      const prototypeToggle = document.querySelector<HTMLButtonElement>(
+        "[data-prototype-toggle]",
+      );
+      const prototypeToggleState = prototypeToggle?.querySelector(
+        "[data-prototype-toggle-state]",
+      );
+      const prototypeToggleTrack = prototypeToggle?.querySelector(
+        "[data-prototype-toggle-track]",
+      );
+      const prototypeToggleThumb = prototypeToggle?.querySelector(
+        "[data-prototype-toggle-thumb]",
+      );
+      const prototypeComments = document.querySelectorAll(
+        "[data-prototype-comment]",
+      );
+
+      const setPrototypeCommentsVisible = (commentsVisible: boolean) => {
+        prototypeToggle?.setAttribute("aria-pressed", String(commentsVisible));
+        prototypeComments.forEach((comment) => {
+          comment.toggleAttribute("hidden", !commentsVisible);
+        });
+
+        if (prototypeToggleState) {
+          prototypeToggleState.textContent = commentsVisible ? "on" : "off";
+        }
+        prototypeToggleTrack?.classList.toggle(
+          "bg-emerald-500",
+          commentsVisible,
+        );
+        prototypeToggleTrack?.classList.toggle("bg-zinc-500", !commentsVisible);
+        prototypeToggleThumb?.classList.toggle(
+          "translate-x-4",
+          commentsVisible,
+        );
+      };
+
+      setPrototypeCommentsVisible(true);
+
+      prototypeToggle?.addEventListener("click", () => {
+        setPrototypeCommentsVisible(
+          prototypeToggle.getAttribute("aria-pressed") !== "true",
+        );
+      });
+    </script>
   </body>
 </html>

@@ -1,1 +1,40 @@
 @import "tailwindcss";
+
+@theme {
+  --color-ink: #050608;
+  --color-panel: #0f1115;
+  --color-panel-soft: #171a20;
+  --color-blue: #4169e1;
+  --color-blue-dark: #2f4fb5;
+  --color-blue-deep: #16214a;
+  /* --color-purple: #9460b3; */
+  --color-purple-dark: #704587;
+  --font-heading: "Public Sans", Arial, sans-serif;
+  --font-body: "Public Sans", Arial, sans-serif;
+  --font-comment: "Kalam", cursive;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 3px solid #4169e1;
+    outline-offset: 4px;
+  }
+
+  svg path,
+  svg circle {
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
