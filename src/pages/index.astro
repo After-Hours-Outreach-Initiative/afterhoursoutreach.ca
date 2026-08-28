@@ -1,5 +1,64 @@
 ---
 import "@/styles/tailwind.css";
+
+const equipmentNeeds = [
+  {
+    name: "Full aluminum D oxygen cylinder",
+    description: "A portable 425 L oxygen supply for emergency response.",
+    price: "$190.00",
+    unit: "each",
+    url: "https://pacificfirstaid.ca/products/oxygen-tank-aluminum-d-cylinder-15-0-cu-ft-425l-with-toggle-valve",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/Screenshot2025-09-16162413.png?v=1758065075",
+  },
+  {
+    name: "Adult bag-valve mask",
+    description: "Manual ventilation equipment for respiratory emergencies.",
+    price: "$29.95",
+    unit: "each",
+    url: "https://pacificfirstaid.ca/products/bag-valve-mask-adult",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/Med-Rescuer.png?v=1730765369",
+  },
+  {
+    name: "Assorted sterile gauze pads",
+    description: "A 100-pack for cleaning, covering, and dressing wounds.",
+    price: "$12.95",
+    unit: "per pack",
+    url: "https://pacificfirstaid.ca/products/sterile-gauze-pad-100-assorted",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/100ASTPads1.png?v=1734032678",
+  },
+  {
+    name: "Oropharyngeal airway set",
+    description:
+      "Eight colour-coded Guedel airways in neonatal to adult sizes.",
+    price: "$11.95",
+    unit: "per set",
+    url: "https://pacificfirstaid.ca/products/oral-airway-set",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/PFA-OAK.png?v=1752601748",
+  },
+  {
+    name: "Adhesive bandages",
+    description: "A 30-count assorted pack for minor cuts and scrapes.",
+    price: "$7.99",
+    unit: "per box",
+    url: "https://pacificfirstaid.ca/products/band-aid%C2%AE-brand-flexible-fabric-adhesive-bandages",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/81tsrk9kp7L._AC_SX425.jpg?v=1717801370",
+  },
+  {
+    name: "Adult oxygen mask with tubing",
+    description:
+      "A disposable partial non-rebreathing mask for oxygen delivery.",
+    price: "$4.35",
+    unit: "each",
+    url: "https://pacificfirstaid.ca/products/partial-non-rebreathing-oxygen-mask-with-tubing-adult",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/products/partial_non_-_rebreathing_oxygen_mask_with_tubing_-_adult.jpg?v=1683401429",
+  },
+];
 ---
 
 <!doctype html>
@@ -17,6 +76,7 @@ import "@/styles/tailwind.css";
     <meta name="theme-color" content="#050608" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.shopify.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
@@ -107,8 +167,12 @@ import "@/styles/tailwind.css";
               class="border-b border-zinc-800 px-5 py-4 text-base"
               href="#services">What we do</a
             >
-            <a class="bg-blue px-5 py-4 text-base" href="#get-involved"
-              >Get involved</a
+            <a
+              class="border-b border-zinc-800 px-5 py-4 text-base"
+              href="#get-involved">Get involved</a
+            >
+            <a class="bg-blue px-5 py-4 text-base font-bold" href="#support"
+              >Donate</a
             >
           </nav>
         </details>
@@ -158,6 +222,140 @@ import "@/styles/tailwind.css";
           </div>
         </div>
       </section>
+
+      <section
+        class="scroll-mt-19 border-y border-zinc-800 bg-panel text-white lg:scroll-mt-22"
+        id="support"
+        aria-labelledby="support-heading"
+      >
+        <div
+          class="mx-auto grid w-full max-w-[1248px] gap-14 px-6 py-24 max-sm:px-4 max-sm:py-18 lg:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)] lg:gap-20"
+        >
+          <div>
+            <h2
+              class="font-heading text-[clamp(2.25rem,4vw,3.75rem)] leading-[1.08] font-bold tracking-[-0.035em]"
+              id="support-heading"
+            >
+              What your donation can put in the field.
+            </h2>
+            <p class="mt-6 max-w-xl text-lg leading-8 text-zinc-300">
+              We want supporters to see the practical needs behind each outreach
+              shift. These are examples of the equipment and supplies we are
+              working toward, from everyday wound care to emergency-response
+              gear.
+            </p>
+
+            <div class="mt-10 border-l-4 border-blue bg-blue-deep p-6 sm:p-7">
+              <p
+                class="text-sm font-bold tracking-[0.12em] text-blue uppercase"
+              >
+                Biggest long-term need
+              </p>
+              <h3 class="mt-3 font-heading text-2xl leading-tight font-bold">
+                DTES operations and storage space
+              </h3>
+              <p class="mt-3 leading-7 text-zinc-300">
+                A reliable location would give us a base for general operations,
+                volunteer coordination, and secure supply storage close to the
+                community we serve.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <a
+              class="group block border border-blue bg-blue/10 p-6 transition-colors hover:bg-blue/15 sm:p-8"
+              href="https://coastalreign.com/products/safety-vests/big-k-first-aid-safety-vest?selectedColour=Royal%20Blue"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <div
+                class="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-5 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-8"
+              >
+                <div class="aspect-square overflow-hidden bg-white p-2 sm:p-3">
+                  <img
+                    class="size-full object-contain"
+                    src="https://cdn.shopify.com/s/files/1/1016/5405/files/1013591.jpg?v=1758155758"
+                    alt=""
+                    width="240"
+                    height="240"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <div
+                  class="flex items-end justify-between gap-8 max-sm:flex-col max-sm:items-start max-sm:gap-4"
+                >
+                  <div>
+                    <h3
+                      class="font-heading text-[clamp(1.6rem,3vw,2.25rem)] leading-tight font-bold"
+                    >
+                      High-visibility first aid vest
+                    </h3>
+                    <p class="mt-3 max-w-lg leading-7 text-zinc-300">
+                      Durable, reflective vests help identify outreach
+                      responders and keep essential supplies within reach on
+                      evening shifts.
+                    </p>
+                    <span
+                      class="mt-5 inline-block border-b border-zinc-500 pb-0.5 text-sm font-bold group-hover:border-white"
+                      >View reference item</span
+                    >
+                  </div>
+                  <strong
+                    class="shrink-0 font-heading text-[clamp(2rem,4vw,3.25rem)] leading-none font-bold text-blue"
+                    >$129.99</strong
+                  >
+                </div>
+              </div>
+            </a>
+
+            <div class="mt-5 border border-zinc-700 bg-ink">
+              {
+                equipmentNeeds.map((item) => (
+                  <a
+                    class="group grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-5 gap-y-2 border-b border-zinc-800 p-5 last:border-b-0 hover:bg-panel-soft sm:grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:gap-x-6 sm:p-6"
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span class="aspect-square overflow-hidden bg-white p-2">
+                      <img
+                        class="size-full object-contain"
+                        src={item.image}
+                        alt=""
+                        width="180"
+                        height="180"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </span>
+                    <span>
+                      <strong class="block text-[17px] leading-snug">
+                        {item.name}
+                      </strong>
+                      <span class="mt-1 block text-sm leading-6 text-zinc-400">
+                        {item.description}
+                      </span>
+                    </span>
+                    <span class="col-start-2 flex items-baseline gap-2 sm:col-start-auto sm:flex-col sm:items-end sm:gap-0">
+                      <strong class="text-xl text-white">{item.price}</strong>
+                      <span class="text-xs text-zinc-500">{item.unit}</span>
+                    </span>
+                  </a>
+                ))
+              }
+            </div>
+
+            <p class="mt-5 text-sm leading-6 text-zinc-400">
+              Reference prices are in CAD and were checked in August 2026. Tax,
+              shipping, oxygen handling, customization, and future price changes
+              are not included. Medical-response equipment is for use by team
+              members with appropriate training.
+            </p>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="bg-black text-white" id="contact">
@@ -197,6 +395,7 @@ import "@/styles/tailwind.css";
           <a class="hover:text-white" href="#about">About</a>
           <a class="hover:text-white" href="#services">What we do</a>
           <a class="hover:text-white" href="#get-involved">Get involved</a>
+          <a class="hover:text-white" href="#support">Donate</a>
         </nav>
 
         <nav
