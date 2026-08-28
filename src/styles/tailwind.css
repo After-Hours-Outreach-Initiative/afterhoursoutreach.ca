@@ -11,7 +11,6 @@
   --color-purple-dark: #704587;
   --font-heading: "Public Sans", Arial, sans-serif;
   --font-body: "Public Sans", Arial, sans-serif;
-  --font-comment: "Kalam", cursive;
 }
 
 @layer base {

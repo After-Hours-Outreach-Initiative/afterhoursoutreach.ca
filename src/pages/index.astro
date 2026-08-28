@@ -18,7 +18,7 @@ import "@/styles/tailwind.css";
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Public+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <title>After Hours Outreach Initiative</title>
@@ -31,36 +31,7 @@ import "@/styles/tailwind.css";
       href="#main-content">Skip to main content</a
     >
 
-    <div
-      class="sticky top-0 z-[60] flex h-6 items-center justify-center gap-2 bg-[repeating-linear-gradient(135deg,#facc15_0,#facc15_14px,#111827_14px,#111827_28px)] px-4 text-xs text-zinc-900 shadow-md"
-      aria-label="Prototype controls"
-    >
-      <div class="flex h-full items-center gap-5 bg-zinc-950 px-2">
-        <span class="font-bold tracking-[0.1em] text-yellow-300 uppercase"
-          >Work in progress</span
-        >
-        <button
-          class="inline-flex cursor-pointer items-center gap-2 rounded-full bg-zinc-950 px-2 py-0.5 font-bold text-yellow-300 hover:bg-zinc-800 focus-visible:outline-yellow-300"
-          type="button"
-          aria-pressed="true"
-          data-prototype-toggle
-        >
-          Toggle Comments
-          <span
-            class="relative h-5 w-9 rounded-full bg-emerald-500 shadow-inner transition-colors"
-            aria-hidden="true"
-            data-prototype-toggle-track
-          >
-            <span
-              class="absolute top-0.5 left-0.5 size-4 translate-x-4 rounded-full bg-white shadow-sm transition-transform"
-              data-prototype-toggle-thumb></span>
-          </span>
-          <span class="sr-only" data-prototype-toggle-state>on</span>
-        </button>
-      </div>
-    </div>
-
-    <header class="sticky top-6 z-50 bg-black text-white">
+    <header class="sticky top-0 z-50 bg-black text-white">
       <div
         class="relative mx-auto flex min-h-22 w-full max-w-[1248px] items-center gap-10 px-6 max-sm:min-h-19 max-sm:px-4"
       >
@@ -86,31 +57,6 @@ import "@/styles/tailwind.css";
           </span>
         </a>
 
-        <aside
-          class="font-comment pointer-events-none absolute top-[calc(100%+1rem)] left-6 z-10 w-[min(21rem,calc(100vw-2rem))] -rotate-1 border border-amber-300/70 bg-amber-100 px-3.5 py-2.5 text-sm leading-[1.4] text-zinc-900 shadow-[3px_4px_0_rgba(0,0,0,0.35)] max-sm:left-4"
-          aria-label="Work in progress note"
-          data-prototype-comment
-        >
-          <svg
-            class="absolute bottom-full left-10 h-10 w-16 overflow-visible text-amber-300"
-            viewBox="0 0 64 40"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M55 38C54 24 43 16 17 10"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-dasharray="4 4"></path>
-            <path d="m22 5-7 5 5 7" stroke="currentColor" stroke-width="2"
-            ></path>
-          </svg>
-          <strong class="font-bold uppercase tracking-[0.08em]"
-            >Work In Progress:</strong
-          > we were trying to make a smaller image-only logo since the text was not
-          readable at this size
-        </aside>
-
         <nav
           class="ml-auto hidden items-center gap-8 lg:flex"
           aria-label="Primary navigation"
@@ -128,28 +74,6 @@ import "@/styles/tailwind.css";
             href="#get-involved">Get involved</a
           >
         </nav>
-
-        <aside
-          class="font-comment pointer-events-none absolute top-[calc(100%+1rem)] right-44 z-10 hidden w-72 rotate-1 border border-amber-300/70 bg-amber-100 px-3.5 py-2.5 text-sm leading-[1.4] text-zinc-900 shadow-[3px_4px_0_rgba(0,0,0,0.35)] lg:block"
-          aria-label="Work in progress note"
-          data-prototype-comment
-        >
-          <svg
-            class="absolute right-12 bottom-full h-10 w-20 overflow-visible text-amber-300"
-            viewBox="0 0 80 40"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M10 38C14 24 32 14 62 9"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-dasharray="4 4"></path>
-            <path d="m56 4 8 4-5 7" stroke="currentColor" stroke-width="2"
-            ></path>
-          </svg>
-          What info should we put on these pages/sections?
-        </aside>
 
         <a
           class="hidden min-h-12 items-center justify-center rounded-lg border-2 border-blue px-5 py-3 text-[15px] font-bold transition-colors hover:bg-blue lg:inline-flex"
@@ -231,158 +155,6 @@ import "@/styles/tailwind.css";
               height="1280"
               decoding="async"
             />
-            <aside
-              class="font-comment pointer-events-none absolute top-[calc(50%+155px)] right-0 z-10 w-80 rotate-1 border border-amber-300/70 bg-amber-100 px-4 py-3 text-sm leading-[1.4] text-zinc-900 shadow-[3px_4px_0_rgba(0,0,0,0.35)]"
-              aria-label="Work in progress note"
-              data-prototype-comment
-            >
-              <svg
-                class="absolute bottom-full left-12 h-12 w-20 overflow-visible text-amber-300"
-                viewBox="0 0 80 48"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M10 46C14 29 32 16 62 9"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-dasharray="4 4"></path>
-                <path d="m56 4 8 4-5 7" stroke="currentColor" stroke-width="2"
-                ></path>
-              </svg>
-              <strong class="font-bold">changes:</strong>
-              <ul class="m-0 list-disc pl-5">
-                <li>removed small text</li>
-                <li>replaced purple with the royal blue</li>
-              </ul>
-              <strong class="mt-2 block font-bold"
-                >some ideas for further changes:</strong
-              >
-              <ul class="m-0 list-disc pl-5">
-                <li>turn the off white into pure white #000000</li>
-                <li>make the "AFTER HOURS" text bigger</li>
-                <li>
-                  maybe remove the hands and emphasize the moon, as it seems to
-                  be common among non-profits
-                </li>
-              </ul>
-            </aside>
-          </div>
-        </div>
-      </section>
-
-      <section
-        class="border-t border-zinc-800 bg-black py-20 lg:py-24"
-        aria-labelledby="logo-variations-heading"
-      >
-        <div class="mx-auto w-full max-w-[1248px] px-6 max-sm:px-4">
-          <h2
-            class="font-heading text-[clamp(2.5rem,5vw,4rem)] leading-none font-bold tracking-[-0.04em]"
-            id="logo-variations-heading"
-          >
-            Logo variations that AI came up with lol
-          </h2>
-
-          <aside
-            class="font-comment relative z-10 mt-8 ml-auto w-full max-w-2xl rotate-1 border border-amber-300/70 bg-amber-100 px-4 py-3 text-base leading-[1.4] text-zinc-900 shadow-[3px_4px_0_rgba(0,0,0,0.35)]"
-            aria-label="Work in progress note"
-            data-prototype-comment
-          >
-            Tudor and Ivan were also thinking of ways to add AH or AHOI to the
-            moon as a monogram in the logo, in case the moon by itself isn't
-            unique enough for our org (AI not very creative/good artist)
-            <svg
-              class="absolute top-full right-16 h-10 w-16 overflow-visible text-amber-300"
-              viewBox="0 0 64 40"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M32 2V34"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-dasharray="4 4"></path>
-              <path d="m25 28 7 7 7-7" stroke="currentColor" stroke-width="2"
-              ></path>
-            </svg>
-          </aside>
-
-          <div class="mt-8 grid gap-px bg-zinc-700 sm:grid-cols-2">
-            <figure class="m-0 bg-black">
-              <div class="flex min-h-70 items-center justify-center p-6">
-                <img
-                  class="h-auto w-full max-w-[420px] object-contain"
-                  src="/logo-variation-01.png"
-                  alt="AH logo variation 1 with a cutout A and blue H integrated into the crescent moon"
-                  width="420"
-                  height="280"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <figcaption
-                class="border-t border-zinc-700 px-5 py-4 text-sm font-semibold"
-              >
-                Variation 01
-              </figcaption>
-            </figure>
-
-            <figure class="m-0 bg-black">
-              <div class="flex min-h-70 items-center justify-center p-6">
-                <img
-                  class="h-auto w-full max-w-[420px] object-contain"
-                  src="/logo-variation-02.png"
-                  alt="AH logo variation 2 with a royal-blue shared-stem monogram across the crescent moon"
-                  width="420"
-                  height="280"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <figcaption
-                class="border-t border-zinc-700 px-5 py-4 text-sm font-semibold"
-              >
-                Variation 02
-              </figcaption>
-            </figure>
-
-            <figure class="m-0 bg-black">
-              <div class="flex min-h-70 items-center justify-center p-6">
-                <img
-                  class="h-auto w-full max-w-[420px] object-contain"
-                  src="/logo-variation-03.png"
-                  alt="AH logo variation 3 with a white monogram inside a royal-blue eclipse"
-                  width="420"
-                  height="280"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <figcaption
-                class="border-t border-zinc-700 px-5 py-4 text-sm font-semibold"
-              >
-                Variation 03
-              </figcaption>
-            </figure>
-
-            <figure class="m-0 bg-black">
-              <div class="flex min-h-70 items-center justify-center p-6">
-                <img
-                  class="h-auto w-full max-w-[420px] object-contain"
-                  src="/logo-variation-04.png"
-                  alt="AH logo variation 4 with a horizontal white-and-blue monogram extending from the crescent moon"
-                  width="420"
-                  height="280"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <figcaption
-                class="border-t border-zinc-700 px-5 py-4 text-sm font-semibold"
-              >
-                Variation 04
-              </figcaption>
-            </figure>
           </div>
         </div>
       </section>
@@ -496,50 +268,6 @@ import "@/styles/tailwind.css";
       document.querySelectorAll(".mobile-nav a").forEach((link) => {
         link.addEventListener("click", () =>
           link.closest("details")?.removeAttribute("open"),
-        );
-      });
-
-      const prototypeToggle = document.querySelector<HTMLButtonElement>(
-        "[data-prototype-toggle]",
-      );
-      const prototypeToggleState = prototypeToggle?.querySelector(
-        "[data-prototype-toggle-state]",
-      );
-      const prototypeToggleTrack = prototypeToggle?.querySelector(
-        "[data-prototype-toggle-track]",
-      );
-      const prototypeToggleThumb = prototypeToggle?.querySelector(
-        "[data-prototype-toggle-thumb]",
-      );
-      const prototypeComments = document.querySelectorAll(
-        "[data-prototype-comment]",
-      );
-
-      const setPrototypeCommentsVisible = (commentsVisible: boolean) => {
-        prototypeToggle?.setAttribute("aria-pressed", String(commentsVisible));
-        prototypeComments.forEach((comment) => {
-          comment.toggleAttribute("hidden", !commentsVisible);
-        });
-
-        if (prototypeToggleState) {
-          prototypeToggleState.textContent = commentsVisible ? "on" : "off";
-        }
-        prototypeToggleTrack?.classList.toggle(
-          "bg-emerald-500",
-          commentsVisible,
-        );
-        prototypeToggleTrack?.classList.toggle("bg-zinc-500", !commentsVisible);
-        prototypeToggleThumb?.classList.toggle(
-          "translate-x-4",
-          commentsVisible,
-        );
-      };
-
-      setPrototypeCommentsVisible(true);
-
-      prototypeToggle?.addEventListener("click", () => {
-        setPrototypeCommentsVisible(
-          prototypeToggle.getAttribute("aria-pressed") !== "true",
         );
       });
     </script>
