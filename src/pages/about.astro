@@ -1,0 +1,319 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { buttonQuiet } from "@/styles/buttons";
+import { organization } from "@/data/organization";
+
+const directors = ["Ivan Z.", "Moli D.", "Ashe M.", "Kaycee G.", "Yoyo L."];
+
+const iconClass = "lucide size-[18px] shrink-0 text-blue";
+
+// Certified copies of what we filed with the BC Registrar of Companies.
+const documents = [
+  {
+    id: "constitution",
+    name: "Constitution",
+    detail: "PDF",
+    href: "/documents/after-hours-outreach-society-constitution.pdf",
+  },
+  {
+    id: "bylaws",
+    name: "Bylaws",
+    detail: "PDF",
+    href: "/documents/after-hours-outreach-society-bylaws.pdf",
+  },
+];
+---
+
+<Layout
+  title="About | After Hours Outreach Society"
+  description="After Hours Outreach Society is a volunteer-run non-profit doing evening street outreach in Vancouver's Downtown Eastside."
+>
+  <section class="bg-black text-white" id="about">
+    <div
+      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
+    >
+      <h1
+        class="max-w-4xl font-heading text-[clamp(2.5rem,5vw,4.25rem)] leading-[1.08] font-bold tracking-[-0.04em]"
+      >
+        <span class="text-blue">About</span>
+      </h1>
+      <p
+        class="mt-8 max-w-3xl text-[clamp(1.1rem,1.5vw,1.3rem)] leading-[1.65] text-zinc-300"
+      >
+        After Hours Outreach Society is a nonprofit providing late-night
+        outreach in Vancouver&rsquo;s Downtown Eastside. Our team includes
+        community advocates, people with lived experience of recovery, first
+        responders, healthcare workers, students, and other volunteers committed
+        to supporting vulnerable community members.
+      </p>
+      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
+        Our focus is filling gaps that arise after many daytime services have
+        closed. Through evening and late-night outreach, we provide overdose
+        response, basic first aid, food, water, clothing, naloxone kits,
+        harm-reduction supplies, and connections to health and social services.
+      </p>
+      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
+        Our team was born as all our founding members were once volunteers in
+        Street Saviours Outreach Society, and wanted to expand their own impact,
+        passionate individuals who wanted to make a difference in the community.
+      </p>
+    </div>
+  </section>
+
+  <section
+    class="border-t border-zinc-800 bg-panel text-white"
+    id="directors"
+    aria-labelledby="directors-heading"
+  >
+    <div
+      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
+    >
+      <h2
+        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
+        id="directors-heading"
+      >
+        Directors
+      </h2>
+
+      <ul class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          directors.map((director) => (
+            <li class="flex items-center gap-5 border border-zinc-700 bg-ink p-6">
+              <span
+                class="flex size-14 shrink-0 items-center justify-center rounded-full bg-blue-deep font-heading text-xl font-bold text-blue"
+                aria-hidden="true"
+              >
+                {director.charAt(0)}
+              </span>
+              <span class="font-heading text-xl leading-tight font-bold">
+                {director}
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section
+    class="border-t border-zinc-800 bg-black text-white"
+    id="non-profit-information"
+    aria-labelledby="non-profit-information-heading"
+  >
+    <div
+      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
+    >
+      <h2
+        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
+        id="non-profit-information-heading"
+      >
+        Non-profit information
+      </h2>
+      <p class="mt-6 max-w-2xl text-lg leading-8 text-zinc-300">
+        After Hours Outreach Society is incorporated as a non-profit in British
+        Columbia.
+      </p>
+
+      <table
+        class="mt-10 w-full max-w-3xl border border-zinc-700 text-left text-[17px]"
+      >
+        <tbody>
+          <tr class="border-b border-zinc-700">
+            <th class="p-6 align-top font-normal text-zinc-400" scope="row"
+              >Incorporation number</th
+            >
+            <td class="p-6 font-heading text-xl font-bold tracking-wide">
+              {organization.incorporationNumber}
+            </td>
+          </tr>
+          <tr class="border-b border-zinc-700">
+            <th class="p-6 align-top font-normal text-zinc-400" scope="row"
+              >Business number</th
+            >
+            <td class="p-6 font-heading text-xl font-bold tracking-wide">
+              {organization.businessNumber}
+            </td>
+          </tr>
+          <tr>
+            <th class="p-6 align-top font-normal text-zinc-400" scope="row"
+              >Address</th
+            >
+            <td class="p-6">
+              <address class="font-heading text-xl font-bold not-italic">
+                <a
+                  class="border-b border-zinc-600 pb-0.5 hover:border-white"
+                  href={organization.address.mapUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {organization.address.street}, {organization.address.city}, {
+                    organization.address.region
+                  }
+                </a>
+              </address>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section
+    class="border-t border-zinc-800 bg-panel text-white"
+    id="documents"
+    aria-labelledby="documents-heading"
+  >
+    <div
+      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
+    >
+      <h2
+        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
+        id="documents-heading"
+      >
+        Governing documents
+      </h2>
+
+      <ul class="mt-10 grid gap-5">
+        {
+          documents.map((document) => (
+            <li class="border border-zinc-700 bg-ink">
+              <div class="flex flex-wrap items-center justify-between gap-x-8 gap-y-5 p-6">
+                <span>
+                  <strong class="block font-heading text-xl leading-tight font-bold">
+                    {document.name}
+                  </strong>
+                  <span class="mt-2 block text-[15px] text-zinc-400">
+                    {document.detail}
+                  </span>
+                </span>
+
+                <span class="flex flex-wrap gap-3">
+                  <a class={buttonQuiet} href={document.href} download>
+                    {/* lucide: download */}
+                    <svg
+                      class={iconClass}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 15V3" />
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <path d="m7 10 5 5 5-5" />
+                    </svg>
+                    Download
+                  </a>
+                  <a
+                    class={buttonQuiet}
+                    href={document.href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {/* lucide: external-link */}
+                    <svg
+                      class={iconClass}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 3h6v6" />
+                      <path d="M10 14 21 3" />
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    </svg>
+                    Open in new tab
+                  </a>
+                  <button
+                    class={`${buttonQuiet} document-toggle cursor-pointer`}
+                    type="button"
+                    aria-controls={`document-${document.id}`}
+                    aria-expanded="false"
+                    data-label-hide="Hide preview"
+                    data-label-show="View in page"
+                  >
+                    {/* lucide: eye */}
+                    <svg
+                      class={`${iconClass} document-toggle-show`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    {/* lucide: eye-off */}
+                    <svg
+                      class={`${iconClass} document-toggle-hide`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                      hidden
+                    >
+                      <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
+                      <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+                      <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
+                      <path d="m2 2 20 20" />
+                    </svg>
+                    <span class="document-toggle-label">View in page</span>
+                  </button>
+                </span>
+              </div>
+
+              <div
+                class="border-t border-zinc-700 p-6"
+                id={`document-${document.id}`}
+                hidden
+              >
+                {/* src is set on first open so the PDFs cost nothing until asked for */}
+                <iframe
+                  class="aspect-[17/22] w-full bg-white"
+                  data-src={document.href}
+                  title={`${document.name} of After Hours Outreach Society`}
+                />
+              </div>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  document
+    .querySelectorAll<HTMLButtonElement>(".document-toggle")
+    .forEach((toggle) => {
+      const panel = document.getElementById(
+        toggle.getAttribute("aria-controls") ?? "",
+      );
+      const frame = panel?.querySelector("iframe");
+
+      toggle.addEventListener("click", () => {
+        if (!panel) return;
+
+        const open = panel.hidden;
+        panel.hidden = !open;
+        toggle.setAttribute("aria-expanded", String(open));
+        const label = toggle.querySelector(".document-toggle-label");
+        if (label) {
+          label.textContent = open
+            ? (toggle.dataset.labelHide ?? "")
+            : (toggle.dataset.labelShow ?? "");
+        }
+
+        toggle.querySelector<SVGElement>(".document-toggle-show")!.hidden =
+          open;
+        toggle.querySelector<SVGElement>(".document-toggle-hide")!.hidden =
+          !open;
+
+        if (open && frame && !frame.src) {
+          frame.src = frame.dataset.src ?? "";
+        }
+      });
+    });
+</script>
