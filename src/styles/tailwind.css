@@ -24,6 +24,15 @@
     stroke-linecap: square;
     stroke-linejoin: miter;
   }
+
+  /* Lucide icons are drawn with round caps and joins */
+  .lucide path,
+  .lucide circle,
+  .lucide line,
+  .lucide rect {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

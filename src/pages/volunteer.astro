@@ -1,40 +1,12 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { social } from "@/data/site";
-
-const expectations = [
-  {
-    title: "Evening shifts",
-    description:
-      "Outreach runs after hours, when most other services in the neighbourhood have closed for the day.",
-  },
-  {
-    title: "On foot, in teams",
-    description:
-      "Volunteers go out in small teams and stay together for the whole shift. Nobody outreaches alone.",
-  },
-  {
-    title: "Training provided",
-    description:
-      "New volunteers attend an orientation covering harm reduction, naloxone, and how we respond to an overdose.",
-  },
-  {
-    title: "Consistency matters",
-    description:
-      "Being a familiar, predictable presence is most of the work. We ask for a commitment you can actually keep.",
-  },
-];
-
-const steps = [
-  "Send us a message with a short introduction and the kind of shifts you could make.",
-  "We will reply with the next orientation date and what to expect on a shift.",
-  "Attend orientation, then join a team for your first evening out.",
-];
+import { buttonPrimary } from "@/styles/buttons";
+import { volunteerFormUrl } from "@/data/site";
 ---
 
 <Layout
-  title="Volunteer | After Hours Outreach Initiative"
-  description="Volunteer with After Hours Outreach Initiative: evening street outreach, harm reduction, and overdose response in Vancouver's Downtown Eastside."
+  title="Volunteer | After Hours Outreach Society"
+  description="Sign up to volunteer with After Hours Outreach Society, doing evening street outreach in Vancouver's Downtown Eastside."
 >
   <section class="bg-black text-white" id="volunteer">
     <div
@@ -43,95 +15,52 @@ const steps = [
       <h1
         class="max-w-4xl font-heading text-[clamp(2.5rem,5vw,4.25rem)] leading-[1.08] font-bold tracking-[-0.04em]"
       >
-        <span class="block text-blue">Volunteer</span>
-        with us
+        <span class="text-blue">Volunteer</span>
       </h1>
-      <p
-        class="mt-8 max-w-3xl text-[clamp(1.1rem,1.5vw,1.3rem)] leading-[1.65]"
-      >
-        You do not need medical training or outreach experience to start. You
-        need to be able to show up, listen, and treat everyone you meet with
-        respect. We will teach you the rest.
+      <p class="mt-8 max-w-3xl text-lg leading-8 text-zinc-300">
+        Our volunteers are community advocates, people with lived experience of
+        recovery, first responders, healthcare workers, students heading into
+        healthcare, and people who simply wanted to help out at night.
       </p>
-    </div>
-  </section>
+      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
+        Patrols typically run Tuesdays and Thursdays, 8:30 PM to midnight. How
+        often we go out depends on how many volunteers are available and what
+        supplies we have on hand.
+      </p>
+      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
+        Fill out the form and we will be in touch about the next orientation.
+      </p>
 
-  <section
-    class="border-y border-zinc-800 bg-panel text-white"
-    aria-labelledby="expectations-heading"
-  >
-    <div
-      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
-    >
-      <h2
-        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
-        id="expectations-heading"
-      >
-        What volunteering looks like
-      </h2>
-
-      <div
-        class="mt-12 grid gap-px border border-zinc-700 bg-zinc-700 sm:grid-cols-2"
-      >
+      <div class="mt-10 flex flex-wrap gap-3.5 max-sm:flex-col">
         {
-          expectations.map((item) => (
-            <div class="bg-ink p-7">
-              <h3 class="font-heading text-xl leading-tight font-bold">
-                {item.title}
-              </h3>
-              <p class="mt-3 leading-7 text-zinc-400">{item.description}</p>
-            </div>
-          ))
+          volunteerFormUrl ? (
+            <a
+              class={buttonPrimary}
+              href={volunteerFormUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {/* lucide: external-link */}
+              <svg
+                class="lucide size-[18px] shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path d="M15 3h6v6" />
+                <path d="M10 14 21 3" />
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              </svg>
+              Volunteer sign-up form
+            </a>
+          ) : (
+            <p class="m-0 text-[15px] text-zinc-400">
+              TODO: add the Google Form sign-up link.
+            </p>
+          )
         }
-      </div>
-    </div>
-  </section>
-
-  <section class="bg-black text-white" aria-labelledby="apply-heading">
-    <div
-      class="mx-auto grid w-full max-w-[1248px] gap-14 px-6 py-24 max-sm:px-4 max-sm:py-18 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)] lg:gap-20"
-    >
-      <div>
-        <h2
-          class="font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
-          id="apply-heading"
-        >
-          How to join
-        </h2>
-        <p class="mt-6 max-w-xl text-lg leading-8 text-zinc-300">
-          Orientation days run with a limited number of slots. Reach out and we
-          will hold you a spot on the next one.
-        </p>
-      </div>
-
-      <div>
-        <ol class="grid gap-px border border-zinc-700 bg-zinc-700">
-          {
-            steps.map((step, index) => (
-              <li class="flex items-start gap-5 bg-ink p-6">
-                <span class="font-heading text-2xl leading-none font-bold text-blue">
-                  {index + 1}
-                </span>
-                <span class="leading-7 text-zinc-300">{step}</span>
-              </li>
-            ))
-          }
-        </ol>
-
-        <div class="mt-8 flex flex-wrap gap-3.5 max-sm:flex-col">
-          <a
-            class="inline-flex min-h-13 items-center justify-center rounded-lg border-2 border-blue bg-blue px-6 py-3 text-[15px] font-bold text-white transition-colors hover:bg-blue-dark"
-            href={social.instagram}
-            target="_blank"
-            rel="noreferrer">Message us on Instagram</a
-          >
-          <a
-            class="inline-flex min-h-13 items-center justify-center rounded-lg border-2 border-white/60 px-6 py-3 text-[15px] font-bold text-white transition-colors hover:border-white hover:bg-white/10"
-            href={social.discord}
-            target="_blank"
-            rel="noreferrer">Join our Discord</a
-          >
-        </div>
       </div>
     </div>
   </section>
