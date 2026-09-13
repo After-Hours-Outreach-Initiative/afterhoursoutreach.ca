@@ -5,7 +5,7 @@ import { organization } from "@/data/organization";
 
 <footer class="bg-black text-white" id="contact">
   <div
-    class="mx-auto grid w-full max-w-[1248px] items-center gap-x-16 gap-y-10 px-6 py-20 max-sm:grid-cols-1 max-sm:px-4 md:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_auto_auto]"
+    class="mx-auto grid w-full max-w-[1248px] items-center gap-x-16 gap-y-10 px-6 py-20 max-sm:grid-cols-1 max-sm:px-4 md:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
   >
     <div>
       <a
@@ -32,6 +32,23 @@ import { organization } from "@/data/organization";
         </span>
       </a>
     </div>
+
+    <address
+      class="text-[15px] leading-7 text-zinc-300 not-italic max-lg:col-span-full"
+    >
+      <p class="m-0 text-sm font-bold tracking-[0.12em] text-blue uppercase">
+        Find us
+      </p>
+      <a
+        class="mt-3 inline-block border-b border-zinc-600 pb-0.5 hover:border-white hover:text-white"
+        href={organization.address.mapUrl}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {organization.address.street}<br />
+        {organization.address.city}, {organization.address.region}
+      </a>
+    </address>
 
     <nav
       class="flex flex-col items-start gap-3 text-[15px] text-zinc-300 md:justify-self-end"
