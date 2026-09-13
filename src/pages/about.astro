@@ -1,6 +1,6 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { organization } from "@/data/organization";
+import { formattedAddress, organization } from "@/data/organization";
 ---
 
 <Layout
@@ -39,11 +39,11 @@ import { organization } from "@/data/organization";
         class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
         id="registration-heading"
       >
-        Registration
+        Registration and address
       </h2>
       <p class="mt-6 max-w-2xl text-lg leading-8 text-zinc-300">
         After Hours Outreach Initiative is incorporated as a non-profit society
-        in British Columbia.
+        in British Columbia. Mail and enquiries reach us at {formattedAddress}.
       </p>
 
       <dl
@@ -67,6 +67,35 @@ import { organization } from "@/data/organization";
             class="mt-3 font-heading text-2xl leading-tight font-bold tracking-wide"
           >
             {organization.businessNumber}
+          </dd>
+        </div>
+        <div class="bg-ink p-7 sm:col-span-2">
+          <dt class="text-sm font-bold tracking-[0.12em] text-blue uppercase">
+            Address
+          </dt>
+          <dd class="mt-3">
+            <address
+              class="font-heading text-2xl leading-tight font-bold not-italic"
+            >
+              <a
+                class="border-b border-zinc-600 pb-0.5 hover:border-white"
+                href={organization.address.mapUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {organization.address.street}, {organization.address.city}, {
+                  organization.address.region
+                }
+              </a>
+            </address>
+            <p class="mt-3 leading-7 text-zinc-400">
+              We are based out of <a
+                class="border-b border-zinc-600 pb-0.5 hover:border-white hover:text-white"
+                href={organization.address.url}
+                target="_blank"
+                rel="noreferrer">312 Main</a
+              >, a community space in the Downtown Eastside.
+            </p>
           </dd>
         </div>
       </dl>
