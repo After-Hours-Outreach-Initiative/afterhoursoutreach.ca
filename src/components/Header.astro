@@ -1,0 +1,122 @@
+---
+import DiscordIcon from "@/components/icons/DiscordIcon.astro";
+import { buttonOutline } from "@/styles/buttons";
+import { navLinks, social } from "@/data/site";
+
+const { pathname } = Astro.url;
+const isCurrent = (href: string) =>
+  pathname === href || pathname === `${href}/`;
+---
+
+<header class="sticky top-0 z-50 bg-black text-white">
+  <div
+    class="relative mx-auto flex min-h-22 w-full max-w-[1248px] items-center gap-10 px-6 max-sm:min-h-19 max-sm:px-4"
+  >
+    <a
+      class="flex shrink-0 items-center gap-3.5"
+      href="/"
+      aria-label="After Hours Outreach Society, home"
+    >
+      <img
+        class="h-16 w-[105px] shrink-0 object-contain max-sm:h-13 max-sm:w-[86px]"
+        src="/logo-header.png"
+        alt=""
+        width="420"
+        height="280"
+        decoding="async"
+      />
+      <span class="flex flex-col leading-tight">
+        <strong class="font-heading text-[19px] font-bold max-sm:text-[17px]"
+          >After Hours</strong
+        >
+        <span class="text-sm text-zinc-400">Outreach Society</span>
+      </span>
+    </a>
+
+    <nav
+      class="ml-auto hidden items-center gap-8 lg:flex"
+      aria-label="Primary navigation"
+    >
+      {
+        navLinks.map((link) => (
+          <a
+            class="py-2.5 text-[15px] font-medium text-zinc-300 transition-colors hover:text-white aria-[current=page]:text-white"
+            href={link.href}
+            aria-current={isCurrent(link.href) ? "page" : undefined}
+          >
+            {link.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <a
+      class={`${buttonOutline} max-lg:hidden`}
+      href={social.discord}
+      target="_blank"
+      rel="noreferrer"
+    >
+      <DiscordIcon class="size-5 shrink-0 fill-current" />
+      Discord
+    </a>
+
+    <details class="mobile-nav group ml-auto lg:hidden">
+      <summary
+        class="flex size-12 cursor-pointer list-none flex-col items-center justify-center gap-1.5 rounded-lg"
+        aria-label="Open navigation"
+      >
+        <span
+          class="h-0.5 w-5 bg-white transition-transform group-open:translate-y-2 group-open:rotate-45"
+        ></span>
+        <span class="h-0.5 w-5 bg-white transition-opacity group-open:opacity-0"
+        ></span>
+        <span
+          class="h-0.5 w-5 bg-white transition-transform group-open:-translate-y-2 group-open:-rotate-45"
+        ></span>
+      </summary>
+      <nav
+        class="absolute inset-x-0 top-full flex w-full flex-col border-y border-zinc-600 bg-ink"
+        aria-label="Mobile navigation"
+      >
+        {
+          navLinks.map((link) => (
+            <a
+              class="border-b border-zinc-800 px-5 py-4 text-base"
+              href={link.href}
+              aria-current={isCurrent(link.href) ? "page" : undefined}
+            >
+              {link.label}
+            </a>
+          ))
+        }
+        <a
+          class="flex items-center gap-2.5 bg-blue px-5 py-4 text-base font-bold"
+          href={social.discord}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <DiscordIcon class="size-5 shrink-0 fill-current" />
+          Discord
+        </a>
+      </nav>
+    </details>
+  </div>
+</header>
+
+<script>
+  const mobileNav = document.querySelector<HTMLDetailsElement>(".mobile-nav");
+  const mobileNavToggle = mobileNav?.querySelector("summary");
+
+  mobileNav?.addEventListener("toggle", () => {
+    mobileNavToggle?.setAttribute(
+      "aria-label",
+      mobileNav.open ? "Close navigation" : "Open navigation",
+    );
+  });
+
+  document.querySelectorAll(".mobile-nav a").forEach((link) => {
+    link.addEventListener("click", () =>
+      link.closest("details")?.removeAttribute("open"),
+    );
+  });
+</script>
