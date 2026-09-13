@@ -1,5 +1,6 @@
 ---
 import { donateHref, navLinks, social } from "@/data/site";
+import { organization } from "@/data/organization";
 ---
 
 <footer class="bg-black text-white" id="contact">
@@ -92,10 +93,21 @@ import { donateHref, navLinks, social } from "@/data/site";
   </div>
 
   <div
-    class="mx-auto flex min-h-20 w-full max-w-[1248px] items-center border-t border-zinc-800 px-6 text-sm text-zinc-400 max-sm:px-4 max-sm:py-5"
+    class="mx-auto flex min-h-20 w-full max-w-[1248px] flex-wrap items-center gap-x-8 gap-y-2 border-t border-zinc-800 px-6 py-5 text-sm text-zinc-400 max-sm:px-4"
   >
     <p class="m-0">
-      &copy; {new Date().getFullYear()} After Hours Outreach Initiative
+      &copy; {new Date().getFullYear()}
+      {organization.legalName}
+    </p>
+    <p class="m-0">
+      Incorporation No. <span class="text-zinc-300"
+        >{organization.incorporationNumber}</span
+      >
+    </p>
+    <p class="m-0">
+      Business No. <span class="text-zinc-300"
+        >{organization.businessNumber}</span
+      >
     </p>
   </div>
 </footer>

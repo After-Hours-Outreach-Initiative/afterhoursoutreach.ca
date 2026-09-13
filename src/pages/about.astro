@@ -1,5 +1,6 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import { organization } from "@/data/organization";
 ---
 
 <Layout
@@ -23,6 +24,52 @@ import Layout from "@/layouts/Layout.astro";
         naloxone, first aid, and immediate overdose response in Vancouver's
         Downtown Eastside.
       </p>
+    </div>
+  </section>
+
+  <section
+    class="border-t border-zinc-800 bg-panel text-white"
+    id="registration"
+    aria-labelledby="registration-heading"
+  >
+    <div
+      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
+    >
+      <h2
+        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
+        id="registration-heading"
+      >
+        Registration
+      </h2>
+      <p class="mt-6 max-w-2xl text-lg leading-8 text-zinc-300">
+        After Hours Outreach Initiative is incorporated as a non-profit society
+        in British Columbia.
+      </p>
+
+      <dl
+        class="mt-10 grid max-w-3xl gap-px border border-zinc-700 bg-zinc-700 sm:grid-cols-2"
+      >
+        <div class="bg-ink p-7">
+          <dt class="text-sm font-bold tracking-[0.12em] text-blue uppercase">
+            Incorporation number
+          </dt>
+          <dd
+            class="mt-3 font-heading text-2xl leading-tight font-bold tracking-wide"
+          >
+            {organization.incorporationNumber}
+          </dd>
+        </div>
+        <div class="bg-ink p-7">
+          <dt class="text-sm font-bold tracking-[0.12em] text-blue uppercase">
+            Business number
+          </dt>
+          <dd
+            class="mt-3 font-heading text-2xl leading-tight font-bold tracking-wide"
+          >
+            {organization.businessNumber}
+          </dd>
+        </div>
+      </dl>
     </div>
   </section>
 </Layout>
