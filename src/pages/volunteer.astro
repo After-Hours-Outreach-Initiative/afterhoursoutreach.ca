@@ -1,0 +1,138 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { social } from "@/data/site";
+
+const expectations = [
+  {
+    title: "Evening shifts",
+    description:
+      "Outreach runs after hours, when most other services in the neighbourhood have closed for the day.",
+  },
+  {
+    title: "On foot, in teams",
+    description:
+      "Volunteers go out in small teams and stay together for the whole shift. Nobody outreaches alone.",
+  },
+  {
+    title: "Training provided",
+    description:
+      "New volunteers attend an orientation covering harm reduction, naloxone, and how we respond to an overdose.",
+  },
+  {
+    title: "Consistency matters",
+    description:
+      "Being a familiar, predictable presence is most of the work. We ask for a commitment you can actually keep.",
+  },
+];
+
+const steps = [
+  "Send us a message with a short introduction and the kind of shifts you could make.",
+  "We will reply with the next orientation date and what to expect on a shift.",
+  "Attend orientation, then join a team for your first evening out.",
+];
+---
+
+<Layout
+  title="Volunteer | After Hours Outreach Initiative"
+  description="Volunteer with After Hours Outreach Initiative: evening street outreach, harm reduction, and overdose response in Vancouver's Downtown Eastside."
+>
+  <section class="bg-black text-white" id="volunteer">
+    <div
+      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
+    >
+      <h1
+        class="max-w-4xl font-heading text-[clamp(2.5rem,5vw,4.25rem)] leading-[1.08] font-bold tracking-[-0.04em]"
+      >
+        <span class="block text-blue">Volunteer</span>
+        with us
+      </h1>
+      <p
+        class="mt-8 max-w-3xl text-[clamp(1.1rem,1.5vw,1.3rem)] leading-[1.65]"
+      >
+        You do not need medical training or outreach experience to start. You
+        need to be able to show up, listen, and treat everyone you meet with
+        respect. We will teach you the rest.
+      </p>
+    </div>
+  </section>
+
+  <section
+    class="border-y border-zinc-800 bg-panel text-white"
+    aria-labelledby="expectations-heading"
+  >
+    <div
+      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
+    >
+      <h2
+        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
+        id="expectations-heading"
+      >
+        What volunteering looks like
+      </h2>
+
+      <div
+        class="mt-12 grid gap-px border border-zinc-700 bg-zinc-700 sm:grid-cols-2"
+      >
+        {
+          expectations.map((item) => (
+            <div class="bg-ink p-7">
+              <h3 class="font-heading text-xl leading-tight font-bold">
+                {item.title}
+              </h3>
+              <p class="mt-3 leading-7 text-zinc-400">{item.description}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="bg-black text-white" aria-labelledby="apply-heading">
+    <div
+      class="mx-auto grid w-full max-w-[1248px] gap-14 px-6 py-24 max-sm:px-4 max-sm:py-18 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)] lg:gap-20"
+    >
+      <div>
+        <h2
+          class="font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold tracking-[-0.035em]"
+          id="apply-heading"
+        >
+          How to join
+        </h2>
+        <p class="mt-6 max-w-xl text-lg leading-8 text-zinc-300">
+          Orientation days run with a limited number of slots. Reach out and we
+          will hold you a spot on the next one.
+        </p>
+      </div>
+
+      <div>
+        <ol class="grid gap-px border border-zinc-700 bg-zinc-700">
+          {
+            steps.map((step, index) => (
+              <li class="flex items-start gap-5 bg-ink p-6">
+                <span class="font-heading text-2xl leading-none font-bold text-blue">
+                  {index + 1}
+                </span>
+                <span class="leading-7 text-zinc-300">{step}</span>
+              </li>
+            ))
+          }
+        </ol>
+
+        <div class="mt-8 flex flex-wrap gap-3.5 max-sm:flex-col">
+          <a
+            class="inline-flex min-h-13 items-center justify-center rounded-lg border-2 border-blue bg-blue px-6 py-3 text-[15px] font-bold text-white transition-colors hover:bg-blue-dark"
+            href={social.instagram}
+            target="_blank"
+            rel="noreferrer">Message us on Instagram</a
+          >
+          <a
+            class="inline-flex min-h-13 items-center justify-center rounded-lg border-2 border-white/60 px-6 py-3 text-[15px] font-bold text-white transition-colors hover:border-white hover:bg-white/10"
+            href={social.discord}
+            target="_blank"
+            rel="noreferrer">Join our Discord</a
+          >
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
