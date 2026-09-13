@@ -1,5 +1,7 @@
 ---
-import { donateHref, navLinks } from "@/data/site";
+import DiscordIcon from "@/components/icons/DiscordIcon.astro";
+import { buttonOutline } from "@/styles/buttons";
+import { navLinks, social } from "@/data/site";
 
 const { pathname } = Astro.url;
 const isCurrent = (href: string) =>
@@ -13,7 +15,7 @@ const isCurrent = (href: string) =>
     <a
       class="flex shrink-0 items-center gap-3.5"
       href="/"
-      aria-label="After Hours Outreach Initiative, home"
+      aria-label="After Hours Outreach Society, home"
     >
       <img
         class="h-16 w-[105px] shrink-0 object-contain max-sm:h-13 max-sm:w-[86px]"
@@ -27,7 +29,7 @@ const isCurrent = (href: string) =>
         <strong class="font-heading text-[19px] font-bold max-sm:text-[17px]"
           >After Hours</strong
         >
-        <span class="text-sm text-zinc-400">Outreach Initiative</span>
+        <span class="text-sm text-zinc-400">Outreach Society</span>
       </span>
     </a>
 
@@ -49,9 +51,14 @@ const isCurrent = (href: string) =>
     </nav>
 
     <a
-      class="hidden min-h-12 items-center justify-center rounded-lg border-2 border-blue px-5 py-3 text-[15px] font-bold transition-colors hover:bg-blue lg:inline-flex"
-      href={donateHref}>Donate</a
+      class={`${buttonOutline} max-lg:hidden`}
+      href={social.discord}
+      target="_blank"
+      rel="noreferrer"
     >
+      <DiscordIcon class="size-5 shrink-0 fill-current" />
+      Discord
+    </a>
 
     <details class="mobile-nav group ml-auto lg:hidden">
       <summary
@@ -82,9 +89,15 @@ const isCurrent = (href: string) =>
             </a>
           ))
         }
-        <a class="bg-blue px-5 py-4 text-base font-bold" href={donateHref}
-          >Donate</a
+        <a
+          class="flex items-center gap-2.5 bg-blue px-5 py-4 text-base font-bold"
+          href={social.discord}
+          target="_blank"
+          rel="noreferrer"
         >
+          <DiscordIcon class="size-5 shrink-0 fill-current" />
+          Discord
+        </a>
       </nav>
     </details>
   </div>

@@ -1,7 +1,7 @@
-// Registration details for After Hours Outreach Initiative, a non-profit
+// Registration details for After Hours Outreach Society, a non-profit
 // society incorporated in British Columbia.
 export const organization = {
-  legalName: "After Hours Outreach Initiative",
+  legalName: "After Hours Outreach Society",
   incorporationNumber: "S0086017",
   businessNumber: "79161 9042 BC0001",
   address: {
@@ -14,9 +14,3 @@ export const organization = {
     mapUrl: "https://maps.google.com/?q=312+Main+Street,+Vancouver,+BC",
   },
 };
-
-export const formattedAddress = [
-  organization.address.street,
-  organization.address.city,
-  organization.address.region,
-].join(", ");
