@@ -1,6 +1,6 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
-import { buttonOutline } from "@/styles/buttons";
+import { buttonPrimary } from "@/styles/buttons";
 import { navLinks, social } from "@/data/site";
 
 const { pathname } = Astro.url;
@@ -51,13 +51,13 @@ const isCurrent = (href: string) =>
     </nav>
 
     <a
-      class={`${buttonOutline} max-lg:hidden`}
+      class={`${buttonPrimary} max-lg:hidden`}
       href={social.discord}
       target="_blank"
       rel="noreferrer"
     >
       <DiscordIcon class="size-5 shrink-0 fill-current" />
-      Discord
+      Join Discord
     </a>
 
     <details class="mobile-nav group ml-auto lg:hidden">
@@ -96,7 +96,7 @@ const isCurrent = (href: string) =>
           rel="noreferrer"
         >
           <DiscordIcon class="size-5 shrink-0 fill-current" />
-          Discord
+          Join Discord
         </a>
       </nav>
     </details>
