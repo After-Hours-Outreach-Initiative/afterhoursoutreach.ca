@@ -1,7 +1,6 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import MoonIcon from "@/components/icons/MoonIcon.astro";
-import { buttonPrimary } from "@/styles/buttons";
 import { navLinks, social } from "@/data/site";
 
 const { pathname } = Astro.url;
@@ -36,7 +35,7 @@ const isCurrent = (href: string) =>
       {
         navLinks.map((link) => (
           <a
-            class="py-2.5 text-[15px] font-medium text-zinc-300 transition-colors hover:text-white aria-[current=page]:text-white"
+            class="py-2.5 text-base font-medium text-zinc-300 transition-colors hover:text-white aria-[current=page]:text-white"
             href={link.href}
             aria-current={isCurrent(link.href) ? "page" : undefined}
           >
@@ -47,12 +46,12 @@ const isCurrent = (href: string) =>
     </nav>
 
     <a
-      class={`${buttonPrimary} max-lg:hidden`}
+      class="btn btn-primary max-lg:hidden"
       href={social.discord}
       target="_blank"
       rel="noreferrer"
     >
-      <DiscordIcon class="size-5 shrink-0 fill-current" />
+      <DiscordIcon class="btn-icon fill-current" />
       Join Discord
     </a>
 
@@ -91,7 +90,7 @@ const isCurrent = (href: string) =>
           target="_blank"
           rel="noreferrer"
         >
-          <DiscordIcon class="size-5 shrink-0 fill-current" />
+          <DiscordIcon class="btn-icon fill-current" />
           Join Discord
         </a>
       </nav>

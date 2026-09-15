@@ -75,6 +75,40 @@
   }
 }
 
+@layer components {
+  /* One button size for the whole site. Variants change colour and border
+     only, so a bordered button lines up with a filled one at the same
+     height. Pair .btn with exactly one variant. */
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2.5 rounded-lg px-5 text-base transition-colors;
+  }
+
+  /* Filled blue, for the main action on a page. */
+  .btn-primary {
+    @apply border-2 border-blue bg-blue font-bold text-white hover:bg-blue-dark;
+  }
+
+  /* Blue outline, for an action that sits beside the primary one. */
+  .btn-outline {
+    @apply border-2 border-blue font-bold text-white hover:bg-blue;
+  }
+
+  /* Light outline, for a secondary action over a dark photo or panel. */
+  .btn-subtle {
+    @apply border-2 border-white/60 font-bold text-white hover:border-white hover:bg-white/10;
+  }
+
+  /* Grey outline, for the several small controls that sit in a row together. */
+  .btn-quiet {
+    @apply border border-zinc-600 font-medium text-zinc-300 hover:border-white hover:text-white;
+  }
+
+  /* Icon beside a button label. Sized in em so it follows the label. */
+  .btn-icon {
+    @apply size-[1.5em] shrink-0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

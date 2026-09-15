@@ -1,7 +1,6 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import Layout from "@/layouts/Layout.astro";
-import { buttonOutline, buttonPrimary } from "@/styles/buttons";
 import { social, volunteerFormUrl } from "@/data/site";
 ---
 
@@ -34,14 +33,14 @@ import { social, volunteerFormUrl } from "@/data/site";
         {
           volunteerFormUrl ? (
             <a
-              class={buttonPrimary}
+              class="btn btn-primary"
               href={volunteerFormUrl}
               target="_blank"
               rel="noreferrer"
             >
               {/* lucide: external-link */}
               <svg
-                class="lucide size-[18px] shrink-0"
+                class="lucide btn-icon"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -68,12 +67,12 @@ import { social, volunteerFormUrl } from "@/data/site";
 
       <div class="mt-6 flex flex-wrap gap-3.5 max-sm:flex-col">
         <a
-          class={buttonOutline}
+          class="btn btn-outline"
           href={social.discord}
           target="_blank"
           rel="noreferrer"
         >
-          <DiscordIcon class="size-5 shrink-0 fill-current" />
+          <DiscordIcon class="btn-icon fill-current" />
           Join our Discord
         </a>
       </div>
