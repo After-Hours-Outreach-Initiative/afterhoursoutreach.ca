@@ -1,34 +1,31 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import Layout from "@/layouts/Layout.astro";
-import { buttonOutline, buttonPrimary } from "@/styles/buttons";
 import { social, volunteerFormUrl } from "@/data/site";
 ---
 
 <Layout
-  title="Volunteer | After Hours Outreach Society"
-  description="Sign up to volunteer with After Hours Outreach Society, doing evening street outreach in Vancouver's Downtown Eastside."
+  title="Volunteer | After Hours Outreach Initiative"
+  description="Sign up to volunteer with After Hours Outreach Initiative, doing evening street outreach in Vancouver's Downtown Eastside."
 >
   <section class="bg-black text-white" id="volunteer">
     <div
       class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
     >
-      <h1
-        class="max-w-4xl font-heading text-[clamp(2.5rem,5vw,4.25rem)] leading-[1.08] font-bold"
-      >
+      <h1 class="max-w-4xl">
         <span class="text-blue">Volunteer</span>
       </h1>
-      <p class="mt-8 max-w-3xl text-lg leading-8 text-zinc-300">
+      <p class="mt-8 max-w-3xl text-zinc-300">
         Our volunteers are community advocates, people with lived experience of
         recovery, first responders, healthcare workers, students heading into
         healthcare, and people who simply wanted to help out at night.
       </p>
-      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
+      <p class="mt-6 max-w-3xl text-zinc-300">
         Patrols typically run Tuesdays and Thursdays, 8:30 PM to midnight. How
         often we go out depends on how many volunteers are available and what
         supplies we have on hand.
       </p>
-      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
+      <p class="mt-6 max-w-3xl text-zinc-300">
         Fill out the form and we will be in touch about the next orientation.
       </p>
 
@@ -36,14 +33,14 @@ import { social, volunteerFormUrl } from "@/data/site";
         {
           volunteerFormUrl ? (
             <a
-              class={buttonPrimary}
+              class="btn btn-primary"
               href={volunteerFormUrl}
               target="_blank"
               rel="noreferrer"
             >
               {/* lucide: external-link */}
               <svg
-                class="lucide size-[18px] shrink-0"
+                class="lucide btn-icon"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -57,25 +54,25 @@ import { social, volunteerFormUrl } from "@/data/site";
               Volunteer sign-up form
             </a>
           ) : (
-            <p class="m-0 text-[15px] text-zinc-400">
+            <p class="m-0 text-sm text-zinc-400">
               TODO: add the Google Form sign-up link.
             </p>
           )
         }
       </div>
 
-      <p class="mt-12 max-w-3xl text-lg leading-8 text-zinc-300">
+      <p class="mt-12 max-w-3xl text-zinc-300">
         Join our Discord for more information and to become more involved.
       </p>
 
       <div class="mt-6 flex flex-wrap gap-3.5 max-sm:flex-col">
         <a
-          class={buttonOutline}
+          class="btn btn-outline"
           href={social.discord}
           target="_blank"
           rel="noreferrer"
         >
-          <DiscordIcon class="size-5 shrink-0 fill-current" />
+          <DiscordIcon class="btn-icon fill-current" />
           Join our Discord
         </a>
       </div>

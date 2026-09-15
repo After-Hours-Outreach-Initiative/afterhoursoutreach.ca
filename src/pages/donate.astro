@@ -2,7 +2,6 @@
 import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
-import { buttonPrimary } from "@/styles/buttons";
 import { gofundmeUrl } from "@/data/site";
 
 const equipmentNeeds = [
@@ -66,20 +65,18 @@ const equipmentNeeds = [
 ---
 
 <Layout
-  title="Donate | After Hours Outreach Society"
-  description="Donate to After Hours Outreach Society and put supplies and emergency response gear in the hands of volunteers doing evening outreach in Vancouver's Downtown Eastside."
+  title="Donate | After Hours Outreach Initiative"
+  description="Donate to After Hours Outreach Initiative and put supplies and emergency response gear in the hands of volunteers doing evening outreach in Vancouver's Downtown Eastside."
 >
   <section class="bg-black text-white" id="donate">
     <div
       class="mx-auto grid w-full max-w-[1248px] items-center gap-14 px-6 pt-24 max-sm:px-4 max-sm:pt-18 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-20"
     >
       <div>
-        <h1
-          class="font-heading text-[clamp(2.5rem,5vw,4.25rem)] leading-[1.08] font-bold"
-        >
+        <h1>
           <span class="text-blue">Donate</span>
         </h1>
-        <p class="mt-8 max-w-xl text-lg leading-8 text-zinc-300">
+        <p class="mt-8 max-w-xl text-zinc-300">
           We are a community run society, and we rely on community support to
           provide outreach. Donations pay for medical equipment like oxygen
           tanks and wound care supplies, hygiene and feminine products, and the
@@ -89,14 +86,14 @@ const equipmentNeeds = [
         </p>
         <div class="mt-9 flex flex-wrap gap-3.5 max-sm:flex-col">
           <a
-            class={buttonPrimary}
+            class="btn btn-primary"
             href={gofundmeUrl}
             target="_blank"
             rel="noreferrer"
           >
             {/* lucide: external-link */}
             <svg
-              class="lucide size-[18px] shrink-0"
+              class="lucide btn-icon"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -116,7 +113,7 @@ const equipmentNeeds = [
       <Image
         class="w-full rounded-2xl object-cover"
         src={outreachTeam}
-        alt="Volunteers from After Hours Outreach Society standing together in front of a mural in the Downtown Eastside."
+        alt="Volunteers from After Hours Outreach Initiative standing together in front of a mural in the Downtown Eastside."
         widths={[520, 760, 1040]}
         sizes="(min-width: 1024px) 480px, 100vw"
         loading="eager"
@@ -126,17 +123,11 @@ const equipmentNeeds = [
     <div
       class="mx-auto w-full max-w-[1248px] px-6 pt-20 pb-24 max-sm:px-4 max-sm:pt-14 max-sm:pb-18"
     >
-      <h2
-        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold"
-      >
-        Where the money goes
-      </h2>
+      <h2 class="max-w-3xl">Where the money goes</h2>
 
       <div class="mt-10 border-l-4 border-blue bg-blue-deep p-6 sm:p-7">
-        <h3 class="font-heading text-2xl leading-tight font-bold">
-          DTES operations and storage space
-        </h3>
-        <p class="mt-3 leading-7 text-zinc-300">
+        <h3>DTES operations and storage space</h3>
+        <p class="mt-3 text-zinc-300">
           Our biggest long-term need is a reliable location. It would give us a
           base for general operations, volunteer coordination, and secure supply
           storage close to the community we serve.
@@ -167,12 +158,8 @@ const equipmentNeeds = [
             class="flex items-end justify-between gap-8 max-sm:flex-col max-sm:items-start max-sm:gap-4"
           >
             <div>
-              <h3
-                class="font-heading text-[clamp(1.6rem,3vw,2.25rem)] leading-tight font-bold"
-              >
-                High-visibility first aid vest
-              </h3>
-              <p class="mt-3 max-w-lg leading-7 text-zinc-300">
+              <h3>High-visibility first aid vest</h3>
+              <p class="mt-3 max-w-lg text-zinc-300">
                 Durable, reflective vests help identify outreach responders and
                 keep essential supplies within reach on evening shifts.
               </p>
@@ -183,7 +170,7 @@ const equipmentNeeds = [
               </span>
             </div>
             <strong
-              class="shrink-0 font-heading text-[clamp(2rem,4vw,3.25rem)] leading-none font-bold text-blue"
+              class="shrink-0 font-heading text-4xl leading-none font-bold text-blue md:text-5xl"
             >
               $129.99
             </strong>
@@ -212,9 +199,7 @@ const equipmentNeeds = [
                 />
               </span>
               <span>
-                <strong class="block text-[17px] leading-snug">
-                  {item.name}
-                </strong>
+                <strong class="block text-xl leading-snug">{item.name}</strong>
                 <span class="mt-1 block text-sm leading-6 text-zinc-400">
                   {item.description}
                 </span>
@@ -228,7 +213,7 @@ const equipmentNeeds = [
         }
       </div>
 
-      <p class="mt-5 text-sm leading-6 text-zinc-400">
+      <p class="mt-5 text-sm text-zinc-400">
         Reference prices are in CAD and were checked in August 2026. Tax,
         shipping, oxygen handling, customization, and future price changes are
         not included. Medical-response equipment is for use by team members with
