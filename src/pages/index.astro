@@ -1,6 +1,5 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { buttonPrimary, buttonSubtle } from "@/styles/buttons";
 
 const upcomingEvents = [
   {
@@ -17,7 +16,7 @@ const upcomingEvents = [
 ---
 
 <Layout
-  title="After Hours Outreach Society"
+  title="After Hours Outreach Initiative"
   description="Volunteer-based evening street outreach providing practical care and overdose response in Vancouver's Downtown Eastside."
 >
   <section class="bg-black text-white" id="top">
@@ -25,22 +24,18 @@ const upcomingEvents = [
       class="mx-auto grid min-h-[720px] w-full max-w-[1248px] items-center gap-12 px-6 max-sm:px-4 lg:grid-cols-[minmax(0,1fr)_420px]"
     >
       <div class="flex w-full max-w-[760px] flex-col justify-center py-20">
-        <h1
-          class="font-heading text-[clamp(2.5rem,5vw,4.5rem)] leading-[1.06] font-bold"
-        >
+        <h1>
           <span class="block text-blue">After Hours</span>
-          <span class="block">Outreach Society</span>
+          <span class="block">Outreach Initiative</span>
         </h1>
-        <p
-          class="mt-8 max-w-2xl text-[clamp(1.1rem,1.5vw,1.3rem)] leading-[1.65]"
-        >
+        <p class="mt-8 max-w-2xl text-xl">
           Volunteer teams provide food, water, clothing, harm reduction
           supplies, naloxone, first aid, and immediate overdose response in
           Vancouver's Downtown Eastside.
         </p>
         <div class="mt-9 flex flex-wrap gap-3.5 max-sm:flex-col">
-          <a class={buttonPrimary} href="/volunteer">Volunteer with us</a>
-          <a class={buttonSubtle} href="#events">See upcoming events</a>
+          <a class="btn btn-primary" href="/volunteer">Volunteer with us</a>
+          <a class="btn btn-subtle" href="#events">See upcoming events</a>
         </div>
       </div>
 
@@ -48,7 +43,7 @@ const upcomingEvents = [
         <img
           class="w-full max-w-[420px] object-contain"
           src="/logo-blue.jpg"
-          alt="After Hours Outreach Society logo"
+          alt="After Hours Outreach Initiative logo"
           width="1280"
           height="1280"
           decoding="async"
@@ -58,31 +53,26 @@ const upcomingEvents = [
   </section>
 
   <section
-    class="scroll-mt-19 border-t border-zinc-800 bg-panel text-white lg:scroll-mt-22"
+    class="scroll-mt-19 bg-black text-white lg:scroll-mt-22"
     id="events"
     aria-labelledby="events-heading"
   >
     <div
       class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
     >
-      <h2
-        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold"
-        id="events-heading"
-      >
-        Upcoming events
-      </h2>
+      <h2 class="max-w-3xl" id="events-heading">Upcoming events</h2>
 
       <ul class="mt-10 max-w-3xl border border-zinc-700 bg-ink">
         {
           upcomingEvents.map((event) => (
             <li class="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2 border-b border-zinc-800 px-6 py-5 last:border-b-0">
-              <span class="font-heading text-xl leading-tight font-bold">
+              <h3>
                 {event.date}
                 <span class="ml-3 font-normal text-zinc-400">
                   {event.weekday}
                 </span>
-              </span>
-              <span class="text-[15px] text-zinc-300">{event.time}</span>
+              </h3>
+              <span class="text-base text-zinc-300">{event.time}</span>
             </li>
           ))
         }

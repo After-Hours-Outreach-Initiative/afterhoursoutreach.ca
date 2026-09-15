@@ -1,6 +1,6 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
-import { buttonPrimary } from "@/styles/buttons";
+import MoonIcon from "@/components/icons/MoonIcon.astro";
 import { navLinks, social } from "@/data/site";
 
 const { pathname } = Astro.url;
@@ -15,21 +15,14 @@ const isCurrent = (href: string) =>
     <a
       class="flex shrink-0 items-center gap-3.5"
       href="/"
-      aria-label="After Hours Outreach Society, home"
+      aria-label="After Hours Outreach Initiative, home"
     >
-      <img
-        class="h-16 w-[105px] shrink-0 object-contain max-sm:h-13 max-sm:w-[86px]"
-        src="/logo-header.png"
-        alt=""
-        width="420"
-        height="280"
-        decoding="async"
+      <MoonIcon
+        class="size-12 shrink-0 fill-current text-blue max-sm:size-10"
       />
       <span class="flex flex-col leading-tight">
-        <strong class="font-heading text-[19px] font-bold max-sm:text-[17px]"
-          >After Hours</strong
-        >
-        <span class="text-sm text-zinc-400">Outreach Society</span>
+        <strong class="font-heading text-xl font-bold">After Hours</strong>
+        <span class="text-base text-zinc-400">Outreach Initiative</span>
       </span>
     </a>
 
@@ -40,7 +33,7 @@ const isCurrent = (href: string) =>
       {
         navLinks.map((link) => (
           <a
-            class="py-2.5 text-[15px] font-medium text-zinc-300 transition-colors hover:text-white aria-[current=page]:text-white"
+            class="py-2.5 text-base font-medium text-zinc-300 transition-colors hover:text-white aria-[current=page]:text-white"
             href={link.href}
             aria-current={isCurrent(link.href) ? "page" : undefined}
           >
@@ -51,27 +44,27 @@ const isCurrent = (href: string) =>
     </nav>
 
     <a
-      class={`${buttonPrimary} max-lg:hidden`}
+      class="btn btn-primary max-lg:hidden"
       href={social.discord}
       target="_blank"
       rel="noreferrer"
     >
-      <DiscordIcon class="size-5 shrink-0 fill-current" />
+      <DiscordIcon class="btn-icon fill-current" />
       Join Discord
     </a>
 
     <details class="mobile-nav group ml-auto lg:hidden">
       <summary
-        class="flex size-12 cursor-pointer list-none flex-col items-center justify-center gap-1.5 rounded-lg"
+        class="flex size-12 cursor-pointer list-none flex-col items-center justify-center gap-2 rounded-lg"
         aria-label="Open navigation"
       >
         <span
-          class="h-0.5 w-5 bg-white transition-transform group-open:translate-y-2 group-open:rotate-45"
+          class="h-0.5 w-7 bg-white transition-transform group-open:translate-y-2.5 group-open:rotate-45"
         ></span>
-        <span class="h-0.5 w-5 bg-white transition-opacity group-open:opacity-0"
+        <span class="h-0.5 w-7 bg-white transition-opacity group-open:opacity-0"
         ></span>
         <span
-          class="h-0.5 w-5 bg-white transition-transform group-open:-translate-y-2 group-open:-rotate-45"
+          class="h-0.5 w-7 bg-white transition-transform group-open:-translate-y-2.5 group-open:-rotate-45"
         ></span>
       </summary>
       <nav
@@ -95,7 +88,7 @@ const isCurrent = (href: string) =>
           target="_blank"
           rel="noreferrer"
         >
-          <DiscordIcon class="size-5 shrink-0 fill-current" />
+          <DiscordIcon class="btn-icon fill-current" />
           Join Discord
         </a>
       </nav>

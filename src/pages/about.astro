@@ -1,11 +1,10 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { buttonQuiet } from "@/styles/buttons";
 import { organization } from "@/data/organization";
 
 const directors = ["Ivan Z.", "Moli D.", "Ashe M.", "Kaycee G.", "Yoyo L."];
 
-const iconClass = "lucide size-[18px] shrink-0 text-blue";
+const iconClass = "lucide btn-icon text-blue";
 
 // Certified copies of what we filed with the BC Registrar of Companies.
 const documents = [
@@ -25,53 +24,46 @@ const documents = [
 ---
 
 <Layout
-  title="About | After Hours Outreach Society"
-  description="After Hours Outreach Society is a volunteer-run non-profit doing evening street outreach in Vancouver's Downtown Eastside."
+  title="About | After Hours Outreach Initiative"
+  description="After Hours Outreach Initiative is a volunteer-run non-profit doing evening street outreach in Vancouver's Downtown Eastside."
 >
   <section class="bg-black text-white" id="about">
     <div
       class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
     >
-      <h1
-        class="max-w-4xl font-heading text-[clamp(2.5rem,5vw,4.25rem)] leading-[1.08] font-bold"
-      >
+      <h1 class="max-w-4xl">
         <span class="text-blue">About</span>
       </h1>
-      <p class="mt-8 max-w-3xl text-lg leading-8 text-zinc-300">
-        After Hours Outreach Society is a nonprofit providing late-night
-        outreach in Vancouver&rsquo;s Downtown Eastside. Our team includes
-        community advocates, people with lived experience of recovery, first
-        responders, healthcare workers, students, and other volunteers committed
-        to supporting residents of the DTES.
+      <p class="mt-8 max-w-3xl text-zinc-300">
+        After Hours Outreach Initiative is a secular nonprofit providing
+        late-night outreach in Vancouver&rsquo;s Downtown Eastside. Our team
+        includes community advocates, people with lived experience of recovery,
+        first responders, healthcare workers, students, and other volunteers
+        committed to supporting residents of the DTES.
       </p>
-      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
+      <p class="mt-6 max-w-3xl text-zinc-300">
         Our focus is filling gaps that arise after many daytime services have
         closed. Through evening and late-night outreach, we provide overdose
         response, prehospital care, food, water, clothing, naloxone kits,
         harm-reduction supplies, and connections to health and social services.
       </p>
-      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
+      <p class="mt-6 max-w-3xl text-zinc-300">
         Our founding members were once volunteers in a separate organization.
         They wanted to expand their own impact and make a difference in the
-        community, so they started After Hours Outreach Society.
+        community, so they started After Hours Outreach Initiative.
       </p>
     </div>
   </section>
 
   <section
-    class="border-t border-zinc-800 bg-panel text-white"
+    class="bg-black text-white"
     id="directors"
     aria-labelledby="directors-heading"
   >
     <div
       class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
     >
-      <h2
-        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold"
-        id="directors-heading"
-      >
-        Directors
-      </h2>
+      <h2 class="max-w-3xl" id="directors-heading">Directors</h2>
 
       <ul class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {
@@ -83,9 +75,7 @@ const documents = [
               >
                 {director.charAt(0)}
               </span>
-              <span class="font-heading text-xl leading-tight font-bold">
-                {director}
-              </span>
+              <h3>{director}</h3>
             </li>
           ))
         }
@@ -94,26 +84,24 @@ const documents = [
   </section>
 
   <section
-    class="border-t border-zinc-800 bg-black text-white"
+    class="bg-black text-white"
     id="non-profit-information"
     aria-labelledby="non-profit-information-heading"
   >
     <div
       class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
     >
-      <h2
-        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold"
-        id="non-profit-information-heading"
-      >
+      <h2 class="max-w-3xl" id="non-profit-information-heading">
         Non-profit information
       </h2>
-      <p class="mt-6 max-w-3xl text-lg leading-8 text-zinc-300">
-        After Hours Outreach Society is incorporated as a non-profit in British
-        Columbia.
+      <p class="mt-6 max-w-3xl text-zinc-300">
+        We are incorporated as a non-profit in British Columbia under the name {
+          organization.legalName
+        }. However, we usually go by After Hours Outreach Initiative.
       </p>
 
       <table
-        class="mt-10 w-full max-w-3xl border border-zinc-700 text-left text-[17px]"
+        class="mt-10 w-full max-w-3xl border border-zinc-700 text-left text-lg"
       >
         <tbody>
           <tr class="border-b border-zinc-700">
@@ -156,36 +144,29 @@ const documents = [
     </div>
   </section>
   <section
-    class="border-t border-zinc-800 bg-panel text-white"
+    class="bg-black text-white"
     id="documents"
     aria-labelledby="documents-heading"
   >
     <div
       class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
     >
-      <h2
-        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold"
-        id="documents-heading"
-      >
-        Governing documents
-      </h2>
+      <h2 class="max-w-3xl" id="documents-heading">Governing documents</h2>
 
       <ul class="mt-10 grid gap-5">
         {
           documents.map((document) => (
             <li class="border border-zinc-700 bg-ink">
               <div class="flex flex-wrap items-center justify-between gap-x-8 gap-y-5 p-6">
-                <span>
-                  <strong class="block font-heading text-xl leading-tight font-bold">
-                    {document.name}
-                  </strong>
-                  <span class="mt-2 block text-[15px] text-zinc-400">
+                <div>
+                  <h3>{document.name}</h3>
+                  <span class="mt-2 block text-base text-zinc-400">
                     {document.detail}
                   </span>
-                </span>
+                </div>
 
                 <span class="flex flex-wrap gap-3">
-                  <a class={buttonQuiet} href={document.href} download>
+                  <a class="btn btn-quiet" href={document.href} download>
                     {/* lucide: download */}
                     <svg
                       class={iconClass}
@@ -202,7 +183,7 @@ const documents = [
                     Download
                   </a>
                   <a
-                    class={buttonQuiet}
+                    class="btn btn-quiet"
                     href={document.href}
                     target="_blank"
                     rel="noreferrer"
@@ -223,7 +204,7 @@ const documents = [
                     Open in new tab
                   </a>
                   <button
-                    class={`${buttonQuiet} document-toggle cursor-pointer`}
+                    class="btn btn-quiet document-toggle cursor-pointer"
                     type="button"
                     aria-controls={`document-${document.id}`}
                     aria-expanded="false"
@@ -271,7 +252,7 @@ const documents = [
                 <iframe
                   class="aspect-[17/22] w-full bg-white"
                   data-src={document.href}
-                  title={`${document.name} of After Hours Outreach Society`}
+                  title={`${document.name} of After Hours Outreach Initiative`}
                 />
               </div>
             </li>

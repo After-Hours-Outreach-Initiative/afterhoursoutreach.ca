@@ -15,7 +15,7 @@ export const gofundmeUrl = "https://gofund.me/4547012cb";
 export const volunteerFormUrl =
   "https://docs.google.com/forms/d/e/1FAIpQLSemPid9VlWAo_PLKflV8goYkCiWQvbH5Glmt76RHbWRHBT15g/viewform";
 
-export const contactEmail = "ivan.zheng@afterhoursoutreach.ca";
+export const contactEmail = "info@afterhoursoutreach.ca";
 
 export const social = {
   instagram: "https://www.instagram.com/afterhoursoutreach",

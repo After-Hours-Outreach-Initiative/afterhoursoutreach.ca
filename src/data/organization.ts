@@ -9,8 +9,6 @@ export const organization = {
     street: "312 Main Street",
     city: "Vancouver",
     region: "BC",
-    country: "Canada",
-    url: "https://312main.ca/",
     mapUrl: "https://maps.google.com/?q=312+Main+Street,+Vancouver,+BC",
   },
 };
