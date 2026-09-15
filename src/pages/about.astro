@@ -75,9 +75,7 @@ const documents = [
               >
                 {director.charAt(0)}
               </span>
-              <span class="font-heading text-xl leading-tight font-bold">
-                {director}
-              </span>
+              <h3>{director}</h3>
             </li>
           ))
         }
@@ -159,14 +157,12 @@ const documents = [
           documents.map((document) => (
             <li class="border border-zinc-700 bg-ink">
               <div class="flex flex-wrap items-center justify-between gap-x-8 gap-y-5 p-6">
-                <span>
-                  <strong class="block font-heading text-xl leading-tight font-bold">
-                    {document.name}
-                  </strong>
+                <div>
+                  <h3>{document.name}</h3>
                   <span class="mt-2 block text-base text-zinc-400">
                     {document.detail}
                   </span>
-                </span>
+                </div>
 
                 <span class="flex flex-wrap gap-3">
                   <a class="btn btn-quiet" href={document.href} download>
