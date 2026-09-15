@@ -1,15 +1,16 @@
+// Flip to false if we ever stop taking donations; the Donate link in the nav
+// and footer follows this.
+export const donationsOpen = true;
+
+export const donateHref = "/donate";
+
 export const navLinks = [
   { label: "About", href: "/about" },
   { label: "Volunteer", href: "/volunteer" },
+  ...(donationsOpen ? [{ label: "Donate", href: donateHref }] : []),
 ];
 
-// The donation section lives on the home page, so it needs an absolute path to
-// work from /about and /volunteer as well.
-export const donateHref = "/#support";
-
-// Flip to true once we can actually take donations; until then the Donate
-// buttons stay hidden and the home page says donations are coming.
-export const donationsOpen = false;
+export const gofundmeUrl = "https://gofund.me/4547012cb";
 
 export const volunteerFormUrl =
   "https://docs.google.com/forms/d/e/1FAIpQLSemPid9VlWAo_PLKflV8goYkCiWQvbH5Glmt76RHbWRHBT15g/viewform";
