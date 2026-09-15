@@ -1,5 +1,6 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
+import MoonIcon from "@/components/icons/MoonIcon.astro";
 import { buttonPrimary } from "@/styles/buttons";
 import { navLinks, social } from "@/data/site";
 
@@ -17,14 +18,7 @@ const isCurrent = (href: string) =>
       href="/"
       aria-label="After Hours Outreach Initiative, home"
     >
-      <img
-        class="h-16 w-[105px] shrink-0 object-contain max-sm:h-13 max-sm:w-[86px]"
-        src="/logo-header.png"
-        alt=""
-        width="420"
-        height="280"
-        decoding="async"
-      />
+      <MoonIcon class="size-12 shrink-0 fill-current text-blue max-sm:size-10" />
       <span class="flex flex-col leading-tight">
         <strong class="font-heading text-[19px] font-bold max-sm:text-[17px]"
           >After Hours</strong
