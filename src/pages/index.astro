@@ -66,12 +66,12 @@ const upcomingEvents = [
         {
           upcomingEvents.map((event) => (
             <li class="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2 border-b border-zinc-800 px-6 py-5 last:border-b-0">
-              <span class="font-heading text-xl leading-tight font-bold">
+              <h3>
                 {event.date}
                 <span class="ml-3 font-normal text-zinc-400">
                   {event.weekday}
                 </span>
-              </span>
+              </h3>
               <span class="text-base text-zinc-300">{event.time}</span>
             </li>
           ))
