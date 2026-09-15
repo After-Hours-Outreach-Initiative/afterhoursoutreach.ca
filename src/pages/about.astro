@@ -1,11 +1,10 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { buttonQuiet } from "@/styles/buttons";
 import { organization } from "@/data/organization";
 
 const directors = ["Ivan Z.", "Moli D.", "Ashe M.", "Kaycee G.", "Yoyo L."];
 
-const iconClass = "lucide size-[18px] shrink-0 text-blue";
+const iconClass = "lucide btn-icon text-blue";
 
 // Certified copies of what we filed with the BC Registrar of Companies.
 const documents = [
@@ -170,7 +169,7 @@ const documents = [
                 </span>
 
                 <span class="flex flex-wrap gap-3">
-                  <a class={buttonQuiet} href={document.href} download>
+                  <a class="btn btn-quiet" href={document.href} download>
                     {/* lucide: download */}
                     <svg
                       class={iconClass}
@@ -187,7 +186,7 @@ const documents = [
                     Download
                   </a>
                   <a
-                    class={buttonQuiet}
+                    class="btn btn-quiet"
                     href={document.href}
                     target="_blank"
                     rel="noreferrer"
@@ -208,7 +207,7 @@ const documents = [
                     Open in new tab
                   </a>
                   <button
-                    class={`${buttonQuiet} document-toggle cursor-pointer`}
+                    class="btn btn-quiet document-toggle cursor-pointer"
                     type="button"
                     aria-controls={`document-${document.id}`}
                     aria-expanded="false"
