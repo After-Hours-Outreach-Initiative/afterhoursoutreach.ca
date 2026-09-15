@@ -1,0 +1,239 @@
+---
+import { Image } from "astro:assets";
+import Layout from "@/layouts/Layout.astro";
+import outreachTeam from "@/assets/outreach-team.jpg";
+import { buttonPrimary } from "@/styles/buttons";
+import { gofundmeUrl } from "@/data/site";
+
+const equipmentNeeds = [
+  {
+    name: "Full aluminum D oxygen cylinder",
+    description: "A portable 425 L oxygen supply for emergency response.",
+    price: "$190.00",
+    unit: "each",
+    url: "https://pacificfirstaid.ca/products/oxygen-tank-aluminum-d-cylinder-15-0-cu-ft-425l-with-toggle-valve",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/Screenshot2025-09-16162413.png?v=1758065075",
+  },
+  {
+    name: "Adult bag-valve mask",
+    description: "Manual ventilation equipment for respiratory emergencies.",
+    price: "$29.95",
+    unit: "each",
+    url: "https://pacificfirstaid.ca/products/bag-valve-mask-adult",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/Med-Rescuer.png?v=1730765369",
+  },
+  {
+    name: "Assorted sterile gauze pads",
+    description: "A 100-pack for cleaning, covering, and dressing wounds.",
+    price: "$12.95",
+    unit: "per pack",
+    url: "https://pacificfirstaid.ca/products/sterile-gauze-pad-100-assorted",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/100ASTPads1.png?v=1734032678",
+  },
+  {
+    name: "Oropharyngeal airway set",
+    description:
+      "Eight colour-coded Guedel airways in neonatal to adult sizes.",
+    price: "$11.95",
+    unit: "per set",
+    url: "https://pacificfirstaid.ca/products/oral-airway-set",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/PFA-OAK.png?v=1752601748",
+  },
+  {
+    name: "Adhesive bandages",
+    description: "A 30-count assorted pack for minor cuts and scrapes.",
+    price: "$7.99",
+    unit: "per box",
+    url: "https://pacificfirstaid.ca/products/band-aid%C2%AE-brand-flexible-fabric-adhesive-bandages",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/81tsrk9kp7L._AC_SX425.jpg?v=1717801370",
+  },
+  {
+    name: "Adult oxygen mask with tubing",
+    description:
+      "A disposable partial non-rebreathing mask for oxygen delivery.",
+    price: "$4.35",
+    unit: "each",
+    url: "https://pacificfirstaid.ca/products/partial-non-rebreathing-oxygen-mask-with-tubing-adult",
+    image:
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/products/partial_non_-_rebreathing_oxygen_mask_with_tubing_-_adult.jpg?v=1683401429",
+  },
+];
+---
+
+<Layout
+  title="Donate | After Hours Outreach Society"
+  description="Donate to After Hours Outreach Society and put supplies and emergency response gear in the hands of volunteers doing evening outreach in Vancouver's Downtown Eastside."
+>
+  <section class="bg-black text-white" id="donate">
+    <div
+      class="mx-auto grid w-full max-w-[1248px] items-center gap-14 px-6 pt-24 max-sm:px-4 max-sm:pt-18 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-20"
+    >
+      <div>
+        <h1
+          class="font-heading text-[clamp(2.5rem,5vw,4.25rem)] leading-[1.08] font-bold"
+        >
+          <span class="text-blue">Donate</span>
+        </h1>
+        <p class="mt-8 max-w-xl text-lg leading-8 text-zinc-300">
+          We are a community run society, and we rely on community support to
+          provide outreach. Donations pay for medical equipment like oxygen
+          tanks and wound care supplies, hygiene and feminine products, and the
+          food, sleeping mats, and emergency blankets we hand out on patrol.
+          They also cover rent toward a space and the wagons we use to carry
+          everything.
+        </p>
+        <div class="mt-9 flex flex-wrap gap-3.5 max-sm:flex-col">
+          <a
+            class={buttonPrimary}
+            href={gofundmeUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {/* lucide: external-link */}
+            <svg
+              class="lucide size-[18px] shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path d="M15 3h6v6"></path>
+              <path d="M10 14 21 3"></path>
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+              ></path>
+            </svg>
+            Donate on GoFundMe
+          </a>
+        </div>
+      </div>
+
+      <Image
+        class="w-full rounded-2xl object-cover"
+        src={outreachTeam}
+        alt="Volunteers from After Hours Outreach Society standing together in front of a mural in the Downtown Eastside."
+        widths={[520, 760, 1040]}
+        sizes="(min-width: 1024px) 480px, 100vw"
+        loading="eager"
+      />
+    </div>
+
+    <div
+      class="mx-auto w-full max-w-[1248px] px-6 pt-20 pb-24 max-sm:px-4 max-sm:pt-14 max-sm:pb-18"
+    >
+      <h2
+        class="max-w-3xl font-heading text-[clamp(2rem,4vw,3.25rem)] leading-[1.1] font-bold"
+      >
+        Where the money goes
+      </h2>
+
+      <div class="mt-10 border-l-4 border-blue bg-blue-deep p-6 sm:p-7">
+        <h3 class="font-heading text-2xl leading-tight font-bold">
+          DTES operations and storage space
+        </h3>
+        <p class="mt-3 leading-7 text-zinc-300">
+          Our biggest long-term need is a reliable location. It would give us a
+          base for general operations, volunteer coordination, and secure supply
+          storage close to the community we serve.
+        </p>
+      </div>
+
+      <a
+        class="group mt-5 block border border-blue bg-blue/10 p-6 transition-colors hover:bg-blue/15 sm:p-8"
+        href="https://coastalreign.com/products/safety-vests/big-k-first-aid-safety-vest?selectedColour=Royal%20Blue"
+        target="_blank"
+        rel="noreferrer"
+      >
+        <div
+          class="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-5 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-8"
+        >
+          <div class="aspect-square overflow-hidden bg-white p-2 sm:p-3">
+            <img
+              class="size-full object-contain"
+              src="https://cdn.shopify.com/s/files/1/1016/5405/files/1013591.jpg?v=1758155758"
+              alt=""
+              width="240"
+              height="240"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <div
+            class="flex items-end justify-between gap-8 max-sm:flex-col max-sm:items-start max-sm:gap-4"
+          >
+            <div>
+              <h3
+                class="font-heading text-[clamp(1.6rem,3vw,2.25rem)] leading-tight font-bold"
+              >
+                High-visibility first aid vest
+              </h3>
+              <p class="mt-3 max-w-lg leading-7 text-zinc-300">
+                Durable, reflective vests help identify outreach responders and
+                keep essential supplies within reach on evening shifts.
+              </p>
+              <span
+                class="mt-5 inline-block border-b border-zinc-500 pb-0.5 text-sm font-bold group-hover:border-white"
+              >
+                View reference item
+              </span>
+            </div>
+            <strong
+              class="shrink-0 font-heading text-[clamp(2rem,4vw,3.25rem)] leading-none font-bold text-blue"
+            >
+              $129.99
+            </strong>
+          </div>
+        </div>
+      </a>
+
+      <div class="mt-5 border border-zinc-700 bg-ink">
+        {
+          equipmentNeeds.map((item) => (
+            <a
+              class="group grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-5 gap-y-2 border-b border-zinc-800 p-5 last:border-b-0 hover:bg-panel-soft sm:grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:gap-x-6 sm:p-6"
+              href={item.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span class="aspect-square overflow-hidden bg-white p-2">
+                <img
+                  class="size-full object-contain"
+                  src={item.image}
+                  alt=""
+                  width="180"
+                  height="180"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </span>
+              <span>
+                <strong class="block text-[17px] leading-snug">
+                  {item.name}
+                </strong>
+                <span class="mt-1 block text-sm leading-6 text-zinc-400">
+                  {item.description}
+                </span>
+              </span>
+              <span class="col-start-2 flex items-baseline gap-2 sm:col-start-auto sm:flex-col sm:items-end sm:gap-0">
+                <strong class="text-xl text-white">{item.price}</strong>
+                <span class="text-xs text-zinc-500">{item.unit}</span>
+              </span>
+            </a>
+          ))
+        }
+      </div>
+
+      <p class="mt-5 text-sm leading-6 text-zinc-400">
+        Reference prices are in CAD and were checked in August 2026. Tax,
+        shipping, oxygen handling, customization, and future price changes are
+        not included. Medical-response equipment is for use by team members with
+        appropriate training.
+      </p>
+    </div>
+  </section>
+</Layout>

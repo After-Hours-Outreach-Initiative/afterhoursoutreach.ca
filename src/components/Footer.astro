@@ -1,12 +1,6 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
-import {
-  contactEmail,
-  donateHref,
-  donationsOpen,
-  navLinks,
-  social,
-} from "@/data/site";
+import { contactEmail, navLinks, social } from "@/data/site";
 import { organization } from "@/data/organization";
 ---
 
@@ -109,13 +103,6 @@ import { organization } from "@/data/organization";
               {link.label}
             </a>
           ))
-        }
-        {
-          donationsOpen && (
-            <a class="hover:text-white" href={donateHref}>
-              Donate
-            </a>
-          )
         }
       </nav>
     </div>
