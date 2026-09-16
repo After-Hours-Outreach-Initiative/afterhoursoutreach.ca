@@ -1,7 +1,7 @@
 ---
 import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
-import outreachTeam from "@/assets/outreach-team.jpg";
+import donateTeam from "@/assets/donate-team.jpg";
 import { gofundmeUrl } from "@/data/site";
 
 const equipmentNeeds = [
@@ -70,7 +70,7 @@ const equipmentNeeds = [
 >
   <section class="bg-black text-white" id="donate">
     <div
-      class="mx-auto grid w-full max-w-[1248px] items-center gap-14 px-6 pt-24 max-sm:px-4 max-sm:pt-18 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-20"
+      class="mx-auto grid w-full max-w-[1248px] items-center gap-14 px-6 pt-24 max-sm:px-4 max-sm:pt-18 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-20"
     >
       <div>
         <h1>
@@ -110,14 +110,16 @@ const equipmentNeeds = [
         </div>
       </div>
 
-      <Image
-        class="w-full rounded-2xl object-cover"
-        src={outreachTeam}
-        alt="Volunteers from After Hours Outreach Initiative standing together in front of a mural in the Downtown Eastside."
-        widths={[520, 760, 1040]}
-        sizes="(min-width: 1024px) 480px, 100vw"
-        loading="eager"
-      />
+      <div class="relative flex items-center justify-center max-lg:order-first">
+        <Image
+          class="w-full max-w-[420px] rounded-2xl object-cover"
+          src={donateTeam}
+          alt="Nine volunteers from After Hours Outreach Initiative with supply bags, standing and sitting in front of a graffiti mural at night in the Downtown Eastside."
+          widths={[420, 840]}
+          sizes="(max-width: 480px) 100vw, 420px"
+          loading="eager"
+        />
+      </div>
     </div>
 
     <div
