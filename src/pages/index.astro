@@ -1,5 +1,7 @@
 ---
+import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
+import outreachTeam from "@/assets/outreach-team.jpg";
 
 const upcomingEvents = [
   {
@@ -23,7 +25,9 @@ const upcomingEvents = [
     <div
       class="mx-auto grid min-h-[720px] w-full max-w-[1248px] items-center gap-12 px-6 max-sm:px-4 lg:grid-cols-[minmax(0,1fr)_420px]"
     >
-      <div class="flex w-full max-w-[760px] flex-col justify-center py-20">
+      <div
+        class="flex w-full max-w-[760px] flex-col justify-center py-20 max-lg:pt-0"
+      >
         <h1>
           <span class="block text-blue">After Hours</span>
           <span class="block">Outreach Initiative</span>
@@ -39,14 +43,16 @@ const upcomingEvents = [
         </div>
       </div>
 
-      <div class="relative hidden items-center justify-center lg:flex">
-        <img
-          class="w-full max-w-[420px] object-contain"
-          src="/logo-blue.jpg"
-          alt="After Hours Outreach Initiative logo"
-          width="1280"
-          height="1280"
-          decoding="async"
+      <div
+        class="relative flex items-center justify-center max-lg:order-first max-lg:pt-14"
+      >
+        <Image
+          class="w-full max-w-[420px] rounded-2xl object-cover"
+          src={outreachTeam}
+          alt="Volunteers from After Hours Outreach Initiative standing together in front of a mural in the Downtown Eastside."
+          widths={[420, 840]}
+          sizes="(max-width: 480px) 100vw, 420px"
+          loading="eager"
         />
       </div>
     </div>
