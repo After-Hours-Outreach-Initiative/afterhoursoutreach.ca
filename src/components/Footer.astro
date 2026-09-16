@@ -1,6 +1,8 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
-import { contactEmail, navLinks, social } from "@/data/site";
+import FacebookIcon from "@/components/icons/FacebookIcon.astro";
+import LinkedInIcon from "@/components/icons/LinkedInIcon.astro";
+import { contactEmail, contactPhone, navLinks, social } from "@/data/site";
 import { organization } from "@/data/organization";
 ---
 
@@ -46,7 +48,7 @@ import { organization } from "@/data/organization";
           rel="noreferrer"
         >
           <svg
-            class="size-5 shrink-0 text-blue"
+            class="size-[1.25em] shrink-0 text-blue"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -66,8 +68,26 @@ import { organization } from "@/data/organization";
           target="_blank"
           rel="noreferrer"
         >
-          <DiscordIcon class="size-5 shrink-0 fill-current text-blue" />
+          <DiscordIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
           Discord</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={social.linkedin}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <LinkedInIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
+          LinkedIn</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={social.facebook}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <FacebookIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
+          Facebook</a
         >
         <a
           class="inline-flex items-center gap-2.5 hover:text-white"
@@ -75,7 +95,7 @@ import { organization } from "@/data/organization";
         >
           {/* lucide: mail */}
           <svg
-            class="lucide size-5 shrink-0 text-blue"
+            class="lucide size-[1.25em] shrink-0 text-blue"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -86,6 +106,27 @@ import { organization } from "@/data/organization";
             <rect x="2" y="4" width="20" height="16" rx="2"></rect>
           </svg>
           {contactEmail}</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={`tel:+1${contactPhone.replace(/\D/g, "")}`}
+        >
+          {/* lucide: phone */}
+          <svg
+            class="lucide size-[1.25em] shrink-0 text-blue"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path
+              d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"
+            ></path>
+          </svg>
+          {contactPhone}</a
         >
       </nav>
     </div>

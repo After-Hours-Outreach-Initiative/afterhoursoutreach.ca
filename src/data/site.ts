@@ -17,7 +17,12 @@ export const volunteerFormUrl =
 
 export const contactEmail = "info@afterhoursoutreach.ca";
 
+export const contactPhone = "604-690-4687";
+
 export const social = {
   instagram: "https://www.instagram.com/afterhoursoutreach",
   discord: "https://discord.gg/USGaTjNMM4",
+  linkedin: "https://www.linkedin.com/company/after-hours-outreach-initiative",
+  facebook:
+    "https://www.facebook.com/people/After-Hours-Outreach-Initiative/61594451129497/",
 };
