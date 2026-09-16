@@ -1,5 +1,7 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
+import FacebookIcon from "@/components/icons/FacebookIcon.astro";
+import LinkedInIcon from "@/components/icons/LinkedInIcon.astro";
 import { contactEmail, contactPhone, navLinks, social } from "@/data/site";
 import { organization } from "@/data/organization";
 ---
@@ -68,6 +70,24 @@ import { organization } from "@/data/organization";
         >
           <DiscordIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
           Discord</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={social.linkedin}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <LinkedInIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
+          LinkedIn</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={social.facebook}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <FacebookIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
+          Facebook</a
         >
         <a
           class="inline-flex items-center gap-2.5 hover:text-white"
