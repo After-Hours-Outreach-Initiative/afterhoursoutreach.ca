@@ -112,31 +112,12 @@ const documents = [
               {organization.incorporationNumber}
             </td>
           </tr>
-          <tr class="border-b border-zinc-700">
+          <tr>
             <th class="p-6 align-top font-normal text-zinc-400" scope="row"
               >Business number</th
             >
             <td class="p-6 font-heading text-xl font-bold tracking-wide">
               {organization.businessNumber}
-            </td>
-          </tr>
-          <tr>
-            <th class="p-6 align-top font-normal text-zinc-400" scope="row"
-              >Address</th
-            >
-            <td class="p-6">
-              <address class="font-heading text-xl font-bold not-italic">
-                <a
-                  class="border-b border-zinc-600 pb-0.5 hover:border-white"
-                  href={organization.address.mapUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {organization.address.street}, {organization.address.city}, {
-                    organization.address.region
-                  }
-                </a>
-              </address>
             </td>
           </tr>
         </tbody>
