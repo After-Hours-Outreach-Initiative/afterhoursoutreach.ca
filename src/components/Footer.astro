@@ -165,25 +165,6 @@ import { organization } from "@/data/organization";
             >
             <td class="text-zinc-300">{organization.businessNumber}</td>
           </tr>
-          <tr>
-            <th
-              class="pr-6 text-left align-top font-normal text-zinc-400"
-              scope="row">Address</th
-            >
-            <td class="text-zinc-300">
-              <address class="not-italic">
-                <a
-                  class="border-b border-zinc-600 pb-0.5 hover:border-white hover:text-white"
-                  href={organization.address.mapUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {organization.address.street}<br />
-                  {organization.address.city}, {organization.address.region}
-                </a>
-              </address>
-            </td>
-          </tr>
         </tbody>
       </table>
     </div>
