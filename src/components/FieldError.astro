@@ -1,0 +1,35 @@
+---
+interface Props {
+  /** Matches the field name passed to showError on the page. */
+  field: string;
+  /** Spacing belongs on the message itself, so a hidden one takes no room. */
+  class?: string;
+}
+
+const { field, class: className } = Astro.props;
+---
+
+<p
+  class:list={[
+    "m-0 flex items-center gap-2 text-base text-red-400",
+    className,
+  ]}
+  id={`error-${field}`}
+  data-error={field}
+  hidden
+>
+  {/* lucide: circle-alert */}
+  <svg
+    class="lucide size-[1.25em] shrink-0"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <path d="M12 8v4"></path>
+    <path d="M12 16h.01"></path>
+  </svg>
+  <span></span>
+</p>
