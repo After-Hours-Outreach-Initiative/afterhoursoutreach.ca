@@ -2,7 +2,7 @@
 import FieldError from "@/components/FieldError.astro";
 import PatrolList from "@/components/PatrolList.astro";
 import Layout from "@/layouts/Layout.astro";
-import { seedPatrols, upcoming } from "@/data/patrols";
+import { seedPatrols, upcoming, visibleTo } from "@/data/patrols";
 
 const patrols = upcoming(seedPatrols);
 ---
@@ -13,16 +13,11 @@ const patrols = upcoming(seedPatrols);
   noindex
 >
   <section class="bg-black text-white">
-    <div
-      class="mx-auto w-full max-w-3xl px-6 py-24 max-sm:px-4 max-sm:py-18"
-    >
+    <div class="mx-auto w-full max-w-3xl px-6 py-24 max-sm:px-4 max-sm:py-18">
       <h1>
         <span class="text-blue">Patrols</span>
       </h1>
-      <p class="mt-8 text-zinc-300">
-        Patrols run every two weeks. Sign in once, then taking a spot is one
-        click and so is giving it up.
-      </p>
+      <p class="mt-8 text-zinc-300">Sign in to take a spot on a patrol.</p>
 
       {
         /*
@@ -68,10 +63,6 @@ const patrols = upcoming(seedPatrols);
         {/* Nobody signed in: ask for an email and mail a link. */}
         <div data-step="email">
           <h2 class="text-2xl">Sign in</h2>
-          <p class="mt-2 text-base text-zinc-300" data-session-note>
-            Give us your email and we will send you a link that signs you in. No
-            password.
-          </p>
 
           <form class="mt-6 flex flex-col gap-4" id="email-form" novalidate>
             <label class="text-base" for="session-email">Email</label>
@@ -199,8 +190,8 @@ const patrols = upcoming(seedPatrols);
               >
                 <path
                   d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
-                />
-                <path d="m15 5 4 4" />
+                ></path>
+                <path d="m15 5 4 4"></path>
               </svg>
               Edit
             </button>
@@ -219,7 +210,7 @@ const patrols = upcoming(seedPatrols);
         id="account"
       >
         <div class="flex items-start justify-between gap-6">
-          <h2 class="text-2xl">Your details</h2>
+          <h2 class="text-2xl">Edit account</h2>
           <button
             class="-mt-1 -mr-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:text-white"
             type="button"
@@ -234,8 +225,8 @@ const patrols = upcoming(seedPatrols);
               stroke-width="2"
               aria-hidden="true"
             >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
             </svg>
           </button>
         </div>
@@ -300,8 +291,8 @@ const patrols = upcoming(seedPatrols);
               stroke-width="2"
               aria-hidden="true"
             >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
             </svg>
           </button>
         </div>
@@ -359,14 +350,49 @@ const patrols = upcoming(seedPatrols);
             />
           </div>
 
-          <label class="flex items-center gap-2 text-base">
+          <label class="flex cursor-pointer items-center gap-3 text-base">
             <input
-              class="size-4 accent-blue"
+              class="switch"
+              id="editor-open"
               name="open"
               type="checkbox"
               checked
             />
-            Open to new signups
+            <span class="switch-track" aria-hidden="true">
+              <span class="switch-thumb">
+                {/* lucide: eye-off */}
+                <svg
+                  class="lucide switch-icon switch-icon-off"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
+                  <path
+                    d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"
+                  />
+                  <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+                  <path
+                    d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"
+                  />
+                  <path d="m2 2 20 20" />
+                </svg>
+                {/* lucide: eye */}
+                <svg
+                  class="lucide switch-icon switch-icon-on"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
+                  <path
+                    d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                  />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </span>
+            </span>
+            <span data-open-label>Visible to volunteers</span>
           </label>
 
           <FieldError field="editor" />
@@ -393,7 +419,9 @@ const patrols = upcoming(seedPatrols);
         {/* Add a patrol sits with the list it adds to, not in the account. */}
         <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
           <h2 class="text-2xl">
-            Upcoming (<span data-patrol-count>{patrols.length}</span>)
+            Upcoming (<span data-patrol-count>
+              {visibleTo(patrols, false).length}
+            </span>)
           </h2>
           <button class="btn btn-primary" type="button" id="add-patrol" hidden>
             Add a patrol
@@ -406,7 +434,7 @@ const patrols = upcoming(seedPatrols);
 </Layout>
 
 <script>
-  import { demoUsers, upcoming } from "@/data/patrols";
+  import { demoUsers, upcoming, visibleTo } from "@/data/patrols";
   import {
     completeSignIn,
     completeSignInWithCode,
@@ -431,8 +459,12 @@ const patrols = upcoming(seedPatrols);
   const codeForm = document.getElementById("code-form") as HTMLFormElement;
   const sent = document.querySelector<HTMLElement>("[data-sent]");
   const sendLink = document.getElementById("send-link") as HTMLButtonElement;
-  const codeSubmit = document.getElementById("code-submit") as HTMLButtonElement;
-  const emailInput = document.getElementById("session-email") as HTMLInputElement;
+  const codeSubmit = document.getElementById(
+    "code-submit",
+  ) as HTMLButtonElement;
+  const emailInput = document.getElementById(
+    "session-email",
+  ) as HTMLInputElement;
   const sentTo = document.querySelector<HTMLElement>("[data-sent-to]");
   const signinLink =
     document.querySelector<HTMLAnchorElement>("[data-signin-link]");
@@ -440,10 +472,14 @@ const patrols = upcoming(seedPatrols);
   const whoName = document.querySelector<HTMLElement>("[data-session-name]");
   const whoEmail = document.querySelector<HTMLElement>("[data-session-email]");
   const addPatrol = document.getElementById("add-patrol") as HTMLButtonElement;
-  const patrolCount = document.querySelector<HTMLElement>("[data-patrol-count]");
+  const patrolCount = document.querySelector<HTMLElement>(
+    "[data-patrol-count]",
+  );
   const editor = document.getElementById("editor") as HTMLDialogElement;
   const account = document.getElementById("account") as HTMLDialogElement;
-  const accountForm = document.getElementById("account-form") as HTMLFormElement;
+  const accountForm = document.getElementById(
+    "account-form",
+  ) as HTMLFormElement;
   const editorForm = document.getElementById("editor-form") as HTMLFormElement;
   const editorHeading = document.querySelector<HTMLElement>(
     "[data-editor-heading]",
@@ -451,6 +487,19 @@ const patrols = upcoming(seedPatrols);
   const editorDelete = document.getElementById(
     "editor-delete",
   ) as HTMLButtonElement;
+  const editorOpen = document.getElementById("editor-open") as HTMLInputElement;
+  const editorSwitch = editorOpen?.nextElementSibling as HTMLElement | null;
+  const openLabel = document.querySelector<HTMLElement>("[data-open-label]");
+
+  /** The switch says which of the two states it is in, not what it will do. */
+  const renderOpenLabel = () => {
+    if (openLabel)
+      openLabel.textContent = editorOpen?.checked
+        ? "Visible to volunteers"
+        : "Hidden from volunteers";
+  };
+
+  editorOpen?.addEventListener("change", renderOpenLabel);
   /** The patrol the popup is open on, if it is editing rather than adding. */
   let editing: string | null = null;
 
@@ -507,7 +556,8 @@ const patrols = upcoming(seedPatrols);
   const syncSendButton = () => {
     if (!sendLink) return;
     const typed = (emailInput?.value ?? "").trim().toLowerCase();
-    sendLink.hidden = Boolean(sentAddress) && typed === sentAddress.toLowerCase();
+    sendLink.hidden =
+      Boolean(sentAddress) && typed === sentAddress.toLowerCase();
   };
 
   const step = (name: "email" | "name" | "in") => {
@@ -555,7 +605,9 @@ const patrols = upcoming(seedPatrols);
     // The heading counts the same patrols the list below renders, so adding or
     // deleting one moves the number with it.
     if (patrolCount)
-      patrolCount.textContent = String(upcoming(patrols()).length);
+      patrolCount.textContent = String(
+        visibleTo(upcoming(patrols()), isOrganizer()).length,
+      );
     if (!me) {
       if (account?.open) account.close();
       step("email");
@@ -688,7 +740,14 @@ const patrols = upcoming(seedPatrols);
     fields.spots.value = String(patrol?.spots ?? 8);
     fields.meetingPoint.value = patrol?.meetingPoint ?? "";
     fields.meetingPointUrl.value = patrol?.meetingPointUrl ?? "";
+    // Setting the switch to this patrol's state is not a toggle, so it skips
+    // the slide and is animated again from the next frame on.
+    editorSwitch?.classList.add("switch-still");
     fields.open.checked = patrol?.open ?? true;
+    renderOpenLabel();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => editorSwitch?.classList.remove("switch-still")),
+    );
   };
 
   addPatrol?.addEventListener("click", () => openEditor());
