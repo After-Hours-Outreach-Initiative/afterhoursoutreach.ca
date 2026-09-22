@@ -1,15 +1,11 @@
 ---
 import { Image } from "astro:assets";
+import PatrolList from "@/components/PatrolList.astro";
 import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
+import { seedPatrols, upcoming } from "@/data/patrols";
 
-const upcomingEvents = [
-  {
-    weekday: "Tuesday",
-    date: "September 22",
-    time: "8:30 PM – 12:00 AM",
-  },
-];
+const patrols = upcoming(seedPatrols);
 ---
 
 <Layout
@@ -67,21 +63,15 @@ const upcomingEvents = [
         Starting in mid October, we plan to run one patrol every two weeks.
       </p>
 
-      <ul class="mt-10 max-w-3xl border border-zinc-700 bg-ink">
-        {
-          upcomingEvents.map((event) => (
-            <li class="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2 border-b border-zinc-800 px-6 py-5 last:border-b-0">
-              <h3>
-                {event.date}
-                <span class="ml-3 font-normal text-zinc-400">
-                  {event.weekday}
-                </span>
-              </h3>
-              <span class="text-base text-zinc-300">{event.time}</span>
-            </li>
-          ))
-        }
-      </ul>
+      <div class="mt-10">
+        <PatrolList patrols={patrols} />
+      </div>
+
+      <p class="mt-8">
+        <a class="text-lg text-blue underline" href="/patrols">
+          See every upcoming patrol
+        </a>
+      </p>
     </div>
   </section>
 </Layout>
