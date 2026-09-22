@@ -167,6 +167,13 @@ export const spotsState = (spotsLeft: number) => {
   return { label: `${spotsLeft} left`, tone: "text-green-400" };
 };
 
+/**
+ * What a viewer is shown. A closed patrol is an organizer's business, so
+ * nobody else sees it on the list at all.
+ */
+export const visibleTo = (patrols: Patrol[], organizer: boolean) =>
+  organizer ? patrols : patrols.filter((patrol) => patrol.open);
+
 /** Patrols still to come, soonest first. */
 export const upcoming = (patrols: Patrol[], now = new Date()) => {
   const today = now.toISOString().slice(0, 10);

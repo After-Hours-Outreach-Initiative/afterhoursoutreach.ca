@@ -4,6 +4,7 @@ import {
   formatStartTime,
   seedCounts,
   spotsState,
+  visibleTo,
   weekdayOf,
   type Patrol,
 } from "@/data/patrols";
@@ -17,7 +18,12 @@ interface Props {
   interactive?: boolean;
 }
 
-const { patrols, interactive = false } = Astro.props;
+const { patrols: given, interactive = false } = Astro.props;
+
+// Nobody is signed in until the script runs, so the markup the server sends
+// carries the open patrols only. An organizer's closed ones arrive with the
+// first client render.
+const patrols = visibleTo(given, false);
 ---
 
 {
@@ -27,15 +33,6 @@ const { patrols, interactive = false } = Astro.props;
     </p>
   ) : (
     <>
-      {interactive && (
-        <p
-          class="mb-4 max-w-3xl text-base text-zinc-400"
-          data-signin-hint
-          hidden
-        >
-          Sign in above to take a spot on a patrol or give one up.
-        </p>
-      )}
       <ul
         class="flex max-w-3xl flex-col gap-4"
         data-patrol-list
@@ -75,17 +72,10 @@ const { patrols, interactive = false } = Astro.props;
                     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
                   <span class={spots.tone}>{spots.label}</span>
-                  {counts.confirmed} of {counts.spots} spots taken
+                  <span class="ml-2">
+                    {counts.confirmed} of {counts.spots} spots taken
+                  </span>
                 </p>
-                {!patrol.open && (
-                  <p class="mt-1 flex items-center gap-2 text-base text-zinc-300">
-                    <span
-                      class="size-[0.6em] shrink-0 rounded-full bg-zinc-500"
-                      aria-hidden="true"
-                    />
-                    Closed to new signups
-                  </p>
-                )}
               </div>
               {patrol.open && counts.spotsLeft > 0 && (
                 <a class="btn btn-outline max-sm:w-full" href="/patrols">
@@ -106,6 +96,7 @@ const { patrols, interactive = false } = Astro.props;
     formatStartTime,
     spotsState,
     upcoming,
+    visibleTo,
     weekdayOf,
   } from "@/data/patrols";
   import {
@@ -124,7 +115,6 @@ const { patrols, interactive = false } = Astro.props;
 
   const list = document.querySelector<HTMLElement>("[data-patrol-list]");
   const interactive = list?.dataset.interactive === "true";
-  const hint = document.querySelector<HTMLElement>("[data-signin-hint]");
 
   /** Patrols with a request in flight, so their row shows it and stays put. */
   const busy = new Set<string>();
@@ -133,6 +123,10 @@ const { patrols, interactive = false } = Astro.props;
   const spinner = `<svg class="lucide btn-icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>`;
 
   const people = `<svg class="lucide size-[1.15em] shrink-0 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>`;
+
+  const eyeOff = `<svg class="lucide size-[1.15em] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" /></svg>`;
+
+  const check = `<svg class="lucide size-[1.15em] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>`;
 
   const chevron = `<svg class="lucide btn-icon transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>`;
 
@@ -159,31 +153,27 @@ const { patrols, interactive = false } = Astro.props;
     const spots = spotsState(tally.spotsLeft);
     return `${people}
       <span class="${spots.tone}">${esc(spots.label)}</span>
-      <span class="text-zinc-300">${tally.confirmed} of ${tally.spots} spots taken</span>`;
+      <span class="ml-2 text-zinc-300">${tally.confirmed} of ${tally.spots} spots taken</span>`;
   };
 
   /**
-   * Where this person stands, marked by a coloured dot. A closed patrol says
-   * so here whether or not anyone is signed in.
-   */
-  /**
-   * A badge, shown only when there is something to say: that this person has a
-   * spot, or that the patrol is shut.
+   * A badge over the card, shown only when this person holds a spot on the
+   * patrol.
    */
   const statusLine = (patrolId: string) => {
-    const patrol = patrols().find((item) => item.id === patrolId);
-    if (!patrol) return "";
-
-    const badge = (tone: string, label: string) =>
-      `<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-base ${tone}">${esc(label)}</span>`;
-
-    if (!patrol.open)
-      return badge("border-zinc-600 text-zinc-400", "Closed to new signups");
     if (!interactive || !session()?.name) return "";
+    if (!mySignup(patrolId)) return "";
+    return `<span class="inline-flex items-center gap-1.5 rounded-full border border-green-500 bg-green-500/15 px-2.5 py-0.5 text-base text-green-400">${check}Signed up</span>`;
+  };
 
-    return mySignup(patrolId)
-      ? badge("border-green-500 bg-green-500/15 text-green-400", "Signed up")
-      : "";
+  /**
+   * A closed patrol is off the list for everyone but organizers, so the card
+   * says so across its top rather than in a badge beside the date.
+   */
+  const hiddenBanner = (patrolId: string) => {
+    const patrol = patrols().find((item) => item.id === patrolId);
+    if (!patrol || patrol.open) return "";
+    return `<p class="m-0 flex items-center gap-2 border-b border-zinc-700 bg-white/5 px-6 py-2 text-base text-zinc-400 max-sm:px-4">${eyeOff}Hidden. Only organizers can see.</p>`;
   };
 
   const action = (patrolId: string) => {
@@ -289,29 +279,31 @@ const { patrols, interactive = false } = Astro.props;
 
   const render = () => {
     if (!list) return;
-    if (hint) hint.hidden = !interactive || Boolean(session()?.name);
-    list.innerHTML = upcoming(patrols())
+    list.innerHTML = visibleTo(upcoming(patrols()), isOrganizer())
       .map(
         (patrol) => `
           <li
-            class="border border-zinc-700 bg-ink px-6 py-5 max-sm:px-4"
+            class="border border-zinc-700 bg-ink"
             data-patrol-id="${esc(patrol.id)}"
           >
-            <div class="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
-              <div class="min-w-0">
-                <h3>
-                  ${esc(weekdayOf(patrol.date))}, ${esc(formatPatrolDate(patrol.date))}
-                  <span class="font-normal text-zinc-400">&middot; ${esc(formatStartTime(patrol))}</span>
-                </h3>
-                <p class="mt-1 text-base text-zinc-300">
-                  Meeting at ${meetingPoint(patrol)}
-                </p>
-                <p class="mt-1 flex items-center gap-2 text-base">${spotsLine(patrol.id)}</p>
-                ${statusLine(patrol.id) ? `<p class="mt-1 text-base">${statusLine(patrol.id)}</p>` : ""}
+            ${hiddenBanner(patrol.id)}
+            <div class="px-6 py-5 max-sm:px-4">
+              <div class="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+                <div class="min-w-0">
+                  ${statusLine(patrol.id) ? `<p class="mb-2 text-base">${statusLine(patrol.id)}</p>` : ""}
+                  <h3>
+                    ${esc(weekdayOf(patrol.date))}, ${esc(formatPatrolDate(patrol.date))}
+                    <span class="font-normal text-zinc-400">&middot; ${esc(formatStartTime(patrol))}</span>
+                  </h3>
+                  <p class="mt-1 text-base text-zinc-300">
+                    Meeting at ${meetingPoint(patrol)}
+                  </p>
+                  <p class="mt-1 flex items-center gap-2 text-base">${spotsLine(patrol.id)}</p>
+                </div>
+                ${rowButtons(patrol.id)}
               </div>
-              ${rowButtons(patrol.id)}
+              ${organizerControls(patrol.id)}
             </div>
-            ${organizerControls(patrol.id)}
           </li>`,
       )
       .join("");
