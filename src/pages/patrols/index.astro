@@ -1,0 +1,862 @@
+---
+import FieldError from "@/components/FieldError.astro";
+import PatrolList from "@/components/PatrolList.astro";
+import Layout from "@/layouts/Layout.astro";
+import { seedPatrols, upcoming, visibleTo } from "@/data/patrols";
+
+const patrols = upcoming(seedPatrols);
+---
+
+<Layout
+  title="Patrols | After Hours Outreach Initiative"
+  description="Upcoming outreach patrols in Vancouver's Downtown Eastside, and how to take a spot on one."
+  noindex
+>
+  <section class="bg-black text-white">
+    <div class="mx-auto w-full max-w-3xl px-6 py-24 max-sm:px-4 max-sm:py-18">
+      <h1>
+        <span class="text-blue">Patrols</span>
+      </h1>
+      <p class="mt-8 text-zinc-300">Sign in to take a spot on a patrol.</p>
+
+      {
+        /*
+        Mockup scaffolding, not part of the design. It jumps between the three
+        views without going through the sign in email each time.
+      */
+      }
+      <div
+        class="mt-10 border border-dashed border-zinc-700 px-6 py-4 max-sm:px-4"
+      >
+        <p
+          class="m-0 flex flex-wrap items-center gap-3 text-base text-zinc-400"
+        >
+          Mockup only. View as
+          <button
+            class="btn btn-quiet px-3 aria-[pressed=true]:border-white aria-[pressed=true]:text-white"
+            type="button"
+            data-view="visitor"
+          >
+            Visitor
+          </button>
+          <button
+            class="btn btn-quiet px-3 aria-[pressed=true]:border-white aria-[pressed=true]:text-white"
+            type="button"
+            data-view="volunteer"
+          >
+            Volunteer
+          </button>
+          <button
+            class="btn btn-quiet px-3 aria-[pressed=true]:border-white aria-[pressed=true]:text-white"
+            type="button"
+            data-view="organizer"
+          >
+            Organizer
+          </button>
+        </p>
+      </div>
+
+      <div
+        class="mt-10 border border-zinc-700 bg-ink px-6 py-6 max-sm:px-4"
+        id="session-panel"
+      >
+        {/* Nobody signed in: ask for an email and mail a link. */}
+        <div data-step="email">
+          <h2 class="text-2xl">Sign in</h2>
+
+          <form class="mt-6 flex flex-col gap-4" id="email-form" novalidate>
+            <label class="text-base" for="session-email">Email</label>
+            <input
+              class="min-h-11 max-w-md rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+              id="session-email"
+              data-field="email"
+              aria-describedby="error-email"
+              name="email"
+              type="email"
+              autocomplete="email"
+            />
+            <FieldError field="email" />
+            <button
+              class="btn btn-primary self-start"
+              type="submit"
+              id="send-link"
+            >
+              Send me a link
+            </button>
+          </form>
+
+          {
+            /* The code arrives under the email, which stays on screen so they
+            can see the address the code went to and fix it if it is wrong. */
+          }
+          <div data-sent hidden>
+            <form class="mt-8 flex flex-col gap-4" id="code-form" novalidate>
+              <label class="text-base" for="session-code">
+                Enter the six digit code we sent to <span data-sent-to></span>
+              </label>
+              <input
+                class="min-h-11 w-40 rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+                id="session-code"
+                data-field="code"
+                aria-describedby="error-code"
+                name="code"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+              />
+              <FieldError field="code" />
+              <button
+                class="btn btn-primary self-start"
+                type="submit"
+                id="code-submit"
+              >
+                Sign in
+              </button>
+            </form>
+
+            <p class="mt-8 text-base text-zinc-300">
+              Or open the link, on this device or any other. Whichever device
+              opens it is the one that ends up signed in, and this tab catches
+              up on its own.
+            </p>
+
+            <div class="mt-4 border border-zinc-700 bg-black px-5 py-4">
+              <p class="m-0 text-base text-zinc-400">
+                There is no real email in this mockup, so here is what would
+                have been in it. The link opens in a new tab, the way clicking
+                it in a mail app would.
+              </p>
+              <p class="mt-3 text-xl" data-sent-code></p>
+              <a
+                class="btn btn-primary mt-4"
+                href="/patrols"
+                target="_blank"
+                rel="noreferrer"
+                data-signin-link
+              >
+                Sign me in
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {
+          /* First time on this address: we still need something to call them. */
+        }
+        <div data-step="name" hidden>
+          <h2 class="text-2xl">What should we call you?</h2>
+          <p class="mt-2 text-base text-zinc-300">
+            This is the name organizers will see on the patrol list.
+          </p>
+          <form class="mt-6 flex flex-col gap-4" id="name-form" novalidate>
+            <label class="text-base" for="session-name">Name</label>
+            <input
+              class="min-h-11 max-w-md rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+              id="session-name"
+              data-field="name"
+              aria-describedby="error-name"
+              name="name"
+              type="text"
+              autocomplete="name"
+            />
+            <FieldError field="name" />
+            <button class="btn btn-primary self-start" type="submit">
+              Save
+            </button>
+          </form>
+        </div>
+
+        {/* Signed in. */}
+        <div class="flex flex-col gap-3" data-step="in" hidden>
+          <h2 class="mb-2 text-2xl">Account</h2>
+          <p class="m-0 text-base">
+            <span class="text-zinc-400">Name</span>
+            <span class="ml-2" data-session-name></span>
+          </p>
+          <p class="m-0 text-base">
+            <span class="text-zinc-400">Email</span>
+            <span class="ml-2" data-session-email></span>
+          </p>
+          <div class="mt-3 flex flex-wrap items-center gap-3.5">
+            <button class="btn btn-quiet" type="button" id="account-edit">
+              <svg
+                class="lucide btn-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                ></path>
+                <path d="m15 5 4 4"></path>
+              </svg>
+              Edit
+            </button>
+            <button class="btn btn-quiet" type="button" id="session-out">
+              Sign out
+            </button>
+          </div>
+        </div>
+
+        <FieldError field="link" class="mt-6" />
+      </div>
+
+      {/* Account details. Opened by Edit in the signed in panel. */}
+      <dialog
+        class="dialog-pop m-auto w-[calc(100%-2rem)] max-w-lg rounded-lg border border-zinc-700 bg-ink p-6 text-zinc-100 max-sm:p-4"
+        id="account"
+      >
+        <div class="flex items-start justify-between gap-6">
+          <h2 class="text-2xl">Edit account</h2>
+          <button
+            class="-mt-1 -mr-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:text-white"
+            type="button"
+            id="account-close"
+            aria-label="Close"
+          >
+            <svg
+              class="lucide size-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <form class="mt-6 flex flex-col gap-5" id="account-form" novalidate>
+          <div class="flex flex-col gap-2">
+            <label class="text-base" for="account-name">Name</label>
+            <input
+              class="min-h-11 max-w-md rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+              id="account-name"
+              data-field="account"
+              aria-describedby="error-account"
+              name="name"
+              type="text"
+              autocomplete="name"
+            />
+            <FieldError field="account" />
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="text-base" for="account-email">Email</label>
+            <input
+              class="min-h-11 max-w-md rounded-lg border border-zinc-700 bg-black px-4 text-base text-zinc-400"
+              id="account-email"
+              name="email"
+              type="email"
+              readonly
+            />
+            <p class="m-0 text-base text-zinc-400">
+              To use a different email, sign out and sign in with that email
+              address.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-end gap-3.5">
+            <button class="btn btn-quiet" type="button" id="account-cancel">
+              Cancel
+            </button>
+            <button class="btn btn-primary" type="submit">Save</button>
+          </div>
+        </form>
+      </dialog>
+
+      {/* Organizers only. Opened by Add a patrol, or Edit on a row. */}
+      <dialog
+        class="dialog-pop m-auto w-[calc(100%-2rem)] max-w-lg rounded-lg border border-zinc-700 bg-ink p-6 text-zinc-100 max-sm:p-4"
+        id="editor"
+      >
+        <div class="flex items-start justify-between gap-6">
+          <h2 class="text-2xl" data-editor-heading>Add a patrol</h2>
+          <button
+            class="-mt-1 -mr-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:text-white"
+            type="button"
+            id="editor-close"
+            aria-label="Close"
+          >
+            <svg
+              class="lucide size-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <form class="mt-6 flex flex-col gap-5" id="editor-form" novalidate>
+          <input type="hidden" name="id" />
+          <div class="flex flex-wrap gap-5">
+            <div class="flex flex-col gap-2">
+              <label class="text-base" for="editor-date">Date</label>
+              <input
+                class="min-h-11 rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+                id="editor-date"
+                name="date"
+                type="date"
+              />
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="text-base" for="editor-start">Start time</label>
+              <input
+                class="min-h-11 rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+                id="editor-start"
+                name="startTime"
+                type="time"
+              />
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="text-base" for="editor-spots">Spots</label>
+              <input
+                class="min-h-11 w-24 rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+                id="editor-spots"
+                name="spots"
+                type="number"
+                min="1"
+                max="60"
+              />
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="text-base" for="editor-meeting">Meeting point</label>
+            <input
+              class="min-h-11 max-w-md rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+              id="editor-meeting"
+              name="meetingPoint"
+              type="text"
+            />
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="text-base" for="editor-map">Map link</label>
+            <input
+              class="min-h-11 max-w-md rounded-lg border border-zinc-600 bg-black px-4 text-base text-white aria-[invalid=true]:border-red-400"
+              id="editor-map"
+              name="meetingPointUrl"
+              type="url"
+            />
+          </div>
+
+          <label class="flex cursor-pointer items-center gap-3 text-base">
+            <input
+              class="switch"
+              id="editor-open"
+              name="open"
+              type="checkbox"
+              checked
+            />
+            <span class="switch-track" aria-hidden="true">
+              <span class="switch-thumb">
+                {/* lucide: eye-off */}
+                <svg
+                  class="lucide switch-icon switch-icon-off"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
+                  <path
+                    d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"
+                  />
+                  <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+                  <path
+                    d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"
+                  />
+                  <path d="m2 2 20 20" />
+                </svg>
+                {/* lucide: eye */}
+                <svg
+                  class="lucide switch-icon switch-icon-on"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
+                  <path
+                    d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                  />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </span>
+            </span>
+            <span data-open-label>Visible to volunteers</span>
+          </label>
+
+          <FieldError field="editor" />
+
+          <button
+            class="btn btn-red self-start"
+            type="button"
+            id="editor-delete"
+            hidden
+          >
+            Delete patrol
+          </button>
+
+          <div class="flex flex-wrap items-center justify-end gap-3.5">
+            <button class="btn btn-quiet" type="button" id="editor-cancel">
+              Cancel
+            </button>
+            <button class="btn btn-primary" type="submit">Save patrol</button>
+          </div>
+        </form>
+      </dialog>
+
+      <div class="mt-10">
+        {/* Add a patrol sits with the list it adds to, not in the account. */}
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+          <h2 class="text-2xl">
+            Upcoming (<span data-patrol-count>
+              {visibleTo(patrols, false).length}
+            </span>)
+          </h2>
+          <button class="btn btn-primary" type="button" id="add-patrol" hidden>
+            Add a patrol
+          </button>
+        </div>
+        <PatrolList patrols={patrols} interactive />
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  import { demoUsers, upcoming, visibleTo } from "@/data/patrols";
+  import {
+    completeSignIn,
+    completeSignInWithCode,
+    isOrganizer,
+    patrol as getPatrol,
+    patrols,
+    counts,
+    deletePatrol,
+    savePatrol,
+    signInAs,
+    load,
+    requestSignIn,
+    session,
+    setName,
+    signOut,
+    subscribe,
+  } from "@/scripts/patrol-store";
+
+  const panel = document.getElementById("session-panel") as HTMLElement;
+  const emailForm = document.getElementById("email-form") as HTMLFormElement;
+  const nameForm = document.getElementById("name-form") as HTMLFormElement;
+  const codeForm = document.getElementById("code-form") as HTMLFormElement;
+  const sent = document.querySelector<HTMLElement>("[data-sent]");
+  const sendLink = document.getElementById("send-link") as HTMLButtonElement;
+  const codeSubmit = document.getElementById(
+    "code-submit",
+  ) as HTMLButtonElement;
+  const emailInput = document.getElementById(
+    "session-email",
+  ) as HTMLInputElement;
+  const sentTo = document.querySelector<HTMLElement>("[data-sent-to]");
+  const signinLink =
+    document.querySelector<HTMLAnchorElement>("[data-signin-link]");
+  const sentCode = document.querySelector<HTMLElement>("[data-sent-code]");
+  const whoName = document.querySelector<HTMLElement>("[data-session-name]");
+  const whoEmail = document.querySelector<HTMLElement>("[data-session-email]");
+  const addPatrol = document.getElementById("add-patrol") as HTMLButtonElement;
+  const patrolCount = document.querySelector<HTMLElement>(
+    "[data-patrol-count]",
+  );
+  const editor = document.getElementById("editor") as HTMLDialogElement;
+  const account = document.getElementById("account") as HTMLDialogElement;
+  const accountForm = document.getElementById(
+    "account-form",
+  ) as HTMLFormElement;
+  const editorForm = document.getElementById("editor-form") as HTMLFormElement;
+  const editorHeading = document.querySelector<HTMLElement>(
+    "[data-editor-heading]",
+  );
+  const editorDelete = document.getElementById(
+    "editor-delete",
+  ) as HTMLButtonElement;
+  const editorOpen = document.getElementById("editor-open") as HTMLInputElement;
+  const editorSwitch = editorOpen?.nextElementSibling as HTMLElement | null;
+  const openLabel = document.querySelector<HTMLElement>("[data-open-label]");
+
+  /** The switch says which of the two states it is in, not what it will do. */
+  const renderOpenLabel = () => {
+    if (openLabel)
+      openLabel.textContent = editorOpen?.checked
+        ? "Visible to volunteers"
+        : "Hidden from volunteers";
+  };
+
+  editorOpen?.addEventListener("change", renderOpenLabel);
+  /** The patrol the popup is open on, if it is editing rather than adding. */
+  let editing: string | null = null;
+
+  let sentAddress: string | null = null;
+
+  const showError = (field: string, message: string) => {
+    const target = document.querySelector<HTMLElement>(
+      `[data-error="${field}"]`,
+    );
+    if (!target) return;
+    const text = target.querySelector("span");
+    if (text) text.textContent = message;
+    target.hidden = message === "";
+
+    const input = document.querySelector<HTMLElement>(
+      `[data-field="${field}"]`,
+    );
+    if (message === "") input?.removeAttribute("aria-invalid");
+    else input?.setAttribute("aria-invalid", "true");
+  };
+
+  const looksLikeEmail = (value: string) =>
+    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+
+  const spinner = `<svg class="lucide btn-icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>`;
+
+  /**
+   * Signing in waits on a server in the real thing, so the button says what it
+   * is doing and refuses a second press until the wait is over.
+   */
+  async function whileBusy<T>(
+    button: HTMLButtonElement | null,
+    label: string,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    if (!button) return work();
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.classList.add("opacity-60");
+    button.innerHTML = `${spinner}${label}`;
+    try {
+      return await work();
+    } finally {
+      button.disabled = false;
+      button.classList.remove("opacity-60");
+      button.innerHTML = original;
+    }
+  }
+
+  /**
+   * Nothing to send while the code for this address is on screen. Editing the
+   * address makes that code stale, so the button comes back with the change.
+   */
+  const syncSendButton = () => {
+    if (!sendLink) return;
+    const typed = (emailInput?.value ?? "").trim().toLowerCase();
+    sendLink.hidden =
+      Boolean(sentAddress) && typed === sentAddress.toLowerCase();
+  };
+
+  const step = (name: "email" | "name" | "in") => {
+    panel
+      .querySelectorAll<HTMLElement>("[data-step]")
+      .forEach((el) => (el.hidden = el.dataset.step !== name));
+    // The code sits inside the email step, so it hides with the address gone.
+    if (sent) sent.hidden = name !== "email" || !sentAddress;
+    syncSendButton();
+  };
+
+  const views = document.querySelectorAll<HTMLButtonElement>("[data-view]");
+
+  const renderSwitcher = () => {
+    const me = session();
+    const current = !me ? "visitor" : isOrganizer() ? "organizer" : "volunteer";
+    views.forEach((button) =>
+      button.setAttribute(
+        "aria-pressed",
+        button.dataset.view === current ? "true" : "false",
+      ),
+    );
+  };
+
+  views.forEach((button) =>
+    button.addEventListener("click", () => {
+      sentAddress = null;
+      const view = button.dataset.view;
+      if (view === "visitor") {
+        signOut();
+        return;
+      }
+      const who =
+        view === "organizer" ? demoUsers.organizer : demoUsers.volunteer;
+      signInAs(who.email, who.name);
+    }),
+  );
+
+  const render = () => {
+    renderSwitcher();
+    const me = session();
+    // Add a patrol sits outside the session panel now, so it hides on its own
+    // whenever the person signing in is not an organizer.
+    if (addPatrol) addPatrol.hidden = !isOrganizer();
+    // The heading counts the same patrols the list below renders, so adding or
+    // deleting one moves the number with it.
+    if (patrolCount)
+      patrolCount.textContent = String(
+        visibleTo(upcoming(patrols()), isOrganizer()).length,
+      );
+    if (!me) {
+      if (account?.open) account.close();
+      step("email");
+      return;
+    }
+    if (!me.name) {
+      step("name");
+      return;
+    }
+    if (whoName) whoName.textContent = me.name;
+    if (whoEmail) whoEmail.textContent = me.email;
+    // Organizer powers ride on who is signed in, so they come and go with them.
+    if (editor?.open && !isOrganizer()) editor.close();
+    step("in");
+  };
+
+  emailForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    showError("email", "");
+    const email = String(new FormData(emailForm).get("email") ?? "").trim();
+    if (!looksLikeEmail(email)) {
+      showError("email", "Enter a valid email address.");
+      return;
+    }
+    const sent = await whileBusy(sendLink, "Sending", () =>
+      requestSignIn(email, location.pathname),
+    );
+    sentAddress = sent.email;
+    if (sentTo) sentTo.textContent = sent.email;
+    if (signinLink) signinLink.href = sent.href;
+    if (sentCode) sentCode.textContent = sent.code;
+    render();
+  });
+
+  codeForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    showError("code", "");
+    if (!sentAddress) return;
+    const code = String(new FormData(codeForm).get("code") ?? "").trim();
+    const result = await whileBusy(codeSubmit, "Signing in", () =>
+      completeSignInWithCode(sentAddress!, code),
+    );
+    if (!result.ok) {
+      showError("code", result.error);
+      return;
+    }
+    sentAddress = null;
+    codeForm.reset();
+    render();
+  });
+
+  nameForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    showError("name", "");
+    const name = String(new FormData(nameForm).get("name") ?? "").trim();
+    if (name === "") {
+      showError("name", "Enter your name.");
+      return;
+    }
+    setName(name);
+    render();
+  });
+
+  document.getElementById("account-edit")?.addEventListener("click", () => {
+    const me = session();
+    if (!me) return;
+    showError("account", "");
+    const fields = accountForm.elements as any;
+    fields.name.value = me.name;
+    fields.email.value = me.email;
+    account.showModal();
+  });
+
+  document
+    .getElementById("account-cancel")
+    ?.addEventListener("click", () => account.close());
+
+  document
+    .getElementById("account-close")
+    ?.addEventListener("click", () => account.close());
+
+  accountForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    showError("account", "");
+    const name = String(new FormData(accountForm).get("name") ?? "").trim();
+    if (name === "") {
+      showError("account", "Enter your name.");
+      return;
+    }
+    setName(name);
+    account.close();
+  });
+
+  document.getElementById("session-out")?.addEventListener("click", () => {
+    sentAddress = null;
+    signOut();
+  });
+
+  // Typing is the fix, so the complaint goes away as soon as they start.
+  document.querySelectorAll<HTMLElement>("[data-field]").forEach((input) => {
+    input.addEventListener("input", () => showError(input.dataset.field!, ""));
+  });
+
+  emailInput?.addEventListener("input", syncSendButton);
+
+  // Organizer editing. Opened from Add a patrol, or from Edit on a row.
+  const clearMarks = () =>
+    editorForm
+      .querySelectorAll("input")
+      .forEach((input) => input.removeAttribute("aria-invalid"));
+
+  const markEditor = (id: string) => {
+    clearMarks();
+    document.getElementById(id)?.setAttribute("aria-invalid", "true");
+  };
+
+  const openEditor = (patrolId?: string) => {
+    const patrol = patrolId ? getPatrol(patrolId) : undefined;
+    editing = patrol?.id ?? null;
+    if (editorDelete) editorDelete.hidden = !patrol;
+    editor.showModal();
+    showError("editor", "");
+    clearMarks();
+    if (editorHeading)
+      editorHeading.textContent = patrol ? "Edit patrol" : "Add a patrol";
+    const fields = editorForm.elements as any;
+    fields.id.value = patrol?.id ?? "";
+    fields.date.value = patrol?.date ?? "";
+    fields.startTime.value = patrol?.startTime ?? "20:30";
+    fields.spots.value = String(patrol?.spots ?? 8);
+    fields.meetingPoint.value = patrol?.meetingPoint ?? "";
+    fields.meetingPointUrl.value = patrol?.meetingPointUrl ?? "";
+    // Setting the switch to this patrol's state is not a toggle, so it skips
+    // the slide and is animated again from the next frame on.
+    editorSwitch?.classList.add("switch-still");
+    fields.open.checked = patrol?.open ?? true;
+    renderOpenLabel();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => editorSwitch?.classList.remove("switch-still")),
+    );
+  };
+
+  addPatrol?.addEventListener("click", () => openEditor());
+
+  document.addEventListener("patrol:edit", (event) =>
+    openEditor((event as CustomEvent<string>).detail),
+  );
+
+  document
+    .getElementById("editor-cancel")
+    ?.addEventListener("click", () => editor.close());
+
+  document
+    .getElementById("editor-close")
+    ?.addEventListener("click", () => editor.close());
+
+  // A click on the backdrop lands on the dialog itself, so the pointer being
+  // outside the box is what tells the two apart. The dialog has padding, and
+  // a click on that is still a click inside.
+  const closeOnBackdrop = (dialog: HTMLDialogElement) =>
+    dialog.addEventListener("click", (event) => {
+      const box = dialog.getBoundingClientRect();
+      const outside =
+        event.clientX < box.left ||
+        event.clientX > box.right ||
+        event.clientY < box.top ||
+        event.clientY > box.bottom;
+      if (outside) dialog.close();
+    });
+
+  closeOnBackdrop(editor);
+  closeOnBackdrop(account);
+
+  editorDelete?.addEventListener("click", () => {
+    if (!editing) return;
+    const tally = counts(editing);
+    const warning =
+      tally.confirmed > 0
+        ? `${tally.confirmed} people are signed up for this patrol. Delete it anyway?`
+        : "Delete this patrol?";
+    if (!confirm(warning)) return;
+    deletePatrol(editing);
+    editor.close();
+  });
+
+  editorForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = new FormData(editorForm);
+    const date = String(data.get("date") ?? "");
+    const meetingPoint = String(data.get("meetingPoint") ?? "").trim();
+    const spots = Number(data.get("spots") ?? 0);
+
+    if (!date) {
+      markEditor("editor-date");
+      showError("editor", "Pick a date.");
+      return;
+    }
+    if (meetingPoint === "") {
+      markEditor("editor-meeting");
+      showError("editor", "Say where the team meets.");
+      return;
+    }
+    if (!Number.isInteger(spots) || spots < 1) {
+      markEditor("editor-spots");
+      showError("editor", "A patrol needs at least one spot.");
+      return;
+    }
+
+    const existing = String(data.get("id") ?? "");
+    let id = existing;
+    if (!id) {
+      id = date;
+      let suffix = 2;
+      while (patrols().some((patrol) => patrol.id === id)) {
+        id = `${date}-${suffix}`;
+        suffix += 1;
+      }
+    }
+
+    savePatrol({
+      id,
+      date,
+      startTime: String(data.get("startTime") ?? "20:30"),
+      meetingPoint,
+      meetingPointUrl:
+        String(data.get("meetingPointUrl") ?? "").trim() || undefined,
+      spots,
+      open: data.get("open") === "on",
+    });
+
+    showError("editor", "");
+    clearMarks();
+    editor.close();
+  });
+
+  const signinToken = new URLSearchParams(location.search).get("signin");
+
+  load();
+
+  if (signinToken) {
+    const result = completeSignIn(signinToken);
+    history.replaceState(null, "", location.pathname);
+    if (result.ok) {
+      sentAddress = null;
+    } else {
+      showError("link", result.error);
+    }
+  }
+
+  render();
+  subscribe(render);
+</script>

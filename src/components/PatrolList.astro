@@ -1,0 +1,368 @@
+---
+import {
+  formatPatrolDate,
+  formatStartTime,
+  seedCounts,
+  spotsState,
+  visibleTo,
+  weekdayOf,
+  type Patrol,
+} from "@/data/patrols";
+
+interface Props {
+  patrols: Patrol[];
+  /**
+   * On the patrol list, rows carry the sign up button and show where the
+   * person stands. Elsewhere, such as the homepage, a row is just a link.
+   */
+  interactive?: boolean;
+}
+
+const { patrols: given, interactive = false } = Astro.props;
+
+// Nobody is signed in until the script runs, so the markup the server sends
+// carries the open patrols only. An organizer's closed ones arrive with the
+// first client render.
+const patrols = visibleTo(given, false);
+---
+
+{
+  patrols.length === 0 ? (
+    <p class="max-w-3xl text-zinc-300">
+      No patrols are scheduled right now. Check back soon.
+    </p>
+  ) : (
+    <>
+      <ul
+        class="flex max-w-3xl flex-col gap-4"
+        data-patrol-list
+        data-interactive={interactive ? "true" : undefined}
+      >
+        {patrols.map((patrol) => {
+          const counts = seedCounts(patrol.id);
+          const spots = spotsState(counts.spotsLeft);
+          return (
+            <li
+              class="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border border-zinc-700 bg-ink px-6 py-5 max-sm:px-4"
+              data-patrol-id={patrol.id}
+            >
+              <div>
+                <h3>
+                  {weekdayOf(patrol.date)}, {formatPatrolDate(patrol.date)}{" "}
+                  <span class="font-normal text-zinc-400">
+                    &middot; {formatStartTime(patrol)}
+                  </span>
+                </h3>
+                <p class="mt-1 text-base text-zinc-300">
+                  Meeting at {patrol.meetingPoint}
+                </p>
+                <p class="mt-1 flex items-center gap-2 text-base text-zinc-300">
+                  {/* lucide: users */}
+                  <svg
+                    class="lucide size-[1.15em] shrink-0 text-zinc-500"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  <span class={spots.tone}>{spots.label}</span>
+                  <span class="ml-2">
+                    {counts.confirmed} of {counts.spots} spots taken
+                  </span>
+                </p>
+              </div>
+              {patrol.open && counts.spotsLeft > 0 && (
+                <a class="btn btn-outline max-sm:w-full" href="/patrols">
+                  Sign up
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  )
+}
+
+<script>
+  import {
+    formatPatrolDate,
+    formatStartTime,
+    spotsState,
+    upcoming,
+    visibleTo,
+    weekdayOf,
+  } from "@/data/patrols";
+  import {
+    cancelSignup,
+    counts,
+    isOrganizer,
+    load,
+    mySignup,
+    patrol as getPatrol,
+    patrols,
+    session,
+    signUp,
+    signupsFor,
+    subscribe,
+  } from "@/scripts/patrol-store";
+
+  const list = document.querySelector<HTMLElement>("[data-patrol-list]");
+  const interactive = list?.dataset.interactive === "true";
+
+  /** Patrols with a request in flight, so their row shows it and stays put. */
+  const busy = new Set<string>();
+
+  // lucide: loader-circle
+  const spinner = `<svg class="lucide btn-icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>`;
+
+  const people = `<svg class="lucide size-[1.15em] shrink-0 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>`;
+
+  const eyeOff = `<svg class="lucide size-[1.15em] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" /></svg>`;
+
+  const check = `<svg class="lucide size-[1.15em] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>`;
+
+  const chevron = `<svg class="lucide btn-icon transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>`;
+
+  const pencil = `<svg class="lucide btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" /></svg>`;
+
+  const esc = (value: string) =>
+    value.replace(
+      /[&<>"]/g,
+      (char) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char] ??
+        char,
+    );
+
+  /** Patrols whose roster is open, for organizers only. */
+  const openRosters = new Set<string>();
+
+  /**
+   * The line under the time. Once we know who someone is it leads with where
+   * they stand, marked by a coloured dot, and keeps the count beside it.
+   */
+  /** Spots taken out of the total, then how many are left, in colour. */
+  const spotsLine = (patrolId: string) => {
+    const tally = counts(patrolId);
+    const spots = spotsState(tally.spotsLeft);
+    return `${people}
+      <span class="${spots.tone}">${esc(spots.label)}</span>
+      <span class="ml-2 text-zinc-300">${tally.confirmed} of ${tally.spots} spots taken</span>`;
+  };
+
+  /**
+   * A badge over the card, shown only when this person holds a spot on the
+   * patrol.
+   */
+  const statusLine = (patrolId: string) => {
+    if (!interactive || !session()?.name) return "";
+    if (!mySignup(patrolId)) return "";
+    return `<span class="inline-flex items-center gap-1.5 rounded-full border border-green-500 bg-green-500/15 px-2.5 py-0.5 text-base text-green-400">${check}Signed up</span>`;
+  };
+
+  /**
+   * A closed patrol is off the list for everyone but organizers, so the card
+   * says so across its top rather than in a badge beside the date.
+   */
+  const hiddenBanner = (patrolId: string) => {
+    const patrol = patrols().find((item) => item.id === patrolId);
+    if (!patrol || patrol.open) return "";
+    return `<p class="m-0 flex items-center gap-2 border-b border-zinc-700 bg-white/5 px-6 py-2 text-base text-zinc-400 max-sm:px-4">${eyeOff}Hidden. Only organizers can see.</p>`;
+  };
+
+  const action = (patrolId: string) => {
+    const patrol = patrols().find((item) => item.id === patrolId);
+    if (!patrol) return "";
+    const tally = counts(patrolId);
+    const label = "Sign up";
+
+    // A closed patrol is there to be read, not acted on, and there is no page
+    // to send anyone to.
+    if (!patrol.open) return "";
+
+    if (!interactive)
+      return `<a class="btn btn-outline max-sm:w-full" href="/patrols">${label}</a>`;
+
+    // Nothing here does anything until we know who they are, so the line
+    // above the list stands in for the buttons.
+    if (!session()?.name) return "";
+
+    const mine = mySignup(patrolId);
+
+    // The store has not changed yet, so whether they hold a spot says which
+    // way this request is going.
+    if (busy.has(patrolId))
+      return `<button class="btn ${mine ? "btn-red" : "btn-green"} opacity-60 max-sm:w-full" type="button" disabled>${spinner}${mine ? "Cancelling" : "Signing up"}</button>`;
+
+    if (mine)
+      return `<button class="btn btn-red max-sm:w-full" type="button" data-cancel="${esc(mine.id)}" data-patrol="${esc(patrolId)}">Cancel my spot</button>`;
+
+    // Nothing to offer on a full patrol now that there is no waitlist.
+    if (tally.spotsLeft === 0) return "";
+
+    return `<button class="btn btn-green max-sm:w-full" type="button" data-signup="${esc(patrol.id)}">${label}</button>`;
+  };
+
+  // The server rendered the seed so the page reads without JavaScript. From
+  // here the list is rebuilt from the store, which also picks up patrols an
+  // organizer added.
+  const when = (value: number) =>
+    new Date(value).toLocaleString("en-CA", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+  /** The roster an organizer can open under a row. */
+  const roster = (patrolId: string) => {
+    const people = signupsFor(patrolId, "confirmed");
+    return `<div class="mt-4 border-t border-zinc-800 pt-4">
+        <h4>Volunteers (${people.length})</h4>
+        <ul class="mt-3 flex flex-col gap-3">
+          ${people
+            .map(
+              (signup) => `
+                <li class="flex flex-col rounded-lg border border-zinc-800 bg-panel-soft px-4 py-3 text-base">
+                  <span>${esc(signup.name)}</span>
+                  <span class="text-zinc-400">${esc(signup.email)}</span>
+                  <span class="text-zinc-500">${esc(when(signup.createdAt))}</span>
+                </li>`,
+            )
+            .join("")}
+        </ul>
+      </div>`;
+  };
+
+  /** The extra controls an organizer gets on every row. */
+  const organizerControls = (patrolId: string) => {
+    if (!interactive || !isOrganizer()) return "";
+    const patrol = getPatrol(patrolId);
+    if (!patrol) return "";
+    // An empty roster has nothing to open, so the row carries no dropdown
+    // until somebody signs up. Closing and deleting live inside the edit
+    // popup, which the Edit button beside the sign up button opens.
+    if (signupsFor(patrolId, "confirmed").length === 0) return "";
+    return `<details class="group mt-4" ${openRosters.has(patrolId) ? "open" : ""} data-roster="${esc(patrolId)}">
+        <summary class="flex cursor-pointer list-none items-center justify-center gap-2 text-base text-zinc-300 [&::-webkit-details-marker]:hidden">View volunteers${chevron}</summary>
+        ${roster(patrolId)}
+      </details>`;
+  };
+
+  /** Edit sits with the sign up button, since both act on the row. */
+  const editButton = (patrolId: string) => {
+    if (!interactive || !isOrganizer()) return "";
+    return `<button class="btn btn-quiet max-sm:w-full" type="button" data-edit="${esc(patrolId)}">${pencil}Edit</button>`;
+  };
+
+  const meetingPoint = (patrol: {
+    meetingPoint: string;
+    meetingPointUrl?: string;
+  }) =>
+    patrol.meetingPointUrl
+      ? `<a class="text-blue underline" href="${esc(patrol.meetingPointUrl)}" target="_blank" rel="noreferrer">${esc(patrol.meetingPoint)}</a>`
+      : esc(patrol.meetingPoint);
+
+  /** Edit and sign up, or nothing at all, which leaves the row without the
+      wrapper rather than with an empty one taking up space. */
+  const rowButtons = (patrolId: string) => {
+    const buttons = `${editButton(patrolId)}${action(patrolId)}`.trim();
+    if (buttons === "") return "";
+    return `<div class="flex flex-wrap items-center gap-3.5 max-sm:w-full">${buttons}</div>`;
+  };
+
+  const render = () => {
+    if (!list) return;
+    list.innerHTML = visibleTo(upcoming(patrols()), isOrganizer())
+      .map(
+        (patrol) => `
+          <li
+            class="border border-zinc-700 bg-ink"
+            data-patrol-id="${esc(patrol.id)}"
+          >
+            ${hiddenBanner(patrol.id)}
+            <div class="px-6 py-5 max-sm:px-4">
+              <div class="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+                <div class="min-w-0">
+                  ${statusLine(patrol.id) ? `<p class="mb-2 text-base">${statusLine(patrol.id)}</p>` : ""}
+                  <h3>
+                    ${esc(weekdayOf(patrol.date))}, ${esc(formatPatrolDate(patrol.date))}
+                    <span class="font-normal text-zinc-400">&middot; ${esc(formatStartTime(patrol))}</span>
+                  </h3>
+                  <p class="mt-1 text-base text-zinc-300">
+                    Meeting at ${meetingPoint(patrol)}
+                  </p>
+                  <p class="mt-1 flex items-center gap-2 text-base">${spotsLine(patrol.id)}</p>
+                </div>
+                ${rowButtons(patrol.id)}
+              </div>
+              ${organizerControls(patrol.id)}
+            </div>
+          </li>`,
+      )
+      .join("");
+  };
+
+  list?.addEventListener("click", async (event) => {
+    const target = event.target as HTMLElement;
+
+    const patrolId =
+      target.closest<HTMLElement>("[data-signup]")?.dataset.signup;
+    if (patrolId) {
+      if (busy.has(patrolId)) return;
+      busy.add(patrolId);
+      render();
+      const result = await signUp(patrolId);
+      busy.delete(patrolId);
+      render();
+      if (!result.ok) alert(result.error);
+      return;
+    }
+
+    const cancel = target.closest<HTMLElement>("[data-cancel]");
+    const signupId = cancel?.dataset.cancel;
+    const cancelling = cancel?.dataset.patrol;
+    if (signupId && cancelling) {
+      if (busy.has(cancelling)) return;
+      busy.add(cancelling);
+      render();
+      await cancelSignup(signupId);
+      busy.delete(cancelling);
+      render();
+      return;
+    }
+
+    if (!isOrganizer()) return;
+
+    const editing = target.closest<HTMLElement>("[data-edit]")?.dataset.edit;
+    if (editing) {
+      document.dispatchEvent(
+        new CustomEvent("patrol:edit", { detail: editing }),
+      );
+    }
+  });
+
+  // A rebuilt list would forget which rosters were expanded, so the details
+  // elements report their state back.
+  list?.addEventListener(
+    "toggle",
+    (event) => {
+      const details = event.target as HTMLDetailsElement;
+      const patrolId = details.dataset?.roster;
+      if (!patrolId) return;
+      if (details.open) openRosters.add(patrolId);
+      else openRosters.delete(patrolId);
+    },
+    true,
+  );
+
+  load();
+  render();
+  subscribe(render);
+</script>

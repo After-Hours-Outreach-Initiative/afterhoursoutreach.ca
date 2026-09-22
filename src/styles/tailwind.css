@@ -51,6 +51,12 @@
     @apply text-lg leading-8;
   }
 
+  /* The reset leaves buttons with the default arrow. A button that does
+     something should say so on hover. */
+  button:not(:disabled) {
+    @apply cursor-pointer;
+  }
+
   :focus-visible {
     outline: 3px solid #4169e1;
     outline-offset: 4px;
@@ -95,14 +101,121 @@
     @apply border-2 border-white/60 font-bold text-white hover:border-white hover:bg-white/10;
   }
 
+  /* Filled green, for taking a spot. Paired with .btn-red so a row of
+     patrols reads at a glance: green adds you, red takes you off. */
+  .btn-green {
+    @apply border-2 border-green-700 bg-green-700 font-bold text-white hover:border-green-800 hover:bg-green-800;
+  }
+
+  /* Filled red, for giving a spot up. */
+  .btn-red {
+    @apply border-2 border-red-700 bg-red-700 font-bold text-white hover:border-red-800 hover:bg-red-800;
+  }
+
   /* Grey outline, for the several small controls that sit in a row together. */
   .btn-quiet {
     @apply border border-zinc-600 font-medium text-zinc-300 hover:border-white hover:text-white;
   }
 
+  /* A checkbox drawn as a switch: red when off, green when on, matching the
+     green and red buttons. The input itself stays for keyboard and screen
+     readers, it is just not painted. */
+  .switch {
+    @apply sr-only;
+  }
+
+  .switch-track {
+    @apply inline-flex h-9 w-16 shrink-0 items-center rounded-lg border-2 border-red-700 bg-red-700 transition-colors;
+  }
+
+  .switch:checked + .switch-track {
+    @apply border-green-700 bg-green-700;
+  }
+
+  .switch:focus-visible + .switch-track {
+    @apply outline-2 outline-offset-2 outline-white;
+  }
+
+  .switch-thumb {
+    @apply ml-0.5 flex size-7 items-center justify-center rounded-md bg-white transition-transform;
+  }
+
+  .switch:checked + .switch-track .switch-thumb {
+    @apply translate-x-7;
+  }
+
+  /* Opening the editor sets the switch to the patrol it is editing. That is a
+     starting state, not a toggle, so it lands without sliding. */
+  .switch-still,
+  .switch-still .switch-thumb {
+    @apply transition-none;
+  }
+
+  /* The thumb carries the state it is in: an eye when the patrol is on the
+     list, the crossed out eye when it is not. */
+  .switch-icon {
+    @apply size-4 shrink-0;
+  }
+
+  .switch-icon-off {
+    @apply text-red-700;
+  }
+
+  .switch-icon-on {
+    @apply hidden text-green-700;
+  }
+
+  .switch:checked + .switch-track .switch-icon-off {
+    @apply hidden;
+  }
+
+  .switch:checked + .switch-track .switch-icon-on {
+    @apply block;
+  }
+
   /* Icon beside a button label. Sized in em so it follows the label. */
   .btn-icon {
     @apply size-[1.5em] shrink-0;
+  }
+
+  /* A modal dialog that fades and lifts into place, and back out again.
+     display and overlay are discrete properties, so they need
+     allow-discrete to keep the closing frame on screen. */
+  .dialog-pop,
+  .dialog-pop::backdrop {
+    transition:
+      opacity 150ms ease-out,
+      translate 150ms ease-out,
+      display 150ms allow-discrete,
+      overlay 150ms allow-discrete;
+  }
+
+  .dialog-pop {
+    opacity: 0;
+    translate: 0 0.75rem;
+  }
+
+  .dialog-pop::backdrop {
+    opacity: 0;
+    background-color: #000000b3;
+  }
+
+  .dialog-pop[open],
+  .dialog-pop[open]::backdrop {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  /* The state a dialog animates from on the frame it opens. */
+  @starting-style {
+    .dialog-pop[open] {
+      opacity: 0;
+      translate: 0 0.75rem;
+    }
+
+    .dialog-pop[open]::backdrop {
+      opacity: 0;
+    }
   }
 }
 
