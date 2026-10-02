@@ -4,6 +4,7 @@ import FacebookIcon from "@/components/icons/FacebookIcon.astro";
 import LinkedInIcon from "@/components/icons/LinkedInIcon.astro";
 import { contactEmail, contactPhone, navLinks, social } from "@/data/site";
 import { organization } from "@/data/organization";
+import { accountsEnabled } from "@/data/environment";
 ---
 
 <footer class="bg-black text-white" id="contact">
@@ -144,6 +145,13 @@ import { organization } from "@/data/organization";
               {link.label}
             </a>
           ))
+        }
+        {
+          accountsEnabled && !import.meta.env.DEV && (
+            <a class="hover:text-white" href="/privacy">
+              Privacy preview
+            </a>
+          )
         }
       </nav>
     </div>

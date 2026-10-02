@@ -32,13 +32,19 @@ still works when the person gets to it.
    the top.
 
 After registration is complete the new volunteer account will only be able to
-sign up for orientation events. Then access to regular patrol events will be
-approved manually by an organizer.
+sign up for orientation events until an organizer manually approves patrol
+access. Completing orientation is the most common path to approval, but is not
+required and does not automatically grant approval.
 
 ### Profile
 
 Everything from the form is saved as the person's profile. They can see and
 edit it at `/volunteer/account`, and delete their account from there.
+
+Volunteers can edit all registration answers. Changes are logged without copying
+sensitive answers into the log and do not change patrol approval. Email changes
+use the separate verification flow described below. All organizers can view
+profile fields after verifying two factor, and each profile view is logged.
 
 ### Fields
 
@@ -65,19 +71,13 @@ them.
 Date of birth, emergency contact, and medical conditions each have a short line
 under them saying what the information is used for.
 
-Volunteers can also upload their medical certifications along with an expiry
-date, which can be used to automatically email organizers when certifications
-are about to expire/already expired.
-
-Volunteer hours could also be tracked for each account.
+Certification uploads, expiry reminders, and volunteer hours are deferred.
 
 ### Discord
 
-The page shown after registration links to the Discord server. Volunteers can
-optionally connect or disconnect their Discord account at `/volunteer/account`.
-Once an organizer approves them for patrols after orientation, they
-automatically receive the patrol-approved Discord role when connected and in
-the server.
+Discord account linking is deferred. A future optional link could grant a
+patrol-approved Discord role based on organizer approval on the website; the
+website remains the source of truth for patrol access.
 
 ## Two factor for organizers
 
@@ -118,27 +118,24 @@ Any organizer can give the organizer role to any account, or take it away,
 without needing another organizer to agree. Organizers sign in the same way as
 everyone else. There is no separate organizer login.
 
+A developer manually assigns the first organizer role to a specific verified
+account. After that, organizers manage roles through the website.
+
 ## Abuse protection
 
-The sign in form is protected so no one can fill an event with fake accounts or
-mailbomb someone:
+Sign in requests are rate limited to reduce fake accounts and mailbombing.
+Requests are counted by both the address being sent to and the IP asking,
+since either one on its own is easy to work around.
 
-- Turnstile on the sign in form.
-- Rate limit on sign in requests, counted by both the address being sent to and
-  the IP asking, since either one on its own is easy to work around.
+Email requests: one per address per minute, three per address per hour, ten per
+IP per hour, and 80 total per day. Counters are stored in D1.
 
 ## TODO
 
-- TODO: decide if we need the full date of birth, or only a checkbox confirming
-  the person is 19 or older.
 - TODO: decide if the medical certification should be checked, for example by
   asking for a licence number or a photo of the certificate. If so, uploads
   need R2 storage and more privacy work.
 - TODO: fix the typos in the current form options when copying them over
   ("Nalaxone", "wiith", "Pa:ramedic", "relatons", "opiod", "ventiliation").
-- TODO: decide if phone number and emergency contact should be hidden from
-  organizers except on the roster of an event the volunteer is signed up for.
 - TODO: decide if volunteers need to accept a code of conduct or waiver as part
   of registering.
-- TODO: decide which fields a volunteer can edit after they register, and if
-  edits should be flagged to organizers.

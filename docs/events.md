@@ -5,9 +5,10 @@ account is required to sign up for either.
 
 ## Orientations
 
-New volunteers sign up for an orientation first. After the orientation, an
-organizer marks each person who attended as completed. Only volunteers who have
-completed an orientation can sign up for patrols.
+New volunteers usually sign up for an orientation first. After the orientation,
+an organizer marks each person who attended as completed. Patrol signups require
+explicit organizer approval. Completing orientation is the most common path to
+approval, but is not required and does not automatically grant approval.
 
 Orientations use the same cards, edit view, and volunteer list as patrols.
 
@@ -34,9 +35,9 @@ The homepage shows sign in and lists upcoming events.
 Each event has a sign up button, which adds a green "Signed up"
 badge and the sign up button turns into a cancel button.
 
-Volunteers who have not completed an orientation see orientations they can sign
-up for. Patrols are shown without a sign up button, with a note that an
-orientation comes first.
+Volunteers who have not been approved for patrols can sign up for orientations.
+Patrols are shown without a sign up button, with a note that organizer approval
+is required.
 
 ### 3. Organizers
 

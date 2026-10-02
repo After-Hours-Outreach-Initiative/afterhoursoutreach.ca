@@ -1,0 +1,200 @@
+---
+import { accountsEnabled } from "@/data/environment";
+import { env } from "cloudflare:workers";
+import { and, eq, gt } from "drizzle-orm";
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
+import {
+  authBindingsForRequest,
+  createAuth,
+  forwardCookies,
+  readAccountSession,
+} from "@/server/auth";
+import { createDatabase } from "@/server/db";
+import { session } from "@/server/db/schema";
+import { loadProfile } from "@/server/accounts/profile";
+import type { RegistrationAnswers } from "@/data/registration";
+import { social } from "@/data/site";
+export const prerender = false;
+if (!accountsEnabled) return new Response("Not found", { status: 404 });
+let values: RegistrationAnswers | null = null;
+let email = "";
+let currentId = "";
+let twoFactorEnabled = false;
+let organizer = false;
+let sessions: { id: string; userAgent: string | null; updatedAt: Date }[] = [];
+if (accountsEnabled) {
+  if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");
+  try {
+    const { response: current, headers } = await readAccountSession(
+      createAuth(authBindingsForRequest(env, Astro.request)),
+      Astro.request,
+    );
+    forwardCookies(headers, Astro.response.headers);
+    if (!current)
+      return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/account");
+    values = await loadProfile(env.DB, current.user.id);
+    if (!values) return Astro.redirect("/volunteer/register");
+    email = current.user.email;
+    currentId = current.session.id;
+    twoFactorEnabled = Boolean(current.user.twoFactorEnabled);
+    organizer = current.user.role === "organizer";
+    const db = createDatabase(env.DB);
+    sessions = await db
+      .select({
+        id: session.id,
+        userAgent: session.userAgent,
+        updatedAt: session.updatedAt,
+      })
+      .from(session)
+      .where(
+        and(
+          eq(session.userId, current.user.id),
+          gt(session.expiresAt, new Date()),
+        ),
+      )
+      .limit(100);
+  } catch {
+    return new Response("Your account is temporarily unavailable.", {
+      status: 503,
+    });
+  }
+}
+---
+
+<AccountLayout
+  title="Your account"
+  description="Edit your volunteer profile and manage your sessions."
+  signedIn
+  organizer={organizer}
+  name={values?.name}
+  email={email}
+>
+  <section class="volunteer-panel">
+    <h2>Your profile</h2>
+    <p>You can update your answers at any time.</p>
+    <AccountProfileForm email={email} values={values} />
+  </section>
+  <section class="volunteer-panel">
+    <h2>Account settings</h2>
+    <div class="volunteer-setting">
+      <div><h3>Email address</h3><p>{email}</p></div>
+    </div>
+    <div class="volunteer-setting">
+      <div>
+        <h3>Two-factor authentication</h3>
+        {
+          twoFactorEnabled ? (
+            <p>
+              Your authenticator is enabled. It is required each time you sign
+              in.
+            </p>
+          ) : (
+            <>
+              <p>
+                Add an authenticator app for extra sign-in protection.
+                Organizers must use two-factor authentication before accessing
+                volunteer profiles.
+              </p>
+              <form
+                data-enable-factor
+                class="volunteer-form mt-6"
+                action="/api/auth/two-factor/enable"
+                method="post"
+              >
+                <p data-form-message role="status" aria-live="polite" hidden />
+                <button class="btn btn-outline" type="submit">
+                  Set up an authenticator
+                </button>
+              </form>
+              <div data-factor-setup class="mt-8" hidden>
+                <p>Add this setup key to your authenticator app:</p>
+                <code data-factor-key />
+                <p class="mt-6">
+                  Save these one-use backup codes somewhere safe:
+                </p>
+                <pre data-backup-codes class="mt-4" />
+                <form
+                  data-confirm-factor
+                  class="volunteer-form volunteer-small mt-8"
+                  action="/api/auth/two-factor/verify-totp"
+                  method="post"
+                >
+                  <label class="volunteer-field">
+                    Authenticator code
+                    <input
+                      name="code"
+                      inputmode="numeric"
+                      autocomplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxlength="6"
+                      required
+                    />
+                  </label>
+                  <p
+                    data-form-message
+                    role="status"
+                    aria-live="polite"
+                    hidden
+                  />
+                  <button class="btn btn-primary" type="submit">
+                    Verify and enable
+                  </button>
+                </form>
+              </div>
+            </>
+          )
+        }
+      </div>
+    </div>
+    <div class="volunteer-setting">
+      <div class="w-full">
+        <h3>Sessions</h3>
+        <ul class="account-sessions mt-6">
+          {
+            sessions.map((entry) => (
+              <li>
+                <div>
+                  <span>
+                    {entry.id === currentId
+                      ? "This device"
+                      : entry.userAgent || "Another device"}
+                  </span>
+                  <span class="volunteer-help">
+                    Last active:{" "}
+                    {entry.updatedAt.toLocaleString("en-CA", {
+                      timeZone: "America/Vancouver",
+                    })}
+                  </span>
+                </div>
+                {entry.id !== currentId && (
+                  <form
+                    data-end-session
+                    action="/api/account/session"
+                    method="post"
+                  >
+                    <input type="hidden" name="id" value={entry.id} />
+                    <button class="btn btn-outline" type="submit">
+                      End session
+                    </button>
+                    <p data-form-message role="status" hidden />
+                  </form>
+                )}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+  <section class="volunteer-panel">
+    <h2>Community</h2>
+    <p>Keep in touch with the team on Discord.</p>
+    <a
+      href={social.discord}
+      target="_blank"
+      rel="noreferrer"
+      class="btn btn-outline">Join Discord</a
+    >
+  </section>
+</AccountLayout>

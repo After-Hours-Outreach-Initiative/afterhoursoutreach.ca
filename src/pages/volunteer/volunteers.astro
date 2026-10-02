@@ -1,0 +1,168 @@
+---
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import VolunteerProfileDialog from "@/components/volunteer/VolunteerProfileDialog.astro";
+import { accountsEnabled } from "@/data/environment";
+import { env } from "cloudflare:workers";
+import { accountContext, requireOrganizer } from "@/server/accounts/access";
+import { listVolunteers } from "@/server/accounts/organizers";
+import { forwardCookies } from "@/server/auth";
+import { RequestError } from "@/server/http";
+import "@/styles/volunteer.css";
+export const prerender = false;
+if (!accountsEnabled) return new Response("Not found", { status: 404 });
+let team: Awaited<ReturnType<typeof listVolunteers>> = {
+  rows: [],
+  hasMore: false,
+};
+let lock = "";
+let accountName = "";
+let accountEmail = "";
+const search = (Astro.url.searchParams.get("q") ?? "").slice(0, 100);
+const offset = Math.min(
+  10000,
+  Math.max(
+    0,
+    Number.parseInt(Astro.url.searchParams.get("offset") ?? "0", 10) || 0,
+  ),
+);
+if (accountsEnabled) {
+  try {
+    const { actor, headers, email } = await accountContext(env, Astro.request);
+    forwardCookies(headers, Astro.response.headers);
+    if (!actor)
+      return Astro.redirect(
+        "/volunteer/sign-in?returnTo=/volunteer/volunteers",
+      );
+    if (actor.role !== "organizer")
+      return new Response("Organizer access is required.", { status: 403 });
+    accountName = actor.name;
+    accountEmail = email;
+    try {
+      requireOrganizer(actor);
+    } catch (error) {
+      if (error instanceof RequestError) lock = error.message;
+      else throw error;
+    }
+    if (!lock) team = await listVolunteers(env.DB, actor, search, offset);
+  } catch {
+    return new Response("Volunteer management is temporarily unavailable.", {
+      status: 503,
+    });
+  }
+}
+---
+
+<AccountLayout
+  title="Volunteers"
+  description="Organizer volunteer management."
+  signedIn
+  organizer
+  name={accountName}
+  email={accountEmail}
+>
+  <p class="volunteer-notice" data-action-notice role="status" hidden></p>
+  {
+    lock ? (
+      <p class="volunteer-notice">
+        {lock} <a href="/volunteer/account">Your account</a>
+      </p>
+    ) : (
+      <>
+        <section class="volunteer-events" data-volunteer-browser>
+          <div class="volunteer-section-heading">
+            <h2>Your team</h2>
+            <form method="get" data-volunteer-search-form>
+              <label class="volunteer-field">
+                Find a volunteer
+                <input
+                  type="search"
+                  name="q"
+                  data-volunteer-search
+                  value={search}
+                  maxlength="100"
+                  placeholder="Search by name"
+                />
+              </label>
+              <noscript>
+                <button class="btn btn-outline" type="submit">
+                  Search
+                </button>
+              </noscript>
+            </form>
+          </div>
+          <div data-volunteer-results>
+            <ul class="volunteer-event-list">
+              {team.rows.map((person) => (
+                <li class="volunteer-event-card">
+                  <div class="volunteer-event-top">
+                    <div>
+                      <h3>{person.name}</h3>
+                      <p>
+                        {person.role === "organizer"
+                          ? "Organizer"
+                          : "Volunteer"}{" "}
+                        · {person.orientations} orientations completed
+                      </p>
+                      <p>
+                        <span
+                          class:list={{
+                            "volunteer-spots": Boolean(person.patrolApproved),
+                          }}
+                        >
+                          {person.patrolApproved
+                            ? "Approved for patrols"
+                            : "Not approved for patrols"}
+                        </span>
+                        {!person.active && " · Inactive"}
+                      </p>
+                    </div>
+                    <a
+                      class="btn btn-quiet"
+                      href={`/volunteer/volunteers/${encodeURIComponent(person.id)}`}
+                      data-volunteer-profile-link
+                    >
+                      View profile and approval
+                    </a>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {!team.rows.length && (
+              <p class="volunteer-notice">
+                No registered volunteers match your search.
+              </p>
+            )}
+            <div class="volunteer-actions">
+              {offset > 0 && (
+                <a
+                  class="btn btn-quiet"
+                  href={`?q=${encodeURIComponent(search)}&offset=${Math.max(0, offset - 50)}`}
+                >
+                  Previous volunteers
+                </a>
+              )}
+              {team.hasMore && (
+                <a
+                  class="btn btn-quiet"
+                  href={`?q=${encodeURIComponent(search)}&offset=${offset + 50}`}
+                >
+                  Next volunteers
+                </a>
+              )}
+            </div>
+          </div>
+          <p
+            data-volunteer-search-error
+            class="volunteer-notice"
+            role="status"
+            hidden
+          />
+        </section>
+        <VolunteerProfileDialog />
+      </>
+    )
+  }
+</AccountLayout>
+<script>
+  import "@/scripts/volunteer";
+</script>

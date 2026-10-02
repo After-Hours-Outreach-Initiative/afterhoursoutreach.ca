@@ -1,0 +1,100 @@
+---
+import {
+  registrationFields,
+  type RegistrationAnswers,
+} from "@/data/registration";
+interface Props {
+  email: string;
+  values?: RegistrationAnswers | null;
+  registration?: boolean;
+}
+const { email, values, registration = false } = Astro.props;
+---
+
+<form
+  data-account-profile
+  class="volunteer-form"
+  action="/api/account/profile"
+  method="post"
+>
+  <div class="volunteer-fields">
+    <label class="volunteer-field"
+      >Email<input type="email" value={email} readonly /><span
+        class="volunteer-help">From your signed-in account.</span
+      ></label
+    >
+    {
+      registrationFields.map((field) => (
+        <label
+          class:list={[
+            "volunteer-field",
+            { "volunteer-wide": "multiline" in field },
+          ]}
+        >
+          <span>
+            {field.label}
+            {!field.required && <span class="volunteer-help"> (optional)</span>}
+          </span>
+          {"multiline" in field ? (
+            <textarea
+              name={field.name}
+              required={field.required}
+              rows="3"
+              maxlength="2000"
+              set:text={values?.[field.name] ?? ""}
+            />
+          ) : (
+            <input
+              name={field.name}
+              type={"type" in field ? field.type : "text"}
+              autocomplete={
+                "autocomplete" in field ? field.autocomplete : "off"
+              }
+              value={values?.[field.name] ?? ""}
+              required={field.required}
+              maxlength={
+                field.name === "phone" || field.name === "emergencyPhone"
+                  ? "40"
+                  : "200"
+              }
+              min={field.name === "birthDate" ? "1900-01-01" : undefined}
+              max={
+                field.name === "birthDate"
+                  ? new Date().toISOString().slice(0, 10)
+                  : undefined
+              }
+            />
+          )}
+          {"help" in field && <span class="volunteer-help">{field.help}</span>}
+        </label>
+      ))
+    }
+    <fieldset class="volunteer-wide">
+      <legend>Which teams interest you? Choose at least one.</legend>
+      <div class="volunteer-checks">
+        {
+          ["outreach", "medic", "non-patrol"].map((team) => (
+            <label>
+              <input
+                type="checkbox"
+                name="teams"
+                value={team}
+                checked={values?.teams.includes(team)}
+              />
+              {team === "non-patrol"
+                ? "Non-patrol support"
+                : team === "medic"
+                  ? "Medic"
+                  : "Outreach"}
+            </label>
+          ))
+        }
+      </div>
+    </fieldset>
+  </div>
+  <p data-form-message role="status" aria-live="polite" hidden></p>
+  <button type="submit" class="btn btn-primary"
+    >{registration ? "Complete registration" : "Save profile"}</button
+  >
+  <noscript><p>JavaScript is required to submit this form.</p></noscript>
+</form>

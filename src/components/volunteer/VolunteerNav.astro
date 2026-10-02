@@ -1,0 +1,114 @@
+---
+import CalendarIcon from "@/components/icons/CalendarIcon.astro";
+import UsersIcon from "@/components/icons/UsersIcon.astro";
+import AccountIcon from "@/components/icons/AccountIcon.astro";
+import CodeIcon from "@/components/icons/CodeIcon.astro";
+interface Props {
+  organizer?: boolean;
+  development?: boolean;
+  signedIn?: boolean;
+  name?: string;
+  email?: string;
+}
+const {
+  organizer = false,
+  development = false,
+  signedIn = false,
+  name,
+  email,
+} = Astro.props;
+const current = Astro.url.pathname.replace(/\/$/, "");
+const accountPage =
+  current === "/volunteer/account" ||
+  current === "/volunteer/register" ||
+  current.startsWith("/volunteer/sign-in");
+---
+
+<nav class="volunteer-nav" aria-label="Volunteer account">
+  <div class="volunteer-nav-inner">
+    <a
+      href="/volunteer"
+      aria-current={current === "/volunteer" ? "page" : undefined}
+    >
+      <CalendarIcon class="volunteer-nav-icon" />
+      Events
+    </a>
+    {
+      organizer && (
+        <a
+          href="/volunteer/volunteers"
+          aria-current={
+            current.startsWith("/volunteer/volunteers") ? "page" : undefined
+          }
+        >
+          <UsersIcon class="volunteer-nav-icon" />
+          Volunteers
+        </a>
+      )
+    }
+    <div class="volunteer-nav-tools">
+      {
+        development && (
+          <button
+            type="button"
+            data-open-account-switcher
+            aria-label="Development controls"
+            title="Development controls"
+            aria-haspopup="dialog"
+            aria-controls="development-account-dialog"
+            aria-expanded="false"
+          >
+            <CodeIcon class="volunteer-nav-icon volunteer-dev-icon" />
+          </button>
+        )
+      }
+      {
+        signedIn ? (
+          <details class="volunteer-account-menu" data-account-menu>
+            <summary aria-label="Account">
+              <AccountIcon class="volunteer-nav-icon" />
+              <span class="volunteer-account-label">Account</span>
+              <svg
+                class="volunteer-nav-chevron"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+            <div class="volunteer-account-dropdown">
+              <div class="volunteer-account-identity">
+                <strong data-account-menu-name>
+                  {name?.trim() || "Your account"}
+                </strong>
+                <p>{email}</p>
+              </div>
+              <a
+                href="/volunteer/account"
+                aria-current={accountPage ? "page" : undefined}
+              >
+                Profile
+              </a>
+              <form data-sign-out action="/api/auth/sign-out" method="post">
+                <button type="submit">Sign out</button>
+                <p
+                  class="volunteer-help"
+                  data-form-message
+                  role="status"
+                  hidden
+                />
+              </form>
+            </div>
+          </details>
+        ) : (
+          <a href="/volunteer/sign-in" class="btn btn-quiet">
+            Sign in
+          </a>
+        )
+      }
+    </div>
+  </div>
+</nav>

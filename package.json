@@ -7,23 +7,46 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "astro dev --host",
-    "build": "astro build",
+    "dev": "wrangler types --strict-vars false && astro dev --host",
+    "build": "wrangler types --strict-vars false && astro build",
+    "build:preview": "node scripts/build-preview.mjs",
+    "deploy:preview": "pnpm build:preview && pnpm db:migrate:preview && wrangler preview --config dist-preview/server/wrangler.json",
+    "check": "wrangler types --strict-vars false && astro check",
+    "test": "tsx --test tests/*.test.ts",
+    "test:ui": "playwright test",
+    "test:accounts": "pnpm build:preview && tsx --test tests/worker/*.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "organizer:bootstrap": "node scripts/bootstrap-organizer.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:seed:local": "tsx scripts/seed-local-events.ts",
+    "db:migrate:preview": "node scripts/check-preview-migrations.mjs && wrangler d1 migrations apply PREVIEW_DB --config wrangler.preview-migrations.jsonc --remote",
     "preview": "astro preview",
     "astro": "astro",
-    "deploy": "pnpm build && wrangler deploy",
+    "deploy": "node scripts/check-production.mjs && pnpm build && wrangler deploy --config dist/server/wrangler.json",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@astrojs/cloudflare": "14.2.0",
+    "@better-auth/drizzle-adapter": "1.7.7",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.2.2",
+    "better-auth": "1.7.7",
+    "drizzle-orm": "0.45.2",
     "sharp": "^0.35.4",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.4",
+    "drizzle-kit": "0.31.9",
+    "miniflare": "5.20260811.0-alpha",
     "prettier": "^3.9.6",
     "prettier-plugin-astro": "^0.14.1",
-    "wrangler": "^4.123.0"
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "wrangler": "4.135.0"
   }
 }

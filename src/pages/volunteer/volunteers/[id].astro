@@ -1,0 +1,100 @@
+---
+import { env } from "cloudflare:workers";
+import { accountsEnabled } from "@/data/environment";
+import { accountContext, requireOrganizer } from "@/server/accounts/access";
+import {
+  viewVolunteerProfile,
+  type VolunteerRow,
+} from "@/server/accounts/organizers";
+import { forwardCookies } from "@/server/auth";
+import { RequestError } from "@/server/http";
+import { registrationFields } from "@/data/registration";
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
+import "@/styles/volunteer.css";
+export const prerender = false;
+if (!accountsEnabled) return new Response("Not found", { status: 404 });
+let values;
+let person: VolunteerRow | null = null;
+let accountName = "";
+let accountEmail = "";
+try {
+  const { actor, headers, email } = await accountContext(env, Astro.request);
+  forwardCookies(headers, Astro.response.headers);
+  if (!actor)
+    return Astro.redirect(
+      `/volunteer/sign-in?returnTo=${encodeURIComponent(Astro.url.pathname)}`,
+    );
+  requireOrganizer(actor);
+  accountName = actor.name;
+  accountEmail = email;
+  values = await viewVolunteerProfile(env.DB, actor, Astro.params.id ?? "");
+  person = await env.DB.prepare(
+    `SELECT u.id, u.name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+    v.active, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+    (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
+    FROM user u JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
+  )
+    .bind(Astro.params.id ?? "")
+    .first<VolunteerRow>();
+} catch (error) {
+  return new Response(
+    error instanceof RequestError
+      ? error.message
+      : "Volunteer profile is temporarily unavailable.",
+    { status: error instanceof RequestError ? error.status : 503 },
+  );
+}
+if (!values || !person)
+  return new Response("Volunteer not found", { status: 404 });
+---
+
+<AccountLayout
+  title="Volunteer profile"
+  description="Organizer-only volunteer profile."
+  signedIn
+  organizer
+  name={accountName}
+  email={accountEmail}
+>
+  <p class="volunteer-notice" data-action-notice role="status" hidden></p>
+  <section class="volunteer-panel">
+    <div data-volunteer-profile>
+      <h2>{values.name}</h2>
+      <p class="volunteer-help">
+        {
+          person.orientations
+            ? "Orientation completion recorded."
+            : "No orientation completion recorded."
+        } Patrol approval is a separate decision.
+      </p>
+      {
+        !import.meta.env.DEV && (
+          <p class="volunteer-notice">
+            This access has been logged. Use these answers only for volunteer
+            coordination and safety; do not copy or share sensitive information.
+          </p>
+        )
+      }
+      <VolunteerControls person={person} />
+      <dl class="volunteer-profile-details">
+        {
+          registrationFields.map((field) => (
+            <div>
+              <>
+                <dt>{field.label}</dt>
+                <dd>
+                  {values[field.name as keyof typeof values] || "Not provided"}
+                </dd>
+              </>
+            </div>
+          ))
+        }<div><dt>Teams</dt><dd>{values.teams.join(", ")}</dd></div>
+      </dl>
+    </div>
+  </section>
+  <a class="btn btn-outline" href="/volunteer/volunteers">Back to volunteers</a>
+</AccountLayout>
+<script>
+  import "@/scripts/volunteer";
+</script>

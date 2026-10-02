@@ -1,0 +1,26 @@
+---
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import { accountsEnabled } from "@/data/environment";
+export const prerender = false;
+if (!accountsEnabled) return new Response("Not found", { status: 404 });
+---
+
+<AccountLayout
+  title="Signing you in"
+  description="Complete your email sign-in."
+>
+  <div data-email-link>
+    <p data-form-message role="status" aria-live="polite">
+      Checking your sign-in link…
+    </p>
+    <a href="/volunteer/sign-in" class="btn btn-outline mt-8"
+      >Request a new link</a
+    >
+  </div>
+  <noscript
+    ><p class="mt-8">
+      Open the sign-in page and enter the code from your email in a browser with
+      JavaScript enabled.
+    </p></noscript
+  >
+</AccountLayout>

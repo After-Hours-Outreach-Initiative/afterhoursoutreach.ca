@@ -1,8 +1,61 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "afterhoursoutreach-ca",
+  "account_id": "76222ab803494dc84947546283e1a63a",
+  "preview_urls": true,
   "compatibility_date": "2026-08-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@astrojs/cloudflare/entrypoints/server",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "afterhoursoutreach",
+      // Local development only until a real D1 database is provisioned.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle",
+      "remote": false,
+    },
+  ],
+  "vars": {
+    "APP_ENV": "local",
+    "AUTH_BASE_URL": "http://localhost:4321",
+    "PREVIEW_HOST_SUFFIX": "",
+  },
+  // Type/local validation declarations only. Upload values to Previews, not production.
+  "secrets": {
+    "required": ["BETTER_AUTH_SECRET", "RESEND_API_KEY"],
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "invocation_logs": false },
+  },
+  "previews": {
+    "vars": {
+      "APP_ENV": "preview",
+      // Resolved per request, after validating this Worker's preview hostname.
+      "AUTH_BASE_URL": "",
+      "PREVIEW_HOST_SUFFIX": "-afterhoursoutreach-ca.ivanzheng9905.workers.dev",
+    },
+    // Branch previews share this non-production database by default.
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "afterhoursoutreach-staging",
+        "database_id": "4412ad44-0ca9-4ebd-8f08-78bb1092bc0d",
+        "migrations_dir": "drizzle",
+      },
+    ],
+    "observability": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "redact_query_string": true,
+      "logs": { "enabled": true, "invocation_logs": false },
+      "traces": { "enabled": true, "head_sampling_rate": 0.1 },
+    },
   },
 }

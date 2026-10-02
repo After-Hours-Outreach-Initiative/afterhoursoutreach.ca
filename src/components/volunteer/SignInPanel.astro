@@ -1,0 +1,97 @@
+---
+import { env } from "cloudflare:workers";
+import { safeReturnTo } from "@/server/http";
+interface Props {
+  returnTo?: string;
+}
+const returnTo = safeReturnTo(Astro.props.returnTo);
+const localTesting = Boolean(import.meta.env.DEV) && env.APP_ENV === "local";
+const ready = Boolean(
+  env.BETTER_AUTH_SECRET && (localTesting || env.RESEND_API_KEY),
+);
+---
+
+<section class="volunteer-panel volunteer-signin-panel" id="volunteer-signin">
+  <h2>Sign in or create an account</h2>
+  <p>Please sign in to sign up for volunteer events.</p>
+  {
+    !ready && (
+      <p class="volunteer-notice" role="status">
+        Sign-in is not configured yet. Please check back later.
+      </p>
+    )
+  }
+  <form
+    data-email-request
+    data-return-to={returnTo}
+    class="volunteer-form"
+    action="/api/auth/email/request"
+    method="post"
+  >
+    <label class="volunteer-field">
+      Email address
+      <input
+        name="email"
+        type="email"
+        autocomplete="email"
+        placeholder="you@example.com"
+        maxlength="254"
+        required
+        disabled={!ready}
+      />
+    </label>
+    <p data-form-message role="status" aria-live="polite" hidden></p>
+    <button type="submit" class="btn btn-primary" disabled={!ready}
+      >Continue with Email</button
+    >
+  </form>
+  <form
+    data-email-code
+    class="volunteer-form"
+    action="/api/auth/email/verify"
+    method="post"
+    hidden
+  >
+    <p>
+      Check your email, then open the link or enter the six-digit code below.
+    </p>
+    <input name="id" type="hidden" />
+    <label class="volunteer-field">
+      Six-digit code
+      <input
+        name="code"
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        pattern="[0-9]{6}"
+        maxlength="6"
+        required
+      />
+    </label>
+    <p data-form-message role="status" aria-live="polite" hidden></p>
+    <button type="submit" class="btn btn-primary">Sign in with code</button>
+  </form>
+  <form
+    data-second-factor
+    class="volunteer-form"
+    action="/api/auth/two-factor/verify-totp"
+    method="post"
+    hidden
+  >
+    <p>Enter a code from your authenticator app to finish signing in.</p>
+    <label class="volunteer-field">
+      Authenticator or backup code
+      <input
+        name="code"
+        autocomplete="one-time-code"
+        maxlength="100"
+        required
+      />
+    </label>
+    <label class="volunteer-check"
+      ><input name="backup" type="checkbox" />Use a backup code</label
+    >
+    <p data-form-message role="status" aria-live="polite" hidden></p>
+    <button type="submit" class="btn btn-primary">Verify code</button>
+  </form>
+  <noscript><p>JavaScript is required to sign in.</p></noscript>
+</section>

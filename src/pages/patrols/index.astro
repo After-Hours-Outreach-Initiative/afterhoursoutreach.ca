@@ -3,8 +3,11 @@ import FieldError from "@/components/FieldError.astro";
 import PatrolList from "@/components/PatrolList.astro";
 import Layout from "@/layouts/Layout.astro";
 import { seedPatrols, upcoming, visibleTo } from "@/data/patrols";
+import { accountsEnabled } from "@/data/environment";
 
 const patrols = upcoming(seedPatrols);
+// Do not expose the legacy browser-only patrol mockup on Worker previews.
+if (accountsEnabled) return Astro.redirect("/volunteer");
 ---
 
 <Layout
@@ -370,12 +373,12 @@ const patrols = upcoming(seedPatrols);
                 >
                   <path
                     d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"
-                  />
-                  <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+                  ></path>
+                  <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"></path>
                   <path
                     d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"
-                  />
-                  <path d="m2 2 20 20" />
+                  ></path>
+                  <path d="m2 2 20 20"></path>
                 </svg>
                 {/* lucide: eye */}
                 <svg
@@ -387,8 +390,8 @@ const patrols = upcoming(seedPatrols);
                 >
                   <path
                     d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
-                  />
-                  <circle cx="12" cy="12" r="3" />
+                  ></path>
+                  <circle cx="12" cy="12" r="3"></circle>
                 </svg>
               </span>
             </span>
@@ -557,7 +560,7 @@ const patrols = upcoming(seedPatrols);
     if (!sendLink) return;
     const typed = (emailInput?.value ?? "").trim().toLowerCase();
     sendLink.hidden =
-      Boolean(sentAddress) && typed === sentAddress.toLowerCase();
+      sentAddress !== null && typed === sentAddress.toLowerCase();
   };
 
   const step = (name: "email" | "name" | "in") => {
@@ -746,7 +749,9 @@ const patrols = upcoming(seedPatrols);
     fields.open.checked = patrol?.open ?? true;
     renderOpenLabel();
     requestAnimationFrame(() =>
-      requestAnimationFrame(() => editorSwitch?.classList.remove("switch-still")),
+      requestAnimationFrame(() =>
+        editorSwitch?.classList.remove("switch-still"),
+      ),
     );
   };
 

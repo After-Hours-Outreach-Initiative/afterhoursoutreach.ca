@@ -1,3 +1,5 @@
+import { accountsEnabled } from "./environment";
+
 // Flip to false if we ever stop taking donations; the Donate link in the nav
 // and footer follows this.
 export const donationsOpen = true;
@@ -6,8 +8,12 @@ export const donateHref = "/donate";
 
 export const navLinks = [
   { label: "About", href: "/about" },
-  { label: "Patrols", href: "/patrols" },
-  { label: "Volunteer", href: "/volunteer" },
+  ...(accountsEnabled
+    ? [{ label: "Volunteer", href: "/volunteer" }]
+    : [
+        { label: "Patrols", href: "/patrols" },
+        { label: "Volunteer", href: "/volunteer" },
+      ]),
   ...(donationsOpen ? [{ label: "Donate", href: donateHref }] : []),
 ];
 

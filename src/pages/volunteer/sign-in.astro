@@ -1,0 +1,40 @@
+---
+import { env } from "cloudflare:workers";
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import SignInPanel from "@/components/volunteer/SignInPanel.astro";
+import { accountsEnabled } from "@/data/environment";
+import {
+  authBindingsForRequest,
+  createAuth,
+  forwardCookies,
+  readAccountSession,
+} from "@/server/auth";
+import { safeReturnTo } from "@/server/http";
+export const prerender = false;
+if (!accountsEnabled) return new Response("Not found", { status: 404 });
+if (env.BETTER_AUTH_SECRET) {
+  try {
+    const { response: current, headers } = await readAccountSession(
+      createAuth(authBindingsForRequest(env, Astro.request)),
+      Astro.request,
+    );
+    forwardCookies(headers, Astro.response.headers);
+    if (current)
+      return Astro.redirect(
+        safeReturnTo(Astro.url.searchParams.get("returnTo") ?? undefined),
+      );
+  } catch {
+    return new Response("Sign-in is temporarily unavailable.", { status: 503 });
+  }
+}
+const returnTo = safeReturnTo(
+  Astro.url.searchParams.get("returnTo") ?? undefined,
+);
+---
+
+<AccountLayout
+  title="Sign in"
+  description="Sign in or create your volunteer account with an email link or code."
+>
+  <SignInPanel returnTo={returnTo} />
+</AccountLayout>
