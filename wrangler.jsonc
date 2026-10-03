@@ -4,22 +4,24 @@
   "account_id": "76222ab803494dc84947546283e1a63a",
   "preview_urls": true,
   "compatibility_date": "2026-08-16",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "main": "@astrojs/cloudflare/entrypoints/server",
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
   },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "afterhoursoutreach",
-      // Local development only until a real D1 database is provisioned.
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "drizzle",
-      "remote": false,
-    },
-  ],
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "afterhoursoutreach",
+  //     // Local development only until a real D1 database is provisioned.
+  //     "database_id": "00000000-0000-0000-0000-000000000000",
+  //     "migrations_dir": "drizzle",
+  //     "remote": false,
+  //   },
+  // ],
   "vars": {
     "APP_ENV": "local",
     "AUTH_BASE_URL": "http://localhost:4321",
@@ -27,12 +29,17 @@
   },
   // Type/local validation declarations only. Upload values to Previews, not production.
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET", "RESEND_API_KEY"],
+    "required": [
+      "BETTER_AUTH_SECRET",
+      "RESEND_API_KEY"
+    ],
   },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
-    "logs": { "invocation_logs": false },
+    "logs": {
+      "invocation_logs": false
+    },
   },
   "previews": {
     "vars": {
@@ -54,8 +61,14 @@
       "enabled": true,
       "head_sampling_rate": 1,
       "redact_query_string": true,
-      "logs": { "enabled": true, "invocation_logs": false },
-      "traces": { "enabled": true, "head_sampling_rate": 0.1 },
+      "logs": {
+        "enabled": true,
+        "invocation_logs": false
+      },
+      "traces": {
+        "enabled": true,
+        "head_sampling_rate": 0.1
+      },
     },
   },
 }
