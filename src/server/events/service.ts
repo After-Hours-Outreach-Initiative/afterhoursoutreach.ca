@@ -37,8 +37,11 @@ export interface EventRow {
   confirmed: number;
   signedUp: number;
 }
-const eventColumns = `e.id, e.type, e.starts_at AS startsAt, e.meeting_point AS meetingPoint,
-  e.meeting_point_url AS meetingPointUrl, e.spots, e.open, e.hidden, e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
+const eventColumns = `
+  e.id, e.type, e.starts_at AS startsAt,
+  e.meeting_point AS meetingPoint, e.meeting_point_url AS meetingPointUrl,
+  e.spots, e.open, e.hidden,
+  e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
 
 export function eventDescription(
   event: Pick<EventRow, "type" | "startsAt" | "meetingPoint">,
@@ -59,16 +62,38 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
     actor.active &&
     (!actor.twoFactorEnabled || actor.twoFactorVerified),
   );
-  const rows = await db
-    .prepare(
-      `SELECT ${eventColumns},
-    (SELECT count(*) FROM signup WHERE event_id = e.id AND status = 'confirmed') AS confirmed,
-    EXISTS(SELECT 1 FROM signup WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp
-    FROM event e WHERE ${organizer ? "1 = 1" : "e.starts_at > ? AND e.cancelled_at IS NULL AND (e.hidden = 0 OR EXISTS(SELECT 1 FROM signup WHERE event_id=e.id AND user_id=? AND status='confirmed'))"}
-    ORDER BY ${organizer ? "(e.starts_at > (julianday('now') - 2440587.5) * 86400000) DESC, CASE WHEN e.starts_at > (julianday('now') - 2440587.5) * 86400000 THEN e.starts_at END ASC, e.starts_at DESC" : "e.starts_at ASC"} LIMIT 100`,
-    )
-    .bind(actor?.id ?? "", ...(organizer ? [] : [Date.now(), actor?.id ?? ""]))
-    .all<EventRow>();
+  const select = `SELECT ${eventColumns},
+    (SELECT count(*) FROM signup
+      WHERE event_id = e.id AND status = 'confirmed') AS confirmed,
+    EXISTS(SELECT 1 FROM signup
+      WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp
+    FROM event e`;
+  const statement = organizer
+    ? db
+        .prepare(
+          `${select}
+        ORDER BY
+          (e.starts_at > (julianday('now') - 2440587.5) * 86400000) DESC,
+          CASE WHEN e.starts_at > (julianday('now') - 2440587.5) * 86400000
+            THEN e.starts_at END ASC,
+          e.starts_at DESC
+        LIMIT 100`,
+        )
+        .bind(actor?.id ?? "")
+    : db
+        .prepare(
+          `${select}
+        WHERE e.starts_at > ?
+          AND e.cancelled_at IS NULL
+          AND (e.hidden = 0 OR EXISTS(
+            SELECT 1 FROM signup
+            WHERE event_id = e.id AND user_id = ? AND status = 'confirmed'
+          ))
+        ORDER BY e.starts_at ASC
+        LIMIT 100`,
+        )
+        .bind(actor?.id ?? "", Date.now(), actor?.id ?? "");
+  const rows = await statement.all<EventRow>();
   return rows.results;
 }
 export async function findEvent(db: Env["DB"], id: string) {
@@ -90,7 +115,8 @@ function eventAudit(
   return db
     .prepare(
       `INSERT INTO event_audit (id, event_id, actor_id, action, changed_fields, created_at)
-    SELECT ?, ?, ?, ?, ?, ? WHERE changes() = 1`,
+        SELECT ?, ?, ?, ?, ?, ?
+        WHERE changes() = 1`,
     )
     .bind(
       operation,
@@ -111,8 +137,11 @@ function notifyRoster(
   return db
     .prepare(
       `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
-    SELECT lower(hex(randomblob(16))), ?, s.user_id, ?, ?, ? FROM signup s
-    WHERE s.event_id = ? AND s.status = 'confirmed' AND EXISTS (SELECT 1 FROM event_audit WHERE id = ?)`,
+        SELECT lower(hex(randomblob(16))), ?, s.user_id, ?, ?, ?
+        FROM signup s
+        WHERE s.event_id = ?
+          AND s.status = 'confirmed'
+          AND EXISTS (SELECT 1 FROM event_audit WHERE id = ?)`,
     )
     .bind(operation, subject, body, Date.now(), eventId, operation);
 }
@@ -167,7 +196,12 @@ export async function saveEvent(
       const results = await db.batch([
         db
           .prepare(
-            `INSERT INTO event (id,type,starts_at,meeting_point,meeting_point_url,spots,open,hidden,created_by,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE ${writePermission(true)}`,
+            `INSERT INTO event (
+              id, type, starts_at, meeting_point, meeting_point_url,
+              spots, open, hidden, created_by, created_at, updated_at
+            )
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            WHERE ${writePermission(true)}`,
           )
           .bind(
             id,
@@ -216,7 +250,19 @@ export async function saveEvent(
       const results = await db.batch([
         db
           .prepare(
-            `UPDATE event SET starts_at=?,meeting_point=?,meeting_point_url=?,spots=?,open=?,hidden=?,updated_at=? WHERE id=? AND updated_at=? AND cancelled_at IS NULL AND starts_at > (julianday('now') - 2440587.5) * 86400000 AND ${writePermission(true)}`,
+            `UPDATE event
+            SET starts_at = ?,
+                meeting_point = ?,
+                meeting_point_url = ?,
+                spots = ?,
+                open = ?,
+                hidden = ?,
+                updated_at = ?
+            WHERE id = ?
+              AND updated_at = ?
+              AND cancelled_at IS NULL
+              AND starts_at > (julianday('now') - 2440587.5) * 86400000
+              AND ${writePermission(true)}`,
           )
           .bind(
             startsAt,
@@ -267,7 +313,13 @@ export async function cancelEvent(
   const results = await db.batch([
     db
       .prepare(
-        `UPDATE event SET cancelled_at=?,open=0,hidden=1,updated_at=? WHERE id=? AND updated_at=? AND cancelled_at IS NULL AND starts_at > (julianday('now') - 2440587.5) * 86400000 AND ${writePermission(true)}`,
+        `UPDATE event
+        SET cancelled_at = ?, open = 0, hidden = 1, updated_at = ?
+        WHERE id = ?
+          AND updated_at = ?
+          AND cancelled_at IS NULL
+          AND starts_at > (julianday('now') - 2440587.5) * 86400000
+          AND ${writePermission(true)}`,
       )
       .bind(
         now,
@@ -286,7 +338,11 @@ export async function cancelEvent(
     ),
     db
       .prepare(
-        "UPDATE signup SET status='cancelled',updated_at=? WHERE event_id=? AND status='confirmed' AND EXISTS(SELECT 1 FROM event_audit WHERE id=?)",
+        `UPDATE signup
+        SET status = 'cancelled', updated_at = ?
+        WHERE event_id = ?
+          AND status = 'confirmed'
+          AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
       )
       .bind(now, id, operation),
   ]);
@@ -319,7 +375,9 @@ export async function changeSignup(
       const results = await db.batch([
         db
           .prepare(
-            `INSERT INTO signup (id,event_id,user_id,status,created_at,updated_at) SELECT ?,?,?,'confirmed',?,? WHERE ${writePermission()}`,
+            `INSERT INTO signup (id, event_id, user_id, status, created_at, updated_at)
+            SELECT ?, ?, ?, 'confirmed', ?, ?
+            WHERE ${writePermission()}`,
           )
           .bind(
             crypto.randomUUID(),
@@ -332,7 +390,9 @@ export async function changeSignup(
         eventAudit(db, operation, eventId, actor.id, "signup_joined"),
         db
           .prepare(
-            `INSERT INTO event_notification(id,operation_id,user_id,subject,body,created_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM event_audit WHERE id=?)`,
+            `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
+            SELECT ?, ?, ?, ?, ?, ?
+            WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
           )
           .bind(
             crypto.randomUUID(),
@@ -350,15 +410,25 @@ export async function changeSignup(
       const results = await db.batch([
         db
           .prepare(
-            `UPDATE signup SET status='cancelled',updated_at=? WHERE event_id=? AND user_id=? AND status='confirmed'
-            AND EXISTS(SELECT 1 FROM event e WHERE e.id=signup.event_id AND e.starts_at > (julianday('now') - 2440587.5) * 86400000) AND ${writePermission()}`,
+            `UPDATE signup
+            SET status = 'cancelled', updated_at = ?
+            WHERE event_id = ?
+              AND user_id = ?
+              AND status = 'confirmed'
+              AND EXISTS(
+                SELECT 1 FROM event e
+                WHERE e.id = signup.event_id
+                  AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+              )
+              AND ${writePermission()}`,
           )
           .bind(now, eventId, actor.id, ...permissionValues(actor)),
         eventAudit(db, operation, eventId, actor.id, "signup_cancelled"),
         db
           .prepare(
-            `INSERT INTO event_notification (id,operation_id,user_id,subject,body,created_at)
-          SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM event_audit WHERE id=?)`,
+            `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
+            SELECT ?, ?, ?, ?, ?, ?
+            WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
           )
           .bind(
             crypto.randomUUID(),
@@ -392,18 +462,20 @@ export async function listRosters(
 ) {
   requireOrganizer(actor);
   if (!eventIds.length) return [];
+  const ids = eventIds.slice(0, 100);
+  const placeholders = ids.map(() => "?").join(", ");
   const rows = await db
     .prepare(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, p.preferred_name AS name,
-    EXISTS(SELECT 1 FROM orientation_completion o WHERE o.event_id=s.event_id AND o.user_id=s.user_id) AS completed
-    FROM signup s JOIN profile p ON p.user_id=s.user_id WHERE s.event_id IN (${eventIds
-      .slice(0, 100)
-      .map(() => "?")
-      .join(
-        ",",
-      )}) AND s.status='confirmed' ORDER BY p.preferred_name LIMIT 10000`,
+        EXISTS(SELECT 1 FROM orientation_completion o
+          WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
+      FROM signup s
+      JOIN profile p ON p.user_id = s.user_id
+      WHERE s.event_id IN (${placeholders}) AND s.status = 'confirmed'
+      ORDER BY p.preferred_name
+      LIMIT 10000`,
     )
-    .bind(...eventIds.slice(0, 100))
+    .bind(...ids)
     .all<{
       id: string;
       eventId: string;
@@ -424,7 +496,9 @@ export async function manageSignup(
   requireOrganizer(actor);
   const row = await db
     .prepare(
-      "SELECT event_id AS eventId, user_id AS userId FROM signup WHERE id=? AND status='confirmed'",
+      `SELECT event_id AS eventId, user_id AS userId
+      FROM signup
+      WHERE id = ? AND status = 'confirmed'`,
     )
     .bind(signupId)
     .first<{ eventId: string; userId: string }>();
@@ -441,8 +515,16 @@ export async function manageSignup(
     const statements = [
       db
         .prepare(
-          `UPDATE signup SET status='cancelled',updated_at=? WHERE id=? AND status='confirmed'
-          AND EXISTS(SELECT 1 FROM event e WHERE e.id=signup.event_id AND e.starts_at > (julianday('now') - 2440587.5) * 86400000) AND ${writePermission(true)}`,
+          `UPDATE signup
+          SET status = 'cancelled', updated_at = ?
+          WHERE id = ?
+            AND status = 'confirmed'
+            AND EXISTS(
+              SELECT 1 FROM event e
+              WHERE e.id = signup.event_id
+                AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+            )
+            AND ${writePermission(true)}`,
         )
         .bind(now, signupId, ...permissionValues(actor)),
       eventAudit(
@@ -457,16 +539,18 @@ export async function manageSignup(
       statements.push(
         db
           .prepare(
-            `INSERT INTO signup(id,event_id,user_id,status,created_at,updated_at)
-      SELECT ?,?,?,'confirmed',?,? WHERE EXISTS(SELECT 1 FROM event_audit WHERE id=?)`,
+            `INSERT INTO signup (id, event_id, user_id, status, created_at, updated_at)
+            SELECT ?, ?, ?, 'confirmed', ?, ?
+            WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
           )
           .bind(crypto.randomUUID(), next.id, row.userId, now, now, operation),
       );
     statements.push(
       db
         .prepare(
-          `INSERT INTO event_notification(id,operation_id,user_id,subject,body,created_at)
-      SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM event_audit WHERE id=?)`,
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
+          SELECT ?, ?, ?, ?, ?, ?
+          WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
         )
         .bind(
           crypto.randomUUID(),
