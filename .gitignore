@@ -1,6 +1,7 @@
 # build output
 dist/
 dist-staging/
+dist-preview/
 .cloudflare/
 # generated types
 .astro/

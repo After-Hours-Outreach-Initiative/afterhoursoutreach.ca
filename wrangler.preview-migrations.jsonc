@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "account_id": "76222ab803494dc84947546283e1a63a",
+  // Migration target only, not a separately deployed Worker.
+  // Keep this binding aligned with previews.d1_databases in wrangler.jsonc.
+  "d1_databases": [
+    {
+      "binding": "PREVIEW_DB",
+      "database_name": "afterhoursoutreach-staging",
+      "database_id": "4412ad44-0ca9-4ebd-8f08-78bb1092bc0d",
+      "migrations_dir": "drizzle",
+    },
+  ],
+}

@@ -2,6 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "afterhoursoutreach-ca",
   "account_id": "76222ab803494dc84947546283e1a63a",
+  "preview_urls": true,
   "compatibility_date": "2026-08-16",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@astrojs/cloudflare/entrypoints/server",
@@ -32,6 +33,35 @@
     "head_sampling_rate": 1,
     "logs": {
       "invocation_logs": false,
+    },
+  },
+  "previews": {
+    "vars": {
+      "APP_ENV": "preview",
+      // Resolve sign-in URLs from the request origin when no canonical URL is set.
+      "AUTH_BASE_URL": "",
+    },
+    // Branch previews share this non-production database by default.
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "afterhoursoutreach-staging",
+        "database_id": "4412ad44-0ca9-4ebd-8f08-78bb1092bc0d",
+        "migrations_dir": "drizzle",
+      },
+    ],
+    "observability": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "redact_query_string": true,
+      "logs": {
+        "enabled": true,
+        "invocation_logs": false,
+      },
+      "traces": {
+        "enabled": true,
+        "head_sampling_rate": 0.1,
+      },
     },
   },
 }

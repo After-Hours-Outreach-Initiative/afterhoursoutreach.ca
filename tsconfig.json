@@ -7,5 +7,5 @@
     }
   },
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "dist-staging"]
+  "exclude": ["dist", "dist-staging", "dist-preview"]
 }

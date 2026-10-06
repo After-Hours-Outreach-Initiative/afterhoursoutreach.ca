@@ -3,6 +3,9 @@ import Footer from "@/components/Footer.astro";
 import Header from "@/components/Header.astro";
 import "@/styles/tailwind.css";
 
+// Preview mode changes only the banner, never account or event availability.
+const showPreviewBanner = import.meta.env.MODE === "preview";
+
 interface Props {
   title: string;
   description: string;
@@ -54,6 +57,22 @@ const {
       href="#main-content">Skip to main content</a
     >
 
+    {
+      showPreviewBanner && (
+        <aside
+          class="border-b border-amber-800 bg-amber-950 px-4 py-3 text-center text-sm text-amber-100"
+          aria-label="Preview environment"
+        >
+          Preview · public test site. Use sample information only.{" "}
+          <a
+            class="underline underline-offset-4 hover:text-white"
+            href="https://afterhoursoutreach.ca"
+          >
+            Visit the regular site
+          </a>
+        </aside>
+      )
+    }
     <Header />
 
     <main id="main-content">
