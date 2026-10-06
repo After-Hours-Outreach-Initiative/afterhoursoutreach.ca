@@ -34,7 +34,7 @@ async function post(path: string, body: object) {
     credentials: "same-origin",
     body: JSON.stringify(body),
   });
-  const result: { message?: string } = await response.json();
+  const result: { message?: string; next?: string } = await response.json();
   if (!response.ok)
     throw new Error(result.message || "The request failed. Please try again.");
   return result;
@@ -237,12 +237,8 @@ form("[data-account-profile]", async (element, values) => {
     menuName.textContent =
       String(values.get("name") ?? "").trim() || "Your account";
   message(element, result.message || "Profile saved.");
-  if (
-    element
-      .querySelector("button")
-      ?.textContent?.includes("Complete registration")
-  )
-    location.assign("/volunteer/account");
+  if (element.hasAttribute("data-registration"))
+    location.assign(result.next ?? "/volunteer/account");
 });
 
 form("[data-sign-out]", async () => {
