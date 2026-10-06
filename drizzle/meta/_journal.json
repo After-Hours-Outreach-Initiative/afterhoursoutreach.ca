@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790890285239,
+      "tag": "0000_core_accounts_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790890289148,
+      "tag": "0001_event_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790915119147,
+      "tag": "0002_account_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790979412356,
+      "tag": "0003_live_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790980469157,
+      "tag": "0004_notification_origin",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791262301027,
+      "tag": "0005_email_otp_optional_two_factor",
+      "breakpoints": true
+    }
+  ]
+}
