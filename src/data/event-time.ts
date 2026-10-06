@@ -1,3 +1,15 @@
+export function formatEventDate(instant: number) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Vancouver",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(instant));
+}
+
 /** Calendar inputs always mean America/Vancouver, never the device time zone. */
 export function vancouverInput(instant: number) {
   const parts = new Intl.DateTimeFormat("en-CA", {

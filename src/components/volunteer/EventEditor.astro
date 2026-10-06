@@ -28,10 +28,8 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
     {
       event && (
         <>
-          <>
-            <input type="hidden" name="id" value={event.id} />
-            <input type="hidden" name="version" value={event.updatedAt} />
-          </>
+          <input type="hidden" name="id" value={event.id} />
+          <input type="hidden" name="version" value={event.updatedAt} />
         </>
       )
     }
@@ -115,10 +113,8 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
         method="post"
       >
         <h3>Cancel event</h3>
-        <>
-          <input type="hidden" name="id" value={event.id} />
-          <input type="hidden" name="version" value={event.updatedAt} />
-        </>
+        <input type="hidden" name="id" value={event.id} />
+        <input type="hidden" name="version" value={event.updatedAt} />
         <label class="volunteer-field">
           Reason (optional)
           <textarea name="reason" maxlength="1000" rows="3" />

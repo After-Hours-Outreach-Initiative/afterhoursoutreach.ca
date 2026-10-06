@@ -3,16 +3,15 @@ import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/accounts/access";
 import { forwardCookies } from "@/server/auth";
 import { listEvents, listRosters } from "@/server/events/service";
-import { signupBlockReason } from "@/server/events/policy";
-import {
-  countNotifications,
-  notificationRetryHours,
-} from "@/server/events/notifications";
+import { countNotifications } from "@/server/events/notifications";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
+import EventCard from "./EventCard.astro";
 import EventEditor from "./EventEditor.astro";
+import EventNotifications from "./EventNotifications.astro";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import "@/styles/volunteer.css";
+
 const { actor, headers, email } = await accountContext(env, Astro.request);
 forwardCookies(headers, Astro.response.headers);
 let organizer = false;
@@ -32,16 +31,13 @@ const rosters =
       )
     : [];
 const notifications = organizer ? await countNotifications(env.DB) : null;
-const formatDate = (instant: number) =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Vancouver",
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(instant));
+const destinations = events.filter(
+  (event) =>
+    event.startsAt > Date.now() &&
+    event.open &&
+    !event.hidden &&
+    !event.cancelledAt,
+);
 const filter = ["patrol", "orientation"].includes(
   Astro.url.searchParams.get("type") ?? "",
 )
@@ -94,10 +90,10 @@ const filter = ["patrol", "orientation"].includes(
   >
     <div class="volunteer-section-heading">
       <div>
-        <h2 id="events-heading">
-          {organizer ? "Events" : "Upcoming events"}
-        </h2><p>All event times are in Vancouver time.</p>
-      </div>{
+        <h2 id="events-heading">{organizer ? "Events" : "Upcoming events"}</h2>
+        <p>All event times are in Vancouver time.</p>
+      </div>
+      {
         organizer && (
           <button
             class="btn btn-primary"
@@ -136,256 +132,16 @@ const filter = ["patrol", "orientation"].includes(
     </form>
     <ul class="volunteer-event-list">
       {
-        events.map((event) => {
-          const roster = rosters.filter(
-            (person) => person.eventId === event.id,
-          );
-          const future = event.startsAt > Date.now();
-          const left = Math.max(0, event.spots - event.confirmed);
-          const blocked = signupBlockReason(
-            actor,
-            {
-              ...event,
-              startsAt: new Date(event.startsAt),
-              open: Boolean(event.open) && !event.hidden && !event.cancelledAt,
-            },
-            event.confirmed,
-          );
-          return (
-            <li
-              class="volunteer-event-card"
-              data-live-event={event.id}
-              data-event-type={event.type}
-              hidden={filter !== "all" && filter !== event.type}
-            >
-              <div class="volunteer-event-top">
-                <>
-                  <div>
-                    {Boolean(event.signedUp) && (
-                      <span class="volunteer-badge">Signed up</span>
-                    )}
-                    {event.cancelledAt ? (
-                      <p class="volunteer-hidden">Cancelled</p>
-                    ) : Boolean(event.hidden) ? (
-                      <p class="volunteer-hidden">Hidden from public list</p>
-                    ) : (
-                      !event.open && (
-                        <p class="volunteer-hidden">Closed for new signups</p>
-                      )
-                    )}
-                    <h3>
-                      {event.type === "patrol" ? "Patrol" : "Orientation"} ·{" "}
-                      {formatDate(event.startsAt)}
-                    </h3>
-                    <p>
-                      Meeting at{" "}
-                      {event.meetingPointUrl ? (
-                        <a
-                          href={event.meetingPointUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {event.meetingPoint}
-                        </a>
-                      ) : (
-                        event.meetingPoint
-                      )}
-                    </p>
-                    <p>
-                      <span
-                        class:list={[
-                          "volunteer-spots",
-                          {
-                            "volunteer-spots-full": left === 0,
-                            "volunteer-spots-low": left > 0 && left <= 2,
-                          },
-                        ]}
-                      >
-                        {left === 0 ? "Full" : `${left} spots left`}
-                      </span>{" "}
-                      · {event.confirmed} of {event.spots} spots taken
-                    </p>
-                    {!event.signedUp && actor && blocked && <p>{blocked}</p>}
-                  </div>
-                  <div class="volunteer-actions">
-                    {event.signedUp && future ? (
-                      <form
-                        data-live-signup
-                        action="/api/events/action"
-                        method="post"
-                      >
-                        <input name="id" type="hidden" value={event.id} />
-                        <input name="action" type="hidden" value="cancel" />
-                        <button class="btn btn-red" type="submit">
-                          Cancel my spot
-                        </button>
-                        <p data-form-message role="status" hidden />
-                      </form>
-                    ) : !actor ? (
-                      <a class="btn btn-outline" href="#volunteer-signin">
-                        Sign in to sign up
-                      </a>
-                    ) : !blocked ? (
-                      <form
-                        data-live-signup
-                        action="/api/events/action"
-                        method="post"
-                      >
-                        <input name="id" type="hidden" value={event.id} />
-                        <input name="action" type="hidden" value="join" />
-                        <button class="btn btn-green" type="submit">
-                          Sign up
-                        </button>
-                        <p data-form-message role="status" hidden />
-                      </form>
-                    ) : null}
-                    {organizer && future && !event.cancelledAt && (
-                      <button
-                        class="btn btn-quiet"
-                        type="button"
-                        data-show-dialog={`event-editor-${event.id}`}
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
-                </>
-              </div>
-              {organizer && (
-                <details class="volunteer-roster">
-                  <summary>Volunteers ({roster.length})</summary>
-                  <ul>
-                    {roster.map((person) => (
-                      <li>
-                        <div>
-                          <a
-                            href={`/volunteer/volunteers/${encodeURIComponent(person.userId)}`}
-                            data-volunteer-profile-link
-                          >
-                            {person.name}
-                          </a>
-                          {Boolean(person.completed) && (
-                            <span>Orientation completed</span>
-                          )}
-                        </div>
-                        {event.type === "orientation" &&
-                          !future &&
-                          !event.cancelledAt &&
-                          !person.completed && (
-                            <form
-                              data-organizer-orientation
-                              action="/api/organizer/action"
-                              method="post"
-                            >
-                              <input
-                                name="userId"
-                                type="hidden"
-                                value={person.userId}
-                              />
-                              <input
-                                name="eventId"
-                                type="hidden"
-                                value={event.id}
-                              />
-                              <button class="btn btn-outline" type="submit">
-                                Mark orientation completed
-                              </button>
-                              <p data-form-message role="status" hidden />
-                            </form>
-                          )}
-                        {future && (
-                          <>
-                            <button
-                              class="btn btn-quiet"
-                              type="button"
-                              data-show-dialog={`signup-editor-${person.id}`}
-                            >
-                              Move or remove
-                            </button>
-                            <dialog
-                              class="dialog-pop volunteer-dialog"
-                              id={`signup-editor-${person.id}`}
-                              aria-labelledby={`signup-editor-heading-${person.id}`}
-                            >
-                              <div class="volunteer-section-heading">
-                                <h2 id={`signup-editor-heading-${person.id}`}>
-                                  Change a signup
-                                </h2>
-                                <button
-                                  class="btn btn-quiet"
-                                  type="button"
-                                  data-dismiss-dialog
-                                >
-                                  Close
-                                </button>
-                              </div>
-                              <p class="mb-6">{person.name}</p>
-                              <form
-                                class="volunteer-form"
-                                data-manage-signup
-                                action="/api/events/action"
-                                method="post"
-                              >
-                                <input
-                                  type="hidden"
-                                  name="id"
-                                  value={person.id}
-                                />
-                                <label class="volunteer-field">
-                                  Destination
-                                  <select name="destination">
-                                    <option value="">Remove signup</option>
-                                    {events
-                                      .filter(
-                                        (other) =>
-                                          other.id !== event.id &&
-                                          other.startsAt > Date.now() &&
-                                          other.open &&
-                                          !other.hidden &&
-                                          !other.cancelledAt,
-                                      )
-                                      .map((other) => (
-                                        <option value={other.id}>
-                                          {other.type} ·{" "}
-                                          {formatDate(other.startsAt)}
-                                        </option>
-                                      ))}
-                                  </select>
-                                </label>
-                                <label class="volunteer-field">
-                                  Reason (optional)
-                                  <textarea
-                                    name="reason"
-                                    rows="3"
-                                    maxlength="1000"
-                                  />
-                                </label>
-                                {!import.meta.env.DEV && (
-                                  <p class="volunteer-help">
-                                    Included in the volunteer’s notification
-                                    email. Do not include medical or other
-                                    sensitive information.
-                                  </p>
-                                )}
-                                <p data-form-message role="status" hidden />
-                                <button class="btn btn-outline" type="submit">
-                                  Save change and notify
-                                </button>
-                              </form>
-                            </dialog>
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-              {organizer && future && !event.cancelledAt && (
-                <EventEditor event={event} />
-              )}
-            </li>
-          );
-        })
+        events.map((event) => (
+          <EventCard
+            event={event}
+            actor={actor}
+            organizer={organizer}
+            roster={rosters.filter((person) => person.eventId === event.id)}
+            destinations={destinations}
+            filter={filter}
+          />
+        ))
       }
     </ul>
     <p
@@ -407,41 +163,11 @@ const filter = ["patrol", "orientation"].includes(
     }
   </section>
   {
-    organizer && (
+    organizer && notifications && (
       <>
-        <>
-          <EventEditor />
-          <VolunteerProfileDialog />
-          <section class="volunteer-panel">
-            <>
-              <h2>Event notifications</h2>
-              <p>
-                {notifications?.pending ?? 0} notifications awaiting delivery.
-                Delivery failures do not undo saved changes. Retries are limited
-                to {notificationRetryHours} hours to avoid duplicate delivery
-                after provider idempotency expires.
-              </p>
-              {Boolean(notifications?.expired) && (
-                <p>
-                  {notifications?.expired} notifications expired and cannot be
-                  retried. Contact the recipients directly.
-                </p>
-              )}
-              <form
-                data-retry-notifications
-                action="/api/events/action"
-                method="post"
-              >
-                <>
-                  <p data-form-message role="status" hidden />
-                  <button class="btn btn-outline" type="submit">
-                    Retry pending notifications
-                  </button>
-                </>
-              </form>
-            </>
-          </section>
-        </>
+        <EventEditor />
+        <VolunteerProfileDialog />
+        <EventNotifications counts={notifications} />
       </>
     )
   }
