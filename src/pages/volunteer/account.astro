@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { APIError } from "better-auth/api";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
+import FieldError from "@/components/FieldError.astro";
 import {
   authBindingsForRequest,
   createAuth,
@@ -122,17 +123,27 @@ try {
                   action="/api/auth/two-factor/verify-totp"
                   method="post"
                 >
-                  <label class="volunteer-field">
-                    Authenticator code
+                  <div class="volunteer-field">
+                    <label for="factor-setup-code">
+                      Authenticator code{" "}
+                      <span class="volunteer-required" aria-hidden="true">
+                        *
+                      </span>
+                    </label>
                     <input
+                      id="factor-setup-code"
                       name="code"
+                      data-error-field="factor-setup-code"
+                      data-validation-message="Enter a six-digit code."
+                      aria-describedby="error-factor-setup-code"
                       inputmode="numeric"
                       autocomplete="one-time-code"
                       pattern="[0-9]{6}"
                       maxlength="6"
                       required
                     />
-                  </label>
+                    <FieldError field="factor-setup-code" />
+                  </div>
                   <p
                     data-form-message
                     role="status"

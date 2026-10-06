@@ -1,5 +1,13 @@
 import { authClient, showSecondFactor } from "./auth-client";
 import type { SignInEmail } from "../server/auth/services";
+import {
+  accountErrorMessage,
+  clearFormMessage,
+  initAccountFormValidation,
+  resetFormFeedback,
+  showFormMessage as message,
+  validateAccountForm,
+} from "./account-forms";
 
 if (import.meta.env.DEV) {
   void import("./account-switcher").then(({ initAccountSwitcher }) =>
@@ -40,38 +48,40 @@ async function post(path: string, body: object) {
   return result;
 }
 
-function message(element: Element, text: string) {
-  const target = element.querySelector<HTMLElement>("[data-form-message]");
-  if (target) {
-    target.textContent = text;
-    target.hidden = false;
-  }
-}
-
 function form(
   selector: string,
   submit: (element: HTMLFormElement, values: FormData) => Promise<void>,
 ) {
   document.querySelectorAll<HTMLFormElement>(selector).forEach((element) => {
+    initAccountFormValidation(element);
     element.addEventListener("submit", async (event) => {
       event.preventDefault();
       const button = element.querySelector<HTMLButtonElement>(
         'button[type="submit"]',
       );
-      if (button?.disabled) return;
+      if (button?.disabled || button?.hidden) return;
+      if (!validateAccountForm(element)) return;
       const values = new FormData(element);
-      if (button) button.disabled = true;
+      const label = button?.textContent;
+      element.setAttribute("aria-busy", "true");
+      if (button) {
+        button.disabled = true;
+        if (button.dataset.loadingLabel) {
+          button.textContent = button.dataset.loadingLabel;
+          button.setAttribute("aria-busy", "true");
+        }
+      }
       try {
         await submit(element, values);
       } catch (error) {
-        message(
-          element,
-          error instanceof Error
-            ? error.message
-            : "The request failed. Please try again.",
-        );
+        message(element, accountErrorMessage(error));
       } finally {
-        if (button) button.disabled = false;
+        element.removeAttribute("aria-busy");
+        if (button) {
+          button.disabled = false;
+          button.removeAttribute("aria-busy");
+          if (button.dataset.loadingLabel) button.textContent = label ?? "";
+        }
       }
     });
   });
@@ -122,16 +132,20 @@ form("[data-email-request]", async (element, values) => {
     );
   const code = document.querySelector<HTMLFormElement>("[data-email-code]");
   if (code && result.success) {
+    clearFormMessage(element);
+    const emailInput = element.querySelector<HTMLInputElement>(
+      'input[name="email"]',
+    )!;
+    emailInput.value = email;
+    emailInput.readOnly = true;
+    element.querySelector<HTMLButtonElement>('button[type="submit"]')!.hidden =
+      true;
     code.hidden = false;
     code.dataset.returnTo = element.dataset.returnTo;
     code.querySelector<HTMLInputElement>('input[name="email"]')!.value = email;
     code.querySelector<HTMLInputElement>('input[name="code"]')?.focus();
-    message(
-      element,
-      import.meta.env.DEV
-        ? "Local sign-in email ready. No email was sent."
-        : "Email sent. You can request another after one minute.",
-    );
+    document.querySelector<HTMLElement>("[data-use-different-email]")!.hidden =
+      false;
   }
   if (import.meta.env.DEV && result.localEmail) {
     const { localEmailDialog } = await import("./local-email-dialog");
@@ -165,16 +179,45 @@ form("[data-email-request]", async (element, values) => {
           ),
         );
       } catch (error) {
-        message(
-          code ?? element,
-          error instanceof Error
-            ? error.message
-            : "The code could not be verified.",
-        );
+        message(code ?? element, accountErrorMessage(error));
       }
     }
   }
 });
+
+document
+  .querySelectorAll<HTMLAnchorElement>("[data-use-different-email]")
+  .forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      const panel = link.closest(".volunteer-signin-panel")!;
+      const email = panel.querySelector<HTMLFormElement>(
+        "[data-email-request]",
+      )!;
+      const code = panel.querySelector<HTMLFormElement>("[data-email-code]")!;
+      if (
+        email.getAttribute("aria-busy") === "true" ||
+        code.getAttribute("aria-busy") === "true"
+      )
+        return;
+      for (const element of [email, code]) {
+        element.reset();
+        resetFormFeedback(element);
+      }
+      code.querySelector<HTMLInputElement>('input[name="email"]')!.value = "";
+      delete code.dataset.returnTo;
+      code.hidden = true;
+      link.hidden = true;
+      email.hidden = false;
+      const emailInput = email.querySelector<HTMLInputElement>(
+        'input[name="email"]',
+      )!;
+      emailInput.readOnly = false;
+      email.querySelector<HTMLButtonElement>('button[type="submit"]')!.hidden =
+        false;
+      emailInput.focus();
+    });
+  });
 
 form("[data-email-code]", async (element, values) => {
   finish(
@@ -236,7 +279,7 @@ form("[data-account-profile]", async (element, values) => {
   if (menuName)
     menuName.textContent =
       String(values.get("name") ?? "").trim() || "Your account";
-  message(element, result.message || "Profile saved.");
+  message(element, result.message || "Profile saved.", "success");
   if (element.hasAttribute("data-registration"))
     location.assign(result.next ?? "/volunteer/account");
 });

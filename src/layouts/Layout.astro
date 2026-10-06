@@ -1,6 +1,7 @@
 ---
 import Footer from "@/components/Footer.astro";
 import Header from "@/components/Header.astro";
+import { Font } from "astro:assets";
 import "@/styles/tailwind.css";
 
 // Preview mode changes only the banner, never account or event availability.
@@ -11,7 +12,7 @@ interface Props {
   description: string;
   /** Keeps private volunteer pages and test data out of search results. */
   noindex?: boolean;
-  /** No third-party font requests on pages containing account information. */
+  /** No third-party resource preconnects on pages containing account information. */
   privatePage?: boolean;
 }
 
@@ -34,19 +35,8 @@ const {
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     <meta name="theme-color" content="#050608" />
-    {
-      !privatePage && (
-        <>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-          <link rel="preconnect" href="https://cdn.shopify.com" />
-          <link
-            href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap"
-            rel="stylesheet"
-          />
-        </>
-      )
-    }
+    <Font cssVariable="--font-public-sans" preload />
+    {!privatePage && <link rel="preconnect" href="https://cdn.shopify.com" />}
     <title>{title}</title>
   </head>
   <body

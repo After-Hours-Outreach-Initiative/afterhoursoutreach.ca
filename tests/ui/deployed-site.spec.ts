@@ -92,7 +92,9 @@ test("deployed sign-in is enabled with no third-party scripts or frames", async 
   await expect(
     page.getByRole("button", { name: "Continue with Email" }),
   ).toBeEnabled();
-  await expect(page.getByLabel("Email address", { exact: true })).toBeEnabled();
+  await expect(
+    page.getByRole("textbox", { name: "Email", exact: true }),
+  ).toBeEnabled();
   await expect(page.locator("iframe")).toHaveCount(0);
   await expect(page.locator("[data-email-request] input")).toHaveCount(1);
   expect(external).toEqual([]);
