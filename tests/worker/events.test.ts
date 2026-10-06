@@ -316,7 +316,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
     );
 
     await t.test(
-      "last spot is atomic across simultaneous signups and email failure does not undo it",
+      "last spot is atomic across simultaneous signups without queuing email",
       async () => {
         const responses = await Promise.all([
           join(orientation.id, alice.cookie),
@@ -325,9 +325,26 @@ test("real event and organizer flows in the built Worker", async (t) => {
         assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409]);
         const result = (await responses
           .find((r) => r.status === 200)!
-          .json()) as { pending: number; localNotifications?: unknown };
-        assert.equal(result.pending, 1);
+          .json()) as {
+          sent: number;
+          failed: number;
+          pending: number;
+          localNotifications?: unknown;
+          message: string;
+        };
+        assert.equal(result.sent, 0);
+        assert.equal(result.failed, 0);
+        assert.equal(result.pending, 0);
+        assert.equal(result.message, "Your spot is confirmed.");
         assert.equal(result.localNotifications, undefined);
+        assert.equal(
+          (
+            await DB.prepare(
+              "SELECT count(*) AS n FROM event_notification",
+            ).first()
+          )?.n,
+          0,
+        );
         assert.equal(
           (
             await DB.prepare(
@@ -361,6 +378,83 @@ test("real event and organizer flows in the built Worker", async (t) => {
           .bind(alice.id)
           .first();
         assert.equal(approved?.approved_by, organizer.id);
+      },
+    );
+
+    await t.test(
+      "volunteer signups and cancellations preserve records and audits without emails",
+      async () => {
+        for (const type of ["orientation", "patrol"]) {
+          const event = await createEvent(type);
+          const before = await DB.prepare(
+            "SELECT count(*) AS n FROM event_notification",
+          ).first();
+          const joined = await ok(await join(event.id, alice.cookie));
+          const confirmed = await DB.prepare(
+            "SELECT id, status FROM signup WHERE event_id=? AND user_id=?",
+          )
+            .bind(event.id, alice.id)
+            .first<{ id: string; status: string }>();
+          assert.equal(confirmed?.status, "confirmed");
+          const cancelled = await ok(
+            await send(
+              "/api/events/action",
+              { action: "cancel", id: event.id },
+              alice.cookie,
+            ),
+          );
+          for (const response of [joined, cancelled]) {
+            const result = (await response.json()) as {
+              sent: number;
+              failed: number;
+              pending: number;
+              expired: number;
+              localNotifications?: unknown;
+              message: string;
+            };
+            assert.deepEqual(
+              {
+                sent: result.sent,
+                failed: result.failed,
+                pending: result.pending,
+                expired: result.expired,
+              },
+              { sent: 0, failed: 0, pending: 0, expired: 0 },
+            );
+            assert.equal(result.localNotifications, undefined);
+            assert.ok(
+              [
+                "Your spot is confirmed.",
+                "Your signup was cancelled.",
+              ].includes(result.message),
+            );
+          }
+          assert.equal(
+            (
+              await DB.prepare(
+                "SELECT count(*) AS n FROM event_notification",
+              ).first()
+            )?.n,
+            before?.n,
+          );
+          assert.equal(
+            (
+              await DB.prepare("SELECT status FROM signup WHERE id=?")
+                .bind(confirmed!.id)
+                .first()
+            )?.status,
+            "cancelled",
+          );
+          const audits = await DB.prepare(
+            "SELECT action FROM event_audit WHERE event_id=? AND action IN ('signup_joined', 'signup_cancelled') ORDER BY action",
+          )
+            .bind(event.id)
+            .all<{ action: string }>();
+          assert.deepEqual(
+            audits.results.map((row) => row.action),
+            ["signup_cancelled", "signup_joined"],
+          );
+        }
       },
     );
 
@@ -620,6 +714,12 @@ test("real event and organizer flows in the built Worker", async (t) => {
       "deactivation cancels future spots and last organizer cannot be removed",
       async () => {
         await ok(await status(alice.id, false, false));
+        const notifications = await DB.prepare(
+          "SELECT count(*) AS n FROM event_notification WHERE user_id=? AND subject='Your After Hours Outreach signup was cancelled' AND body LIKE '%volunteer access changed%'",
+        )
+          .bind(alice.id)
+          .first<{ n: number }>();
+        assert.ok(notifications && notifications.n > 0);
         assert.equal(
           (
             await DB.prepare(

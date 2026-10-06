@@ -75,7 +75,8 @@ names, not sensitive answers.
 Organizers create/edit events, separately close signups or hide listings, view
 rosters, move/remove signups with an optional emailed reason, and mark past
 orientation attendance. Volunteers can sign up and cancel before the event
-starts. D1 triggers enforce eligibility and capacity across concurrent requests.
+starts. These self-service actions are confirmed on screen without sending email.
+D1 triggers enforce eligibility and capacity across concurrent requests.
 Edits use version checks to prevent overwriting another organizer's changes.
 
 Event cancellation requires creating another event to reschedule, not a

@@ -396,21 +396,6 @@ export async function changeSignup(
             ...permissionValues(actor),
           ),
         eventAudit(db, operation, eventId, actor.id, "signup_joined"),
-        db
-          .prepare(
-            `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
-            SELECT ?, ?, ?, ?, ?, ?
-            WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
-          )
-          .bind(
-            crypto.randomUUID(),
-            operation,
-            actor.id,
-            "Your After Hours Outreach signup",
-            `${eventDescription(event)}\n\nYour spot is confirmed. You can cancel from the events page before it starts.`,
-            now,
-            operation,
-          ),
       ]);
       if (!results[0].meta.changes)
         throw new RequestError(403, "Your sign-in changed. Sign in again.");
@@ -432,21 +417,6 @@ export async function changeSignup(
           )
           .bind(now, eventId, actor.id, ...permissionValues(actor)),
         eventAudit(db, operation, eventId, actor.id, "signup_cancelled"),
-        db
-          .prepare(
-            `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
-            SELECT ?, ?, ?, ?, ?, ?
-            WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
-          )
-          .bind(
-            crypto.randomUUID(),
-            operation,
-            actor.id,
-            "Your After Hours Outreach signup was cancelled",
-            `${eventDescription(event)}\n\nYou cancelled your spot.`,
-            now,
-            operation,
-          ),
       ]);
       if (!results[0].meta.changes)
         throw new RequestError(409, "You are not signed up for this event.");
