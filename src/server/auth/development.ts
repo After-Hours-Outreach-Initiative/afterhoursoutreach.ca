@@ -13,13 +13,12 @@ import { asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "../db";
 import { profile, user } from "../db/schema";
-import { isLocalDevelopment } from "../development";
 import { safeReturnTo } from "../http";
 import type { AuthBindings } from "./index";
 
 export function developmentAccounts(bindings: AuthBindings) {
   const requireLocal = (request: Request | undefined) => {
-    if (!request || !isLocalDevelopment(request))
+    if (!request || !import.meta.env?.DEV)
       throw new APIError("NOT_FOUND", { message: "Not found" });
     const origin = request.headers.get("origin");
     const expectedOrigin = new URL(request.url).origin;

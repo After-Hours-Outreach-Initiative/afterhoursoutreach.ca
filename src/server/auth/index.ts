@@ -16,7 +16,6 @@ import {
 } from "./abuse";
 import { sendSignInEmail, type SignInEmail } from "./services";
 import { developmentAccounts } from "./development";
-import { isLocalDevelopment } from "../development";
 
 export type AuthBindings = Pick<
   Env,
@@ -29,7 +28,7 @@ export function authBindingsForRequest(
   request: Request,
 ) {
   const url = new URL(request.url);
-  const local = isLocalDevelopment(request);
+  const local = import.meta.env?.DEV;
   // Pin hosted sign-in links to AUTH_BASE_URL when configured. Otherwise use
   // the URL routed to this Worker, not Host or X-Forwarded-Host headers.
   const origin =
