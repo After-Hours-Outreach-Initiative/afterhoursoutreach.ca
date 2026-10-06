@@ -29,10 +29,14 @@ export async function listVolunteers(
   const rows = await db
     .prepare(
       `SELECT u.id, p.preferred_name AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
-    v.active, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
-    (SELECT count(*) FROM orientation_completion o WHERE o.user_id=u.id) AS orientations
-    FROM user u JOIN profile p ON p.user_id=u.id JOIN volunteer_status v ON v.user_id=u.id
-    WHERE instr(lower(p.preferred_name), lower(?)) > 0 ORDER BY p.preferred_name, u.id LIMIT 51 OFFSET ?`,
+        v.active, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
+      FROM user u
+      JOIN profile p ON p.user_id = u.id
+      JOIN volunteer_status v ON v.user_id = u.id
+      WHERE instr(lower(p.preferred_name), lower(?)) > 0
+      ORDER BY p.preferred_name, u.id
+      LIMIT 51 OFFSET ?`,
     )
     .bind(search.slice(0, 100), offset)
     .all<VolunteerRow>();
@@ -55,15 +59,23 @@ export async function viewVolunteerProfile(
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO audit_log(id,actor_id,subject_id,action,created_at) SELECT ?,?,?,'profile_viewed',? WHERE ${writePermission(true)}`,
+        `INSERT INTO audit_log (id, actor_id, subject_id, action, created_at)
+        SELECT ?, ?, ?, 'profile_viewed', ?
+        WHERE ${writePermission(true)}`,
       )
       .bind(accessId, actor.id, userId, Date.now(), ...permissionValues(actor)),
     db
       .prepare(
-        `SELECT preferred_name AS name,coalesce(pronouns,'') AS pronouns,phone,birth_date AS birthDate,
-      emergency_contact_name AS emergencyName,emergency_contact_phone AS emergencyPhone,emergency_contact_relationship AS emergencyRelationship,
-      heard_about_us AS heardAboutUs,motivation,teams,medical_certification AS certification,training_experience AS experience,
-      coalesce(medical_conditions,'') AS medicalConditions FROM profile WHERE user_id=? AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)`,
+        `SELECT preferred_name AS name, coalesce(pronouns, '') AS pronouns,
+          phone, birth_date AS birthDate,
+          emergency_contact_name AS emergencyName,
+          emergency_contact_phone AS emergencyPhone,
+          emergency_contact_relationship AS emergencyRelationship,
+          heard_about_us AS heardAboutUs, motivation, teams,
+          medical_certification AS certification, training_experience AS experience,
+          coalesce(medical_conditions, '') AS medicalConditions
+        FROM profile
+        WHERE user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
       )
       .bind(userId, accessId),
   ]);
@@ -95,7 +107,9 @@ export async function setVolunteerStatus(
   const { userId, version, active, patrolApproved } = parsed.data;
   const old = await db
     .prepare(
-      "SELECT active, patrol_approved AS patrolApproved FROM volunteer_status WHERE user_id=?",
+      `SELECT active, patrol_approved AS patrolApproved
+      FROM volunteer_status
+      WHERE user_id = ?`,
     )
     .bind(userId)
     .first<{ active: number; patrolApproved: number }>();
@@ -112,8 +126,15 @@ export async function setVolunteerStatus(
     const results = await db.batch([
       db
         .prepare(
-          `UPDATE volunteer_status SET active=?,patrol_approved=?,approved_by=CASE WHEN patrol_approved=? THEN approved_by ELSE ? END,
-        approved_at=CASE WHEN patrol_approved=? THEN approved_at ELSE ? END,updated_at=? WHERE user_id=? AND updated_at=? AND ${writePermission(true)}`,
+          `UPDATE volunteer_status
+          SET active = ?,
+              patrol_approved = ?,
+              approved_by = CASE WHEN patrol_approved = ? THEN approved_by ELSE ? END,
+              approved_at = CASE WHEN patrol_approved = ? THEN approved_at ELSE ? END,
+              updated_at = ?
+          WHERE user_id = ?
+            AND updated_at = ?
+            AND ${writePermission(true)}`,
         )
         .bind(
           Number(active),
@@ -129,7 +150,9 @@ export async function setVolunteerStatus(
         ),
       db
         .prepare(
-          `INSERT INTO audit_log(id,actor_id,subject_id,action,changed_fields,created_at) SELECT ?,?,?,?,?,? WHERE changes()=1`,
+          `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+          SELECT ?, ?, ?, ?, ?, ?
+          WHERE changes() = 1`,
         )
         .bind(
           operation,
@@ -144,11 +167,17 @@ export async function setVolunteerStatus(
       // Queue before cancelling so the recipient still has the original event details.
       db
         .prepare(
-          `INSERT INTO event_notification(id,operation_id,user_id,subject,body,created_at)
-        SELECT lower(hex(randomblob(16))),?,s.user_id,'Your After Hours Outreach signup was cancelled',
-        'Your signup for ' || e.type || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.',?
-        FROM signup s JOIN event e ON e.id=s.event_id WHERE s.user_id=? AND s.status='confirmed' AND e.starts_at>?
-        AND (?=0 OR (?=0 AND e.type='patrol')) AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)`,
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
+          SELECT lower(hex(randomblob(16))), ?, s.user_id,
+            'Your After Hours Outreach signup was cancelled',
+            'Your signup for ' || e.type || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.', ?
+          FROM signup s
+          JOIN event e ON e.id = s.event_id
+          WHERE s.user_id = ?
+            AND s.status = 'confirmed'
+            AND e.starts_at > ?
+            AND (? = 0 OR (? = 0 AND e.type = 'patrol'))
+            AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
         )
         .bind(
           operation,
@@ -161,9 +190,15 @@ export async function setVolunteerStatus(
         ),
       db
         .prepare(
-          `UPDATE signup SET status='cancelled',updated_at=? WHERE user_id=? AND status='confirmed'
-        AND event_id IN(SELECT id FROM event WHERE starts_at>? AND (?=0 OR (?=0 AND type='patrol')))
-        AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)`,
+          `UPDATE signup
+          SET status = 'cancelled', updated_at = ?
+          WHERE user_id = ?
+            AND status = 'confirmed'
+            AND event_id IN(
+              SELECT id FROM event
+              WHERE starts_at > ? AND (? = 0 OR (? = 0 AND type = 'patrol'))
+            )
+            AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
         )
         .bind(
           now,
@@ -175,8 +210,9 @@ export async function setVolunteerStatus(
         ),
       db
         .prepare(
-          `INSERT INTO event_notification(id,operation_id,user_id,subject,body,created_at)
-        SELECT ?,?,?,'Your After Hours Outreach volunteer access changed',?,? WHERE EXISTS(SELECT 1 FROM audit_log WHERE id=?)`,
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
+          SELECT ?, ?, ?, 'Your After Hours Outreach volunteer access changed', ?, ?
+          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
         )
         .bind(
           crypto.randomUUID(),
@@ -207,8 +243,11 @@ export async function setRole(
   requireOrganizer(actor);
   const target = await db
     .prepare(
-      `SELECT u.role,u.email_verified AS verified,v.active
-    FROM user u JOIN profile p ON p.user_id=u.id JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
+      `SELECT u.role, u.email_verified AS verified, v.active
+      FROM user u
+      JOIN profile p ON p.user_id = u.id
+      JOIN volunteer_status v ON v.user_id = u.id
+      WHERE u.id = ?`,
     )
     .bind(userId)
     .first<{
@@ -230,8 +269,14 @@ export async function setRole(
     const results = await db.batch([
       db
         .prepare(
-          `UPDATE user SET role=?,updated_at=? WHERE id=? AND role=? AND ${writePermission(true)}
-         AND (?='volunteer' OR (email_verified=1 AND EXISTS(SELECT 1 FROM volunteer_status WHERE user_id=? AND active=1)))`,
+          `UPDATE user
+          SET role = ?, updated_at = ?
+          WHERE id = ?
+            AND role = ?
+            AND ${writePermission(true)}
+            AND (? = 'volunteer' OR (email_verified = 1 AND EXISTS(
+              SELECT 1 FROM volunteer_status WHERE user_id = ? AND active = 1
+            )))`,
         )
         .bind(
           role,
@@ -244,18 +289,22 @@ export async function setRole(
         ),
       db
         .prepare(
-          `INSERT INTO audit_log(id,actor_id,subject_id,action,changed_fields,created_at) SELECT ?,?,?,'role_changed','["role"]',? WHERE changes()=1`,
+          `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+          SELECT ?, ?, ?, 'role_changed', '["role"]', ?
+          WHERE changes() = 1`,
         )
         .bind(operation, actor.id, userId, now),
       db
         .prepare(
-          "DELETE FROM session WHERE user_id=? AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)",
+          `DELETE FROM session
+          WHERE user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
         )
         .bind(userId, operation),
       db
         .prepare(
-          `INSERT INTO event_notification(id,operation_id,user_id,subject,body,created_at)
-        SELECT ?,?,?,'Your After Hours Outreach account role changed',?,? WHERE EXISTS(SELECT 1 FROM audit_log WHERE id=?)`,
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
+          SELECT ?, ?, ?, 'Your After Hours Outreach account role changed', ?, ?
+          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
         )
         .bind(
           crypto.randomUUID(),
@@ -289,8 +338,15 @@ export async function completeOrientation(
   requireOrganizer(actor);
   const eligible = await db
     .prepare(
-      `SELECT e.id FROM event e JOIN signup s ON s.event_id=e.id
-    WHERE e.id=? AND e.type='orientation' AND e.cancelled_at IS NULL AND e.starts_at<=? AND s.user_id=? AND s.status='confirmed'`,
+      `SELECT e.id
+      FROM event e
+      JOIN signup s ON s.event_id = e.id
+      WHERE e.id = ?
+        AND e.type = 'orientation'
+        AND e.cancelled_at IS NULL
+        AND e.starts_at <= ?
+        AND s.user_id = ?
+        AND s.status = 'confirmed'`,
     )
     .bind(eventId, Date.now(), userId)
     .first();
@@ -303,10 +359,20 @@ export async function completeOrientation(
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO orientation_completion(id,user_id,event_id,marked_by,marked_at) SELECT ?,?,?,?,? WHERE ${writePermission(true)}
-        AND EXISTS(SELECT 1 FROM event e JOIN signup s ON s.event_id=e.id WHERE e.id=? AND s.user_id=? AND s.status='confirmed'
-        AND e.type='orientation' AND e.cancelled_at IS NULL AND e.starts_at <= (julianday('now') - 2440587.5) * 86400000)
-        ON CONFLICT(user_id,event_id) DO NOTHING`,
+        `INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
+        SELECT ?, ?, ?, ?, ?
+        WHERE ${writePermission(true)}
+          AND EXISTS(
+            SELECT 1 FROM event e
+            JOIN signup s ON s.event_id = e.id
+            WHERE e.id = ?
+              AND s.user_id = ?
+              AND s.status = 'confirmed'
+              AND e.type = 'orientation'
+              AND e.cancelled_at IS NULL
+              AND e.starts_at <= (julianday('now') - 2440587.5) * 86400000
+          )
+        ON CONFLICT(user_id, event_id) DO NOTHING`,
       )
       .bind(
         crypto.randomUUID(),
@@ -320,8 +386,9 @@ export async function completeOrientation(
       ),
     db
       .prepare(
-        `INSERT INTO audit_log(id,actor_id,subject_id,action,changed_fields,created_at)
-      SELECT ?,?,?,'orientation_completed','["orientationCompletion"]',? WHERE changes()=1`,
+        `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+        SELECT ?, ?, ?, 'orientation_completed', '["orientationCompletion"]', ?
+        WHERE changes() = 1`,
       )
       .bind(operation, actor.id, userId, Date.now()),
   ]);
