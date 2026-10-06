@@ -1,0 +1,53 @@
+---
+import type { EventRow, RosterRow } from "@/server/events/service";
+import SignupEditor from "./SignupEditor.astro";
+
+interface Props {
+  event: EventRow;
+  roster: RosterRow[];
+  future: boolean;
+  destinations: EventRow[];
+}
+const { event, roster, future, destinations } = Astro.props;
+---
+
+<details class="volunteer-roster">
+  <summary>Volunteers ({roster.length})</summary>
+  <ul>
+    {
+      roster.map((person) => (
+        <li>
+          <div>
+            <a
+              href={`/volunteer/volunteers/${encodeURIComponent(person.userId)}`}
+              data-volunteer-profile-link
+            >
+              {person.name}
+            </a>
+            {Boolean(person.completed) && <span>Orientation completed</span>}
+          </div>
+          {event.type === "orientation" &&
+            !future &&
+            !event.cancelledAt &&
+            !person.completed && (
+              <form
+                data-organizer-orientation
+                action="/api/organizer/action"
+                method="post"
+              >
+                <input name="userId" type="hidden" value={person.userId} />
+                <input name="eventId" type="hidden" value={event.id} />
+                <button class="btn btn-outline" type="submit">
+                  Mark orientation completed
+                </button>
+                <p data-form-message role="status" hidden />
+              </form>
+            )}
+          {future && (
+            <SignupEditor signup={person} destinations={destinations} />
+          )}
+        </li>
+      ))
+    }
+  </ul>
+</details>

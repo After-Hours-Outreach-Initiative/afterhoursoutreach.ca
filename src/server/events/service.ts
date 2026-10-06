@@ -38,6 +38,13 @@ export interface EventRow {
   confirmed: number;
   signedUp: number;
 }
+export interface RosterRow {
+  id: string;
+  eventId: string;
+  userId: string;
+  name: string;
+  completed: number;
+}
 const eventColumns = `
   e.id, e.type, e.starts_at AS startsAt,
   e.meeting_point AS meetingPoint, e.meeting_point_url AS meetingPointUrl,
@@ -477,13 +484,7 @@ export async function listRosters(
       LIMIT 10000`,
     )
     .bind(...ids)
-    .all<{
-      id: string;
-      eventId: string;
-      userId: string;
-      name: string;
-      completed: number;
-    }>();
+    .all<RosterRow>();
   return rows.results;
 }
 

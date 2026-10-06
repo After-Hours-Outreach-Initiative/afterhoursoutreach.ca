@@ -1,0 +1,31 @@
+---
+import { notificationRetryHours } from "@/server/events/notifications";
+
+interface Props {
+  counts: { pending: number; expired: number };
+}
+const { counts } = Astro.props;
+---
+
+<section class="volunteer-panel">
+  <h2>Event notifications</h2>
+  <p>
+    {counts.pending} notifications awaiting delivery. Delivery failures do not undo
+    saved changes. Retries are limited to {notificationRetryHours} hours to avoid
+    duplicate delivery after provider idempotency expires.
+  </p>
+  {
+    Boolean(counts.expired) && (
+      <p>
+        {counts.expired} notifications expired and cannot be retried. Contact
+        the recipients directly.
+      </p>
+    )
+  }
+  <form data-retry-notifications action="/api/events/action" method="post">
+    <p data-form-message role="status" hidden></p>
+    <button class="btn btn-outline" type="submit"
+      >Retry pending notifications</button
+    >
+  </form>
+</section>

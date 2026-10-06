@@ -1,0 +1,135 @@
+---
+import type { Actor } from "@/server/accounts/access";
+import type { EventRow, RosterRow } from "@/server/events/service";
+import { signupBlockReason } from "@/server/events/policy";
+import { formatEventDate } from "@/data/event-time";
+import EventEditor from "./EventEditor.astro";
+import EventRoster from "./EventRoster.astro";
+
+interface Props {
+  event: EventRow;
+  actor: Actor | null;
+  organizer: boolean;
+  roster: RosterRow[];
+  destinations: EventRow[];
+  filter: string;
+}
+const { event, actor, organizer, roster, destinations, filter } = Astro.props;
+const future = event.startsAt > Date.now();
+const left = Math.max(0, event.spots - event.confirmed);
+const blocked = signupBlockReason(
+  actor,
+  {
+    ...event,
+    startsAt: new Date(event.startsAt),
+    open: Boolean(event.open) && !event.hidden && !event.cancelledAt,
+  },
+  event.confirmed,
+);
+---
+
+<li
+  class="volunteer-event-card"
+  data-live-event={event.id}
+  data-event-type={event.type}
+  hidden={filter !== "all" && filter !== event.type}
+>
+  <div class="volunteer-event-top">
+    <div>
+      {
+        Boolean(event.signedUp) && (
+          <span class="volunteer-badge">Signed up</span>
+        )
+      }
+      {
+        event.cancelledAt ? (
+          <p class="volunteer-hidden">Cancelled</p>
+        ) : Boolean(event.hidden) ? (
+          <p class="volunteer-hidden">Hidden from public list</p>
+        ) : (
+          !event.open && <p class="volunteer-hidden">Closed for new signups</p>
+        )
+      }
+      <h3>
+        {event.type === "patrol" ? "Patrol" : "Orientation"} · {
+          formatEventDate(event.startsAt)
+        }
+      </h3>
+      <p>
+        Meeting at{" "}
+        {
+          event.meetingPointUrl ? (
+            <a href={event.meetingPointUrl} target="_blank" rel="noreferrer">
+              {event.meetingPoint}
+            </a>
+          ) : (
+            event.meetingPoint
+          )
+        }
+      </p>
+      <p>
+        <span
+          class:list={[
+            "volunteer-spots",
+            {
+              "volunteer-spots-full": left === 0,
+              "volunteer-spots-low": left > 0 && left <= 2,
+            },
+          ]}
+        >
+          {left === 0 ? "Full" : `${left} spots left`}
+        </span>{" "}· {event.confirmed} of {event.spots} spots taken
+      </p>
+      {!event.signedUp && actor && blocked && <p>{blocked}</p>}
+    </div>
+    <div class="volunteer-actions">
+      {
+        event.signedUp && future ? (
+          <form data-live-signup action="/api/events/action" method="post">
+            <input name="id" type="hidden" value={event.id} />
+            <input name="action" type="hidden" value="cancel" />
+            <button class="btn btn-red" type="submit">
+              Cancel my spot
+            </button>
+            <p data-form-message role="status" hidden />
+          </form>
+        ) : !actor ? (
+          <a class="btn btn-outline" href="#volunteer-signin">
+            Sign in to sign up
+          </a>
+        ) : !blocked ? (
+          <form data-live-signup action="/api/events/action" method="post">
+            <input name="id" type="hidden" value={event.id} />
+            <input name="action" type="hidden" value="join" />
+            <button class="btn btn-green" type="submit">
+              Sign up
+            </button>
+            <p data-form-message role="status" hidden />
+          </form>
+        ) : null
+      }
+      {
+        organizer && future && !event.cancelledAt && (
+          <button
+            class="btn btn-quiet"
+            type="button"
+            data-show-dialog={`event-editor-${event.id}`}
+          >
+            Edit
+          </button>
+        )
+      }
+    </div>
+  </div>
+  {
+    organizer && (
+      <EventRoster
+        event={event}
+        roster={roster}
+        future={future}
+        destinations={destinations.filter((other) => other.id !== event.id)}
+      />
+    )
+  }
+  {organizer && future && !event.cancelledAt && <EventEditor event={event} />}
+</li>

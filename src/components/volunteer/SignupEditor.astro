@@ -1,0 +1,65 @@
+---
+import type { EventRow, RosterRow } from "@/server/events/service";
+import { formatEventDate } from "@/data/event-time";
+
+interface Props {
+  signup: RosterRow;
+  destinations: EventRow[];
+}
+const { signup, destinations } = Astro.props;
+---
+
+<button
+  class="btn btn-quiet"
+  type="button"
+  data-show-dialog={`signup-editor-${signup.id}`}>Move or remove</button
+>
+<dialog
+  class="dialog-pop volunteer-dialog"
+  id={`signup-editor-${signup.id}`}
+  aria-labelledby={`signup-editor-heading-${signup.id}`}
+>
+  <div class="volunteer-section-heading">
+    <h2 id={`signup-editor-heading-${signup.id}`}>Change a signup</h2>
+    <button class="btn btn-quiet" type="button" data-dismiss-dialog
+      >Close</button
+    >
+  </div>
+  <p class="mb-6">{signup.name}</p>
+  <form
+    class="volunteer-form"
+    data-manage-signup
+    action="/api/events/action"
+    method="post"
+  >
+    <input type="hidden" name="id" value={signup.id} />
+    <label class="volunteer-field">
+      Destination
+      <select name="destination">
+        <option value="">Remove signup</option>
+        {
+          destinations.map((event) => (
+            <option value={event.id}>
+              {event.type} · {formatEventDate(event.startsAt)}
+            </option>
+          ))
+        }
+      </select>
+    </label>
+    <label class="volunteer-field">
+      Reason (optional)
+      <textarea name="reason" rows="3" maxlength="1000"></textarea>
+    </label>
+    {
+      !import.meta.env.DEV && (
+        <p class="volunteer-help">
+          Included in the volunteer’s notification email. Do not include medical
+          or other sensitive information.
+        </p>
+      )
+    }
+    <p data-form-message role="status" hidden></p>
+    <button class="btn btn-outline" type="submit">Save change and notify</button
+    >
+  </form>
+</dialog>
