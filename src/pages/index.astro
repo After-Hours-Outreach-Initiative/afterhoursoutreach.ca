@@ -1,11 +1,8 @@
 ---
 import { Image } from "astro:assets";
-import PatrolList from "@/components/PatrolList.astro";
+import EventTeaser from "@/components/volunteer/EventTeaser.astro";
 import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
-import { seedPatrols, upcoming } from "@/data/patrols";
-
-const patrols = upcoming(seedPatrols);
 ---
 
 <Layout
@@ -64,12 +61,12 @@ const patrols = upcoming(seedPatrols);
       </p>
 
       <div class="mt-10">
-        <PatrolList patrols={patrols} />
+        <EventTeaser />
       </div>
 
       <p class="mt-8">
-        <a class="text-lg text-blue underline" href="/patrols">
-          See every upcoming patrol
+        <a class="text-lg text-blue underline" href="/volunteer">
+          See all events and sign in
         </a>
       </p>
     </div>

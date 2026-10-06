@@ -6,7 +6,6 @@ export const donateHref = "/donate";
 
 export const navLinks = [
   { label: "About", href: "/about" },
-  { label: "Patrols", href: "/patrols" },
   { label: "Volunteer", href: "/volunteer" },
   ...(donationsOpen ? [{ label: "Donate", href: donateHref }] : []),
 ];
