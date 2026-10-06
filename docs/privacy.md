@@ -39,7 +39,42 @@ A `/privacy` page, linked from the footer and the registration form, covering:
 ## Deleting an account
 
 A volunteer can delete their account from `/volunteer/account`. This removes
-their profile and signups.
+their operational profile and signups, subject to the retention policy approved
+before launch.
+
+## Retention and deletion proposal
+
+For board and privacy-officer review, not an approved policy or an implemented
+purge schedule. The one-year decision-record minimum comes from
+[PIPA section 35](https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/03063_01#section35).
+These are proposed maximum periods unless continued retention is required for a
+documented legal or operational purpose.
+
+| Information                                                                              | Proposed retention                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Verified accounts without registration                                                   | Delete after 90 days without sign-in.                                                                                                                                                                                         |
+| Active volunteer profiles                                                                | Keep while the volunteer participates. Review after 24 months without sign-in or event participation; give 30 days' notice before deletion.                                                                                   |
+| Event signups and orientation attendance                                                 | Keep identifiable records for 12 months after the event, then delete or keep only anonymous totals, unless still needed as a decision record.                                                                                 |
+| Information used for approval, denial, or other decisions directly affecting a volunteer | Preserve the information actually used for at least one year after each decision, including the applicable version if the profile later changes. Review and delete when that minimum and any other justified need have ended. |
+| Profile-view, edit, role, and approval audit logs                                        | Keep for 12 months, or longer where part of a required decision record or a documented investigation. No medical answers or authentication secrets in logs.                                                                   |
+| Email sign-in codes and hashed abuse counters                                            | Codes expire after ten minutes; purge verification records and counters within 24 hours after expiry.                                                                                                                         |
+| Sessions and associated IP/device details                                                | Revoke immediately on sign-out or account deletion; purge expired sessions within seven days.                                                                                                                                 |
+| Staging accounts and sample profiles                                                     | Use sample profile answers only; delete test accounts within 30 days of last use.                                                                                                                                             |
+
+On a confirmed deletion request, revoke sessions and cancel future signups
+immediately. Remove the operational account and profile within 30 days. If
+specific decision information must be retained, explain what is kept, why, and
+its review date. Restrict it to the privacy officer and authorized review staff;
+do not keep the entire profile merely because an approval occurred.
+
+Document any legal hold, its reason, owner, and review date. Deleted data may
+remain in backups until those backups expire; restores must reapply deletions
+before serving traffic. Confirm Cloudflare backup windows and Resend's email
+retention separately before publishing promises about provider-held copies.
+
+Approval is also needed for the privacy contact, restricted decision-record
+storage, and scheduled deletion jobs. The current profile-edit audit records
+field names only; it does not preserve the information used in past decisions.
 
 ## Cookies
 
