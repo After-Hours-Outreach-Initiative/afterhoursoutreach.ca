@@ -1,3 +1,42 @@
+import { vancouverInstant } from "../data/event-time";
+
+document
+  .querySelectorAll<HTMLElement>("[data-event-browser]")
+  .forEach((root) => {
+    const cards = root.querySelectorAll<HTMLElement>("[data-event-type]");
+    const filters = root.querySelectorAll<HTMLButtonElement>(
+      "[data-event-filter]",
+    );
+    const empty = root.querySelector<HTMLElement>("[data-empty-events]");
+    const applyFilter = (type: string) => {
+      const selected = ["patrol", "orientation"].includes(type) ? type : "all";
+      let visible = 0;
+      for (const card of cards) {
+        card.hidden = selected !== "all" && card.dataset.eventType !== selected;
+        if (!card.hidden) visible++;
+      }
+      for (const button of filters)
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.eventFilter === selected),
+        );
+      if (empty) empty.hidden = visible !== 0;
+    };
+    for (const button of filters)
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const type = button.dataset.eventFilter ?? "all";
+        applyFilter(type);
+        const url = new URL(location.href);
+        if (type === "all") url.searchParams.delete("type");
+        else url.searchParams.set("type", type);
+        history.pushState(null, "", url);
+      });
+    window.addEventListener("popstate", () =>
+      applyFilter(new URL(location.href).searchParams.get("type") ?? "all"),
+    );
+  });
+
 interface Result {
   message?: string;
   failed?: number;
@@ -49,6 +88,40 @@ function form(
   });
 }
 const str = (values: FormData, key: string) => String(values.get(key) ?? "");
+form("[data-live-signup]", "/api/events/action", (v) => ({
+  action: str(v, "action"),
+  id: str(v, "id"),
+}));
+form("[data-event-save]", "/api/events/action", (v) => ({
+  action: "save",
+  ...(v.has("id")
+    ? { id: str(v, "id"), version: Number(v.get("version")) }
+    : {}),
+  event: {
+    type: str(v, "type"),
+    startsAt: vancouverInstant(str(v, "startsAt")),
+    meetingPoint: str(v, "meetingPoint"),
+    meetingPointUrl: str(v, "meetingPointUrl"),
+    spots: Number(v.get("spots")),
+    open: v.has("open"),
+    hidden: v.has("hidden"),
+  },
+}));
+form("[data-event-cancel]", "/api/events/action", (v) => ({
+  action: "cancel-event",
+  id: str(v, "id"),
+  version: Number(v.get("version")),
+  reason: str(v, "reason"),
+}));
+form("[data-manage-signup]", "/api/events/action", (v) => ({
+  action: "manage-signup",
+  id: str(v, "id"),
+  ...(v.get("destination") ? { destination: str(v, "destination") } : {}),
+  reason: str(v, "reason"),
+}));
+form("[data-retry-notifications]", "/api/events/action", () => ({
+  action: "retry-notifications",
+}));
 form("[data-organizer-status]", "/api/organizer/action", (v) => ({
   action: "status",
   userId: str(v, "userId"),

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { createTestHarness } from "wrangler";
+import { chromium } from "@playwright/test";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
 
@@ -133,6 +135,18 @@ test("real event and organizer flows in the built Worker", async (t) => {
       open: true,
       hidden: false,
     });
+
+    await t.test(
+      "new databases show a genuine empty event list, not sample fixtures",
+      async () => {
+        const response = await ok(await send("/volunteer"));
+        assert.match(await response.text(), /No upcoming events are scheduled/);
+        const list = (await (await ok(await send("/api/events"))).json()) as {
+          events: unknown[];
+        };
+        assert.deepEqual(list.events, []);
+      },
+    );
 
     await t.test(
       "bootstrap requires verified registration but not two-factor, is atomic and one-time",
@@ -277,6 +291,29 @@ test("real event and organizer flows in the built Worker", async (t) => {
         organizer.cookie,
       );
     };
+
+    await t.test(
+      "real listings have no invented events, demo code or signed-out account menu",
+      async () => {
+        const response = await ok(await send("/volunteer"));
+        const html = await response.text();
+        assert.doesNotMatch(html, /Preview · public test site/);
+        assert.match(html, /Sample meeting point/);
+        assert.doesNotMatch(
+          html,
+          /preview-event|data-account-switcher|View as|Sample Alice|PRIVATE HEALTH ANSWER|data-account-menu/,
+        );
+        assert.match(response.headers.get("cache-control")!, /no-store/);
+        const summaries = (await (
+          await ok(await send("/api/events"))
+        ).json()) as { events: unknown[] };
+        assert.equal(summaries.events.length, 3);
+        assert.doesNotMatch(
+          JSON.stringify(summaries),
+          /PRIVATE HEALTH ANSWER|Sample Alice|userId|confirmed|signedUp|version/,
+        );
+      },
+    );
 
     await t.test(
       "last spot is atomic across simultaneous signups and email failure does not undo it",
@@ -428,6 +465,14 @@ test("real event and organizer flows in the built Worker", async (t) => {
             },
             organizer.cookie,
           ),
+        );
+        assert.doesNotMatch(
+          await (await send("/volunteer")).text(),
+          new RegExp(`data-live-event="${patrol.id}"`),
+        );
+        assert.match(
+          await (await send("/volunteer", undefined, alice.cookie)).text(),
+          new RegExp(`data-live-event="${patrol.id}"`),
         );
         await ok(await join(patrol.id, bob.cookie), 403);
       },
@@ -728,6 +773,281 @@ test("real event and organizer flows in the built Worker", async (t) => {
       },
     );
 
+    await t.test(
+      "real browser UI supports event creation and signup with nav below heading on mobile",
+      async () => {
+        const browser = await chromium.launch({
+          executablePath:
+            process.env.CHROMIUM_PATH ??
+            (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
+        });
+        try {
+          const page = await browser.newPage({
+            viewport: { width: 375, height: 812 },
+          });
+          const errors: string[] = [];
+          page.on("pageerror", (error) => errors.push(error.message));
+          let routeCookie = organizer.cookie;
+          await page.route("**/*", async (route) => {
+            const request = route.request();
+            if (!request.url().startsWith(origin)) return route.abort();
+            const response = await worker.fetch(request.url(), {
+              method: request.method(),
+              headers: {
+                ...(await request.allHeaders()),
+                cookie: routeCookie,
+              },
+              ...(request.postData() ? { body: request.postData()! } : {}),
+              redirect: "manual",
+            });
+            await route.fulfill({
+              status: response.status,
+              headers: Object.fromEntries(response.headers),
+              body: Buffer.from(await response.arrayBuffer()),
+            });
+          });
+          await page.goto(`${origin}/volunteer`);
+          const nav = page.getByRole("navigation", {
+            name: "Volunteer account",
+          });
+          const account = nav.locator("[data-account-menu] > summary");
+          assert.equal(
+            (
+              await nav.locator("[data-account-menu-name]").textContent()
+            )?.trim(),
+            "Sample Organizer",
+          );
+          await account.waitFor();
+          await page.goto(`${origin}/volunteer/volunteers`);
+          await account.waitFor();
+          const teamSearch = page.getByRole("searchbox", {
+            name: "Find a volunteer",
+          });
+          await teamSearch.fill("Sample Alice");
+          await page.waitForURL(
+            `${origin}/volunteer/volunteers?q=Sample+Alice`,
+          );
+          await page
+            .locator("[data-volunteer-results]")
+            .getByRole("heading", { name: "Sample Alice", exact: true })
+            .waitFor();
+          await page
+            .getByRole("link", {
+              name: "View profile and approval",
+              exact: true,
+            })
+            .click();
+          const profileDialog = page.getByRole("dialog", {
+            name: "Volunteer profile",
+            exact: true,
+          });
+          await profileDialog
+            .getByRole("heading", { name: "Sample Alice", exact: true })
+            .waitFor();
+          assert.match(
+            await profileDialog.innerText(),
+            /PRIVATE HEALTH ANSWER/,
+          );
+          assert.match(page.url(), /\/volunteer\/volunteers\?q=Sample\+Alice$/);
+          await profileDialog
+            .getByRole("button", { name: "Approve for patrols", exact: true })
+            .click();
+          await page.locator("[data-action-notice]").waitFor();
+          assert.equal(await profileDialog.isVisible(), false);
+          assert.deepEqual(
+            await DB.prepare(
+              "SELECT active, patrol_approved AS approved FROM volunteer_status WHERE user_id=?",
+            )
+              .bind(alice.id)
+              .first(),
+            { active: 0, approved: 1 },
+          );
+          await page.goto(`${origin}/volunteer/volunteers/${alice.id}`);
+          await account.waitFor();
+          await page.getByLabel("Active volunteer", { exact: true }).check();
+          await page.locator("[data-action-notice]").waitFor();
+          assert.deepEqual(
+            await DB.prepare(
+              "SELECT active, patrol_approved AS approved FROM volunteer_status WHERE user_id=?",
+            )
+              .bind(alice.id)
+              .first(),
+            { active: 1, approved: 1 },
+          );
+          await page.goto(`${origin}/volunteer/volunteers?q=Sample+Alice`);
+          await page
+            .getByRole("link", {
+              name: "View profile and approval",
+              exact: true,
+            })
+            .click();
+          await profileDialog
+            .getByLabel("Account role")
+            .selectOption("organizer");
+          await page.locator("[data-action-notice]").waitFor();
+          assert.equal(
+            (
+              await DB.prepare("SELECT role FROM user WHERE id=?")
+                .bind(alice.id)
+                .first<{ role: string }>()
+            )?.role,
+            "organizer",
+          );
+          await page
+            .getByRole("link", {
+              name: "View profile and approval",
+              exact: true,
+            })
+            .click();
+          await profileDialog
+            .getByLabel("Account role")
+            .selectOption("volunteer");
+          await page.locator("[data-action-notice]").waitFor();
+          alice.cookie = await signIn(alice.email);
+          await page.goto(`${origin}/volunteer`);
+          await page
+            .getByRole("button", { name: "Add an event", exact: true })
+            .click();
+          const dialog = page.getByRole("dialog", {
+            name: "Add an event",
+            exact: true,
+          });
+          await dialog
+            .getByLabel("Start date and time")
+            .fill("2031-04-12T20:30");
+          await dialog
+            .getByLabel("Meeting point", { exact: true })
+            .fill("Browser-created meeting point");
+          await dialog
+            .getByRole("button", { name: "Save event", exact: true })
+            .click();
+          await page
+            .getByRole("heading", { name: /Patrol · .*2031/ })
+            .waitFor();
+          const filters = page.getByRole("group", {
+            name: "Filter events",
+            exact: true,
+          });
+          assert.equal(await filters.getByRole("combobox").count(), 0);
+          await filters
+            .getByRole("button", { name: "Orientations", exact: true })
+            .click();
+          assert.equal(
+            await page
+              .locator('[data-live-event][data-event-type="patrol"]:visible')
+              .count(),
+            0,
+          );
+          await filters
+            .getByRole("button", { name: "Patrols", exact: true })
+            .click();
+          assert.equal(
+            await page
+              .locator(
+                '[data-live-event][data-event-type="orientation"]:visible',
+              )
+              .count(),
+            0,
+          );
+          await filters
+            .getByRole("button", { name: "All events", exact: true })
+            .click();
+          assert.equal(
+            await nav
+              .getByRole("link")
+              .evaluateAll((links) =>
+                links.every(
+                  (link) =>
+                    getComputedStyle(link).textDecorationLine === "none" &&
+                    getComputedStyle(link).boxShadow === "none",
+                ),
+              ),
+            true,
+          );
+          assert.equal(
+            await page.evaluate(() => {
+              const heading = document.querySelector("h1")!,
+                nav = document.querySelector(
+                  '[aria-label="Volunteer account"]',
+                )!;
+              return Boolean(
+                heading.compareDocumentPosition(nav) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+              );
+            }),
+            true,
+          );
+          assert.equal(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+            true,
+          );
+          routeCookie = bob.cookie;
+          await page.goto(`${origin}/volunteer`);
+          const card = page
+            .locator("[data-live-event]")
+            .filter({ hasText: "Browser-created meeting point" });
+          await card
+            .getByRole("button", { name: "Sign up", exact: true })
+            .click();
+          await card.getByText("Signed up", { exact: true }).waitFor();
+          routeCookie = organizer.cookie;
+          await page.reload();
+          await card.locator("summary").click();
+          await card
+            .getByRole("button", { name: "Move or remove", exact: true })
+            .click();
+          const signupDialog = page.getByRole("dialog", {
+            name: "Change a signup",
+            exact: true,
+          });
+          await signupDialog
+            .getByLabel("Reason (optional)")
+            .fill("Browser-tested cancellation");
+          await signupDialog
+            .getByRole("button", {
+              name: "Save change and notify",
+              exact: true,
+            })
+            .click();
+          await card.getByText("Volunteers (0)", { exact: true }).waitFor();
+          assert.equal(await signupDialog.isVisible(), false);
+          routeCookie = bob.cookie;
+          await page.goto(`${origin}/volunteer`);
+          await card
+            .getByRole("button", { name: "Sign up", exact: true })
+            .click();
+          await card.getByText("Signed up", { exact: true }).waitFor();
+          await card
+            .getByRole("button", { name: "Cancel my spot", exact: true })
+            .click();
+          await card
+            .getByRole("button", { name: "Sign up", exact: true })
+            .waitFor();
+          await account.click();
+          await nav.getByRole("link", { name: "Profile", exact: true }).click();
+          await page
+            .getByRole("heading", { name: "Your account", exact: true })
+            .waitFor();
+          assert.equal(
+            (
+              await nav.locator("[data-account-menu-name]").textContent()
+            )?.trim(),
+            "Sample Bob",
+          );
+          await page.goto(origin);
+          await page
+            .locator("[data-live-event-teaser]")
+            .getByText("Sample meeting point", { exact: true })
+            .first()
+            .waitFor();
+          assert.deepEqual(errors, []);
+        } finally {
+          await browser.close();
+        }
+      },
+    );
   } finally {
     await server.close();
   }

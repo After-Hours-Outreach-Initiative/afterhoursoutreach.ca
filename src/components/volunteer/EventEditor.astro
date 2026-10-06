@@ -1,0 +1,137 @@
+---
+import type { EventRow } from "@/server/events/service";
+import { vancouverInput } from "@/data/event-time";
+interface Props {
+  event?: EventRow;
+}
+const { event } = Astro.props;
+const dialogId = `event-editor-${event?.id ?? "new"}`;
+---
+
+<dialog
+  class="dialog-pop volunteer-dialog"
+  id={dialogId}
+  aria-labelledby={`${dialogId}-heading`}
+>
+  <div class="volunteer-section-heading">
+    <h2 id={`${dialogId}-heading`}>{event ? "Edit event" : "Add an event"}</h2>
+    <button class="btn btn-quiet" data-dismiss-dialog type="button"
+      >Close</button
+    >
+  </div>
+  <form
+    class="volunteer-form"
+    data-event-save
+    action="/api/events/action"
+    method="post"
+  >
+    {
+      event && (
+        <>
+          <>
+            <input type="hidden" name="id" value={event.id} />
+            <input type="hidden" name="version" value={event.updatedAt} />
+          </>
+        </>
+      )
+    }
+    <div class="volunteer-fields">
+      <label class="volunteer-field"
+        >Event type
+        <select name="type" disabled={Boolean(event)}
+          ><option value="patrol" selected={event?.type !== "orientation"}
+            >Patrol</option
+          ><option value="orientation" selected={event?.type === "orientation"}
+            >Orientation</option
+          ></select
+        >
+        {event && <input type="hidden" name="type" value={event.type} />}
+      </label>
+      <label class="volunteer-field"
+        >Start date and time<input
+          type="datetime-local"
+          name="startsAt"
+          required
+          value={event ? vancouverInput(event.startsAt) : ""}
+        /><span class="volunteer-help"
+          >Vancouver time, regardless of your device’s time zone.</span
+        ></label
+      >
+      <label class="volunteer-field volunteer-wide"
+        >Meeting point<input
+          name="meetingPoint"
+          required
+          maxlength="500"
+          value={event?.meetingPoint}
+        /></label
+      >
+      <label class="volunteer-field"
+        >Map link (optional)<input
+          type="url"
+          name="meetingPointUrl"
+          maxlength="2048"
+          value={event?.meetingPointUrl ?? ""}
+          placeholder="https://"
+        /></label
+      >
+      <label class="volunteer-field"
+        >Volunteer spots<input
+          name="spots"
+          type="number"
+          min="1"
+          max="100"
+          required
+          value={event?.spots ?? 8}
+        /></label
+      >
+    </div>
+    <label class="volunteer-check"
+      ><input
+        name="open"
+        type="checkbox"
+        checked={event ? Boolean(event.open) : true}
+      />Open for signups</label
+    >
+    <label class="volunteer-check"
+      ><input
+        name="hidden"
+        type="checkbox"
+        checked={Boolean(event?.hidden)}
+      />Hide from the public event list</label
+    >
+    <p class="volunteer-help">
+      Closing or hiding an event does not cancel existing spots. Changes notify
+      signed-up volunteers.
+    </p>
+    <p data-form-message role="status" hidden></p>
+    <button class="btn btn-primary" type="submit">Save event</button>
+  </form>
+  {
+    event && (
+      <form
+        class="volunteer-form volunteer-danger"
+        data-event-cancel
+        action="/api/events/action"
+        method="post"
+      >
+        <h3>Cancel event</h3>
+        <>
+          <input type="hidden" name="id" value={event.id} />
+          <input type="hidden" name="version" value={event.updatedAt} />
+        </>
+        <label class="volunteer-field">
+          Reason (optional)
+          <textarea name="reason" maxlength="1000" rows="3" />
+        </label>
+        <p class="volunteer-help">
+          Cancels all spots and notifies volunteers. Records are retained, not
+          permanently deleted.
+        </p>
+        <p data-form-message role="status" hidden />
+        <button class="btn btn-red" type="submit">
+          Cancel event and notify
+        </button>
+      </form>
+    )
+  }
+</dialog>

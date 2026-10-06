@@ -362,7 +362,9 @@ const patrols = visibleTo(given, false);
     true,
   );
 
-  load();
-  render();
-  subscribe(render);
+  if (list) {
+    load();
+    render();
+    subscribe(render);
+  }
 </script>
