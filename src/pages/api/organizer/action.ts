@@ -10,7 +10,10 @@ import {
 } from "@/server/accounts/organizers";
 import { forwardCookies } from "@/server/auth";
 import { takeRateLimit } from "@/server/auth/abuse";
-import { deliverNotifications } from "@/server/events/notifications";
+import {
+  deliverNotifications,
+  notificationNotice,
+} from "@/server/events/notifications";
 import { readJson, RequestError, errorResponse } from "@/server/http";
 
 const id = z.string().min(1).max(200);
@@ -66,12 +69,12 @@ export const POST: APIRoute = async ({ request }) => {
     try {
       delivery = await deliverNotifications(bindings, result.operation);
     } catch {
-      delivery = { failed: 1, sent: 0, pending: 1 };
+      delivery = { failed: 1, sent: 0, pending: 1, expired: 0 };
     }
     const response = Response.json(
       {
         ...delivery,
-        message: `${result.message}${delivery.pending ? " Some notifications are awaiting delivery; an organizer can retry them." : ""}`,
+        message: result.message + notificationNotice(delivery),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

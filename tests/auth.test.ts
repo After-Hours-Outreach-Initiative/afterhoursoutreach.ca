@@ -12,6 +12,7 @@ import { createSignInOTP } from "./helpers/email-otp";
 import { hashAuthValue, takeRateLimit } from "../src/server/auth/abuse";
 import { sendSignInEmail, type SignInEmail } from "../src/server/auth/services";
 import {
+  countNotifications,
   deliverNotifications,
   queueNotification,
 } from "../src/server/events/notifications";
@@ -270,10 +271,13 @@ test("notifications share the sign-in sending budget and old pending mail is not
   )
     .bind(Date.now() - 24 * 3_600_000, operation)
     .run();
-  assert.equal(
-    (await deliverNotifications(bindings, operation, fetcher)).pending,
-    1,
-  );
+  const expired = await deliverNotifications(bindings, operation, fetcher);
+  assert.equal(expired.pending, 0);
+  assert.equal(expired.expired, 1);
+  assert.deepEqual(await countNotifications(bindings.DB, operation), {
+    pending: 0,
+    expired: 1,
+  });
   assert.equal(calls, 0);
 });
 

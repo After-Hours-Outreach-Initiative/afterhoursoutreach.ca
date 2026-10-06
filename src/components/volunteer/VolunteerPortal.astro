@@ -4,6 +4,10 @@ import { accountContext, requireOrganizer } from "@/server/accounts/access";
 import { forwardCookies } from "@/server/auth";
 import { listEvents, listRosters } from "@/server/events/service";
 import { signupBlockReason } from "@/server/events/policy";
+import {
+  countNotifications,
+  notificationRetryHours,
+} from "@/server/events/notifications";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
 import EventEditor from "./EventEditor.astro";
@@ -27,11 +31,7 @@ const rosters =
         events.map((event) => event.id),
       )
     : [];
-const notifications = organizer
-  ? await env.DB.prepare(
-      "SELECT count(*) AS count FROM event_notification WHERE status IN ('pending','sending')",
-    ).first<{ count: number }>()
-  : null;
+const notifications = organizer ? await countNotifications(env.DB) : null;
 const formatDate = (instant: number) =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Vancouver",
@@ -416,11 +416,17 @@ const filter = ["patrol", "orientation"].includes(
             <>
               <h2>Event notifications</h2>
               <p>
-                {notifications?.count ?? 0} notifications awaiting delivery.
+                {notifications?.pending ?? 0} notifications awaiting delivery.
                 Delivery failures do not undo saved changes. Retries are limited
-                to 23 hours to avoid duplicate delivery after provider
-                idempotency expires.
+                to {notificationRetryHours} hours to avoid duplicate delivery
+                after provider idempotency expires.
               </p>
+              {Boolean(notifications?.expired) && (
+                <p>
+                  {notifications?.expired} notifications expired and cannot be
+                  retried. Contact the recipients directly.
+                </p>
+              )}
               <form
                 data-retry-notifications
                 action="/api/events/action"
