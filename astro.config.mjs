@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig } from "astro/config";
+import { defineConfig, fontProviders } from "astro/config";
 import cloudflare from "@astrojs/cloudflare";
 import { chmod } from "node:fs/promises";
 
@@ -8,6 +8,16 @@ import tailwindcss from "@tailwindcss/vite";
 // https://astro.build/config
 export default defineConfig({
   adapter: cloudflare({ imageService: "compile", remoteBindings: false }),
+  fonts: [
+    {
+      provider: fontProviders.google(),
+      name: "Public Sans",
+      cssVariable: "--font-public-sans",
+      weights: [400, 500, 600, 700],
+      styles: ["normal"],
+      subsets: ["latin"],
+    },
+  ],
   // Better Auth will own database-backed sessions, not Astro's KV sessions.
   session: false,
   integrations: [

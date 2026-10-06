@@ -6,10 +6,9 @@ export function showSecondFactor() {
     "[data-email-request]",
     "[data-email-code]",
     "[data-email-link]",
+    "[data-use-different-email]",
   ])
-    document
-      .querySelector<HTMLFormElement>(selector)
-      ?.setAttribute("hidden", "");
+    document.querySelector<HTMLElement>(selector)?.setAttribute("hidden", "");
   const factor = document.querySelector<HTMLFormElement>(
     "[data-second-factor]",
   );

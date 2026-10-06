@@ -3,6 +3,7 @@ import {
   registrationFields,
   type RegistrationAnswers,
 } from "@/data/registration";
+import FieldError from "@/components/FieldError.astro";
 interface Props {
   email: string;
   values?: RegistrationAnswers | null;
@@ -26,19 +27,28 @@ const { email, values, registration = false } = Astro.props;
     >
     {
       registrationFields.map((field) => (
-        <label
+        <div
           class:list={[
             "volunteer-field",
             { "volunteer-wide": "multiline" in field },
           ]}
         >
-          <span>
+          <label for={`profile-${field.name}`}>
             {field.label}
-            {!field.required && <span class="volunteer-help"> (optional)</span>}
-          </span>
+            {field.required ? (
+              <span class="volunteer-required" aria-hidden="true">
+                {" "}
+                *
+              </span>
+            ) : (
+              <span class="volunteer-help"> (optional)</span>
+            )}
+          </label>
           {"multiline" in field ? (
             <textarea
+              id={`profile-${field.name}`}
               name={field.name}
+              aria-describedby={`error-${field.name}${"help" in field ? ` help-${field.name}` : ""}`}
               required={field.required}
               rows="3"
               maxlength="2000"
@@ -46,7 +56,9 @@ const { email, values, registration = false } = Astro.props;
             />
           ) : (
             <input
+              id={`profile-${field.name}`}
               name={field.name}
+              aria-describedby={`error-${field.name}${"help" in field ? ` help-${field.name}` : ""}`}
               type={"type" in field ? field.type : "text"}
               autocomplete={
                 "autocomplete" in field ? field.autocomplete : "off"
@@ -66,12 +78,27 @@ const { email, values, registration = false } = Astro.props;
               }
             />
           )}
-          {"help" in field && <span class="volunteer-help">{field.help}</span>}
-        </label>
+          {"help" in field && (
+            <span class="volunteer-help" id={`help-${field.name}`}>
+              {field.help}
+            </span>
+          )}
+          <FieldError field={field.name} />
+        </div>
       ))
     }
-    <fieldset class="volunteer-wide">
-      <legend>Which teams interest you? Choose at least one.</legend>
+    <fieldset
+      class="volunteer-wide"
+      data-required-checkboxes="teams"
+      aria-describedby="error-teams"
+    >
+      <legend>
+        Which teams interest you? <span
+          class="volunteer-required"
+          aria-hidden="true">*</span
+        >
+      </legend>
+      <span class="volunteer-help">Choose at least one.</span>
       <div class="volunteer-checks">
         {
           ["outreach", "medic", "non-patrol"].map((team) => (
@@ -91,6 +118,7 @@ const { email, values, registration = false } = Astro.props;
           ))
         }
       </div>
+      <FieldError field="teams" />
     </fieldset>
   </div>
   <p data-form-message role="status" aria-live="polite" hidden></p>

@@ -6,8 +6,11 @@
   --color-blue: #4169e1;
   --color-blue-dark: #2f4fb5;
   --color-blue-deep: #16214a;
-  --font-heading: "Public Sans", Arial, sans-serif;
-  --font-body: "Public Sans", Arial, sans-serif;
+}
+
+@theme inline {
+  --font-heading: var(--font-public-sans);
+  --font-body: var(--font-public-sans);
 }
 
 @layer base {

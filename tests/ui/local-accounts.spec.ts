@@ -29,7 +29,7 @@ test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async
       requests.push(request.url());
   });
   await page
-    .getByLabel("Email address")
+    .getByRole("textbox", { name: "Email", exact: true })
     .fill(`local-code-${crypto.randomUUID()}@example.org`);
   for (const outcome of ["Simulate delivery failure", "Simulate rate limit"]) {
     await page.getByRole("button", { name: "Continue with Email" }).click();
@@ -72,7 +72,7 @@ test("local D1 email links are one-use and sign-in pages have no third-party req
   });
   await page.reload();
   await page
-    .getByLabel("Email address")
+    .getByRole("textbox", { name: "Email", exact: true })
     .fill(`local-link-${crypto.randomUUID()}@example.org`);
   await page.getByRole("button", { name: "Continue with Email" }).click();
   await page

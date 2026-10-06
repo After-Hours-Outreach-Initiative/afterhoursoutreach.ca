@@ -36,7 +36,7 @@ test("the shared sign-in panel is centered and left-aligned on desktop and mobil
         .getByRole("button", { name: "Continue with Email" })
         .boundingBox())!;
       const inputBox = (await panel
-        .getByLabel("Email address", { exact: true })
+        .getByRole("textbox", { name: "Email", exact: true })
         .boundingBox())!;
       expect(panelBox.width).toBeLessThanOrEqual(560);
       expect(

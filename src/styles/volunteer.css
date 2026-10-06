@@ -157,6 +157,25 @@
 .volunteer-signin-panel .volunteer-form {
   max-width: none;
 }
+.volunteer-signin-panel .volunteer-form + .volunteer-form {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.volunteer-signin-panel [data-email-request]:not([hidden]) + [data-email-code] {
+  margin-top: 24px;
+}
+.volunteer-email-reset {
+  display: block;
+  width: fit-content;
+  margin: 24px auto 0;
+  color: #c7d2fe;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.volunteer-email-reset:hover {
+  color: white;
+}
 .volunteer-signin-panel > .btn,
 .volunteer-signin-panel .volunteer-form > .btn {
   width: 100%;
@@ -439,6 +458,56 @@
 }
 .volunteer-portal [data-form-message] {
   overflow-wrap: anywhere;
+}
+.volunteer-required,
+.volunteer-portal [data-error],
+.volunteer-portal [data-form-message][data-message-kind="error"] {
+  color: #f87171;
+}
+.volunteer-portal [data-error] {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.volunteer-portal input[aria-invalid="true"],
+.volunteer-portal textarea[aria-invalid="true"],
+.volunteer-portal select[aria-invalid="true"] {
+  border-color: #f87171;
+}
+.volunteer-portal [aria-invalid="true"]:focus-visible {
+  outline-color: #f87171;
+}
+.volunteer-form fieldset[aria-invalid="true"] .volunteer-checks {
+  border-left: 3px solid #f87171;
+  padding-left: 12px;
+}
+.volunteer-form fieldset > [data-error] {
+  margin-top: 8px;
+}
+.volunteer-form .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.volunteer-form .btn[aria-busy="true"]::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: volunteer-loading 800ms linear infinite;
+}
+.volunteer-form .btn[aria-busy="true"] {
+  cursor: wait;
+}
+@keyframes volunteer-loading {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .volunteer-form .btn[aria-busy="true"]::before {
+    animation: none;
+  }
 }
 @media (max-width: 640px) {
   .volunteer-wrap {

@@ -2,6 +2,7 @@
 import { env } from "cloudflare:workers";
 import { safeReturnTo } from "@/server/http";
 import SecondFactorForm from "./SecondFactorForm.astro";
+import FieldError from "@/components/FieldError.astro";
 interface Props {
   returnTo?: string;
 }
@@ -29,21 +30,27 @@ const ready = Boolean(
     action="/api/auth/email-otp/send-verification-otp"
     method="post"
   >
-    <label class="volunteer-field">
-      Email address
+    <div class="volunteer-field">
+      <label for="sign-in-email">Email</label>
       <input
+        id="sign-in-email"
         name="email"
         type="email"
         autocomplete="email"
         placeholder="you@example.com"
         maxlength="254"
+        aria-describedby="error-email"
         required
         disabled={!ready}
       />
-    </label>
+      <FieldError field="email" />
+    </div>
     <p data-form-message role="status" aria-live="polite" hidden></p>
-    <button type="submit" class="btn btn-primary" disabled={!ready}
-      >Continue with Email</button
+    <button
+      type="submit"
+      class="btn btn-primary"
+      data-loading-label="Sending email…"
+      disabled={!ready}>Continue with Email</button
     >
   </form>
   <form
@@ -57,20 +64,35 @@ const ready = Boolean(
       Check your email, then open the link or enter the six-digit code below.
     </p>
     <input name="email" type="hidden" />
-    <label class="volunteer-field">
-      Six-digit code
+    <div class="volunteer-field">
+      <label for="sign-in-code">
+        Six-digit code <span class="volunteer-required" aria-hidden="true"
+          >*</span
+        >
+      </label>
       <input
+        id="sign-in-code"
         name="code"
+        data-error-field="email-code"
+        data-validation-message="Enter a six-digit code."
+        aria-describedby="error-email-code"
         inputmode="numeric"
         autocomplete="one-time-code"
         pattern="[0-9]{6}"
         maxlength="6"
         required
       />
-    </label>
+      <FieldError field="email-code" />
+    </div>
     <p data-form-message role="status" aria-live="polite" hidden></p>
     <button type="submit" class="btn btn-primary">Sign in with code</button>
   </form>
   <SecondFactorForm />
+  <a
+    href="/volunteer/sign-in"
+    class="volunteer-email-reset"
+    data-use-different-email
+    hidden>Use a different email</a
+  >
   <noscript><p>JavaScript is required to sign in.</p></noscript>
 </section>
