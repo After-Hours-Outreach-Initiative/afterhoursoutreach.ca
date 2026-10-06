@@ -1,8 +1,19 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "afterhoursoutreach-ca",
+  "account_id": "76222ab803494dc84947546283e1a63a",
   "compatibility_date": "2026-08-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@astrojs/cloudflare/entrypoints/server",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "invocation_logs": false,
+    },
   },
 }
