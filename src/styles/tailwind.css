@@ -191,6 +191,8 @@
   }
 
   .dialog-pop {
+    color-scheme: dark;
+    clip-path: border-box;
     opacity: 0;
     translate: 0 0.75rem;
   }
