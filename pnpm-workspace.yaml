@@ -1,3 +1,7 @@
 allowBuilds:
   esbuild: true
   workerd: true
+
+# Keep the plugin on a published runtime compatible with local development.
+overrides:
+  "@cloudflare/vite-plugin": 1.52.0
