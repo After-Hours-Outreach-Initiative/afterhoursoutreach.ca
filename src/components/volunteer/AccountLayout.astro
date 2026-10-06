@@ -1,0 +1,45 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import "@/styles/account.css";
+import "@/styles/volunteer.css";
+import VolunteerNav from "./VolunteerNav.astro";
+interface Props {
+  title: string;
+  description: string;
+  signedIn?: boolean;
+  organizer?: boolean;
+  name?: string;
+  email?: string;
+}
+const {
+  title,
+  description,
+  signedIn = false,
+  organizer = false,
+  name,
+  email,
+} = Astro.props;
+---
+
+<Layout
+  title={`${title} | After Hours Outreach Initiative`}
+  description={description}
+  noindex
+  privatePage
+>
+  <section class="volunteer-portal bg-black">
+    <h1 class="sr-only">{title}</h1>
+    <VolunteerNav
+      organizer={organizer}
+      signedIn={signedIn}
+      name={name}
+      email={email}
+    />
+    <div class="volunteer-wrap">
+      <slot />
+    </div>
+  </section>
+</Layout>
+<script>
+  import "@/scripts/account";
+</script>

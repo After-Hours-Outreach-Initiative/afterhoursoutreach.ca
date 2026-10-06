@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { totpFromSetupKey } from "./helpers/totp";
 import { afterEach, beforeEach, test } from "node:test";
 import { convertV4MiniflareOptions, Miniflare } from "miniflare";
 import {
@@ -10,6 +11,11 @@ import {
 import { createSignInOTP } from "./helpers/email-otp";
 import { hashAuthValue, takeRateLimit } from "../src/server/auth/abuse";
 import { sendSignInEmail, type SignInEmail } from "../src/server/auth/services";
+import {
+  loadProfile,
+  profileSchema,
+  saveProfile,
+} from "../src/server/accounts/profile";
 import {
   readJson,
   RequestError,
@@ -99,6 +105,22 @@ async function signIn(email = "volunteer@example.org") {
   assert.equal(signedIn.status, 200, await signedIn.clone().text());
   return { response: signedIn, cookie: cookies(signedIn), challenge };
 }
+
+const answers = {
+  name: "Sample Volunteer",
+  pronouns: "they/them",
+  phone: "604-555-0100",
+  birthDate: "1995-04-12",
+  emergencyName: "Sample Contact",
+  emergencyPhone: "604-555-0101",
+  emergencyRelationship: "Friend",
+  heardAboutUs: "A friend",
+  motivation: "Sample volunteering answer",
+  teams: ["outreach"],
+  certification: "None",
+  experience: "None",
+  medicalConditions: "Sample private answer",
+};
 
 test("auth uses the configured site origin or request URL without trusting forwarded hosts", () => {
   const base = { ...bindings, AUTH_BASE_URL: "" };
@@ -419,12 +441,176 @@ test("invalid email requests send no email and create no challenge", async () =>
   assert.equal(count?.count, 0);
 });
 
+test("registration/editing persists all answers, keeps approval, and audits only changed field names", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  const id = current.user.id;
+  await saveProfile(bindings.DB, id, answers);
+  assert.deepEqual(await loadProfile(bindings.DB, id), answers);
+  await bindings.DB.prepare(
+    "INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at) VALUES ('organizer', 'Organizer', 'organizer@example.org', 1, 'organizer', 0, 0)",
+  ).run();
+  await bindings.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved = 1, approved_by = 'organizer', approved_at = ? WHERE user_id = ?",
+  )
+    .bind(Date.now(), id)
+    .run();
+  const edit = {
+    ...answers,
+    medicalConditions: "Changed sample private answer",
+    birthDate: "1993-03-15",
+  };
+  await saveProfile(bindings.DB, id, edit);
+  assert.deepEqual(await loadProfile(bindings.DB, id), edit);
+  const status = await bindings.DB.prepare(
+    "SELECT patrol_approved FROM volunteer_status WHERE user_id = ?",
+  )
+    .bind(id)
+    .first();
+  assert.equal(status?.patrol_approved, 1);
+  const logs = await bindings.DB.prepare(
+    "SELECT changed_fields FROM audit_log WHERE subject_id = ? ORDER BY created_at",
+  )
+    .bind(id)
+    .all();
+  assert.deepEqual(JSON.parse(String(logs.results.at(-1)?.changed_fields)), [
+    "birthDate",
+    "medicalConditions",
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(logs),
+    /Sample private answer|Changed sample private answer|1993-03-15/,
+  );
+  const registered = await createSignInOTP(
+    bindings.DB,
+    bindings.BETTER_AUTH_SECRET!,
+    "volunteer@example.org",
+  );
+  const response = await request(
+    "/sign-in/email-otp?returnTo=%2Fvolunteer%2Faccount%3Ftab%3Dprofile",
+    registered,
+  );
+  assert.equal(
+    ((await response.json()) as { next: string }).next,
+    "/volunteer/account?tab=profile",
+  );
+});
+
+test("profile validation rejects privilege fields, invalid dates, absent/duplicate teams and oversized answers", () => {
+  for (const input of [
+    { ...answers, role: "organizer" },
+    { ...answers, patrolApproved: true },
+    { ...answers, userId: "another-user" },
+    { ...answers, birthDate: "1995-02-31" },
+    { ...answers, birthDate: "2999-01-01" },
+    { ...answers, teams: [] },
+    { ...answers, teams: ["outreach", "outreach"] },
+    { ...answers, medicalConditions: "x".repeat(2001) },
+  ])
+    assert.equal(profileSchema.safeParse(input).success, false);
+});
+
 test("sign-out revokes the session rather than just removing the browser cookie", async () => {
   const { cookie } = await signIn();
   assert.equal((await request("/sign-out", {}, cookie)).status, 200);
   assert.equal(
     await auth.api.getSession({ headers: new Headers({ cookie }) }),
     null,
+  );
+});
+
+test("passwordless two-factor enrollment and login cannot bypass the authenticator", async () => {
+  const signedIn = await signIn();
+  const initial = await auth.api.getSession({
+    headers: new Headers({ cookie: signedIn.cookie }),
+  });
+  await saveProfile(bindings.DB, initial!.user.id, answers);
+  const enabled = await request(
+    "/two-factor/enable",
+    { method: "totp" },
+    signedIn.cookie,
+  );
+  assert.equal(enabled.status, 200, await enabled.clone().text());
+  const setup = (await enabled.json()) as {
+    totpURI: string;
+    backupCodes: string[];
+  };
+  assert.equal(setup.backupCodes.length, 10);
+  const secret = new URL(setup.totpURI).searchParams.get("secret")!;
+  const code = totpFromSetupKey(secret);
+  const confirmed = await request(
+    "/two-factor/verify-totp",
+    { code },
+    signedIn.cookie,
+  );
+  assert.equal(confirmed.status, 200, await confirmed.clone().text());
+  const currentCookie = cookies(confirmed) || signedIn.cookie;
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie: currentCookie }),
+  });
+  assert.equal(current?.user.twoFactorEnabled, true);
+  assert.equal(current?.session.twoFactorVerified, true);
+  await request("/sign-out", {}, currentCookie);
+  const proof = await createSignInOTP(
+    bindings.DB,
+    bindings.BETTER_AUTH_SECRET!,
+    "volunteer@example.org",
+  );
+  const pending = await request(
+    "/sign-in/email-otp?returnTo=%2Fvolunteer%2Faccount%3Ftab%3Dsample",
+    proof,
+  );
+  assert.equal(
+    ((await pending.json()) as { twoFactorRedirect: boolean })
+      .twoFactorRedirect,
+    true,
+  );
+  const pendingCookie = cookies(pending);
+  assert.equal(
+    await auth.api.getSession({
+      headers: new Headers({ cookie: pendingCookie }),
+    }),
+    null,
+  );
+  const wrong = await request(
+    "/two-factor/verify-totp",
+    { code: "wrong" },
+    pendingCookie,
+  );
+  assert.equal(wrong.status, 401);
+  assert.equal(
+    await auth.api.getSession({
+      headers: new Headers({ cookie: pendingCookie }),
+    }),
+    null,
+  );
+  const verified = await request(
+    "/two-factor/verify-backup-code",
+    { code: setup.backupCodes[0] },
+    pendingCookie,
+  );
+  assert.equal(verified.status, 200, await verified.clone().text());
+  assert.equal(
+    ((await verified.clone().json()) as { next: string }).next,
+    "/volunteer/account?tab=sample",
+  );
+  const verifiedCookie = cookies(verified);
+  const session = await auth.api.getSession({
+    headers: new Headers({ cookie: verifiedCookie }),
+  });
+  assert.equal(session?.session.twoFactorVerified, true);
+  assert.equal(
+    (
+      await request(
+        "/two-factor/verify-backup-code",
+        { code: setup.backupCodes[0] },
+        verifiedCookie,
+      )
+    ).status,
+    401,
   );
 });
 

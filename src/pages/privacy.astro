@@ -1,0 +1,55 @@
+---
+import Layout from "@/layouts/Layout.astro";
+export const prerender = false;
+---
+
+<Layout
+  title="Privacy | After Hours Outreach Initiative"
+  description="Draft privacy information for volunteer accounts and events."
+  noindex
+  privatePage
+>
+  <section class="mx-auto max-w-3xl px-6 py-20">
+    <h1 class="text-blue">Privacy</h1>
+    <p
+      class="mt-8 rounded-lg border border-amber-800 bg-amber-950/30 p-5 text-amber-200"
+    >
+      {
+        import.meta.env.DEV
+          ? "This is local development, not the final privacy policy. Use sample information only. Accounts, profiles, and events are saved in local D1 on this computer. No real emails are sent."
+          : "This privacy policy is still being reviewed. Use sample profile answers until the policy is finalized."
+      }
+    </p>
+    <h2 class="mt-12">Your information</h2>
+    <p class="mt-6">
+      {
+        import.meta.env.DEV
+          ? "Your email identifies your local account. Sign-in emails are shown in a development dialog instead of sent. Profile answers are stored in local D1, not browser storage. Sessions use an HttpOnly cookie. The development View as selector can switch to any user in the local database without an email or authenticator challenge."
+          : "Your email identifies your account and receives sign-in emails through Resend. Profile answers are saved in Cloudflare D1 in the US. Date of birth is used for age and eligibility; emergency contacts and optional medical information help support volunteer safety. Profile edits are logged by field name, without copying your answers. Sessions use a necessary HttpOnly cookie; profile answers are not saved in browser storage."
+      }
+    </p>
+    <h2 class="mt-12">Organizer access and events</h2>
+    <p class="mt-6">
+      Active, registered organizers can manage volunteers and view full
+      profiles. Two-factor authentication is optional; accounts that enable it
+      must use it when signing in. Full profile views and edits are logged;
+      audit entries do not copy sensitive answers. Event rosters contain
+      volunteer names, not medical or emergency-contact answers. Event signups,
+      attendance, access decisions, cancellations, and notification records are
+      saved in D1. {
+        import.meta.env.DEV
+          ? "Notification delivery is simulated locally."
+          : "Event and access changes send notifications through Resend."
+      }
+      Do not include sensitive personal information in an organizer’s emailed reason.
+      Cancelled event and signup records are retained while retention rules are reviewed.
+    </p>
+    <h2 class="mt-12">Before launch</h2>
+    <p class="mt-6">
+      The privacy contact, retention and deletion policy, and handling of
+      sensitive information still need review before collecting real volunteer
+      data.
+    </p>
+    <a class="btn btn-outline mt-10" href="/volunteer">Back to volunteering</a>
+  </section>
+</Layout>

@@ -1,0 +1,218 @@
+---
+import { env } from "cloudflare:workers";
+import { APIError } from "better-auth/api";
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
+import {
+  authBindingsForRequest,
+  createAuth,
+  forwardCookies,
+  readAccountSession,
+} from "@/server/auth";
+import { loadProfile } from "@/server/accounts/profile";
+import type { RegistrationAnswers } from "@/data/registration";
+import { social } from "@/data/site";
+export const prerender = false;
+let values: RegistrationAnswers | null = null;
+let email = "";
+let currentId = "";
+let twoFactorEnabled = false;
+let organizer = false;
+let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
+let sessionsNeedSignIn = false;
+if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");
+try {
+  const auth = createAuth(authBindingsForRequest(env, Astro.request));
+  const { response: current, headers } = await readAccountSession(
+    auth,
+    Astro.request,
+  );
+  forwardCookies(headers, Astro.response.headers);
+  if (!current)
+    return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/account");
+  values = await loadProfile(env.DB, current.user.id);
+  if (!values) return Astro.redirect("/volunteer/register");
+  email = current.user.email;
+  currentId = current.session.id;
+  twoFactorEnabled = Boolean(current.user.twoFactorEnabled);
+  organizer = current.user.role === "organizer";
+  try {
+    const listed = await auth.api.listSessions({
+      headers: Astro.request.headers,
+      returnHeaders: true,
+    });
+    forwardCookies(listed.headers, Astro.response.headers);
+    // Only display IDs and metadata, never session tokens.
+    sessions = listed.response
+      .slice(0, 100)
+      .map(({ id, userAgent, updatedAt }) => ({
+        id,
+        userAgent,
+        updatedAt,
+      }));
+  } catch (error) {
+    if (
+      !(error instanceof APIError) ||
+      error.body?.code !== "SESSION_NOT_FRESH"
+    )
+      throw error;
+    sessionsNeedSignIn = true;
+  }
+} catch {
+  return new Response("Your account is temporarily unavailable.", {
+    status: 503,
+  });
+}
+---
+
+<AccountLayout
+  title="Your account"
+  description="Edit your volunteer profile and manage your sessions."
+  signedIn
+  organizer={organizer}
+  name={values?.name}
+  email={email}
+>
+  <section class="volunteer-panel">
+    <h2>Your profile</h2>
+    <p>You can update your answers at any time.</p>
+    <AccountProfileForm email={email} values={values} />
+  </section>
+  <section class="volunteer-panel">
+    <h2>Account settings</h2>
+    <div class="volunteer-setting">
+      <div><h3>Email address</h3><p>{email}</p></div>
+    </div>
+    <div class="volunteer-setting">
+      <div>
+        <h3>Two-factor authentication</h3>
+        {
+          twoFactorEnabled ? (
+            <p>
+              Your authenticator is enabled. It is required each time you sign
+              in.
+            </p>
+          ) : (
+            <>
+              <p>
+                Add an authenticator app for extra sign-in protection. This is
+                optional for both volunteers and organizers.
+              </p>
+              <form
+                data-enable-factor
+                class="volunteer-form mt-6"
+                action="/api/auth/two-factor/enable"
+                method="post"
+              >
+                <p data-form-message role="status" aria-live="polite" hidden />
+                <button class="btn btn-outline" type="submit">
+                  Set up an authenticator
+                </button>
+              </form>
+              <div data-factor-setup class="mt-8" hidden>
+                <p>Add this setup key to your authenticator app:</p>
+                <code data-factor-key />
+                <p class="mt-6">
+                  Save these one-use backup codes somewhere safe:
+                </p>
+                <pre data-backup-codes class="mt-4" />
+                <form
+                  data-confirm-factor
+                  class="volunteer-form volunteer-small mt-8"
+                  action="/api/auth/two-factor/verify-totp"
+                  method="post"
+                >
+                  <label class="volunteer-field">
+                    Authenticator code
+                    <input
+                      name="code"
+                      inputmode="numeric"
+                      autocomplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxlength="6"
+                      required
+                    />
+                  </label>
+                  <p
+                    data-form-message
+                    role="status"
+                    aria-live="polite"
+                    hidden
+                  />
+                  <button class="btn btn-primary" type="submit">
+                    Verify and enable
+                  </button>
+                </form>
+              </div>
+            </>
+          )
+        }
+      </div>
+    </div>
+    <div class="volunteer-setting">
+      <div class="w-full">
+        <h3>Sessions</h3>
+        {
+          sessionsNeedSignIn && (
+            <form
+              data-sign-out
+              action="/api/auth/sign-out"
+              method="post"
+              class="mt-6"
+            >
+              <p>Sign in again to view and manage your active sessions.</p>
+              <button class="btn btn-outline mt-4" type="submit">
+                Sign out to sign in again
+              </button>
+              <p data-form-message role="status" hidden />
+            </form>
+          )
+        }
+        <ul class="account-sessions mt-6">
+          {
+            sessions.map((entry) => (
+              <li>
+                <div>
+                  <span>
+                    {entry.id === currentId
+                      ? "This device"
+                      : entry.userAgent || "Another device"}
+                  </span>
+                  <span class="volunteer-help">
+                    Last active:{" "}
+                    {entry.updatedAt.toLocaleString("en-CA", {
+                      timeZone: "America/Vancouver",
+                    })}
+                  </span>
+                </div>
+                {entry.id !== currentId && (
+                  <form
+                    data-end-session
+                    action="/api/account/session"
+                    method="post"
+                  >
+                    <input type="hidden" name="id" value={entry.id} />
+                    <button class="btn btn-outline" type="submit">
+                      End session
+                    </button>
+                    <p data-form-message role="status" hidden />
+                  </form>
+                )}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+  <section class="volunteer-panel">
+    <h2>Community</h2>
+    <p>Keep in touch with the team on Discord.</p>
+    <a
+      href={social.discord}
+      target="_blank"
+      rel="noreferrer"
+      class="btn btn-outline">Join Discord</a
+    >
+  </section>
+</AccountLayout>
