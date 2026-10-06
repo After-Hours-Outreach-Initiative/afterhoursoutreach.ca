@@ -10,19 +10,26 @@ Authentication is passwordless, using an emailed link or code.
 1. The person enters their email address.
 2. The email holds a sign in link and a 6 digit code. Having both lets someone
    open the email on a different device from the one they are signing in on.
-3. The link signs in whichever device opens it, with no button to press, and
+3. The link opens a confirmation page on whichever device opens it, then
    redirects to the page they started from. The code signs in the device that
    asked for it.
-4. Using one spends the other. Both expire after 1 hour. 10 wrong codes cancel
+4. Using one spends the other. Both expire after 10 minutes. 3 wrong codes cancel
    the request and a new one has to be asked for.
+5. Requesting another email replaces the previous code and link.
 
 The first sign in with a new address creates the account and goes to the
 registration form. See [Registration](#registration).
 
-Opening the link is not what spends the token. The link opens a page, and that
-page makes the request that completes the sign in. Mail scanners and link
-previewers fetch every URL in a message without running the page, so the link
-still works when the person gets to it.
+Better Auth's official Email OTP plugin generates, stores, expires, and consumes
+the code, creates verified accounts, and manages sessions. The link carries that
+same code in its URL fragment, not a separate token; fragments are not sent in
+HTTP requests. The completion page clears the fragment from browser history.
+Only pressing **Confirm sign-in** submits the code, so simply visiting the page
+does not consume it, including when a mail scanner runs JavaScript.
+
+Apply migration `0005_email_otp_optional_two_factor.sql` when upgrading an
+existing database. It removes the old email-challenge table and its outstanding
+links/codes; existing accounts, profiles, and sessions remain intact.
 
 ## Registration
 
@@ -32,13 +39,20 @@ still works when the person gets to it.
    the top.
 
 After registration is complete the new volunteer account will only be able to
-sign up for orientation events. Then access to regular patrol events will be
-approved manually by an organizer.
+sign up for orientation events until an organizer manually approves patrol
+access. Completing orientation is the most common path to approval, but is not
+required and does not automatically grant approval.
 
 ### Profile
 
 Everything from the form is saved as the person's profile. They can see and
 edit it at `/volunteer/account`, and delete their account from there.
+
+Volunteers can edit all registration answers. Changes are logged without copying
+sensitive answers into the log and do not change patrol approval. Email changes
+use the separate verification flow described below. All organizers can view
+profile fields, and each profile view is logged. Accounts with an authenticator
+enabled must verify it when signing in.
 
 ### Fields
 
@@ -65,26 +79,20 @@ them.
 Date of birth, emergency contact, and medical conditions each have a short line
 under them saying what the information is used for.
 
-Volunteers can also upload their medical certifications along with an expiry
-date, which can be used to automatically email organizers when certifications
-are about to expire/already expired.
-
-Volunteer hours could also be tracked for each account.
+Certification uploads, expiry reminders, and volunteer hours are deferred.
 
 ### Discord
 
-The page shown after registration links to the Discord server. Volunteers can
-optionally connect or disconnect their Discord account at `/volunteer/account`.
-Once an organizer approves them for patrols after orientation, they
-automatically receive the patrol-approved Discord role when connected and in
-the server.
+Discord account linking is deferred. A future optional link could grant a
+patrol-approved Discord role based on organizer approval on the website; the
+website remains the source of truth for patrol access.
 
 ## Two factor for organizers
 
-Organizers must have an authenticator app (TOTP) set up before any volunteer
-profile is shown to them. Backup codes are given when TOTP is set up.
-
-Volunteers can add TOTP if they want, but do not have to.
+Two-factor authentication is optional for both organizers and volunteers. They
+can add an authenticator app (TOTP) from their account settings. Backup codes are
+given when TOTP is set up. Once enabled, the authenticator or a backup code is
+required each time that account signs in.
 
 ## Sessions
 
@@ -118,27 +126,28 @@ Any organizer can give the organizer role to any account, or take it away,
 without needing another organizer to agree. Organizers sign in the same way as
 everyone else. There is no separate organizer login.
 
+A developer manually assigns the first organizer role to a specific verified
+account. After that, organizers manage roles through the website.
+
 ## Abuse protection
 
-The sign in form is protected so no one can fill an event with fake accounts or
-mailbomb someone:
+Sign in requests are rate limited to reduce fake accounts and mailbombing.
+Requests are counted by both the address being sent to and the IP asking,
+since either one on its own is easy to work around.
 
-- Turnstile on the sign in form.
-- Rate limit on sign in requests, counted by both the address being sent to and
-  the IP asking, since either one on its own is easy to work around.
+Email requests: one per address per minute, three per address per hour, ten per
+IP per hour, and 80 total per day. Counters are stored in D1.
+
+Code verification: 3 attempts per code, plus 10 submissions per address per hour
+and 30 per IP per minute. The per-address budget survives resends and code rotation.
+Codes are stored hashed in Better Auth's verification table.
 
 ## TODO
 
-- TODO: decide if we need the full date of birth, or only a checkbox confirming
-  the person is 19 or older.
 - TODO: decide if the medical certification should be checked, for example by
   asking for a licence number or a photo of the certificate. If so, uploads
   need R2 storage and more privacy work.
 - TODO: fix the typos in the current form options when copying them over
   ("Nalaxone", "wiith", "Pa:ramedic", "relatons", "opiod", "ventiliation").
-- TODO: decide if phone number and emergency contact should be hidden from
-  organizers except on the roster of an event the volunteer is signed up for.
 - TODO: decide if volunteers need to accept a code of conduct or waiver as part
   of registering.
-- TODO: decide which fields a volunteer can edit after they register, and if
-  edits should be flagged to organizers.
