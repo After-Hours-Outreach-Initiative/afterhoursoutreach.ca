@@ -1,4 +1,5 @@
 import { RequestError } from "../http";
+import { emailPolicy } from "../email-policy";
 
 export interface SignInEmail {
   email: string;
@@ -24,7 +25,7 @@ export async function sendSignInEmail(
       "Content-Type": "application/json",
       "Idempotency-Key": `sign-in/${email.id}`,
     },
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(emailPolicy.timeoutMs),
     body: JSON.stringify({
       from: "After Hours Outreach <noreply@afterhoursoutreach.ca>",
       to: [email.email],
