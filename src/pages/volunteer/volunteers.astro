@@ -3,7 +3,10 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import VolunteerProfileDialog from "@/components/volunteer/VolunteerProfileDialog.astro";
 import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/accounts/access";
-import { listVolunteers } from "@/server/accounts/organizers";
+import {
+  listVolunteers,
+  volunteerPageSize,
+} from "@/server/accounts/organizers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
 import "@/styles/volunteer.css";
@@ -130,7 +133,7 @@ try {
               {offset > 0 && (
                 <a
                   class="btn btn-quiet"
-                  href={`?q=${encodeURIComponent(search)}&offset=${Math.max(0, offset - 50)}`}
+                  href={`?q=${encodeURIComponent(search)}&offset=${Math.max(0, offset - volunteerPageSize)}`}
                 >
                   Previous volunteers
                 </a>
@@ -138,7 +141,7 @@ try {
               {team.hasMore && (
                 <a
                   class="btn btn-quiet"
-                  href={`?q=${encodeURIComponent(search)}&offset=${offset + 50}`}
+                  href={`?q=${encodeURIComponent(search)}&offset=${offset + volunteerPageSize}`}
                 >
                   Next volunteers
                 </a>

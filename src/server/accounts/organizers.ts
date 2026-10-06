@@ -20,6 +20,8 @@ export interface VolunteerRow {
   twoFactorEnabled: number;
   orientations: number;
 }
+export const volunteerPageSize = 50;
+
 export async function listVolunteers(
   db: Env["DB"],
   actor: Actor,
@@ -37,11 +39,14 @@ export async function listVolunteers(
       JOIN volunteer_status v ON v.user_id = u.id
       WHERE instr(lower(p.preferred_name), lower(?)) > 0
       ORDER BY p.preferred_name, u.id
-      LIMIT 51 OFFSET ?`,
+      LIMIT ? OFFSET ?`,
     )
-    .bind(search.slice(0, 100), offset)
+    .bind(search.slice(0, 100), volunteerPageSize + 1, offset)
     .all<VolunteerRow>();
-  return { rows: rows.results.slice(0, 50), hasMore: rows.results.length > 50 };
+  return {
+    rows: rows.results.slice(0, volunteerPageSize),
+    hasMore: rows.results.length > volunteerPageSize,
+  };
 }
 
 /** Log before reading sensitive answers; failed logging means no disclosure. */
