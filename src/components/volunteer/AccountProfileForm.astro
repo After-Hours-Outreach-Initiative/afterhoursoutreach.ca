@@ -13,6 +13,7 @@ const { email, values, registration = false } = Astro.props;
 
 <form
   data-account-profile
+  data-registration={registration || undefined}
   class="volunteer-form"
   action="/api/account/profile"
   method="post"
