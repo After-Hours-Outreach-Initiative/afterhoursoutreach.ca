@@ -32,6 +32,37 @@ export function queueNotification(
     .bind(crypto.randomUUID(), operation, userId, subject, body, Date.now());
 }
 
+// Keep expired outbox records, but never describe them as retryable pending mail.
+export async function countNotifications(db: Env["DB"], operation?: string) {
+  const cutoff = Date.now() - retryWindowMs;
+  const counts = await db
+    .prepare(
+      `SELECT
+        count(CASE WHEN created_at > ? THEN 1 END) AS pending,
+        count(CASE WHEN created_at <= ? THEN 1 END) AS expired
+      FROM event_notification
+      WHERE status IN ('pending', 'sending')
+        ${operation ? "AND operation_id = ?" : ""}`,
+    )
+    .bind(cutoff, cutoff, ...(operation ? [operation] : []))
+    .first<{ pending: number; expired: number }>();
+  return counts ?? { pending: 0, expired: 0 };
+}
+
+export function notificationNotice(counts: {
+  pending: number;
+  expired: number;
+}) {
+  return (
+    (counts.pending
+      ? " Some notifications are awaiting delivery; an organizer can retry them."
+      : "") +
+    (counts.expired
+      ? " Some notifications expired and cannot be retried; contact the recipients directly."
+      : "")
+  );
+}
+
 /** Leasing plus Resend idempotency prevents concurrent retries sending twice. */
 export async function deliverNotifications(
   bindings: AuthBindings,
@@ -62,16 +93,20 @@ export async function deliverNotifications(
       await new Promise((resolve) => setTimeout(resolve, providerDelayMs));
     await Promise.all(
       rows.results.slice(offset, offset + concurrency).map(async (email) => {
+        const claimedAt = Date.now();
         const claimed = await db
           .prepare(
             `UPDATE event_notification SET status = 'sending', lease_until = ?, attempts = attempts + 1, delivery_origin=coalesce(delivery_origin,?)
-        WHERE id = ? AND (status = 'pending' OR (status = 'sending' AND lease_until < ?)) RETURNING id, delivery_origin`,
+        WHERE id = ? AND (status = 'pending' OR (status = 'sending' AND lease_until < ?))
+          AND created_at > ?
+        RETURNING id, delivery_origin`,
           )
           .bind(
-            Date.now() + leaseMs,
+            claimedAt + leaseMs,
             bindings.AUTH_BASE_URL,
             email.id,
-            Date.now(),
+            claimedAt,
+            claimedAt - retryWindowMs,
           )
           .first();
         if (!claimed) return;
@@ -118,16 +153,11 @@ export async function deliverNotifications(
       }),
     );
   }
-  const remaining = await db
-    .prepare(
-      `SELECT count(*) AS count FROM event_notification WHERE status IN ('pending','sending') ${operation ? "AND operation_id=?" : ""}`,
-    )
-    .bind(...(operation ? [operation] : []))
-    .first<{ count: number }>();
+  const counts = await countNotifications(db, operation);
   return {
     sent,
     failed,
-    pending: remaining?.count ?? 0,
+    ...counts,
     ...(import.meta.env?.DEV ? { localNotifications: emails } : {}),
   };
 }

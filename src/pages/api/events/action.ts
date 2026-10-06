@@ -12,7 +12,10 @@ import {
   manageSignup,
   eventSchema,
 } from "@/server/events/service";
-import { deliverNotifications } from "@/server/events/notifications";
+import {
+  deliverNotifications,
+  notificationNotice,
+} from "@/server/events/notifications";
 
 const id = z.string().min(1).max(200);
 const reason = z.string().trim().max(1000).default("");
@@ -101,12 +104,12 @@ export const POST: APIRoute = async ({ request }) => {
     try {
       delivery = await deliverNotifications(bindings, result.operation);
     } catch {
-      delivery = { failed: 1, sent: 0, pending: 1 };
+      delivery = { failed: 1, sent: 0, pending: 1, expired: 0 };
     }
     const response = Response.json(
       {
         ...delivery,
-        message: `${result.message}${delivery.pending ? " Some notifications are awaiting delivery; an organizer can retry them." : ""}`,
+        message: result.message + notificationNotice(delivery),
       },
       { headers: { "Cache-Control": "no-store" } },
     );
