@@ -1,4 +1,5 @@
 import { RequestError } from "../http";
+import { emailPolicy } from "../email-policy";
 
 export async function hashAuthValue(secret: string | undefined, value: string) {
   if (!secret) throw new RequestError(503, "Sign-in is not configured yet.");
@@ -67,8 +68,20 @@ export async function limitEmailRequests(
       "Wait one minute before requesting another email.",
     );
   await takeRateLimit(binding, secret, `send-email:${email}`, 3, 3_600_000);
-  // Shared with event notifications; stay below Resend's 100/day free quota.
-  await takeRateLimit(binding, secret, "send-total", 80, 86_400_000);
+  await takeEmailBudget(binding, secret);
+}
+
+export function takeEmailBudget(
+  binding: Env["DB"],
+  secret: string | undefined,
+) {
+  return takeRateLimit(
+    binding,
+    secret,
+    "send-total",
+    emailPolicy.dailyLimit,
+    emailPolicy.budgetWindowMs,
+  );
 }
 
 export async function cleanupAuthRecords(binding: Env["DB"], now = Date.now()) {
