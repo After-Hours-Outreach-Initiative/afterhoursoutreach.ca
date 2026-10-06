@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createTestHarness } from "wrangler";
 import { chromium, type Page } from "@playwright/test";
@@ -377,6 +377,44 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
           .bind("sign-in-otp-no-mail@example.org")
           .first();
         assert.equal(count?.count, 0);
+      },
+    );
+
+    await t.test(
+      "production assets contain no simulated sign-in or demo controls",
+      async () => {
+        const chunks = readdirSync(
+          new URL("../../dist/client/_astro/", import.meta.url),
+        );
+        assert.ok(
+          chunks.some((name) => name.startsWith("AccountLayout.astro_")),
+        );
+        assert.equal(
+          chunks.some((name) =>
+            /PatrolList|patrol-store|local-email-dialog|account-switcher/.test(
+              name,
+            ),
+          ),
+          false,
+        );
+        for (const name of chunks.filter((name) => name.endsWith(".js")))
+          assert.doesNotMatch(
+            readFileSync(
+              new URL(`../../dist/client/_astro/${name}`, import.meta.url),
+              "utf8",
+            ),
+            /Simulate successful delivery|Simulate wrong code|chooseEmailOutcome|localEmailDialog|\/dev\/switch-user/,
+          );
+        const signInPage = await send("/volunteer/sign-in");
+        assert.doesNotMatch(
+          await signInPage.text(),
+          /data-account-switcher|Test email outcome|Local sign-in email/,
+        );
+        const homepage = await send("/");
+        assert.doesNotMatch(
+          await homepage.text(),
+          /data-account-switcher|data-patrol-list|data-event-teaser/,
+        );
       },
     );
 
@@ -763,6 +801,43 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
     // This runtime is isolated and contains only the test fixture above.
     console.error(JSON.stringify(server.getLogs()));
     throw error;
+  } finally {
+    await server.close();
+  }
+});
+
+test("a built Worker cannot enable account switching with local runtime vars", async () => {
+  const server = createTestHarness({
+    workers: [
+      {
+        configPath: "dist/server/wrangler.json",
+        vars: {
+          APP_ENV: "local",
+          AUTH_BASE_URL: "http://localhost:4321",
+        },
+        secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
+      },
+    ],
+  });
+  try {
+    await server.listen();
+    const worker = server.getWorker<Env>();
+    const listing = await worker.fetch(
+      "http://localhost:4321/api/auth/dev/users",
+    );
+    assert.equal(listing.status, 404);
+    const switching = await worker.fetch(
+      "http://localhost:4321/api/auth/dev/switch-user",
+      {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:4321",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ userId: null }),
+      },
+    );
+    assert.equal(switching.status, 404);
   } finally {
     await server.close();
   }

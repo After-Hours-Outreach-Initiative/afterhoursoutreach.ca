@@ -3,6 +3,7 @@ import Layout from "@/layouts/Layout.astro";
 import "@/styles/account.css";
 import "@/styles/volunteer.css";
 import VolunteerNav from "./VolunteerNav.astro";
+import { isLocalDevelopment } from "@/server/development";
 interface Props {
   title: string;
   description: string;
@@ -19,6 +20,7 @@ const {
   name,
   email,
 } = Astro.props;
+const localDevelopment = isLocalDevelopment(Astro.request);
 ---
 
 <Layout
@@ -31,11 +33,50 @@ const {
     <h1 class="sr-only">{title}</h1>
     <VolunteerNav
       organizer={organizer}
+      development={localDevelopment}
       signedIn={signedIn}
       name={name}
       email={email}
     />
     <div class="volunteer-wrap">
+      {
+        localDevelopment && (
+          <dialog
+            id="development-account-dialog"
+            class="dialog-pop volunteer-dialog"
+            data-account-switcher
+            aria-labelledby="development-account-dialog-heading"
+          >
+            <div class="volunteer-section-heading">
+              <h2 id="development-account-dialog-heading">Local development</h2>
+              <button
+                class="btn btn-quiet"
+                type="button"
+                data-close-account-switcher
+                aria-label="Close development controls"
+              >
+                Close
+              </button>
+            </div>
+            <div class="volunteer-form">
+              <label class="volunteer-field" for="development-account">
+                View as
+                <select id="development-account" data-view-as disabled>
+                  <option value="">Visitor</option>
+                </select>
+              </label>
+              <a
+                class="btn btn-quiet"
+                href="/volunteer/sign-in"
+                data-create-account
+              >
+                Create an account
+              </a>
+              <p data-switch-message role="status" hidden />
+            </div>
+          </dialog>
+        )
+      }
       <slot />
     </div>
   </section>

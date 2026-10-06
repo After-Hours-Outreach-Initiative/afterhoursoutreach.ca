@@ -40,6 +40,7 @@ document
 interface Result {
   message?: string;
   failed?: number;
+  localNotifications?: { to: string; subject: string; body: string }[];
 }
 function form(
   selector: string,
@@ -70,7 +71,19 @@ function form(
       const result: Result = await response.json();
       if (!response.ok)
         throw new Error(result.message || "The change could not be saved.");
-      const notice = result.message ?? "Saved.";
+      let notice = result.message ?? "Saved.";
+      if (import.meta.env.DEV && result.localNotifications?.length) {
+        // Close the editor before opening the separate local email test dialog.
+        element.closest<HTMLDialogElement>("dialog")?.close();
+        const { chooseEmailOutcome } = await import("./local-email-dialog");
+        const outcome = await chooseEmailOutcome(
+          result.localNotifications,
+          true,
+        );
+        if (outcome === "failure")
+          notice +=
+            " Notification delivery failed (simulated locally); your change is still saved.";
+      }
       sessionStorage.setItem("aho-volunteer-notice", notice);
       location.reload();
     } catch (error) {

@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { authBindingsForRequest, createAuth } from "@/server/auth";
 import { takeRateLimit } from "@/server/auth/abuse";
+import { isLocalDevelopment } from "@/server/development";
 import {
   errorResponse,
   readJson,
@@ -19,10 +20,18 @@ const allowed = new Map([
   ["/two-factor/enable", "POST"],
   ["/two-factor/verify-totp", "POST"],
   ["/two-factor/verify-backup-code", "POST"],
+  ...(import.meta.env.DEV
+    ? ([
+        ["/dev/users", "GET"],
+        ["/dev/switch-user", "POST"],
+      ] as const)
+    : []),
 ]);
 
 export const ALL: APIRoute = async ({ request, clientAddress }) => {
   const path = new URL(request.url).pathname.replace(/^\/api\/auth/, "");
+  if (path.startsWith("/dev/") && !isLocalDevelopment(request))
+    return new Response("Not found", { status: 404 });
   if (!allowed.has(path)) return new Response("Not found", { status: 404 });
   if (request.method !== allowed.get(path))
     return new Response("Method not allowed", { status: 405 });

@@ -2,14 +2,17 @@
 import CalendarIcon from "@/components/icons/CalendarIcon.astro";
 import UsersIcon from "@/components/icons/UsersIcon.astro";
 import AccountIcon from "@/components/icons/AccountIcon.astro";
+import CodeIcon from "@/components/icons/CodeIcon.astro";
 interface Props {
   organizer?: boolean;
+  development?: boolean;
   signedIn?: boolean;
   name?: string;
   email?: string;
 }
 const {
   organizer = false,
+  development = false,
   signedIn = false,
   name,
   email,
@@ -44,6 +47,21 @@ const accountPage =
       )
     }
     <div class="volunteer-nav-tools">
+      {
+        development && (
+          <button
+            type="button"
+            data-open-account-switcher
+            aria-label="Development controls"
+            title="Development controls"
+            aria-haspopup="dialog"
+            aria-controls="development-account-dialog"
+            aria-expanded="false"
+          >
+            <CodeIcon class="volunteer-nav-icon volunteer-dev-icon" />
+          </button>
+        )
+      }
       {
         signedIn ? (
           <details class="volunteer-account-menu" data-account-menu>
