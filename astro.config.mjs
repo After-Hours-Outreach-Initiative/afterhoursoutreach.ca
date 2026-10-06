@@ -33,5 +33,9 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    // Account pages disallow inline scripts; keep Astro's scripts external.
+    build: {
+      assetsInlineLimit: (path) => (path.endsWith(".js") ? false : undefined),
+    },
   },
 });
