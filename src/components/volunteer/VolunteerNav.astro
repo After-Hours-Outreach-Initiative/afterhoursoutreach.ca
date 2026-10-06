@@ -1,5 +1,6 @@
 ---
 import CalendarIcon from "@/components/icons/CalendarIcon.astro";
+import UsersIcon from "@/components/icons/UsersIcon.astro";
 import AccountIcon from "@/components/icons/AccountIcon.astro";
 interface Props {
   organizer?: boolean;
@@ -29,6 +30,19 @@ const accountPage =
       <CalendarIcon class="volunteer-nav-icon" />
       Events
     </a>
+    {
+      organizer && (
+        <a
+          href="/volunteer/volunteers"
+          aria-current={
+            current.startsWith("/volunteer/volunteers") ? "page" : undefined
+          }
+        >
+          <UsersIcon class="volunteer-nav-icon" />
+          Volunteers
+        </a>
+      )
+    }
     <div class="volunteer-nav-tools">
       {
         signedIn ? (

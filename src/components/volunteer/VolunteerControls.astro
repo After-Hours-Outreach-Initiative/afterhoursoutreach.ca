@@ -1,0 +1,92 @@
+---
+import type { VolunteerRow } from "@/server/accounts/organizers";
+interface Props {
+  person: VolunteerRow;
+}
+const { person } = Astro.props;
+---
+
+<div class="volunteer-profile-controls">
+  <form
+    class="volunteer-form"
+    data-organizer-status
+    action="/api/organizer/action"
+    method="post"
+  >
+    <input type="hidden" name="userId" value={person.id} />
+    <input type="hidden" name="version" value={person.updatedAt} />
+    <input
+      type="checkbox"
+      name="active"
+      checked={Boolean(person.active)}
+      hidden
+    />
+    <input
+      type="checkbox"
+      name="patrolApproved"
+      checked={!person.patrolApproved}
+      hidden
+    />
+    <p data-form-message role="status" hidden></p>
+    <button
+      class:list={["btn", person.patrolApproved ? "btn-red" : "btn-green"]}
+      type="submit"
+      >{
+        person.patrolApproved ? "Revoke patrol approval" : "Approve for patrols"
+      }</button
+    >
+  </form>
+  <form
+    class="volunteer-form"
+    data-organizer-status
+    data-submit-on-change
+    action="/api/organizer/action"
+    method="post"
+  >
+    <input type="hidden" name="userId" value={person.id} />
+    <input type="hidden" name="version" value={person.updatedAt} />
+    <input
+      type="checkbox"
+      name="patrolApproved"
+      checked={Boolean(person.patrolApproved)}
+      hidden
+    />
+    <label class="volunteer-check"
+      ><input
+        type="checkbox"
+        name="active"
+        checked={Boolean(person.active)}
+      />Active volunteer</label
+    >
+    <p data-form-message role="status" hidden></p>
+    <noscript
+      ><button class="btn btn-quiet" type="submit">Save active status</button
+      ></noscript
+    >
+  </form>
+  <form
+    class="volunteer-form"
+    data-organizer-role
+    data-submit-on-change
+    action="/api/organizer/action"
+    method="post"
+  >
+    <input type="hidden" name="userId" value={person.id} />
+    <label class="volunteer-field"
+      >Account role
+      <select name="role">
+        <option value="volunteer" selected={person.role === "volunteer"}
+          >Volunteer</option
+        >
+        <option value="organizer" selected={person.role === "organizer"}
+          >Organizer</option
+        >
+      </select>
+    </label>
+    <p data-form-message role="status" hidden></p>
+    <noscript
+      ><button class="btn btn-outline" type="submit">Save role</button
+      ></noscript
+    >
+  </form>
+</div>
