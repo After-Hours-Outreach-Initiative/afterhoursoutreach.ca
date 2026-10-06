@@ -15,6 +15,7 @@ import {
   limitEmailVerification,
 } from "./abuse";
 import { sendSignInEmail, type SignInEmail } from "./services";
+import { developmentAccounts } from "./development";
 import { isLocalDevelopment } from "../development";
 
 export type AuthBindings = Pick<
@@ -95,7 +96,7 @@ export function createAuth(
   // Request-scoped delivery feedback; never a shared outbox or public proof.
   const emailDeliveries = new WeakMap<
     object,
-    { error: string }
+    { localEmail?: SignInEmail } | { error: string }
   >();
   const emailSignIn = emailOTP({
     expiresIn: 600,
@@ -110,12 +111,14 @@ export function createAuth(
         returnTo: signInReturnTo(ctx?.query),
       }).toString();
       try {
-        await services.sendEmail({
+        const localEmail = await services.sendEmail({
           id: crypto.randomUUID(),
           email,
           code: otp,
           url: url.href,
         });
+        if (import.meta.env?.DEV && localEmail && ctx)
+          emailDeliveries.set(ctx.context, { localEmail });
       } catch (error) {
         // Better Auth intentionally swallows delivery callback errors. Keep a
         // sanitized outcome for the after hook so the form can still report failure.
@@ -312,6 +315,11 @@ export function createAuth(
           const delivery = emailDeliveries.get(ctx.context);
           if (delivery && "error" in delivery)
             return Response.json({ message: delivery.error }, { status: 503 });
+          if (import.meta.env?.DEV && delivery?.localEmail)
+            return ctx.json({
+              success: true,
+              localEmail: delivery.localEmail,
+            });
           return;
         }
         if (ctx.path !== "/sign-in/email-otp") return;
@@ -345,6 +353,7 @@ export function createAuth(
       emailSignIn,
       secondFactor,
       verificationMarker,
+      ...(import.meta.env?.DEV ? [developmentAccounts(bindings)] : []),
     ],
   });
 }

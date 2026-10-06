@@ -1,4 +1,12 @@
 import { authClient, showSecondFactor } from "./auth-client";
+import type { SignInEmail } from "../server/auth/services";
+
+if (import.meta.env.DEV) {
+  void import("./account-switcher").then(({ initAccountSwitcher }) =>
+    initAccountSwitcher(),
+  );
+}
+
 const accountMenu = document.querySelector<HTMLDetailsElement>(
   "[data-account-menu]",
 );
@@ -90,10 +98,24 @@ function emailOptions(returnTo?: string) {
 }
 
 form("[data-email-request]", async (element, values) => {
+  if (import.meta.env.DEV) {
+    const { chooseEmailOutcome } = await import("./local-email-dialog");
+    const outcome = await chooseEmailOutcome();
+    if (!outcome) return;
+    if (outcome !== "success") {
+      message(
+        element,
+        outcome === "failure"
+          ? "We could not send the email. Try again later. (Simulated locally.)"
+          : "Too many email requests. Try again after one minute. (Simulated locally.)",
+      );
+      return;
+    }
+  }
   const email = String(values.get("email") ?? "")
     .trim()
     .toLowerCase();
-  const result: { success: boolean } =
+  const result: { success: boolean; localEmail?: SignInEmail } =
     await authClient.emailOtp.sendVerificationOtp(
       { email, type: "sign-in" },
       emailOptions(element.dataset.returnTo),
@@ -106,8 +128,51 @@ form("[data-email-request]", async (element, values) => {
     code.querySelector<HTMLInputElement>('input[name="code"]')?.focus();
     message(
       element,
-      "Email sent. You can request another after one minute.",
+      import.meta.env.DEV
+        ? "Local sign-in email ready. No email was sent."
+        : "Email sent. You can request another after one minute.",
     );
+  }
+  if (import.meta.env.DEV && result.localEmail) {
+    const { localEmailDialog } = await import("./local-email-dialog");
+    const outcome = await localEmailDialog({
+      title: "Local sign-in email",
+      emails: [
+        {
+          to: result.localEmail.email,
+          subject: "Your local sign-in code",
+          body: `Your code is ${result.localEmail.code}. The code and link expire in ten minutes; using either invalidates both. A new email replaces the previous code.`,
+          href: result.localEmail.url,
+        },
+      ],
+      actions: [
+        { value: "valid", label: "Use valid code" },
+        { value: "wrong", label: "Simulate wrong code" },
+      ],
+    });
+    if (outcome) {
+      try {
+        const proof =
+          outcome === "valid"
+            ? result.localEmail.code
+            : result.localEmail.code === "000000"
+              ? "000001"
+              : "000000";
+        finish(
+          await authClient.signIn.emailOtp(
+            { email, otp: proof },
+            emailOptions(element.dataset.returnTo),
+          ),
+        );
+      } catch (error) {
+        message(
+          code ?? element,
+          error instanceof Error
+            ? error.message
+            : "The code could not be verified.",
+        );
+      }
+    }
   }
 });
 

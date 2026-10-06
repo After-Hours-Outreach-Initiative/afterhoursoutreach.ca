@@ -126,6 +126,42 @@ const answers = {
   medicalConditions: "Sample private answer",
 };
 
+test("local D1 event notifications never contact a provider, even with a real-shaped key", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  const operation = crypto.randomUUID();
+  await queueNotification(
+    bindings.DB,
+    operation,
+    current.user.id,
+    "Sample subject",
+    "Sample body",
+  ).run();
+  const result = await deliverNotifications(
+    { ...bindings, APP_ENV: "local" },
+    operation,
+    async () => {
+      throw new Error("A local notification must not call fetch");
+    },
+  );
+  assert.equal(result.sent, 1);
+  assert.equal(result.failed, 0);
+  assert.equal(result.pending, 0);
+  assert.equal(
+    (
+      await bindings.DB.prepare(
+        "SELECT status FROM event_notification WHERE operation_id=?",
+      )
+        .bind(operation)
+        .first()
+    )?.status,
+    "local",
+  );
+});
+
 test("event delivery retries use stable idempotency keys and atomic leases without exposing provider errors", async () => {
   const { cookie } = await signIn();
   const current = await auth.api.getSession({
@@ -769,6 +805,21 @@ test("Resend receives the same sign-in message in every hosted environment and h
     (error: unknown) =>
       error instanceof RequestError && !error.message.includes("private"),
   );
+});
+
+test("local email delivery never calls Resend, even with a configured key", async () => {
+  const email = {
+    email: "local@example.org",
+    code: "123456",
+    url: "http://localhost:4321/volunteer/sign-in/complete#email=local%40example.org&otp=123456",
+    id: "local-test",
+  };
+  for (const key of [undefined, "test-only-key"]) {
+    const captured = await sendSignInEmail(key, email, "local", async () => {
+      assert.fail("Local email must not make any network request");
+    });
+    assert.deepEqual(captured, email);
+  }
 });
 
 test("email proofs are never returned in a public response, even by a capture service", async () => {

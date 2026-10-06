@@ -6,8 +6,9 @@ interface Props {
   returnTo?: string;
 }
 const returnTo = safeReturnTo(Astro.props.returnTo);
+const localTesting = Boolean(import.meta.env.DEV);
 const ready = Boolean(
-  env.BETTER_AUTH_SECRET && env.RESEND_API_KEY,
+  env.BETTER_AUTH_SECRET && (localTesting || env.RESEND_API_KEY),
 );
 ---
 

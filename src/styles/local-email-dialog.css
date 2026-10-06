@@ -1,0 +1,49 @@
+.local-email-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 28px;
+  overflow: auto;
+  border: 1px solid #52525b;
+  border-radius: 10px;
+  background: #0c0d10;
+  color: #f4f4f5;
+}
+.local-email-dialog::backdrop {
+  background: #000b;
+}
+.local-email-dialog h2 {
+  font-size: 28px;
+}
+.local-email-dialog h3 {
+  font-size: 20px;
+}
+.local-email-dialog p {
+  margin-top: 16px;
+}
+.local-email-dialog article {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #3f3f46;
+}
+.local-email-dialog .local-email-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.local-email-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+@media (max-width: 600px) {
+  .local-email-dialog {
+    padding: 20px;
+  }
+  .local-email-actions {
+    flex-direction: column;
+  }
+  .local-email-actions .btn {
+    width: 100%;
+  }
+}
