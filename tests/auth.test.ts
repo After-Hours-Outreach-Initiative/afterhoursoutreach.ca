@@ -12,6 +12,10 @@ import { createSignInOTP } from "./helpers/email-otp";
 import { hashAuthValue, takeRateLimit } from "../src/server/auth/abuse";
 import { sendSignInEmail, type SignInEmail } from "../src/server/auth/services";
 import {
+  deliverNotifications,
+  queueNotification,
+} from "../src/server/events/notifications";
+import {
   loadProfile,
   profileSchema,
   saveProfile,
@@ -121,6 +125,121 @@ const answers = {
   experience: "None",
   medicalConditions: "Sample private answer",
 };
+
+test("event delivery retries use stable idempotency keys and atomic leases without exposing provider errors", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  const operation = crypto.randomUUID();
+  await queueNotification(
+    bindings.DB,
+    operation,
+    current.user.id,
+    "Sample subject",
+    "Sample body",
+  ).run();
+  const keys: string[] = [];
+  const payloads: string[] = [];
+  const rejected: typeof fetch = async (_url, init) => {
+    keys.push(new Headers(init?.headers).get("Idempotency-Key")!);
+    payloads.push(String(init?.body));
+    return new Response("PRIVATE PROVIDER BODY", { status: 503 });
+  };
+  const failure = await deliverNotifications(bindings, operation, rejected);
+  assert.equal(failure.failed, 1);
+  assert.equal(failure.pending, 1);
+  assert.doesNotMatch(
+    JSON.stringify(failure),
+    /PRIVATE PROVIDER BODY|volunteer@example.org/,
+  );
+  let calls = 0;
+  const accepted: typeof fetch = async (_url, init) => {
+    calls++;
+    keys.push(new Headers(init?.headers).get("Idempotency-Key")!);
+    payloads.push(String(init?.body));
+    const payload = JSON.parse(String(init?.body));
+    assert.equal(payload.subject, "Sample subject");
+    assert.doesNotMatch(payload.text, /public branch preview/);
+    return new Response("{}", { status: 200 });
+  };
+  await Promise.all([
+    deliverNotifications(
+      {
+        ...bindings,
+        AUTH_BASE_URL:
+          "https://another-branch-afterhoursoutreach-ca.ivanzheng9905.workers.dev",
+      },
+      operation,
+      accepted,
+    ),
+    deliverNotifications(bindings, operation, accepted),
+  ]);
+  assert.equal(calls, 1);
+  assert.equal(new Set(keys).size, 1);
+  assert.equal(
+    new Set(payloads).size,
+    1,
+    "Cross-branch retries must preserve the original sending payload",
+  );
+  assert.equal(
+    (
+      await bindings.DB.prepare(
+        "SELECT status FROM event_notification WHERE operation_id=?",
+      )
+        .bind(operation)
+        .first()
+    )?.status,
+    "sent",
+  );
+  await deliverNotifications(bindings, operation, accepted);
+  assert.equal(calls, 1);
+});
+
+test("notifications share the sign-in sending budget and old pending mail is not blindly resent", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  const operation = crypto.randomUUID();
+  await queueNotification(
+    bindings.DB,
+    operation,
+    current.user.id,
+    "Sample subject",
+    "Sample body",
+  ).run();
+  const start = Math.floor(Date.now() / 86_400_000) * 86_400_000;
+  const key = await hashAuthValue(
+    bindings.BETTER_AUTH_SECRET,
+    `rate:send-total:86400000:${start}`,
+  );
+  await bindings.DB.prepare("UPDATE auth_rate_limit SET count=80 WHERE key=?")
+    .bind(key)
+    .run();
+  let calls = 0;
+  const fetcher: typeof fetch = async () => {
+    calls++;
+    return new Response("{}");
+  };
+  assert.equal(
+    (await deliverNotifications(bindings, operation, fetcher)).failed,
+    1,
+  );
+  assert.equal(calls, 0);
+  await bindings.DB.prepare(
+    "UPDATE event_notification SET created_at=? WHERE operation_id=?",
+  )
+    .bind(Date.now() - 24 * 3_600_000, operation)
+    .run();
+  assert.equal(
+    (await deliverNotifications(bindings, operation, fetcher)).pending,
+    1,
+  );
+  assert.equal(calls, 0);
+});
 
 test("auth uses the configured site origin or request URL without trusting forwarded hosts", () => {
   const base = { ...bindings, AUTH_BASE_URL: "" };
