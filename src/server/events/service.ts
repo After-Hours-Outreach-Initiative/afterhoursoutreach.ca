@@ -7,6 +7,7 @@ import {
   permissionValues,
 } from "../accounts/access";
 import { RequestError } from "../http";
+import { nowMsSql } from "../db/sql";
 
 export const eventSchema = z.strictObject({
   type: z.enum(["patrol", "orientation"]),
@@ -73,8 +74,8 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
         .prepare(
           `${select}
         ORDER BY
-          (e.starts_at > (julianday('now') - 2440587.5) * 86400000) DESC,
-          CASE WHEN e.starts_at > (julianday('now') - 2440587.5) * 86400000
+          (e.starts_at > ${nowMsSql}) DESC,
+          CASE WHEN e.starts_at > ${nowMsSql}
             THEN e.starts_at END ASC,
           e.starts_at DESC
         LIMIT 100`,
@@ -261,7 +262,7 @@ export async function saveEvent(
             WHERE id = ?
               AND updated_at = ?
               AND cancelled_at IS NULL
-              AND starts_at > (julianday('now') - 2440587.5) * 86400000
+              AND starts_at > ${nowMsSql}
               AND ${writePermission(true)}`,
           )
           .bind(
@@ -318,7 +319,7 @@ export async function cancelEvent(
         WHERE id = ?
           AND updated_at = ?
           AND cancelled_at IS NULL
-          AND starts_at > (julianday('now') - 2440587.5) * 86400000
+          AND starts_at > ${nowMsSql}
           AND ${writePermission(true)}`,
       )
       .bind(
@@ -418,7 +419,7 @@ export async function changeSignup(
               AND EXISTS(
                 SELECT 1 FROM event e
                 WHERE e.id = signup.event_id
-                  AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+                  AND e.starts_at > ${nowMsSql}
               )
               AND ${writePermission()}`,
           )
@@ -522,7 +523,7 @@ export async function manageSignup(
             AND EXISTS(
               SELECT 1 FROM event e
               WHERE e.id = signup.event_id
-                AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+                AND e.starts_at > ${nowMsSql}
             )
             AND ${writePermission(true)}`,
         )

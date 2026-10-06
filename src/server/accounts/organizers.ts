@@ -8,6 +8,7 @@ import {
 import type { RegistrationAnswers } from "../../data/registration";
 import { RequestError } from "../http";
 import { eventWriteError } from "../events/service";
+import { nowMsSql } from "../db/sql";
 
 export interface VolunteerRow {
   id: string;
@@ -370,7 +371,7 @@ export async function completeOrientation(
               AND s.status = 'confirmed'
               AND e.type = 'orientation'
               AND e.cancelled_at IS NULL
-              AND e.starts_at <= (julianday('now') - 2440587.5) * 86400000
+              AND e.starts_at <= ${nowMsSql}
           )
         ON CONFLICT(user_id, event_id) DO NOTHING`,
       )
