@@ -153,9 +153,16 @@ export function createAuth(
     },
   });
   // Better Auth does not gate passwordless sign-ins by default. Reuse its
-  // challenge/cookie/lockout handling for the official Email OTP endpoint.
-  secondFactor.hooks.after[0].matcher = (context) =>
-    context.path === "/sign-in/email-otp";
+  // challenge/cookie/lockout handling, preserving its built-in sign-in routes.
+  // Fail closed if an upgrade changes the plugin's single challenge-hook contract.
+  const challengeHooks = secondFactor.hooks.after;
+  if (challengeHooks.length !== 1)
+    throw new Error("Review the Better Auth two-factor sign-in integration.");
+  secondFactor.hooks.after = challengeHooks.map((hook) => ({
+    ...hook,
+    matcher: (context) =>
+      context.path === "/sign-in/email-otp" || hook.matcher(context),
+  }));
 
   const verificationMarker = {
     id: "verified-second-factor",
