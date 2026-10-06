@@ -99,12 +99,15 @@ export const POST: APIRoute = async ({ request }) => {
         result = { message: "Notification retry complete." };
         break;
     }
-    // A delivery failure must never undo a committed event/signup change.
-    let delivery;
-    try {
-      delivery = await deliverNotifications(bindings, result.operation);
-    } catch {
-      delivery = { failed: 1, sent: 0, pending: 1, expired: 0 };
+    // Self-service signups and cancellations are confirmed on screen, not by email.
+    let delivery = { failed: 0, sent: 0, pending: 0, expired: 0 };
+    if (input.action !== "join" && input.action !== "cancel") {
+      // A delivery failure must never undo a committed event/signup change.
+      try {
+        delivery = await deliverNotifications(bindings, result.operation);
+      } catch {
+        delivery = { failed: 1, sent: 0, pending: 1, expired: 0 };
+      }
     }
     const response = Response.json(
       {
