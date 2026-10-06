@@ -1,0 +1,18 @@
+<form
+  data-second-factor
+  class="volunteer-form"
+  action="/api/auth/two-factor/verify-totp"
+  method="post"
+  hidden
+>
+  <p>Enter a code from your authenticator app to finish signing in.</p>
+  <label class="volunteer-field">
+    Authenticator or backup code
+    <input name="code" autocomplete="one-time-code" maxlength="100" required />
+  </label>
+  <label class="volunteer-check"
+    ><input name="backup" type="checkbox" />Use a backup code</label
+  >
+  <p data-form-message role="status" aria-live="polite" hidden></p>
+  <button type="submit" class="btn btn-primary">Verify code</button>
+</form>

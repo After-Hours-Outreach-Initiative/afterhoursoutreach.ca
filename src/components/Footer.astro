@@ -145,6 +145,13 @@ import { organization } from "@/data/organization";
             </a>
           ))
         }
+        {
+          !import.meta.env.DEV && (
+            <a class="hover:text-white" href="/privacy">
+              Privacy
+            </a>
+          )
+        }
       </nav>
     </div>
 

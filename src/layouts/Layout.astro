@@ -6,11 +6,18 @@ import "@/styles/tailwind.css";
 interface Props {
   title: string;
   description: string;
-  /** Keeps the patrol scheduling mockup out of search results. */
+  /** Keeps private volunteer pages and test data out of search results. */
   noindex?: boolean;
+  /** No third-party font requests on pages containing account information. */
+  privatePage?: boolean;
 }
 
-const { title, description, noindex = false } = Astro.props;
+const {
+  title,
+  description,
+  noindex = false,
+  privatePage = false,
+} = Astro.props;
 ---
 
 <!doctype html>
@@ -22,15 +29,21 @@ const { title, description, noindex = false } = Astro.props;
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
-    {noindex && <meta name="robots" content="noindex" />}
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <meta name="theme-color" content="#050608" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://cdn.shopify.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    {
+      !privatePage && (
+        <>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+          <link rel="preconnect" href="https://cdn.shopify.com" />
+          <link
+            href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+          />
+        </>
+      )
+    }
     <title>{title}</title>
   </head>
   <body

@@ -12,6 +12,7 @@
     "check": "wrangler types --strict-vars false && astro check",
     "test": "tsx --test tests/*.test.ts",
     "test:ui": "playwright test",
+    "test:accounts": "pnpm build && tsx --test tests/worker/*.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "preview": "astro preview",

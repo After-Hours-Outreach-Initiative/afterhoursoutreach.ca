@@ -1,0 +1,83 @@
+export interface RegistrationAnswers {
+  name: string;
+  pronouns: string;
+  phone: string;
+  birthDate: string;
+  emergencyName: string;
+  emergencyPhone: string;
+  emergencyRelationship: string;
+  heardAboutUs: string;
+  motivation: string;
+  teams: string[];
+  certification: string;
+  experience: string;
+  medicalConditions: string;
+}
+
+export const registrationFields = [
+  {
+    name: "name",
+    label: "Full or preferred name",
+    required: true,
+    autocomplete: "name",
+  },
+  { name: "pronouns", label: "Pronouns", required: false },
+  {
+    name: "phone",
+    label: "Phone number",
+    required: true,
+    type: "tel",
+    autocomplete: "tel",
+  },
+  {
+    name: "birthDate",
+    label: "Date of birth",
+    required: true,
+    type: "date",
+    help: "Used to understand volunteer age and eligibility.",
+  },
+  {
+    name: "emergencyName",
+    label: "Emergency contact name",
+    required: true,
+    help: "Someone we can contact if you need help during an event.",
+  },
+  {
+    name: "emergencyPhone",
+    label: "Emergency contact phone",
+    required: true,
+    type: "tel",
+  },
+  {
+    name: "emergencyRelationship",
+    label: "Relationship to emergency contact",
+    required: true,
+  },
+  { name: "heardAboutUs", label: "How did you hear about us?", required: true },
+  {
+    name: "motivation",
+    label: "Why do you want to volunteer?",
+    required: true,
+    multiline: true,
+  },
+  {
+    name: "certification",
+    label: "Highest medical certification",
+    required: true,
+    help: "Write “None” if you do not have a medical certification.",
+  },
+  {
+    name: "experience",
+    label: "Other training and experience",
+    required: true,
+    multiline: true,
+    help: "Write “None” if this is your first experience.",
+  },
+  {
+    name: "medicalConditions",
+    label: "Medical conditions or triggers",
+    required: false,
+    multiline: true,
+    help: "Optional. Used to help organizers support your safety during events.",
+  },
+] as const;
