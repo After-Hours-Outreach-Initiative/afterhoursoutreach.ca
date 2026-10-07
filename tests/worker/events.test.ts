@@ -1308,7 +1308,10 @@ test("real event and organizer flows in the built Worker", async (t) => {
               "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
             );
             await expect(
-              editor.getByText("Vancouver time (PCT).", { exact: true }),
+              editor.getByText(
+                "Vancouver time, regardless of your device’s time zone.",
+                { exact: true },
+              ),
             ).toBeVisible();
             const fields = await editor
               .locator("[data-event-save] .volunteer-fields > .volunteer-field")

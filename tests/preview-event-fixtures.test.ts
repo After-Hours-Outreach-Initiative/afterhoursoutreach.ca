@@ -181,3 +181,44 @@ test("preview reseeding preserves existing accounts, fixture edits, and cancelle
     db.close();
   }
 });
+
+test("preview reseeding does not rejoin a cancelled non-fixture signup", () => {
+  const db = database();
+  try {
+    const now = Date.now();
+    db.exec(previewEventFixtures(now).join(";\n"));
+    db.exec("DELETE FROM signup WHERE id='preview-fixture-signup-casey'");
+    db.prepare(
+      "INSERT INTO signup (id, user_id, event_id, created_at, updated_at) VALUES ('manual-signup', ?, ?, ?, ?)",
+    ).run(previewUserId("casey"), previewEventId("orientation"), now, now);
+    db.exec("UPDATE signup SET status='cancelled' WHERE id='manual-signup'");
+    const before = db.prepare("SELECT * FROM signup ORDER BY id").all();
+
+    db.exec(previewEventFixtures(now + 1000).join(";\n"));
+
+    assert.deepEqual(
+      db.prepare("SELECT * FROM signup ORDER BY id").all(),
+      before,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("preview fixture dates advance by Vancouver calendar days across daylight-saving changes", () => {
+  for (const [now, expected] of [
+    ["2025-10-31T00:30:00-07:00", "2025-11-03T18:00"],
+    ["2025-03-07T23:30:00-08:00", "2025-03-10T18:00"],
+  ]) {
+    const db = database();
+    try {
+      db.exec(previewEventFixtures(Date.parse(now)).join(";\n"));
+      const event = db
+        .prepare("SELECT starts_at FROM event WHERE id=?")
+        .get(previewEventId("orientation"))!;
+      assert.equal(vancouverInput(Number(event.starts_at)), expected);
+    } finally {
+      db.close();
+    }
+  }
+});

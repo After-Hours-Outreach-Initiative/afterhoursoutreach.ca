@@ -1,4 +1,5 @@
 import { vancouverInput, vancouverInstant } from "../src/data/event-time";
+import { nowMsSql } from "../src/server/db/sql";
 
 export const previewUserId = (key: string) => `preview-fixture-user-${key}`;
 export const previewEventId = (key: string) => `preview-fixture-event-${key}`;
@@ -7,12 +8,15 @@ const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
 /** Synthetic preview data only; never imported by the site or migrations. */
 export function previewEventFixtures(now = Date.now()) {
   const statements: string[] = [];
-  const date = (days: number, time: string) =>
-    Date.parse(
-      vancouverInstant(
-        `${vancouverInput(now + days * 86_400_000).slice(0, 10)}T${time}`,
-      ),
+  const today = vancouverInput(now).slice(0, 10);
+  const date = (days: number, time: string) => {
+    // Add calendar days, not 24-hour durations that can shift the local date at DST.
+    const day = new Date(`${today}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + days);
+    return Date.parse(
+      vancouverInstant(`${day.toISOString().slice(0, 10)}T${time}`),
     );
+  };
   const people = [
     { key: "robin", name: "Robin Vance" },
     { key: "casey", name: "Casey Lee" },
@@ -107,11 +111,11 @@ export function previewEventFixtures(now = Date.now()) {
     statements.push(`INSERT INTO signup (id, user_id, event_id, created_at, updated_at)
       SELECT ${id}, ${user}, ${eventId}, ${now}, ${now}
       WHERE NOT EXISTS (SELECT 1 FROM signup WHERE id = ${id})
-      AND NOT EXISTS (SELECT 1 FROM signup WHERE user_id = ${user} AND event_id = ${eventId} AND status = 'confirmed')
+      AND NOT EXISTS (SELECT 1 FROM signup WHERE user_id = ${user} AND event_id = ${eventId})
       AND EXISTS (SELECT 1 FROM event e JOIN volunteer_status v ON v.user_id = ${user}
         JOIN profile p ON p.user_id = v.user_id
         WHERE e.id = ${eventId} AND e.open = 1 AND e.hidden = 0 AND e.cancelled_at IS NULL
-        AND e.starts_at > (julianday('now') - 2440587.5) * 86400000 AND v.active = 1
+        AND e.starts_at > ${nowMsSql} AND v.active = 1
         AND (e.type = 'orientation' OR v.patrol_approved = 1)
         AND (SELECT count(*) FROM signup WHERE event_id = e.id AND status = 'confirmed') < e.spots)`);
   }
