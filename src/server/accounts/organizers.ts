@@ -100,6 +100,7 @@ export const statusSchema = z.strictObject({
   version: z.number().int().nonnegative(),
   active: z.boolean(),
   patrolApproved: z.boolean(),
+  notify: z.boolean().default(false),
 });
 export async function setVolunteerStatus(
   db: Env["DB"],
@@ -110,7 +111,7 @@ export async function setVolunteerStatus(
   const parsed = statusSchema.safeParse(input);
   if (!parsed.success)
     throw new RequestError(400, "Choose a volunteer and their access status.");
-  const { userId, version, active, patrolApproved } = parsed.data;
+  const { userId, version, active, patrolApproved, notify } = parsed.data;
   const old = await db
     .prepare(
       `SELECT active, patrol_approved AS patrolApproved
@@ -170,7 +171,7 @@ export async function setVolunteerStatus(
           JSON.stringify(fields),
           now,
         ),
-      // Queue before cancelling so the recipient still has the original event details.
+      // Only queue opted-in mail, before cancellation loses the original roster.
       db
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
@@ -183,7 +184,8 @@ export async function setVolunteerStatus(
             AND s.status = 'confirmed'
             AND e.starts_at > ?
             AND (? = 0 OR (? = 0 AND e.type = 'patrol'))
-            AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
+            AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)
+            AND ? = 1`,
         )
         .bind(
           operation,
@@ -193,6 +195,7 @@ export async function setVolunteerStatus(
           Number(active),
           Number(patrolApproved),
           operation,
+          Number(notify),
         ),
       db
         .prepare(
@@ -218,7 +221,7 @@ export async function setVolunteerStatus(
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
           SELECT ?, ?, ?, 'Your After Hours Outreach volunteer access changed', ?, ?
-          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
+          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
           crypto.randomUUID(),
@@ -227,6 +230,7 @@ export async function setVolunteerStatus(
           `Volunteer account: ${active ? "active" : "inactive"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. Orientation attendance does not automatically grant patrol approval.`,
           now,
           operation,
+          Number(notify),
         ),
     ]);
     if (!results[0].meta.changes)
@@ -245,6 +249,7 @@ export async function setRole(
   actor: Actor,
   userId: string,
   role: "volunteer" | "organizer",
+  notify = false,
 ) {
   requireOrganizer(actor);
   const target = await db
@@ -310,7 +315,7 @@ export async function setRole(
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
           SELECT ?, ?, ?, 'Your After Hours Outreach account role changed', ?, ?
-          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
+          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
           crypto.randomUUID(),
@@ -319,6 +324,7 @@ export async function setRole(
           `Your role is now ${role}. Sign in again to continue.`,
           now,
           operation,
+          Number(notify),
         ),
     ]);
     if (!results[0].meta.changes)

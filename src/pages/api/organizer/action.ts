@@ -23,6 +23,7 @@ const inputSchema = z.discriminatedUnion("action", [
     action: z.literal("role"),
     userId: id,
     role: z.enum(["volunteer", "organizer"]),
+    notify: z.boolean().default(false),
   }),
   z.strictObject({ action: z.literal("orientation"), userId: id, eventId: id }),
 ]);
@@ -56,20 +57,23 @@ export const POST: APIRoute = async ({ request }) => {
             version: input.version,
             active: input.active,
             patrolApproved: input.patrolApproved,
+            notify: input.notify,
           })
         : input.action === "role"
-          ? await setRole(env.DB, actor, input.userId, input.role)
+          ? await setRole(env.DB, actor, input.userId, input.role, input.notify)
           : await completeOrientation(
               env.DB,
               actor,
               input.userId,
               input.eventId,
             );
-    let delivery;
-    try {
-      delivery = await deliverNotifications(bindings, result.operation);
-    } catch {
-      delivery = { failed: 1, sent: 0, pending: 1, expired: 0 };
+    let delivery = { failed: 0, sent: 0, pending: 0, expired: 0 };
+    if ("notify" in input && input.notify) {
+      try {
+        delivery = await deliverNotifications(bindings, result.operation);
+      } catch {
+        delivery = { failed: 1, sent: 0, pending: 1, expired: 0 };
+      }
     }
     const response = Response.json(
       {

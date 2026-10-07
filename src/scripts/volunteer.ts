@@ -1,27 +1,37 @@
 import { vancouverInstant } from "../data/event-time";
+import { actionFragment, loadActionPage } from "./action-page";
+import { chooseNotification } from "./notification-choice";
+
+// Compare against the server HTML, not transient loading/filter/expanded state.
+const renderedCards = new WeakMap<HTMLElement, string>();
+for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
+  renderedCards.set(card, card.outerHTML);
+
+function applyEventFilter(root: HTMLElement, type: string) {
+  const selected = ["patrol", "orientation"].includes(type) ? type : "all";
+  let visible = 0;
+  for (const card of root.querySelectorAll<HTMLElement>("[data-event-type]")) {
+    card.hidden = selected !== "all" && card.dataset.eventType !== selected;
+    if (!card.hidden) visible++;
+  }
+  for (const button of root.querySelectorAll<HTMLButtonElement>(
+    "[data-event-filter]",
+  ))
+    button.setAttribute(
+      "aria-pressed",
+      String(button.dataset.eventFilter === selected),
+    );
+  const empty = root.querySelector<HTMLElement>("[data-empty-events]");
+  if (empty) empty.hidden = visible !== 0;
+}
 
 document
   .querySelectorAll<HTMLElement>("[data-event-browser]")
   .forEach((root) => {
-    const cards = root.querySelectorAll<HTMLElement>("[data-event-type]");
     const filters = root.querySelectorAll<HTMLButtonElement>(
       "[data-event-filter]",
     );
-    const empty = root.querySelector<HTMLElement>("[data-empty-events]");
-    const applyFilter = (type: string) => {
-      const selected = ["patrol", "orientation"].includes(type) ? type : "all";
-      let visible = 0;
-      for (const card of cards) {
-        card.hidden = selected !== "all" && card.dataset.eventType !== selected;
-        if (!card.hidden) visible++;
-      }
-      for (const button of filters)
-        button.setAttribute(
-          "aria-pressed",
-          String(button.dataset.eventFilter === selected),
-        );
-      if (empty) empty.hidden = visible !== 0;
-    };
+    const applyFilter = (type: string) => applyEventFilter(root, type);
     for (const button of filters)
       button.addEventListener("click", (event) => {
         event.preventDefault();
@@ -37,57 +47,251 @@ document
     );
   });
 
+function syncNotifications(page: Document) {
+  const target = document.querySelector<HTMLElement>(
+    "[data-event-notifications]",
+  );
+  if (target)
+    target.replaceWith(actionFragment(page, "[data-event-notifications]"));
+}
+
+function syncEvents(page: Document, element?: HTMLFormElement) {
+  const root = document.querySelector<HTMLElement>("[data-event-browser]");
+  if (!root) return;
+  // Reuse server rendering for authoritative capacity, eligibility, rosters,
+  // destination options and optimistic edit versions.
+  const refreshed = actionFragment(page, "[data-event-browser]");
+  const list = root.querySelector<HTMLElement>("[data-event-list]")!;
+  const previous = new Map(
+    [...list.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
+      card.dataset.liveEvent!,
+      card,
+    ]),
+  );
+  const eventId =
+    element?.closest<HTMLElement>("[data-live-event]")?.dataset.liveEvent;
+  const dialog = element?.closest<HTMLDialogElement>("dialog");
+  const restoreFocus = Boolean(
+    element &&
+    (element.contains(document.activeElement) ||
+      dialog?.contains(document.activeElement) ||
+      document.activeElement === document.body),
+  );
+  dialog?.close();
+  let added: HTMLElement | undefined;
+  let position = list.firstElementChild;
+  for (const updated of refreshed.querySelectorAll<HTMLElement>(
+    "[data-live-event]",
+  )) {
+    const id = updated.dataset.liveEvent!;
+    let card = previous.get(id);
+    previous.delete(id);
+    // Don't discard an unrelated editor's draft or another action in flight.
+    const protectedCard =
+      card &&
+      (card.querySelector("dialog[open]") ||
+        [
+          ...card.querySelectorAll<HTMLFormElement>(
+            'form[data-submitting="true"]',
+          ),
+        ].some((form) => form !== element));
+    if (
+      !card ||
+      (!protectedCard && renderedCards.get(card) !== updated.outerHTML)
+    ) {
+      const replacement = document.importNode(updated, true);
+      renderedCards.set(replacement, updated.outerHTML);
+      const roster =
+        replacement.querySelector<HTMLDetailsElement>(".volunteer-roster");
+      if (roster)
+        roster.open =
+          card?.querySelector<HTMLDetailsElement>(".volunteer-roster")?.open ??
+          false;
+      if (card) {
+        if (position === card) position = replacement;
+        card.replaceWith(replacement);
+      } else added ??= replacement;
+      card = replacement;
+    }
+    if (card !== position) list.insertBefore(card, position);
+    position = card.nextElementSibling;
+  }
+  for (const card of previous.values()) card.remove();
+  for (const selector of ["[data-empty-events]", "[data-event-limit]"]) {
+    const target = root.querySelector(selector);
+    if (target) target.replaceWith(actionFragment(page, selector));
+  }
+  applyEventFilter(
+    root,
+    new URL(location.href).searchParams.get("type") ?? "all",
+  );
+  if (element?.matches("[data-event-save]") && !eventId) element.reset();
+  if (restoreFocus) {
+    const card = eventId
+      ? [...list.querySelectorAll<HTMLElement>("[data-live-event]")].find(
+          (card) => card.dataset.liveEvent === eventId,
+        )
+      : added;
+    const selector = element?.matches("[data-live-signup]")
+      ? '[data-live-signup] button[type="submit"]'
+      : element?.matches("[data-event-save]")
+        ? "[data-show-dialog]"
+        : ".volunteer-roster summary";
+    (card && !card.hidden
+      ? card.querySelector<HTMLElement>(selector)
+      : null
+    )?.focus({ preventScroll: true });
+    if (document.activeElement === document.body)
+      root
+        .querySelector<HTMLElement>('[data-event-filter][aria-pressed="true"]')
+        ?.focus({ preventScroll: true });
+  }
+}
+
+async function refreshEvents(element: HTMLFormElement) {
+  const page = await loadActionPage();
+  syncEvents(page, element);
+  syncNotifications(page);
+}
+
+async function refreshNotifications(element: HTMLFormElement) {
+  const restoreFocus =
+    element.contains(document.activeElement) ||
+    document.activeElement === document.body;
+  syncNotifications(await loadActionPage());
+  if (restoreFocus)
+    document
+      .querySelector<HTMLElement>("[data-retry-notifications] button")
+      ?.focus({ preventScroll: true });
+}
+
+async function refreshVolunteer(element: HTMLFormElement) {
+  const userId = element.querySelector<HTMLInputElement>(
+    'input[name="userId"]',
+  )!.value;
+  const profile = element.closest<HTMLElement>("[data-volunteer-profile]")!;
+  const hostUrl = location.href;
+  const profileUrl = `/volunteer/volunteers/${encodeURIComponent(userId)}`;
+  const onProfilePage = location.pathname === profileUrl;
+  const [page, host] = await Promise.all([
+    loadActionPage(profileUrl),
+    onProfilePage ? Promise.resolve(null) : loadActionPage(hostUrl),
+  ]);
+  const replacement = actionFragment(page, "[data-volunteer-profile]");
+  // Keep the dialog itself (and its scroll position) open; replace all status
+  // forms together so their versions and hidden checkbox values stay in sync.
+  const dialog = element.closest<HTMLDialogElement>("dialog");
+  const scroll = dialog?.scrollTop;
+  const active = document.activeElement;
+  const restoreFocus = element.contains(active) || active === document.body;
+  const selector = element.matches("[data-organizer-role]")
+    ? '[data-organizer-role] select[name="role"]'
+    : element.hasAttribute("data-submit-on-change")
+      ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
+      : '[data-organizer-status]:not([data-submit-on-change]) button[type="submit"]';
+  if (profile.isConnected && (!dialog || dialog.open)) {
+    profile.replaceWith(replacement);
+    if (dialog && scroll !== undefined) dialog.scrollTop = scroll;
+    if (restoreFocus)
+      replacement
+        .querySelector<HTMLElement>(selector)
+        ?.focus({ preventScroll: true });
+  }
+  if (host && location.href === hostUrl) {
+    const results = document.querySelector<HTMLElement>(
+      "[data-volunteer-results]",
+    );
+    if (results)
+      results.replaceChildren(
+        ...actionFragment(host, "[data-volunteer-results]").childNodes,
+      );
+    syncEvents(host);
+    syncNotifications(host);
+  }
+}
+
 interface Result {
   message?: string;
-  failed?: number;
   localNotifications?: { to: string; subject: string; body: string }[];
 }
 function form(
   selector: string,
   endpoint: string,
   body: (values: FormData) => object,
+  complete: (element: HTMLFormElement) => Promise<void> = refreshEvents,
 ) {
   document.addEventListener("submit", async (event) => {
     const element = event.target;
     if (!(element instanceof HTMLFormElement) || !element.matches(selector))
       return;
     event.preventDefault();
-    if (element.dataset.submitting) return;
+    const scope =
+      element.closest<HTMLElement>("[data-volunteer-controls], dialog") ??
+      element;
+    if (scope.dataset.submitting) return;
     const button = element.querySelector<HTMLButtonElement>(
       'button[type="submit"]',
     );
     if (button?.disabled) return;
+    const focused = document.activeElement;
     element.dataset.submitting = "true";
+    scope.dataset.submitting = "true";
     const values = new FormData(element);
-    if (button) button.disabled = true;
+    const controls = [
+      ...scope.querySelectorAll<HTMLElement & { disabled: boolean }>(
+        'input:not([type="hidden"]), select, textarea, button',
+      ),
+    ].filter((control) => !control.disabled);
+    for (const control of controls) control.disabled = true;
+    const loading = element.querySelector<HTMLElement>("[data-action-loading]");
+    const label = button?.textContent;
     const message = element.querySelector<HTMLElement>("[data-form-message]");
+    if (message) {
+      message.hidden = true;
+      message.textContent = "";
+    }
+    let saved = false;
     try {
+      let notify: boolean | undefined;
+      if (element.dataset.emailPrompt) {
+        const choice = await chooseNotification(element.dataset.emailPrompt);
+        if (choice === null) {
+          if (element.hasAttribute("data-submit-on-change")) element.reset();
+          return;
+        }
+        notify = choice;
+      }
+      element.setAttribute("aria-busy", "true");
+      if (loading) loading.hidden = false;
+      if (button?.dataset.loadingLabel) {
+        button.textContent = button.dataset.loadingLabel;
+        button.setAttribute("aria-busy", "true");
+      }
       const response = await fetch(endpoint, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body(values)),
+        body: JSON.stringify({
+          ...body(values),
+          ...(notify === undefined ? {} : { notify }),
+        }),
       });
       const result: Result = await response.json();
       if (!response.ok)
         throw new Error(result.message || "The change could not be saved.");
-      let notice = result.message ?? "Saved.";
+      saved = true;
       if (import.meta.env.DEV && result.localNotifications?.length) {
-        // Close the editor before opening the separate local email test dialog.
-        element.closest<HTMLDialogElement>("dialog")?.close();
         const { chooseEmailOutcome } = await import("./local-email-dialog");
-        const outcome = await chooseEmailOutcome(
-          result.localNotifications,
-          true,
-        );
-        if (outcome === "failure")
-          notice +=
-            " Notification delivery failed (simulated locally); your change is still saved.";
+        await chooseEmailOutcome(result.localNotifications, true);
       }
-      sessionStorage.setItem("aho-volunteer-notice", notice);
-      location.reload();
+      await complete(element);
     } catch (error) {
+      // Failed automatic toggles must not look like committed settings.
+      if (!saved && element.hasAttribute("data-submit-on-change"))
+        element.reset();
       if (message) {
+        message.setAttribute("role", "alert");
+        message.dataset.messageKind = "error";
         message.textContent =
           error instanceof Error
             ? error.message
@@ -95,8 +299,23 @@ function form(
         message.hidden = false;
       }
     } finally {
-      if (button) button.disabled = false;
+      for (const control of controls) control.disabled = false;
+      if (button) {
+        button.removeAttribute("aria-busy");
+        if (button.dataset.loadingLabel) button.textContent = label ?? "";
+      }
+      element.removeAttribute("aria-busy");
+      if (loading) loading.hidden = true;
       delete element.dataset.submitting;
+      delete scope.dataset.submitting;
+      if (
+        !saved &&
+        focused instanceof HTMLElement &&
+        focused.isConnected &&
+        (document.activeElement === document.body ||
+          document.activeElement === element.closest("dialog"))
+      )
+        focused.focus({ preventScroll: true });
     }
   });
 }
@@ -116,8 +335,8 @@ form("[data-event-save]", "/api/events/action", (v) => ({
     meetingPoint: str(v, "meetingPoint"),
     meetingPointUrl: str(v, "meetingPointUrl"),
     spots: Number(v.get("spots")),
-    open: v.has("open"),
-    hidden: v.has("hidden"),
+    open: str(v, "open") === "true",
+    hidden: str(v, "hidden") === "true",
   },
 }));
 form("[data-event-cancel]", "/api/events/action", (v) => ({
@@ -132,21 +351,36 @@ form("[data-manage-signup]", "/api/events/action", (v) => ({
   ...(v.get("destination") ? { destination: str(v, "destination") } : {}),
   reason: str(v, "reason"),
 }));
-form("[data-retry-notifications]", "/api/events/action", () => ({
-  action: "retry-notifications",
-}));
-form("[data-organizer-status]", "/api/organizer/action", (v) => ({
-  action: "status",
-  userId: str(v, "userId"),
-  version: Number(v.get("version")),
-  active: v.has("active"),
-  patrolApproved: v.has("patrolApproved"),
-}));
-form("[data-organizer-role]", "/api/organizer/action", (v) => ({
-  action: "role",
-  userId: str(v, "userId"),
-  role: str(v, "role"),
-}));
+form(
+  "[data-retry-notifications]",
+  "/api/events/action",
+  () => ({
+    action: "retry-notifications",
+  }),
+  refreshNotifications,
+);
+form(
+  "[data-organizer-status]",
+  "/api/organizer/action",
+  (v) => ({
+    action: "status",
+    userId: str(v, "userId"),
+    version: Number(v.get("version")),
+    active: v.has("active"),
+    patrolApproved: v.has("patrolApproved"),
+  }),
+  refreshVolunteer,
+);
+form(
+  "[data-organizer-role]",
+  "/api/organizer/action",
+  (v) => ({
+    action: "role",
+    userId: str(v, "userId"),
+    role: str(v, "role"),
+  }),
+  refreshVolunteer,
+);
 form("[data-organizer-orientation]", "/api/organizer/action", (v) => ({
   action: "orientation",
   userId: str(v, "userId"),
@@ -178,10 +412,16 @@ const profileContent = profileDialog?.querySelector<HTMLElement>(
   "[data-profile-dialog-content]",
 );
 if (profileDialog && profileContent) {
+  const loadingTemplate = profileDialog.querySelector<HTMLTemplateElement>(
+    "[data-profile-dialog-loading]",
+  );
   let pending: AbortController | undefined;
   profileDialog.addEventListener("close", () => {
     pending?.abort();
+    pending = undefined;
     profileContent.replaceChildren();
+    profileContent.removeAttribute("aria-busy");
+    profileDialog.scrollTop = 0;
   });
   document.addEventListener("click", async (event) => {
     if (
@@ -201,7 +441,11 @@ if (profileDialog && profileContent) {
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
-    profileContent.textContent = "Loading volunteer profile…";
+    if (loadingTemplate)
+      profileContent.replaceChildren(loadingTemplate.content.cloneNode(true));
+    else profileContent.textContent = "Loading";
+    profileContent.setAttribute("aria-busy", "true");
+    profileDialog.scrollTop = 0;
     profileDialog.showModal();
     try {
       // The normal private page still authenticates, checks organizer access,
@@ -220,14 +464,54 @@ if (profileDialog && profileContent) {
       );
       const content = page.querySelector("[data-volunteer-profile]");
       if (!content) throw new Error("The volunteer profile is unavailable.");
-      if (!controller.signal.aborted && profileDialog.open)
-        profileContent.replaceChildren(document.importNode(content, true));
+      if (!controller.signal.aborted && profileDialog.open) {
+        const loading = profileContent.querySelector<HTMLElement>(
+          ".volunteer-profile-loading",
+        );
+        const loadingHeight = profileContent.clientHeight;
+        const profile = document.importNode(content, true);
+        const animate = !window.matchMedia("(prefers-reduced-motion: reduce)")
+          .matches;
+        if (animate) {
+          profile.setAttribute("data-profile-entering", "");
+          const finishEntering = (event: Event) => {
+            if (event.target === profile)
+              profile.removeAttribute("data-profile-entering");
+          };
+          profile.addEventListener("animationend", finishEntering, {
+            once: true,
+          });
+          profile.addEventListener("animationcancel", finishEntering, {
+            once: true,
+          });
+        }
+        profileContent.replaceChildren(profile);
+        if (loading && animate) {
+          // Keep the outgoing loader in place as the full profile grows below it.
+          loading.style.height = `${loadingHeight}px`;
+          loading.style.bottom = "auto";
+          loading.setAttribute("aria-hidden", "true");
+          loading.dataset.fading = "true";
+          const removeLoading = (event: Event) => {
+            if (event.target === loading) loading.remove();
+          };
+          loading.addEventListener("animationend", removeLoading, {
+            once: true,
+          });
+          loading.addEventListener("animationcancel", removeLoading, {
+            once: true,
+          });
+          profileContent.appendChild(loading);
+        }
+      }
     } catch (error) {
       if (!controller.signal.aborted)
         profileContent.textContent =
           error instanceof Error
             ? error.message
             : "The volunteer profile is unavailable.";
+    } finally {
+      if (pending === controller) profileContent.removeAttribute("aria-busy");
     }
   });
 }
@@ -305,25 +589,19 @@ document
     });
   });
 
-document
-  .querySelectorAll<HTMLDialogElement>(".volunteer-dialog")
-  .forEach((dialog) => {
-    dialog.addEventListener("click", (event) => {
-      if (event.target !== dialog) return;
-      const bounds = dialog.getBoundingClientRect();
-      if (
-        event.clientX < bounds.left ||
-        event.clientX > bounds.right ||
-        event.clientY < bounds.top ||
-        event.clientY > bounds.bottom
-      )
-        dialog.close();
-    });
-  });
-const notice = sessionStorage.getItem("aho-volunteer-notice");
-const target = document.querySelector<HTMLElement>("[data-action-notice]");
-if (notice && target) {
-  target.textContent = notice;
-  target.hidden = false;
-  sessionStorage.removeItem("aho-volunteer-notice");
-}
+document.addEventListener("click", (event) => {
+  const dialog = event.target;
+  if (
+    !(dialog instanceof HTMLDialogElement) ||
+    !dialog.matches(".volunteer-dialog")
+  )
+    return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    event.clientX < bounds.left ||
+    event.clientX > bounds.right ||
+    event.clientY < bounds.top ||
+    event.clientY > bounds.bottom
+  )
+    dialog.close();
+});

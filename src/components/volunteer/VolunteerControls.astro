@@ -6,10 +6,11 @@ interface Props {
 const { person } = Astro.props;
 ---
 
-<div class="volunteer-profile-controls">
+<div class="volunteer-profile-controls" data-volunteer-controls>
   <form
     class="volunteer-form"
     data-organizer-status
+    data-email-prompt="access"
     action="/api/organizer/action"
     method="post"
   >
@@ -31,6 +32,7 @@ const { person } = Astro.props;
     <button
       class:list={["btn", person.patrolApproved ? "btn-red" : "btn-green"]}
       type="submit"
+      data-loading-label="Saving…"
       >{
         person.patrolApproved ? "Revoke patrol approval" : "Approve for patrols"
       }</button
@@ -40,6 +42,7 @@ const { person } = Astro.props;
     class="volunteer-form"
     data-organizer-status
     data-submit-on-change
+    data-email-prompt="access"
     action="/api/organizer/action"
     method="post"
   >
@@ -59,6 +62,12 @@ const { person } = Astro.props;
       />Active volunteer</label
     >
     <p data-form-message role="status" hidden></p>
+    <span
+      class="volunteer-control-loading"
+      data-action-loading
+      role="status"
+      hidden>Saving…</span
+    >
     <noscript
       ><button class="btn btn-quiet" type="submit">Save active status</button
       ></noscript
@@ -67,6 +76,7 @@ const { person } = Astro.props;
   <form
     class="volunteer-form"
     data-organizer-role
+    data-email-prompt="role"
     data-submit-on-change
     action="/api/organizer/action"
     method="post"
@@ -84,6 +94,12 @@ const { person } = Astro.props;
       </select>
     </label>
     <p data-form-message role="status" hidden></p>
+    <span
+      class="volunteer-control-loading"
+      data-action-loading
+      role="status"
+      hidden>Saving…</span
+    >
     <noscript
       ><button class="btn btn-outline" type="submit">Save role</button
       ></noscript

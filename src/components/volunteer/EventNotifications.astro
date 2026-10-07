@@ -7,7 +7,7 @@ interface Props {
 const { counts } = Astro.props;
 ---
 
-<section class="volunteer-panel">
+<section class="volunteer-panel" data-event-notifications>
   <h2>Event notifications</h2>
   <p>
     {counts.pending} notifications awaiting delivery. Delivery failures do not undo
@@ -24,7 +24,7 @@ const { counts } = Astro.props;
   }
   <form data-retry-notifications action="/api/events/action" method="post">
     <p data-form-message role="status" hidden></p>
-    <button class="btn btn-outline" type="submit"
+    <button class="btn btn-outline" type="submit" data-loading-label="Retrying…"
       >Retry pending notifications</button
     >
   </form>

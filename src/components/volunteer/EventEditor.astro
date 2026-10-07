@@ -22,6 +22,7 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
   <form
     class="volunteer-form"
     data-event-save
+    data-email-prompt={event ? "event" : undefined}
     action="/api/events/action"
     method="post"
   >
@@ -34,28 +35,44 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
       )
     }
     <div class="volunteer-fields">
-      <label class="volunteer-field"
-        >Event type
-        <select name="type" disabled={Boolean(event)}
-          ><option value="patrol" selected={event?.type !== "orientation"}
-            >Patrol</option
-          ><option value="orientation" selected={event?.type === "orientation"}
-            >Orientation</option
-          ></select
-        >
-        {event && <input type="hidden" name="type" value={event.type} />}
-      </label>
+      {
+        event ? (
+          <div class="volunteer-field volunteer-wide" data-event-type-readonly>
+            <span>Event type</span>
+            <span class="volunteer-readonly-value">
+              {event.type === "patrol" ? "Patrol" : "Orientation"}
+            </span>
+            <input type="hidden" name="type" value={event.type} />
+          </div>
+        ) : (
+          <label class="volunteer-field volunteer-wide">
+            Event type
+            <select name="type">
+              <option value="patrol">Patrol</option>
+              <option value="orientation">Orientation</option>
+            </select>
+          </label>
+        )
+      }
       <label class="volunteer-field"
         >Start date and time<input
           type="datetime-local"
           name="startsAt"
           required
           value={event ? vancouverInput(event.startsAt) : ""}
-        /><span class="volunteer-help"
-          >Vancouver time, regardless of your device’s time zone.</span
-        ></label
+        /><span class="volunteer-help">Vancouver time (PCT).</span></label
       >
-      <label class="volunteer-field volunteer-wide"
+      <label class="volunteer-field"
+        >Volunteer spots<input
+          name="spots"
+          type="number"
+          min="1"
+          max="100"
+          required
+          value={event?.spots ?? 8}
+        /></label
+      >
+      <label class="volunteer-field"
         >Meeting point<input
           name="meetingPoint"
           required
@@ -72,43 +89,72 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
           placeholder="https://"
         /></label
       >
-      <label class="volunteer-field"
-        >Volunteer spots<input
-          name="spots"
-          type="number"
-          min="1"
-          max="100"
-          required
-          value={event?.spots ?? 8}
-        /></label
-      >
+      <fieldset class="volunteer-state-field">
+        <legend>Signups</legend>
+        <div class="volunteer-state-selector">
+          <label class="volunteer-state-option volunteer-state-positive">
+            <input
+              class="sr-only"
+              type="radio"
+              name="open"
+              value="true"
+              checked={event ? Boolean(event.open) : true}
+            />
+            <span>Open</span>
+          </label>
+          <label class="volunteer-state-option volunteer-state-negative">
+            <input
+              class="sr-only"
+              type="radio"
+              name="open"
+              value="false"
+              checked={event ? !event.open : false}
+            />
+            <span>Closed</span>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset class="volunteer-state-field">
+        <legend>Public event list</legend>
+        <div class="volunteer-state-selector">
+          <label class="volunteer-state-option volunteer-state-positive">
+            <input
+              class="sr-only"
+              type="radio"
+              name="hidden"
+              value="false"
+              checked={!event?.hidden}
+            />
+            <span>Visible</span>
+          </label>
+          <label class="volunteer-state-option volunteer-state-negative">
+            <input
+              class="sr-only"
+              type="radio"
+              name="hidden"
+              value="true"
+              checked={Boolean(event?.hidden)}
+            />
+            <span>Hidden</span>
+          </label>
+        </div>
+      </fieldset>
     </div>
-    <label class="volunteer-check"
-      ><input
-        name="open"
-        type="checkbox"
-        checked={event ? Boolean(event.open) : true}
-      />Open for signups</label
-    >
-    <label class="volunteer-check"
-      ><input
-        name="hidden"
-        type="checkbox"
-        checked={Boolean(event?.hidden)}
-      />Hide from the public event list</label
-    >
     <p class="volunteer-help">
-      Closing or hiding an event does not cancel existing spots. Changes notify
-      signed-up volunteers.
+      Closing or hiding an event does not cancel existing spots. You can choose
+      whether to email signed-up volunteers when saving changes.
     </p>
     <p data-form-message role="status" hidden></p>
-    <button class="btn btn-primary" type="submit">Save event</button>
+    <button class="btn btn-primary" type="submit" data-loading-label="Saving…"
+      >Save event</button
+    >
   </form>
   {
     event && (
       <form
         class="volunteer-form volunteer-danger"
         data-event-cancel
+        data-email-prompt="event-cancel"
         action="/api/events/action"
         method="post"
       >
@@ -120,12 +166,16 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
           <textarea name="reason" maxlength="1000" rows="3" />
         </label>
         <p class="volunteer-help">
-          Cancels all spots and notifies volunteers. Records are retained, not
-          permanently deleted.
+          Cancels all spots. You can choose whether to email volunteers. Records
+          are retained, not permanently deleted.
         </p>
         <p data-form-message role="status" hidden />
-        <button class="btn btn-red" type="submit">
-          Cancel event and notify
+        <button
+          class="btn btn-red"
+          type="submit"
+          data-loading-label="Cancelling…"
+        >
+          Cancel event
         </button>
       </form>
     )

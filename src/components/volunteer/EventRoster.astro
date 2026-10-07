@@ -37,7 +37,11 @@ const { event, roster, future, destinations } = Astro.props;
               >
                 <input name="userId" type="hidden" value={person.userId} />
                 <input name="eventId" type="hidden" value={event.id} />
-                <button class="btn btn-outline" type="submit">
+                <button
+                  class="btn btn-outline"
+                  type="submit"
+                  data-loading-label="Saving…"
+                >
                   Mark orientation completed
                 </button>
                 <p data-form-message role="status" hidden />
