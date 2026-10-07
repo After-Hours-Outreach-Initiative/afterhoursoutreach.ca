@@ -21,6 +21,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:seed:local": "tsx scripts/seed-local-events.ts",
     "db:migrate:preview": "node scripts/check-preview-migrations.mjs && wrangler d1 migrations apply PREVIEW_DB --config wrangler.preview-migrations.jsonc --remote",
+    "db:seed:preview": "tsx scripts/seed-preview-events.ts",
     "preview": "astro preview",
     "astro": "astro",
     "deploy": "pnpm build && wrangler deploy --config dist/server/wrangler.json",

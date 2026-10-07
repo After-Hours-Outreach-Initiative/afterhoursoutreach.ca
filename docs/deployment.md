@@ -19,6 +19,20 @@ Run `pnpm deploy:preview` to build, migrate the preview database, and run
 `wrangler preview`. The preview name defaults to the Git branch.
 `pnpm preview` remains local Astro previewing.
 
+After migrations, run `pnpm db:seed:preview` to add six synthetic volunteers,
+five upcoming sample events (including full, closed, and hidden examples), and
+four orientation signups to the shared preview database. Names and meeting points
+are labelled as samples; email addresses use the non-deliverable `.invalid` domain.
+The command verifies the preview binding and refuses production targets. It
+preserves existing accounts, fixture edits, and signup cancellations, and does not
+run automatically during builds or deployments. Dates are relative to the first
+seed run; rerunning does not reschedule existing events.
+
+Seeding sends no email and creates no sign-in credentials, sessions, patrol
+approvals, or organizer roles. Use `pnpm organizer:bootstrap --preview --email
+verified@example.org` for your own verified, registered preview account if the
+database has no organizer yet. Volunteer-management pages remain organizer-only.
+
 `pnpm build` includes all account and event features for production. There is no
 account feature flag or preview-host restriction. `pnpm build:preview` uses the
 same application with a preview banner and a separate output directory; preview
