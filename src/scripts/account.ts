@@ -1,4 +1,5 @@
 import { authClient, showSecondFactor } from "./auth-client";
+import { actionFragment, loadActionPage } from "./action-page";
 import type { SignInEmail } from "../server/auth/services";
 import {
   accountErrorMessage,
@@ -52,38 +53,50 @@ function form(
   selector: string,
   submit: (element: HTMLFormElement, values: FormData) => Promise<void>,
 ) {
-  document.querySelectorAll<HTMLFormElement>(selector).forEach((element) => {
+  const initialized = new WeakSet<HTMLFormElement>();
+  const initialize = (element: HTMLFormElement) => {
+    if (initialized.has(element)) return;
     initAccountFormValidation(element);
-    element.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const button = element.querySelector<HTMLButtonElement>(
-        'button[type="submit"]',
-      );
-      if (button?.disabled || button?.hidden) return;
-      if (!validateAccountForm(element)) return;
-      const values = new FormData(element);
-      const label = button?.textContent;
-      element.setAttribute("aria-busy", "true");
+    initialized.add(element);
+  };
+  document.querySelectorAll<HTMLFormElement>(selector).forEach(initialize);
+  // Refreshed settings and session rows must keep working without re-running scripts.
+  document.addEventListener("submit", async (event) => {
+    const element = event.target;
+    if (!(element instanceof HTMLFormElement) || !element.matches(selector))
+      return;
+    event.preventDefault();
+    if (element.dataset.submitting) return;
+    initialize(element);
+    const button = element.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    );
+    if (button?.disabled || button?.hidden) return;
+    if (!validateAccountForm(element)) return;
+    element.dataset.submitting = "true";
+    const values = new FormData(element);
+    const label = button?.textContent;
+    element.setAttribute("aria-busy", "true");
+    if (button) {
+      button.disabled = true;
+      if (button.dataset.loadingLabel) {
+        button.textContent = button.dataset.loadingLabel;
+        button.setAttribute("aria-busy", "true");
+      }
+    }
+    try {
+      await submit(element, values);
+    } catch (error) {
+      message(element, accountErrorMessage(error));
+    } finally {
+      delete element.dataset.submitting;
+      element.removeAttribute("aria-busy");
       if (button) {
-        button.disabled = true;
-        if (button.dataset.loadingLabel) {
-          button.textContent = button.dataset.loadingLabel;
-          button.setAttribute("aria-busy", "true");
-        }
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+        if (button.dataset.loadingLabel) button.textContent = label ?? "";
       }
-      try {
-        await submit(element, values);
-      } catch (error) {
-        message(element, accountErrorMessage(error));
-      } finally {
-        element.removeAttribute("aria-busy");
-        if (button) {
-          button.disabled = false;
-          button.removeAttribute("aria-busy");
-          if (button.dataset.loadingLabel) button.textContent = label ?? "";
-        }
-      }
-    });
+    }
   });
 }
 
@@ -289,9 +302,19 @@ form("[data-sign-out]", async () => {
   location.assign("/volunteer/sign-in");
 });
 
-form("[data-end-session]", async (_element, values) => {
+form("[data-end-session]", async (element, values) => {
   await post("/api/account/session", { id: String(values.get("id")) });
-  location.reload();
+  const row = element.closest<HTMLElement>("[data-session-row]")!;
+  const sessions = row.closest<HTMLElement>("[data-account-sessions]")!;
+  const restoreFocus =
+    element.contains(document.activeElement) ||
+    document.activeElement === document.body;
+  row.remove();
+  if (restoreFocus)
+    (
+      sessions.querySelector<HTMLElement>("[data-end-session] button") ??
+      sessions.querySelector<HTMLElement>("h3")
+    )?.focus({ preventScroll: true });
 });
 
 form("[data-enable-factor]", async (element) => {
@@ -308,11 +331,22 @@ form("[data-enable-factor]", async (element) => {
   element.hidden = true;
 });
 
-form("[data-confirm-factor]", async (_element, values) => {
+form("[data-confirm-factor]", async (element, values) => {
   await authClient.twoFactor.verifyTotp({
     code: String(values.get("code")),
   });
-  location.reload();
+  // Verification may rotate the current session. Refresh its metadata as well
+  // as the authenticator state, leaving unsaved profile answers untouched.
+  const page = await loadActionPage();
+  const settings = actionFragment(page, "[data-factor-settings]");
+  const sessions = actionFragment(page, "[data-account-sessions]");
+  const restoreFocus =
+    element.contains(document.activeElement) ||
+    document.activeElement === document.body;
+  element.closest("[data-factor-settings]")!.replaceWith(settings);
+  document.querySelector("[data-account-sessions]")!.replaceWith(sessions);
+  if (restoreFocus)
+    settings.querySelector<HTMLElement>("h3")?.focus({ preventScroll: true });
 });
 
 export {};

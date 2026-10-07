@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createLocalAccount, sampleAnswers } from "../helpers/local-account";
 import { totpFromSetupKey } from "../helpers/totp";
+import { inPlaceAction } from "../helpers/in-place-action";
 
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
@@ -242,6 +243,14 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(
     page.getByRole("textbox", { name: "Full or preferred name", exact: true }),
   ).toHaveValue(sampleAnswers.name);
+  await expect(
+    page.getByRole("heading", { name: "Community", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .locator(".volunteer-wrap")
+      .getByRole("link", { name: "Join Discord", exact: true }),
+  ).toHaveCount(0);
   // Editing the account uses the same validation, but successful saves aren't red errors.
   await page
     .getByRole("textbox", { name: "Full or preferred name", exact: true })
@@ -262,6 +271,11 @@ test("authenticator setup and sign-in show inline required and code errors", asy
 }) => {
   await createLocalAccount(page.request, baseURL!);
   await page.goto("/volunteer/account");
+  const name = page.getByRole("textbox", {
+    name: "Full or preferred name",
+    exact: true,
+  });
+  await name.fill("Unsaved authenticator draft");
   await page.getByRole("button", { name: "Set up an authenticator" }).click();
   const setup = page.locator("[data-confirm-factor]");
   await expect(setup).toBeVisible();
@@ -280,10 +294,21 @@ test("authenticator setup and sign-in show inline required and code errors", asy
   );
   const key = (await page.locator("[data-factor-key]").textContent())!;
   await code.fill(totpFromSetupKey(key));
-  await page.getByRole("button", { name: "Verify and enable" }).click();
-  await expect(
-    page.getByText("Your authenticator is enabled.", { exact: false }),
-  ).toBeVisible();
+  await inPlaceAction(page, {
+    endpoint: "/api/auth/two-factor/verify-totp",
+    form: setup,
+    trigger: () =>
+      page.getByRole("button", { name: "Verify and enable" }).click(),
+    updated: () =>
+      expect(
+        page.getByText("Your authenticator is enabled.", { exact: false }),
+      ).toBeVisible(),
+    loadingLabel: "Verifying…",
+  });
+  await expect(name).toHaveValue("Unsaved authenticator draft");
+  await expect(page.locator("[data-account-sessions]")).toContainText(
+    "This device",
+  );
   await page.locator("[data-account-menu] summary").click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
