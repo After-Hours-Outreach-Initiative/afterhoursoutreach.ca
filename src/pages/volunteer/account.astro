@@ -12,7 +12,6 @@ import {
 } from "@/server/auth";
 import { loadProfile } from "@/server/accounts/profile";
 import type { RegistrationAnswers } from "@/data/registration";
-import { social } from "@/data/site";
 export const prerender = false;
 let values: RegistrationAnswers | null = null;
 let email = "";
@@ -84,12 +83,12 @@ try {
     <div class="volunteer-setting">
       <div><h3>Email address</h3><p>{email}</p></div>
     </div>
-    <div class="volunteer-setting">
+    <div class="volunteer-setting" data-factor-settings>
       <div>
-        <h3>Two-factor authentication</h3>
+        <h3 tabindex="-1">Two-factor authentication</h3>
         {
           twoFactorEnabled ? (
-            <p>
+            <p role="status">
               Your authenticator is enabled. It is required each time you sign
               in.
             </p>
@@ -106,7 +105,11 @@ try {
                 method="post"
               >
                 <p data-form-message role="status" aria-live="polite" hidden />
-                <button class="btn btn-outline" type="submit">
+                <button
+                  class="btn btn-outline"
+                  type="submit"
+                  data-loading-label="Setting up…"
+                >
                   Set up an authenticator
                 </button>
               </form>
@@ -150,7 +153,11 @@ try {
                     aria-live="polite"
                     hidden
                   />
-                  <button class="btn btn-primary" type="submit">
+                  <button
+                    class="btn btn-primary"
+                    type="submit"
+                    data-loading-label="Verifying…"
+                  >
                     Verify and enable
                   </button>
                 </form>
@@ -160,9 +167,9 @@ try {
         }
       </div>
     </div>
-    <div class="volunteer-setting">
+    <div class="volunteer-setting" data-account-sessions>
       <div class="w-full">
-        <h3>Sessions</h3>
+        <h3 tabindex="-1">Sessions</h3>
         {
           sessionsNeedSignIn && (
             <form
@@ -182,7 +189,7 @@ try {
         <ul class="account-sessions mt-6">
           {
             sessions.map((entry) => (
-              <li>
+              <li data-session-row>
                 <div>
                   <span>
                     {entry.id === currentId
@@ -203,7 +210,11 @@ try {
                     method="post"
                   >
                     <input type="hidden" name="id" value={entry.id} />
-                    <button class="btn btn-outline" type="submit">
+                    <button
+                      class="btn btn-outline"
+                      type="submit"
+                      data-loading-label="Ending session…"
+                    >
                       End session
                     </button>
                     <p data-form-message role="status" hidden />
@@ -215,15 +226,5 @@ try {
         </ul>
       </div>
     </div>
-  </section>
-  <section class="volunteer-panel">
-    <h2>Community</h2>
-    <p>Keep in touch with the team on Discord.</p>
-    <a
-      href={social.discord}
-      target="_blank"
-      rel="noreferrer"
-      class="btn btn-outline">Join Discord</a
-    >
   </section>
 </AccountLayout>

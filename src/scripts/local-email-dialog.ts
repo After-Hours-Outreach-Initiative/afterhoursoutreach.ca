@@ -1,6 +1,8 @@
 // Imported by the real account/event UI through DEV-gated dynamic imports.
 import "../styles/local-email-dialog.css";
 
+let nextDialogId = 0;
+
 export interface LocalEmail {
   to: string;
   subject: string;
@@ -19,7 +21,9 @@ export function localEmailDialog(options: {
   const dialog = document.createElement("dialog");
   dialog.className = "dialog-pop local-email-dialog";
   const heading = document.createElement("h2");
-  heading.id = `local-email-${crypto.randomUUID()}`;
+  // This is only an accessible DOM label, not a security token. Use a counter
+  // so development over HTTP LAN addresses doesn't need secure-context crypto.
+  heading.id = `local-email-${++nextDialogId}`;
   heading.textContent = options.title ?? "Test email outcome";
   dialog.setAttribute("aria-labelledby", heading.id);
   const warning = document.createElement("p");
