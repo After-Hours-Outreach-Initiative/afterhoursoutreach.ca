@@ -222,7 +222,7 @@ for (const width of [1280, 375]) {
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Community", exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     const nav = page.getByRole("navigation", { name: "Volunteer account" });
     for (const link of await nav.getByRole("link").all()) {
       await expect(link).toHaveCSS("text-decoration-line", "none");

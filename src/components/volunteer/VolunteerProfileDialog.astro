@@ -1,5 +1,5 @@
 <dialog
-  class="dialog-pop volunteer-dialog"
+  class="dialog-pop volunteer-dialog volunteer-profile-dialog"
   data-volunteer-profile-dialog
   aria-labelledby="volunteer-profile-dialog-heading"
 >
@@ -13,4 +13,10 @@
     >
   </div>
   <div data-profile-dialog-content></div>
+  <template data-profile-dialog-loading>
+    <div class="volunteer-profile-loading" role="status">
+      <span class="volunteer-profile-loading-icon" aria-hidden="true"></span>
+      <span>Loading</span>
+    </div>
+  </template>
 </dialog>

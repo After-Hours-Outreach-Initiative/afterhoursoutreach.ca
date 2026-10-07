@@ -53,14 +53,6 @@ const filter = ["patrol", "orientation"].includes(
   name={actor?.name}
   email={email}
 >
-  <p
-    class="volunteer-notice"
-    data-action-notice
-    role="status"
-    tabindex="-1"
-    hidden
-  >
-  </p>
   {
     !actor ? (
       <SignInPanel returnTo="/volunteer" />
@@ -91,7 +83,6 @@ const filter = ["patrol", "orientation"].includes(
     <div class="volunteer-section-heading">
       <div>
         <h2 id="events-heading">{organizer ? "Events" : "Upcoming events"}</h2>
-        <p>All event times are in Vancouver time.</p>
       </div>
       {
         organizer && (
@@ -130,7 +121,7 @@ const filter = ["patrol", "orientation"].includes(
         ))
       }
     </form>
-    <ul class="volunteer-event-list">
+    <ul class="volunteer-event-list" data-event-list>
       {
         events.map((event) => (
           <EventCard
@@ -156,11 +147,9 @@ const filter = ["patrol", "orientation"].includes(
           : "No upcoming events are scheduled. Check back soon."
       }
     </p>
-    {
-      events.length === 100 && (
-        <p class="volunteer-help">Showing up to 100 events.</p>
-      )
-    }
+    <p class="volunteer-help" data-event-limit hidden={events.length !== 100}>
+      Showing up to 100 events.
+    </p>
   </section>
   {
     organizer && notifications && (

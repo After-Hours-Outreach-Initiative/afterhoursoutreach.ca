@@ -88,7 +88,11 @@ const blocked = signupBlockReason(
           <form data-live-signup action="/api/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="cancel" />
-            <button class="btn btn-red" type="submit">
+            <button
+              class="btn btn-red"
+              type="submit"
+              data-loading-label="Cancelling…"
+            >
               Cancel my spot
             </button>
             <p data-form-message role="status" hidden />
@@ -101,7 +105,11 @@ const blocked = signupBlockReason(
           <form data-live-signup action="/api/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="join" />
-            <button class="btn btn-green" type="submit">
+            <button
+              class="btn btn-green"
+              type="submit"
+              data-loading-label="Signing up…"
+            >
               Sign up
             </button>
             <p data-form-message role="status" hidden />

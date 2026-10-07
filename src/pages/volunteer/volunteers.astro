@@ -1,6 +1,7 @@
 ---
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import VolunteerProfileDialog from "@/components/volunteer/VolunteerProfileDialog.astro";
+import SearchIcon from "@/components/icons/SearchIcon.astro";
 import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/accounts/access";
 import {
@@ -57,7 +58,6 @@ try {
   name={accountName}
   email={accountEmail}
 >
-  <p class="volunteer-notice" data-action-notice role="status" hidden></p>
   {
     lock ? (
       <p class="volunteer-notice">
@@ -66,27 +66,29 @@ try {
     ) : (
       <>
         <section class="volunteer-events" data-volunteer-browser>
-          <div class="volunteer-section-heading">
-            <h2>Your team</h2>
-            <form method="get" data-volunteer-search-form>
-              <label class="volunteer-field">
-                Find a volunteer
-                <input
-                  type="search"
-                  name="q"
-                  data-volunteer-search
-                  value={search}
-                  maxlength="100"
-                  placeholder="Search by name"
-                />
-              </label>
-              <noscript>
-                <button class="btn btn-outline" type="submit">
-                  Search
-                </button>
-              </noscript>
-            </form>
-          </div>
+          <form
+            class="volunteer-search"
+            method="get"
+            data-volunteer-search-form
+          >
+            <label class="volunteer-search-field">
+              <span class="sr-only">Find a volunteer</span>
+              <SearchIcon class="volunteer-search-icon" />
+              <input
+                type="search"
+                name="q"
+                data-volunteer-search
+                value={search}
+                maxlength="100"
+                placeholder="Search by name"
+              />
+            </label>
+            <noscript>
+              <button class="btn btn-outline mt-3" type="submit">
+                Search
+              </button>
+            </noscript>
+          </form>
           <div data-volunteer-results>
             <ul class="volunteer-event-list">
               {team.rows.map((person) => (
