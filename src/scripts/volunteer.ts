@@ -214,6 +214,8 @@ interface Result {
   message?: string;
   localNotifications?: { to: string; subject: string; body: string }[];
 }
+let pendingRefresh = Promise.resolve();
+
 function form(
   selector: string,
   endpoint: string,
@@ -284,7 +286,11 @@ function form(
         const { chooseEmailOutcome } = await import("./local-email-dialog");
         await chooseEmailOutcome(result.localNotifications, true);
       }
-      await complete(element);
+      // Writes may run concurrently, but each refresh must fetch and apply after
+      // the previous one. Otherwise a slower, older response can undo newer UI.
+      const refresh = pendingRefresh.then(() => complete(element));
+      pendingRefresh = refresh.catch(() => {});
+      await refresh;
     } catch (error) {
       // Failed automatic toggles must not look like committed settings.
       if (!saved && element.hasAttribute("data-submit-on-change"))

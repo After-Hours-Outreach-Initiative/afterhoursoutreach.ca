@@ -60,7 +60,9 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
           name="startsAt"
           required
           value={event ? vancouverInput(event.startsAt) : ""}
-        /><span class="volunteer-help">Vancouver time (PCT).</span></label
+        /><span class="volunteer-help"
+          >Vancouver time, regardless of your device’s time zone.</span
+        ></label
       >
       <label class="volunteer-field"
         >Volunteer spots<input
