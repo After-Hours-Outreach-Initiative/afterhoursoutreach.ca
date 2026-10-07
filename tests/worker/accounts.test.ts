@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createTestHarness } from "wrangler";
-import { chromium, type Page } from "@playwright/test";
+import { chromium, expect, type Page } from "@playwright/test";
+import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
 
@@ -520,6 +521,14 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
               body: Buffer.from(await response.arrayBuffer()),
             });
           });
+          const siblings: string[] = [];
+          for (let i = 0; i < 2; i++) {
+            const siblingCookie = await signIn("worker-volunteer@example.org");
+            const sibling = (await (
+              await send("/api/auth/get-session", undefined, siblingCookie)
+            ).json()) as { session: { id: string } };
+            siblings.push(sibling.session.id);
+          }
           await page.goto(`${origin}/volunteer/account`);
           await page
             .getByRole("heading", { name: "Your account", exact: true })
@@ -548,6 +557,35 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
           await page
             .getByLabel("Medical conditions or triggers", { exact: false })
             .fill("Changed browser sample");
+          for (const id of siblings) {
+            const sessionForm = page
+              .locator("[data-end-session]")
+              .filter({ has: page.locator(`input[value="${id}"]`) });
+            await inPlaceAction(page, {
+              endpoint: "/api/account/session",
+              form: sessionForm,
+              trigger: () =>
+                sessionForm
+                  .getByRole("button", { name: "End session", exact: true })
+                  .click(),
+              updated: () => expect(sessionForm).toHaveCount(0),
+              loadingLabel: "Ending session…",
+            });
+            await expect(page.getByLabel("Full or preferred name")).toHaveValue(
+              changedName,
+            );
+            await expect(
+              page.getByLabel("Medical conditions or triggers", {
+                exact: false,
+              }),
+            ).toHaveValue("Changed browser sample");
+            assert.equal(
+              await DB.prepare("SELECT id FROM session WHERE id=?")
+                .bind(id)
+                .first(),
+              null,
+            );
+          }
           await page.getByRole("button", { name: "Save profile" }).click();
           try {
             await page

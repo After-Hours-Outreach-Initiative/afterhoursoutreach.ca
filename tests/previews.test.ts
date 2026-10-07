@@ -92,6 +92,11 @@ test("deployment scripts explicitly select Worker Previews and their migration t
     "node scripts/check-preview-migrations.mjs && wrangler d1 migrations apply PREVIEW_DB --config wrangler.preview-migrations.jsonc --remote",
   );
   assert.equal(
+    scripts["db:seed:preview"],
+    "tsx scripts/seed-preview-events.ts",
+  );
+  assert.doesNotMatch(scripts["deploy:preview"], /seed/);
+  assert.equal(
     scripts.deploy,
     "pnpm build && wrangler deploy --config dist/server/wrangler.json",
   );

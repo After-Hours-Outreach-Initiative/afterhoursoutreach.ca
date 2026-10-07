@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import { createTestHarness } from "wrangler";
+import {
+  previewEventFixtures,
+  previewEventId,
+} from "../../scripts/preview-event-fixtures";
 
 test("the preview banner does not gate features or restrict accounts to preview hosts", async () => {
   const html = readFileSync(
@@ -66,6 +70,32 @@ test("the preview banner does not gate features or restrict accounts to preview 
         404,
       );
     }
+    const { DB } = await worker.getEnv();
+    await DB.batch(previewEventFixtures().map((sql) => DB.prepare(sql)));
+    const seeded = await worker.fetch(
+      "https://feature-login-afterhoursoutreach-ca.ivanzheng9905.workers.dev/volunteer",
+    );
+    assert.equal(seeded.status, 200);
+    const listing = await seeded.text();
+    assert.equal((listing.match(/data-live-event=/g) ?? []).length, 4);
+    assert.match(listing, /\[Sample\] Strathcona Community Centre/);
+    assert.match(listing, /\[Sample\] Lord Strathcona Elementary School/);
+    assert.doesNotMatch(
+      listing,
+      new RegExp(previewEventId("hidden-orientation")),
+    );
+    assert.equal(
+      (await DB.prepare("SELECT count(*) AS n FROM profile").first<{
+        n: number;
+      }>())!.n,
+      6,
+    );
+    assert.equal(
+      (await DB.prepare("SELECT count(*) AS n FROM event_notification").first<{
+        n: number;
+      }>())!.n,
+      0,
+    );
   } finally {
     await server.close();
   }
