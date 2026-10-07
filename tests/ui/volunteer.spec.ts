@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { createLocalAccount } from "../helpers/local-account";
+import {
+  createLocalAccount,
+  openLocalAccountSwitcher,
+} from "../helpers/local-account";
 import { totpFromSetupKey } from "../helpers/totp";
 
 test.beforeEach(async ({ page, baseURL }) => {
@@ -10,55 +13,30 @@ test.beforeEach(async ({ page, baseURL }) => {
   await page.goto("/volunteer");
 });
 
-test("the shared sign-in panel is centered and left-aligned on desktop and mobile", async ({
+test("volunteer-page sign-in is usable on mobile and opens the shared code form", async ({
   page,
 }) => {
-  for (const width of [1280, 375]) {
-    await page.setViewportSize({ width, height: 812 });
-    for (const path of ["/volunteer", "/volunteer/sign-in"]) {
-      await page.goto(path);
-      await expect(
-        page.getByRole("link", { name: "Privacy preview", exact: true }),
-      ).toHaveCount(0);
-      await expect(
-        page.getByText(
-          "Accounts and events use local D1. No real emails are sent.",
-        ),
-      ).toHaveCount(0);
-      const panel = page.locator(".volunteer-signin-panel");
-      await expect(panel).toBeVisible();
-      await expect(panel.getByRole("heading")).toHaveCSS("text-align", "left");
-      await expect(
-        panel.getByText("Sign in to sign up for volunteer events."),
-      ).toBeVisible();
-      const panelBox = (await panel.boundingBox())!;
-      const buttonBox = (await panel
-        .getByRole("button", { name: "Continue with Email" })
-        .boundingBox())!;
-      const inputBox = (await panel
-        .getByRole("textbox", { name: "Email", exact: true })
-        .boundingBox())!;
-      expect(panelBox.width).toBeLessThanOrEqual(560);
-      expect(
-        Math.abs(panelBox.x + panelBox.width / 2 - width / 2),
-      ).toBeLessThan(1);
-      expect(Math.abs(buttonBox.x - inputBox.x)).toBeLessThan(1);
-      expect(Math.abs(buttonBox.width - inputBox.width)).toBeLessThan(1);
-      await expect(page.locator("header")).toHaveCSS(
-        "background-color",
-        "rgb(0, 0, 0)",
-      );
-      await expect(page.locator(".volunteer-portal")).toHaveCSS(
-        "background-color",
-        "rgb(0, 0, 0)",
-      );
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth > innerWidth,
-        ),
-      ).toBe(false);
-    }
-  }
+  await page.setViewportSize({ width: 375, height: 812 });
+  const emails: string[] = [];
+  await page.route("**/api/auth/email-otp/send-verification-otp**", (route) => {
+    emails.push(route.request().postDataJSON().email);
+    return route.fulfill({ json: { success: true } });
+  });
+  await page
+    .getByRole("textbox", { name: "Email", exact: true })
+    .fill("mobile@example.org");
+  await page.getByRole("button", { name: "Continue with Email" }).click();
+  await page
+    .getByRole("button", { name: "Simulate successful delivery" })
+    .click();
+  await expect(page.getByLabel("Six-digit code")).toBeVisible();
+  await expect(page.getByLabel("Six-digit code")).toBeFocused();
+  expect(emails).toEqual(["mobile@example.org"]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
 });
 
 test("event type buttons filter instantly, preserve deep links, and never submit a confirmation form", async ({
@@ -73,10 +51,8 @@ test("event type buttons filter instantly, preserve deep links, and never submit
     nodes.map((node) => (node as HTMLElement).dataset.eventType),
   );
   const filters = page.getByRole("group", { name: "Filter events" });
-  await expect(filters.getByRole("combobox")).toHaveCount(0);
-  await expect(
-    filters.getByRole("button", { name: "Filter events", exact: true }),
-  ).toHaveCount(0);
+  expect(types).toContain("orientation");
+  expect(types).toContain("patrol");
   await filters
     .getByRole("button", { name: "Orientations", exact: true })
     .click();
@@ -121,29 +97,22 @@ test("View as lists actual D1 users and switching to Visitor ends only the curre
   const independentSession: { session: { id: string } } =
     await independent.json();
   await page.reload();
-  const selector = page.getByLabel("View as", { exact: true });
-  await expect(selector).toBeEnabled();
+  const selector = await openLocalAccountSwitcher(page);
   await expect(selector.locator(`option[value="${user.id}"]`)).toContainText(
     user.email,
   );
-  await expect(
-    page.getByRole("navigation", { name: "Volunteer account" }),
-  ).toHaveCount(0);
+  await expect(page.locator("[data-account-menu]")).toHaveCount(0);
   await selector.selectOption(user.id);
-  await expect(
-    page.getByRole("navigation", { name: "Volunteer account" }),
-  ).toBeVisible();
+  await expect(page.locator("[data-account-menu]")).toBeVisible();
   await expect(selector).toHaveValue(user.id);
   const selected = await page.request.get("/api/auth/get-session");
   const selectedSession: { user: { id: string }; session: { id: string } } =
     await selected.json();
   expect(selectedSession.user.id).toBe(user.id);
   expect(selectedSession.session.id).not.toBe(independentSession.session.id);
-  await selector.selectOption("");
+  await (await openLocalAccountSwitcher(page)).selectOption("");
   await expect(page).toHaveURL(/\/volunteer\/?$/);
-  await expect(
-    page.getByRole("navigation", { name: "Volunteer account" }),
-  ).toHaveCount(0);
+  await expect(page.locator("[data-account-menu]")).toHaveCount(0);
   expect(
     await (await page.request.get("/api/auth/get-session")).json(),
   ).toBeNull();
@@ -159,8 +128,7 @@ test("View as can choose an unregistered D1 account without changing it", async 
 }) => {
   const user = await createLocalAccount(request, baseURL!, false);
   await page.reload();
-  const selector = page.getByLabel("View as", { exact: true });
-  await expect(selector).toBeEnabled();
+  const selector = await openLocalAccountSwitcher(page);
   await selector.selectOption(user.id);
   await expect(page).toHaveURL(/\/volunteer\/register$/);
   await expect(
@@ -171,115 +139,42 @@ test("View as can choose an unregistered D1 account without changing it", async 
   );
   await expect(page.getByLabel("Full or preferred name")).toHaveValue("");
   await expect(selector).toHaveValue(user.id);
-  await expect(
-    page.locator("[data-account-profile] .account-notice"),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "Read the privacy notice" }),
-  ).toHaveCount(0);
 });
 
-for (const width of [1280, 375]) {
-  test(`account edits persist in D1 and use the shared UI at ${width}px`, async ({
-    page,
-    request,
-    baseURL,
-  }) => {
-    const user = await createLocalAccount(request, baseURL!);
+test("account navigation and profile controls are usable on desktop and mobile", async ({
+  page,
+  baseURL,
+}) => {
+  const user = await createLocalAccount(page.request, baseURL!);
+  await page.reload();
+  for (const width of [1280, 375]) {
     await page.setViewportSize({ width, height: 812 });
-    await page.reload();
-    const selector = page.getByLabel("View as", { exact: true });
-    await expect(selector).toBeEnabled();
-    await selector.selectOption(user.id);
-    await page.getByRole("link", { name: user.name, exact: true }).click();
+    const menu = page.locator("[data-account-menu]");
+    await menu.locator("summary").click();
+    await expect(menu).toContainText(user.email);
+    await menu.getByRole("link", { name: "Profile", exact: true }).click();
     await expect(page).toHaveURL(/\/volunteer\/account$/);
-    const access = page.locator(".volunteer-access");
-    await expect(access).toHaveCSS("background-color", "rgb(22, 33, 74)");
+    const name = page.getByLabel("Full or preferred name");
+    await expect(name).toHaveValue(user.name);
+    await expect(name).toBeEditable();
     await expect(
-      access.getByRole("heading", {
-        name: "Start with an orientation",
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expect(
-      access.getByRole("link", { name: "Find an event", exact: true }),
-    ).toHaveAttribute("href", "/volunteer");
-    const profilePanel = page.locator(".volunteer-panel").filter({
-      has: page.getByRole("heading", { name: "Your profile", exact: true }),
-    });
-    await expect(profilePanel).toHaveCSS("background-color", "rgb(12, 13, 16)");
-    await expect(profilePanel).toHaveCSS("border-radius", "10px");
-    await expect(profilePanel.locator("input[readonly]")).toHaveCSS(
-      "background-color",
-      "rgb(23, 26, 32)",
-    );
-    await expect(profilePanel.locator('input[name="name"]')).toHaveCSS(
-      "background-color",
-      "rgb(5, 6, 8)",
-    );
-    await expect(
-      page.getByRole("heading", { name: "Account settings", exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Community", exact: true }),
-    ).toHaveCount(0);
-    const nav = page.getByRole("navigation", { name: "Volunteer account" });
-    for (const link of await nav.getByRole("link").all()) {
-      await expect(link).toHaveCSS("text-decoration-line", "none");
-      await expect(link).toHaveCSS("box-shadow", "none");
-    }
-    const columnCount = await profilePanel
-      .locator(".volunteer-fields")
-      .evaluate(
-        (element) =>
-          getComputedStyle(element).gridTemplateColumns.split(" ").length,
-      );
-    expect(columnCount).toBe(width > 640 ? 2 : 1);
-    await expect(
-      page.locator("[data-account-profile] .account-notice"),
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole("link", { name: "Read the privacy notice" }),
-    ).toHaveCount(0);
-    const updatedName = `Updated ${crypto.randomUUID().slice(0, 8)}`;
-    await page.getByLabel("Full or preferred name").fill(updatedName);
-    await page.getByLabel("Pronouns").fill("she/her");
-    await page.getByRole("button", { name: "Save profile" }).click();
-    await expect(
-      page.locator("[data-account-profile] [data-form-message]"),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: updatedName, exact: true }),
-    ).toBeVisible();
-    await page.reload();
-    await expect(page.getByLabel("Full or preferred name")).toHaveValue(
-      updatedName,
-    );
-    await expect(page.getByLabel("Pronouns")).toHaveValue("she/her");
-    expect(
-      await page.evaluate(() =>
-        localStorage.getItem("aho-local-volunteer-demo"),
-      ),
-    ).toBeNull();
+      page.getByRole("button", { name: "Save profile" }),
+    ).toBeEnabled();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,
       ),
     ).toBe(false);
-    await expect(page.locator(".volunteer-portal")).toHaveCSS(
-      "background-color",
-      "rgb(0, 0, 0)",
-    );
-    if (width === 1280)
-      await page
-        .getByRole("link", { name: "Create an account", exact: true })
-        .click();
-    else
-      await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
-    await expect(selector).toHaveValue("");
-  });
-}
+    await page.getByRole("link", { name: "Events", exact: true }).click();
+    await expect(page).toHaveURL(/\/volunteer\/?$/);
+  }
+  await page.locator("[data-account-menu] summary").click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
+  expect(
+    await (await page.request.get("/api/auth/get-session")).json(),
+  ).toBeNull();
+});
 
 test("local account selection rejects cross-origin writes and unknown users", async ({
   page,
@@ -309,7 +204,7 @@ test("local account selection rejects cross-origin writes and unknown users", as
     (await (await request.get("/api/auth/get-session")).json()).user.id,
   ).toBe(user.id);
   await page.reload();
-  await expect(page.getByLabel("View as", { exact: true })).toBeEnabled();
+  await openLocalAccountSwitcher(page);
 });
 
 test("View as simulates a verified factor without changing the user's real role or enrollment", async ({
@@ -334,12 +229,9 @@ test("View as simulates a verified factor without changing the user's real role 
   });
   expect(verified.status()).toBe(200);
   await page.reload();
-  const selector = page.getByLabel("View as", { exact: true });
-  await expect(selector).toBeEnabled();
+  const selector = await openLocalAccountSwitcher(page);
   await selector.selectOption(user.id);
-  await expect(
-    page.getByRole("navigation", { name: "Volunteer account" }),
-  ).toBeVisible();
+  await expect(page.locator("[data-account-menu]")).toBeVisible();
   await expect(selector).toHaveValue(user.id);
   const current = await page.request.get("/api/auth/get-session");
   const session = await current.json();

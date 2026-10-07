@@ -1,4 +1,24 @@
-import { expect, type APIRequestContext } from "@playwright/test";
+import { expect, type APIRequestContext, type Page } from "@playwright/test";
+
+export async function openLocalAccountSwitcher(page: Page) {
+  await page
+    .getByRole("button", { name: "Development controls", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Local development",
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  // Keep the locator usable for value assertions after navigation closes the dialog.
+  const selector = page.getByRole("combobox", {
+    name: "View as",
+    exact: true,
+    includeHidden: true,
+  });
+  await expect(selector).toBeVisible();
+  await expect(selector).toBeEnabled();
+  return selector;
+}
 
 export const sampleAnswers = {
   name: "Database Test Volunteer",

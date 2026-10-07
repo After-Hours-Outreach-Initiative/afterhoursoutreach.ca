@@ -66,11 +66,6 @@ export async function inPlaceAction(
       .first();
     await expect(loading).toBeVisible();
     await expect(loading).toHaveText(options.loadingLabel);
-    expect(
-      await loading.evaluate(
-        (element) => getComputedStyle(element, "::before").animationName,
-      ),
-    ).toBe("volunteer-loading");
     await expect.poll(() => submissions).toBe(1);
     await options.pending?.();
     await options.form.evaluate((element) =>

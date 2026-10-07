@@ -60,14 +60,6 @@ test("local approval notifications work without crypto.randomUUID", async ({
     }),
   );
   await page.goto("/volunteer");
-  await expect(page.locator("#development-account-dialog")).toHaveCSS(
-    "scrollbar-width",
-    "thin",
-  );
-  await expect(page.locator("#development-account-dialog")).toHaveCSS(
-    "scrollbar-color",
-    "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
-  );
   await page.evaluate((html) => {
     const dialog = document.createElement("dialog");
     dialog.className = "volunteer-dialog";
@@ -98,21 +90,11 @@ test("local approval notifications work without crypto.randomUUID", async ({
       exact: true,
     });
     await expect(choiceDialog).toBeVisible();
-    await expect(choiceDialog).toHaveCSS("scrollbar-width", "thin");
-    await expect(choiceDialog).toHaveCSS(
-      "scrollbar-color",
-      "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
-    );
     expect(submissions).toHaveLength(approve ? 0 : 1);
     await choiceDialog
       .getByRole("button", { name: "Save and send email", exact: true })
       .click();
     await expect(emailDialog).toBeVisible();
-    await expect(emailDialog).toHaveCSS("scrollbar-width", "thin");
-    await expect(emailDialog).toHaveCSS(
-      "scrollbar-color",
-      "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
-    );
     await expect(emailDialog).toContainText(`Patrol approval: ${approve}.`);
     const headingId = (await emailDialog.getAttribute("aria-labelledby"))!;
     expect(ids.has(headingId)).toBe(false);

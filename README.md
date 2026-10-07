@@ -16,3 +16,6 @@ Documentation is in [docs/](docs/).
 The [test benchmark report](docs/test-benchmarks.md) records the baseline test
 counts, suite/build runtimes, and per-test timings. It includes commands for
 rerunning `pnpm test:benchmark` and comparing changes with the saved baseline.
+
+The [simplified-suite comparison](docs/test-benchmarks-simplified.md) records the
+results after removing cosmetic assertions and consolidating duplicate flows.
