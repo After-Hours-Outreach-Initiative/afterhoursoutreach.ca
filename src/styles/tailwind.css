@@ -60,6 +60,11 @@
     @apply cursor-pointer;
   }
 
+  dialog {
+    scrollbar-color: #52525b transparent;
+    scrollbar-width: thin;
+  }
+
   :focus-visible {
     outline: 3px solid #4169e1;
     outline-offset: 4px;
