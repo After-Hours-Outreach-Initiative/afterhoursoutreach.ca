@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { createTestHarness } from "wrangler";
-import { chromium } from "@playwright/test";
+import { chromium, expect, type Locator } from "@playwright/test";
+import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
 
@@ -591,6 +592,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
               id: signedUp!.id,
               destination: destination.id,
               reason: "Sample reason",
+              notify: true,
             },
             organizer.cookie,
           ),
@@ -628,6 +630,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
               id: signedUp!.id,
               destination: destination.id,
               reason: "Sample reason",
+              notify: true,
             },
             organizer.cookie,
           ),
@@ -711,7 +714,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
     );
 
     await t.test(
-      "deactivation cancels future spots and last organizer cannot be removed",
+      "deactivation silently cancels future spots and last organizer cannot be removed",
       async () => {
         await ok(await status(alice.id, false, false));
         const notifications = await DB.prepare(
@@ -719,7 +722,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
         )
           .bind(alice.id)
           .first<{ n: number }>();
-        assert.ok(notifications && notifications.n > 0);
+        assert.equal(notifications?.n, 0);
         assert.equal(
           (
             await DB.prepare(
@@ -744,7 +747,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
     );
 
     await t.test(
-      "cancellation preserves records, cancels spots and queues notifications atomically",
+      "opted-in cancellation preserves records, cancels spots and queues notifications atomically",
       async () => {
         const event = await createEvent("patrol", 2);
         await ok(await join(event.id, bob.cookie));
@@ -756,6 +759,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
               id: event.id,
               version: event.version,
               reason: "Sample cancellation",
+              notify: true,
             },
             organizer.cookie,
           ),
@@ -907,6 +911,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
             });
           });
           await page.goto(`${origin}/volunteer`);
+          assert.equal(await page.locator("[data-action-notice]").count(), 0);
           const nav = page.getByRole("navigation", {
             name: "Volunteer account",
           });
@@ -919,10 +924,46 @@ test("real event and organizer flows in the built Worker", async (t) => {
           );
           await account.waitFor();
           await page.goto(`${origin}/volunteer/volunteers`);
+          assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
           const teamSearch = page.getByRole("searchbox", {
             name: "Find a volunteer",
           });
+          await expect(
+            page.getByRole("heading", { name: "Your team", exact: true }),
+          ).toHaveCount(0);
+          await expect(teamSearch).toHaveAttribute(
+            "placeholder",
+            "Search by name",
+          );
+          await expect(
+            page.locator(".volunteer-search-field > span"),
+          ).toHaveClass("sr-only");
+          for (const width of [1280, 375]) {
+            await page.setViewportSize({ width, height: 812 });
+            await expect(page.locator(".volunteer-search-icon")).toBeVisible();
+            await expect(
+              page.locator(".volunteer-search-icon"),
+            ).toHaveAttribute("aria-hidden", "true");
+            const bounds = await teamSearch.evaluate((input) => {
+              const field = input.getBoundingClientRect();
+              const section = input
+                .closest("[data-volunteer-browser]")!
+                .getBoundingClientRect();
+              return {
+                widthDifference: Math.abs(field.width - section.width),
+                leftDifference: Math.abs(field.left - section.left),
+                paddingLeft: Number.parseFloat(
+                  getComputedStyle(input).paddingLeft,
+                ),
+                overflow: document.documentElement.scrollWidth > innerWidth,
+              };
+            });
+            assert.ok(bounds.widthDifference < 1);
+            assert.ok(bounds.leftDifference < 1);
+            assert.ok(bounds.paddingLeft >= 44);
+            assert.equal(bounds.overflow, false);
+          }
           await teamSearch.fill("Sample Alice");
           await page.waitForURL(
             `${origin}/volunteer/volunteers?q=Sample+Alice`,
@@ -931,29 +972,209 @@ test("real event and organizer flows in the built Worker", async (t) => {
             .locator("[data-volunteer-results]")
             .getByRole("heading", { name: "Sample Alice", exact: true })
             .waitFor();
-          await page
-            .getByRole("link", {
-              name: "View profile and approval",
-              exact: true,
-            })
-            .click();
           const profileDialog = page.getByRole("dialog", {
             name: "Volunteer profile",
             exact: true,
           });
+          const profilePane = profileDialog.locator(
+            "[data-profile-dialog-content]",
+          );
+          let releaseProfile!: () => void;
+          const profileGate = new Promise<void>((resolve) => {
+            releaseProfile = resolve;
+          });
+          const profilePattern = `**/volunteer/volunteers/${alice.id}`;
+          await page.route(profilePattern, async (route) => {
+            await profileGate;
+            await route.fallback();
+          });
+          const profileViewports = [
+            { width: 1280, height: 900 },
+            { width: 375, height: 812 },
+          ];
+          const loadingBounds = new Map<
+            number,
+            { x: number; y: number; width: number; height: number }
+          >();
+          await page.evaluate(() => {
+            document.addEventListener("animationstart", (event) => {
+              if (event.animationName === "volunteer-profile-fade-in")
+                document.documentElement.dataset.testProfileFadeIn = "true";
+              if (event.animationName === "volunteer-profile-fade-out")
+                document.documentElement.dataset.testProfileFadeOut = "true";
+            });
+          });
+          try {
+            await page
+              .getByRole("link", {
+                name: "View profile and approval",
+                exact: true,
+              })
+              .click();
+            await expect(profilePane).toHaveAttribute("aria-busy", "true");
+            await expect(
+              profilePane.getByText("Loading", {
+                exact: true,
+              }),
+            ).toBeVisible();
+            await expect(
+              profilePane.locator(".volunteer-profile-loading-icon"),
+            ).toBeVisible();
+            await expect(
+              profilePane.locator(".volunteer-profile-loading-icon"),
+            ).toHaveAttribute("aria-hidden", "true");
+            await expect(
+              profilePane.locator(".volunteer-profile-loading"),
+            ).toHaveCSS("align-items", "center");
+            await expect(
+              profilePane.locator(".volunteer-profile-loading"),
+            ).toHaveCSS("justify-content", "center");
+            for (const viewport of profileViewports) {
+              await page.setViewportSize(viewport);
+              await expect
+                .poll(async () =>
+                  Math.abs(
+                    (await profileDialog.boundingBox())!.height -
+                      Math.min(800, viewport.height - 48),
+                  ),
+                )
+                .toBeLessThan(1);
+              await expect
+                .poll(async () =>
+                  Math.abs(
+                    (await profileDialog.boundingBox())!.y -
+                      (viewport.height - Math.min(800, viewport.height - 48)) /
+                        2,
+                  ),
+                )
+                .toBeLessThan(1);
+              loadingBounds.set(
+                viewport.width,
+                (await profileDialog.boundingBox())!,
+              );
+              await expect(
+                profileDialog.getByRole("button", {
+                  name: "Close volunteer profile",
+                  exact: true,
+                }),
+              ).toBeVisible();
+            }
+          } finally {
+            releaseProfile();
+          }
           await profileDialog
             .getByRole("heading", { name: "Sample Alice", exact: true })
             .waitFor();
+          await page.unroute(profilePattern);
+          await expect(profilePane).not.toHaveAttribute("aria-busy", "true");
+          await expect(
+            profilePane.locator(".volunteer-profile-loading"),
+          ).toHaveCount(0);
+          await expect(page.locator("html")).toHaveAttribute(
+            "data-test-profile-fade-in",
+            "true",
+          );
+          await expect(page.locator("html")).toHaveAttribute(
+            "data-test-profile-fade-out",
+            "true",
+          );
+          await expect(
+            profilePane.locator("[data-volunteer-profile]"),
+          ).not.toHaveAttribute("data-profile-entering");
+          // The frame stays identical as the loader fades into a long profile.
+          for (const viewport of profileViewports) {
+            await page.setViewportSize(viewport);
+            const before = loadingBounds.get(viewport.width)!;
+            const after = (await profileDialog.boundingBox())!;
+            for (const key of ["x", "y", "width", "height"] as const)
+              assert.ok(
+                Math.abs(before[key] - after[key]) < 1,
+                JSON.stringify({ key, before, after, viewport }),
+              );
+            await profileDialog
+              .getByLabel("Active volunteer", { exact: true })
+              .focus();
+            await page.keyboard.press("Tab");
+            const roleSelect = profileDialog.getByLabel("Account role");
+            await expect(roleSelect).toBeFocused();
+            await expect(roleSelect).toHaveCSS("outline-style", "solid");
+            await expect(roleSelect).toHaveCSS("outline-width", "3px");
+            await expect(roleSelect).toHaveCSS("outline-offset", "4px");
+            const focusFits = await roleSelect.evaluate((select) => {
+              const field = select.getBoundingClientRect();
+              const popup = select.closest("dialog")!.getBoundingClientRect();
+              const style = getComputedStyle(select);
+              const ring =
+                Number.parseFloat(style.outlineOffset) +
+                Number.parseFloat(style.outlineWidth);
+              return (
+                field.left - ring > popup.left &&
+                field.right + ring < popup.right
+              );
+            });
+            assert.equal(focusFits, true);
+          }
+          assert.equal(
+            await profileDialog.evaluate(
+              (popup) => popup.scrollHeight > popup.clientHeight,
+            ),
+            true,
+          );
+          await expect(profilePane).toHaveCSS("overflow-y", "visible");
+          await expect(profileDialog).toHaveCSS("overflow-y", "auto");
+          await expect(profileDialog).toHaveCSS("scrollbar-width", "thin");
+          await expect(profileDialog).toHaveCSS(
+            "scrollbar-color",
+            "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
+          );
+          await profileDialog.evaluate((popup) => {
+            popup.scrollTop = 80;
+          });
           assert.match(
             await profileDialog.innerText(),
             /PRIVATE HEALTH ANSWER/,
           );
           assert.match(page.url(), /\/volunteer\/volunteers\?q=Sample\+Alice$/);
-          await profileDialog
-            .getByRole("button", { name: "Approve for patrols", exact: true })
-            .click();
-          await page.locator("[data-action-notice]").waitFor();
-          assert.equal(await profileDialog.isVisible(), false);
+          await inPlaceAction(page, {
+            endpoint: "/api/organizer/action",
+            form: profileDialog.locator(
+              "[data-organizer-status]:not([data-submit-on-change])",
+            ),
+            notify: true,
+            trigger: () =>
+              profileDialog
+                .getByRole("button", {
+                  name: "Approve for patrols",
+                  exact: true,
+                })
+                .click(),
+            updated: () =>
+              profileDialog
+                .getByRole("button", {
+                  name: "Revoke patrol approval",
+                  exact: true,
+                })
+                .waitFor(),
+            loadingLabel: "Saving…",
+            pending: async () => {
+              await expect(
+                profileDialog.getByLabel("Active volunteer", { exact: true }),
+              ).toBeDisabled();
+              await expect(
+                profileDialog.getByLabel("Account role"),
+              ).toBeDisabled();
+            },
+          });
+          await expect(profileDialog).toBeVisible();
+          assert.equal(
+            await profileDialog.evaluate((popup) => popup.scrollTop),
+            80,
+          );
+          await expect(
+            page
+              .locator("[data-volunteer-results]")
+              .getByText("Approved for patrols", { exact: true }),
+          ).toBeVisible();
           assert.deepEqual(
             await DB.prepare(
               "SELECT active, patrol_approved AS approved FROM volunteer_status WHERE user_id=?",
@@ -963,9 +1184,25 @@ test("real event and organizer flows in the built Worker", async (t) => {
             { active: 0, approved: 1 },
           );
           await page.goto(`${origin}/volunteer/volunteers/${alice.id}`);
+          assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
-          await page.getByLabel("Active volunteer", { exact: true }).check();
-          await page.locator("[data-action-notice]").waitFor();
+          await inPlaceAction(page, {
+            endpoint: "/api/organizer/action",
+            form: page.locator(
+              "[data-organizer-status][data-submit-on-change]",
+            ),
+            trigger: () =>
+              page.getByLabel("Active volunteer", { exact: true }).check(),
+            updated: async () => {
+              await expect(
+                page.getByLabel("Active volunteer", { exact: true }),
+              ).toBeEnabled();
+              await expect(
+                page.getByLabel("Active volunteer", { exact: true }),
+              ).toBeChecked();
+            },
+            loadingLabel: "Saving…",
+          });
           assert.deepEqual(
             await DB.prepare(
               "SELECT active, patrol_approved AS approved FROM volunteer_status WHERE user_id=?",
@@ -981,10 +1218,27 @@ test("real event and organizer flows in the built Worker", async (t) => {
               exact: true,
             })
             .click();
-          await profileDialog
-            .getByLabel("Account role")
-            .selectOption("organizer");
-          await page.locator("[data-action-notice]").waitFor();
+          await inPlaceAction(page, {
+            endpoint: "/api/organizer/action",
+            form: profileDialog.locator("[data-organizer-role]"),
+            trigger: () =>
+              profileDialog
+                .getByLabel("Account role")
+                .selectOption("organizer"),
+            updated: async () => {
+              await expect(
+                profileDialog.getByLabel("Account role"),
+              ).toBeEnabled();
+              await expect(
+                profileDialog.getByLabel("Account role"),
+              ).toHaveValue("organizer");
+            },
+            loadingLabel: "Saving…",
+          });
+          await expect(profileDialog).toBeVisible();
+          await expect(page.locator("[data-volunteer-results]")).toContainText(
+            "Organizer",
+          );
           assert.equal(
             (
               await DB.prepare("SELECT role FROM user WHERE id=?")
@@ -993,16 +1247,47 @@ test("real event and organizer flows in the built Worker", async (t) => {
             )?.role,
             "organizer",
           );
-          await page
-            .getByRole("link", {
-              name: "View profile and approval",
-              exact: true,
-            })
-            .click();
-          await profileDialog
-            .getByLabel("Account role")
-            .selectOption("volunteer");
-          await page.locator("[data-action-notice]").waitFor();
+          await inPlaceAction(page, {
+            endpoint: "/api/organizer/action",
+            form: profileDialog.locator("[data-organizer-role]"),
+            trigger: () =>
+              profileDialog
+                .getByLabel("Account role")
+                .selectOption("volunteer"),
+            updated: () =>
+              expect(profileDialog.getByLabel("Account role")).toBeEnabled(),
+            loadingLabel: "Saving…",
+          });
+          await expect(profileDialog).toBeVisible();
+          const activeForm = profileDialog.locator(
+            "[data-organizer-status][data-submit-on-change]",
+          );
+          await page.route("**/api/organizer/action", (route) =>
+            route.fulfill({
+              status: 409,
+              json: { message: "This volunteer's status changed." },
+            }),
+          );
+          await inPlaceAction(page, {
+            endpoint: "/api/organizer/action",
+            form: activeForm,
+            trigger: () =>
+              profileDialog
+                .getByLabel("Active volunteer", { exact: true })
+                .uncheck(),
+            updated: () =>
+              expect(activeForm.locator("[data-form-message]")).toHaveText(
+                "This volunteer's status changed.",
+              ),
+            loadingLabel: "Saving…",
+          });
+          await expect(
+            profileDialog.getByLabel("Active volunteer", { exact: true }),
+          ).toBeChecked();
+          await expect(
+            profileDialog.getByLabel("Active volunteer", { exact: true }),
+          ).toBeEnabled();
+          await page.unroute("**/api/organizer/action");
           alice.cookie = await signIn(alice.email);
           await page.goto(`${origin}/volunteer`);
           await page
@@ -1012,18 +1297,351 @@ test("real event and organizer flows in the built Worker", async (t) => {
             name: "Add an event",
             exact: true,
           });
+          await expect(dialog.getByRole("checkbox")).toHaveCount(0);
+          await expect(
+            dialog.getByRole("combobox", { name: "Event type", exact: true }),
+          ).toBeEnabled();
+          const expectEventLayout = async (editor: Locator, width: number) => {
+            await expect(editor).toHaveCSS("scrollbar-width", "thin");
+            await expect(editor).toHaveCSS(
+              "scrollbar-color",
+              "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
+            );
+            await expect(
+              editor.getByText("Vancouver time (PCT).", { exact: true }),
+            ).toBeVisible();
+            const fields = await editor
+              .locator("[data-event-save] .volunteer-fields > .volunteer-field")
+              .evaluateAll((items) =>
+                items.map((item) => {
+                  const box = item.getBoundingClientRect();
+                  return {
+                    name: item.querySelector("[name]")!.getAttribute("name"),
+                    top: box.top,
+                    bottom: box.bottom,
+                    left: box.left,
+                    right: box.right,
+                  };
+                }),
+              );
+            assert.deepEqual(
+              fields.map((field) => field.name),
+              ["type", "startsAt", "spots", "meetingPoint", "meetingPointUrl"],
+            );
+            const [type, date, spots, meeting, map] = fields;
+            assert.ok(date.top > type.bottom);
+            assert.ok(meeting.top > spots.bottom);
+            for (const [first, second] of [
+              [date, spots],
+              [meeting, map],
+            ]) {
+              assert.equal(first.left, type.left);
+              assert.equal(second.right, type.right);
+              if (width > 640) {
+                assert.equal(first.top, second.top);
+                assert.ok(first.right < second.left);
+              } else {
+                assert.ok(first.bottom < second.top);
+                assert.equal(first.left, second.left);
+              }
+            }
+          };
+          const signupChoices = dialog.getByRole("group", {
+            name: "Signups",
+            exact: true,
+          });
+          const visibilityChoices = dialog.getByRole("group", {
+            name: "Public event list",
+            exact: true,
+          });
+          const stateBox = (group: Locator) =>
+            group.locator(".volunteer-state-selector").evaluate((selector) => {
+              const style = getComputedStyle(selector, "::before");
+              return {
+                background: style.backgroundColor,
+                translateX: new DOMMatrixReadOnly(style.transform).m41,
+                transition: style.transitionProperty,
+              };
+            });
+          await expect(
+            signupChoices.getByRole("radio", { name: "Open", exact: true }),
+          ).toBeChecked();
+          await expect(
+            visibilityChoices.getByRole("radio", {
+              name: "Visible",
+              exact: true,
+            }),
+          ).toBeChecked();
+          for (const width of [1280, 375]) {
+            await page.setViewportSize({ width, height: 812 });
+            await expectEventLayout(dialog, width);
+            for (const group of [signupChoices, visibilityChoices]) {
+              await expect(group.getByRole("radio")).toHaveCount(2);
+              await expect(group.getByRole("combobox")).toHaveCount(0);
+              const options = group.locator(".volunteer-state-option span");
+              await expect(options.nth(0)).toBeVisible();
+              await expect(options.nth(1)).toBeVisible();
+              await expect(options.nth(0)).toHaveCSS(
+                "color",
+                "rgb(74, 222, 128)",
+              );
+              await expect(options.nth(1)).toHaveCSS(
+                "color",
+                "rgb(161, 161, 170)",
+              );
+              await expect
+                .poll(async () => (await stateBox(group)).background)
+                .toBe("rgb(5, 46, 22)");
+              const boxes = await options.evaluateAll((items) =>
+                items.map((item) => {
+                  const box = item.getBoundingClientRect();
+                  return {
+                    top: box.top,
+                    right: box.right,
+                    left: box.left,
+                    height: box.height,
+                  };
+                }),
+              );
+              assert.equal(boxes[0].top, boxes[1].top);
+              assert.ok(boxes[0].right < boxes[1].left);
+              assert.ok(boxes.every((box) => box.height >= 44));
+            }
+          }
+          // Hover must not create a second box ahead of the sliding indicator.
+          const closedOption = signupChoices.getByText("Closed", {
+            exact: true,
+          });
+          await closedOption.hover();
+          await expect(closedOption).toHaveCSS(
+            "background-color",
+            "rgba(0, 0, 0, 0)",
+          );
+          // Inspect an actual sliding transition at its midpoint, not just its CSS.
+          const motion = await signupChoices
+            .locator(".volunteer-state-selector")
+            .evaluate((selector) => {
+              const from = new DOMMatrixReadOnly(
+                getComputedStyle(selector, "::before").transform,
+              ).m41;
+              selector
+                .querySelector<HTMLInputElement>('input[value="false"]')!
+                .click();
+              getComputedStyle(selector, "::before").transform;
+              const slide = selector
+                .getAnimations({ subtree: true })
+                .find(
+                  (animation) =>
+                    animation instanceof CSSTransition &&
+                    animation.transitionProperty === "transform",
+                );
+              if (!slide) return null;
+              slide.pause();
+              const duration = Number(
+                slide.effect!.getComputedTiming().duration,
+              );
+              slide.currentTime = duration / 2;
+              const middle = new DOMMatrixReadOnly(
+                getComputedStyle(selector, "::before").transform,
+              ).m41;
+              const backgrounds = Array.from(
+                selector.querySelectorAll(".volunteer-state-option span"),
+                (option) => getComputedStyle(option).backgroundColor,
+              );
+              slide.finish();
+              const to = new DOMMatrixReadOnly(
+                getComputedStyle(selector, "::before").transform,
+              ).m41;
+              return { from, middle, to, duration, backgrounds };
+            });
+          assert.ok(motion);
+          assert.ok(motion.duration > 0);
+          assert.ok(motion.middle > motion.from && motion.middle < motion.to);
+          assert.deepEqual(motion.backgrounds, [
+            "rgba(0, 0, 0, 0)",
+            "rgba(0, 0, 0, 0)",
+          ]);
+          await signupChoices.getByText("Open", { exact: true }).click();
+          await expect
+            .poll(async () => (await stateBox(signupChoices)).translateX)
+            .toBe(0);
+          await page.emulateMedia({ reducedMotion: "reduce" });
+          assert.equal((await stateBox(signupChoices)).transition, "none");
+          await signupChoices.getByText("Closed", { exact: true }).click();
+          assert.ok((await stateBox(signupChoices)).translateX > 0);
+          assert.equal(
+            (await stateBox(signupChoices)).background,
+            "rgb(69, 10, 10)",
+          );
+          await signupChoices.getByText("Open", { exact: true }).click();
+          assert.equal((await stateBox(signupChoices)).translateX, 0);
+          await page.emulateMedia({ reducedMotion: "no-preference" });
+          // Native radio groups support keyboard selection without saving the form.
+          await signupChoices
+            .getByRole("radio", { name: "Open", exact: true })
+            .focus();
+          await page.keyboard.press("ArrowRight");
+          await expect(
+            signupChoices.getByRole("radio", { name: "Closed", exact: true }),
+          ).toBeChecked();
+          await expect
+            .poll(async () => (await stateBox(signupChoices)).background)
+            .toBe("rgb(69, 10, 10)");
+          await page.keyboard.press("ArrowLeft");
+          await expect(
+            signupChoices.getByRole("radio", { name: "Open", exact: true }),
+          ).toBeChecked();
           await dialog
             .getByLabel("Start date and time")
             .fill("2031-04-12T20:30");
           await dialog
             .getByLabel("Meeting point", { exact: true })
             .fill("Browser-created meeting point");
-          await dialog
-            .getByRole("button", { name: "Save event", exact: true })
-            .click();
+          const createdCard = page
+            .locator("[data-live-event]")
+            .filter({ hasText: "Browser-created meeting point" });
+          await inPlaceAction(page, {
+            endpoint: "/api/events/action",
+            form: dialog.locator("[data-event-save]"),
+            trigger: () =>
+              dialog
+                .getByRole("button", { name: "Save event", exact: true })
+                .click(),
+            updated: () => createdCard.waitFor(),
+            loadingLabel: "Saving…",
+          });
+          await expect(dialog).toBeHidden();
+          // Refreshed editor versions support another save without navigation.
+          for (const spots of [9, 8]) {
+            await createdCard
+              .getByRole("button", { name: "Edit", exact: true })
+              .click();
+            const editor = page.getByRole("dialog", {
+              name: "Edit event",
+              exact: true,
+            });
+            await expect(editor.getByRole("checkbox")).toHaveCount(0);
+            await expect(
+              editor.getByRole("combobox", { name: "Event type", exact: true }),
+            ).toHaveCount(0);
+            await expect(
+              editor.locator(
+                "[data-event-type-readonly] .volunteer-readonly-value",
+              ),
+            ).toHaveText("Patrol");
+            await expect(
+              editor.locator('input[type="hidden"][name="type"]'),
+            ).toHaveValue("patrol");
+            for (const width of [1280, 375]) {
+              await page.setViewportSize({ width, height: 812 });
+              await expectEventLayout(editor, width);
+            }
+            const signupState = editor.getByRole("group", {
+              name: "Signups",
+              exact: true,
+            });
+            const visibility = editor.getByRole("group", {
+              name: "Public event list",
+              exact: true,
+            });
+            // Reopening the editor must explicitly show the saved states.
+            await expect(
+              signupState.getByRole("radio", {
+                name: spots === 9 ? "Open" : "Closed",
+                exact: true,
+              }),
+            ).toBeChecked();
+            await expect(
+              visibility.getByRole("radio", {
+                name: spots === 9 ? "Visible" : "Hidden",
+                exact: true,
+              }),
+            ).toBeChecked();
+            await signupState
+              .getByText(spots === 9 ? "Closed" : "Open", { exact: true })
+              .click();
+            await visibility
+              .getByText(spots === 9 ? "Hidden" : "Visible", { exact: true })
+              .click();
+            for (const group of [signupState, visibility]) {
+              const selected = group.locator("input:checked + span");
+              await expect(
+                group.locator("input:not(:checked) + span"),
+              ).toHaveCSS("color", "rgb(161, 161, 170)");
+              await expect(selected).toHaveCSS(
+                "color",
+                spots === 9 ? "rgb(248, 113, 113)" : "rgb(74, 222, 128)",
+              );
+              await expect
+                .poll(async () => (await stateBox(group)).background)
+                .toBe(spots === 9 ? "rgb(69, 10, 10)" : "rgb(5, 46, 22)");
+            }
+            await editor.getByLabel("Volunteer spots").fill(String(spots));
+            await inPlaceAction(page, {
+              endpoint: "/api/events/action",
+              form: editor.locator("[data-event-save]"),
+              notify: spots === 9,
+              trigger: () =>
+                editor
+                  .getByRole("button", { name: "Save event", exact: true })
+                  .click(),
+              updated: () =>
+                expect(createdCard.locator(".volunteer-spots")).toHaveText(
+                  `${spots} spots left`,
+                ),
+              loadingLabel: "Saving…",
+              pending: async () => {
+                for (const radio of await editor.getByRole("radio").all())
+                  await expect(radio).toBeDisabled();
+                await expect(
+                  editor.getByRole("button", {
+                    name: "Cancel event",
+                    exact: true,
+                  }),
+                ).toBeDisabled();
+              },
+            });
+            assert.deepEqual(
+              await DB.prepare("SELECT open, hidden FROM event WHERE id=?")
+                .bind(await createdCard.getAttribute("data-live-event"))
+                .first(),
+              { open: spots === 9 ? 0 : 1, hidden: spots === 9 ? 1 : 0 },
+            );
+          }
           await page
-            .getByRole("heading", { name: /Patrol · .*2031/ })
-            .waitFor();
+            .getByRole("button", { name: "Add an event", exact: true })
+            .click();
+          await expect(
+            dialog.getByLabel("Meeting point", { exact: true }),
+          ).toHaveValue("");
+          await expect(
+            signupChoices.getByRole("radio", { name: "Open", exact: true }),
+          ).toBeChecked();
+          await expect(
+            visibilityChoices.getByRole("radio", {
+              name: "Visible",
+              exact: true,
+            }),
+          ).toBeChecked();
+          await dialog
+            .getByLabel("Start date and time")
+            .fill("2031-04-13T20:30");
+          await dialog
+            .getByLabel("Meeting point", { exact: true })
+            .fill("Browser move destination");
+          const destinationCard = page
+            .locator("[data-live-event]")
+            .filter({ hasText: "Browser move destination" });
+          await inPlaceAction(page, {
+            endpoint: "/api/events/action",
+            form: dialog.locator("[data-event-save]"),
+            trigger: () =>
+              dialog
+                .getByRole("button", { name: "Save event", exact: true })
+                .click(),
+            updated: () => destinationCard.waitFor(),
+            loadingLabel: "Saving…",
+          });
           const filters = page.getByRole("group", {
             name: "Filter events",
             exact: true,
@@ -1088,10 +1706,78 @@ test("real event and organizer flows in the built Worker", async (t) => {
           const card = page
             .locator("[data-live-event]")
             .filter({ hasText: "Browser-created meeting point" });
+          await page.route("**/api/events/action", (route) =>
+            route.fulfill({
+              status: 409,
+              json: { message: "This event is full." },
+            }),
+          );
           await card
             .getByRole("button", { name: "Sign up", exact: true })
             .click();
-          await card.getByText("Signed up", { exact: true }).waitFor();
+          await card
+            .getByText("This event is full.", { exact: true })
+            .waitFor();
+          assert.equal(
+            await card.locator("[data-form-message]").isVisible(),
+            true,
+          );
+          await page.unroute("**/api/events/action");
+          await expect(
+            card.getByRole("button", { name: "Sign up", exact: true }),
+          ).toBeEnabled();
+          await expect(
+            card.locator("[data-live-signup] button"),
+          ).not.toHaveAttribute("aria-busy", "true");
+          const changeSpot = async (
+            action: "join" | "cancel",
+            updated: () => Promise<void>,
+            target: Locator = card,
+          ) =>
+            inPlaceAction(page, {
+              endpoint: "/api/events/action",
+              form: target.locator("[data-live-signup]"),
+              trigger: () =>
+                target.locator("[data-live-signup] button").click(),
+              updated,
+              loadingLabel: action === "join" ? "Signing up…" : "Cancelling…",
+              pending: () =>
+                expect(
+                  target.locator("[data-live-signup] button"),
+                ).toBeDisabled(),
+            });
+          const volunteerFilters = page.getByRole("group", {
+            name: "Filter events",
+            exact: true,
+          });
+          await volunteerFilters
+            .getByRole("button", { name: "Patrols", exact: true })
+            .click();
+          await changeSpot("join", () =>
+            card.getByText("Signed up", { exact: true }).waitFor(),
+          );
+          await expect(card.locator(".volunteer-spots")).toHaveText(
+            "7 spots left",
+          );
+          await expect(
+            card.getByRole("button", { name: "Cancel my spot", exact: true }),
+          ).toBeFocused();
+          await expect(page).toHaveURL(/\?type=patrol$/);
+          await volunteerFilters
+            .getByRole("button", { name: "Orientations", exact: true })
+            .click();
+          await expect(card).toBeHidden();
+          await volunteerFilters
+            .getByRole("button", { name: "Patrols", exact: true })
+            .click();
+          await expect(card).toBeVisible();
+          assert.equal(await page.locator("[data-action-notice]").count(), 0);
+          assert.equal(
+            await page
+              .getByText("Your spot is confirmed.", { exact: true })
+              .count(),
+            0,
+          );
           routeCookie = organizer.cookie;
           await page.reload();
           await card.locator("summary").click();
@@ -1102,29 +1788,135 @@ test("real event and organizer flows in the built Worker", async (t) => {
             name: "Change a signup",
             exact: true,
           });
+          await expect(signupDialog).toHaveCSS("scrollbar-width", "thin");
+          await expect(signupDialog).toHaveCSS(
+            "scrollbar-color",
+            "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
+          );
+          const sourceId = (await card.getAttribute("data-live-event"))!;
+          const destinationId =
+            (await destinationCard.getAttribute("data-live-event"))!;
+          await signupDialog
+            .getByLabel("Destination")
+            .selectOption(destinationId);
+          await inPlaceAction(page, {
+            endpoint: "/api/events/action",
+            form: signupDialog.locator("[data-manage-signup]"),
+            notify: true,
+            trigger: () =>
+              signupDialog
+                .getByRole("button", {
+                  name: "Save change",
+                  exact: true,
+                })
+                .click(),
+            updated: async () => {
+              await expect(card.locator("summary")).toHaveText(
+                "Volunteers (0)",
+              );
+              await expect(destinationCard.locator("summary")).toHaveText(
+                "Volunteers (1)",
+              );
+            },
+            loadingLabel: "Saving…",
+          });
+          await expect(card.locator(".volunteer-roster")).toHaveAttribute(
+            "open",
+            "",
+          );
+          await destinationCard.locator("summary").click();
+          await destinationCard
+            .getByRole("button", { name: "Move or remove", exact: true })
+            .click();
+          await signupDialog.getByLabel("Destination").selectOption(sourceId);
+          await inPlaceAction(page, {
+            endpoint: "/api/events/action",
+            form: signupDialog.locator("[data-manage-signup]"),
+            trigger: () =>
+              signupDialog
+                .getByRole("button", {
+                  name: "Save change",
+                  exact: true,
+                })
+                .click(),
+            updated: async () => {
+              await expect(card.locator("summary")).toHaveText(
+                "Volunteers (1)",
+              );
+              await expect(destinationCard.locator("summary")).toHaveText(
+                "Volunteers (0)",
+              );
+            },
+            loadingLabel: "Saving…",
+          });
+          await card
+            .getByRole("button", { name: "Move or remove", exact: true })
+            .click();
           await signupDialog
             .getByLabel("Reason (optional)")
             .fill("Browser-tested cancellation");
-          await signupDialog
-            .getByRole("button", {
-              name: "Save change and notify",
-              exact: true,
-            })
-            .click();
-          await card.getByText("Volunteers (0)", { exact: true }).waitFor();
+          await inPlaceAction(page, {
+            endpoint: "/api/events/action",
+            form: signupDialog.locator("[data-manage-signup]"),
+            trigger: () =>
+              signupDialog
+                .getByRole("button", {
+                  name: "Save change",
+                  exact: true,
+                })
+                .click(),
+            updated: () =>
+              card.getByText("Volunteers (0)", { exact: true }).waitFor(),
+            loadingLabel: "Saving…",
+          });
           assert.equal(await signupDialog.isVisible(), false);
           routeCookie = bob.cookie;
           await page.goto(`${origin}/volunteer`);
-          await card
-            .getByRole("button", { name: "Sign up", exact: true })
-            .click();
-          await card.getByText("Signed up", { exact: true }).waitFor();
-          await card
-            .getByRole("button", { name: "Cancel my spot", exact: true })
-            .click();
-          await card
-            .getByRole("button", { name: "Sign up", exact: true })
-            .waitFor();
+          await changeSpot("join", () =>
+            card.getByText("Signed up", { exact: true }).waitFor(),
+          );
+          await changeSpot("cancel", () =>
+            card
+              .getByRole("button", { name: "Sign up", exact: true })
+              .waitFor(),
+          );
+          await expect(card.locator(".volunteer-spots")).toHaveText(
+            "8 spots left",
+          );
+          await expect(
+            card.getByText("Signed up", { exact: true }),
+          ).toHaveCount(0);
+          assert.equal(await page.locator("[data-action-notice]").count(), 0);
+          assert.equal(
+            await page
+              .getByText("Your signup was cancelled.", { exact: true })
+              .count(),
+            0,
+          );
+          assert.equal(
+            await page.evaluate(() =>
+              sessionStorage.getItem("aho-volunteer-notice"),
+            ),
+            null,
+          );
+          await changeSpot("join", () =>
+            card.getByText("Signed up", { exact: true }).waitFor(),
+          );
+          const hiddenEventId = await card.getAttribute("data-live-event");
+          await DB.prepare("UPDATE event SET hidden=1 WHERE id=?")
+            .bind(hiddenEventId)
+            .run();
+          await page.goto(`${origin}/volunteer?type=patrol`);
+          await expect(
+            card.getByText("Hidden from public list", { exact: true }),
+          ).toBeVisible();
+          await changeSpot("cancel", () => card.waitFor({ state: "detached" }));
+          await expect(
+            volunteerFilters.getByRole("button", {
+              name: "Patrols",
+              exact: true,
+            }),
+          ).toBeFocused();
           await account.click();
           await nav.getByRole("link", { name: "Profile", exact: true }).click();
           await page
@@ -1136,6 +1928,90 @@ test("real event and organizer flows in the built Worker", async (t) => {
             )?.trim(),
             "Sample Bob",
           );
+          routeCookie = organizer.cookie;
+          const attendance = await createEvent("orientation", 2);
+          await ok(await join(attendance.id, bob.cookie));
+          await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
+            .bind(Date.now() - 1000, attendance.id)
+            .run();
+          await page.goto(`${origin}/volunteer`);
+          const attendanceCard = page.locator(
+            `[data-live-event="${attendance.id}"]`,
+          );
+          await attendanceCard.locator("summary").click();
+          await inPlaceAction(page, {
+            endpoint: "/api/organizer/action",
+            form: attendanceCard.locator("[data-organizer-orientation]"),
+            trigger: () =>
+              attendanceCard
+                .getByRole("button", {
+                  name: "Mark orientation completed",
+                  exact: true,
+                })
+                .click(),
+            updated: () =>
+              attendanceCard
+                .getByText("Orientation completed", { exact: true })
+                .waitFor(),
+            loadingLabel: "Saving…",
+          });
+          await expect(
+            attendanceCard.locator(".volunteer-roster"),
+          ).toHaveAttribute("open", "");
+          await card.getByRole("button", { name: "Edit", exact: true }).click();
+          const cancelEditor = page.getByRole("dialog", {
+            name: "Edit event",
+            exact: true,
+          });
+          await inPlaceAction(page, {
+            endpoint: "/api/events/action",
+            form: cancelEditor.locator("[data-event-cancel]"),
+            trigger: () =>
+              cancelEditor
+                .getByRole("button", {
+                  name: "Cancel event",
+                  exact: true,
+                })
+                .click(),
+            updated: () =>
+              card.getByText("Cancelled", { exact: true }).waitFor(),
+            loadingLabel: "Cancelling…",
+          });
+          await expect(cancelEditor).toBeHidden();
+          // Retry only refreshes delivery status, with fresh server counts.
+          await DB.prepare(
+            "UPDATE event_notification SET created_at=? WHERE status IN ('pending','sending')",
+          )
+            .bind(Date.now() - 24 * 60 * 60 * 1000)
+            .run();
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const retryForm = page.locator("[data-retry-notifications]");
+            await inPlaceAction(page, {
+              endpoint: "/api/events/action",
+              form: retryForm,
+              trigger: () =>
+                retryForm
+                  .getByRole("button", {
+                    name: "Retry pending notifications",
+                    exact: true,
+                  })
+                  .click(),
+              updated: () =>
+                expect(
+                  retryForm.getByRole("button", {
+                    name: "Retry pending notifications",
+                    exact: true,
+                  }),
+                ).toBeEnabled(),
+              loadingLabel: "Retrying…",
+            });
+            await expect(
+              page.locator("[data-event-notifications]"),
+            ).toContainText("0 notifications awaiting delivery.");
+            await expect(
+              page.locator("[data-event-notifications]"),
+            ).toContainText("notifications expired and cannot be retried.");
+          }
           await page.goto(origin);
           await page
             .locator("[data-live-event-teaser]")
