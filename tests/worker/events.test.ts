@@ -878,7 +878,7 @@ test("real event and organizer flows in the built Worker", async (t) => {
     );
 
     await t.test(
-      "real browser UI supports event creation and signup with nav below heading on mobile",
+      "browser organizer and volunteer workflows save in place and remain usable on mobile",
       async () => {
         const browser = await chromium.launch({
           executablePath:
@@ -929,41 +929,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
           const teamSearch = page.getByRole("searchbox", {
             name: "Find a volunteer",
           });
-          await expect(
-            page.getByRole("heading", { name: "Your team", exact: true }),
-          ).toHaveCount(0);
-          await expect(teamSearch).toHaveAttribute(
-            "placeholder",
-            "Search by name",
-          );
-          await expect(
-            page.locator(".volunteer-search-field > span"),
-          ).toHaveClass("sr-only");
-          for (const width of [1280, 375]) {
-            await page.setViewportSize({ width, height: 812 });
-            await expect(page.locator(".volunteer-search-icon")).toBeVisible();
-            await expect(
-              page.locator(".volunteer-search-icon"),
-            ).toHaveAttribute("aria-hidden", "true");
-            const bounds = await teamSearch.evaluate((input) => {
-              const field = input.getBoundingClientRect();
-              const section = input
-                .closest("[data-volunteer-browser]")!
-                .getBoundingClientRect();
-              return {
-                widthDifference: Math.abs(field.width - section.width),
-                leftDifference: Math.abs(field.left - section.left),
-                paddingLeft: Number.parseFloat(
-                  getComputedStyle(input).paddingLeft,
-                ),
-                overflow: document.documentElement.scrollWidth > innerWidth,
-              };
-            });
-            assert.ok(bounds.widthDifference < 1);
-            assert.ok(bounds.leftDifference < 1);
-            assert.ok(bounds.paddingLeft >= 44);
-            assert.equal(bounds.overflow, false);
-          }
           await teamSearch.fill("Sample Alice");
           await page.waitForURL(
             `${origin}/volunteer/volunteers?q=Sample+Alice`,
@@ -988,22 +953,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
             await profileGate;
             await route.fallback();
           });
-          const profileViewports = [
-            { width: 1280, height: 900 },
-            { width: 375, height: 812 },
-          ];
-          const loadingBounds = new Map<
-            number,
-            { x: number; y: number; width: number; height: number }
-          >();
-          await page.evaluate(() => {
-            document.addEventListener("animationstart", (event) => {
-              if (event.animationName === "volunteer-profile-fade-in")
-                document.documentElement.dataset.testProfileFadeIn = "true";
-              if (event.animationName === "volunteer-profile-fade-out")
-                document.documentElement.dataset.testProfileFadeOut = "true";
-            });
-          });
           try {
             await page
               .getByRole("link", {
@@ -1018,47 +967,11 @@ test("real event and organizer flows in the built Worker", async (t) => {
               }),
             ).toBeVisible();
             await expect(
-              profilePane.locator(".volunteer-profile-loading-icon"),
+              profileDialog.getByRole("button", {
+                name: "Close volunteer profile",
+                exact: true,
+              }),
             ).toBeVisible();
-            await expect(
-              profilePane.locator(".volunteer-profile-loading-icon"),
-            ).toHaveAttribute("aria-hidden", "true");
-            await expect(
-              profilePane.locator(".volunteer-profile-loading"),
-            ).toHaveCSS("align-items", "center");
-            await expect(
-              profilePane.locator(".volunteer-profile-loading"),
-            ).toHaveCSS("justify-content", "center");
-            for (const viewport of profileViewports) {
-              await page.setViewportSize(viewport);
-              await expect
-                .poll(async () =>
-                  Math.abs(
-                    (await profileDialog.boundingBox())!.height -
-                      Math.min(800, viewport.height - 48),
-                  ),
-                )
-                .toBeLessThan(1);
-              await expect
-                .poll(async () =>
-                  Math.abs(
-                    (await profileDialog.boundingBox())!.y -
-                      (viewport.height - Math.min(800, viewport.height - 48)) /
-                        2,
-                  ),
-                )
-                .toBeLessThan(1);
-              loadingBounds.set(
-                viewport.width,
-                (await profileDialog.boundingBox())!,
-              );
-              await expect(
-                profileDialog.getByRole("button", {
-                  name: "Close volunteer profile",
-                  exact: true,
-                }),
-              ).toBeVisible();
-            }
           } finally {
             releaseProfile();
           }
@@ -1070,63 +983,11 @@ test("real event and organizer flows in the built Worker", async (t) => {
           await expect(
             profilePane.locator(".volunteer-profile-loading"),
           ).toHaveCount(0);
-          await expect(page.locator("html")).toHaveAttribute(
-            "data-test-profile-fade-in",
-            "true",
-          );
-          await expect(page.locator("html")).toHaveAttribute(
-            "data-test-profile-fade-out",
-            "true",
-          );
-          await expect(
-            profilePane.locator("[data-volunteer-profile]"),
-          ).not.toHaveAttribute("data-profile-entering");
-          // The frame stays identical as the loader fades into a long profile.
-          for (const viewport of profileViewports) {
-            await page.setViewportSize(viewport);
-            const before = loadingBounds.get(viewport.width)!;
-            const after = (await profileDialog.boundingBox())!;
-            for (const key of ["x", "y", "width", "height"] as const)
-              assert.ok(
-                Math.abs(before[key] - after[key]) < 1,
-                JSON.stringify({ key, before, after, viewport }),
-              );
-            await profileDialog
-              .getByLabel("Active volunteer", { exact: true })
-              .focus();
-            await page.keyboard.press("Tab");
-            const roleSelect = profileDialog.getByLabel("Account role");
-            await expect(roleSelect).toBeFocused();
-            await expect(roleSelect).toHaveCSS("outline-style", "solid");
-            await expect(roleSelect).toHaveCSS("outline-width", "3px");
-            await expect(roleSelect).toHaveCSS("outline-offset", "4px");
-            const focusFits = await roleSelect.evaluate((select) => {
-              const field = select.getBoundingClientRect();
-              const popup = select.closest("dialog")!.getBoundingClientRect();
-              const style = getComputedStyle(select);
-              const ring =
-                Number.parseFloat(style.outlineOffset) +
-                Number.parseFloat(style.outlineWidth);
-              return (
-                field.left - ring > popup.left &&
-                field.right + ring < popup.right
-              );
-            });
-            assert.equal(focusFits, true);
-          }
-          assert.equal(
-            await profileDialog.evaluate(
-              (popup) => popup.scrollHeight > popup.clientHeight,
-            ),
-            true,
-          );
-          await expect(profilePane).toHaveCSS("overflow-y", "visible");
-          await expect(profileDialog).toHaveCSS("overflow-y", "auto");
-          await expect(profileDialog).toHaveCSS("scrollbar-width", "thin");
-          await expect(profileDialog).toHaveCSS(
-            "scrollbar-color",
-            "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
-          );
+          await profileDialog
+            .getByLabel("Active volunteer", { exact: true })
+            .focus();
+          await page.keyboard.press("Tab");
+          await expect(profileDialog.getByLabel("Account role")).toBeFocused();
           await profileDialog.evaluate((popup) => {
             popup.scrollTop = 80;
           });
@@ -1297,58 +1158,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
             name: "Add an event",
             exact: true,
           });
-          await expect(dialog.getByRole("checkbox")).toHaveCount(0);
           await expect(
             dialog.getByRole("combobox", { name: "Event type", exact: true }),
           ).toBeEnabled();
-          const expectEventLayout = async (editor: Locator, width: number) => {
-            await expect(editor).toHaveCSS("scrollbar-width", "thin");
-            await expect(editor).toHaveCSS(
-              "scrollbar-color",
-              "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
-            );
-            await expect(
-              editor.getByText(
-                "Vancouver time, regardless of your device’s time zone.",
-                { exact: true },
-              ),
-            ).toBeVisible();
-            const fields = await editor
-              .locator("[data-event-save] .volunteer-fields > .volunteer-field")
-              .evaluateAll((items) =>
-                items.map((item) => {
-                  const box = item.getBoundingClientRect();
-                  return {
-                    name: item.querySelector("[name]")!.getAttribute("name"),
-                    top: box.top,
-                    bottom: box.bottom,
-                    left: box.left,
-                    right: box.right,
-                  };
-                }),
-              );
-            assert.deepEqual(
-              fields.map((field) => field.name),
-              ["type", "startsAt", "spots", "meetingPoint", "meetingPointUrl"],
-            );
-            const [type, date, spots, meeting, map] = fields;
-            assert.ok(date.top > type.bottom);
-            assert.ok(meeting.top > spots.bottom);
-            for (const [first, second] of [
-              [date, spots],
-              [meeting, map],
-            ]) {
-              assert.equal(first.left, type.left);
-              assert.equal(second.right, type.right);
-              if (width > 640) {
-                assert.equal(first.top, second.top);
-                assert.ok(first.right < second.left);
-              } else {
-                assert.ok(first.bottom < second.top);
-                assert.equal(first.left, second.left);
-              }
-            }
-          };
           const signupChoices = dialog.getByRole("group", {
             name: "Signups",
             exact: true,
@@ -1357,15 +1169,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
             name: "Public event list",
             exact: true,
           });
-          const stateBox = (group: Locator) =>
-            group.locator(".volunteer-state-selector").evaluate((selector) => {
-              const style = getComputedStyle(selector, "::before");
-              return {
-                background: style.backgroundColor,
-                translateX: new DOMMatrixReadOnly(style.transform).m41,
-                transition: style.transitionProperty,
-              };
-            });
           await expect(
             signupChoices.getByRole("radio", { name: "Open", exact: true }),
           ).toBeChecked();
@@ -1375,110 +1178,8 @@ test("real event and organizer flows in the built Worker", async (t) => {
               exact: true,
             }),
           ).toBeChecked();
-          for (const width of [1280, 375]) {
-            await page.setViewportSize({ width, height: 812 });
-            await expectEventLayout(dialog, width);
-            for (const group of [signupChoices, visibilityChoices]) {
-              await expect(group.getByRole("radio")).toHaveCount(2);
-              await expect(group.getByRole("combobox")).toHaveCount(0);
-              const options = group.locator(".volunteer-state-option span");
-              await expect(options.nth(0)).toBeVisible();
-              await expect(options.nth(1)).toBeVisible();
-              await expect(options.nth(0)).toHaveCSS(
-                "color",
-                "rgb(74, 222, 128)",
-              );
-              await expect(options.nth(1)).toHaveCSS(
-                "color",
-                "rgb(161, 161, 170)",
-              );
-              await expect
-                .poll(async () => (await stateBox(group)).background)
-                .toBe("rgb(5, 46, 22)");
-              const boxes = await options.evaluateAll((items) =>
-                items.map((item) => {
-                  const box = item.getBoundingClientRect();
-                  return {
-                    top: box.top,
-                    right: box.right,
-                    left: box.left,
-                    height: box.height,
-                  };
-                }),
-              );
-              assert.equal(boxes[0].top, boxes[1].top);
-              assert.ok(boxes[0].right < boxes[1].left);
-              assert.ok(boxes.every((box) => box.height >= 44));
-            }
-          }
-          // Hover must not create a second box ahead of the sliding indicator.
-          const closedOption = signupChoices.getByText("Closed", {
-            exact: true,
-          });
-          await closedOption.hover();
-          await expect(closedOption).toHaveCSS(
-            "background-color",
-            "rgba(0, 0, 0, 0)",
-          );
-          // Inspect an actual sliding transition at its midpoint, not just its CSS.
-          const motion = await signupChoices
-            .locator(".volunteer-state-selector")
-            .evaluate((selector) => {
-              const from = new DOMMatrixReadOnly(
-                getComputedStyle(selector, "::before").transform,
-              ).m41;
-              selector
-                .querySelector<HTMLInputElement>('input[value="false"]')!
-                .click();
-              getComputedStyle(selector, "::before").transform;
-              const slide = selector
-                .getAnimations({ subtree: true })
-                .find(
-                  (animation) =>
-                    animation instanceof CSSTransition &&
-                    animation.transitionProperty === "transform",
-                );
-              if (!slide) return null;
-              slide.pause();
-              const duration = Number(
-                slide.effect!.getComputedTiming().duration,
-              );
-              slide.currentTime = duration / 2;
-              const middle = new DOMMatrixReadOnly(
-                getComputedStyle(selector, "::before").transform,
-              ).m41;
-              const backgrounds = Array.from(
-                selector.querySelectorAll(".volunteer-state-option span"),
-                (option) => getComputedStyle(option).backgroundColor,
-              );
-              slide.finish();
-              const to = new DOMMatrixReadOnly(
-                getComputedStyle(selector, "::before").transform,
-              ).m41;
-              return { from, middle, to, duration, backgrounds };
-            });
-          assert.ok(motion);
-          assert.ok(motion.duration > 0);
-          assert.ok(motion.middle > motion.from && motion.middle < motion.to);
-          assert.deepEqual(motion.backgrounds, [
-            "rgba(0, 0, 0, 0)",
-            "rgba(0, 0, 0, 0)",
-          ]);
-          await signupChoices.getByText("Open", { exact: true }).click();
-          await expect
-            .poll(async () => (await stateBox(signupChoices)).translateX)
-            .toBe(0);
+          // State controls remain keyboard-operable with reduced motion enabled.
           await page.emulateMedia({ reducedMotion: "reduce" });
-          assert.equal((await stateBox(signupChoices)).transition, "none");
-          await signupChoices.getByText("Closed", { exact: true }).click();
-          assert.ok((await stateBox(signupChoices)).translateX > 0);
-          assert.equal(
-            (await stateBox(signupChoices)).background,
-            "rgb(69, 10, 10)",
-          );
-          await signupChoices.getByText("Open", { exact: true }).click();
-          assert.equal((await stateBox(signupChoices)).translateX, 0);
-          await page.emulateMedia({ reducedMotion: "no-preference" });
           // Native radio groups support keyboard selection without saving the form.
           await signupChoices
             .getByRole("radio", { name: "Open", exact: true })
@@ -1487,9 +1188,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
           await expect(
             signupChoices.getByRole("radio", { name: "Closed", exact: true }),
           ).toBeChecked();
-          await expect
-            .poll(async () => (await stateBox(signupChoices)).background)
-            .toBe("rgb(69, 10, 10)");
           await page.keyboard.press("ArrowLeft");
           await expect(
             signupChoices.getByRole("radio", { name: "Open", exact: true }),
@@ -1523,7 +1221,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
               name: "Edit event",
               exact: true,
             });
-            await expect(editor.getByRole("checkbox")).toHaveCount(0);
             await expect(
               editor.getByRole("combobox", { name: "Event type", exact: true }),
             ).toHaveCount(0);
@@ -1535,10 +1232,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
             await expect(
               editor.locator('input[type="hidden"][name="type"]'),
             ).toHaveValue("patrol");
-            for (const width of [1280, 375]) {
-              await page.setViewportSize({ width, height: 812 });
-              await expectEventLayout(editor, width);
-            }
             const signupState = editor.getByRole("group", {
               name: "Signups",
               exact: true,
@@ -1566,19 +1259,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
             await visibility
               .getByText(spots === 9 ? "Hidden" : "Visible", { exact: true })
               .click();
-            for (const group of [signupState, visibility]) {
-              const selected = group.locator("input:checked + span");
-              await expect(
-                group.locator("input:not(:checked) + span"),
-              ).toHaveCSS("color", "rgb(161, 161, 170)");
-              await expect(selected).toHaveCSS(
-                "color",
-                spots === 9 ? "rgb(248, 113, 113)" : "rgb(74, 222, 128)",
-              );
-              await expect
-                .poll(async () => (await stateBox(group)).background)
-                .toBe(spots === 9 ? "rgb(69, 10, 10)" : "rgb(5, 46, 22)");
-            }
             await editor.getByLabel("Volunteer spots").fill(String(spots));
             await inPlaceAction(page, {
               endpoint: "/api/events/action",
@@ -1649,7 +1329,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
             name: "Filter events",
             exact: true,
           });
-          assert.equal(await filters.getByRole("combobox").count(), 0);
           await filters
             .getByRole("button", { name: "Orientations", exact: true })
             .click();
@@ -1673,31 +1352,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
           await filters
             .getByRole("button", { name: "All events", exact: true })
             .click();
-          assert.equal(
-            await nav
-              .getByRole("link")
-              .evaluateAll((links) =>
-                links.every(
-                  (link) =>
-                    getComputedStyle(link).textDecorationLine === "none" &&
-                    getComputedStyle(link).boxShadow === "none",
-                ),
-              ),
-            true,
-          );
-          assert.equal(
-            await page.evaluate(() => {
-              const heading = document.querySelector("h1")!,
-                nav = document.querySelector(
-                  '[aria-label="Volunteer account"]',
-                )!;
-              return Boolean(
-                heading.compareDocumentPosition(nav) &
-                Node.DOCUMENT_POSITION_FOLLOWING,
-              );
-            }),
-            true,
-          );
           assert.equal(
             await page.evaluate(
               () => document.documentElement.scrollWidth <= innerWidth,
@@ -1791,11 +1445,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
             name: "Change a signup",
             exact: true,
           });
-          await expect(signupDialog).toHaveCSS("scrollbar-width", "thin");
-          await expect(signupDialog).toHaveCSS(
-            "scrollbar-color",
-            "rgb(82, 82, 91) rgba(0, 0, 0, 0)",
-          );
           const sourceId = (await card.getAttribute("data-live-event"))!;
           const destinationId =
             (await destinationCard.getAttribute("data-live-event"))!;

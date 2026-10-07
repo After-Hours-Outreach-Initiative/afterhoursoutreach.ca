@@ -13,7 +13,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   });
   await page.goto("/volunteer/sign-in");
   await expect(
-    page.getByRole("complementary", { name: "Development account controls" }),
+    page.getByRole("button", { name: "Continue with Email" }),
   ).toBeVisible();
 });
 

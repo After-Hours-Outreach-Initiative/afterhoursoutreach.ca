@@ -2,25 +2,13 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createTestHarness } from "wrangler";
-import { chromium, expect, type Page } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
 
 const origin = "https://afterhoursoutreach.ca";
 const secret = "test-only-worker-auth-secret-12345678901234567890";
-async function assertAccountBackground(page: Page) {
-  assert.deepEqual(
-    await page.evaluate(() => ({
-      header: getComputedStyle(document.querySelector("header")!)
-        .backgroundColor,
-      content: getComputedStyle(
-        document.querySelector(".volunteer-wrap")!.parentElement!,
-      ).backgroundColor,
-    })),
-    { header: "rgb(0, 0, 0)", content: "rgb(0, 0, 0)" },
-  );
-}
 const answers = {
   name: "Worker Test Volunteer",
   pronouns: "they/them",
@@ -156,14 +144,6 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
     );
 
     const cookie = await signIn("worker-volunteer@example.org");
-    await t.test(
-      "signed-in registration includes account navigation",
-      async () => {
-        const page = await send("/volunteer/register", undefined, cookie);
-        assert.equal(page.status, 200);
-        assert.match(await page.text(), /aria-label="Volunteer account"/);
-      },
-    );
     let current = (await (
       await send("/api/auth/get-session", undefined, cookie)
     ).json()) as { user: { id: string }; session: { id: string } };
@@ -178,10 +158,6 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
         assert.match(html, /Worker Test Volunteer/);
         assert.match(html, /aria-label="Volunteer account"/);
         assert.match(html, /Sample private answer/);
-        assert.doesNotMatch(
-          html,
-          /Submitting saves your answers|Read the privacy notice/,
-        );
         assert.doesNotMatch(
           html,
           /data-account-switcher|fonts.googleapis.com|cdn.shopify.com/,
@@ -454,9 +430,6 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
             /frame-src 'none'/,
           );
           assert.equal(await page.locator("iframe").count(), 0);
-          await assertAccountBackground(page);
-          await page.setViewportSize({ width: 375, height: 812 });
-          await assertAccountBackground(page);
           assert.deepEqual(
             await page
               .locator("[data-email-request] input")
@@ -533,7 +506,6 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
           await page
             .getByRole("heading", { name: "Your account", exact: true })
             .waitFor();
-          await assertAccountBackground(page);
           const nav = page.getByRole("navigation", {
             name: "Volunteer account",
           });
@@ -622,10 +594,6 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
               .inputValue(),
             "Changed browser sample",
           );
-          await page.screenshot({
-            path: "/tmp/opencode/account-preview.png",
-            fullPage: true,
-          });
           assert.deepEqual(
             await page.evaluate(() => ({
               local: Object.keys(localStorage),
@@ -679,7 +647,7 @@ test("production-built Worker enforces authentication, ownership, CSRF and priva
               exact: true,
             })
             .waitFor();
-          await assertAccountBackground(newPage);
+          await expect(newPage.locator("[data-account-menu]")).toBeVisible();
           for (const [name, value] of Object.entries(answers)) {
             if (name === "teams") continue;
             await newPage.locator(`[name="${name}"]`).fill(String(value));

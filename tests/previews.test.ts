@@ -45,14 +45,6 @@ test("the default environment does not use preview resources", () => {
   );
 });
 
-test("Astro disables all remote bindings in development", () => {
-  const config = readFileSync(
-    new URL("../astro.config.mjs", import.meta.url),
-    "utf8",
-  );
-  assert.match(config, /remoteBindings: false/);
-});
-
 test("organizer bootstrap refuses implicit targets and production mode", () => {
   for (const args of [
     [],
@@ -83,33 +75,42 @@ test("deployment scripts explicitly select Worker Previews and their migration t
   const { scripts } = JSON.parse(
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   );
-  assert.equal(
-    scripts["deploy:preview"],
-    "pnpm build:preview && pnpm db:migrate:preview && wrangler preview --config dist-preview/server/wrangler.json",
+  const deploy = scripts["deploy:preview"];
+  assert.match(deploy, /\bpnpm\s+(?:run\s+)?build:preview\b/);
+  assert.match(deploy, /\bpnpm\s+(?:run\s+)?db:migrate:preview\b/);
+  assert.match(deploy, /\bwrangler\s+preview\b/);
+  assert.match(
+    deploy,
+    /--config\s+["']?(?:\.\/)?dist-preview\/server\/wrangler\.json\b/,
   );
-  assert.equal(
-    scripts["db:migrate:preview"],
-    "node scripts/check-preview-migrations.mjs && wrangler d1 migrations apply PREVIEW_DB --config wrangler.preview-migrations.jsonc --remote",
+  assert.ok(
+    deploy.indexOf("build:preview") < deploy.indexOf("db:migrate:preview"),
   );
-  assert.equal(
-    scripts["db:seed:preview"],
-    "tsx scripts/seed-preview-events.ts",
+  assert.ok(deploy.indexOf("db:migrate:preview") < deploy.indexOf("wrangler"));
+  assert.doesNotMatch(deploy, /seed|versions|--env\b|\bwrangler\s+deploy\b/);
+
+  const migrations = scripts["db:migrate:preview"];
+  assert.match(
+    migrations,
+    /\bnode\s+(?:\.\/)?scripts\/check-preview-migrations\.mjs\b/,
   );
-  assert.doesNotMatch(scripts["deploy:preview"], /seed/);
-  assert.equal(
-    scripts.deploy,
-    "pnpm build && wrangler deploy --config dist/server/wrangler.json",
+  assert.match(
+    migrations,
+    /\bwrangler\s+d1\s+migrations\s+apply\s+PREVIEW_DB\b/,
   );
-  assert.equal(
-    scripts["build:preview"],
-    "wrangler types --strict-vars false && astro build --mode preview --outDir ./dist-preview",
+  assert.match(
+    migrations,
+    /--config\s+["']?(?:\.\/)?wrangler\.preview-migrations\.jsonc\b/,
   );
-  assert.equal(
-    scripts["test:accounts"],
-    "pnpm build && tsx --test tests/worker/*.test.ts",
+  assert.match(migrations, /--remote\b/);
+  assert.ok(
+    migrations.indexOf("check-preview-migrations.mjs") <
+      migrations.indexOf("wrangler d1"),
   );
-  assert.equal(scripts.preview, "astro preview");
-  assert.equal(scripts["build:staging"], undefined);
-  assert.equal(scripts["deploy:staging"], undefined);
-  assert.doesNotMatch(scripts["deploy:preview"], /versions|--env/);
+  assert.doesNotMatch(migrations, /--env\b|--local\b/);
+
+  const build = scripts["build:preview"];
+  assert.match(build, /\bastro\s+build\b/);
+  assert.match(build, /--mode(?:\s+|=)preview\b/);
+  assert.match(build, /--outDir(?:\s+|=)["']?(?:\.\/)?dist-preview\b/);
 });

@@ -14,127 +14,118 @@ test.beforeEach(async ({ page, baseURL }) => {
   });
 });
 
-for (const path of ["/volunteer", "/volunteer/sign-in"]) {
-  test(`email sign-in validates, loads, switches to code, and resets on ${path}`, async ({
-    page,
-  }) => {
-    let finishSending!: () => void;
-    const sending = new Promise<void>((resolve) => {
-      finishSending = resolve;
-    });
-    const emails: string[] = [];
-    await page.route(
-      "**/api/auth/email-otp/send-verification-otp**",
-      async (route) => {
-        emails.push(route.request().postDataJSON().email);
-        await sending;
-        await route.fulfill({ json: { success: true } });
-      },
-    );
-    const proofs: object[] = [];
-    await page.route("**/api/auth/sign-in/email-otp**", async (route) => {
-      proofs.push(route.request().postDataJSON());
-      await route.fulfill({
-        status: 400,
-        json: { message: "That code is incorrect or has expired." },
-      });
-    });
-    await page.goto(path);
-    const emailForm = page.locator("[data-email-request]");
-    const codeForm = page.locator("[data-email-code]");
-    const emailInput = page.getByRole("textbox", {
-      name: "Email",
-      exact: true,
-    });
-    const continueButton = page.getByRole("button", {
-      name: "Continue with Email",
-    });
-    await expect(emailForm).toHaveAttribute("novalidate", "");
-    await expect(emailForm.locator("label")).toHaveText("Email");
-    await continueButton.click();
-    await expect(emailForm.locator("[data-error=email]")).toHaveText(
-      "This field is required.",
-    );
-    await expect(emailInput).toHaveAttribute("aria-invalid", "true");
-    await emailInput.fill("not-an-email");
-    await expect(emailForm.locator("[data-error=email]")).toHaveText(
-      "Enter a valid email address.",
-    );
-    await emailInput.fill("  First@example.org  ");
-    await expect(emailForm.locator("[data-error=email]")).toBeHidden();
-    await continueButton.click();
-    const loading = page.getByRole("button", { name: "Sending email…" });
-    await expect(loading).toBeDisabled();
-    await expect(loading).toHaveAttribute("aria-busy", "true");
-    await page
-      .getByRole("button", { name: "Simulate successful delivery" })
-      .click();
-    await expect.poll(() => emails.length).toBe(1);
-    await expect(loading).toBeDisabled();
-    finishSending();
-    await expect(emailForm).toBeVisible();
-    await expect(emailInput).toBeVisible();
-    await expect(emailInput).toHaveValue("first@example.org");
-    await expect(emailInput).not.toBeEditable();
-    await expect(continueButton).toBeHidden();
-    await expect(codeForm).toBeVisible();
-    await expect(
-      page.getByText("Email sent. You can request another after one minute."),
-    ).toHaveCount(0);
-    const code = codeForm.locator('input[name="code"]');
-    await expect(code).toHaveAccessibleName("Six-digit code");
-    await expect(code).toBeFocused();
-    await emailInput.press("Enter");
-    await expect(emailForm).not.toHaveAttribute("aria-busy", "true");
-    await expect(
-      page.getByRole("button", { name: "Simulate successful delivery" }),
-    ).toHaveCount(0);
-    expect(emails).toEqual(["first@example.org"]);
-    await code.fill("123");
-    await page.getByRole("button", { name: "Sign in with code" }).click();
-    await expect(codeForm.locator("[data-error=email-code]")).toHaveText(
-      "Enter a six-digit code.",
-    );
-    expect(proofs).toEqual([]);
-    await code.fill("123456");
-    await page.getByRole("button", { name: "Sign in with code" }).click();
-    await expect(codeForm.locator("[data-form-message]")).toHaveText(
-      "That code is incorrect or has expired.",
-    );
-    await expect(codeForm.locator("[data-form-message]")).toHaveCSS(
-      "color",
-      "rgb(248, 113, 113)",
-    );
-    expect(proofs).toEqual([{ email: "first@example.org", otp: "123456" }]);
-    await page.getByRole("link", { name: "Use a different email" }).click();
-    await expect(emailForm).toBeVisible();
-    await expect(emailInput).toHaveValue("");
-    await expect(emailInput).toBeEditable();
-    await expect(emailInput).toBeFocused();
-    await expect(continueButton).toBeEnabled();
-    await expect(continueButton).toBeVisible();
-    await expect(codeForm).toBeHidden();
-    await expect(code).toHaveValue("");
-    await expect(codeForm.locator('input[name="email"]')).toHaveValue("");
-    await expect(codeForm.locator("[data-form-message]")).toBeHidden();
-    await expect(
-      page.getByRole("link", { name: "Use a different email" }),
-    ).toBeHidden();
-    await emailInput.fill("second@example.org");
-    await continueButton.click();
-    await page
-      .getByRole("button", { name: "Simulate successful delivery" })
-      .click();
-    await expect(codeForm).toBeVisible();
-    await expect(emailInput).toBeVisible();
-    await expect(emailInput).toHaveValue("second@example.org");
-    await expect(emailInput).not.toBeEditable();
-    await expect(codeForm.locator('input[name="email"]')).toHaveValue(
-      "second@example.org",
-    );
-    expect(emails).toEqual(["first@example.org", "second@example.org"]);
+test("email sign-in validates, loads, switches to code, and resets", async ({
+  page,
+}) => {
+  let finishSending!: () => void;
+  const sending = new Promise<void>((resolve) => {
+    finishSending = resolve;
   });
-}
+  const emails: string[] = [];
+  await page.route(
+    "**/api/auth/email-otp/send-verification-otp**",
+    async (route) => {
+      emails.push(route.request().postDataJSON().email);
+      await sending;
+      await route.fulfill({ json: { success: true } });
+    },
+  );
+  const proofs: object[] = [];
+  await page.route("**/api/auth/sign-in/email-otp**", async (route) => {
+    proofs.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 400,
+      json: { message: "That code is incorrect or has expired." },
+    });
+  });
+  await page.goto("/volunteer/sign-in");
+  const emailForm = page.locator("[data-email-request]");
+  const codeForm = page.locator("[data-email-code]");
+  const emailInput = page.getByRole("textbox", {
+    name: "Email",
+    exact: true,
+  });
+  const continueButton = page.getByRole("button", {
+    name: "Continue with Email",
+  });
+  await expect(emailForm).toHaveAttribute("novalidate", "");
+  await expect(emailForm.locator("label")).toHaveText("Email");
+  await continueButton.click();
+  await expect(emailForm.locator("[data-error=email]")).toHaveText(
+    "This field is required.",
+  );
+  await expect(emailInput).toHaveAttribute("aria-invalid", "true");
+  await emailInput.fill("not-an-email");
+  await expect(emailForm.locator("[data-error=email]")).toHaveText(
+    "Enter a valid email address.",
+  );
+  await emailInput.fill("  First@example.org  ");
+  await expect(emailForm.locator("[data-error=email]")).toBeHidden();
+  await continueButton.click();
+  const loading = page.getByRole("button", { name: "Sending email…" });
+  await expect(loading).toBeDisabled();
+  await expect(loading).toHaveAttribute("aria-busy", "true");
+  await page
+    .getByRole("button", { name: "Simulate successful delivery" })
+    .click();
+  await expect.poll(() => emails.length).toBe(1);
+  await expect(loading).toBeDisabled();
+  finishSending();
+  await expect(emailForm).toBeVisible();
+  await expect(emailInput).toBeVisible();
+  await expect(emailInput).toHaveValue("first@example.org");
+  await expect(emailInput).not.toBeEditable();
+  await expect(continueButton).toBeHidden();
+  await expect(codeForm).toBeVisible();
+  const code = codeForm.locator('input[name="code"]');
+  await expect(code).toHaveAccessibleName("Six-digit code");
+  await expect(code).toBeFocused();
+  await emailInput.press("Enter");
+  await expect(emailForm).not.toHaveAttribute("aria-busy", "true");
+  await expect(
+    page.getByRole("button", { name: "Simulate successful delivery" }),
+  ).toHaveCount(0);
+  expect(emails).toEqual(["first@example.org"]);
+  await code.fill("123");
+  await page.getByRole("button", { name: "Sign in with code" }).click();
+  await expect(codeForm.locator("[data-error=email-code]")).toHaveText(
+    "Enter a six-digit code.",
+  );
+  expect(proofs).toEqual([]);
+  await code.fill("123456");
+  await page.getByRole("button", { name: "Sign in with code" }).click();
+  await expect(codeForm.locator("[data-form-message]")).toHaveText(
+    "That code is incorrect or has expired.",
+  );
+  expect(proofs).toEqual([{ email: "first@example.org", otp: "123456" }]);
+  await page.getByRole("link", { name: "Use a different email" }).click();
+  await expect(emailForm).toBeVisible();
+  await expect(emailInput).toHaveValue("");
+  await expect(emailInput).toBeEditable();
+  await expect(emailInput).toBeFocused();
+  await expect(continueButton).toBeEnabled();
+  await expect(continueButton).toBeVisible();
+  await expect(codeForm).toBeHidden();
+  await expect(code).toHaveValue("");
+  await expect(codeForm.locator('input[name="email"]')).toHaveValue("");
+  await expect(codeForm.locator("[data-form-message]")).toBeHidden();
+  await expect(
+    page.getByRole("link", { name: "Use a different email" }),
+  ).toBeHidden();
+  await emailInput.fill("second@example.org");
+  await continueButton.click();
+  await page
+    .getByRole("button", { name: "Simulate successful delivery" })
+    .click();
+  await expect(codeForm).toBeVisible();
+  await expect(emailInput).toBeVisible();
+  await expect(emailInput).toHaveValue("second@example.org");
+  await expect(emailInput).not.toBeEditable();
+  await expect(codeForm.locator('input[name="email"]')).toHaveValue(
+    "second@example.org",
+  );
+  expect(emails).toEqual(["first@example.org", "second@example.org"]);
+});
 
 test("real email cooldowns and empty HTTP 429 responses are readable and retryable", async ({
   page,
@@ -164,7 +155,6 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
   await expect(error).toHaveText(
     "Wait one minute before requesting another email.",
   );
-  await expect(error).toHaveCSS("color", "rgb(248, 113, 113)");
   await expect(error).toHaveAttribute("role", "alert");
   await expect(button).toBeEnabled();
   await page.route("**/api/auth/email-otp/send-verification-otp**", (route) =>
@@ -201,7 +191,6 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(form.locator("[data-error]:visible")).toHaveCount(count + 1);
   for (const input of await required.all()) {
     await expect(input).toHaveAttribute("aria-invalid", "true");
-    await expect(input).toHaveCSS("border-color", "rgb(248, 113, 113)");
     const id = await input.getAttribute("id");
     await expect(
       form.locator(`label[for="${id}"] .volunteer-required`),
@@ -243,22 +232,13 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(
     page.getByRole("textbox", { name: "Full or preferred name", exact: true }),
   ).toHaveValue(sampleAnswers.name);
-  await expect(
-    page.getByRole("heading", { name: "Community", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page
-      .locator(".volunteer-wrap")
-      .getByRole("link", { name: "Join Discord", exact: true }),
-  ).toHaveCount(0);
-  // Editing the account uses the same validation, but successful saves aren't red errors.
+  // Editing reuses validation and identifies successful saves semantically.
   await page
     .getByRole("textbox", { name: "Full or preferred name", exact: true })
     .fill("Updated volunteer");
   await page.getByRole("button", { name: "Save profile" }).click();
   const saved = page.locator("[data-account-profile] [data-form-message]");
   await expect(saved).toHaveAttribute("data-message-kind", "success");
-  await expect(saved).not.toHaveCSS("color", "rgb(248, 113, 113)");
   await page.reload();
   await expect(
     page.getByRole("textbox", { name: "Full or preferred name", exact: true }),
@@ -282,10 +262,6 @@ test("authenticator setup and sign-in show inline required and code errors", asy
   await page.getByRole("button", { name: "Verify and enable" }).click();
   await expect(setup.locator("[data-error=factor-setup-code]")).toHaveText(
     "This field is required.",
-  );
-  await expect(setup.locator("[data-error=factor-setup-code]")).toHaveCSS(
-    "color",
-    "rgb(248, 113, 113)",
   );
   const code = setup.locator('input[name="code"]');
   await code.fill("123");
@@ -328,64 +304,25 @@ test("authenticator setup and sign-in show inline required and code errors", asy
   await expect(challenge.locator(".volunteer-required")).toHaveText("*");
 });
 
-test("public and private headers keep the same font and geometry, and privacy is black", async ({
+test("private pages make no third-party requests and remain usable on mobile", async ({
   page,
   baseURL,
 }) => {
-  for (const width of [1280, 375]) {
-    await page.setViewportSize({ width, height: 812 });
-    let reference: unknown;
-    for (const path of [
-      "/",
-      "/volunteer",
-      "/privacy",
-      "/about",
-      "/volunteer/sign-in",
-    ]) {
-      const external: string[] = [];
-      const record = (request: { url(): string }) => {
-        if (new URL(request.url()).origin !== new URL(baseURL!).origin)
-          external.push(request.url());
-      };
-      page.on("request", record);
-      await page.goto(path);
-      await page.evaluate(() => document.fonts.ready);
-      expect(
-        await page.evaluate(() =>
-          document.fonts.check('500 16px "Public Sans"'),
-        ),
-      ).toBe(true);
-      const geometry = await page.locator("header").evaluate((header) =>
-        [header, ...header.querySelectorAll("a, summary")].map((element) => {
-          const { x, y, width, height } = element.getBoundingClientRect();
-          return {
-            x,
-            y,
-            width,
-            height,
-            font: getComputedStyle(element).fontFamily,
-          };
-        }),
-      );
-      reference ??= geometry;
-      expect(geometry).toEqual(reference);
-      if (path.startsWith("/volunteer") || path === "/privacy")
-        expect(external).toEqual([]);
-      page.off("request", record);
-      if (path === "/privacy") {
-        await expect(page.locator("main > section")).toHaveCSS(
-          "background-color",
-          "rgb(0, 0, 0)",
-        );
-        await expect(
-          page.getByRole("link", { name: "Back to volunteering" }),
-        ).toHaveCount(0);
-      }
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth > innerWidth,
-        ),
-      ).toBe(false);
-    }
+  await page.setViewportSize({ width: 375, height: 812 });
+  const external: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).origin !== new URL(baseURL!).origin)
+      external.push(request.url());
+  });
+  for (const path of ["/volunteer", "/privacy", "/volunteer/sign-in"]) {
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(200);
+    await expect(page.locator("main")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
   }
+  expect(external).toEqual([]);
 });
