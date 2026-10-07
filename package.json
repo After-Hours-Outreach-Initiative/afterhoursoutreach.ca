@@ -16,6 +16,7 @@
     "test:ui": "playwright test",
     "test:accounts": "pnpm build && tsx --test tests/worker/*.test.ts",
     "test:preview": "pnpm build:preview && tsx --test tests/preview/*.test.ts",
+    "test:benchmark": "node scripts/benchmark-tests.mjs",
     "db:generate": "drizzle-kit generate",
     "organizer:bootstrap": "node scripts/bootstrap-organizer.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
