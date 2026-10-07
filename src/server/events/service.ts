@@ -141,6 +141,7 @@ function notifyRoster(
   eventId: string,
   subject: string,
   body: string,
+  notify: boolean,
 ) {
   return db
     .prepare(
@@ -149,9 +150,18 @@ function notifyRoster(
         FROM signup s
         WHERE s.event_id = ?
           AND s.status = 'confirmed'
-          AND EXISTS (SELECT 1 FROM event_audit WHERE id = ?)`,
+          AND EXISTS (SELECT 1 FROM event_audit WHERE id = ?)
+          AND ? = 1`,
     )
-    .bind(operation, subject, body, Date.now(), eventId, operation);
+    .bind(
+      operation,
+      subject,
+      body,
+      Date.now(),
+      eventId,
+      operation,
+      Number(notify),
+    );
 }
 export function eventWriteError(error: unknown): never {
   if (error instanceof RequestError) throw error;
@@ -184,6 +194,7 @@ export async function saveEvent(
   input: unknown,
   id?: string,
   version?: number,
+  notify = false,
 ) {
   requireOrganizer(actor);
   const parsed = eventSchema.safeParse(input);
@@ -291,6 +302,7 @@ export async function saveEvent(
           id,
           "Your After Hours Outreach event changed",
           `${eventDescription({ ...old, startsAt, meetingPoint: data.meetingPoint })}\n\n${data.open ? "Signups are open." : "Signups are closed. Your existing spot is still reserved."}`,
+          notify,
         ),
       ]);
       if (!results[0].meta.changes)
@@ -311,6 +323,7 @@ export async function cancelEvent(
   id: string,
   version: number,
   reason: string,
+  notify = false,
 ) {
   requireOrganizer(actor);
   const old = await findEvent(db, id);
@@ -343,6 +356,7 @@ export async function cancelEvent(
       id,
       "Your After Hours Outreach event was cancelled",
       `${eventDescription(old)}\n\nThis event was cancelled.${reason ? `\nReason: ${reason}` : ""}`,
+      notify,
     ),
     db
       .prepare(
@@ -464,6 +478,7 @@ export async function manageSignup(
   signupId: string,
   destination: string | undefined,
   reason: string,
+  notify = false,
 ) {
   requireOrganizer(actor);
   const row = await db
@@ -522,7 +537,7 @@ export async function manageSignup(
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
           SELECT ?, ?, ?, ?, ?, ?
-          WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
+          WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?) AND ? = 1`,
         )
         .bind(
           crypto.randomUUID(),
@@ -534,6 +549,7 @@ export async function manageSignup(
           `${eventDescription(old)}\n\n${next ? `An organizer moved your signup to:\n${eventDescription(next)}` : "An organizer removed your signup."}${reason ? `\nReason: ${reason}` : ""}`,
           now,
           operation,
+          Number(notify),
         ),
     );
     const results = await db.batch(statements);

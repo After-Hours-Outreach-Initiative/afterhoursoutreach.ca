@@ -69,6 +69,12 @@ that enable it must complete it when signing in. Full profile
 views are logged atomically before answers are returned; lists/rosters contain
 names, not sensitive answers.
 
+Account and organizer mutations show loading states and update the affected
+server-rendered controls, lists, and delivery counts without reloading the page.
+Volunteer profile dialogs stay open, and session/authenticator changes preserve
+unsaved profile answers. If a change revokes the current session or organizer
+access, the browser still navigates to sign-in or the volunteer portal.
+
 ## Events
 
 `/volunteer` is request-rendered and lists D1 events, never invented fixtures.
@@ -85,7 +91,17 @@ or closing an event preserves existing spots; signed-up volunteers can still
 see a hidden event. Access revocation cancels affected future signups.
 Orientation completion never grants patrol approval.
 
-Notification records are written in the same transaction as the change.
+Organizer emails are opt-in. Access/approval changes, role changes, signup
+moves/removals, and event edits/cancellations prompt for “Save without email” or
+“Save and send email” before the change is submitted. Cancelling the prompt
+saves nothing. The API also defaults to no email unless `notify: true` is
+explicitly provided. Access revocation still cancels affected future spots;
+their cancellation emails are only included when the organizer opts in.
+Sign-in emails are unchanged, and event creation and orientation completion
+remain silent.
+
+Opted-in notification records are written in the same transaction as the change.
+Skipping email creates no outbox records, so there is nothing to send on retry.
 Delivery failure leaves the change saved and the notification pending. Public
 requests attempt at most five notifications to keep Worker subrequests bounded;
 organizers can retry pending notifications from `/volunteer`. There is no

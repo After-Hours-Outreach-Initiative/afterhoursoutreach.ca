@@ -25,12 +25,14 @@ const inputSchema = z.discriminatedUnion("action", [
     id: id.optional(),
     version: z.number().int().nonnegative().optional(),
     event: eventSchema,
+    notify: z.boolean().default(false),
   }),
   z.strictObject({
     action: z.literal("cancel-event"),
     id,
     version: z.number().int().nonnegative(),
     reason,
+    notify: z.boolean().default(false),
   }),
   z.strictObject({ action: z.enum(["join", "cancel"]), id }),
   z.strictObject({
@@ -38,6 +40,7 @@ const inputSchema = z.discriminatedUnion("action", [
     id,
     destination: id.optional(),
     reason,
+    notify: z.boolean().default(false),
   }),
   z.strictObject({ action: z.literal("retry-notifications") }),
 ]);
@@ -70,6 +73,7 @@ export const POST: APIRoute = async ({ request }) => {
           input.event,
           input.id,
           input.version,
+          input.notify,
         );
         break;
       case "cancel-event":
@@ -79,6 +83,7 @@ export const POST: APIRoute = async ({ request }) => {
           input.id,
           input.version,
           input.reason,
+          input.notify,
         );
         break;
       case "join":
@@ -92,6 +97,7 @@ export const POST: APIRoute = async ({ request }) => {
           input.id,
           input.destination,
           input.reason,
+          input.notify,
         );
         break;
       case "retry-notifications":
@@ -99,9 +105,12 @@ export const POST: APIRoute = async ({ request }) => {
         result = { message: "Notification retry complete." };
         break;
     }
-    // Self-service signups and cancellations are confirmed on screen, not by email.
+    // Never send (or create retryable mail) without explicit organizer consent.
     let delivery = { failed: 0, sent: 0, pending: 0, expired: 0 };
-    if (input.action !== "join" && input.action !== "cancel") {
+    if (
+      input.action === "retry-notifications" ||
+      ("notify" in input && input.notify)
+    ) {
       // A delivery failure must never undo a committed event/signup change.
       try {
         delivery = await deliverNotifications(bindings, result.operation);

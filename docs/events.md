@@ -53,7 +53,10 @@ deleted.
 The bottom of the event card has a roster details element that shows the list
 of volunteers when expanded. Volunteers can be moved or removed in which case a
 reason message can be added by the organizer who makes the change, and an email
-will be sent to the volunteer including the reason message.
+can optionally be sent to the volunteer including the reason message. The
+organizer is prompted to save with or without email; no email is sent or queued
+unless they choose to send one. Event edits/cancellations and volunteer
+access/role changes use the same optional email prompt.
 
 On an orientation, the list also has a completed checkbox for each volunteer.
 

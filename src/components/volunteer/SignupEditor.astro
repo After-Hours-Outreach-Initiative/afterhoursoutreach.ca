@@ -29,6 +29,7 @@ const { signup, destinations } = Astro.props;
   <form
     class="volunteer-form"
     data-manage-signup
+    data-email-prompt="signup"
     action="/api/events/action"
     method="post"
   >
@@ -53,13 +54,14 @@ const { signup, destinations } = Astro.props;
     {
       !import.meta.env.DEV && (
         <p class="volunteer-help">
-          Included in the volunteer’s notification email. Do not include medical
-          or other sensitive information.
+          Included in the email if you choose to send one. Do not include
+          medical or other sensitive information.
         </p>
       )
     }
     <p data-form-message role="status" hidden></p>
-    <button class="btn btn-outline" type="submit">Save change and notify</button
+    <button class="btn btn-outline" type="submit" data-loading-label="Saving…"
+      >Save change</button
     >
   </form>
 </dialog>
