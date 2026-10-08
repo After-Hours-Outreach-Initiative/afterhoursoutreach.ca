@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
 import { totpFromSetupKey } from "./helpers/totp";
-import { afterEach, beforeEach, test } from "node:test";
-import { convertV4MiniflareOptions, Miniflare } from "miniflare";
+import { beforeEach, test } from "vitest";
+import { env } from "cloudflare:workers";
 import {
   authBindingsForRequest,
   createAuth,
@@ -28,35 +27,14 @@ import {
   safeReturnTo,
 } from "../src/server/http";
 
-let runtime: Miniflare;
 let bindings: AuthBindings;
 let outbox: SignInEmail[];
 let auth: ReturnType<typeof createAuth>;
 const origin = "https://afterhoursoutreach.ca";
 
 beforeEach(async () => {
-  runtime = new Miniflare(
-    convertV4MiniflareOptions({
-      modules: true,
-      script: "export default { fetch() { return new Response('ok'); } }",
-      compatibilityDate: "2026-08-16",
-      compatibilityFlags: ["nodejs_compat"],
-      d1Databases: { DB: "auth-test-db" },
-    }),
-  );
-  const DB = await runtime.getD1Database("DB");
-  const migrations = new URL("../drizzle/", import.meta.url);
-  for (const name of readdirSync(migrations)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()) {
-    const statements = readFileSync(new URL(name, migrations), "utf8")
-      .split("--> statement-breakpoint")
-      .map((value) => value.trim())
-      .filter(Boolean);
-    await DB.batch(statements.map((value) => DB.prepare(value)));
-  }
   bindings = {
-    DB,
+    DB: env.DB,
     APP_ENV: "production",
     AUTH_BASE_URL: origin,
     BETTER_AUTH_SECRET: "test-only-auth-secret-not-a-deployed-secret-123456789",
@@ -68,10 +46,6 @@ beforeEach(async () => {
       outbox.push(email);
     },
   });
-});
-
-afterEach(async () => {
-  await runtime?.dispose();
 });
 
 function request(path: string, body?: object, cookie?: string) {

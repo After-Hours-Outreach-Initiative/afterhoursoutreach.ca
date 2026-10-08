@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { vancouverInput, vancouverInstant } from "../src/data/event-time";
 
 test("event calendar inputs always use Vancouver time", () => {

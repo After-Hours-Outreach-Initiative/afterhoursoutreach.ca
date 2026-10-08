@@ -11,6 +11,12 @@ pnpm install
 
 Documentation is in [docs/](docs/).
 
+## Tests
+
+Run `pnpm test` for Vitest unit and Cloudflare runtime tests, or
+`pnpm test:watch` during development. Built-Worker and Playwright commands are
+documented in [docs/testing.md](docs/testing.md).
+
 ## Test benchmarks
 
 The [test benchmark report](docs/test-benchmarks.md) records the baseline test
@@ -19,3 +25,6 @@ rerunning `pnpm test:benchmark` and comparing changes with the saved baseline.
 
 The [simplified-suite comparison](docs/test-benchmarks-simplified.md) records the
 results after removing cosmetic assertions and consolidating duplicate flows.
+
+The [Vitest migration comparison](docs/test-benchmarks-vitest.md) records the
+Cloudflare runtime migration and compares it with both saved snapshots.

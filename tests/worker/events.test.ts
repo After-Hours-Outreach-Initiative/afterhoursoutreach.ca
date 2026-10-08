@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { test } from "node:test";
+import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { chromium, expect, type Locator } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
@@ -31,24 +31,37 @@ const cookies = (response: { headers: { getSetCookie(): string[] } }) =>
     .map((cookie) => cookie.split(";")[0])
     .join("; ");
 
-test("real event and organizer flows in the built Worker", async (t) => {
-  const server = createTestHarness({
-    workers: [
-      {
-        configPath: "dist/server/wrangler.json",
-        vars: {
-          APP_ENV: "production",
-          AUTH_BASE_URL: "",
+// These cases intentionally share one ordered organizer/volunteer workflow.
+describe(
+  "real event and organizer flows in the built Worker",
+  { concurrent: false, shuffle: false },
+  () => {
+    const server = createTestHarness({
+      workers: [
+        {
+          configPath: "dist/server/wrangler.json",
+          vars: {
+            APP_ENV: "production",
+            AUTH_BASE_URL: "",
+          },
+          secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
         },
-        secrets: { BETTER_AUTH_SECRET: secret, RESEND_API_KEY: "" },
-      },
-    ],
-  });
-  try {
-    await server.listen();
-    const worker = server.getWorker<Env>();
-    await worker.applyD1Migrations("DB");
-    const { DB } = await worker.getEnv();
+      ],
+    });
+    let worker: ReturnType<typeof server.getWorker<Env>>;
+    let DB: Env["DB"];
+    let organizer: Awaited<ReturnType<typeof person>>;
+    let alice: Awaited<ReturnType<typeof person>>;
+    let bob: Awaited<ReturnType<typeof person>>;
+    beforeAll(async () => {
+      await server.listen();
+      worker = server.getWorker<Env>();
+      await worker.applyD1Migrations("DB");
+      DB = (await worker.getEnv()).DB;
+      organizer = await person("organizer@example.org", "Sample Organizer");
+      alice = await person("alice@example.org", "Sample Alice");
+      bob = await person("bob@example.org", "Sample Bob");
+    });
     const cookieIPs = new Map<string, string>();
     const send = (
       path: string,
@@ -124,9 +137,6 @@ test("real event and organizer flows in the built Worker", async (t) => {
         email,
       };
     };
-    const organizer = await person("organizer@example.org", "Sample Organizer");
-    const alice = await person("alice@example.org", "Sample Alice");
-    const bob = await person("bob@example.org", "Sample Bob");
     const eventInput = (type = "orientation", spots = 2) => ({
       type,
       startsAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
@@ -137,118 +147,107 @@ test("real event and organizer flows in the built Worker", async (t) => {
       hidden: false,
     });
 
-    await t.test(
-      "new databases show a genuine empty event list, not sample fixtures",
-      async () => {
-        const response = await ok(await send("/volunteer"));
-        assert.match(await response.text(), /No upcoming events are scheduled/);
-        const list = (await (await ok(await send("/api/events"))).json()) as {
-          events: unknown[];
-        };
-        assert.deepEqual(list.events, []);
-      },
-    );
+    test("new databases show a genuine empty event list, not sample fixtures", async () => {
+      const response = await ok(await send("/volunteer"));
+      assert.match(await response.text(), /No upcoming events are scheduled/);
+      const list = (await (await ok(await send("/api/events"))).json()) as {
+        events: unknown[];
+      };
+      assert.deepEqual(list.events, []);
+    });
 
-    await t.test(
-      "bootstrap requires verified registration but not two-factor, is atomic and one-time",
-      async () => {
-        await DB.prepare("UPDATE user SET email_verified=0 WHERE id=?")
-          .bind(organizer.id)
-          .run();
-        await assert.rejects(
-          DB.prepare("INSERT INTO organizer_bootstrap VALUES(1,?,?)")
-            .bind(organizer.id, Date.now())
-            .run(),
-          /organizer_not_ready/,
-        );
-        await DB.prepare("UPDATE user SET email_verified=1 WHERE id=?")
-          .bind(organizer.id)
-          .run();
-        assert.equal(
-          (
-            await DB.prepare(
-              "SELECT count(*) AS n FROM audit_log WHERE action='role_changed'",
-            ).first()
-          )?.n,
-          0,
-        );
-        assert.equal(
-          (
-            await DB.prepare("SELECT two_factor_enabled FROM user WHERE id=?")
-              .bind(organizer.id)
-              .first()
-          )?.two_factor_enabled,
-          0,
-        );
-        await DB.prepare("INSERT INTO organizer_bootstrap VALUES(1,?,?)")
+    test("bootstrap requires verified registration but not two-factor, is atomic and one-time", async () => {
+      await DB.prepare("UPDATE user SET email_verified=0 WHERE id=?")
+        .bind(organizer.id)
+        .run();
+      await assert.rejects(
+        DB.prepare("INSERT INTO organizer_bootstrap VALUES(1,?,?)")
           .bind(organizer.id, Date.now())
-          .run();
-        assert.equal(
-          (
-            await DB.prepare(
-              "SELECT count(*) AS n FROM session WHERE user_id=?",
-            )
-              .bind(organizer.id)
-              .first()
-          )?.n,
-          0,
-        );
-        organizer.cookie = await signIn(organizer.email);
-        await assert.rejects(
-          DB.prepare("INSERT INTO organizer_bootstrap VALUES(1,?,?)")
-            .bind(alice.id, Date.now())
-            .run(),
-          /organizer_already_exists|UNIQUE/,
-        );
-      },
-    );
+          .run(),
+        /organizer_not_ready/,
+      );
+      await DB.prepare("UPDATE user SET email_verified=1 WHERE id=?")
+        .bind(organizer.id)
+        .run();
+      assert.equal(
+        (
+          await DB.prepare(
+            "SELECT count(*) AS n FROM audit_log WHERE action='role_changed'",
+          ).first()
+        )?.n,
+        0,
+      );
+      assert.equal(
+        (
+          await DB.prepare("SELECT two_factor_enabled FROM user WHERE id=?")
+            .bind(organizer.id)
+            .first()
+        )?.two_factor_enabled,
+        0,
+      );
+      await DB.prepare("INSERT INTO organizer_bootstrap VALUES(1,?,?)")
+        .bind(organizer.id, Date.now())
+        .run();
+      assert.equal(
+        (
+          await DB.prepare("SELECT count(*) AS n FROM session WHERE user_id=?")
+            .bind(organizer.id)
+            .first()
+        )?.n,
+        0,
+      );
+      organizer.cookie = await signIn(organizer.email);
+      await assert.rejects(
+        DB.prepare("INSERT INTO organizer_bootstrap VALUES(1,?,?)")
+          .bind(alice.id, Date.now())
+          .run(),
+        /organizer_already_exists|UNIQUE/,
+      );
+    });
 
-    await t.test(
-      "visitors and volunteers cannot perform organizer actions; CSRF is rejected",
-      async () => {
-        await ok(
-          await send("/api/events/action", {
-            action: "save",
-            event: eventInput(),
-          }),
-          401,
-        );
-        await ok(
-          await send(
-            "/api/events/action",
-            { action: "save", event: eventInput() },
-            alice.cookie,
-          ),
-          403,
-        );
-        await ok(
-          await send(
-            "/api/organizer/action",
-            { action: "role", userId: alice.id, role: "organizer" },
-            alice.cookie,
-          ),
-          403,
-        );
-        await ok(
-          await send(
-            "/api/events/action",
-            { action: "save", event: eventInput() },
-            organizer.cookie,
-            "https://evil.example",
-          ),
-          403,
-        );
-        await ok(
-          await send(
-            `/volunteer/volunteers/${alice.id}`,
-            undefined,
-            alice.cookie,
-          ),
-          403,
-        );
-        await ok(await send("/volunteer/volunteers"), 302);
-      },
-    );
+    test("visitors and volunteers cannot perform organizer actions; CSRF is rejected", async () => {
+      await ok(
+        await send("/api/events/action", {
+          action: "save",
+          event: eventInput(),
+        }),
+        401,
+      );
+      await ok(
+        await send(
+          "/api/events/action",
+          { action: "save", event: eventInput() },
+          alice.cookie,
+        ),
+        403,
+      );
+      await ok(
+        await send(
+          "/api/organizer/action",
+          { action: "role", userId: alice.id, role: "organizer" },
+          alice.cookie,
+        ),
+        403,
+      );
+      await ok(
+        await send(
+          "/api/events/action",
+          { action: "save", event: eventInput() },
+          organizer.cookie,
+          "https://evil.example",
+        ),
+        403,
+      );
+      await ok(
+        await send(
+          `/volunteer/volunteers/${alice.id}`,
+          undefined,
+          alice.cookie,
+        ),
+        403,
+      );
+      await ok(await send("/volunteer/volunteers"), 302);
+    });
 
     const createEvent = async (type = "orientation", spots = 2) => {
       const data = eventInput(type, spots);
@@ -265,37 +264,41 @@ test("real event and organizer flows in the built Worker", async (t) => {
       assert.ok(row);
       return { ...row, data };
     };
-    const orientation = await createEvent("orientation", 1);
-    const patrol = await createEvent("patrol", 3);
-    const destination = await createEvent("orientation", 2);
-    const join = (eventId: string, cookie: string) =>
-      send("/api/events/action", { action: "join", id: eventId }, cookie);
-    const status = async (
-      userId: string,
-      active = true,
-      patrolApproved = true,
-    ) => {
-      const row = await DB.prepare(
-        "SELECT updated_at AS version FROM volunteer_status WHERE user_id=?",
-      )
-        .bind(userId)
-        .first<{ version: number }>();
-      return send(
-        "/api/organizer/action",
-        {
-          action: "status",
-          userId,
-          version: row!.version,
-          active,
-          patrolApproved,
-        },
-        organizer.cookie,
-      );
-    };
+    describe("with scheduled events", () => {
+      let orientation: Awaited<ReturnType<typeof createEvent>>;
+      let patrol: Awaited<ReturnType<typeof createEvent>>;
+      let destination: Awaited<ReturnType<typeof createEvent>>;
+      beforeAll(async () => {
+        orientation = await createEvent("orientation", 1);
+        patrol = await createEvent("patrol", 3);
+        destination = await createEvent("orientation", 2);
+      });
+      const join = (eventId: string, cookie: string) =>
+        send("/api/events/action", { action: "join", id: eventId }, cookie);
+      const status = async (
+        userId: string,
+        active = true,
+        patrolApproved = true,
+      ) => {
+        const row = await DB.prepare(
+          "SELECT updated_at AS version FROM volunteer_status WHERE user_id=?",
+        )
+          .bind(userId)
+          .first<{ version: number }>();
+        return send(
+          "/api/organizer/action",
+          {
+            action: "status",
+            userId,
+            version: row!.version,
+            active,
+            patrolApproved,
+          },
+          organizer.cookie,
+        );
+      };
 
-    await t.test(
-      "real listings have no invented events, demo code or signed-out account menu",
-      async () => {
+      test("real listings have no invented events, demo code or signed-out account menu", async () => {
         const response = await ok(await send("/volunteer"));
         const html = await response.text();
         assert.doesNotMatch(html, /Preview · public test site/);
@@ -313,12 +316,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           JSON.stringify(summaries),
           /PRIVATE HEALTH ANSWER|Sample Alice|userId|confirmed|signedUp|version/,
         );
-      },
-    );
+      });
 
-    await t.test(
-      "last spot is atomic across simultaneous signups without queuing email",
-      async () => {
+      test("last spot is atomic across simultaneous signups without queuing email", async () => {
         const responses = await Promise.all([
           join(orientation.id, alice.cookie),
           join(orientation.id, bob.cookie),
@@ -356,12 +356,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           )?.n,
           1,
         );
-      },
-    );
+      });
 
-    await t.test(
-      "approval without orientation grants patrol access, arbitrary client role does not",
-      async () => {
+      test("approval without orientation grants patrol access, arbitrary client role does not", async () => {
         await ok(await join(patrol.id, alice.cookie), 403);
         await ok(await status(alice.id));
         await ok(await join(patrol.id, alice.cookie));
@@ -379,12 +376,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           .bind(alice.id)
           .first();
         assert.equal(approved?.approved_by, organizer.id);
-      },
-    );
+      });
 
-    await t.test(
-      "volunteer signups and cancellations preserve records and audits without emails",
-      async () => {
+      test("volunteer signups and cancellations preserve records and audits without emails", async () => {
         for (const type of ["orientation", "patrol"]) {
           const event = await createEvent(type);
           const before = await DB.prepare(
@@ -456,12 +450,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
             ["signup_cancelled", "signup_joined"],
           );
         }
-      },
-    );
+      });
 
-    await t.test(
-      "organizers without two-factor can manage events and view audited profiles",
-      async () => {
+      test("organizers without two-factor can manage events and view audited profiles", async () => {
         const session = (await (
           await send("/api/auth/get-session", undefined, organizer.cookie)
         ).json()) as { session: { id: string } };
@@ -505,12 +496,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           await send("/volunteer/volunteers", undefined, organizer.cookie),
         );
         assert.doesNotMatch(await team.text(), /PRIVATE HEALTH ANSWER/);
-      },
-    );
+      });
 
-    await t.test(
-      "capacity, optimistic edit conflicts, hidden and closed events are enforced",
-      async () => {
+      test("capacity, optimistic edit conflicts, hidden and closed events are enforced", async () => {
         await ok(await join(patrol.id, bob.cookie), 403);
         const row = await DB.prepare(
           "SELECT updated_at AS version FROM event WHERE id=?",
@@ -570,12 +558,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           new RegExp(`data-live-event="${patrol.id}"`),
         );
         await ok(await join(patrol.id, bob.cookie), 403);
-      },
-    );
+      });
 
-    await t.test(
-      "move rollback preserves source signup when destination is full",
-      async () => {
+      test("move rollback preserves source signup when destination is full", async () => {
         const signedUp = await DB.prepare(
           "SELECT id,user_id AS userId FROM signup WHERE event_id=? AND status='confirmed'",
         )
@@ -651,12 +636,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           )?.n,
           1,
         );
-      },
-    );
+      });
 
-    await t.test(
-      "orientation completion requires an actual past attendance and never approves patrols",
-      async () => {
+      test("orientation completion requires an actual past attendance and never approves patrols", async () => {
         const attendee = await DB.prepare(
           "SELECT user_id AS userId FROM signup WHERE event_id=? AND status='confirmed'",
         )
@@ -710,12 +692,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           )?.n,
           1,
         );
-      },
-    );
+      });
 
-    await t.test(
-      "deactivation silently cancels future spots and last organizer cannot be removed",
-      async () => {
+      test("deactivation silently cancels future spots and last organizer cannot be removed", async () => {
         await ok(await status(alice.id, false, false));
         const notifications = await DB.prepare(
           "SELECT count(*) AS n FROM event_notification WHERE user_id=? AND subject='Your After Hours Outreach signup was cancelled' AND body LIKE '%volunteer access changed%'",
@@ -743,12 +722,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           409,
         );
         await ok(await status(organizer.id, false, false), 409);
-      },
-    );
+      });
 
-    await t.test(
-      "opted-in cancellation preserves records, cancels spots and queues notifications atomically",
-      async () => {
+      test("opted-in cancellation preserves records, cancels spots and queues notifications atomically", async () => {
         const event = await createEvent("patrol", 2);
         await ok(await join(event.id, bob.cookie));
         await ok(
@@ -796,12 +772,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
           ),
           409,
         );
-      },
-    );
+      });
 
-    await t.test(
-      "organizer promotions require verified registration, not two-factor, and revoke sessions",
-      async () => {
+      test("organizer promotions require verified registration, not two-factor, and revoke sessions", async () => {
         await DB.prepare("UPDATE user SET email_verified=0 WHERE id=?")
           .bind(bob.id)
           .run();
@@ -874,12 +847,9 @@ test("real event and organizer flows in the built Worker", async (t) => {
         assert.ok(
           audit.results.every((row) => row.changed_fields === '["role"]'),
         );
-      },
-    );
+      });
 
-    await t.test(
-      "browser organizer and volunteer workflows save in place and remain usable on mobile",
-      async () => {
+      test("browser organizer and volunteer workflows save in place and remain usable on mobile", async () => {
         const browser = await chromium.launch({
           executablePath:
             process.env.CHROMIUM_PATH ??
@@ -1674,9 +1644,10 @@ test("real event and organizer flows in the built Worker", async (t) => {
         } finally {
           await browser.close();
         }
-      },
-    );
-  } finally {
-    await server.close();
-  }
-});
+      });
+    });
+    afterAll(async () => {
+      await server.close();
+    });
+  },
+);

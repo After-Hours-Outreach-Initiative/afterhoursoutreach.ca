@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { accountErrorMessage } from "../src/scripts/account-forms";
 
 test("auth errors use the API message instead of Better Fetch's HTTP status", () => {

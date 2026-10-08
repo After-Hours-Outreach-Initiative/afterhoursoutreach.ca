@@ -21,7 +21,6 @@ import { chromium } from "@playwright/test";
 import { renderReport } from "./test-benchmark-report.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const reporter = join(root, "scripts/test-benchmark-reporter.mjs");
 const round = (value) => Math.round(value * 1000) / 1000;
 const git = (...args) =>
   execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
@@ -32,31 +31,70 @@ const testFiles = (directory) =>
     .sort()
     .map((name) => join(directory, name));
 
-export function nodeResult(report) {
-  if (!report.summary)
-    throw new Error("Node reporter did not return a summary.");
-  const cases = report.cases.map((item) => ({
-    ...item,
-    file: filePath(item.file),
-    durationMs: round(item.durationMs),
-    container: report.cases.some(
-      (child) =>
-        child.file === item.file &&
-        child.names.length > item.names.length &&
-        item.names.every((name, index) => child.names[index] === name),
-    ),
-  }));
+export function vitestResult(report) {
+  if (!Array.isArray(report.testResults) || typeof report.success !== "boolean")
+    throw new Error("Vitest reporter did not return a valid summary.");
+  const status = {
+    passed: "passed",
+    failed: "failed",
+    pending: "skipped",
+    skipped: "skipped",
+    disabled: "skipped",
+    todo: "todo",
+  };
+  const cases = report.testResults.flatMap((file) =>
+    file.assertionResults.map((item) => {
+      if (!status[item.status])
+        throw new Error(`Unknown Vitest status: ${item.status}`);
+      return {
+        file: filePath(file.name),
+        names: [...item.ancestorTitles.filter(Boolean), item.title],
+        nesting: 0,
+        type: "test",
+        container: false,
+        durationMs: round(item.duration ?? 0),
+        status: status[item.status],
+        errors: (item.failureMessages ?? []).map(stripVTControlCharacters),
+      };
+    }),
+  );
+  const counts = {
+    tests: cases.length,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    todo: 0,
+  };
+  for (const item of cases) counts[item.status]++;
   if (
-    cases.filter((item) => item.type === "test").length !==
-    report.summary.counts.tests
+    counts.tests !== report.numTotalTests ||
+    counts.passed !== report.numPassedTests ||
+    counts.failed !== report.numFailedTests ||
+    counts.skipped !== report.numPendingTests ||
+    counts.todo !== report.numTodoTests
   )
     throw new Error(
-      "Node test inventory does not match its reported test count.",
+      "Vitest test inventory does not match its reported test count.",
     );
   return {
-    counts: report.summary.counts,
-    runnerMs: round(report.summary.duration_ms),
+    counts,
+    runnerMs: round(
+      Math.max(
+        report.startTime,
+        ...report.testResults.map((file) => file.endTime),
+      ) - report.startTime,
+    ),
     cases,
+    files: report.testResults.map((file) => ({
+      file: filePath(file.name),
+      durationMs: round(file.endTime - file.startTime),
+    })),
+    reportPassed:
+      report.success &&
+      report.testResults.every((file) => file.status === "passed"),
+    errors: report.testResults
+      .filter((file) => file.message)
+      .map((file) => stripVTControlCharacters(file.message)),
   };
 }
 
@@ -328,17 +366,22 @@ export async function main(args = process.argv.slice(2)) {
   await mkdir(logs, { recursive: true });
   const versions = Object.fromEntries(
     await Promise.all(
-      ["astro", "wrangler", "tsx", "@playwright/test", "miniflare"].map(
-        async (name) => [
-          name,
-          JSON.parse(
-            await readFile(
-              join(root, "node_modules", name, "package.json"),
-              "utf8",
-            ),
-          ).version,
-        ],
-      ),
+      [
+        "astro",
+        "wrangler",
+        "tsx",
+        "@playwright/test",
+        "vitest",
+        "@cloudflare/vitest-plugin",
+      ].map(async (name) => [
+        name,
+        JSON.parse(
+          await readFile(
+            join(root, "node_modules", name, "package.json"),
+            "utf8",
+          ),
+        ).version,
+      ]),
     ),
   );
   const data = {
@@ -401,28 +444,32 @@ export async function main(args = process.argv.slice(2)) {
     }
     const prefix = join(logs, `${iteration}-${id}`);
     const resultFile = `${prefix}.json`;
-    if (kind === "node" && commandArgs.length === 3) {
+    const directory = {
+      unit: "tests",
+      worker: "tests/worker",
+      preview: "tests/preview",
+    }[id];
+    if (kind === "vitest" && directory && !testFiles(directory).length) {
       const sample = {
         exitCode: 0,
         wallMs: 0,
         runnerMs: 0,
         counts: { tests: 0, passed: 0, failed: 0, skipped: 0 },
         cases: [],
-        note: "No files matched; Node auto-discovery was not launched.",
+        note: "No files matched; Vitest was not launched.",
       };
       console.log(`${iteration} ${label}: no test files`);
       if (!iteration.startsWith("warmup")) phase.samples.push(sample);
       return sample;
     }
     const launchArgs =
-      kind === "node"
+      kind === "vitest"
         ? [
-            "exec",
-            "tsx",
-            "--test",
-            `--test-reporter=${reporter}`,
-            `--test-reporter-destination=${resultFile}`,
-            ...commandArgs.slice(3),
+            ...commandArgs,
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile",
+            resultFile,
           ]
         : kind === "browser"
           ? [...commandArgs, "--output", `${prefix}-artifacts`]
@@ -437,8 +484,9 @@ export async function main(args = process.argv.slice(2)) {
         const report = JSON.parse(await readFile(resultFile, "utf8"));
         Object.assign(
           sample,
-          kind === "node" ? nodeResult(report) : browserResult(report),
+          kind === "vitest" ? vitestResult(report) : browserResult(report),
         );
+        if (sample.reportPassed === false) sample.exitCode ||= 1;
       } catch (error) {
         sample.error = error.message;
         sample.exitCode ||= 1;
@@ -465,10 +513,10 @@ export async function main(args = process.argv.slice(2)) {
         index < 0 ? `warmup-${index + warmups + 1}` : `run-${index + 1}`;
       await measure(
         "unit",
-        "Node unit / local-runtime tests",
-        ["exec", "tsx", "--test", ...testFiles("tests")],
+        "Vitest unit / Cloudflare runtime tests",
+        ["exec", "vitest", "run", "--project", "unit", "--project", "runtime"],
         iteration,
-        "node",
+        "vitest",
       );
       const production = await measure(
         "build-production",
@@ -481,9 +529,9 @@ export async function main(args = process.argv.slice(2)) {
         await measure(
           "worker",
           "Production Worker tests",
-          ["exec", "tsx", "--test", ...testFiles("tests/worker")],
+          ["exec", "vitest", "run", "--project", "worker"],
           iteration,
-          "node",
+          "vitest",
         );
       const preview = await measure(
         "build-preview",
@@ -496,9 +544,9 @@ export async function main(args = process.argv.slice(2)) {
         await measure(
           "preview",
           "Preview Worker tests",
-          ["exec", "tsx", "--test", ...testFiles("tests/preview")],
+          ["exec", "vitest", "run", "--project", "preview"],
           iteration,
-          "node",
+          "vitest",
         );
       await measure(
         "ui-local",

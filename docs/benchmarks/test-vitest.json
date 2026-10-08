@@ -1,0 +1,4839 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-07T23:05:32.588Z",
+  "commit": "45a0471cce095bf806edcc374527134592184de3",
+  "branch": "chore/test-benchmark-baseline",
+  "workingTree": "M README.md\n M docs/accounts.md\n M docs/deployment.md\n M package.json\n M pnpm-lock.yaml\n M scripts/benchmark-tests.mjs\n M scripts/test-benchmark-report.mjs\n D scripts/test-benchmark-reporter.mjs\n D src/scripts/account-switcher.ts\n M src/scripts/account.ts\n D src/scripts/local-email-dialog.ts\n M src/scripts/volunteer.ts\n D src/server/auth/development.ts\n M src/server/auth/index.ts\n D src/styles/local-email-dialog.css\n M tests/account-forms.test.ts\n M tests/auth.test.ts\n M tests/d1.test.ts\n M tests/database.test.ts\n M tests/event-policy.test.ts\n M tests/event-time.test.ts\n M tests/local-event-fixtures.test.ts\n M tests/preview-event-fixtures.test.ts\n M tests/preview/build.test.ts\n M tests/previews.test.ts\n M tests/worker/accounts.test.ts\n M tests/worker/action-refresh.test.ts\n M tests/worker/events.test.ts\n M tests/worker/organizer-notifications.test.ts\n?? docs/testing.md\n?? src/dev/\n?? tests/helpers/runtime-setup.ts\n?? tests/test-benchmark.test.ts\n?? tests/vitest.d.ts\n?? vitest.config.ts",
+  "environment": {
+    "node": "v22.22.3",
+    "pnpm": "11.9.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 5700X 8-Core Processor",
+    "logicalCpus": 16,
+    "availableParallelism": 16,
+    "memoryGiB": 15.535,
+    "versions": {
+      "astro": "7.2.2",
+      "wrangler": "4.135.0",
+      "tsx": "4.23.15",
+      "@playwright/test": "1.63.0",
+      "vitest": "4.1.11",
+      "@cloudflare/vitest-plugin": "1.3.1"
+    },
+    "chromium": "Chromium 151.0.7922.173 Arch Linux"
+  },
+  "options": {
+    "runs": 3,
+    "warmups": 1,
+    "localServer": "isolated",
+    "deployedUrl": "https://feat-patrol-scheduling-mockup-afterhoursoutreach-ca.ivanzheng9905.workers.dev"
+  },
+  "logs": "test-results/benchmarks/2026-10-07T23-05-32-588Z",
+  "phases": [
+    {
+      "id": "unit",
+      "label": "Vitest unit / Cloudflare runtime tests",
+      "kind": "vitest",
+      "command": "pnpm exec vitest run --project unit --project runtime",
+      "samples": [
+        {
+          "wallMs": 8133.904,
+          "exitCode": 0,
+          "counts": {
+            "tests": 60,
+            "passed": 60,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 6137.869,
+          "cases": [
+            {
+              "file": "tests/account-forms.test.ts",
+              "names": [
+                "auth errors use the API message instead of Better Fetch's HTTP status"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.51,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/account-forms.test.ts",
+              "names": [
+                "empty rate-limit and service errors have readable fallbacks"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.135,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["approval is independent of orientation completion"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 6.431,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "approval without any orientation allows patrol signup"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 3.343,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["only an organizer can be recorded as the approver"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 3.218,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "last spot cannot be overbooked, including by reactivation or moving"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 3.884,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "duplicate confirmed signup is rejected, cancelled signup permits a new one"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 3.508,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "inactive, unregistered, hidden and started events reject signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 4.237,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["capacity cannot shrink below existing signups"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 3.514,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "patrol cannot be recorded as an orientation completion"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 2.966,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["emails are unique regardless of capitalization"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 3.476,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "approval allows patrol signup without orientation completion"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.055,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["patrols require explicit approval"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.19,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["unapproved volunteers can sign up for orientations"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.107,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["sign-in, registration and active status are required"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.151,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "full, closed, started and invalid-date events reject signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.162,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "organizer profile access requires two-factor only when enabled"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.144,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-time.test.ts",
+              "names": ["event calendar inputs always use Vancouver time"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 16.766,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "the local seed refuses remote, preview, and production arguments before any writes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5614.853,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "local fixtures restore open, full, hidden, and past events in the real schema"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 17.885,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "rerunning the local seed preserves edits, cancellations, approvals, and unrelated data"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 8.869,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview seed refuses target overrides before running Wrangler"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 394.925,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview fixtures use the real schema without credentials, privileges, or queued email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 16.83,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview reseeding preserves existing accounts, fixture edits, and cancelled or ineligible signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 11.279,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview reseeding does not rejoin a cancelled non-fixture signup"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 6.521,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview fixture dates advance by Vancouver calendar days across daylight-saving changes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 10.076,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "branch previews target the main Worker with non-production bindings, not version URLs"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 6.879,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "the default environment does not use preview resources"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.721,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "organizer bootstrap refuses implicit targets and production mode"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 230.31,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "preview migrations match the shared binding and cannot target production"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 895.424,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "deployment scripts explicitly select Worker Previews and their migration target"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.96,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results count leaf cases, skips, todos and failures"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 4.314,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "a failed Vitest fixture is not counted as a passing benchmark"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.322,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results reject missing summaries, count mismatches and unknown statuses"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.852,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results retain a passing empty inventory without inventing cases"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.232,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "benchmark comparisons distinguish retired Node containers from lost leaf coverage"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.327,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "local D1 event notifications never contact a provider, even with a real-shaped key"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 66,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "event delivery retries use stable idempotency keys and atomic leases without exposing provider errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 57,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "notifications share the sign-in sending budget and old pending mail is not blindly resent"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 36,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "auth uses the configured site origin or request URL without trusting forwarded hosts"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 12,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "real passwordless sign-in creates a verified volunteer and a host-only secure session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 38,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "link and code redemption race produces exactly one successful result"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 36,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": ["three wrong codes invalidate both code and link"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 38,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the plugin stores hashed codes with ten-minute expiry"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 19,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": ["requesting a new code invalidates the previous code"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 41,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the per-address verification budget survives code rotation"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 95,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "rate limits are atomic, persistent, and do not store raw email/IP keys"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 24,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "email hourly limits still apply after the resend cooldown expires"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 28,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "IP sending limits prevent cycling recipient addresses"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 57,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the global daily limit blocks email requests before creating challenges"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 68,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "invalid email requests send no email and create no challenge"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 37,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "registration/editing persists all answers, keeps approval, and audits only changed field names"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 43,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "profile validation rejects privilege fields, invalid dates, absent/duplicate teams and oversized answers"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 13,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "sign-out revokes the session rather than just removing the browser cookie"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 28,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "passwordless two-factor enrollment and login cannot bypass the authenticator"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 88,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "Resend receives the same sign-in message in every hosted environment and hides provider errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 19,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "local email delivery never calls Resend, even with a configured key"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 17,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "email proofs are never returned in a public response, even by a capture service"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 23,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "origins and redirect targets are checked; JSON bodies are bounded even without Content-Length"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 12,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/d1.test.ts",
+              "names": [
+                "Drizzle and capacity constraints work in the D1 runtime"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 35,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/account-forms.test.ts", "durationMs": 2.135 },
+            { "file": "tests/database.test.ts", "durationMs": 35.476 },
+            { "file": "tests/event-policy.test.ts", "durationMs": 2.162 },
+            { "file": "tests/event-time.test.ts", "durationMs": 16.766 },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "durationMs": 5641.869
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "durationMs": 440.076
+            },
+            { "file": "tests/previews.test.ts", "durationMs": 1134.96 },
+            { "file": "tests/test-benchmark.test.ts", "durationMs": 7.326 },
+            { "file": "tests/auth.test.ts", "durationMs": 896 },
+            { "file": "tests/d1.test.ts", "durationMs": 35 }
+          ],
+          "reportPassed": true,
+          "errors": []
+        },
+        {
+          "wallMs": 8007.38,
+          "exitCode": 0,
+          "counts": {
+            "tests": 60,
+            "passed": 60,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 6049.56,
+          "cases": [
+            {
+              "file": "tests/account-forms.test.ts",
+              "names": [
+                "auth errors use the API message instead of Better Fetch's HTTP status"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.793,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/account-forms.test.ts",
+              "names": [
+                "empty rate-limit and service errors have readable fallbacks"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.199,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["approval is independent of orientation completion"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 9.189,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "approval without any orientation allows patrol signup"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 6.14,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["only an organizer can be recorded as the approver"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 4.259,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "last spot cannot be overbooked, including by reactivation or moving"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.7,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "duplicate confirmed signup is rejected, cancelled signup permits a new one"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.644,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "inactive, unregistered, hidden and started events reject signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.111,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["capacity cannot shrink below existing signups"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.089,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "patrol cannot be recorded as an orientation completion"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 4.213,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["emails are unique regardless of capitalization"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.012,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "approval allows patrol signup without orientation completion"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.686,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["patrols require explicit approval"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.199,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["unapproved volunteers can sign up for orientations"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.51,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["sign-in, registration and active status are required"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.222,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "full, closed, started and invalid-date events reject signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.222,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "organizer profile access requires two-factor only when enabled"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.194,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-time.test.ts",
+              "names": ["event calendar inputs always use Vancouver time"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 20.391,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "the local seed refuses remote, preview, and production arguments before any writes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5482.77,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "local fixtures restore open, full, hidden, and past events in the real schema"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 16.346,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "rerunning the local seed preserves edits, cancellations, approvals, and unrelated data"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 7.56,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview seed refuses target overrides before running Wrangler"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 345.855,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview fixtures use the real schema without credentials, privileges, or queued email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 20.953,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview reseeding preserves existing accounts, fixture edits, and cancelled or ineligible signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 8.79,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview reseeding does not rejoin a cancelled non-fixture signup"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 6.684,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview fixture dates advance by Vancouver calendar days across daylight-saving changes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 11.312,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "branch previews target the main Worker with non-production bindings, not version URLs"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 9.102,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "the default environment does not use preview resources"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 8.272,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "organizer bootstrap refuses implicit targets and production mode"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 217.44,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "preview migrations match the shared binding and cannot target production"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 904.347,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "deployment scripts explicitly select Worker Previews and their migration target"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.042,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results count leaf cases, skips, todos and failures"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 3.896,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "a failed Vitest fixture is not counted as a passing benchmark"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.378,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results reject missing summaries, count mismatches and unknown statuses"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.497,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results retain a passing empty inventory without inventing cases"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.289,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "benchmark comparisons distinguish retired Node containers from lost leaf coverage"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 2.09,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "local D1 event notifications never contact a provider, even with a real-shaped key"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 62,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "event delivery retries use stable idempotency keys and atomic leases without exposing provider errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 37,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "notifications share the sign-in sending budget and old pending mail is not blindly resent"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 35,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "auth uses the configured site origin or request URL without trusting forwarded hosts"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 12,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "real passwordless sign-in creates a verified volunteer and a host-only secure session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 46,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "link and code redemption race produces exactly one successful result"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 47,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": ["three wrong codes invalidate both code and link"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 38,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the plugin stores hashed codes with ten-minute expiry"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 18,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": ["requesting a new code invalidates the previous code"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 27,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the per-address verification budget survives code rotation"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 84,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "rate limits are atomic, persistent, and do not store raw email/IP keys"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 31,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "email hourly limits still apply after the resend cooldown expires"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 43,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "IP sending limits prevent cycling recipient addresses"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 60,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the global daily limit blocks email requests before creating challenges"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 50,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "invalid email requests send no email and create no challenge"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 17,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "registration/editing persists all answers, keeps approval, and audits only changed field names"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 57,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "profile validation rejects privilege fields, invalid dates, absent/duplicate teams and oversized answers"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 17,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "sign-out revokes the session rather than just removing the browser cookie"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 42,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "passwordless two-factor enrollment and login cannot bypass the authenticator"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 86,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "Resend receives the same sign-in message in every hosted environment and hides provider errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 13,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "local email delivery never calls Resend, even with a configured key"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 11,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "email proofs are never returned in a public response, even by a capture service"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 19,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "origins and redirect targets are checked; JSON bodies are bounded even without Content-Length"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 12,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/d1.test.ts",
+              "names": [
+                "Drizzle and capacity constraints work in the D1 runtime"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 30,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/account-forms.test.ts", "durationMs": 1.793 },
+            { "file": "tests/database.test.ts", "durationMs": 51.012 },
+            { "file": "tests/event-policy.test.ts", "durationMs": 3.222 },
+            { "file": "tests/event-time.test.ts", "durationMs": 20.391 },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "durationMs": 5507.56
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "durationMs": 394.312
+            },
+            { "file": "tests/previews.test.ts", "durationMs": 1141.042 },
+            { "file": "tests/test-benchmark.test.ts", "durationMs": 9.09 },
+            { "file": "tests/auth.test.ts", "durationMs": 866 },
+            { "file": "tests/d1.test.ts", "durationMs": 30 }
+          ],
+          "reportPassed": true,
+          "errors": []
+        },
+        {
+          "wallMs": 7728.29,
+          "exitCode": 0,
+          "counts": {
+            "tests": 60,
+            "passed": 60,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 5801.355,
+          "cases": [
+            {
+              "file": "tests/account-forms.test.ts",
+              "names": [
+                "auth errors use the API message instead of Better Fetch's HTTP status"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.631,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/account-forms.test.ts",
+              "names": [
+                "empty rate-limit and service errors have readable fallbacks"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.185,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["approval is independent of orientation completion"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.8,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "approval without any orientation allows patrol signup"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 4.608,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["only an organizer can be recorded as the approver"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.034,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "last spot cannot be overbooked, including by reactivation or moving"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.862,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "duplicate confirmed signup is rejected, cancelled signup permits a new one"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.262,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "inactive, unregistered, hidden and started events reject signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.82,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["capacity cannot shrink below existing signups"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.291,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": [
+                "patrol cannot be recorded as an orientation completion"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.557,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/database.test.ts",
+              "names": ["emails are unique regardless of capitalization"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5.69,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "approval allows patrol signup without orientation completion"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 2.043,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["patrols require explicit approval"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.686,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["unapproved volunteers can sign up for orientations"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.118,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": ["sign-in, registration and active status are required"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.16,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "full, closed, started and invalid-date events reject signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.154,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-policy.test.ts",
+              "names": [
+                "organizer profile access requires two-factor only when enabled"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.15,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/event-time.test.ts",
+              "names": ["event calendar inputs always use Vancouver time"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 11.947,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "the local seed refuses remote, preview, and production arguments before any writes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5410.364,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "local fixtures restore open, full, hidden, and past events in the real schema"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 18.276,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "names": [
+                "rerunning the local seed preserves edits, cancellations, approvals, and unrelated data"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 7.355,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview seed refuses target overrides before running Wrangler"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 342.754,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview fixtures use the real schema without credentials, privileges, or queued email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 17.91,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview reseeding preserves existing accounts, fixture edits, and cancelled or ineligible signups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 8.948,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview reseeding does not rejoin a cancelled non-fixture signup"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 8.119,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "names": [
+                "preview fixture dates advance by Vancouver calendar days across daylight-saving changes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 11.511,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "branch previews target the main Worker with non-production bindings, not version URLs"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 7.689,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "the default environment does not use preview resources"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.344,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "organizer bootstrap refuses implicit targets and production mode"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 219.943,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "preview migrations match the shared binding and cannot target production"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 924.697,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/previews.test.ts",
+              "names": [
+                "deployment scripts explicitly select Worker Previews and their migration target"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.946,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results count leaf cases, skips, todos and failures"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 2.816,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "a failed Vitest fixture is not counted as a passing benchmark"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.316,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results reject missing summaries, count mismatches and unknown statuses"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.97,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "Vitest benchmark results retain a passing empty inventory without inventing cases"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 0.255,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/test-benchmark.test.ts",
+              "names": [
+                "benchmark comparisons distinguish retired Node containers from lost leaf coverage"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1.377,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "local D1 event notifications never contact a provider, even with a real-shaped key"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 60,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "event delivery retries use stable idempotency keys and atomic leases without exposing provider errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 42,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "notifications share the sign-in sending budget and old pending mail is not blindly resent"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 50,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "auth uses the configured site origin or request URL without trusting forwarded hosts"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 15,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "real passwordless sign-in creates a verified volunteer and a host-only secure session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 38,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "link and code redemption race produces exactly one successful result"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 32,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": ["three wrong codes invalidate both code and link"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 37,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the plugin stores hashed codes with ten-minute expiry"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 19,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": ["requesting a new code invalidates the previous code"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 26,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the per-address verification budget survives code rotation"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 107,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "rate limits are atomic, persistent, and do not store raw email/IP keys"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 24,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "email hourly limits still apply after the resend cooldown expires"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 26,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "IP sending limits prevent cycling recipient addresses"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 51,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "the global daily limit blocks email requests before creating challenges"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 54,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "invalid email requests send no email and create no challenge"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 21,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "registration/editing persists all answers, keeps approval, and audits only changed field names"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 64,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "profile validation rejects privilege fields, invalid dates, absent/duplicate teams and oversized answers"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 12,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "sign-out revokes the session rather than just removing the browser cookie"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 26,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "passwordless two-factor enrollment and login cannot bypass the authenticator"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 79,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "Resend receives the same sign-in message in every hosted environment and hides provider errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 11,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "local email delivery never calls Resend, even with a configured key"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 10,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "email proofs are never returned in a public response, even by a capture service"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 15,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/auth.test.ts",
+              "names": [
+                "origins and redirect targets are checked; JSON bodies are bounded even without Content-Length"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 12,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/d1.test.ts",
+              "names": [
+                "Drizzle and capacity constraints work in the D1 runtime"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 67,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/account-forms.test.ts", "durationMs": 3.185 },
+            { "file": "tests/database.test.ts", "durationMs": 48.689 },
+            { "file": "tests/event-policy.test.ts", "durationMs": 3.16 },
+            { "file": "tests/event-time.test.ts", "durationMs": 11.947 },
+            {
+              "file": "tests/local-event-fixtures.test.ts",
+              "durationMs": 5436.355
+            },
+            {
+              "file": "tests/preview-event-fixtures.test.ts",
+              "durationMs": 389.511
+            },
+            { "file": "tests/previews.test.ts", "durationMs": 1159.946 },
+            { "file": "tests/test-benchmark.test.ts", "durationMs": 6.377 },
+            { "file": "tests/auth.test.ts", "durationMs": 833 },
+            { "file": "tests/d1.test.ts", "durationMs": 67 }
+          ],
+          "reportPassed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "id": "build-production",
+      "label": "Production build",
+      "kind": "build",
+      "command": "pnpm build",
+      "samples": [
+        { "wallMs": 5227.566, "exitCode": 0 },
+        { "wallMs": 4923.081, "exitCode": 0 },
+        { "wallMs": 4865.505, "exitCode": 0 }
+      ]
+    },
+    {
+      "id": "worker",
+      "label": "Production Worker tests",
+      "kind": "vitest",
+      "command": "pnpm exec vitest run --project worker",
+      "samples": [
+        {
+          "wallMs": 14484.475,
+          "exitCode": 0,
+          "counts": {
+            "tests": 35,
+            "passed": 35,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 12487.583,
+          "cases": [
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "site origins reject unrelated, preview and forwarded-host CSRF"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 12.019,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "unauthenticated profile access is rejected and registration redirects to sign-in"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 25.857,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "signed-out pages omit the signed-in account menu"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 14.907,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "registration and edits round-trip through the real API"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 40.481,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "session management lists only active owned sessions and revokes by ID without exposing tokens"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 176.131,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "older sessions can edit their profile but must sign in again to list sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 64.473,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "ending another person's session cannot revoke it"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 84.826,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "GET link pages do not consume codes or set session cookies"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 36.209,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "unconfigured email delivery fails closed and removes its code"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 30.983,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "production builds reject development account endpoints without changing sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 26.316,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "sign-in pages request no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 536.19,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "browser edits persisted profile answers without browser storage or third-party requests"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 5634.782,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "sign-out removes the server-side session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 39.41,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "the Worker encrypts authenticator data and requires a second factor after email sign-in"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 165.143,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "a built Worker cannot enable account switching with local runtime vars"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 380.994,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "names": ["overlapping signup refreshes stay ordered"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1748.04,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "names": [
+                "overlapping signup refreshes stay ordered after a failed refresh"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1574.202,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "new databases show a genuine empty event list, not sample fixtures"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 25.799,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "bootstrap requires verified registration but not two-factor, is atomic and one-time"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 155.141,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "visitors and volunteers cannot perform organizer actions; CSRF is rejected"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 56.997,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "real listings have no invented events, demo code or signed-out account menu"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 13.069,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "last spot is atomic across simultaneous signups without queuing email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 45.026,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "approval without orientation grants patrol access, arbitrary client role does not"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 67.891,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "volunteer signups and cancellations preserve records and audits without emails"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 222.214,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "organizers without two-factor can manage events and view audited profiles"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 88.227,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "capacity, optimistic edit conflicts, hidden and closed events are enforced"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 179.595,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "move rollback preserves source signup when destination is full"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 183.396,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "orientation completion requires an actual past attendance and never approves patrols"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 93.9,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "deactivation silently cancels future spots and last organizer cannot be removed"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 127.965,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "opted-in cancellation preserves records, cancels spots and queues notifications atomically"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 128.896,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "organizer promotions require verified registration, not two-factor, and revoke sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 200.657,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "browser organizer and volunteer workflows save in place and remain usable on mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 7781.583,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify omitted applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 564.598,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify false applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 546.929,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify true applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 625.536,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/worker/accounts.test.ts", "durationMs": 7285.994 },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "durationMs": 3322.202
+            },
+            { "file": "tests/worker/events.test.ts", "durationMs": 9444.583 },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "durationMs": 1737.536
+            }
+          ],
+          "reportPassed": true,
+          "errors": []
+        },
+        {
+          "wallMs": 14620.204,
+          "exitCode": 0,
+          "counts": {
+            "tests": 35,
+            "passed": 35,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 12609.799,
+          "cases": [
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "site origins reject unrelated, preview and forwarded-host CSRF"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 10.198,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "unauthenticated profile access is rejected and registration redirects to sign-in"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 23.658,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "signed-out pages omit the signed-in account menu"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 18.742,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "registration and edits round-trip through the real API"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 68.646,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "session management lists only active owned sessions and revokes by ID without exposing tokens"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 177.656,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "older sessions can edit their profile but must sign in again to list sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 66.198,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "ending another person's session cannot revoke it"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 68.994,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "GET link pages do not consume codes or set session cookies"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 32.912,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "unconfigured email delivery fails closed and removes its code"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 30.529,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "production builds reject development account endpoints without changing sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 24.381,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "sign-in pages request no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 555.278,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "browser edits persisted profile answers without browser storage or third-party requests"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 6761.912,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "sign-out removes the server-side session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 41.106,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "the Worker encrypts authenticator data and requires a second factor after email sign-in"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 176.129,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "a built Worker cannot enable account switching with local runtime vars"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 369.148,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "names": ["overlapping signup refreshes stay ordered"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1719.304,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "names": [
+                "overlapping signup refreshes stay ordered after a failed refresh"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1664.909,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "new databases show a genuine empty event list, not sample fixtures"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 17.148,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "bootstrap requires verified registration but not two-factor, is atomic and one-time"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 164.88,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "visitors and volunteers cannot perform organizer actions; CSRF is rejected"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 47.567,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "real listings have no invented events, demo code or signed-out account menu"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 11.128,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "last spot is atomic across simultaneous signups without queuing email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 43.367,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "approval without orientation grants patrol access, arbitrary client role does not"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 75.165,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "volunteer signups and cancellations preserve records and audits without emails"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 220.313,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "organizers without two-factor can manage events and view audited profiles"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 109.382,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "capacity, optimistic edit conflicts, hidden and closed events are enforced"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 174.353,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "move rollback preserves source signup when destination is full"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 154.305,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "orientation completion requires an actual past attendance and never approves patrols"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 105.259,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "deactivation silently cancels future spots and last organizer cannot be removed"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 129.234,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "opted-in cancellation preserves records, cancels spots and queues notifications atomically"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 150.955,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "organizer promotions require verified registration, not two-factor, and revoke sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 204.809,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "browser organizer and volunteer workflows save in place and remain usable on mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 7802.799,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify omitted applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 553.918,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify false applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 598.724,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify true applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 640.224,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/worker/accounts.test.ts", "durationMs": 8443.148 },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "durationMs": 3383.909
+            },
+            { "file": "tests/worker/events.test.ts", "durationMs": 9469.799 },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "durationMs": 1793.224
+            }
+          ],
+          "reportPassed": true,
+          "errors": []
+        },
+        {
+          "wallMs": 14406.844,
+          "exitCode": 0,
+          "counts": {
+            "tests": 35,
+            "passed": 35,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 12355.504,
+          "cases": [
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "site origins reject unrelated, preview and forwarded-host CSRF"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 12.147,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "unauthenticated profile access is rejected and registration redirects to sign-in"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 23.773,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "signed-out pages omit the signed-in account menu"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 11.455,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "registration and edits round-trip through the real API"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 37.533,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "session management lists only active owned sessions and revokes by ID without exposing tokens"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 177.298,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "older sessions can edit their profile but must sign in again to list sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 58.732,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "ending another person's session cannot revoke it"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 70.635,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "GET link pages do not consume codes or set session cookies"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 38.054,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "unconfigured email delivery fails closed and removes its code"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 43.555,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "production builds reject development account endpoints without changing sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 21.98,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "sign-in pages request no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 532.194,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "browser edits persisted profile answers without browser storage or third-party requests"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 6671.004,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "sign-out removes the server-side session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 50.635,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "production-built Worker enforces authentication, ownership, CSRF and private-page protections",
+                "the Worker encrypts authenticator data and requires a second factor after email sign-in"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 153.504,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/accounts.test.ts",
+              "names": [
+                "a built Worker cannot enable account switching with local runtime vars"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 380.32,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "names": ["overlapping signup refreshes stay ordered"],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1690.465,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "names": [
+                "overlapping signup refreshes stay ordered after a failed refresh"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 1568.596,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "new databases show a genuine empty event list, not sample fixtures"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 16.821,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "bootstrap requires verified registration but not two-factor, is atomic and one-time"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 168.561,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "visitors and volunteers cannot perform organizer actions; CSRF is rejected"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 51.456,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "real listings have no invented events, demo code or signed-out account menu"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 15.728,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "last spot is atomic across simultaneous signups without queuing email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 55.731,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "approval without orientation grants patrol access, arbitrary client role does not"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 68.402,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "volunteer signups and cancellations preserve records and audits without emails"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 236.798,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "organizers without two-factor can manage events and view audited profiles"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 77.672,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "capacity, optimistic edit conflicts, hidden and closed events are enforced"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 170.851,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "move rollback preserves source signup when destination is full"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 158.156,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "orientation completion requires an actual past attendance and never approves patrols"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 97.146,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "deactivation silently cancels future spots and last organizer cannot be removed"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 122.64,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "opted-in cancellation preserves records, cancels spots and queues notifications atomically"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 139.716,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "organizer promotions require verified registration, not two-factor, and revoke sessions"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 213.238,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/events.test.ts",
+              "names": [
+                "real event and organizer flows in the built Worker",
+                "with scheduled events",
+                "browser organizer and volunteer workflows save in place and remain usable on mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 7689.504,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify omitted applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 542.169,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify false applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 551.116,
+              "status": "passed",
+              "errors": []
+            },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "names": [
+                "organizer emails require explicit opt-in in the built Worker",
+                "notify true applies to every organizer email"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 641.43,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/worker/accounts.test.ts", "durationMs": 8302.32 },
+            {
+              "file": "tests/worker/action-refresh.test.ts",
+              "durationMs": 3259.596
+            },
+            { "file": "tests/worker/events.test.ts", "durationMs": 9348.504 },
+            {
+              "file": "tests/worker/organizer-notifications.test.ts",
+              "durationMs": 1735.43
+            }
+          ],
+          "reportPassed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "id": "build-preview",
+      "label": "Preview build",
+      "kind": "build",
+      "command": "pnpm build:preview",
+      "samples": [
+        { "wallMs": 5071.992, "exitCode": 0 },
+        { "wallMs": 4882.861, "exitCode": 0 },
+        { "wallMs": 4834.005, "exitCode": 0 }
+      ]
+    },
+    {
+      "id": "preview",
+      "label": "Preview Worker tests",
+      "kind": "vitest",
+      "command": "pnpm exec vitest run --project preview",
+      "samples": [
+        {
+          "wallMs": 3775.865,
+          "exitCode": 0,
+          "counts": {
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 1821.179,
+          "cases": [
+            {
+              "file": "tests/preview/build.test.ts",
+              "names": [
+                "preview builds support real account features but reject development endpoints"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 882.179,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/preview/build.test.ts", "durationMs": 882.179 }
+          ],
+          "reportPassed": true,
+          "errors": []
+        },
+        {
+          "wallMs": 3765.608,
+          "exitCode": 0,
+          "counts": {
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 1807.753,
+          "cases": [
+            {
+              "file": "tests/preview/build.test.ts",
+              "names": [
+                "preview builds support real account features but reject development endpoints"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 878.753,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/preview/build.test.ts", "durationMs": 878.753 }
+          ],
+          "reportPassed": true,
+          "errors": []
+        },
+        {
+          "wallMs": 3865.198,
+          "exitCode": 0,
+          "counts": {
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "runnerMs": 1840.686,
+          "cases": [
+            {
+              "file": "tests/preview/build.test.ts",
+              "names": [
+                "preview builds support real account features but reject development endpoints"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "durationMs": 877.686,
+              "status": "passed",
+              "errors": []
+            }
+          ],
+          "files": [
+            { "file": "tests/preview/build.test.ts", "durationMs": 877.686 }
+          ],
+          "reportPassed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "id": "ui-local",
+      "label": "Local browser tests",
+      "kind": "browser",
+      "command": "pnpm exec playwright test --reporter=json",
+      "samples": [
+        {
+          "wallMs": 10160.674,
+          "exitCode": 0,
+          "counts": {
+            "tests": 20,
+            "passed": 16,
+            "failed": 0,
+            "skipped": 4,
+            "flaky": 0
+          },
+          "runnerMs": 8976.477,
+          "workers": 8,
+          "errors": [],
+          "cases": [
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "email sign-in validates, loads, switches to code, and resets"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3271,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "real email cooldowns and empty HTTP 429 responses are readable and retryable"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2555,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "registration shows all required errors and saves after they are corrected"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 6233,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "authenticator setup and sign-in show inline required and code errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 6534,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "private pages make no third-party requests and remain usable on mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2177,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed site uses real account features and shows a banner only on previews"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 4,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "account and organizer routes require sign-in without loading mockups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 3,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "private pages exclude indexing and the database is available"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 3,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed sign-in is enabled with no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 1,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/local-accounts.spec.ts",
+              "names": [
+                "local D1 sign-in uses dialogs for delivery, errors and valid codes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 5489,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/local-accounts.spec.ts",
+              "names": [
+                "local D1 email links are one-use and sign-in pages have no third-party requests"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 4556,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/local-notifications.spec.ts",
+              "names": [
+                "local approval notifications work without crypto.randomUUID"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3601,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/notification-choice.spec.ts",
+              "names": [
+                "organizer email choice defaults to no email and cancellation restores controls"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3102,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "volunteer-page sign-in is usable on mobile and opens the shared code form"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 1523,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "event type buttons filter instantly, preserve deep links, and never submit a confirmation form"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 1873,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as lists actual D1 users and switching to Visitor ends only the current session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3922,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as can choose an unregistered D1 account without changing it"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2680,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "account navigation and profile controls are usable on desktop and mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3398,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "local account selection rejects cross-origin writes and unknown users"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2189,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as simulates a verified factor without changing the user's real role or enrollment"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2323,
+              "errors": []
+            }
+          ]
+        },
+        {
+          "wallMs": 10278.029,
+          "exitCode": 0,
+          "counts": {
+            "tests": 20,
+            "passed": 16,
+            "failed": 0,
+            "skipped": 4,
+            "flaky": 0
+          },
+          "runnerMs": 9071.801,
+          "workers": 8,
+          "errors": [],
+          "cases": [
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "email sign-in validates, loads, switches to code, and resets"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3502,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "real email cooldowns and empty HTTP 429 responses are readable and retryable"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3363,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "registration shows all required errors and saves after they are corrected"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 6399,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "authenticator setup and sign-in show inline required and code errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 6166,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "private pages make no third-party requests and remain usable on mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2169,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed site uses real account features and shows a banner only on previews"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 3,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "account and organizer routes require sign-in without loading mockups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 3,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "private pages exclude indexing and the database is available"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 3,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed sign-in is enabled with no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 1,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/local-accounts.spec.ts",
+              "names": [
+                "local D1 sign-in uses dialogs for delivery, errors and valid codes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 5226,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/local-accounts.spec.ts",
+              "names": [
+                "local D1 email links are one-use and sign-in pages have no third-party requests"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 5002,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/local-notifications.spec.ts",
+              "names": [
+                "local approval notifications work without crypto.randomUUID"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3966,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/notification-choice.spec.ts",
+              "names": [
+                "organizer email choice defaults to no email and cancellation restores controls"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2599,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "volunteer-page sign-in is usable on mobile and opens the shared code form"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 1473,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "event type buttons filter instantly, preserve deep links, and never submit a confirmation form"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 1881,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as lists actual D1 users and switching to Visitor ends only the current session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3497,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as can choose an unregistered D1 account without changing it"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2304,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "account navigation and profile controls are usable on desktop and mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3232,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "local account selection rejects cross-origin writes and unknown users"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2347,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as simulates a verified factor without changing the user's real role or enrollment"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2339,
+              "errors": []
+            }
+          ]
+        },
+        {
+          "wallMs": 10167.282,
+          "exitCode": 0,
+          "counts": {
+            "tests": 20,
+            "passed": 16,
+            "failed": 0,
+            "skipped": 4,
+            "flaky": 0
+          },
+          "runnerMs": 8968.371,
+          "workers": 8,
+          "errors": [],
+          "cases": [
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "email sign-in validates, loads, switches to code, and resets"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3390,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "real email cooldowns and empty HTTP 429 responses are readable and retryable"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3357,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "registration shows all required errors and saves after they are corrected"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 6411,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "authenticator setup and sign-in show inline required and code errors"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 6238,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/account-forms.spec.ts",
+              "names": [
+                "private pages make no third-party requests and remain usable on mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 1907,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed site uses real account features and shows a banner only on previews"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 5,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "account and organizer routes require sign-in without loading mockups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 5,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "private pages exclude indexing and the database is available"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 3,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed sign-in is enabled with no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "skipped",
+              "durationMs": 2,
+              "errors": [],
+              "skipReason": "Deployed Worker check only"
+            },
+            {
+              "file": "tests/ui/local-accounts.spec.ts",
+              "names": [
+                "local D1 sign-in uses dialogs for delivery, errors and valid codes"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 4585,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/local-accounts.spec.ts",
+              "names": [
+                "local D1 email links are one-use and sign-in pages have no third-party requests"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 4298,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/local-notifications.spec.ts",
+              "names": [
+                "local approval notifications work without crypto.randomUUID"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 4293,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/notification-choice.spec.ts",
+              "names": [
+                "organizer email choice defaults to no email and cancellation restores controls"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2573,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "volunteer-page sign-in is usable on mobile and opens the shared code form"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 1429,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "event type buttons filter instantly, preserve deep links, and never submit a confirmation form"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2136,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as lists actual D1 users and switching to Visitor ends only the current session"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3226,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as can choose an unregistered D1 account without changing it"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2636,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "account navigation and profile controls are usable on desktop and mobile"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 3489,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "local account selection rejects cross-origin writes and unknown users"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2573,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/volunteer.spec.ts",
+              "names": [
+                "View as simulates a verified factor without changing the user's real role or enrollment"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 2612,
+              "errors": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ui-deployed",
+      "label": "Deployed browser smoke tests",
+      "kind": "browser",
+      "command": "pnpm exec playwright test tests/ui/deployed-site.spec.ts --reporter=json",
+      "samples": [
+        {
+          "wallMs": 2631.87,
+          "exitCode": 0,
+          "counts": {
+            "tests": 4,
+            "passed": 4,
+            "failed": 0,
+            "skipped": 0,
+            "flaky": 0
+          },
+          "runnerMs": 1439.715,
+          "workers": 8,
+          "errors": [],
+          "cases": [
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed site uses real account features and shows a banner only on previews"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 838,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "account and organizer routes require sign-in without loading mockups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 298,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "private pages exclude indexing and the database is available"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 193,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed sign-in is enabled with no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 373,
+              "errors": []
+            }
+          ]
+        },
+        {
+          "wallMs": 2630.898,
+          "exitCode": 0,
+          "counts": {
+            "tests": 4,
+            "passed": 4,
+            "failed": 0,
+            "skipped": 0,
+            "flaky": 0
+          },
+          "runnerMs": 1446.846,
+          "workers": 8,
+          "errors": [],
+          "cases": [
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed site uses real account features and shows a banner only on previews"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 845,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "account and organizer routes require sign-in without loading mockups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 271,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "private pages exclude indexing and the database is available"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 184,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed sign-in is enabled with no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 380,
+              "errors": []
+            }
+          ]
+        },
+        {
+          "wallMs": 2687.903,
+          "exitCode": 0,
+          "counts": {
+            "tests": 4,
+            "passed": 4,
+            "failed": 0,
+            "skipped": 0,
+            "flaky": 0
+          },
+          "runnerMs": 1465.954,
+          "workers": 8,
+          "errors": [],
+          "cases": [
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed site uses real account features and shows a banner only on previews"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 867,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "account and organizer routes require sign-in without loading mockups"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 277,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "private pages exclude indexing and the database is available"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 183,
+              "errors": []
+            },
+            {
+              "file": "tests/ui/deployed-site.spec.ts",
+              "names": [
+                "deployed sign-in is enabled with no third-party scripts or frames"
+              ],
+              "nesting": 0,
+              "type": "test",
+              "container": false,
+              "status": "passed",
+              "durationMs": 391,
+              "errors": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warmupFailures": [],
+  "setupMs": 14103.593,
+  "finishedAt": "2026-10-07T23:09:07.386Z",
+  "inventoryStable": true,
+  "valid": true
+}

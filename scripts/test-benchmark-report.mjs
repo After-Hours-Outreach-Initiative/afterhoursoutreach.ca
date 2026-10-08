@@ -63,7 +63,7 @@ export function renderReport(data, baseline, options) {
     `**${data.valid ? "Valid baseline: all measured runs and warm-ups passed." : "Failed or incomplete runs: do not treat this as a passing performance baseline."}**`,
     "",
     `- ${cases.size} distinct registered tests across ${files.length} test files; ${executed} executed in at least one profile.`,
-    `- ${containers} of the registered Node tests are parent/container tests; ${cases.size - containers} are leaf cases. Parent timings include their children.`,
+    `- ${cases.size - containers} leaf cases and ${containers} legacy parent/container tests. Vitest describes are suites, not extra test cases; historical Node parent timings include their children.`,
     `- ${data.options.warmups} untimed warm-up round(s), then ${data.options.runs} measured rounds. Suites run sequentially; each test runner retains its normal parallelism.`,
     `- Local browser data: ${data.options.localServer === "isolated" ? "a temporary copy of the current working tree, a fresh local D1 database and synthetic fixtures; no developer server/database/secrets reused" : "the supplied existing localhost server/database"}. State is reused across rounds, so test-created accounts accumulate.`,
     `- One-off development-server/database setup: ${seconds(data.setupMs)}; excluded from measured suite times. Builds, runner startup and browser startup are included in their respective wall times.`,
@@ -184,11 +184,11 @@ export function renderReport(data, baseline, options) {
       }),
     ),
     "",
-    "Build and test commands are launched separately so their costs are visible. The combined figures are the sum for each measured round, including both command launches; they are not measurements of one shell invocation of the package script. Node phases cover the same file globs as the package scripts. The root Node group also includes local D1/Miniflare tests, not only pure unit tests. Empty Node groups are recorded as zero tests without launching auto-discovery; regular package scripts may reject empty globs.",
+    "Build and test commands are launched separately so their costs are visible. The combined figures are the sum for each measured round, including both command launches; they are not measurements of one shell invocation of the package script. Vitest phases select the same projects as the package scripts. The unit phase includes Node utility tests and source-level tests inside Cloudflare's runtime. Built Worker tests remain in Node-hosted Vitest projects to exercise the actual production/preview artifacts. Empty groups are recorded as zero tests without launching a runner.",
     "",
     "## Per-file benchmarks",
     "",
-    "These are summed top-level Node durations (including setup inside parent tests) or summed Playwright case durations, **not** file wall times. Nested child durations are not added a second time. Runner/process/browser startup outside cases is visible only in the suite wall times.",
+    "Vitest JSON reports each file's elapsed span from its first leaf case to its last, including intervening hooks but excluding outer beforeAll/afterAll and collection. Historical Node snapshots use summed top-level durations, including setup inside parent tests; Playwright uses summed case durations. These measures are not directly equivalent. Full fixture, runner and browser costs are captured by phase wall times.",
     "",
     table(
       [
@@ -196,7 +196,7 @@ export function renderReport(data, baseline, options) {
         "File",
         "Tests",
         "Leaf cases",
-        "Median body time",
+        "Median file/test time",
         "Min",
         "Max",
       ],
@@ -214,10 +214,12 @@ export function renderReport(data, baseline, options) {
             (item) => item.file === file,
           );
           const timing = statistics(
-            phase.samples.map((sample) =>
-              (sample.cases ?? [])
-                .filter((item) => item.file === file && item.nesting === 0)
-                .reduce((sum, item) => sum + item.durationMs, 0),
+            phase.samples.map(
+              (sample) =>
+                sample.files?.find((item) => item.file === file)?.durationMs ??
+                (sample.cases ?? [])
+                  .filter((item) => item.file === file && item.nesting === 0)
+                  .reduce((sum, item) => sum + item.durationMs, 0),
             ),
           );
           return [
@@ -235,7 +237,7 @@ export function renderReport(data, baseline, options) {
     "",
     "## Complete test inventory and timings",
     "",
-    "Sorted by median measured case duration, slowest first. Skipped profiles are excluded from case timing statistics. Containers are marked; removing a child will affect its parent's inclusive duration too. Identities use file and full test name, not line numbers, so deleting earlier tests does not make unchanged tests appear renamed.",
+    "Sorted by median measured case duration, slowest first. Skipped profiles are excluded from case timing statistics. Legacy containers are marked; removing a child affects its parent's inclusive duration too. Vitest case timings exclude suite-level fixture hooks. Identities use file and full test name, not line numbers, so deleting earlier tests does not make unchanged tests appear renamed.",
     "",
     table(
       ["File", "Test", "Profiles/status", "Median", "Min", "Max"],
@@ -259,6 +261,9 @@ export function renderReport(data, baseline, options) {
   ];
   if (baseline) {
     const previous = inventory(baseline);
+    const previousContainers = [...previous.values()].filter(
+      (item) => item.container,
+    ).length;
     const currentIds = new Set(cases.keys());
     const removed = [...previous]
       .filter(([id]) => !currentIds.has(id))
@@ -271,6 +276,7 @@ export function renderReport(data, baseline, options) {
       "## Comparison with baseline",
       "",
       `Baseline: ${baseline.startedAt}, commit \`${baseline.commit}\`. Distinct registered tests: ${previous.size} → ${cases.size} (${cases.size - previous.size >= 0 ? "+" : ""}${cases.size - previous.size}).`,
+      `Leaf cases: ${previous.size - previousContainers} → ${cases.size - containers}. Parent/container counts: ${previousContainers} → ${containers}. A runner changing its suite-counting convention is not a coverage reduction.`,
     );
     if (
       JSON.stringify(data.environment) !==
