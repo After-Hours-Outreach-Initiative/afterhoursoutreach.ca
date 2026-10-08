@@ -119,7 +119,7 @@ test("duplicate confirmed signup is rejected, cancelled signup permits a new one
   signUp("replacement", "orientation", "alice");
 });
 
-test("inactive, unregistered, hidden and started events reject signups", () => {
+test("inactive, unregistered, closed, hidden, cancelled and started events reject signups", () => {
   db.exec("UPDATE volunteer_status SET active = 0 WHERE user_id = 'alice'");
   assert.throws(
     () => signUp("inactive", "orientation", "alice"),
@@ -137,7 +137,21 @@ test("inactive, unregistered, hidden and started events reject signups", () => {
     () => signUp("closed", "orientation", "bob"),
     /signup_not_eligible/,
   );
-  db.exec("UPDATE event SET open = 1, starts_at = 0 WHERE id = 'orientation'");
+  db.exec("UPDATE event SET open = 1, hidden = 1 WHERE id = 'orientation'");
+  assert.throws(
+    () => signUp("hidden", "orientation", "bob"),
+    /signup_not_eligible/,
+  );
+  db.exec(
+    "UPDATE event SET hidden = 0, cancelled_at = 1 WHERE id = 'orientation'",
+  );
+  assert.throws(
+    () => signUp("cancelled", "orientation", "bob"),
+    /signup_not_eligible/,
+  );
+  db.exec(
+    "UPDATE event SET cancelled_at = NULL, starts_at = 0 WHERE id = 'orientation'",
+  );
   assert.throws(
     () => signUp("past", "orientation", "bob"),
     /signup_not_eligible/,

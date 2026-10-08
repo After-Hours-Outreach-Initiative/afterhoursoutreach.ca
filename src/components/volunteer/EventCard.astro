@@ -1,7 +1,7 @@
 ---
-import type { Actor } from "@/server/accounts/access";
-import type { EventRow, RosterRow } from "@/server/events/service";
-import { signupBlockReason } from "@/server/events/policy";
+import type { Actor } from "@/server/db/access";
+import type { EventRow, RosterRow } from "@/server/db/events";
+import { signupBlockReason } from "@/server/db/policy";
 import { formatEventDate } from "@/data/event-time";
 import EventEditor from "./EventEditor.astro";
 import EventRoster from "./EventRoster.astro";

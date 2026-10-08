@@ -1,13 +1,14 @@
 import { z } from "zod";
-import type { Actor } from "../accounts/access";
+import type { Actor } from "./access";
 import {
   requireOrganizer,
   requireVolunteer,
   writePermission,
   permissionValues,
-} from "../accounts/access";
+} from "./access";
 import { RequestError } from "../http";
-import { nowMsSql } from "../db/sql";
+import { nowMsSql } from "./sql";
+import { databaseWriteError } from "./errors";
 
 export const eventSchema = z.strictObject({
   type: z.enum(["patrol", "orientation"]),
@@ -163,31 +164,6 @@ function notifyRoster(
       Number(notify),
     );
 }
-export function eventWriteError(error: unknown): never {
-  if (error instanceof RequestError) throw error;
-  const message =
-    error instanceof Error
-      ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
-      : "";
-  if (message.includes("event_full"))
-    throw new RequestError(409, "This event is full.");
-  if (message.includes("signup_not_eligible"))
-    throw new RequestError(
-      403,
-      "This event is closed or you are not eligible to sign up.",
-    );
-  if (message.includes("capacity_below_signups"))
-    throw new RequestError(
-      409,
-      "Capacity cannot be lower than the number of signups.",
-    );
-  if (message.includes("last_organizer"))
-    throw new RequestError(409, "Keep at least one active organizer.");
-  if (message.includes("UNIQUE constraint failed: signup"))
-    throw new RequestError(409, "You are already signed up.");
-  throw error;
-}
-
 export async function saveEvent(
   db: Env["DB"],
   actor: Actor,
@@ -313,7 +289,7 @@ export async function saveEvent(
     }
     return { operation, message: "Event saved." };
   } catch (error) {
-    return eventWriteError(error);
+    return databaseWriteError(error);
   }
 }
 
@@ -443,7 +419,7 @@ export async function changeSignup(
           : "Your signup was cancelled.",
     };
   } catch (error) {
-    return eventWriteError(error);
+    return databaseWriteError(error);
   }
 }
 
@@ -557,6 +533,6 @@ export async function manageSignup(
       throw new RequestError(409, "This signup changed. Reload the page.");
     return { operation, message: next ? "Signup moved." : "Signup removed." };
   } catch (error) {
-    return eventWriteError(error);
+    return databaseWriteError(error);
   }
 }

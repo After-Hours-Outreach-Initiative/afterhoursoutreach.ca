@@ -6,8 +6,8 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import { saveProfile } from "@/server/accounts/profile";
-import { takeRateLimit } from "@/server/auth/abuse";
+import { saveProfile } from "@/server/db/profiles";
+import { takeRateLimit } from "@/server/db/rate-limits";
 import {
   errorResponse,
   readJson,

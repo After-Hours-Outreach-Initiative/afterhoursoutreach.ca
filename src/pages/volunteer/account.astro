@@ -10,7 +10,7 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import { loadProfile } from "@/server/accounts/profile";
+import { loadProfile } from "@/server/db/profiles";
 import type { RegistrationAnswers } from "@/data/registration";
 export const prerender = false;
 let values: RegistrationAnswers | null = null;

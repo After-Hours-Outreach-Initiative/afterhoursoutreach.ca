@@ -1,5 +1,5 @@
 import { RequestError } from "../http";
-import { emailPolicy } from "../email-policy";
+import { emailPolicy } from "../db/policy";
 
 export interface SignInEmail {
   email: string;

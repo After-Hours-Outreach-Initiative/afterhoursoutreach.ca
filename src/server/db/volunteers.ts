@@ -7,8 +7,8 @@ import {
 } from "./access";
 import type { RegistrationAnswers } from "../../data/registration";
 import { RequestError } from "../http";
-import { eventWriteError } from "../events/service";
-import { nowMsSql } from "../db/sql";
+import { databaseWriteError } from "./errors";
+import { nowMsSql } from "./sql";
 
 export interface VolunteerRow {
   id: string;
@@ -47,6 +47,19 @@ export async function listVolunteers(
     rows: rows.results.slice(0, volunteerPageSize),
     hasMore: rows.results.length > volunteerPageSize,
   };
+}
+
+export function findVolunteer(db: Env["DB"], actor: Actor, userId: string) {
+  requireOrganizer(actor);
+  return db
+    .prepare(
+      `SELECT u.id, u.name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+        v.active, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
+      FROM user u JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
+    )
+    .bind(userId)
+    .first<VolunteerRow>();
 }
 
 /** Log before reading sensitive answers; failed logging means no disclosure. */
@@ -240,7 +253,7 @@ export async function setVolunteerStatus(
       );
     return { operation, message: "Volunteer access saved." };
   } catch (error) {
-    return eventWriteError(error);
+    return databaseWriteError(error);
   }
 }
 
@@ -337,7 +350,7 @@ export async function setRole(
       message: "Role saved. The volunteer must sign in again.",
     };
   } catch (error) {
-    return eventWriteError(error);
+    return databaseWriteError(error);
   }
 }
 

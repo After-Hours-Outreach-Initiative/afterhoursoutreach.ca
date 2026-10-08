@@ -11,8 +11,8 @@ import {
 } from "./account-forms";
 
 if (import.meta.env.DEV) {
-  void import("./account-switcher").then(({ initAccountSwitcher }) =>
-    initAccountSwitcher(),
+  void import("../dev/scripts/account-switcher").then(
+    ({ initAccountSwitcher }) => initAccountSwitcher(),
   );
 }
 
@@ -122,7 +122,8 @@ function emailOptions(returnTo?: string) {
 
 form("[data-email-request]", async (element, values) => {
   if (import.meta.env.DEV) {
-    const { chooseEmailOutcome } = await import("./local-email-dialog");
+    const { chooseEmailOutcome } =
+      await import("../dev/scripts/local-email-dialog");
     const outcome = await chooseEmailOutcome();
     if (!outcome) return;
     if (outcome !== "success") {
@@ -161,7 +162,8 @@ form("[data-email-request]", async (element, values) => {
       false;
   }
   if (import.meta.env.DEV && result.localEmail) {
-    const { localEmailDialog } = await import("./local-email-dialog");
+    const { localEmailDialog } =
+      await import("../dev/scripts/local-email-dialog");
     const outcome = await localEmailDialog({
       title: "Local sign-in email",
       emails: [

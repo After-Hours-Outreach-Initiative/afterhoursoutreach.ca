@@ -1,6 +1,5 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
   authBindingsForRequest,
@@ -8,8 +7,7 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import { createDatabase } from "@/server/db";
-import { session } from "@/server/db/schema";
+import { findOwnSession } from "@/server/db/sessions";
 import {
   errorResponse,
   readJson,
@@ -37,16 +35,11 @@ export const POST: APIRoute = async ({ request }) => {
       return auth.api.signOut({ headers: request.headers, asResponse: true });
     // Keep bearer tokens out of the browser: resolve the submitted ID only
     // within this user's sessions, then let Better Auth perform revocation.
-    const target = await createDatabase(env.DB)
-      .select({ token: session.token })
-      .from(session)
-      .where(
-        and(
-          eq(session.id, parsed.data.id),
-          eq(session.user_id, current.user.id),
-        ),
-      )
-      .get();
+    const target = await findOwnSession(
+      env.DB,
+      current.user.id,
+      parsed.data.id,
+    );
     if (target) {
       const revoked = await auth.api.revokeSession({
         headers: request.headers,

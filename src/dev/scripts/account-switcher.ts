@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/client";
 import { InferServerPlugin } from "better-auth/client/plugins";
-import type { AccountAuth } from "../server/auth";
-import { authClient } from "./auth-client";
+import type { AccountAuth } from "../../server/auth";
+import { authClient } from "../../scripts/auth-client";
 
 // This module is loaded only in development; server imports are type-only.
 const developmentAuthClient = createAuthClient({

@@ -1,3 +1,4 @@
+// User-facing previews of the rules enforced by database writes and triggers.sql.
 export interface SignupVolunteer {
   registered: boolean;
   active: boolean;
@@ -41,3 +42,10 @@ export function canViewVolunteerProfile(actor: {
     (!actor.twoFactorEnabled || actor.twoFactorVerified)
   );
 }
+
+export const emailPolicy = {
+  // Sign-in and event mail share a budget below the provider's 100/day quota.
+  dailyLimit: 80,
+  budgetWindowMs: 24 * 60 * 60 * 1000,
+  timeoutMs: 10 * 1000,
+};

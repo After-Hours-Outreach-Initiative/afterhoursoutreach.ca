@@ -5,8 +5,9 @@ import {
   readAccountSession,
 } from "../auth";
 import type { AuthBindings } from "../auth";
-import { createDatabase } from "../db";
-import { volunteerStatus, profile } from "../db/schema";
+import { createDatabase } from ".";
+import { volunteerStatus } from "./schema";
+import { isRegistered } from "./profiles";
 import { RequestError, requireSameOrigin } from "../http";
 
 export async function accountContext(
@@ -29,12 +30,7 @@ export async function accountContext(
   const status = await db.query.volunteerStatus.findFirst({
     where: eq(volunteerStatus.user_id, person.id),
   });
-  const registered = Boolean(
-    await db.query.profile.findFirst({
-      where: eq(profile.user_id, person.id),
-      columns: { user_id: true },
-    }),
-  );
+  const registered = await isRegistered(bindings.DB, person.id);
   return {
     actor: {
       id: person.id,

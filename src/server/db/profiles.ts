@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { RegistrationAnswers } from "../../data/registration";
-import { createDatabase } from "../db";
-import { profile, user, volunteerStatus, auditLog } from "../db/schema";
+import { createDatabase } from ".";
+import { profile, user, volunteerStatus, auditLog } from "./schema";
 import { RequestError } from "../http";
 
 const shortAnswer = z.string().trim().min(1).max(200);
@@ -43,6 +43,15 @@ export const profileSchema = z.strictObject({
   experience: longAnswer,
   medicalConditions: z.string().trim().max(2000),
 });
+
+export async function isRegistered(binding: Env["DB"], userId: string) {
+  return Boolean(
+    await createDatabase(binding).query.profile.findFirst({
+      where: eq(profile.user_id, userId),
+      columns: { user_id: true },
+    }),
+  );
+}
 
 export async function loadProfile(binding: Env["DB"], userId: string) {
   const row = await createDatabase(binding).query.profile.findFirst({

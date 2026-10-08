@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { authBindingsForRequest, createAuth } from "@/server/auth";
-import { takeRateLimit } from "@/server/auth/abuse";
+import { takeRateLimit } from "@/server/db/rate-limits";
 import {
   errorResponse,
   readJson,

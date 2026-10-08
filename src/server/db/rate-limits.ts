@@ -1,5 +1,7 @@
 import { RequestError } from "../http";
-import { emailPolicy } from "../email-policy";
+import { emailPolicy } from "./policy";
+
+// Persistent counters are shared across requests and Worker instances.
 
 export async function hashAuthValue(secret: string | undefined, value: string) {
   if (!secret) throw new RequestError(503, "Sign-in is not configured yet.");

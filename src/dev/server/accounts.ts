@@ -11,14 +11,14 @@ import {
 } from "better-auth/cookies";
 import { asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
-import { createDatabase } from "../db";
-import { profile, user } from "../db/schema";
-import { safeReturnTo } from "../http";
-import type { AuthBindings } from "./index";
+import { createDatabase } from "../../server/db";
+import { profile, user } from "../../server/db/schema";
+import { safeReturnTo } from "../../server/http";
+import type { AuthBindings } from "../../server/auth";
 
 export function developmentAccounts(bindings: AuthBindings) {
   const requireLocal = (request: Request | undefined) => {
-    if (!request || !import.meta.env?.DEV)
+    if (!request || !("env" in import.meta) || !import.meta.env.DEV)
       throw new APIError("NOT_FOUND", { message: "Not found" });
     const origin = request.headers.get("origin");
     const expectedOrigin = new URL(request.url).origin;

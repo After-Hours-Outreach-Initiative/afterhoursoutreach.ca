@@ -1,9 +1,9 @@
 ---
 import { env } from "cloudflare:workers";
-import { accountContext, requireOrganizer } from "@/server/accounts/access";
+import { accountContext, requireOrganizer } from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
-import { listEvents, listRosters } from "@/server/events/service";
-import { countNotifications } from "@/server/events/notifications";
+import { listEvents, listRosters } from "@/server/db/events";
+import { countNotifications } from "@/server/db/notifications";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
 import EventCard from "./EventCard.astro";

@@ -4,7 +4,6 @@ import { expireCookie } from "better-auth/cookies";
 import { emailOTP } from "better-auth/plugins/email-otp";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "../db";
 import * as schema from "../db/schema";
@@ -13,9 +12,23 @@ import {
   cleanupAuthRecords,
   limitEmailRequests,
   limitEmailVerification,
-} from "./abuse";
+} from "../db/rate-limits";
+import { isRegistered } from "../db/profiles";
+import { markSessionSecondFactorVerified } from "../db/sessions";
 import { sendSignInEmail, type SignInEmail } from "./services";
-import { developmentAccounts } from "./development";
+
+// A build-time gate keeps the development plugin out of deployed Workers.
+// Direct .DEV access lets Vite replace the flag; the property check also keeps
+// this module importable in Node tests, which have no Vite environment object.
+const development = "env" in import.meta && import.meta.env.DEV;
+let developmentAccounts:
+  typeof import("../../dev/server/accounts").developmentAccounts | undefined;
+if ("env" in import.meta) {
+  if (import.meta.env.DEV) {
+    developmentAccounts = (await import("../../dev/server/accounts"))
+      .developmentAccounts;
+  }
+}
 
 export type AuthBindings = Pick<
   Env,
@@ -28,7 +41,7 @@ export function authBindingsForRequest(
   request: Request,
 ) {
   const url = new URL(request.url);
-  const local = import.meta.env?.DEV;
+  const local = development;
   // Pin hosted sign-in links to AUTH_BASE_URL when configured. Otherwise use
   // the URL routed to this Worker, not Host or X-Forwarded-Host headers.
   const origin =
@@ -116,7 +129,7 @@ export function createAuth(
           code: otp,
           url: url.href,
         });
-        if (import.meta.env?.DEV && localEmail && ctx)
+        if (development && localEmail && ctx)
           emailDeliveries.set(ctx.context, { localEmail });
       } catch (error) {
         // Better Auth intentionally swallows delivery callback errors. Keep a
@@ -176,10 +189,7 @@ export function createAuth(
             if (!result.success) return;
             const token =
               ctx.context.newSession?.session.token ?? result.data.token;
-            await db
-              .update(schema.session)
-              .set({ two_factor_verified: true })
-              .where(eq(schema.session.token, token));
+            await markSessionSecondFactorVerified(bindings.DB, token);
             const cookie = ctx.context.createAuthCookie("sign_in_return");
             const value = await ctx.getSignedCookie(
               cookie.name,
@@ -321,7 +331,7 @@ export function createAuth(
           const delivery = emailDeliveries.get(ctx.context);
           if (delivery && "error" in delivery)
             return Response.json({ message: delivery.error }, { status: 503 });
-          if (import.meta.env?.DEV && delivery?.localEmail)
+          if (development && delivery?.localEmail)
             return ctx.json({
               success: true,
               localEmail: delivery.localEmail,
@@ -332,10 +342,7 @@ export function createAuth(
         const current = ctx.context.newSession;
         const result = signInResultSchema.safeParse(ctx.context.returned);
         if (!current || !result.success) return;
-        const registered = await db.query.profile.findFirst({
-          where: eq(schema.profile.user_id, current.user.id),
-          columns: { user_id: true },
-        });
+        const registered = await isRegistered(bindings.DB, current.user.id);
         const next = registered
           ? signInReturnTo(ctx.query)
           : "/volunteer/register";
@@ -359,7 +366,7 @@ export function createAuth(
       emailSignIn,
       secondFactor,
       verificationMarker,
-      ...(import.meta.env?.DEV ? [developmentAccounts(bindings)] : []),
+      ...(developmentAccounts ? [developmentAccounts(bindings)] : []),
     ],
   });
 }

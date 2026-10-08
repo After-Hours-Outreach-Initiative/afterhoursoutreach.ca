@@ -5,7 +5,7 @@ import {
   signupBlockReason,
   type SignupEvent,
   type SignupVolunteer,
-} from "../src/server/events/policy";
+} from "../src/server/db/policy";
 
 const now = new Date("2026-10-01T19:00:00Z");
 const event: SignupEvent = {

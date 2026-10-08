@@ -1,10 +1,11 @@
 ---
 import { env } from "cloudflare:workers";
-import { accountContext, requireOrganizer } from "@/server/accounts/access";
+import { accountContext, requireOrganizer } from "@/server/db/access";
 import {
+  findVolunteer,
   viewVolunteerProfile,
   type VolunteerRow,
-} from "@/server/accounts/organizers";
+} from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
 import { registrationFields } from "@/data/registration";
@@ -27,14 +28,7 @@ try {
   accountName = actor.name;
   accountEmail = email;
   values = await viewVolunteerProfile(env.DB, actor, Astro.params.id ?? "");
-  person = await env.DB.prepare(
-    `SELECT u.id, u.name, u.role, u.two_factor_enabled AS twoFactorEnabled,
-    v.active, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
-    (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
-    FROM user u JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
-  )
-    .bind(Astro.params.id ?? "")
-    .first<VolunteerRow>();
+  person = await findVolunteer(env.DB, actor, Astro.params.id ?? "");
 } catch (error) {
   return new Response(
     error instanceof RequestError

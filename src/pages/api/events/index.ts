@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { authBindingsForRequest } from "@/server/auth";
-import { listEvents } from "@/server/events/service";
+import { listEvents } from "@/server/db/events";
 import { errorResponse } from "@/server/http";
 
 export const prerender = false;
