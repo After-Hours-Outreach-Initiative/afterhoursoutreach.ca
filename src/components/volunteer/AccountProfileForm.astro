@@ -1,9 +1,11 @@
 ---
 import {
+  profileFields,
   registrationFields,
   type RegistrationAnswers,
 } from "@/data/registration";
 import FieldError from "@/components/FieldError.astro";
+import CodeOfConduct from "./CodeOfConduct.astro";
 interface Props {
   email: string;
   values?: RegistrationAnswers | null;
@@ -26,7 +28,7 @@ const { email, values, registration = false } = Astro.props;
       ></label
     >
     {
-      registrationFields.map((field) => (
+      (registration ? registrationFields : profileFields).map((field) => (
         <div
           class:list={[
             "volunteer-field",
@@ -121,6 +123,7 @@ const { email, values, registration = false } = Astro.props;
       <FieldError field="teams" />
     </fieldset>
   </div>
+  {registration && <CodeOfConduct />}
   <p data-form-message role="status" aria-live="polite" hidden></p>
   <button type="submit" class="btn btn-primary"
     >{registration ? "Complete registration" : "Save profile"}</button

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createLocalAccount, sampleAnswers } from "../helpers/local-account";
 
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
@@ -15,6 +16,71 @@ test.beforeEach(async ({ page, baseURL }) => {
   await expect(
     page.getByRole("button", { name: "Continue with Email" }),
   ).toBeVisible();
+});
+
+test("unfinished registration shows a clickable yellow warning card without clipping", async ({
+  page,
+  baseURL,
+}) => {
+  await page.goto("/volunteer");
+  const warning = page.getByRole("link", {
+    name: "Complete your registration to sign up for events",
+    exact: true,
+  });
+  await expect(warning).toHaveCount(0);
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/volunteer");
+  await expect(warning).toBeVisible();
+  await expect(warning).toHaveClass(/volunteer-registration-warning/);
+  await expect(warning).toHaveAttribute("href", "/volunteer/register");
+  await expect(warning).toHaveText(
+    "Complete your registration to sign up for events",
+  );
+  await expect(warning).toHaveCSS("background-color", "rgb(33, 26, 8)");
+  await expect(warning).toHaveCSS("border-top-color", "rgb(161, 98, 7)");
+  const icon = warning.locator("svg.volunteer-warning-icon");
+  await expect(icon).toBeVisible();
+  await expect(icon).toHaveAttribute("aria-hidden", "true");
+  await expect(icon).toHaveCSS("color", "rgb(250, 204, 21)");
+  const arrow = warning.locator("svg.volunteer-registration-warning-arrow");
+  await expect(arrow).toBeVisible();
+  await expect(arrow).toHaveAttribute("aria-hidden", "true");
+  const text = warning.locator(".volunteer-registration-warning-text");
+  expect(
+    await text.evaluate(
+      (element) =>
+        element.getBoundingClientRect().height <=
+        Number.parseFloat(getComputedStyle(element).lineHeight) + 1,
+    ),
+  ).toBe(true);
+  for (const width of [375, 320]) {
+    await page.setViewportSize({ width, height: 812 });
+    await expect(text).toHaveCSS("white-space", "normal");
+    expect(
+      await text.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+  }
+  await warning.focus();
+  await warning.press("Enter");
+  await expect(page).toHaveURL(/\/volunteer\/register$/);
+  await page.goto("/volunteer");
+  // The padding is clickable too, not just the text or arrow.
+  await warning.click({ position: { x: 4, y: 4 } });
+  await expect(page).toHaveURL(/\/volunteer\/register$/);
+  const registered = await page.request.post("/api/account/profile", {
+    headers: { origin: baseURL! },
+    data: { ...sampleAnswers, codeOfConductAccepted: true },
+  });
+  expect(registered.status(), await registered.text()).toBe(200);
+  await page.goto("/volunteer");
+  await expect(warning).toHaveCount(0);
 });
 
 test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async ({

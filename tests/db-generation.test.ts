@@ -51,6 +51,39 @@ test("checked-in migrations are generated, unedited, and match the current sourc
   assert.equal(await generateDatabaseMigration({ check: true }), null);
 });
 
+test("the Code of Conduct migration preserves existing profiles without inventing acknowledgement", () => {
+  const db = database();
+  db.exec(
+    readFileSync(
+      new URL("../drizzle/0000_database.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  db.exec(`
+    INSERT INTO user (id, name, email, created_at, updated_at)
+      VALUES ('existing', 'Existing volunteer', 'existing@example.org', 1, 1);
+    INSERT INTO profile (
+      user_id, preferred_name, phone, birth_date, emergency_contact_name,
+      emergency_contact_phone, emergency_contact_relationship, heard_about_us,
+      motivation, teams, medical_certification, training_experience, registered_at, updated_at
+    ) VALUES ('existing', 'Existing volunteer', '604-555-0100', '1995-04-12',
+      'Contact', '604-555-0101', 'Friend', 'Friend', 'Help', '["outreach"]', 'None', 'None', 1, 1);
+  `);
+  const before = db.prepare("SELECT * FROM profile").get();
+  db.exec(
+    readFileSync(
+      new URL("../drizzle/0001_code_of_conduct.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  const after = db.prepare("SELECT * FROM profile").get()!;
+  const { code_of_conduct_version, code_of_conduct_accepted_at, ...answers } =
+    after;
+  assert.equal(code_of_conduct_version, null);
+  assert.equal(code_of_conduct_accepted_at, null);
+  assert.deepEqual(answers, { ...before });
+});
+
 test("generation creates runnable schema and triggers and is a no-op without changes", async () => {
   const directory = scratchDirectory();
   const options = { directory, schema, triggers };

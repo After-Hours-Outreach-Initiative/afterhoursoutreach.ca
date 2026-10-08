@@ -282,11 +282,16 @@ form("[data-second-factor]", async (_element, values) => {
 
 form("[data-account-profile]", async (element, values) => {
   const body = Object.fromEntries(
-    [...values].filter(([key]) => key !== "teams"),
+    [...values].filter(
+      ([key]) => key !== "teams" && key !== "codeOfConductAccepted",
+    ),
   );
   const result = await post("/api/account/profile", {
     ...body,
     teams: values.getAll("teams"),
+    ...(element.hasAttribute("data-registration") && {
+      codeOfConductAccepted: values.get("codeOfConductAccepted") === "true",
+    }),
   });
   const menuName = document.querySelector<HTMLElement>(
     "[data-account-menu-name]",

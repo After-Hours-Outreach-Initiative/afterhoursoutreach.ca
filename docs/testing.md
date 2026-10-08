@@ -11,7 +11,7 @@ remains the browser runner.
 | `pnpm test:watch`     | Watch the same unit and runtime projects                                              |
 | `pnpm test:accounts`  | Build production, then test the actual Worker and its browser flows                   |
 | `pnpm test:preview`   | Build preview, then test the actual preview Worker                                    |
-| `pnpm test:ui`        | Browser tests against a running local development server                              |
+| `pnpm test:ui`        | Browser tests with an automatically started server and disposable local D1 database   |
 | `pnpm test:benchmark` | Isolated local browser setup, builds and all test projects, with saved timing reports |
 
 Run a single source-level file with, for example:
@@ -59,10 +59,34 @@ and deployment regressions that source-level runtime tests cannot catch.
 Their embedded Playwright flows remain intact; the separate `tests/ui/`
 development and deployed read-only smoke tests also remain on Playwright.
 
-For local browser tests, start Astro in background mode as described in
-[backend.md](backend.md). The benchmark command instead creates and removes its
-own isolated working-tree copy, synthetic fixtures and local D1 database; it
-does not reuse or stop a developer server.
+Run `pnpm test:ui` without starting a server. Both this command and the benchmark
+create their own temporary copy of the current working tree, synthetic fixtures,
+local secrets, and fresh migrated D1 database. Astro runs in background mode on
+an unused port. The server is stopped and its temporary directory removed after
+the run, including failed tests. `pnpm test:ui` also handles Ctrl-C and SIGTERM.
+Neither command reuses, changes, or stops your development server/database.
+Existing test accounts in your development database are not deleted.
+
+Playwright arguments are forwarded normally:
+
+```sh
+pnpm test:ui tests/ui/local-accounts.spec.ts
+pnpm test:ui --grep "registration"
+```
+
+Local `PLAYWRIGHT_BASE_URL` overrides and the benchmark's former `--local-url`
+option are rejected to prevent accidental writes to a persistent dev database.
+Use `pnpm test:ui`, not bare `pnpm exec playwright test`, for local runs. Setup
+logs are retained under `test-results/ui/` (or `test-results/benchmarks/`). A hard
+process kill can leave a temporary directory/server behind, but cannot add
+accounts to your normal development database.
+
+An explicit HTTPS origin runs only the read-only deployed smoke suite and does
+not create a local database:
+
+```sh
+PLAYWRIGHT_BASE_URL=https://your-preview.workers.dev pnpm test:ui
+```
 
 ## Benchmark comparisons
 

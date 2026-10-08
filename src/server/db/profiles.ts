@@ -1,6 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { RegistrationAnswers } from "../../data/registration";
+import {
+  codeOfConductError,
+  codeOfConductVersion,
+} from "../../data/code-of-conduct";
 import { createDatabase } from ".";
 import { profile, user, volunteerStatus, auditLog } from "./schema";
 import { RequestError } from "../http";
@@ -42,6 +46,13 @@ export const profileSchema = z.strictObject({
   certification: shortAnswer,
   experience: longAnswer,
   medicalConditions: z.string().trim().max(2000),
+  codeOfConductAccepted: z.boolean().optional(),
+});
+
+// Older clients may still send these answers; profile edits never replace them.
+const profileEditSchema = profileSchema.partial({
+  heardAboutUs: true,
+  motivation: true,
 });
 
 export async function isRegistered(binding: Env["DB"], userId: string) {
@@ -80,14 +91,21 @@ export async function saveProfile(
   userId: string,
   input: unknown,
 ) {
-  const parsed = profileSchema.safeParse(input);
+  const old = await loadProfile(binding, userId);
+  const parsed = (old ? profileEditSchema : profileSchema).safeParse(input);
   if (!parsed.success)
     throw new RequestError(
       400,
       "Check the required fields, phone numbers, date of birth, and team selection.",
     );
-  const answers = parsed.data;
-  const old = await loadProfile(binding, userId);
+  const { codeOfConductAccepted, ...submitted } = parsed.data;
+  if (!old && codeOfConductAccepted !== true)
+    throw new RequestError(400, codeOfConductError);
+  const answers: RegistrationAnswers = {
+    ...submitted,
+    heardAboutUs: old?.heardAboutUs ?? submitted.heardAboutUs!,
+    motivation: old?.motivation ?? submitted.motivation!,
+  };
   const changedFields = (
     Object.keys(answers) as (keyof RegistrationAnswers)[]
   ).filter(
@@ -116,7 +134,13 @@ export async function saveProfile(
   await db.batch([
     db
       .insert(profile)
-      .values({ user_id: userId, ...values, registered_at: now })
+      .values({
+        user_id: userId,
+        ...values,
+        code_of_conduct_version: codeOfConductVersion,
+        code_of_conduct_accepted_at: now,
+        registered_at: now,
+      })
       .onConflictDoUpdate({ target: profile.user_id, set: values }),
     db
       .update(user)

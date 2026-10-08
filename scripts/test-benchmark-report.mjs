@@ -81,7 +81,7 @@ export function renderReport(data, baseline, options) {
     "",
     "The default outputs are `test-results/benchmarks/latest.md` and `test-results/benchmarks/latest.json`. The report lists test-count/runtime deltas and added/removed test names. Use the same machine, package versions, target, concurrency and run count. Avoid other builds/tests while measuring. Small changes within the observed min–max range may just be noise.",
     "",
-    "Use `--runs N` or `--warmups N` to change sampling, `--report FILE.md` and `--output FILE.json` to retain another snapshot, or `--local-url http://localhost:PORT` to opt into an existing development database. The default starts and stops its own Astro background server; it never stops your existing server. No deployment or remote database mutation is performed.",
+    "Use `--runs N` or `--warmups N` to change sampling, or `--report FILE.md` and `--output FILE.json` to retain another snapshot. Local browser tests always use their own Astro background server and disposable database; `--local-url` is no longer supported. Your existing development server is never stopped. No deployment or remote database mutation is performed.",
     "",
     "## Environment",
     "",

@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "triggers": [
+    {
+      "name": "signup_confirm_insert",
+      "sql": "-- Current database-enforced business rules. Edit this source, then run pnpm db:generate.\n-- Each trigger is one statement; the generator preserves it in a frozen migration.\n\n-- Check eligibility and capacity inside SQLite so concurrent writes cannot overbook.\nCREATE TRIGGER signup_confirm_insert\nBEFORE INSERT ON signup WHEN NEW.status = 'confirmed'\nBEGIN\n  SELECT RAISE(ABORT, 'signup_not_eligible')\n  WHERE NOT EXISTS (\n    SELECT 1 FROM event e\n    JOIN volunteer_status v ON v.user_id = NEW.user_id\n    JOIN profile p ON p.user_id = v.user_id\n    WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1\n      AND e.starts_at > (julianday('now') - 2440587.5) * 86400000\n      AND (e.type = 'orientation' OR v.patrol_approved = 1)\n  );\n  SELECT RAISE(ABORT, 'event_full')\n  WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed')\n    >= (SELECT spots FROM event WHERE id = NEW.event_id);\nEND;"
+    },
+    {
+      "name": "signup_confirm_update",
+      "sql": "CREATE TRIGGER signup_confirm_update\nBEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'\nBEGIN\n  SELECT RAISE(ABORT, 'signup_not_eligible')\n  WHERE NOT EXISTS (\n    SELECT 1 FROM event e\n    JOIN volunteer_status v ON v.user_id = NEW.user_id\n    JOIN profile p ON p.user_id = v.user_id\n    WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1\n      AND e.starts_at > (julianday('now') - 2440587.5) * 86400000\n      AND (e.type = 'orientation' OR v.patrol_approved = 1)\n  );\n  SELECT RAISE(ABORT, 'event_full')\n  WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id)\n    >= (SELECT spots FROM event WHERE id = NEW.event_id);\nEND;"
+    },
+    {
+      "name": "event_capacity_update",
+      "sql": "CREATE TRIGGER event_capacity_update\nBEFORE UPDATE OF spots ON event\nBEGIN\n  SELECT RAISE(ABORT, 'capacity_below_signups')\n  WHERE NEW.spots < (SELECT count(*) FROM signup WHERE event_id = OLD.id AND status = 'confirmed');\nEND;"
+    },
+    {
+      "name": "orientation_completion_insert",
+      "sql": "-- Completion is recorded separately from patrol approval.\nCREATE TRIGGER orientation_completion_insert\nBEFORE INSERT ON orientation_completion\nBEGIN\n  SELECT RAISE(ABORT, 'not_an_orientation')\n  WHERE NOT EXISTS (SELECT 1 FROM event WHERE id = NEW.event_id AND type = 'orientation');\nEND;"
+    },
+    {
+      "name": "orientation_completion_update",
+      "sql": "CREATE TRIGGER orientation_completion_update\nBEFORE UPDATE OF event_id ON orientation_completion\nBEGIN\n  SELECT RAISE(ABORT, 'not_an_orientation')\n  WHERE NOT EXISTS (SELECT 1 FROM event WHERE id = NEW.event_id AND type = 'orientation');\nEND;"
+    },
+    {
+      "name": "approval_organizer_insert",
+      "sql": "CREATE TRIGGER approval_organizer_insert\nBEFORE INSERT ON volunteer_status WHEN NEW.patrol_approved = 1\nBEGIN\n  SELECT RAISE(ABORT, 'approval_requires_organizer')\n  WHERE NOT EXISTS (SELECT 1 FROM user WHERE id = NEW.approved_by AND role = 'organizer');\nEND;"
+    },
+    {
+      "name": "approval_organizer_update",
+      "sql": "CREATE TRIGGER approval_organizer_update\nBEFORE UPDATE OF patrol_approved, approved_by ON volunteer_status WHEN NEW.patrol_approved = 1\nBEGIN\n  SELECT RAISE(ABORT, 'approval_requires_organizer')\n  WHERE NOT EXISTS (SELECT 1 FROM user WHERE id = NEW.approved_by AND role = 'organizer');\nEND;"
+    },
+    {
+      "name": "signup_visible_insert",
+      "sql": "-- Existing spots survive hiding/closing; new confirmed spots must be visible.\nCREATE TRIGGER signup_visible_insert BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'\nBEGIN\n  SELECT RAISE(ABORT, 'signup_not_eligible') WHERE EXISTS (\n    SELECT 1 FROM event WHERE id = NEW.event_id AND (hidden = 1 OR cancelled_at IS NOT NULL)\n  );\nEND;"
+    },
+    {
+      "name": "signup_visible_update",
+      "sql": "CREATE TRIGGER signup_visible_update BEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'\nBEGIN\n  SELECT RAISE(ABORT, 'signup_not_eligible') WHERE EXISTS (\n    SELECT 1 FROM event WHERE id = NEW.event_id AND (hidden = 1 OR cancelled_at IS NOT NULL)\n  );\nEND;"
+    },
+    {
+      "name": "keep_last_organizer",
+      "sql": "-- Preserve at least one active organizer.\nCREATE TRIGGER keep_last_organizer BEFORE UPDATE OF role ON user\nWHEN OLD.role = 'organizer' AND NEW.role != 'organizer'\nBEGIN\n  SELECT RAISE(ABORT, 'last_organizer') WHERE (SELECT count(*) FROM user WHERE role = 'organizer') <= 1;\n  SELECT RAISE(ABORT, 'last_organizer') WHERE NOT EXISTS (\n    SELECT 1 FROM user u JOIN volunteer_status v ON v.user_id=u.id\n    WHERE u.id != OLD.id AND u.role='organizer' AND v.active=1\n  );\nEND;"
+    },
+    {
+      "name": "keep_last_active_organizer",
+      "sql": "CREATE TRIGGER keep_last_active_organizer BEFORE UPDATE OF active ON volunteer_status\nWHEN OLD.active = 1 AND NEW.active = 0 AND EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id AND role = 'organizer')\nBEGIN\n  SELECT RAISE(ABORT, 'last_organizer') WHERE (\n    SELECT count(*) FROM user u JOIN volunteer_status v ON v.user_id = u.id WHERE u.role = 'organizer' AND v.active = 1\n  ) <= 1;\nEND;"
+    },
+    {
+      "name": "bootstrap_first_organizer",
+      "sql": "-- One-time organizer bootstrap: verified email and active registration, no mandatory 2FA.\nCREATE TRIGGER bootstrap_first_organizer BEFORE INSERT ON organizer_bootstrap\nBEGIN\n  SELECT RAISE(ABORT, 'organizer_already_exists') WHERE EXISTS (SELECT 1 FROM user WHERE role='organizer');\n  SELECT RAISE(ABORT, 'organizer_not_ready') WHERE NOT EXISTS (\n    SELECT 1 FROM user u JOIN profile p ON p.user_id=u.id JOIN volunteer_status v ON v.user_id=u.id\n    WHERE u.id=NEW.user_id AND u.email_verified=1 AND v.active=1\n  );\nEND;"
+    },
+    {
+      "name": "bootstrap_first_organizer_apply",
+      "sql": "CREATE TRIGGER bootstrap_first_organizer_apply AFTER INSERT ON organizer_bootstrap\nBEGIN\n  UPDATE user SET role='organizer',updated_at=NEW.created_at WHERE id=NEW.user_id;\n  INSERT INTO audit_log(id,actor_id,subject_id,action,changed_fields,created_at)\n    VALUES(lower(hex(randomblob(16))),NEW.user_id,NEW.user_id,'role_changed','[\"role\"]',NEW.created_at);\n  DELETE FROM session WHERE user_id=NEW.user_id;\nEND;"
+    }
+  ],
+  "sqlHash": "4f43e4b8675eab5b46ed92bd97c776b1d943bb8cb25c85133a4e4485ace09012"
+}

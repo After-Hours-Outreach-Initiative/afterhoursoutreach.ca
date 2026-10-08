@@ -133,6 +133,9 @@ export const profile = sqliteTable("profile", {
   medical_certification: text().notNull(),
   training_experience: text().notNull(),
   medical_conditions: text(),
+  // Nullable for existing/synthetic profiles; never invent an acknowledgement.
+  code_of_conduct_version: text(),
+  code_of_conduct_accepted_at: timestamp(),
   registered_at: timestamp().notNull(),
   updated_at: timestamp().notNull(),
 });

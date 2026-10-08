@@ -6,6 +6,12 @@ import { chromium, expect } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
+import {
+  codeOfConductConfirmation,
+  codeOfConductError,
+  codeOfConductRules,
+  codeOfConductVersion,
+} from "../../src/data/code-of-conduct";
 
 const origin = "https://afterhoursoutreach.ca";
 const secret = "test-only-worker-auth-secret-12345678901234567890";
@@ -144,14 +150,76 @@ describe(
     });
 
     test("registration and edits round-trip through the real API", async () => {
-      const response = await send("/api/account/profile", answers, cookie);
+      const unregisteredPortal = await send("/volunteer", undefined, cookie);
+      assert.equal(unregisteredPortal.status, 200);
+      const prompt = await unregisteredPortal.text();
+      assert.match(prompt, /volunteer-registration-warning/);
+      assert.match(prompt, /volunteer-warning-icon/);
+      assert.match(prompt, /volunteer-registration-warning-arrow/);
+      assert.match(prompt, /Complete your registration to sign up for events/);
+      assert.match(
+        prompt,
+        /<a\b[^>]*class="volunteer-registration-warning"[^>]*href="\/volunteer\/register"/,
+      );
+      assert.doesNotMatch(
+        prompt,
+        /Continue registration|Complete your profile before signing up for events\./,
+      );
+      for (const input of [
+        answers,
+        { ...answers, codeOfConductAccepted: false },
+        { ...answers, codeOfConductAccepted: "true" },
+        {
+          ...answers,
+          heardAboutUs: undefined,
+          motivation: undefined,
+          codeOfConductAccepted: true,
+        },
+      ]) {
+        const rejected = await send("/api/account/profile", input, cookie);
+        assert.equal(rejected.status, 400);
+      }
+      assert.equal(
+        await DB.prepare("SELECT user_id FROM profile WHERE user_id=?")
+          .bind(current.user.id)
+          .first(),
+        null,
+      );
+      const response = await send(
+        "/api/account/profile",
+        { ...answers, codeOfConductAccepted: true },
+        cookie,
+      );
       assert.equal(response.status, 200, await response.clone().text());
+      const registeredPortal = await send("/volunteer", undefined, cookie);
+      assert.equal(registeredPortal.status, 200);
+      assert.doesNotMatch(
+        await registeredPortal.text(),
+        /volunteer-registration-warning/,
+      );
+      const acknowledgement = await DB.prepare(
+        "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
+      )
+        .bind(current.user.id)
+        .first();
+      assert.equal(
+        acknowledgement?.code_of_conduct_version,
+        codeOfConductVersion,
+      );
+      assert.equal(
+        typeof acknowledgement?.code_of_conduct_accepted_at,
+        "number",
+      );
       const page = await send("/volunteer/account", undefined, cookie);
       assert.equal(page.status, 200);
       const html = await page.text();
       assert.match(html, /Worker Test Volunteer/);
       assert.match(html, /aria-label="Volunteer account"/);
       assert.match(html, /Sample private answer/);
+      assert.doesNotMatch(
+        html,
+        /How did you hear about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
+      );
       assert.doesNotMatch(
         html,
         /data-account-switcher|fonts.googleapis.com|cdn.shopify.com/,
@@ -462,6 +530,11 @@ describe(
         await page
           .getByRole("heading", { name: "Your account", exact: true })
           .waitFor();
+        await expect(
+          page.locator(
+            '[name="heardAboutUs"], [name="motivation"], .volunteer-code-of-conduct',
+          ),
+        ).toHaveCount(0);
         const nav = page.getByRole("navigation", {
           name: "Volunteer account",
         });
@@ -538,6 +611,17 @@ describe(
           changedName,
         );
         await page.reload();
+        assert.deepEqual(
+          await DB.prepare(
+            "SELECT heard_about_us, motivation FROM profile WHERE user_id=?",
+          )
+            .bind(current.user.id)
+            .first(),
+          {
+            heard_about_us: answers.heardAboutUs,
+            motivation: answers.motivation,
+          },
+        );
         assert.equal(
           (
             await menu.locator("[data-account-menu-name]").textContent()
@@ -602,11 +686,50 @@ describe(
           })
           .waitFor();
         await expect(newPage.locator("[data-account-menu]")).toBeVisible();
+        const conduct = newPage.getByRole("region", {
+          name: "Code of Conduct",
+          exact: true,
+        });
+        await expect(conduct.getByRole("listitem")).toHaveText(
+          codeOfConductRules.slice(0, 2),
+        );
+        const toggle = conduct.locator("summary");
+        await expect(toggle).toHaveAccessibleName("Read all 14 rules");
+        await toggle.click();
+        await expect(conduct.getByRole("listitem")).toHaveText([
+          ...codeOfConductRules,
+        ]);
+        await expect(toggle).toHaveAccessibleName("Show fewer rules");
+        const lastRule = await conduct
+          .getByRole("listitem")
+          .last()
+          .boundingBox();
+        const collapse = await toggle.boundingBox();
+        assert.ok(
+          lastRule && collapse && collapse.y >= lastRule.y + lastRule.height,
+          "Show fewer rules appears below the final rule.",
+        );
+        await toggle.click();
+        await expect(conduct.getByRole("listitem")).toHaveCount(2);
+        const confirmation = newPage.getByRole("checkbox", {
+          name: codeOfConductConfirmation,
+          exact: true,
+        });
+        await expect(confirmation).not.toBeChecked();
+        await expect(confirmation).toBeVisible();
         for (const [name, value] of Object.entries(answers)) {
           if (name === "teams") continue;
           await newPage.locator(`[name="${name}"]`).fill(String(value));
         }
         await newPage.locator('[name="teams"][value="outreach"]').check();
+        await newPage
+          .getByRole("button", { name: "Complete registration" })
+          .click();
+        await expect(
+          newPage.locator("[data-error=codeOfConductAccepted]"),
+        ).toHaveText(codeOfConductError);
+        await expect(confirmation).toBeFocused();
+        await confirmation.check();
         await newPage
           .getByRole("button", { name: "Complete registration" })
           .click();
@@ -624,6 +747,12 @@ describe(
           answers.name,
         );
         assert.equal(newPage.url(), `${origin}/volunteer/account`);
+        await expect(
+          newPage.getByRole("checkbox", {
+            name: codeOfConductConfirmation,
+            exact: true,
+          }),
+        ).toHaveCount(0);
         const consumed = await DB.prepare(
           "SELECT id FROM verification WHERE identifier = ?",
         )
@@ -666,7 +795,12 @@ describe(
     test("the Worker encrypts authenticator data and requires a second factor after email sign-in", async () => {
       const email = "worker-factor@example.org";
       const initialCookie = await signIn(email);
-      await send("/api/account/profile", answers, initialCookie);
+      const registered = await send(
+        "/api/account/profile",
+        { ...answers, codeOfConductAccepted: true },
+        initialCookie,
+      );
+      assert.equal(registered.status, 200, await registered.clone().text());
       const enabled = await send(
         "/api/auth/two-factor/enable",
         { method: "totp" },

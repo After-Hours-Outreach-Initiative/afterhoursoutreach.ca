@@ -37,6 +37,19 @@ before rebuilding a pre-production database that used the old migration history.
 2. The person signs in. See [Authentication](#authentication).
 3. A new account goes to the registration form. The privacy notice is shown at
    the top.
+4. After the team choices, the Code of Conduct initially shows the first two
+   rules, fading into the dark background near the bottom. **Read all 14 rules**
+   expands the remaining rules and removes the fade; **Show fewer rules** appears
+   below the final rule and collapses them again. The required, initially unchecked
+   acknowledgement stays visible below in both states, before **Complete registration**.
+
+New registration requires `codeOfConductAccepted: true` in the profile API too;
+omitted, false, and non-boolean values cannot create a profile. The server saves
+the rules version and acknowledgement time with the profile in the same
+transaction. Profile edits neither require the checkbox again nor change that
+record. Existing and synthetic profiles are not backfilled with invented consent.
+The additive `code_of_conduct` migration must be applied before deploying this
+change; it preserves existing accounts and profile answers.
 
 After registration is complete the new volunteer account will only be able to
 sign up for orientation events until an organizer manually approves patrol
@@ -45,10 +58,18 @@ required and does not automatically grant approval.
 
 ### Profile
 
-Everything from the form is saved as the person's profile. They can see and
-edit it at `/volunteer/account`, and delete their account from there.
+Registration answers are saved with the person's profile. Ongoing contact,
+safety, training, and team-interest answers can be seen and edited at
+`/volunteer/account`.
 
-Volunteers can edit all registration answers. Changes are logged without copying
+“How did you hear about us?”, “Why do you want to volunteer?”, and the Code of
+Conduct appear only during registration, not on the volunteer's profile or
+organizer profile pages/dialogs. The server preserves these registration-only
+answers and the acknowledgement record when a profile is edited. New
+registration still requires both questions and the acknowledgement; profile
+updates omit them, and older clients cannot overwrite the saved answers.
+
+Volunteers can edit ongoing profile answers. Changes are logged without copying
 sensitive answers into the log and do not change patrol approval. Email changes
 use the separate verification flow described below. All organizers can view
 profile fields, and each profile view is logged. Accounts with an authenticator
@@ -56,25 +77,27 @@ enabled must verify it when signing in.
 
 ### Fields
 
-Taken from the current Google Form. The volunteer and organizers can see all of
-them.
+Questions are based on the current Google Form. The referral and motivation
+questions and Code of Conduct confirmation are registration-only; the volunteer
+and organizers can see the remaining profile answers.
 
-| Field                                    | Required |
-| ---------------------------------------- | -------- |
-| Full or preferred name                   | Yes      |
-| Email (from the account)                 | Yes      |
-| Pronouns                                 | No       |
-| Phone number                             | Yes      |
-| Date of birth                            | Yes      |
-| Emergency contact name                   | Yes      |
-| Emergency contact phone                  | Yes      |
-| Emergency contact relationship           | Yes      |
-| How did you hear about us                | Yes      |
-| Why do you want to volunteer             | Yes      |
-| Teams (outreach, medic, non-patrol)      | Yes      |
-| Highest medical certification            | Yes      |
-| Other training and experience, and other | Yes      |
-| Medical conditions or triggers           | No       |
+| Field                                    | Required        |
+| ---------------------------------------- | --------------- |
+| Full or preferred name                   | Yes             |
+| Email (from the account)                 | Yes             |
+| Pronouns                                 | No              |
+| Phone number                             | Yes             |
+| Date of birth                            | Yes             |
+| Emergency contact name                   | Yes             |
+| Emergency contact phone                  | Yes             |
+| Emergency contact relationship           | Yes             |
+| How did you hear about us                | Yes             |
+| Why do you want to volunteer             | Yes             |
+| Teams (outreach, medic, non-patrol)      | Yes             |
+| Highest medical certification            | Yes             |
+| Other training and experience, and other | Yes             |
+| Medical conditions or triggers           | No              |
+| Code of Conduct acknowledgement          | On registration |
 
 Date of birth, emergency contact, and medical conditions each have a short line
 under them saying what the information is used for.
@@ -165,5 +188,4 @@ Dev-tool assets must not be placed in `public/`, which is copied into builds.
   need R2 storage and more privacy work.
 - TODO: fix the typos in the current form options when copying them over
   ("Nalaxone", "wiith", "Pa:ramedic", "relatons", "opiod", "ventiliation").
-- TODO: decide if volunteers need to accept a code of conduct or waiver as part
-  of registering.
+- TODO: decide if volunteers also need a waiver as part of registering.

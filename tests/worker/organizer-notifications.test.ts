@@ -81,7 +81,11 @@ describe(
     };
     const person = async (email: string, name: string) => {
       const cookie = await signIn(email);
-      await send("/api/account/profile", { ...answers, name }, cookie);
+      await send(
+        "/api/account/profile",
+        { ...answers, name, codeOfConductAccepted: true },
+        cookie,
+      );
       const session = (await (
         await send("/api/auth/get-session", undefined, cookie)
       ).json()) as { user: { id: string } };

@@ -53,12 +53,18 @@ export const registrationFields = [
     label: "Relationship to emergency contact",
     required: true,
   },
-  { name: "heardAboutUs", label: "How did you hear about us?", required: true },
+  {
+    name: "heardAboutUs",
+    label: "How did you hear about us?",
+    required: true,
+    registrationOnly: true,
+  },
   {
     name: "motivation",
     label: "Why do you want to volunteer?",
     required: true,
     multiline: true,
+    registrationOnly: true,
   },
   {
     name: "certification",
@@ -81,3 +87,7 @@ export const registrationFields = [
     help: "Optional. Used to help organizers support your safety during events.",
   },
 ] as const;
+
+export const profileFields = registrationFields.filter(
+  (field) => !("registrationOnly" in field),
+);

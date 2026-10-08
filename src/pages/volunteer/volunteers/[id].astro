@@ -8,7 +8,7 @@ import {
 } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
-import { registrationFields } from "@/data/registration";
+import { profileFields } from "@/data/registration";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
 import "@/styles/volunteer.css";
@@ -70,7 +70,7 @@ if (!values || !person)
       <VolunteerControls person={person} />
       <dl class="volunteer-profile-details">
         {
-          registrationFields.map((field) => (
+          profileFields.map((field) => (
             <div>
               <>
                 <dt>{field.label}</dt>

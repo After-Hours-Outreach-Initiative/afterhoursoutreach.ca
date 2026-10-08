@@ -10,6 +10,7 @@ import EventCard from "./EventCard.astro";
 import EventEditor from "./EventEditor.astro";
 import EventNotifications from "./EventNotifications.astro";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
+import WarningIcon from "@/components/icons/WarningIcon.astro";
 import "@/styles/volunteer.css";
 
 const { actor, headers, email } = await accountContext(env, Astro.request);
@@ -57,13 +58,24 @@ const filter = ["patrol", "orientation"].includes(
     !actor ? (
       <SignInPanel returnTo="/volunteer" />
     ) : !actor.registered ? (
-      <section class="volunteer-panel">
-        <h2>Finish your registration</h2>
-        <p>Complete your profile before signing up for events.</p>
-        <a class="btn btn-primary" href="/volunteer/register">
-          Continue registration
-        </a>
-      </section>
+      <a class="volunteer-registration-warning" href="/volunteer/register">
+        <WarningIcon class="volunteer-warning-icon" />
+        <span class="volunteer-registration-warning-text">
+          Complete your registration to sign up for events
+        </span>
+        <svg
+          class="volunteer-registration-warning-arrow"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M5 12h14m-6-6 6 6-6 6" />
+        </svg>
+      </a>
     ) : null
   }
   {

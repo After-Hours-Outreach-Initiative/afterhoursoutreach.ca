@@ -2,6 +2,7 @@ import { createAuthClient } from "better-auth/client";
 import { InferServerPlugin } from "better-auth/client/plugins";
 import type { AccountAuth } from "../../server/auth";
 import { authClient } from "../../scripts/auth-client";
+import { accountErrorMessage } from "../../scripts/account-forms";
 
 // This module is loaded only in development; server imports are type-only.
 const developmentAuthClient = createAuthClient({
@@ -23,9 +24,22 @@ export async function initAccountSwitcher() {
   const root = document.querySelector<HTMLDialogElement>(
     "dialog[data-account-switcher]",
   );
-  const select = root?.querySelector("[data-view-as]");
+  const profiles = root?.querySelector<HTMLElement>("[data-view-as]");
   const message = root?.querySelector<HTMLElement>("[data-switch-message]");
-  if (!root || !(select instanceof HTMLSelectElement) || !message) return;
+  if (!root || !profiles || !message) return;
+  const createAccount = root.querySelector<HTMLAnchorElement>(
+    "[data-create-account]",
+  );
+  let busy = true;
+  const setBusy = (value: boolean) => {
+    busy = value;
+    profiles.setAttribute("aria-busy", String(value));
+    profiles
+      .querySelectorAll<HTMLButtonElement>("[data-switch-user]")
+      .forEach((button) => (button.disabled = value));
+    createAccount?.setAttribute("aria-disabled", String(value));
+  };
+  setBusy(true);
   const trigger = document.querySelector<HTMLButtonElement>(
     "[data-open-account-switcher]",
   );
@@ -51,21 +65,42 @@ export async function initAccountSwitcher() {
       root.close();
   });
   const fail = (error: unknown) => {
-    message.textContent =
-      error instanceof Error ? error.message : "Could not switch accounts.";
+    message.textContent = accountErrorMessage(error);
     message.hidden = false;
   };
-  root
-    .querySelector<HTMLAnchorElement>("[data-create-account]")
-    ?.addEventListener("click", async (event) => {
-      event.preventDefault();
-      try {
-        await authClient.signOut();
-        location.assign("/volunteer/sign-in");
-      } catch (error) {
-        fail(error);
-      }
-    });
+  createAccount?.addEventListener("click", async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    message.hidden = true;
+    try {
+      await authClient.signOut();
+      location.assign("/volunteer/sign-in");
+    } catch (error) {
+      setBusy(false);
+      fail(error);
+    }
+  });
+  profiles.addEventListener("click", async (event) => {
+    const button =
+      event.target instanceof Element
+        ? event.target.closest<HTMLButtonElement>("button[data-switch-user]")
+        : null;
+    if (!button || !profiles.contains(button) || button.disabled || busy)
+      return;
+    setBusy(true);
+    message.hidden = true;
+    try {
+      const result = await developmentAuthClient.dev.switchUser({
+        userId: button.dataset.switchUser || null,
+        returnTo: location.pathname + location.search,
+      });
+      location.assign(result.next || "/volunteer");
+    } catch (error) {
+      setBusy(false);
+      fail(error);
+    }
+  });
   try {
     const users: DevelopmentUser[] = [];
     let after: string | null = null;
@@ -80,29 +115,30 @@ export async function initAccountSwitcher() {
     } while (after);
     users.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
     for (const user of users) {
-      const option = document.createElement("option");
-      option.value = user.id;
-      option.textContent = `${user.name || "Not registered"} · ${user.email}${user.role === "organizer" ? " · Organizer" : ""}`;
-      select.appendChild(option);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn-quiet account-profile-button";
+      button.dataset.switchUser = user.id;
+      const name = document.createElement("span");
+      name.textContent = user.name || "Not registered";
+      const detail = document.createElement("span");
+      detail.className = "account-profile-detail";
+      detail.textContent = `${user.email}${user.role === "organizer" ? " · Organizer" : ""}`;
+      button.appendChild(name);
+      button.appendChild(detail);
+      profiles.appendChild(button);
     }
-    select.value = currentUserId ?? "";
-    select.disabled = false;
-    select.addEventListener("change", async () => {
-      select.disabled = true;
-      message.hidden = true;
-      try {
-        const result = await developmentAuthClient.dev.switchUser({
-          userId: select.value || null,
-          returnTo: location.pathname + location.search,
-        });
-        location.assign(result.next || "/volunteer");
-      } catch (error) {
-        select.value = currentUserId ?? "";
-        select.disabled = false;
-        fail(error);
-      }
-    });
+    profiles
+      .querySelectorAll<HTMLButtonElement>("[data-switch-user]")
+      .forEach((button) =>
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.switchUser === (currentUserId ?? "")),
+        ),
+      );
+    setBusy(false);
   } catch (error) {
+    setBusy(false);
     fail(error);
   }
 }

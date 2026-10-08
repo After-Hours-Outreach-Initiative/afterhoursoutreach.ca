@@ -8,6 +8,13 @@
       "when": 1791417001294,
       "tag": "0000_database",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791491492368,
+      "tag": "0001_code_of_conduct",
+      "breakpoints": true
     }
   ]
 }
