@@ -1,1 +1,0 @@
-ALTER TABLE `event_notification` ADD `delivery_origin` text;

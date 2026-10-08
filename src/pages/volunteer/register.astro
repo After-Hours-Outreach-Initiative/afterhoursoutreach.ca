@@ -8,7 +8,7 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import { loadProfile } from "@/server/accounts/profile";
+import { loadProfile } from "@/server/db/profiles";
 export const prerender = false;
 let email = "";
 if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");

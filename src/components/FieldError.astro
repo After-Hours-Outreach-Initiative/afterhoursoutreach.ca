@@ -10,10 +10,7 @@ const { field, class: className } = Astro.props;
 ---
 
 <p
-  class:list={[
-    "m-0 flex items-center gap-2 text-base text-red-400",
-    className,
-  ]}
+  class:list={["m-0 flex items-center gap-2 text-base text-red-400", className]}
   id={`error-${field}`}
   data-error={field}
   hidden

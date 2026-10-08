@@ -12,6 +12,22 @@ The server side behind accounts, registration, and event signups.
   [accounts.md](accounts.md).
 - Resend for sign in and notification emails.
 
+## Database and business rules
+
+Database queries and persisted business workflows are grouped in
+[`src/server/db/`](../src/server/db/README.md). Constraints are declared in
+`schema.ts`, atomic invariants in `triggers.sql`, and workflows in the event,
+volunteer, profile, access, session, outbox, and rate-limit modules there.
+HTTP handling, authentication integration, and email transport stay outside.
+
+Run `pnpm db:generate` after changing schema or trigger definitions. Everything
+in `drizzle/` is generated and committed; do not edit it. `pnpm db:check` and
+the tests detect stale or hand-edited SQL output.
+
+The pre-production migration history was consolidated into generated
+`0000_database.sql`. Old-history local/preview databases require an explicit
+rebuild before applying this baseline; generation never resets a database.
+
 ## Local testing
 
 Apply `pnpm db:migrate:local`, configure a local `BETTER_AUTH_SECRET` of at least

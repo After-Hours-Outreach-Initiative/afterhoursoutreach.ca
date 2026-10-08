@@ -1,9 +1,9 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
-import { accountContext, requireOrganizer } from "@/server/accounts/access";
+import { accountContext, requireOrganizer } from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
-import { takeRateLimit } from "@/server/auth/abuse";
+import { takeRateLimit } from "@/server/db/rate-limits";
 import { readJson, RequestError, errorResponse } from "@/server/http";
 import {
   saveEvent,
@@ -11,7 +11,7 @@ import {
   changeSignup,
   manageSignup,
   eventSchema,
-} from "@/server/events/service";
+} from "@/server/db/events";
 import {
   deliverNotifications,
   notificationNotice,

@@ -283,7 +283,8 @@ function form(
         throw new Error(result.message || "The change could not be saved.");
       saved = true;
       if (import.meta.env.DEV && result.localNotifications?.length) {
-        const { chooseEmailOutcome } = await import("./local-email-dialog");
+        const { chooseEmailOutcome } =
+          await import("../dev/scripts/local-email-dialog");
         await chooseEmailOutcome(result.localNotifications, true);
       }
       // Writes may run concurrently, but each refresh must fetch and apply after

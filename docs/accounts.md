@@ -27,9 +27,9 @@ HTTP requests. The completion page clears the fragment from browser history.
 Only pressing **Confirm sign-in** submits the code, so simply visiting the page
 does not consume it, including when a mail scanner runs JavaScript.
 
-Apply migration `0005_email_otp_optional_two_factor.sql` when upgrading an
-existing database. It removes the old email-challenge table and its outstanding
-links/codes; existing accounts, profiles, and sessions remain intact.
+The generated database baseline uses Better Auth's verification table, not the
+old email-challenge table. See [database migrations](../src/server/db/README.md)
+before rebuilding a pre-production database that used the old migration history.
 
 ## Registration
 
@@ -141,6 +141,22 @@ IP per hour, and 80 total per day. Counters are stored in D1.
 Code verification: 3 attempts per code, plus 10 submissions per address per hour
 and 30 per IP per minute. The per-address budget survives resends and code rotation.
 Codes are stored hashed in Better Auth's verification table.
+
+## Local development tools
+
+Development-only browser scripts and email-dialog styles live in `src/dev/`,
+alongside the server account-switching plugin. Shared application code loads
+them through dynamic imports guarded by `import.meta.env.DEV`. The guard is
+replaced at build time, so both production and preview builds exclude these
+modules. The folder name itself does not exclude code from a build; keep every
+runtime import from outside `src/dev/` behind the guard. Type-only imports are
+safe because TypeScript removes them.
+
+The development controls are available only in the local dev server. Built
+Worker tests check that `GET /api/auth/dev/users` and
+`POST /api/auth/dev/switch-user` return `404` in production and preview builds;
+local browser tests exercise account switching and simulated email delivery.
+Dev-tool assets must not be placed in `public/`, which is copied into builds.
 
 ## TODO
 

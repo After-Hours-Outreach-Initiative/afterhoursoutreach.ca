@@ -9,18 +9,18 @@ import {
   type AuthBindings,
 } from "../src/server/auth";
 import { createSignInOTP } from "./helpers/email-otp";
-import { hashAuthValue, takeRateLimit } from "../src/server/auth/abuse";
+import { hashAuthValue, takeRateLimit } from "../src/server/db/rate-limits";
 import { sendSignInEmail, type SignInEmail } from "../src/server/auth/services";
+import { deliverNotifications } from "../src/server/events/notifications";
 import {
   countNotifications,
-  deliverNotifications,
   queueNotification,
-} from "../src/server/events/notifications";
+} from "../src/server/db/notifications";
 import {
   loadProfile,
   profileSchema,
   saveProfile,
-} from "../src/server/accounts/profile";
+} from "../src/server/db/profiles";
 import {
   readJson,
   RequestError,

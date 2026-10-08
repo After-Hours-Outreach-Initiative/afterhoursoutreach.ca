@@ -3,11 +3,8 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import VolunteerProfileDialog from "@/components/volunteer/VolunteerProfileDialog.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
 import { env } from "cloudflare:workers";
-import { accountContext, requireOrganizer } from "@/server/accounts/access";
-import {
-  listVolunteers,
-  volunteerPageSize,
-} from "@/server/accounts/organizers";
+import { accountContext, requireOrganizer } from "@/server/db/access";
+import { listVolunteers, volunteerPageSize } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
 import "@/styles/volunteer.css";
