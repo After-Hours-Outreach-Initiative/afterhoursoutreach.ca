@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { sql } from "drizzle-orm";
 import { check, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { afterEach, test } from "node:test";
+import { afterEach, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import {
   generateDatabaseMigration,

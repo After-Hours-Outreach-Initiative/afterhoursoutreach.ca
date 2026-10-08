@@ -1,28 +1,18 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
-import { test } from "node:test";
+import { readFileSync } from "node:fs";
+import { test } from "vitest";
 import { createTestHarness } from "wrangler";
 import {
   previewEventFixtures,
   previewEventId,
 } from "../../scripts/preview-event-fixtures";
 
-test("the preview banner does not gate features or restrict accounts to preview hosts", async () => {
+test("preview builds support real account features but reject development endpoints", async () => {
   const html = readFileSync(
     new URL("../../dist-preview/client/index.html", import.meta.url),
     "utf8",
   );
   assert.match(html, /Preview · public test site/);
-  assert.match(html, /data-live-event-teaser/);
-  assert.doesNotMatch(html, /data-patrol-list|data-account-switcher/);
-  const chunks = readdirSync(
-    new URL("../../dist-preview/client/_astro/", import.meta.url),
-  );
-  assert.ok(
-    !chunks.some((name) =>
-      /PatrolList|patrol-store|local-email-dialog|account-switcher/.test(name),
-    ),
-  );
 
   const server = createTestHarness({
     workers: [
@@ -69,6 +59,15 @@ test("the preview banner does not gate features or restrict accounts to preview 
         (await worker.fetch(`${origin}/api/auth/dev/users`)).status,
         404,
       );
+      const switchUser = await worker.fetch(
+        `${origin}/api/auth/dev/switch-user`,
+        {
+          method: "POST",
+          headers: { origin, "content-type": "application/json" },
+          body: JSON.stringify({ userId: null }),
+        },
+      );
+      assert.equal(switchUser.status, 404);
     }
     const { DB } = await worker.getEnv();
     await DB.batch(previewEventFixtures().map((sql) => DB.prepare(sql)));

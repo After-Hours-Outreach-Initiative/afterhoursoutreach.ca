@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { test } from "node:test";
+import { test } from "vitest";
 import { chromium, expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 

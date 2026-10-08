@@ -15,6 +15,16 @@
 - All previews share D1 `afterhoursoutreach-staging` unless their bindings and
   `wrangler.preview-migrations.jsonc` both specify a separate database.
 
+The pre-production migration history now starts at generated
+`0000_database.sql`. A preview database that applied the old history must be
+explicitly rebuilt before the next deployment; applying the new baseline over
+existing tables fails. Export a backup first, then rebuild only the shared
+non-production database identified by `wrangler.preview-migrations.jsonc`.
+Rebuilding removes existing accounts, sessions, organizer roles, events, and
+migration records. Reapply `pnpm db:migrate:preview` afterward. Seeding and
+organizer bootstrap remain separate, explicit operations; no command resets
+databases automatically. Never use this process for production data.
+
 Run `pnpm deploy:preview` to build, migrate the preview database, and run
 `wrangler preview`. The preview name defaults to the Git branch.
 `pnpm preview` remains local Astro previewing.
@@ -49,8 +59,9 @@ Use `wrangler preview base-config secret put NAME` for new previews, or
 `wrangler preview secret put NAME --name BRANCH` for an existing preview.
 Account secrets are configured in Previews Base. Email requests remain rate limited.
 `pnpm test:accounts` uses local data only.
-`pnpm test:preview` checks the preview build, including its banner, using a local
-Worker and local test database.
+`pnpm test:preview` checks preview account behavior and rejection of development
+endpoints using a local Worker and test database. See [testing.md](testing.md)
+for the Vitest projects and browser-test commands.
 
 Production: `pnpm deploy`. The developer controls when to deploy; there is no
 custom pre-deployment gate. Before doing so, replace the placeholder production
