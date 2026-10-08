@@ -35,7 +35,9 @@ test("deployed site uses real account features and shows a banner only on previe
         "[data-account-switcher], [data-event-teaser], [data-patrol-list], [data-view]",
       ),
     ).toHaveCount(0);
-    await expect(page.getByLabel("View as", { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole("group", { name: "View as", exact: true }),
+    ).toHaveCount(0);
   }
   expect(errors).toEqual([]);
   await page.goto("/patrols");

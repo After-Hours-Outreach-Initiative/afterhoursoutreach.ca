@@ -149,6 +149,45 @@
   margin: 16px 0 24px;
   color: #a1a1aa;
 }
+.volunteer-registration-warning {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  margin: 28px 0;
+  padding: 16px;
+  border: 1px solid #a16207;
+  border-radius: 10px;
+  background: #211a08;
+  color: #fef08a;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+}
+.volunteer-registration-warning:hover {
+  border-color: #eab308;
+  background: #2f2308;
+}
+.volunteer-registration-warning:focus-visible {
+  outline: 2px solid #facc15;
+  outline-offset: 4px;
+}
+.volunteer-warning-icon,
+.volunteer-registration-warning-arrow {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: #facc15;
+}
+.volunteer-registration-warning-text {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+}
 .volunteer-signin-panel {
   max-width: 560px;
   margin-inline: auto;
@@ -392,6 +431,85 @@
   display: flex;
   gap: 10px;
   align-items: center;
+}
+.volunteer-code-of-conduct {
+  border-top: 1px solid #27272a;
+  padding-top: 24px;
+}
+.volunteer-code-of-conduct h3 {
+  font-size: 20px;
+}
+.volunteer-code-of-conduct ul {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+  padding-left: 24px;
+  list-style: disc;
+  font-size: 16px;
+  line-height: 1.7;
+}
+.volunteer-code-of-conduct .volunteer-conduct-preview {
+  padding-bottom: 12px;
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+}
+.volunteer-code-of-conduct:has(.volunteer-conduct-details[open])
+  .volunteer-conduct-preview {
+  padding-bottom: 0;
+  mask-image: none;
+}
+.volunteer-conduct-details {
+  margin-bottom: 16px;
+}
+.volunteer-conduct-details[open] {
+  position: relative;
+  padding-bottom: 52px;
+}
+.volunteer-conduct-details[open] summary {
+  position: absolute;
+  bottom: 0;
+}
+.volunteer-conduct-details summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 44px;
+  border-radius: 4px;
+  color: #c7d2fe;
+  font-size: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+.volunteer-conduct-details summary::-webkit-details-marker {
+  display: none;
+}
+.volunteer-conduct-details summary:hover {
+  color: white;
+}
+.volunteer-conduct-details summary svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.volunteer-conduct-details[open] summary svg {
+  transform: rotate(180deg);
+}
+.volunteer-conduct-show-less,
+.volunteer-conduct-details[open] .volunteer-conduct-show-more {
+  display: none;
+}
+.volunteer-conduct-details[open] .volunteer-conduct-show-less {
+  display: inline;
+}
+.volunteer-conduct-confirmation {
+  align-items: flex-start;
+  min-height: 44px;
+  padding: 12px 0;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.volunteer-conduct-confirmation input {
+  margin-top: 4px;
 }
 .volunteer-section-heading {
   display: flex;
@@ -711,6 +829,16 @@
 @media (max-width: 640px) {
   .volunteer-wrap {
     padding: 0 16px 64px;
+  }
+  .volunteer-registration-warning {
+    gap: 8px;
+    padding: 14px 12px;
+    font-size: 14px;
+  }
+  .volunteer-warning-icon,
+  .volunteer-registration-warning-arrow {
+    width: 18px;
+    height: 18px;
   }
   .volunteer-panel,
   .volunteer-event-card,

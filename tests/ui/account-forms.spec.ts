@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { createLocalAccount, sampleAnswers } from "../helpers/local-account";
+import {
+  codeOfConductConfirmation,
+  codeOfConductError,
+  codeOfConductRules,
+} from "../../src/data/code-of-conduct";
 import { totpFromSetupKey } from "../helpers/totp";
 import { inPlaceAction } from "../helpers/in-place-action";
 
@@ -178,6 +183,88 @@ test("registration shows all required errors and saves after they are corrected"
   await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/volunteer/register");
   const form = page.locator("[data-account-profile]");
+  const conduct = form.getByRole("region", {
+    name: "Code of Conduct",
+    exact: true,
+  });
+  await expect(conduct.getByRole("listitem")).toHaveText(
+    codeOfConductRules.slice(0, 2),
+  );
+  const preview = conduct.locator(".volunteer-conduct-preview");
+  const details = conduct.locator("details");
+  expect(
+    await preview.evaluate((element) => getComputedStyle(element).maskImage),
+  ).toMatch(/linear-gradient\(.*40%/);
+  await expect(conduct.locator("#code-of-conduct-more-rules")).toBeHidden();
+  const toggle = conduct.locator("summary");
+  const expectCollapseBelowRules = async () => {
+    // Measure together: opening with the keyboard can also scroll the page.
+    expect(
+      await conduct.evaluate((element) => {
+        const rules = element.querySelector("#code-of-conduct-more-rules")!;
+        const control = element.querySelector("summary")!;
+        return (
+          control.getBoundingClientRect().top -
+          rules.getBoundingClientRect().bottom
+        );
+      }),
+    ).toBeGreaterThanOrEqual(0);
+  };
+  await expect(toggle).toHaveAccessibleName("Read all 14 rules");
+  await toggle.focus();
+  await toggle.press("Enter");
+  await expect(details).toHaveAttribute("open", "");
+  await expect(conduct.getByRole("listitem")).toHaveText([
+    ...codeOfConductRules,
+  ]);
+  expect(
+    await preview.evaluate((element) => getComputedStyle(element).maskImage),
+  ).toBe("none");
+  await expect(toggle).toHaveAccessibleName("Show fewer rules");
+  await expectCollapseBelowRules();
+  await toggle.press("Space");
+  await expect(details).not.toHaveAttribute("open");
+  await expect(conduct.getByRole("listitem")).toHaveText(
+    codeOfConductRules.slice(0, 2),
+  );
+  const confirmation = form.getByRole("checkbox", {
+    name: codeOfConductConfirmation,
+    exact: true,
+  });
+  await expect(confirmation).not.toBeChecked();
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toHaveAttribute("required", "");
+  await expect(
+    form.getByRole("textbox", {
+      name: "How did you hear about us?",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    form.getByRole("textbox", {
+      name: "Why do you want to volunteer?",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(
+    await form.evaluate((element) => {
+      const teams = element.querySelector(
+        '[data-required-checkboxes="teams"]',
+      )!;
+      const rules = element.querySelector(".volunteer-code-of-conduct")!;
+      const submit = element.querySelector('button[type="submit"]')!;
+      return (
+        Boolean(
+          teams.compareDocumentPosition(rules) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        ) &&
+        Boolean(
+          rules.compareDocumentPosition(submit) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        )
+      );
+    }),
+  ).toBe(true);
   await expect(form).toHaveAttribute("novalidate", "");
   const requests: string[] = [];
   page.on("request", (request) => {
@@ -223,15 +310,52 @@ test("registration shows all required errors and saves after they are corrected"
     if (field !== "teams")
       await form.locator(`[name="${field}"]`).fill(String(value));
   }
+  await page.getByRole("button", { name: "Complete registration" }).click();
+  await expect(form.getByLabel("Outreach", { exact: true })).toBeFocused();
+  expect(requests).toEqual([]);
   await form.getByLabel("Outreach", { exact: true }).check();
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+  await page.getByRole("button", { name: "Complete registration" }).click();
+  await expect(form.locator("[data-error=codeOfConductAccepted]")).toHaveText(
+    codeOfConductError,
+  );
+  await expect(confirmation).toBeFocused();
+  expect(requests).toEqual([]);
+  await confirmation.press("Space");
+  await expect(confirmation).toBeChecked();
+  await expect(confirmation).not.toHaveAttribute("aria-invalid");
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
   await expect(form.locator("[data-form-message]")).toBeHidden();
+  await toggle.click();
+  await expect(conduct.getByRole("listitem")).toHaveCount(
+    codeOfConductRules.length,
+  );
+  await expect(confirmation).toBeVisible();
+  await expectCollapseBelowRules();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+  await toggle.click();
+  await expect(confirmation).toBeChecked();
   await page.getByRole("button", { name: "Complete registration" }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await expect(
     page.getByRole("textbox", { name: "Full or preferred name", exact: true }),
   ).toHaveValue(sampleAnswers.name);
+  await expect(
+    page.getByRole("region", { name: "Code of Conduct", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('[name="heardAboutUs"], [name="motivation"]'),
+  ).toHaveCount(0);
   // Editing reuses validation and identifies successful saves semantically.
   await page
     .getByRole("textbox", { name: "Full or preferred name", exact: true })

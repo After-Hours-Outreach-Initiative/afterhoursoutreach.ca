@@ -87,6 +87,93 @@ test("event type buttons filter instantly, preserve deep links, and never submit
   );
 });
 
+test("View as has a button for every seeded profile and supports keyboard switching on mobile", async ({
+  page,
+}) => {
+  for (const width of [1280, 375, 320]) {
+    await page.setViewportSize({ width, height: 812 });
+    const profiles = await openLocalAccountSwitcher(page);
+    await expect(profiles.getByRole("combobox")).toHaveCount(0);
+    for (const key of [
+      "alex",
+      "casey",
+      "dana",
+      "jamie",
+      "robin",
+      "sam",
+      "first-sign-in",
+    ]) {
+      const profile = profiles.locator(
+        `[data-switch-user="local-fixture-user-${key}"]`,
+      );
+      await expect(profile).toBeVisible();
+      await expect(profile).toBeEnabled();
+      await expect(profile).toContainText(`${key}.local@example.org`);
+    }
+    await expect(
+      profiles.getByRole("button", { name: "Visitor", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+    await page
+      .getByRole("button", { name: "Close development controls", exact: true })
+      .click();
+  }
+  const profiles = await openLocalAccountSwitcher(page);
+  const robin = profiles.locator(
+    '[data-switch-user="local-fixture-user-robin"]',
+  );
+  await robin.focus();
+  await robin.press("Enter");
+  await expect(
+    page
+      .getByRole("navigation", { name: "Volunteer account" })
+      .getByRole("link", { name: "Volunteers", exact: true }),
+  ).toBeVisible();
+  await expect(robin).toHaveAttribute("aria-pressed", "true");
+});
+
+test("profile buttons disable during switching and recover without changing selection on failure", async ({
+  page,
+}) => {
+  const profiles = await openLocalAccountSwitcher(page);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/auth/dev/switch-user", async (route) => {
+    await gate;
+    await route.fulfill({
+      status: 503,
+      json: { message: "Try switching again." },
+    });
+  });
+  const robin = profiles.locator(
+    '[data-switch-user="local-fixture-user-robin"]',
+  );
+  const visitor = profiles.getByRole("button", {
+    name: "Visitor",
+    exact: true,
+  });
+  try {
+    await robin.click();
+    await expect(profiles).toHaveAttribute("aria-busy", "true");
+    await expect(robin).toBeDisabled();
+    await expect(visitor).toBeDisabled();
+  } finally {
+    release();
+  }
+  await expect(page.locator("[data-switch-message]")).toHaveText(
+    "Try switching again.",
+  );
+  await expect(profiles).toHaveAttribute("aria-busy", "false");
+  await expect(robin).toBeEnabled();
+  await expect(visitor).toBeEnabled();
+  await expect(visitor).toHaveAttribute("aria-pressed", "true");
+  await expect(robin).toHaveAttribute("aria-pressed", "false");
+});
+
 test("View as lists actual D1 users and switching to Visitor ends only the current session", async ({
   page,
   request,
@@ -97,20 +184,23 @@ test("View as lists actual D1 users and switching to Visitor ends only the curre
   const independentSession: { session: { id: string } } =
     await independent.json();
   await page.reload();
-  const selector = await openLocalAccountSwitcher(page);
-  await expect(selector.locator(`option[value="${user.id}"]`)).toContainText(
-    user.email,
-  );
+  const profiles = await openLocalAccountSwitcher(page);
+  const profile = profiles.locator(`[data-switch-user="${user.id}"]`);
+  await expect(profile).toContainText(user.email);
   await expect(page.locator("[data-account-menu]")).toHaveCount(0);
-  await selector.selectOption(user.id);
+  await profile.click();
   await expect(page.locator("[data-account-menu]")).toBeVisible();
-  await expect(selector).toHaveValue(user.id);
+  await expect(profile).toHaveAttribute("aria-pressed", "true");
   const selected = await page.request.get("/api/auth/get-session");
   const selectedSession: { user: { id: string }; session: { id: string } } =
     await selected.json();
   expect(selectedSession.user.id).toBe(user.id);
   expect(selectedSession.session.id).not.toBe(independentSession.session.id);
-  await (await openLocalAccountSwitcher(page)).selectOption("");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .getByRole("button", { name: "Visitor", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/volunteer\/?$/);
   await expect(page.locator("[data-account-menu]")).toHaveCount(0);
   expect(
@@ -128,8 +218,9 @@ test("View as can choose an unregistered D1 account without changing it", async 
 }) => {
   const user = await createLocalAccount(request, baseURL!, false);
   await page.reload();
-  const selector = await openLocalAccountSwitcher(page);
-  await selector.selectOption(user.id);
+  const profiles = await openLocalAccountSwitcher(page);
+  const profile = profiles.locator(`[data-switch-user="${user.id}"]`);
+  await profile.click();
   await expect(page).toHaveURL(/\/volunteer\/register$/);
   await expect(
     page.getByRole("heading", { name: "Volunteer registration" }),
@@ -138,7 +229,7 @@ test("View as can choose an unregistered D1 account without changing it", async 
     user.email,
   );
   await expect(page.getByLabel("Full or preferred name")).toHaveValue("");
-  await expect(selector).toHaveValue(user.id);
+  await expect(profile).toHaveAttribute("aria-pressed", "true");
 });
 
 test("account navigation and profile controls are usable on desktop and mobile", async ({
@@ -229,10 +320,11 @@ test("View as simulates a verified factor without changing the user's real role 
   });
   expect(verified.status()).toBe(200);
   await page.reload();
-  const selector = await openLocalAccountSwitcher(page);
-  await selector.selectOption(user.id);
+  const profiles = await openLocalAccountSwitcher(page);
+  const profile = profiles.locator(`[data-switch-user="${user.id}"]`);
+  await profile.click();
   await expect(page.locator("[data-account-menu]")).toBeVisible();
-  await expect(selector).toHaveValue(user.id);
+  await expect(profile).toHaveAttribute("aria-pressed", "true");
   const current = await page.request.get("/api/auth/get-session");
   const session = await current.json();
   expect(session.user.id).toBe(user.id);

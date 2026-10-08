@@ -14,7 +14,7 @@
     "check": "wrangler types --strict-vars false && astro check",
     "test": "vitest run --project unit --project runtime",
     "test:watch": "vitest --project unit --project runtime",
-    "test:ui": "playwright test",
+    "test:ui": "node scripts/test-ui.mjs",
     "test:accounts": "pnpm build && vitest run --project worker",
     "test:preview": "pnpm build:preview && vitest run --project preview",
     "test:benchmark": "node scripts/benchmark-tests.mjs",

@@ -1,0 +1,59 @@
+---
+import FieldError from "@/components/FieldError.astro";
+import {
+  codeOfConductConfirmation,
+  codeOfConductError,
+  codeOfConductRules,
+} from "@/data/code-of-conduct";
+---
+
+<section
+  class="volunteer-code-of-conduct"
+  aria-labelledby="code-of-conduct-heading"
+>
+  <h3 id="code-of-conduct-heading">Code of Conduct</h3>
+  <ul class="volunteer-conduct-preview">
+    {codeOfConductRules.slice(0, 2).map((rule) => <li>{rule}</li>)}
+  </ul>
+  <details class="volunteer-conduct-details">
+    <summary aria-controls="code-of-conduct-more-rules">
+      <span class="volunteer-conduct-show-more"
+        >Read all {codeOfConductRules.length} rules</span
+      >
+      <span class="volunteer-conduct-show-less">Show fewer rules</span>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <path d="m6 9 6 6 6-6"></path>
+      </svg>
+    </summary>
+    <ul id="code-of-conduct-more-rules">
+      {codeOfConductRules.slice(2).map((rule) => <li>{rule}</li>)}
+    </ul>
+  </details>
+  <div class="volunteer-field">
+    <label
+      class="volunteer-check volunteer-conduct-confirmation"
+      for="profile-codeOfConductAccepted"
+    >
+      <input
+        id="profile-codeOfConductAccepted"
+        type="checkbox"
+        name="codeOfConductAccepted"
+        value="true"
+        required
+        aria-describedby="error-codeOfConductAccepted"
+        data-validation-message={codeOfConductError}
+      />
+      <span>
+        {codeOfConductConfirmation}
+        <span class="volunteer-required" aria-hidden="true"> *</span>
+      </span>
+    </label>
+    <FieldError field="codeOfConductAccepted" />
+  </div>
+</section>

@@ -37,8 +37,12 @@ account/event backend. D1 persists under `.wrangler/state/`; remote bindings
 are disabled. A Resend key is not required locally. Sign-in links and codes
 appear in a dialog, not an inbox. Local D1 rate limits still apply.
 
+Automated browser tests use `pnpm test:ui`, which starts its own server and
+disposable D1 database; it never adds test accounts to this persistent dev database.
+See [testing.md](testing.md).
+
 On localhost or the dev server's LAN address, the shared account layout includes
-a **View as** selector populated from all users in local D1, including accounts that have
+a **View as** button for every user in local D1, including accounts that have
 not finished registration. Choosing a user replaces only this browser's
 session; choosing Visitor signs out. Switching simulates a verified two-factor
 session for users with an enrolled authenticator, without changing their role,
@@ -54,7 +58,7 @@ only targets local D1, preserves existing records and fixture edits, and never
 runs during a build or deployment. Dev UI has no privacy disclosures; storage
 details belong on `/privacy`.
 
-The selector and its `/api/auth/dev/*` endpoints require a development build.
+The profile buttons and their `/api/auth/dev/*` endpoints require a development build.
 Local auth uses the current request's origin so phones on
 the LAN can also switch accounts. POSTs require the same Origin as the website.
 These controls and simulated email dialogs are excluded

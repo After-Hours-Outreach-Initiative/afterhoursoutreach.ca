@@ -9,15 +9,18 @@ export async function openLocalAccountSwitcher(page: Page) {
     exact: true,
   });
   await expect(dialog).toBeVisible();
-  // Keep the locator usable for value assertions after navigation closes the dialog.
-  const selector = page.getByRole("combobox", {
+  // Keep the locator usable for selection assertions after navigation closes the dialog.
+  const profiles = page.getByRole("group", {
     name: "View as",
     exact: true,
     includeHidden: true,
   });
-  await expect(selector).toBeVisible();
-  await expect(selector).toBeEnabled();
-  return selector;
+  await expect(profiles).toBeVisible();
+  await expect(profiles).toHaveAttribute("aria-busy", "false");
+  await expect(
+    profiles.getByRole("button", { name: "Visitor", exact: true }),
+  ).toBeEnabled();
+  return profiles;
 }
 
 export const sampleAnswers = {
@@ -64,7 +67,7 @@ export async function createLocalAccount(
   if (registered) {
     const profile = await request.post("/api/account/profile", {
       headers,
-      data: sampleAnswers,
+      data: { ...sampleAnswers, codeOfConductAccepted: true },
     });
     expect(profile.status(), await profile.text()).toBe(200);
   }

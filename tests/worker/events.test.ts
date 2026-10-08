@@ -125,7 +125,11 @@ describe(
     const person = async (email: string, name: string) => {
       let cookie = await signIn(email);
       await ok(
-        await send("/api/account/profile", { ...answers, name }, cookie),
+        await send(
+          "/api/account/profile",
+          { ...answers, name, codeOfConductAccepted: true },
+          cookie,
+        ),
       );
       const session = (await (
         await ok(await send("/api/auth/get-session", undefined, cookie))
@@ -480,7 +484,12 @@ describe(
             organizer.cookie,
           ),
         );
-        assert.match(await response.text(), /PRIVATE HEALTH ANSWER/);
+        const profileHtml = await response.text();
+        assert.match(profileHtml, /PRIVATE HEALTH ANSWER/);
+        assert.doesNotMatch(
+          profileHtml,
+          /How did you hear about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
+        );
         const logs = await DB.prepare(
           "SELECT * FROM audit_log WHERE action='profile_viewed' AND subject_id=?",
         )

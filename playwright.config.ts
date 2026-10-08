@@ -1,11 +1,18 @@
 import { defineConfig } from "@playwright/test";
 import { existsSync } from "node:fs";
+import { playwrightTarget } from "./scripts/ui-test-target.mjs";
+
+const baseURL = playwrightTarget();
 
 export default defineConfig({
   testDir: "./tests/ui",
+  outputDir: "./test-results/playwright",
+  testMatch: baseURL.startsWith("https://")
+    ? "deployed-site.spec.ts"
+    : "**/*.spec.ts",
   fullyParallel: true,
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:4321",
+    baseURL,
     browserName: "chromium",
     launchOptions: {
       executablePath:

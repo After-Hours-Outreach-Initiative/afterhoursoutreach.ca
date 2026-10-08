@@ -1,16 +1,6 @@
 import { spawn, execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import { createWriteStream, existsSync, readdirSync } from "node:fs";
-import {
-  copyFile,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
-import { createServer } from "node:net";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -19,6 +9,7 @@ import { parseArgs, stripVTControlCharacters } from "node:util";
 import { format } from "prettier";
 import { chromium } from "@playwright/test";
 import { renderReport } from "./test-benchmark-report.mjs";
+import { startLocalTestServer } from "./local-test-server.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const round = (value) => Math.round(value * 1000) / 1000;
@@ -179,119 +170,6 @@ async function command(args, log, cwd = root, environment = {}) {
   return { exitCode, wallMs: round(performance.now() - started), stdout };
 }
 
-async function unusedPort() {
-  const server = createServer();
-  await new Promise((accept, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", accept);
-  });
-  const port = server.address().port;
-  await new Promise((accept) => server.close(accept));
-  return port;
-}
-
-async function localServer(logs) {
-  const temporaryRoot = join(os.tmpdir(), "opencode");
-  await mkdir(temporaryRoot, { recursive: true });
-  const directory = await mkdtemp(join(temporaryRoot, "test-benchmark-"));
-  let started = false;
-  const stop = async () => {
-    if (started) {
-      const result = await command(
-        ["exec", "astro", "dev", "stop"],
-        join(logs, "dev-stop.log"),
-        directory,
-      );
-      if (result.exitCode) {
-        throw new Error(
-          `Could not stop benchmark server in ${directory}; retained its files.`,
-        );
-      }
-    }
-    // Only remove the specific temporary directory created by this invocation.
-    await rm(directory, { recursive: true });
-  };
-  try {
-    const files = execFileSync(
-      "git",
-      ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-      { cwd: root, encoding: "utf8" },
-    )
-      .split("\0")
-      .filter(Boolean);
-    for (const file of new Set(files)) {
-      if (!existsSync(join(root, file))) continue;
-      await mkdir(dirname(join(directory, file)), { recursive: true });
-      await copyFile(join(root, file), join(directory, file));
-    }
-    await symlink(
-      join(root, "node_modules"),
-      join(directory, "node_modules"),
-      "dir",
-    );
-    // Never copy the developer's secrets or persisted database into the benchmark.
-    await writeFile(
-      join(directory, ".dev.vars"),
-      `APP_ENV="local"\nAUTH_BASE_URL=""\nBETTER_AUTH_SECRET="${randomBytes(32).toString("hex")}"\nRESEND_API_KEY="benchmark-local-no-email"\n`,
-      { mode: 0o600 },
-    );
-    const migrated = await command(
-      ["db:migrate:local"],
-      join(logs, "dev-migrations.log"),
-      directory,
-    );
-    if (migrated.exitCode)
-      throw new Error("Benchmark local database migrations failed.");
-    const origin = `http://localhost:${await unusedPort()}`;
-    const server = await command(
-      [
-        "exec",
-        "astro",
-        "dev",
-        "--background",
-        "--host",
-        "localhost",
-        "--port",
-        new URL(origin).port,
-      ],
-      join(logs, "dev-start.log"),
-      directory,
-    );
-    started = true;
-    if (server.exitCode)
-      throw new Error("Benchmark development server failed to start.");
-    const deadline = Date.now() + 120_000;
-    let ready = false;
-    while (Date.now() < deadline) {
-      try {
-        const response = await fetch(`${origin}/api/auth/dev/users`, {
-          signal: AbortSignal.timeout(5000),
-        });
-        ready = response.ok;
-        await response.body?.cancel();
-        if (ready) break;
-      } catch {
-        // The background process may still be compiling its first routes.
-      }
-      await new Promise((accept) => setTimeout(accept, 500));
-    }
-    if (!ready)
-      throw new Error("Benchmark development server did not become ready.");
-    const seeded = await command(
-      ["db:seed:local"],
-      join(logs, "dev-seed.log"),
-      directory,
-      { LOCAL_BASE_URL: origin },
-    );
-    if (seeded.exitCode)
-      throw new Error("Benchmark local fixture seeding failed.");
-    return { origin, stop };
-  } catch (error) {
-    await stop();
-    throw error;
-  }
-}
-
 export async function main(args = process.argv.slice(2)) {
   const { values } = parseArgs({
     args,
@@ -299,7 +177,6 @@ export async function main(args = process.argv.slice(2)) {
       runs: { type: "string", default: "3" },
       warmups: { type: "string", default: "1" },
       baseline: { type: "string" },
-      "local-url": { type: "string" },
       "deployed-url": { type: "string" },
       report: { type: "string", default: "test-results/benchmarks/latest.md" },
       output: {
@@ -311,7 +188,7 @@ export async function main(args = process.argv.slice(2)) {
   });
   if (values.help) {
     console.log(
-      "Usage: pnpm test:benchmark [--runs 3] [--warmups 1] [--baseline FILE] [--deployed-url HTTPS_URL] [--local-url http://localhost:PORT] [--report FILE.md] [--output FILE.json]",
+      "Usage: pnpm test:benchmark [--runs 3] [--warmups 1] [--baseline FILE] [--deployed-url HTTPS_URL] [--report FILE.md] [--output FILE.json]",
     );
     return;
   }
@@ -326,24 +203,17 @@ export async function main(args = process.argv.slice(2)) {
     throw new Error(
       "Runs must be a positive integer and warmups a non-negative integer.",
     );
-  for (const [name, protocol] of [
-    ["local-url", "http:"],
-    ["deployed-url", "https:"],
-  ]) {
-    if (!values[name]) continue;
-    const url = new URL(values[name]);
+  if (values["deployed-url"]) {
+    const url = new URL(values["deployed-url"]);
     if (
-      url.protocol !== protocol ||
+      url.protocol !== "https:" ||
       url.username ||
       url.password ||
       url.pathname !== "/" ||
       url.search ||
-      url.hash ||
-      (name === "local-url" && url.hostname !== "localhost")
+      url.hash
     )
-      throw new Error(
-        `${name} must be a ${protocol} origin${name === "local-url" ? " on localhost" : ""}.`,
-      );
+      throw new Error("deployed-url must be a https: origin.");
   }
   const baseline = values.baseline
     ? JSON.parse(await readFile(resolve(root, values.baseline), "utf8"))
@@ -407,7 +277,7 @@ export async function main(args = process.argv.slice(2)) {
     options: {
       runs,
       warmups,
-      localServer: values["local-url"] ? "existing" : "isolated",
+      localServer: "isolated",
       deployedUrl: values["deployed-url"] ?? null,
     },
     logs: filePath(logs),
@@ -504,9 +374,7 @@ export async function main(args = process.argv.slice(2)) {
   let server;
   const setupStart = performance.now();
   try {
-    server = values["local-url"]
-      ? { origin: new URL(values["local-url"]).origin, stop: async () => {} }
-      : await localServer(logs);
+    server = await startLocalTestServer(logs);
     data.setupMs = round(performance.now() - setupStart);
     for (let index = -warmups; index < runs; index++) {
       const iteration =
@@ -554,7 +422,10 @@ export async function main(args = process.argv.slice(2)) {
         ["exec", "playwright", "test", "--reporter=json"],
         iteration,
         "browser",
-        { PLAYWRIGHT_BASE_URL: server.origin },
+        {
+          PLAYWRIGHT_BASE_URL: server.origin,
+          PLAYWRIGHT_ISOLATED_BASE_URL: server.origin,
+        },
       );
       if (values["deployed-url"])
         await measure(

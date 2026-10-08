@@ -64,6 +64,10 @@ export function resetFormFeedback(element: HTMLFormElement) {
 }
 
 function fieldMessage(control: FormControl): string {
+  if (control instanceof HTMLInputElement && control.type === "checkbox")
+    return control.required && !control.checked
+      ? (control.dataset.validationMessage ?? "This field is required.")
+      : "";
   const value = control.value.trim();
   const validity = control.validity;
   if (validity.badInput) return "Enter a valid value.";
@@ -105,7 +109,11 @@ export function validateAccountForm(element: HTMLFormElement, focus = true) {
   let firstInvalid: HTMLElement | undefined;
   const controls = element.querySelectorAll<FormControl>("input, textarea");
   for (const control of controls) {
-    if (!control.willValidate || control.type === "checkbox") continue;
+    if (
+      !control.willValidate ||
+      (control.type === "checkbox" && !control.required)
+    )
+      continue;
     const text = fieldMessage(control);
     setFieldError(
       element,
@@ -130,7 +138,15 @@ export function validateAccountForm(element: HTMLFormElement, focus = true) {
       [group, ...boxes],
       text,
     );
-    if (text) firstInvalid ??= boxes[0];
+    const firstBox = boxes[0];
+    if (
+      text &&
+      firstBox &&
+      (!firstInvalid ||
+        firstBox.compareDocumentPosition(firstInvalid) &
+          Node.DOCUMENT_POSITION_FOLLOWING)
+    )
+      firstInvalid = firstBox;
   }
   if (firstInvalid) {
     showFormMessage(element, "Please correct the highlighted fields.");

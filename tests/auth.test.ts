@@ -8,6 +8,10 @@ import {
   type AuthBindings,
 } from "../src/server/auth";
 import { createSignInOTP } from "./helpers/email-otp";
+import {
+  codeOfConductError,
+  codeOfConductVersion,
+} from "../src/data/code-of-conduct";
 import { hashAuthValue, takeRateLimit } from "../src/server/db/rate-limits";
 import { sendSignInEmail, type SignInEmail } from "../src/server/auth/services";
 import { deliverNotifications } from "../src/server/events/notifications";
@@ -574,6 +578,41 @@ test("invalid email requests send no email and create no challenge", async () =>
   assert.equal(count?.count, 0);
 });
 
+test("registration requires explicit Code of Conduct acknowledgement before any profile writes", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  for (const input of [
+    answers,
+    { ...answers, codeOfConductAccepted: false },
+    { ...answers, codeOfConductAccepted: "true" },
+    { ...answers, codeOfConductAccepted: 1 },
+    { ...answers, codeOfConductAccepted: null },
+  ]) {
+    await assert.rejects(
+      () => saveProfile(bindings.DB, current.user.id, input),
+      (error: unknown) => error instanceof RequestError && error.status === 400,
+    );
+  }
+  await assert.rejects(
+    () => saveProfile(bindings.DB, current.user.id, answers),
+    (error: unknown) =>
+      error instanceof RequestError && error.message === codeOfConductError,
+  );
+  for (const table of ["profile", "volunteer_status", "audit_log"]) {
+    const count = await bindings.DB.prepare(
+      `SELECT count(*) AS n FROM ${table}`,
+    ).first();
+    assert.equal(count?.n, 0);
+  }
+  const person = await bindings.DB.prepare("SELECT name FROM user WHERE id=?")
+    .bind(current.user.id)
+    .first();
+  assert.notEqual(person?.name, answers.name);
+});
+
 test("registration/editing persists all answers, keeps approval, and audits only changed field names", async () => {
   const { cookie } = await signIn();
   const current = await auth.api.getSession({
@@ -581,8 +620,26 @@ test("registration/editing persists all answers, keeps approval, and audits only
   });
   assert.ok(current);
   const id = current.user.id;
-  await saveProfile(bindings.DB, id, answers);
+  const started = Date.now();
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
   assert.deepEqual(await loadProfile(bindings.DB, id), answers);
+  const acknowledgement = await bindings.DB.prepare(
+    "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
+  )
+    .bind(id)
+    .first<{
+      code_of_conduct_version: string;
+      code_of_conduct_accepted_at: number;
+    }>();
+  assert.equal(acknowledgement?.code_of_conduct_version, codeOfConductVersion);
+  assert.ok(
+    acknowledgement &&
+      acknowledgement.code_of_conduct_accepted_at >= started &&
+      acknowledgement.code_of_conduct_accepted_at <= Date.now(),
+  );
   await bindings.DB.prepare(
     "INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at) VALUES ('organizer', 'Organizer', 'organizer@example.org', 1, 'organizer', 0, 0)",
   ).run();
@@ -598,6 +655,14 @@ test("registration/editing persists all answers, keeps approval, and audits only
   };
   await saveProfile(bindings.DB, id, edit);
   assert.deepEqual(await loadProfile(bindings.DB, id), edit);
+  assert.deepEqual(
+    await bindings.DB.prepare(
+      "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
+    )
+      .bind(id)
+      .first(),
+    acknowledgement,
+  );
   const status = await bindings.DB.prepare(
     "SELECT patrol_approved FROM volunteer_status WHERE user_id = ?",
   )
@@ -632,11 +697,97 @@ test("registration/editing persists all answers, keeps approval, and audits only
   );
 });
 
+test("registration-only questions are required once and preserved through profile edits", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  const id = current.user.id;
+  const { heardAboutUs, motivation, ...editable } = answers;
+  for (const input of [
+    editable,
+    { ...editable, heardAboutUs },
+    { ...editable, motivation },
+  ]) {
+    await assert.rejects(
+      () =>
+        saveProfile(bindings.DB, id, { ...input, codeOfConductAccepted: true }),
+      (error: unknown) => error instanceof RequestError && error.status === 400,
+    );
+  }
+  assert.equal(await loadProfile(bindings.DB, id), null);
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
+  await saveProfile(bindings.DB, id, {
+    ...editable,
+    name: "Updated volunteer",
+  });
+  assert.deepEqual(await loadProfile(bindings.DB, id), {
+    ...answers,
+    name: "Updated volunteer",
+  });
+  // A stale client sending the old form cannot replace registration-only answers.
+  await saveProfile(bindings.DB, id, {
+    ...editable,
+    name: "Updated again",
+    heardAboutUs: "Replacement referral",
+    motivation: "Replacement motivation",
+  });
+  assert.deepEqual(await loadProfile(bindings.DB, id), {
+    ...answers,
+    name: "Updated again",
+  });
+  const logs = await bindings.DB.prepare(
+    "SELECT changed_fields FROM audit_log WHERE subject_id=?",
+  )
+    .bind(id)
+    .all();
+  const edits = logs.results
+    .map((row) => JSON.parse(String(row.changed_fields)) as string[])
+    .filter((fields) => fields.length === 1);
+  assert.deepEqual(edits, [["name"], ["name"]]);
+});
+
+test("existing profiles can be edited without inventing Code of Conduct acknowledgement", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  const id = current.user.id;
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
+  await bindings.DB.prepare(
+    "UPDATE profile SET code_of_conduct_version=NULL, code_of_conduct_accepted_at=NULL WHERE user_id=?",
+  )
+    .bind(id)
+    .run();
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    name: "Existing volunteer",
+  });
+  assert.deepEqual(
+    await bindings.DB.prepare(
+      "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
+    )
+      .bind(id)
+      .first(),
+    { code_of_conduct_version: null, code_of_conduct_accepted_at: null },
+  );
+});
+
 test("profile validation rejects privilege fields, invalid dates, absent/duplicate teams and oversized answers", () => {
   for (const input of [
     { ...answers, role: "organizer" },
     { ...answers, patrolApproved: true },
     { ...answers, userId: "another-user" },
+    { ...answers, codeOfConductVersion: "forged-version" },
+    { ...answers, codeOfConductAcceptedAt: 0 },
     { ...answers, birthDate: "1995-02-31" },
     { ...answers, birthDate: "2999-01-01" },
     { ...answers, teams: [] },
@@ -660,7 +811,10 @@ test("passwordless two-factor enrollment and login cannot bypass the authenticat
   const initial = await auth.api.getSession({
     headers: new Headers({ cookie: signedIn.cookie }),
   });
-  await saveProfile(bindings.DB, initial!.user.id, answers);
+  await saveProfile(bindings.DB, initial!.user.id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
   const enabled = await request(
     "/two-factor/enable",
     { method: "totp" },
