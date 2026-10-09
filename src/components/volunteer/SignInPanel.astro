@@ -27,7 +27,7 @@ const ready = Boolean(
     data-email-request
     data-return-to={returnTo}
     class="volunteer-form"
-    action="/api/auth/email-otp/send-verification-otp"
+    action="/api/v1/auth/email-otp/send-verification-otp"
     method="post"
   >
     <div class="volunteer-field">
@@ -56,7 +56,7 @@ const ready = Boolean(
   <form
     data-email-code
     class="volunteer-form"
-    action="/api/auth/sign-in/email-otp"
+    action="/api/v1/auth/sign-in/email-otp"
     method="post"
     hidden
   >

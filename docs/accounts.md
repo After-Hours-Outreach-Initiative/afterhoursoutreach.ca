@@ -188,8 +188,8 @@ runtime import from outside `src/dev/` behind the guard. Type-only imports are
 safe because TypeScript removes them.
 
 The development controls are available only in the local dev server. Built
-Worker tests check that `GET /api/auth/dev/users` and
-`POST /api/auth/dev/switch-user` return `404` in production and preview builds;
+Worker tests check that `GET /api/v1/auth/dev/users` and
+`POST /api/v1/auth/dev/switch-user` return `404` in production and preview builds;
 local browser tests exercise account switching and simulated email delivery.
 Dev-tool assets must not be placed in `public/`, which is copied into builds.
 

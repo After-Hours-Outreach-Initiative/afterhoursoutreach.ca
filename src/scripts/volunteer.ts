@@ -327,11 +327,11 @@ function form(
   });
 }
 const str = (values: FormData, key: string) => String(values.get(key) ?? "");
-form("[data-live-signup]", "/api/events/action", (v) => ({
+form("[data-live-signup]", "/api/v1/events/action", (v) => ({
   action: str(v, "action"),
   id: str(v, "id"),
 }));
-form("[data-event-save]", "/api/events/action", (v) => ({
+form("[data-event-save]", "/api/v1/events/action", (v) => ({
   action: "save",
   ...(v.has("id")
     ? { id: str(v, "id"), version: Number(v.get("version")) }
@@ -346,13 +346,13 @@ form("[data-event-save]", "/api/events/action", (v) => ({
     hidden: str(v, "hidden") === "true",
   },
 }));
-form("[data-event-cancel]", "/api/events/action", (v) => ({
+form("[data-event-cancel]", "/api/v1/events/action", (v) => ({
   action: "cancel-event",
   id: str(v, "id"),
   version: Number(v.get("version")),
   reason: str(v, "reason"),
 }));
-form("[data-manage-signup]", "/api/events/action", (v) => ({
+form("[data-manage-signup]", "/api/v1/events/action", (v) => ({
   action: "manage-signup",
   id: str(v, "id"),
   ...(v.get("destination") ? { destination: str(v, "destination") } : {}),
@@ -360,7 +360,7 @@ form("[data-manage-signup]", "/api/events/action", (v) => ({
 }));
 form(
   "[data-retry-notifications]",
-  "/api/events/action",
+  "/api/v1/events/action",
   () => ({
     action: "retry-notifications",
   }),
@@ -368,7 +368,7 @@ form(
 );
 form(
   "[data-organizer-status]",
-  "/api/organizer/action",
+  "/api/v1/organizer/action",
   (v) => ({
     action: "status",
     userId: str(v, "userId"),
@@ -380,7 +380,7 @@ form(
 );
 form(
   "[data-organizer-role]",
-  "/api/organizer/action",
+  "/api/v1/organizer/action",
   (v) => ({
     action: "role",
     userId: str(v, "userId"),
@@ -388,7 +388,7 @@ form(
   }),
   refreshVolunteer,
 );
-form("[data-organizer-orientation]", "/api/organizer/action", (v) => ({
+form("[data-organizer-orientation]", "/api/v1/organizer/action", (v) => ({
   action: "orientation",
   userId: str(v, "userId"),
   eventId: str(v, "eventId"),

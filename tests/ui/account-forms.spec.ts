@@ -69,7 +69,7 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
   });
   const emails: string[] = [];
   await page.route(
-    "**/api/auth/email-otp/send-verification-otp**",
+    "**/api/v1/auth/email-otp/send-verification-otp**",
     async (route) => {
       emails.push(route.request().postDataJSON().email);
       await sending;
@@ -77,7 +77,7 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
     },
   );
   const proofs: object[] = [];
-  await page.route("**/api/auth/sign-in/email-otp**", async (route) => {
+  await page.route("**/api/v1/auth/sign-in/email-otp**", async (route) => {
     proofs.push(route.request().postDataJSON());
     await route.fulfill({
       status: 400,
@@ -182,7 +182,7 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
 }) => {
   const email = `cooldown-${crypto.randomUUID()}@example.org`;
   const sent = await page.request.post(
-    "/api/auth/email-otp/send-verification-otp",
+    "/api/v1/auth/email-otp/send-verification-otp",
     {
       headers: { origin: baseURL! },
       data: { email, type: "sign-in" },
@@ -202,8 +202,9 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
   );
   await expect(error).toHaveAttribute("role", "alert");
   await expect(button).toBeEnabled();
-  await page.route("**/api/auth/email-otp/send-verification-otp**", (route) =>
-    route.fulfill({ status: 429, json: {} }),
+  await page.route(
+    "**/api/v1/auth/email-otp/send-verification-otp**",
+    (route) => route.fulfill({ status: 429, json: {} }),
   );
   await button.click();
   await page
@@ -343,7 +344,7 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(form).not.toHaveAttribute("novalidate");
   const requests: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/api/account/profile")
+    if (new URL(request.url()).pathname === "/api/v1/account/profile")
       requests.push(request.url());
   });
   await expect(
@@ -480,7 +481,7 @@ test("profile saves enable only for changed answers and disable after saving", a
   const name = form.locator('[name="name"]');
   const requests: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/api/account/profile")
+    if (new URL(request.url()).pathname === "/api/v1/account/profile")
       requests.push(request.url());
   });
   await expect(save).toBeDisabled();
@@ -555,7 +556,7 @@ test("team selection requires any one checkbox and restores constraints on reset
   const medic = form.getByLabel("Medic", { exact: true });
   const requests: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/api/account/profile")
+    if (new URL(request.url()).pathname === "/api/v1/account/profile")
       requests.push(request.url());
   });
   await expect(error).toBeHidden();
@@ -598,7 +599,7 @@ test("event editor shows native number and URL errors without submitting", async
   const form = dialog.locator("[data-event-save]");
   const requests: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/api/events/action")
+    if (new URL(request.url()).pathname === "/api/v1/events/action")
       requests.push(request.url());
   });
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
@@ -637,7 +638,7 @@ test("failed profile saves keep unsaved changes retryable", async ({
   const form = page.locator("[data-account-profile]");
   const save = form.getByRole("button", { name: "Save profile" });
   const name = form.locator('[name="name"]');
-  await page.route("**/api/account/profile", (route) =>
+  await page.route("**/api/v1/account/profile", (route) =>
     route.fulfill({
       status: 503,
       json: { message: "Your profile is temporarily unavailable." },
@@ -653,7 +654,7 @@ test("failed profile saves keep unsaved changes retryable", async ({
   await name.fill(sampleAnswers.name);
   await expect(save).toBeDisabled();
   await name.fill("Retry this profile");
-  await page.unroute("**/api/account/profile");
+  await page.unroute("**/api/v1/account/profile");
   await save.click();
   await expect(form.locator("[data-form-message]")).toHaveAttribute(
     "data-message-kind",
@@ -675,7 +676,7 @@ test("edits made during a profile save remain unsaved", async ({
   const saving = new Promise<void>((resolve) => {
     finishSaving = resolve;
   });
-  await page.route("**/api/account/profile", async (route) => {
+  await page.route("**/api/v1/account/profile", async (route) => {
     await saving;
     await route.continue();
   });
@@ -733,7 +734,7 @@ test("authenticator setup and sign-in show native inline code errors", async ({
   const key = (await page.locator("[data-factor-key]").textContent())!;
   await code.fill(totpFromSetupKey(key));
   await inPlaceAction(page, {
-    endpoint: "/api/auth/two-factor/verify-totp",
+    endpoint: "/api/v1/auth/two-factor/verify-totp",
     form: setup,
     trigger: () =>
       page.getByRole("button", { name: "Verify and enable" }).click(),

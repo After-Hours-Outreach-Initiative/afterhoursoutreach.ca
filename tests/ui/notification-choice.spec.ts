@@ -12,7 +12,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
     <div data-volunteer-profile>
       <h2>Sample volunteer</h2>
       <div data-volunteer-controls>
-        <form data-organizer-status data-email-prompt="access" action="/api/organizer/action" method="post">
+        <form data-organizer-status data-email-prompt="access" action="/api/v1/organizer/action" method="post">
           <input type="hidden" name="userId" value="test-email-choice" />
           <input type="hidden" name="version" value="${version}" />
           <input type="checkbox" name="active" checked hidden />
@@ -20,7 +20,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
           <button type="submit" data-loading-label="Saving…">${approved ? "Revoke patrol approval" : "Approve for patrols"}</button>
           <p data-form-message hidden></p>
         </form>
-        <form data-organizer-status data-submit-on-change data-email-prompt="access" action="/api/organizer/action" method="post">
+        <form data-organizer-status data-submit-on-change data-email-prompt="access" action="/api/v1/organizer/action" method="post">
           <input type="hidden" name="userId" value="test-email-choice" />
           <input type="hidden" name="version" value="${version}" />
           <label><input type="checkbox" name="active" checked />Active volunteer</label>
@@ -28,7 +28,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
           <span data-action-loading hidden>Saving…</span>
           <p data-form-message hidden></p>
         </form>
-        <form data-organizer-role data-submit-on-change data-email-prompt="role" action="/api/organizer/action" method="post">
+        <form data-organizer-role data-submit-on-change data-email-prompt="role" action="/api/v1/organizer/action" method="post">
           <input type="hidden" name="userId" value="test-email-choice" />
           <label>Account role<select name="role"><option value="volunteer">Volunteer</option><option value="organizer">Organizer</option></select></label>
           <span data-action-loading hidden>Saving…</span>
@@ -36,7 +36,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
         </form>
       </div>
     </div>`;
-  await page.route("**/api/organizer/action", async (route) => {
+  await page.route("**/api/v1/organizer/action", async (route) => {
     const body = route.request().postDataJSON();
     submissions.push(body);
     approved = body.patrolApproved;

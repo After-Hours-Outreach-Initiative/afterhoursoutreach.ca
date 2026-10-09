@@ -11,7 +11,7 @@ const { person } = Astro.props;
     class="volunteer-form"
     data-organizer-status
     data-email-prompt="access"
-    action="/api/organizer/action"
+    action="/api/v1/organizer/action"
     method="post"
   >
     <input type="hidden" name="userId" value={person.id} />
@@ -43,7 +43,7 @@ const { person } = Astro.props;
     data-organizer-status
     data-submit-on-change
     data-email-prompt="access"
-    action="/api/organizer/action"
+    action="/api/v1/organizer/action"
     method="post"
   >
     <input type="hidden" name="userId" value={person.id} />
@@ -78,7 +78,7 @@ const { person } = Astro.props;
     data-organizer-role
     data-email-prompt="role"
     data-submit-on-change
-    action="/api/organizer/action"
+    action="/api/v1/organizer/action"
     method="post"
   >
     <input type="hidden" name="userId" value={person.id} />

@@ -64,7 +64,7 @@ describe(
       assert.equal(environment.AUTH_BASE_URL, origin);
       cookie = await signIn("worker-volunteer@example.org");
       current = (await (
-        await send("/api/auth/get-session", undefined, cookie)
+        await send("/api/v1/auth/get-session", undefined, cookie)
       ).json()) as typeof current;
     });
     const send = (
@@ -89,7 +89,7 @@ describe(
         "https://other-afterhoursoutreach-ca.ivanzheng9905.workers.dev",
       ]) {
         const response = await send(
-          "/api/auth/email-otp/send-verification-otp",
+          "/api/v1/auth/email-otp/send-verification-otp",
           { email: "no-mail@example.org", type: "sign-in" },
           undefined,
           host,
@@ -97,14 +97,14 @@ describe(
         assert.equal(response.status, 403);
       }
       const response = await worker.fetch(
-        "https://evil.example.org/api/auth/get-session",
+        "https://evil.example.org/api/v1/auth/get-session",
         { headers: { "x-forwarded-host": new URL(origin).hostname } },
       );
       assert.equal(response.status, 403);
     });
     const signIn = async (email: string) => {
       const proof = await createSignInOTP(DB, secret, email);
-      const response = await send("/api/auth/sign-in/email-otp", proof);
+      const response = await send("/api/v1/auth/sign-in/email-otp", proof);
       assert.equal(response.status, 200, await response.clone().text());
       return response.headers
         .getSetCookie()
@@ -114,26 +114,27 @@ describe(
     };
 
     test("unauthenticated profile access is rejected and registration redirects to sign-in", async () => {
-      const profile = await send("/api/account/profile", answers);
+      const profile = await send("/api/v1/account/profile", answers);
       assert.equal(profile.status, 401, await profile.clone().text());
       const register = await send("/volunteer/register");
       assert.equal(register.status, 302);
       assert.match(register.headers.get("location")!, /sign-in/);
-      assert.equal((await send("/api/auth/sign-in/email-otp")).status, 405);
+      assert.equal((await send("/api/v1/auth/sign-in/email-otp")).status, 405);
       assert.equal(
-        (await send("/api/auth/email-otp/get-verification-otp")).status,
+        (await send("/api/v1/auth/email-otp/get-verification-otp")).status,
         404,
       );
       assert.equal(
-        (await send("/api/auth/email-otp/check-verification-otp", {})).status,
+        (await send("/api/v1/auth/email-otp/check-verification-otp", {}))
+          .status,
         404,
       );
       assert.equal(
-        (await send("/api/auth/update-user", { name: "Attacker" })).status,
+        (await send("/api/v1/auth/update-user", { name: "Attacker" })).status,
         404,
       );
       assert.equal(
-        (await send("/api/auth/two-factor/disable", {})).status,
+        (await send("/api/v1/auth/two-factor/disable", {})).status,
         404,
       );
     });
@@ -176,7 +177,7 @@ describe(
           codeOfConductAccepted: true,
         },
       ]) {
-        const rejected = await send("/api/account/profile", input, cookie);
+        const rejected = await send("/api/v1/account/profile", input, cookie);
         assert.equal(rejected.status, 400);
       }
       assert.equal(
@@ -186,7 +187,7 @@ describe(
         null,
       );
       const response = await send(
-        "/api/account/profile",
+        "/api/v1/account/profile",
         { ...answers, codeOfConductAccepted: true },
         cookie,
       );
@@ -233,7 +234,7 @@ describe(
       assert.equal(
         (
           await send(
-            "/api/account/profile",
+            "/api/v1/account/profile",
             { ...answers, userId: "another-user" },
             cookie,
           )
@@ -243,7 +244,7 @@ describe(
       assert.equal(
         (
           await send(
-            "/api/account/profile",
+            "/api/v1/account/profile",
             answers,
             cookie,
             "https://evil.example",
@@ -252,8 +253,14 @@ describe(
         403,
       );
       assert.equal(
-        (await send("/api/auth/sign-out", {}, cookie, "https://evil.example"))
-          .status,
+        (
+          await send(
+            "/api/v1/auth/sign-out",
+            {},
+            cookie,
+            "https://evil.example",
+          )
+        ).status,
         403,
       );
     });
@@ -262,10 +269,10 @@ describe(
       const siblingCookie = await signIn("worker-volunteer@example.org");
       const expiredCookie = await signIn("worker-volunteer@example.org");
       const sibling = (await (
-        await send("/api/auth/get-session", undefined, siblingCookie)
+        await send("/api/v1/auth/get-session", undefined, siblingCookie)
       ).json()) as { session: { id: string; token: string } };
       const expired = (await (
-        await send("/api/auth/get-session", undefined, expiredCookie)
+        await send("/api/v1/auth/get-session", undefined, expiredCookie)
       ).json()) as { session: { id: string; token: string } };
       await DB.prepare("UPDATE session SET expires_at=? WHERE id=?")
         .bind(Date.now() - 1000, expired.session.id)
@@ -279,33 +286,41 @@ describe(
       assert.ok(!html.includes(expired.session.token));
 
       const revoked = await send(
-        "/api/account/session",
+        "/api/v1/account/session",
         { id: sibling.session.id },
         cookie,
       );
       assert.equal(revoked.status, 200, await revoked.clone().text());
       assert.equal(
         await (
-          await send("/api/auth/get-session", undefined, siblingCookie)
+          await send("/api/v1/auth/get-session", undefined, siblingCookie)
         ).json(),
         null,
       );
       assert.ok(
-        await (await send("/api/auth/get-session", undefined, cookie)).json(),
+        await (
+          await send("/api/v1/auth/get-session", undefined, cookie)
+        ).json(),
       );
       assert.equal(
-        (await send("/api/account/session", { id: "unknown-session" }, cookie))
-          .status,
+        (
+          await send(
+            "/api/v1/account/session",
+            { id: "unknown-session" },
+            cookie,
+          )
+        ).status,
         200,
       );
       assert.equal(
-        (await send("/api/account/session", { id: current.session.id })).status,
+        (await send("/api/v1/account/session", { id: current.session.id }))
+          .status,
         401,
       );
       assert.equal(
         (
           await send(
-            "/api/account/session",
+            "/api/v1/account/session",
             { id: current.session.id },
             cookie,
             "https://evil.example",
@@ -341,20 +356,25 @@ describe(
     test("ending another person's session cannot revoke it", async () => {
       const otherCookie = await signIn("other-worker-volunteer@example.org");
       const other = (await (
-        await send("/api/auth/get-session", undefined, otherCookie)
+        await send("/api/v1/auth/get-session", undefined, otherCookie)
       ).json()) as { session: { id: string } };
       assert.equal(
-        (await send("/api/account/session", { id: other.session.id }, cookie))
-          .status,
+        (
+          await send(
+            "/api/v1/account/session",
+            { id: other.session.id },
+            cookie,
+          )
+        ).status,
         200,
       );
       assert.equal(
-        (await send("/api/auth/get-session", undefined, otherCookie)).status,
+        (await send("/api/v1/auth/get-session", undefined, otherCookie)).status,
         200,
       );
       assert.ok(
         await (
-          await send("/api/auth/get-session", undefined, otherCookie)
+          await send("/api/v1/auth/get-session", undefined, otherCookie)
         ).json(),
       );
     });
@@ -377,10 +397,13 @@ describe(
     test("unconfigured email delivery fails closed and removes its code", async () => {
       const page = await send("/volunteer/sign-in");
       assert.match(await page.text(), /Sign-in is not configured yet/);
-      const response = await send("/api/auth/email-otp/send-verification-otp", {
-        email: "no-mail@example.org",
-        type: "sign-in",
-      });
+      const response = await send(
+        "/api/v1/auth/email-otp/send-verification-otp",
+        {
+          email: "no-mail@example.org",
+          type: "sign-in",
+        },
+      );
       assert.equal(response.status, 503);
       assert.match(
         ((await response.json()) as { message: string }).message,
@@ -396,23 +419,29 @@ describe(
 
     test("production builds reject development account endpoints without changing sessions", async () => {
       const before = (await (
-        await send("/api/auth/get-session", undefined, cookie)
+        await send("/api/v1/auth/get-session", undefined, cookie)
       ).json()) as typeof current;
       for (const sessionCookie of [undefined, cookie]) {
         assert.equal(
-          (await send("/api/auth/dev/users", undefined, sessionCookie)).status,
+          (await send("/api/v1/auth/dev/users", undefined, sessionCookie))
+            .status,
           404,
         );
         for (const userId of [before.user.id, null]) {
           assert.equal(
-            (await send("/api/auth/dev/switch-user", { userId }, sessionCookie))
-              .status,
+            (
+              await send(
+                "/api/v1/auth/dev/switch-user",
+                { userId },
+                sessionCookie,
+              )
+            ).status,
             404,
           );
         }
       }
       const after = (await (
-        await send("/api/auth/get-session", undefined, cookie)
+        await send("/api/v1/auth/get-session", undefined, cookie)
       ).json()) as typeof current;
       assert.equal(after.user.id, before.user.id);
       assert.equal(after.session.id, before.session.id);
@@ -522,7 +551,7 @@ describe(
         for (let i = 0; i < 2; i++) {
           const siblingCookie = await signIn("worker-volunteer@example.org");
           const sibling = (await (
-            await send("/api/auth/get-session", undefined, siblingCookie)
+            await send("/api/v1/auth/get-session", undefined, siblingCookie)
           ).json()) as { session: { id: string } };
           siblings.push(sibling.session.id);
         }
@@ -571,7 +600,7 @@ describe(
             .locator("[data-end-session]")
             .filter({ has: page.locator(`input[value="${id}"]`) });
           await inPlaceAction(page, {
-            endpoint: "/api/account/session",
+            endpoint: "/api/v1/account/session",
             form: sessionForm,
             trigger: () =>
               sessionForm
@@ -790,15 +819,20 @@ describe(
 
     test("sign-out removes the server-side session", async () => {
       current = (await (
-        await send("/api/auth/get-session", undefined, cookie)
+        await send("/api/v1/auth/get-session", undefined, cookie)
       ).json()) as typeof current;
-      assert.equal((await send("/api/auth/sign-out", {}, cookie)).status, 200);
+      assert.equal(
+        (await send("/api/v1/auth/sign-out", {}, cookie)).status,
+        200,
+      );
       const result = await DB.prepare("SELECT id FROM session WHERE id = ?")
         .bind(current.session.id)
         .first();
       assert.equal(result, null);
       assert.equal(
-        await (await send("/api/auth/get-session", undefined, cookie)).json(),
+        await (
+          await send("/api/v1/auth/get-session", undefined, cookie)
+        ).json(),
         null,
       );
       const signedOut = await send("/volunteer/sign-in", undefined, cookie);
@@ -808,13 +842,13 @@ describe(
       const email = "worker-factor@example.org";
       const initialCookie = await signIn(email);
       const registered = await send(
-        "/api/account/profile",
+        "/api/v1/account/profile",
         { ...answers, codeOfConductAccepted: true },
         initialCookie,
       );
       assert.equal(registered.status, 200, await registered.clone().text());
       const enabled = await send(
-        "/api/auth/two-factor/enable",
+        "/api/v1/auth/two-factor/enable",
         { method: "totp" },
         initialCookie,
       );
@@ -825,7 +859,7 @@ describe(
       };
       const key = new URL(setup.totpURI).searchParams.get("secret")!;
       const confirmed = await send(
-        "/api/auth/two-factor/verify-totp",
+        "/api/v1/auth/two-factor/verify-totp",
         { code: totpFromSetupKey(key) },
         initialCookie,
       );
@@ -836,7 +870,7 @@ describe(
         .map((value) => value.split(";")[0])
         .join("; ");
       const factorSession = (await (
-        await send("/api/auth/get-session", undefined, confirmedCookie)
+        await send("/api/v1/auth/get-session", undefined, confirmedCookie)
       ).json()) as { session: { twoFactorVerified: boolean } };
       assert.equal(factorSession.session.twoFactorVerified, true);
       const encrypted = await DB.prepare(
@@ -847,11 +881,11 @@ describe(
         JSON.stringify(encrypted),
         new RegExp(setup.backupCodes[0]),
       );
-      await send("/api/auth/sign-out", {}, confirmedCookie);
+      await send("/api/v1/auth/sign-out", {}, confirmedCookie);
 
       const proof = await createSignInOTP(DB, secret, email);
       const pending = await send(
-        "/api/auth/sign-in/email-otp?returnTo=%2Fvolunteer%2Faccount%3Ftab%3Dfactor",
+        "/api/v1/auth/sign-in/email-otp?returnTo=%2Fvolunteer%2Faccount%3Ftab%3Dfactor",
         proof,
       );
       assert.equal(pending.status, 200);
@@ -867,16 +901,16 @@ describe(
         .join("; ");
       assert.equal(
         await (
-          await send("/api/auth/get-session", undefined, pendingCookie)
+          await send("/api/v1/auth/get-session", undefined, pendingCookie)
         ).json(),
         null,
       );
       assert.equal(
-        (await send("/api/account/profile", answers, pendingCookie)).status,
+        (await send("/api/v1/account/profile", answers, pendingCookie)).status,
         401,
       );
       const verified = await send(
-        "/api/auth/two-factor/verify-backup-code",
+        "/api/v1/auth/two-factor/verify-backup-code",
         { code: setup.backupCodes[0] },
         pendingCookie,
       );
@@ -891,7 +925,7 @@ describe(
         .map((value) => value.split(";")[0])
         .join("; ");
       const result = (await (
-        await send("/api/auth/get-session", undefined, verifiedCookie)
+        await send("/api/v1/auth/get-session", undefined, verifiedCookie)
       ).json()) as { session: { twoFactorVerified: boolean } };
       assert.equal(result.session.twoFactorVerified, true);
     });
@@ -925,11 +959,11 @@ test("a built Worker cannot enable account switching with local runtime vars", a
     await server.listen();
     const worker = server.getWorker<Env>();
     const listing = await worker.fetch(
-      "http://localhost:4321/api/auth/dev/users",
+      "http://localhost:4321/api/v1/auth/dev/users",
     );
     assert.equal(listing.status, 404);
     const switching = await worker.fetch(
-      "http://localhost:4321/api/auth/dev/switch-user",
+      "http://localhost:4321/api/v1/auth/dev/switch-user",
       {
         method: "POST",
         headers: {

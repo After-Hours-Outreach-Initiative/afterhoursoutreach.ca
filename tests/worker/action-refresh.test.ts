@@ -77,7 +77,7 @@ for (const failFirst of [false, true]) {
             ...parsed.querySelector("[data-event-browser]")!.childNodes,
           );
       }, listing());
-      await page.route("**/api/events/action", async (route) => {
+      await page.route("**/api/v1/events/action", async (route) => {
         signedUp.add(route.request().postDataJSON().id);
         await route.fulfill({ json: { message: "Your spot is confirmed." } });
       });
@@ -109,7 +109,7 @@ for (const failFirst of [false, true]) {
         await expect.poll(() => refreshes).toBe(1);
         const secondSaved = page.waitForResponse(
           (response) =>
-            response.url().endsWith("/api/events/action") &&
+            response.url().endsWith("/api/v1/events/action") &&
             response.request().postDataJSON().id === "second",
         );
         await second

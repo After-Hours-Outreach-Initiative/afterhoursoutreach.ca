@@ -100,7 +100,7 @@ describe(
       const proof = await createSignInOTP(DB, secret, email);
       const response = await ok(
         await send(
-          "/api/auth/sign-in/email-otp?returnTo=%2Fvolunteer",
+          "/api/v1/auth/sign-in/email-otp?returnTo=%2Fvolunteer",
           proof,
           undefined,
           origin,
@@ -113,7 +113,7 @@ describe(
         cookie = cookies(
           await ok(
             await send(
-              "/api/auth/two-factor/verify-totp",
+              "/api/v1/auth/two-factor/verify-totp",
               { code: totpFromSetupKey(factorKey) },
               cookie,
             ),
@@ -126,13 +126,13 @@ describe(
       let cookie = await signIn(email);
       await ok(
         await send(
-          "/api/account/profile",
+          "/api/v1/account/profile",
           { ...answers, name, codeOfConductAccepted: true },
           cookie,
         ),
       );
       const session = (await (
-        await ok(await send("/api/auth/get-session", undefined, cookie))
+        await ok(await send("/api/v1/auth/get-session", undefined, cookie))
       ).json()) as { user: { id: string }; session: { id: string } };
       return {
         cookie,
@@ -154,7 +154,7 @@ describe(
     test("new databases show a genuine empty event list, not sample fixtures", async () => {
       const response = await ok(await send("/volunteer"));
       assert.match(await response.text(), /No upcoming events are scheduled/);
-      const list = (await (await ok(await send("/api/events"))).json()) as {
+      const list = (await (await ok(await send("/api/v1/events"))).json()) as {
         events: unknown[];
       };
       assert.deepEqual(list.events, []);
@@ -211,7 +211,7 @@ describe(
 
     test("visitors and volunteers cannot perform organizer actions; CSRF is rejected", async () => {
       await ok(
-        await send("/api/events/action", {
+        await send("/api/v1/events/action", {
           action: "save",
           event: eventInput(),
         }),
@@ -219,7 +219,7 @@ describe(
       );
       await ok(
         await send(
-          "/api/events/action",
+          "/api/v1/events/action",
           { action: "save", event: eventInput() },
           alice.cookie,
         ),
@@ -227,7 +227,7 @@ describe(
       );
       await ok(
         await send(
-          "/api/organizer/action",
+          "/api/v1/organizer/action",
           { action: "role", userId: alice.id, role: "organizer" },
           alice.cookie,
         ),
@@ -235,7 +235,7 @@ describe(
       );
       await ok(
         await send(
-          "/api/events/action",
+          "/api/v1/events/action",
           { action: "save", event: eventInput() },
           organizer.cookie,
           "https://evil.example",
@@ -257,7 +257,7 @@ describe(
       const data = eventInput(type, spots);
       await ok(
         await send(
-          "/api/events/action",
+          "/api/v1/events/action",
           { action: "save", event: data },
           organizer.cookie,
         ),
@@ -278,7 +278,7 @@ describe(
         destination = await createEvent("orientation", 2);
       });
       const join = (eventId: string, cookie: string) =>
-        send("/api/events/action", { action: "join", id: eventId }, cookie);
+        send("/api/v1/events/action", { action: "join", id: eventId }, cookie);
       const status = async (
         userId: string,
         active = true,
@@ -290,7 +290,7 @@ describe(
           .bind(userId)
           .first<{ version: number }>();
         return send(
-          "/api/organizer/action",
+          "/api/v1/organizer/action",
           {
             action: "status",
             userId,
@@ -313,7 +313,7 @@ describe(
         );
         assert.match(response.headers.get("cache-control")!, /no-store/);
         const summaries = (await (
-          await ok(await send("/api/events"))
+          await ok(await send("/api/v1/events"))
         ).json()) as { events: unknown[] };
         assert.equal(summaries.events.length, 3);
         assert.doesNotMatch(
@@ -368,7 +368,7 @@ describe(
         await ok(await join(patrol.id, alice.cookie));
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             { action: "join", id: patrol.id, role: "organizer" },
             bob.cookie,
           ),
@@ -397,7 +397,7 @@ describe(
           assert.equal(confirmed?.status, "confirmed");
           const cancelled = await ok(
             await send(
-              "/api/events/action",
+              "/api/v1/events/action",
               { action: "cancel", id: event.id },
               alice.cookie,
             ),
@@ -458,7 +458,7 @@ describe(
 
       test("organizers without two-factor can manage events and view audited profiles", async () => {
         const session = (await (
-          await send("/api/auth/get-session", undefined, organizer.cookie)
+          await send("/api/v1/auth/get-session", undefined, organizer.cookie)
         ).json()) as { session: { id: string } };
         assert.equal(
           (
@@ -472,7 +472,7 @@ describe(
         );
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             { action: "save", event: eventInput() },
             organizer.cookie,
           ),
@@ -516,7 +516,7 @@ describe(
           .first<{ version: number }>();
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             {
               action: "save",
               id: patrol.id,
@@ -530,7 +530,7 @@ describe(
         await ok(await join(patrol.id, bob.cookie), 409);
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             {
               action: "save",
               id: patrol.id,
@@ -548,7 +548,7 @@ describe(
           .first<{ version: number }>())!.version;
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             {
               action: "save",
               id: patrol.id,
@@ -580,7 +580,7 @@ describe(
         await ok(await join(destination.id, bob.cookie));
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             {
               action: "manage-signup",
               id: signedUp!.id,
@@ -602,7 +602,7 @@ describe(
         );
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             { action: "cancel", id: destination.id },
             other.cookie,
           ),
@@ -611,14 +611,14 @@ describe(
         const attendee = signedUp!.userId === alice.id ? alice : bob;
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             { action: "cancel", id: destination.id },
             attendee.cookie,
           ),
         );
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             {
               action: "manage-signup",
               id: signedUp!.id,
@@ -655,7 +655,7 @@ describe(
           .first<{ userId: string }>();
         await ok(
           await send(
-            "/api/organizer/action",
+            "/api/v1/organizer/action",
             {
               action: "orientation",
               userId: attendee!.userId,
@@ -670,7 +670,7 @@ describe(
           .run();
         await ok(
           await send(
-            "/api/organizer/action",
+            "/api/v1/organizer/action",
             {
               action: "orientation",
               userId: attendee!.userId,
@@ -681,7 +681,7 @@ describe(
         );
         await ok(
           await send(
-            "/api/organizer/action",
+            "/api/v1/organizer/action",
             {
               action: "orientation",
               userId: attendee!.userId,
@@ -724,7 +724,7 @@ describe(
         await ok(await join(orientation.id, alice.cookie), 403);
         await ok(
           await send(
-            "/api/organizer/action",
+            "/api/v1/organizer/action",
             { action: "role", userId: organizer.id, role: "volunteer" },
             organizer.cookie,
           ),
@@ -738,7 +738,7 @@ describe(
         await ok(await join(event.id, bob.cookie));
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             {
               action: "cancel-event",
               id: event.id,
@@ -775,7 +775,7 @@ describe(
         await ok(await join(event.id, bob.cookie), 403);
         await ok(
           await send(
-            "/api/events/action",
+            "/api/v1/events/action",
             { action: "cancel-event", id: event.id, version: event.version },
             organizer.cookie,
           ),
@@ -789,7 +789,7 @@ describe(
           .run();
         await ok(
           await send(
-            "/api/organizer/action",
+            "/api/v1/organizer/action",
             { action: "role", userId: bob.id, role: "organizer" },
             organizer.cookie,
           ),
@@ -808,7 +808,7 @@ describe(
         );
         await ok(
           await send(
-            "/api/organizer/action",
+            "/api/v1/organizer/action",
             { action: "role", userId: bob.id, role: "organizer" },
             organizer.cookie,
           ),
@@ -827,7 +827,7 @@ describe(
         await ok(await send("/volunteer/volunteers", undefined, bob.cookie));
         await ok(
           await send(
-            "/api/organizer/action",
+            "/api/v1/organizer/action",
             { action: "role", userId: bob.id, role: "volunteer" },
             organizer.cookie,
           ),
@@ -976,7 +976,7 @@ describe(
           );
           assert.match(page.url(), /\/volunteer\/volunteers\?q=Sample\+Alice$/);
           await inPlaceAction(page, {
-            endpoint: "/api/organizer/action",
+            endpoint: "/api/v1/organizer/action",
             form: profileDialog.locator(
               "[data-organizer-status]:not([data-submit-on-change])",
             ),
@@ -1027,7 +1027,7 @@ describe(
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
           await inPlaceAction(page, {
-            endpoint: "/api/organizer/action",
+            endpoint: "/api/v1/organizer/action",
             form: page.locator(
               "[data-organizer-status][data-submit-on-change]",
             ),
@@ -1059,7 +1059,7 @@ describe(
             })
             .click();
           await inPlaceAction(page, {
-            endpoint: "/api/organizer/action",
+            endpoint: "/api/v1/organizer/action",
             form: profileDialog.locator("[data-organizer-role]"),
             trigger: () =>
               profileDialog
@@ -1088,7 +1088,7 @@ describe(
             "organizer",
           );
           await inPlaceAction(page, {
-            endpoint: "/api/organizer/action",
+            endpoint: "/api/v1/organizer/action",
             form: profileDialog.locator("[data-organizer-role]"),
             trigger: () =>
               profileDialog
@@ -1102,14 +1102,14 @@ describe(
           const activeForm = profileDialog.locator(
             "[data-organizer-status][data-submit-on-change]",
           );
-          await page.route("**/api/organizer/action", (route) =>
+          await page.route("**/api/v1/organizer/action", (route) =>
             route.fulfill({
               status: 409,
               json: { message: "This volunteer's status changed." },
             }),
           );
           await inPlaceAction(page, {
-            endpoint: "/api/organizer/action",
+            endpoint: "/api/v1/organizer/action",
             form: activeForm,
             trigger: () =>
               profileDialog
@@ -1127,7 +1127,7 @@ describe(
           await expect(
             profileDialog.getByLabel("Active volunteer", { exact: true }),
           ).toBeEnabled();
-          await page.unroute("**/api/organizer/action");
+          await page.unroute("**/api/v1/organizer/action");
           alice.cookie = await signIn(alice.email);
           await page.goto(`${origin}/volunteer`);
           await page
@@ -1181,7 +1181,7 @@ describe(
             .locator("[data-live-event]")
             .filter({ hasText: "Browser-created meeting point" });
           await inPlaceAction(page, {
-            endpoint: "/api/events/action",
+            endpoint: "/api/v1/events/action",
             form: dialog.locator("[data-event-save]"),
             trigger: () =>
               dialog
@@ -1240,7 +1240,7 @@ describe(
               .click();
             await editor.getByLabel("Volunteer spots").fill(String(spots));
             await inPlaceAction(page, {
-              endpoint: "/api/events/action",
+              endpoint: "/api/v1/events/action",
               form: editor.locator("[data-event-save]"),
               notify: spots === 9,
               trigger: () =>
@@ -1295,7 +1295,7 @@ describe(
             .locator("[data-live-event]")
             .filter({ hasText: "Browser move destination" });
           await inPlaceAction(page, {
-            endpoint: "/api/events/action",
+            endpoint: "/api/v1/events/action",
             form: dialog.locator("[data-event-save]"),
             trigger: () =>
               dialog
@@ -1342,7 +1342,7 @@ describe(
           const card = page
             .locator("[data-live-event]")
             .filter({ hasText: "Browser-created meeting point" });
-          await page.route("**/api/events/action", (route) =>
+          await page.route("**/api/v1/events/action", (route) =>
             route.fulfill({
               status: 409,
               json: { message: "This event is full." },
@@ -1358,7 +1358,7 @@ describe(
             await card.locator("[data-form-message]").isVisible(),
             true,
           );
-          await page.unroute("**/api/events/action");
+          await page.unroute("**/api/v1/events/action");
           await expect(
             card.getByRole("button", { name: "Sign up", exact: true }),
           ).toBeEnabled();
@@ -1371,7 +1371,7 @@ describe(
             target: Locator = card,
           ) =>
             inPlaceAction(page, {
-              endpoint: "/api/events/action",
+              endpoint: "/api/v1/events/action",
               form: target.locator("[data-live-signup]"),
               trigger: () =>
                 target.locator("[data-live-signup] button").click(),
@@ -1431,7 +1431,7 @@ describe(
             .getByLabel("Destination")
             .selectOption(destinationId);
           await inPlaceAction(page, {
-            endpoint: "/api/events/action",
+            endpoint: "/api/v1/events/action",
             form: signupDialog.locator("[data-manage-signup]"),
             notify: true,
             trigger: () =>
@@ -1461,7 +1461,7 @@ describe(
             .click();
           await signupDialog.getByLabel("Destination").selectOption(sourceId);
           await inPlaceAction(page, {
-            endpoint: "/api/events/action",
+            endpoint: "/api/v1/events/action",
             form: signupDialog.locator("[data-manage-signup]"),
             trigger: () =>
               signupDialog
@@ -1487,7 +1487,7 @@ describe(
             .getByLabel("Reason (optional)")
             .fill("Browser-tested cancellation");
           await inPlaceAction(page, {
-            endpoint: "/api/events/action",
+            endpoint: "/api/v1/events/action",
             form: signupDialog.locator("[data-manage-signup]"),
             trigger: () =>
               signupDialog
@@ -1571,7 +1571,7 @@ describe(
           );
           await attendanceCard.locator("summary").click();
           await inPlaceAction(page, {
-            endpoint: "/api/organizer/action",
+            endpoint: "/api/v1/organizer/action",
             form: attendanceCard.locator("[data-organizer-orientation]"),
             trigger: () =>
               attendanceCard
@@ -1595,7 +1595,7 @@ describe(
             exact: true,
           });
           await inPlaceAction(page, {
-            endpoint: "/api/events/action",
+            endpoint: "/api/v1/events/action",
             form: cancelEditor.locator("[data-event-cancel]"),
             trigger: () =>
               cancelEditor
@@ -1618,7 +1618,7 @@ describe(
           for (let attempt = 0; attempt < 2; attempt++) {
             const retryForm = page.locator("[data-retry-notifications]");
             await inPlaceAction(page, {
-              endpoint: "/api/events/action",
+              endpoint: "/api/v1/events/action",
               form: retryForm,
               trigger: () =>
                 retryForm

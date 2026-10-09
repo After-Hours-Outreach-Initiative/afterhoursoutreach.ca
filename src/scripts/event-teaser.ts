@@ -9,7 +9,7 @@ async function renderEvents(root: HTMLElement) {
   const loading = root.querySelector<HTMLElement>("[data-events-loading]")!;
   try {
     // Public event summaries have no session, roster, or profile information.
-    const response = await fetch("/api/events", { credentials: "omit" });
+    const response = await fetch("/api/v1/events", { credentials: "omit" });
     if (!response.ok) throw new Error("Unavailable events");
     const { events } = (await response.json()) as { events: PublicEvent[] };
     if (!events.length) {

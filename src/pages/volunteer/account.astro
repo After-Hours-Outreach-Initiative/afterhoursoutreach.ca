@@ -100,7 +100,7 @@ try {
               <form
                 data-enable-factor
                 class="volunteer-form mt-6"
-                action="/api/auth/two-factor/enable"
+                action="/api/v1/auth/two-factor/enable"
                 method="post"
               >
                 <p data-form-message role="status" aria-live="polite" hidden />
@@ -122,7 +122,7 @@ try {
                 <form
                   data-confirm-factor
                   class="volunteer-form volunteer-small mt-8"
-                  action="/api/auth/two-factor/verify-totp"
+                  action="/api/v1/auth/two-factor/verify-totp"
                   method="post"
                 >
                   <div class="volunteer-field">
@@ -174,7 +174,7 @@ try {
           sessionsNeedSignIn && (
             <form
               data-sign-out
-              action="/api/auth/sign-out"
+              action="/api/v1/auth/sign-out"
               method="post"
               class="mt-6"
             >
@@ -206,7 +206,7 @@ try {
                 {entry.id !== currentId && (
                   <form
                     data-end-session
-                    action="/api/account/session"
+                    action="/api/v1/account/session"
                     method="post"
                   >
                     <input type="hidden" name="id" value={entry.id} />

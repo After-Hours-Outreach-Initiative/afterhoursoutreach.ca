@@ -49,7 +49,7 @@ const client = await request.newContext({
 });
 try {
   // Confirm the server is actually in development before making any writes.
-  const listing = await client.get("/api/auth/dev/users");
+  const listing = await client.get("/api/v1/auth/dev/users");
   if (!listing.ok())
     throw new Error(
       "Start the local dev server and apply local migrations before seeding.",
@@ -96,18 +96,22 @@ try {
       throw new Error(`Local organizer setup failed at ${path}.`);
     return result.json();
   };
-  await post("/api/auth/dev/switch-user", { userId: fixtureUserId("robin") });
-  const current = await (await client.get("/api/auth/get-session")).json();
+  await post("/api/v1/auth/dev/switch-user", {
+    userId: fixtureUserId("robin"),
+  });
+  const current = await (await client.get("/api/v1/auth/get-session")).json();
   if (!current?.user?.twoFactorEnabled) {
     // Enroll through the real auth backend; never fake the enabled flag or
     // commit an authenticator secret. View as handles verified dev sessions.
-    const setup = await post("/api/auth/two-factor/enable", { method: "totp" });
+    const setup = await post("/api/v1/auth/two-factor/enable", {
+      method: "totp",
+    });
     const key = new URL(setup.totpURI).searchParams.get("secret")!;
-    await post("/api/auth/two-factor/verify-totp", {
+    await post("/api/v1/auth/two-factor/verify-totp", {
       code: authenticatorCode(key),
     });
   }
-  await post("/api/auth/sign-out", {});
+  await post("/api/v1/auth/sign-out", {});
   console.log(
     "Local D1 test events and sample accounts are ready. Choose Robin Vance in View as for organizer tools.",
   );

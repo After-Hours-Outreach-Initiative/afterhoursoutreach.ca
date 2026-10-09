@@ -12,6 +12,10 @@ The server side behind accounts, registration, and event signups.
   [accounts.md](accounts.md).
 - Resend for sign in and notification emails.
 
+All HTTP API endpoints use `/api/v1/`, including authentication and health checks.
+The unversioned routes are no longer served. This keeps event requests outside the
+`workers.dev/api/event` adblock rule.
+
 ## Database and business rules
 
 Database queries and persisted business workflows are grouped in
@@ -58,7 +62,7 @@ only targets local D1, preserves existing records and fixture edits, and never
 runs during a build or deployment. Dev UI has no privacy disclosures; storage
 details belong on `/privacy`.
 
-The profile buttons and their `/api/auth/dev/*` endpoints require a development build.
+The profile buttons and their `/api/v1/auth/dev/*` endpoints require a development build.
 Local auth uses the current request's origin so phones on
 the LAN can also switch accounts. POSTs require the same Origin as the website.
 These controls and simulated email dialogs are excluded

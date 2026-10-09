@@ -22,7 +22,7 @@ const { counts } = Astro.props;
       </p>
     )
   }
-  <form data-retry-notifications action="/api/events/action" method="post">
+  <form data-retry-notifications action="/api/v1/events/action" method="post">
     <p data-form-message role="status" hidden></p>
     <button class="btn btn-outline" type="submit" data-loading-label="Retrying…"
       >Retry pending notifications</button

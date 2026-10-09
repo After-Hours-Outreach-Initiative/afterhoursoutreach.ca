@@ -31,7 +31,7 @@ const { signup, destinations } = Astro.props;
     class="volunteer-form"
     data-manage-signup
     data-email-prompt="signup"
-    action="/api/events/action"
+    action="/api/v1/events/action"
     method="post"
   >
     <input type="hidden" name="id" value={signup.id} />

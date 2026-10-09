@@ -32,7 +32,7 @@ const { event, roster, future, destinations } = Astro.props;
             !person.completed && (
               <form
                 data-organizer-orientation
-                action="/api/organizer/action"
+                action="/api/v1/organizer/action"
                 method="post"
               >
                 <input name="userId" type="hidden" value={person.userId} />

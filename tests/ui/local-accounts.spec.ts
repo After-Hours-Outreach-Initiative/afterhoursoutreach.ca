@@ -74,7 +74,7 @@ test("unfinished registration shows a clickable yellow warning card without clip
   // The padding is clickable too, not just the text or arrow.
   await warning.click({ position: { x: 4, y: 4 } });
   await expect(page).toHaveURL(/\/volunteer\/register$/);
-  const registered = await page.request.post("/api/account/profile", {
+  const registered = await page.request.post("/api/v1/account/profile", {
     headers: { origin: baseURL! },
     data: { ...sampleAnswers, codeOfConductAccepted: true },
   });
@@ -90,7 +90,7 @@ test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async
   page.on("request", (request) => {
     if (
       new URL(request.url()).pathname ===
-      "/api/auth/email-otp/send-verification-otp"
+      "/api/v1/auth/email-otp/send-verification-otp"
     )
       requests.push(request.url());
   });
@@ -154,7 +154,7 @@ test("local D1 email links are one-use and sign-in pages have no third-party req
   expect(new URL(page.url()).hash).toBe("");
   await page.getByRole("button", { name: "Confirm sign-in" }).click();
   await expect(page).toHaveURL(/\/volunteer\/register/);
-  const replay = await request.post("/api/auth/sign-in/email-otp", {
+  const replay = await request.post("/api/v1/auth/sign-in/email-otp", {
     headers: { origin: url.origin },
     data: { email: proof.email, otp: proof.otp },
   });

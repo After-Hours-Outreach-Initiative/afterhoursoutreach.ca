@@ -85,7 +85,7 @@ const blocked = signupBlockReason(
     <div class="volunteer-actions">
       {
         event.signedUp && future ? (
-          <form data-live-signup action="/api/events/action" method="post">
+          <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="cancel" />
             <button
@@ -102,7 +102,7 @@ const blocked = signupBlockReason(
             Sign in to sign up
           </a>
         ) : !blocked ? (
-          <form data-live-signup action="/api/events/action" method="post">
+          <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="join" />
             <button

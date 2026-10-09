@@ -6,6 +6,7 @@ import { accountErrorMessage } from "../../scripts/account-forms";
 
 // This module is loaded only in development; server imports are type-only.
 const developmentAuthClient = createAuthClient({
+  basePath: "/api/v1/auth",
   fetchOptions: { credentials: "same-origin", throw: true },
   plugins: [
     {

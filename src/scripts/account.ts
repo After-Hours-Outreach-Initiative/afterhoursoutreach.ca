@@ -297,7 +297,7 @@ form("[data-account-profile]", async (element, values) => {
       ([key]) => key !== "teams" && key !== "codeOfConductAccepted",
     ),
   );
-  const result = await post("/api/account/profile", {
+  const result = await post("/api/v1/account/profile", {
     ...body,
     teams: values.getAll("teams"),
     ...(element.hasAttribute("data-registration") && {
@@ -321,7 +321,7 @@ form("[data-sign-out]", async () => {
 });
 
 form("[data-end-session]", async (element, values) => {
-  await post("/api/account/session", { id: String(values.get("id")) });
+  await post("/api/v1/account/session", { id: String(values.get("id")) });
   const row = element.closest<HTMLElement>("[data-session-row]")!;
   const sessions = row.closest<HTMLElement>("[data-account-sessions]")!;
   const restoreFocus =

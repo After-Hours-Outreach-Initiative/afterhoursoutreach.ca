@@ -70,7 +70,7 @@ describe(
     };
     const signIn = async (email: string) => {
       const response = await send(
-        "/api/auth/sign-in/email-otp",
+        "/api/v1/auth/sign-in/email-otp",
         await createSignInOTP(DB, secret, email),
       );
       return response.headers
@@ -82,12 +82,12 @@ describe(
     const person = async (email: string, name: string) => {
       const cookie = await signIn(email);
       await send(
-        "/api/account/profile",
+        "/api/v1/account/profile",
         { ...answers, name, codeOfConductAccepted: true },
         cookie,
       );
       const session = (await (
-        await send("/api/auth/get-session", undefined, cookie)
+        await send("/api/v1/auth/get-session", undefined, cookie)
       ).json()) as { user: { id: string } };
       return { id: session.user.id, cookie, email };
     };
@@ -106,7 +106,7 @@ describe(
     };
     const createEvent = async () => {
       await send(
-        "/api/events/action",
+        "/api/v1/events/action",
         { action: "save", event: eventData },
         organizer.cookie,
       );
@@ -155,7 +155,7 @@ describe(
               patrolApproved: number;
             }>())!;
           return checkMutation(
-            "/api/organizer/action",
+            "/api/v1/organizer/action",
             {
               action: "status",
               userId: volunteer.id,
@@ -173,11 +173,11 @@ describe(
         const source = await createEvent();
         const destination = await createEvent();
         await send(
-          "/api/events/action",
+          "/api/v1/events/action",
           { action: "join", id: source.id },
           volunteer.cookie,
         );
-        await checkMutation("/api/events/action", {
+        await checkMutation("/api/v1/events/action", {
           action: "save",
           id: source.id,
           version: source.version,
@@ -191,7 +191,7 @@ describe(
         )
           .bind(source.id)
           .first<{ id: string }>())!;
-        await checkMutation("/api/events/action", {
+        await checkMutation("/api/v1/events/action", {
           action: "manage-signup",
           id: signup.id,
           destination: destination.id,
@@ -202,17 +202,17 @@ describe(
         )
           .bind(destination.id)
           .first<{ id: string }>())!;
-        await checkMutation("/api/events/action", {
+        await checkMutation("/api/v1/events/action", {
           action: "manage-signup",
           id: moved.id,
           reason: "Sample removal",
         });
         await send(
-          "/api/events/action",
+          "/api/v1/events/action",
           { action: "join", id: destination.id },
           volunteer.cookie,
         );
-        await checkMutation("/api/events/action", {
+        await checkMutation("/api/v1/events/action", {
           action: "cancel-event",
           id: destination.id,
           version: destination.version,
@@ -229,7 +229,7 @@ describe(
           "cancelled",
         );
         await send(
-          "/api/events/action",
+          "/api/v1/events/action",
           { action: "join", id: source.id },
           volunteer.cookie,
         );
@@ -246,12 +246,12 @@ describe(
           "cancelled",
         );
         await status(true, true);
-        await checkMutation("/api/organizer/action", {
+        await checkMutation("/api/v1/organizer/action", {
           action: "role",
           userId: volunteer.id,
           role: "organizer",
         });
-        await checkMutation("/api/organizer/action", {
+        await checkMutation("/api/v1/organizer/action", {
           action: "role",
           userId: volunteer.id,
           role: "volunteer",
@@ -261,7 +261,7 @@ describe(
           // Retrying must not resurrect emails skipped or omitted in the request.
           const retry = (await (
             await send(
-              "/api/events/action",
+              "/api/v1/events/action",
               { action: "retry-notifications" },
               organizer.cookie,
             )

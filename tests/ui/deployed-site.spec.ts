@@ -72,7 +72,7 @@ test("private pages exclude indexing and the database is available", async ({
     expect(response.status()).toBe(200);
     expect(response.headers()["x-robots-tag"]).toContain("noindex");
   }
-  expect(await (await request.get("/api/health")).json()).toEqual({
+  expect(await (await request.get("/api/v1/health")).json()).toEqual({
     status: "ok",
   });
 });

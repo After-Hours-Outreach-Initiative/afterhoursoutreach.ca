@@ -51,7 +51,7 @@ export async function createLocalAccount(
     "cf-connecting-ip": `198.18.${bytes[0]}.${bytes[1]}`,
   };
   const challenge = await request.post(
-    "/api/auth/email-otp/send-verification-otp",
+    "/api/v1/auth/email-otp/send-verification-otp",
     {
       headers,
       data: { email, type: "sign-in" },
@@ -59,19 +59,19 @@ export async function createLocalAccount(
   );
   expect(challenge.status(), await challenge.text()).toBe(200);
   const proof: { localEmail: { code: string } } = await challenge.json();
-  const verified = await request.post("/api/auth/sign-in/email-otp", {
+  const verified = await request.post("/api/v1/auth/sign-in/email-otp", {
     headers,
     data: { email, otp: proof.localEmail.code },
   });
   expect(verified.status(), await verified.text()).toBe(200);
   if (registered) {
-    const profile = await request.post("/api/account/profile", {
+    const profile = await request.post("/api/v1/account/profile", {
       headers,
       data: { ...sampleAnswers, codeOfConductAccepted: true },
     });
     expect(profile.status(), await profile.text()).toBe(200);
   }
-  const current = await request.get("/api/auth/get-session", { headers });
+  const current = await request.get("/api/v1/auth/get-session", { headers });
   const { user }: { user: { id: string } } = await current.json();
   return { id: user.id, email, name: sampleAnswers.name };
 }
