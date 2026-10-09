@@ -532,9 +532,16 @@ describe(
           .waitFor();
         await expect(
           page.locator(
-            '[name="heardAboutUs"], [name="motivation"], .volunteer-code-of-conduct',
+            '[data-account-profile] input[type="email"], [name="heardAboutUs"], [name="motivation"], .volunteer-code-of-conduct',
           ),
         ).toHaveCount(0);
+        const saveProfile = page.getByRole("button", { name: "Save profile" });
+        await expect(saveProfile).toBeDisabled();
+        await expect(
+          page
+            .getByRole("group", { name: "Emergency contact", exact: true })
+            .locator("input"),
+        ).toHaveCount(3);
         const nav = page.getByRole("navigation", {
           name: "Volunteer account",
         });
@@ -558,6 +565,7 @@ describe(
         await page
           .getByLabel("Medical conditions or triggers", { exact: false })
           .fill("Changed browser sample");
+        await expect(saveProfile).toBeEnabled();
         for (const id of siblings) {
           const sessionForm = page
             .locator("[data-end-session]")
@@ -587,7 +595,7 @@ describe(
             null,
           );
         }
-        await page.getByRole("button", { name: "Save profile" }).click();
+        await saveProfile.click();
         try {
           await page
             .getByText("Profile saved.", { exact: true })
@@ -604,6 +612,7 @@ describe(
           );
           throw error;
         }
+        await expect(saveProfile).toBeDisabled();
         assert.equal(
           (
             await menu.locator("[data-account-menu-name]").textContent()
@@ -694,7 +703,7 @@ describe(
           codeOfConductRules.slice(0, 2),
         );
         const toggle = conduct.locator("summary");
-        await expect(toggle).toHaveAccessibleName("Read all 14 rules");
+        await expect(toggle).toHaveAccessibleName("Read all rules");
         await toggle.click();
         await expect(conduct.getByRole("listitem")).toHaveText([
           ...codeOfConductRules,

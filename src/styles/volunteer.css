@@ -256,6 +256,27 @@
 .volunteer-wide {
   grid-column: 1 / -1;
 }
+.volunteer-profile-form {
+  gap: 32px;
+}
+.volunteer-profile-section {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.volunteer-profile-section > legend {
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 0;
+}
+.volunteer-profile-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #3f3f46;
+  font-size: 22px;
+  font-weight: normal;
+  line-height: 1.4;
+}
 .volunteer-portal input:not([type="checkbox"], [type="radio"]),
 .volunteer-portal textarea,
 .volunteer-portal select {
@@ -431,13 +452,6 @@
   display: flex;
   gap: 10px;
   align-items: center;
-}
-.volunteer-code-of-conduct {
-  border-top: 1px solid #27272a;
-  padding-top: 24px;
-}
-.volunteer-code-of-conduct h3 {
-  font-size: 20px;
 }
 .volunteer-code-of-conduct ul {
   display: grid;
@@ -788,6 +802,12 @@
 .volunteer-portal form .btn:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+.volunteer-portal form[data-save-changes] .btn:disabled {
+  background: #27272a;
+  border-color: #3f3f46;
+  color: #a1a1aa;
+  opacity: 1;
 }
 .volunteer-portal form .btn[aria-busy="true"]::before,
 .volunteer-control-loading::before {

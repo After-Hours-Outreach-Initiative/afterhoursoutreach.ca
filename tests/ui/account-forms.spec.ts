@@ -180,9 +180,44 @@ test("registration shows all required errors and saves after they are corrected"
   page,
   baseURL,
 }) => {
-  await createLocalAccount(page.request, baseURL!, false);
+  const { email } = await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/volunteer/register");
   const form = page.locator("[data-account-profile]");
+  await expect(form.getByRole("heading", { level: 3 })).toHaveText([
+    "Personal info",
+    "Emergency contact",
+    "About volunteering",
+    "Training and safety",
+    "Team interests",
+    "Code of Conduct",
+  ]);
+  const emailInput = form.locator("input").first();
+  await expect(emailInput).toHaveAttribute("type", "email");
+  await expect(emailInput).toHaveValue(email);
+  await expect(emailInput).not.toBeEditable();
+  const emergencyContact = form.getByRole("group", {
+    name: "Emergency contact",
+    exact: true,
+  });
+  await expect(emergencyContact.locator("input")).toHaveCount(3);
+  await expect(
+    form
+      .getByRole("group", { name: "About volunteering", exact: true })
+      .locator("input, textarea"),
+  ).toHaveCount(2);
+  await expect(
+    form
+      .getByRole("group", { name: "Training and safety", exact: true })
+      .locator("input, textarea"),
+  ).toHaveCount(3);
+  for (const field of [
+    "emergencyName",
+    "emergencyPhone",
+    "emergencyRelationship",
+  ])
+    await expect(
+      emergencyContact.locator(`input[name="${field}"]`),
+    ).toHaveAttribute("required", "");
   const conduct = form.getByRole("region", {
     name: "Code of Conduct",
     exact: true,
@@ -210,7 +245,7 @@ test("registration shows all required errors and saves after they are corrected"
       }),
     ).toBeGreaterThanOrEqual(0);
   };
-  await expect(toggle).toHaveAccessibleName("Read all 14 rules");
+  await expect(toggle).toHaveAccessibleName("Read all rules");
   await toggle.focus();
   await toggle.press("Enter");
   await expect(details).toHaveAttribute("open", "");
@@ -271,6 +306,9 @@ test("registration shows all required errors and saves after they are corrected"
     if (new URL(request.url()).pathname === "/api/account/profile")
       requests.push(request.url());
   });
+  await expect(
+    page.getByRole("button", { name: "Complete registration" }),
+  ).toBeEnabled();
   await page.getByRole("button", { name: "Complete registration" }).click();
   const required = form.locator("input[required], textarea[required]");
   const count = await required.count();
@@ -356,6 +394,9 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(
     page.locator('[name="heardAboutUs"], [name="motivation"]'),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Save profile" }),
+  ).toBeDisabled();
   // Editing reuses validation and identifies successful saves semantically.
   await page
     .getByRole("textbox", { name: "Full or preferred name", exact: true })
@@ -363,10 +404,170 @@ test("registration shows all required errors and saves after they are corrected"
   await page.getByRole("button", { name: "Save profile" }).click();
   const saved = page.locator("[data-account-profile] [data-form-message]");
   await expect(saved).toHaveAttribute("data-message-kind", "success");
+  await expect(
+    page.getByRole("button", { name: "Save profile" }),
+  ).toBeDisabled();
   await page.reload();
   await expect(
     page.getByRole("textbox", { name: "Full or preferred name", exact: true }),
   ).toHaveValue("Updated volunteer");
+});
+
+test("profile saves enable only for changed answers and disable after saving", async ({
+  page,
+  baseURL,
+}) => {
+  const { email } = await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const form = page.locator("[data-account-profile]");
+  await expect(form.locator('input[type="email"]')).toHaveCount(0);
+  const settings = page.locator(".volunteer-panel").filter({
+    has: page.getByRole("heading", { name: "Account settings", exact: true }),
+  });
+  await expect(settings.getByText(email, { exact: true })).toBeVisible();
+  const save = form.getByRole("button", { name: "Save profile" });
+  const name = form.locator('[name="name"]');
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/account/profile")
+      requests.push(request.url());
+  });
+  await expect(save).toBeDisabled();
+  await expect(save).toHaveCSS("background-color", "rgb(39, 39, 42)");
+  await name.press("Enter");
+  await form.evaluate((element: HTMLFormElement) => element.requestSubmit());
+  expect(requests).toEqual([]);
+
+  for (const [field, changed] of [
+    ["name", "Updated volunteer"],
+    ["birthDate", "1996-05-13"],
+    ["emergencyName", "Updated contact"],
+    ["emergencyPhone", "604-555-0199"],
+    ["emergencyRelationship", "Sibling"],
+    ["medicalConditions", "Updated safety answer"],
+  ] as const) {
+    const input = form.locator(`[name="${field}"]`);
+    await input.fill(changed);
+    await expect(save).toBeEnabled();
+    await input.fill(sampleAnswers[field]);
+    await expect(save).toBeDisabled();
+  }
+  const medic = form.getByLabel("Medic", { exact: true });
+  await medic.focus();
+  await medic.press("Space");
+  await expect(save).toBeEnabled();
+  await medic.press("Space");
+  await expect(save).toBeDisabled();
+  await name.fill(` ${sampleAnswers.name} `);
+  await expect(save).toBeDisabled();
+  await name.fill("Reset this draft");
+  await expect(save).toBeEnabled();
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(save).toBeDisabled();
+
+  await name.fill("");
+  await save.click();
+  await expect(form.locator("[data-error=name]")).toHaveText(
+    "This field is required.",
+  );
+  expect(requests).toEqual([]);
+  await name.fill(sampleAnswers.name);
+  await expect(save).toBeDisabled();
+  await name.fill("Updated volunteer");
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveAttribute(
+    "data-message-kind",
+    "success",
+  );
+  await expect(save).toBeDisabled();
+  expect(requests).toHaveLength(1);
+  await name.fill(sampleAnswers.name);
+  await expect(save).toBeEnabled();
+  await name.fill("Updated volunteer");
+  await expect(save).toBeDisabled();
+  await page.reload();
+  await expect(name).toHaveValue("Updated volunteer");
+  await expect(save).toBeDisabled();
+});
+
+test("failed profile saves keep unsaved changes retryable", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const form = page.locator("[data-account-profile]");
+  const save = form.getByRole("button", { name: "Save profile" });
+  const name = form.locator('[name="name"]');
+  await page.route("**/api/account/profile", (route) =>
+    route.fulfill({
+      status: 503,
+      json: { message: "Your profile is temporarily unavailable." },
+    }),
+  );
+  await name.fill("Retry this profile");
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveText(
+    "Your profile is temporarily unavailable.",
+  );
+  await expect(save).toBeEnabled();
+  await expect(name).toHaveValue("Retry this profile");
+  await name.fill(sampleAnswers.name);
+  await expect(save).toBeDisabled();
+  await name.fill("Retry this profile");
+  await page.unroute("**/api/account/profile");
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveAttribute(
+    "data-message-kind",
+    "success",
+  );
+  await expect(save).toBeDisabled();
+});
+
+test("edits made during a profile save remain unsaved", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const form = page.locator("[data-account-profile]");
+  const save = form.getByRole("button", { name: "Save profile" });
+  const name = form.locator('[name="name"]');
+  let finishSaving!: () => void;
+  const saving = new Promise<void>((resolve) => {
+    finishSaving = resolve;
+  });
+  await page.route("**/api/account/profile", async (route) => {
+    await saving;
+    await route.continue();
+  });
+  try {
+    await name.fill("First saved name");
+    await save.click();
+    await expect(form).toHaveAttribute("aria-busy", "true");
+    await expect(save).toBeDisabled();
+    await name.fill("Second unsaved name");
+    await expect(save).toBeDisabled();
+    finishSaving();
+    await expect(form).not.toHaveAttribute("aria-busy");
+    await expect(form.locator("[data-form-message]")).toHaveAttribute(
+      "data-message-kind",
+      "success",
+    );
+    await expect(save).toBeEnabled();
+    await name.fill("First saved name");
+    await expect(save).toBeDisabled();
+    await name.fill("Second unsaved name");
+    await save.click();
+    await expect(save).toBeDisabled();
+    await expect(form).not.toHaveAttribute("aria-busy");
+    await page.reload();
+    await expect(name).toHaveValue("Second unsaved name");
+    await expect(save).toBeDisabled();
+  } finally {
+    finishSaving();
+  }
 });
 
 test("authenticator setup and sign-in show inline required and code errors", async ({
