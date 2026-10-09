@@ -38,7 +38,7 @@ before rebuilding a pre-production database that used the old migration history.
 3. A new account goes to the registration form. The privacy notice is shown at
    the top.
 4. After the team choices, the Code of Conduct initially shows the first two
-   rules, fading into the dark background near the bottom. **Read all 14 rules**
+   rules, fading into the dark background near the bottom. **Read all rules**
    expands the remaining rules and removes the fade; **Show fewer rules** appears
    below the final rule and collapses them again. The required, initially unchecked
    acknowledgement stays visible below in both states, before **Complete registration**.
@@ -61,6 +61,18 @@ required and does not automatically grant approval.
 Registration answers are saved with the person's profile. Ongoing contact,
 safety, training, and team-interest answers can be seen and edited at
 `/volunteer/account`.
+
+Email appears first during registration. On the account page it appears in
+**Account settings**, not in the profile form.
+
+Both forms use larger section headings with horizontal dividers: **Personal
+info**, **Emergency contact**, **Training and safety**, and **Team interests**.
+Registration also includes **About volunteering** and **Code of Conduct**.
+
+**Save profile** is greyed out until an answer or team selection differs from
+the saved profile. Reverting every change disables it again. Successful saves
+establish the new baseline; failed saves remain retryable, and edits made while
+a save is pending stay unsaved. **Complete registration** is unaffected.
 
 “How did you hear about us?”, “Why do you want to volunteer?”, and the Code of
 Conduct appear only during registration, not on the volunteer's profile or

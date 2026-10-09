@@ -4,6 +4,7 @@ import type { SignInEmail } from "../server/auth/services";
 import {
   accountErrorMessage,
   clearFormMessage,
+  initAccountFormChanges,
   initAccountFormValidation,
   resetFormFeedback,
   showFormMessage as message,
@@ -53,11 +54,21 @@ function form(
   selector: string,
   submit: (element: HTMLFormElement, values: FormData) => Promise<void>,
 ) {
-  const initialized = new WeakSet<HTMLFormElement>();
+  const initialized = new WeakMap<
+    HTMLFormElement,
+    ReturnType<typeof initAccountFormChanges> | undefined
+  >();
   const initialize = (element: HTMLFormElement) => {
-    if (initialized.has(element)) return;
-    initAccountFormValidation(element);
-    initialized.add(element);
+    if (!initialized.has(element)) {
+      initAccountFormValidation(element);
+      initialized.set(
+        element,
+        element.hasAttribute("data-save-changes")
+          ? initAccountFormChanges(element)
+          : undefined,
+      );
+    }
+    return initialized.get(element);
   };
   document.querySelectorAll<HTMLFormElement>(selector).forEach(initialize);
   // Refreshed settings and session rows must keep working without re-running scripts.
@@ -67,7 +78,7 @@ function form(
       return;
     event.preventDefault();
     if (element.dataset.submitting) return;
-    initialize(element);
+    const changes = initialize(element);
     const button = element.querySelector<HTMLButtonElement>(
       'button[type="submit"]',
     );
@@ -86,6 +97,7 @@ function form(
     }
     try {
       await submit(element, values);
+      changes?.markSaved(values);
     } catch (error) {
       message(element, accountErrorMessage(error));
     } finally {
@@ -96,6 +108,7 @@ function form(
         button.removeAttribute("aria-busy");
         if (button.dataset.loadingLabel) button.textContent = label ?? "";
       }
+      changes?.update();
     }
   });
 }

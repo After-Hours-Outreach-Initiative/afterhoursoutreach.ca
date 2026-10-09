@@ -167,3 +167,32 @@ export function initAccountFormValidation(element: HTMLFormElement) {
     });
   }
 }
+
+export function initAccountFormChanges(element: HTMLFormElement) {
+  const button = element.querySelector<HTMLButtonElement>(
+    'button[type="submit"]',
+  );
+  // Profile answers are text and checkbox values; the server trims text on save.
+  const snapshot = (values: FormData) =>
+    JSON.stringify(
+      [...values].map(([name, value]) => [name, String(value).trim()]),
+    );
+  let saved = snapshot(new FormData(element));
+  const update = () => {
+    if (button)
+      button.disabled =
+        Boolean(element.dataset.submitting) ||
+        snapshot(new FormData(element)) === saved;
+  };
+  for (const event of ["input", "change"])
+    element.addEventListener(event, update);
+  element.addEventListener("reset", () => queueMicrotask(update));
+  update();
+  return {
+    update,
+    markSaved(values: FormData) {
+      // Edits made while the request is pending must remain unsaved.
+      saved = snapshot(values);
+    },
+  };
+}

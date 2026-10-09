@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   createLocalAccount,
   openLocalAccountSwitcher,
+  sampleAnswers,
 } from "../helpers/local-account";
 import { totpFromSetupKey } from "../helpers/totp";
 
@@ -238,19 +239,60 @@ test("account navigation and profile controls are usable on desktop and mobile",
 }) => {
   const user = await createLocalAccount(page.request, baseURL!);
   await page.reload();
-  for (const width of [1280, 375]) {
+  for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     const menu = page.locator("[data-account-menu]");
     await menu.locator("summary").click();
     await expect(menu).toContainText(user.email);
     await menu.getByRole("link", { name: "Profile", exact: true }).click();
     await expect(page).toHaveURL(/\/volunteer\/account$/);
+    const form = page.locator("[data-account-profile]");
+    await expect(form.getByRole("heading", { level: 3 })).toHaveText([
+      "Personal info",
+      "Emergency contact",
+      "Training and safety",
+      "Team interests",
+    ]);
+    await expect(
+      form.getByRole("group", { name: "About volunteering", exact: true }),
+    ).toHaveCount(0);
     const name = page.getByLabel("Full or preferred name");
     await expect(name).toHaveValue(user.name);
     await expect(name).toBeEditable();
-    await expect(
-      page.getByRole("button", { name: "Save profile" }),
-    ).toBeEnabled();
+    const emergencyContact = page.getByRole("group", {
+      name: "Emergency contact",
+      exact: true,
+    });
+    await expect(emergencyContact).toBeVisible();
+    await expect(emergencyContact.locator("input")).toHaveCount(3);
+    for (const field of [
+      "emergencyName",
+      "emergencyPhone",
+      "emergencyRelationship",
+    ] as const)
+      await expect(
+        emergencyContact.locator(`input[name="${field}"]`),
+      ).toHaveValue(sampleAnswers[field]);
+    await expect(emergencyContact).toHaveCSS("border-top-width", "0px");
+    await expect(emergencyContact).toHaveCSS("padding", "0px");
+    for (const heading of await form.getByRole("heading", { level: 3 }).all()) {
+      await expect(heading).toHaveCSS("font-size", "22px");
+      await expect(heading).toHaveCSS("border-bottom-width", "1px");
+    }
+    expect(
+      await emergencyContact
+        .locator(".volunteer-fields")
+        .evaluate(
+          (element) =>
+            getComputedStyle(element).gridTemplateColumns.split(" ").length,
+        ),
+    ).toBe(width <= 640 ? 1 : 2);
+    const save = page.getByRole("button", { name: "Save profile" });
+    await expect(save).toBeDisabled();
+    await name.fill("Unsaved layout draft");
+    await expect(save).toBeEnabled();
+    await name.fill(user.name);
+    await expect(save).toBeDisabled();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,

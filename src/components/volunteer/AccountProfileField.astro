@@ -1,0 +1,73 @@
+---
+import type {
+  registrationFields,
+  RegistrationAnswers,
+} from "@/data/registration";
+import FieldError from "@/components/FieldError.astro";
+
+interface Props {
+  field: (typeof registrationFields)[number];
+  values?: RegistrationAnswers | null;
+}
+const { field, values } = Astro.props;
+---
+
+<div
+  class:list={["volunteer-field", { "volunteer-wide": "multiline" in field }]}
+>
+  <label for={`profile-${field.name}`}>
+    {field.label}
+    {
+      field.required ? (
+        <span class="volunteer-required" aria-hidden="true">
+          {" "}
+          *
+        </span>
+      ) : (
+        <span class="volunteer-help"> (optional)</span>
+      )
+    }
+  </label>
+  {
+    "multiline" in field ? (
+      <textarea
+        id={`profile-${field.name}`}
+        name={field.name}
+        aria-describedby={`error-${field.name}${"help" in field ? ` help-${field.name}` : ""}`}
+        required={field.required}
+        rows="3"
+        maxlength="2000"
+        set:text={values?.[field.name] ?? ""}
+      />
+    ) : (
+      <input
+        id={`profile-${field.name}`}
+        name={field.name}
+        aria-describedby={`error-${field.name}${"help" in field ? ` help-${field.name}` : ""}`}
+        type={"type" in field ? field.type : "text"}
+        autocomplete={"autocomplete" in field ? field.autocomplete : "off"}
+        value={values?.[field.name] ?? ""}
+        required={field.required}
+        maxlength={
+          field.name === "phone" || field.name === "emergencyPhone"
+            ? "40"
+            : "200"
+        }
+        min={field.name === "birthDate" ? "1900-01-01" : undefined}
+        max={
+          field.name === "birthDate"
+            ? new Date().toISOString().slice(0, 10)
+            : undefined
+        }
+      />
+    )
+  }
+  {
+    "help" in field && (
+      <span class="volunteer-help" id={`help-${field.name}`}>
+        {field.help}
+      </span>
+    )
+  }
+  <FieldError field={field.name} />
+</div>

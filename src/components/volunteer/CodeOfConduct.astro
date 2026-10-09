@@ -11,15 +11,15 @@ import {
   class="volunteer-code-of-conduct"
   aria-labelledby="code-of-conduct-heading"
 >
-  <h3 id="code-of-conduct-heading">Code of Conduct</h3>
+  <h3 id="code-of-conduct-heading" class="volunteer-profile-heading">
+    Code of Conduct
+  </h3>
   <ul class="volunteer-conduct-preview">
     {codeOfConductRules.slice(0, 2).map((rule) => <li>{rule}</li>)}
   </ul>
   <details class="volunteer-conduct-details">
     <summary aria-controls="code-of-conduct-more-rules">
-      <span class="volunteer-conduct-show-more"
-        >Read all {codeOfConductRules.length} rules</span
-      >
+      <span class="volunteer-conduct-show-more">Read all rules</span>
       <span class="volunteer-conduct-show-less">Show fewer rules</span>
       <svg
         viewBox="0 0 24 24"
