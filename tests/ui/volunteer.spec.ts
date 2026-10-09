@@ -289,10 +289,14 @@ test("account navigation and profile controls are usable on desktop and mobile",
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     const menu = page.locator("[data-account-menu]");
+    await expect(menu.locator("summary")).toHaveAccessibleName("Account");
     await menu.locator("summary").click();
     await expect(menu).toContainText(user.email);
-    await menu.getByRole("link", { name: "Profile", exact: true }).click();
+    await menu.getByRole("link", { name: "Account", exact: true }).click();
     await expect(page).toHaveURL(/\/volunteer\/account$/);
+    await expect(
+      page.getByRole("heading", { name: "Your account", exact: true }),
+    ).toBeVisible();
     const form = page.locator("[data-account-profile]");
     await expect(form.getByRole("heading", { level: 3 })).toHaveText([
       "Personal info",

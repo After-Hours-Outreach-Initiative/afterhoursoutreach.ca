@@ -1553,7 +1553,7 @@ describe(
             }),
           ).toBeFocused();
           await account.click();
-          await nav.getByRole("link", { name: "Profile", exact: true }).click();
+          await nav.getByRole("link", { name: "Account", exact: true }).click();
           await page
             .getByRole("heading", { name: "Your account", exact: true })
             .waitFor();

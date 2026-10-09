@@ -707,7 +707,7 @@ describe(
         await menu.locator("summary").click();
         assert.equal(
           await menu
-            .getByRole("link", { name: "Profile", exact: true })
+            .getByRole("link", { name: "Account", exact: true })
             .getAttribute("href"),
           "/volunteer/account",
         );
