@@ -11,6 +11,7 @@ import {
 } from "../../src/data/code-of-conduct";
 import { totpFromSetupKey } from "../helpers/totp";
 import { inPlaceAction } from "../helpers/in-place-action";
+import { registrationBirthDateError } from "../../src/data/registration";
 
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
@@ -390,7 +391,9 @@ test("registration shows all required errors and saves after they are corrected"
   );
   await expect(form.locator("[data-error=phone]")).toBeVisible();
   await page.getByLabel(/^Date of birth/).fill("2999-01-01");
-  await expect(form.locator("[data-error=birthDate]")).toContainText("today");
+  await expect(form.locator("[data-error=birthDate]")).toContainText(
+    "at least 19 years old",
+  );
   await expect(form.locator("[data-error=birthDate]")).toBeVisible();
   expect(requests).toEqual([]);
   for (const [field, value] of Object.entries(sampleAnswers)) {
@@ -463,6 +466,105 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(
     page.getByRole("textbox", { name: "Full or preferred name", exact: true }),
   ).toHaveValue("Updated volunteer");
+});
+
+test("registration and profile edits block underage birth dates at the birthday boundary", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/volunteer/register");
+  const form = page.locator("[data-account-profile]");
+  const birthDate = form.locator('[name="birthDate"]');
+  const cutoff = (await birthDate.getAttribute("max"))!;
+  const today = new Date();
+  expect(cutoff.slice(0, 4)).toBe(String(today.getUTCFullYear() - 19));
+  expect(cutoff.slice(5)).toBe(
+    today.toISOString().slice(5, 10) === "02-29"
+      ? "02-28"
+      : today.toISOString().slice(5, 10),
+  );
+  for (const [field, value] of Object.entries(sampleAnswers)) {
+    if (field !== "teams")
+      await form.locator(`[name="${field}"]`).fill(String(value));
+  }
+  await form.getByLabel("Outreach", { exact: true }).check();
+  await form.getByRole("checkbox", { name: codeOfConductConfirmation }).check();
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/account/profile")
+      requests.push(request.url());
+  });
+  const younger = new Date(`${cutoff}T00:00:00Z`);
+  younger.setUTCDate(younger.getUTCDate() + 1);
+  const underage = younger.toISOString().slice(0, 10);
+  for (const invalid of [underage, today.toISOString().slice(0, 10)]) {
+    await birthDate.fill(invalid);
+    await form.getByRole("button", { name: "Complete registration" }).click();
+    await expect(birthDate).toBeFocused();
+    await expect(form.locator("[data-error=birthDate]")).toBeVisible();
+    await expect(form.locator("[data-error=birthDate]")).toHaveText(
+      registrationBirthDateError,
+    );
+    expect(requests).toEqual([]);
+    await expect(page).toHaveURL(/\/volunteer\/register$/);
+  }
+  await birthDate.fill(cutoff);
+  await expect(form.locator("[data-error=birthDate]")).toBeHidden();
+  await form.getByRole("button", { name: "Complete registration" }).click();
+  await expect(page).toHaveURL(/\/volunteer\/account$/);
+  expect(requests).toHaveLength(1);
+  await expect(birthDate).toHaveValue(cutoff);
+  await birthDate.fill(underage);
+  await form.getByRole("button", { name: "Save profile" }).click();
+  await expect(form.locator("[data-error=birthDate]")).toBeVisible();
+  expect(requests).toHaveLength(1);
+  await page.reload();
+  await expect(birthDate).toHaveValue(cutoff);
+});
+
+test("the birth-date cutoff blocks native submission without JavaScript", async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({
+    baseURL,
+    javaScriptEnabled: false,
+  });
+  try {
+    await createLocalAccount(context.request, baseURL!, false);
+    const page = await context.newPage();
+    await page.goto("/volunteer/register");
+    const form = page.locator("[data-account-profile]");
+    for (const [field, value] of Object.entries(sampleAnswers)) {
+      if (field !== "teams")
+        await form.locator(`[name="${field}"]`).fill(String(value));
+    }
+    // Without the checkbox-group script, each team retains its native constraint.
+    for (const checkbox of await form.getByRole("checkbox").all()) {
+      await checkbox.focus();
+      await checkbox.press("Space");
+    }
+    const birthDate = form.locator('[name="birthDate"]');
+    const cutoff = (await birthDate.getAttribute("max"))!;
+    const younger = new Date(`${cutoff}T00:00:00Z`);
+    younger.setUTCDate(younger.getUTCDate() + 1);
+    await birthDate.fill(younger.toISOString().slice(0, 10));
+    const submit = form.getByRole("button", { name: "Complete registration" });
+    await submit.focus();
+    await submit.press("Enter");
+    await expect(birthDate).toBeFocused();
+    await expect(form.locator("[data-error=birthDate]")).toBeVisible();
+    await expect(page).toHaveURL(/\/volunteer\/register$/);
+    await birthDate.fill(cutoff);
+    expect(
+      await birthDate.evaluate(
+        (input: HTMLInputElement) => input.validity.valid,
+      ),
+    ).toBe(true);
+  } finally {
+    await context.close();
+  }
 });
 
 test("profile saves enable only for changed answers and disable after saving", async ({

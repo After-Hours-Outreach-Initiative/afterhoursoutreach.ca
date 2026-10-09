@@ -14,6 +14,20 @@ export interface RegistrationAnswers {
   medicalConditions: string;
 }
 
+export const registrationBirthDateError =
+  "You must be at least 19 years old. Choose a valid date of birth on or after January 1, 1900.";
+
+export function latestRegistrationBirthDate(today = new Date()): string {
+  // Match the UTC calendar dates used by server validation, not elapsed days.
+  const year = today.getUTCFullYear() - 19;
+  const month = today.getUTCMonth();
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  // February 29 must not roll the cutoff forward into March in a non-leap year.
+  return new Date(Date.UTC(year, month, Math.min(today.getUTCDate(), lastDay)))
+    .toISOString()
+    .slice(0, 10);
+}
+
 export const registrationFields = [
   {
     name: "name",
@@ -42,7 +56,7 @@ export const registrationFields = [
     label: "Date of birth",
     required: true,
     type: "date",
-    help: "Used to understand volunteer age and eligibility.",
+    help: "You must be at least 19 years old to register.",
   },
   {
     name: "emergencyName",
