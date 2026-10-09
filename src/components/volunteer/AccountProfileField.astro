@@ -1,7 +1,9 @@
 ---
-import type {
-  registrationFields,
-  RegistrationAnswers,
+import {
+  latestRegistrationBirthDate,
+  registrationBirthDateError,
+  type registrationFields,
+  type RegistrationAnswers,
 } from "@/data/registration";
 import FieldError from "@/components/FieldError.astro";
 
@@ -13,7 +15,7 @@ const { field, values } = Astro.props;
 const phone = field.name === "phone" || field.name === "emergencyPhone";
 const message =
   field.name === "birthDate"
-    ? "Choose a date of birth between January 1, 1900 and today."
+    ? registrationBirthDateError
     : phone
       ? "Enter a valid phone number with at least 7 characters."
       : field.required
@@ -68,9 +70,7 @@ const message =
         maxlength={phone ? "40" : "200"}
         min={field.name === "birthDate" ? "1900-01-01" : undefined}
         max={
-          field.name === "birthDate"
-            ? new Date().toISOString().slice(0, 10)
-            : undefined
+          field.name === "birthDate" ? latestRegistrationBirthDate() : undefined
         }
       />
     )

@@ -7,6 +7,10 @@ import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
 import {
+  latestRegistrationBirthDate,
+  registrationBirthDateError,
+} from "../../src/data/registration";
+import {
   codeOfConductConfirmation,
   codeOfConductError,
   codeOfConductRules,
@@ -148,6 +152,77 @@ describe(
         assert.equal(page.status, 200);
         assert.doesNotMatch(await page.text(), /data-account-menu/);
       }
+    });
+
+    test("the API rejects underage registration and edits without writing profile data", async () => {
+      const ageCookie = await signIn("worker-age-boundary@example.org");
+      const account = (await (
+        await send("/api/v1/auth/get-session", undefined, ageCookie)
+      ).json()) as typeof current;
+      const cutoff = latestRegistrationBirthDate();
+      const younger = new Date(`${cutoff}T00:00:00Z`);
+      younger.setUTCDate(younger.getUTCDate() + 1);
+      const underage = younger.toISOString().slice(0, 10);
+      const snapshots = async () => ({
+        profile: await DB.prepare("SELECT * FROM profile WHERE user_id=?")
+          .bind(account.user.id)
+          .first(),
+        status: await DB.prepare(
+          "SELECT * FROM volunteer_status WHERE user_id=?",
+        )
+          .bind(account.user.id)
+          .first(),
+        audit: (
+          await DB.prepare("SELECT * FROM audit_log WHERE subject_id=?")
+            .bind(account.user.id)
+            .all()
+        ).results,
+        user: await DB.prepare("SELECT * FROM user WHERE id=?")
+          .bind(account.user.id)
+          .first(),
+      });
+      const unregistered = await snapshots();
+      for (const birthDate of [underage, "2999-01-01", "2005-02-29"]) {
+        const response = await send(
+          "/api/v1/account/profile",
+          { ...answers, birthDate, codeOfConductAccepted: true },
+          ageCookie,
+        );
+        assert.equal(response.status, 400, await response.clone().text());
+        assert.equal(
+          ((await response.json()) as { message: string }).message,
+          registrationBirthDateError,
+        );
+        assert.deepEqual(await snapshots(), unregistered);
+      }
+      const registered = await send(
+        "/api/v1/account/profile",
+        { ...answers, birthDate: cutoff, codeOfConductAccepted: true },
+        ageCookie,
+      );
+      assert.equal(registered.status, 200, await registered.clone().text());
+      const saved = await snapshots();
+      assert.equal(saved.profile?.birth_date, cutoff);
+      const { heardAboutUs: _, motivation: __, ...editedAnswers } = answers;
+      const rejectedEdit = await send(
+        "/api/v1/account/profile",
+        { ...editedAnswers, name: "Underage edit", birthDate: underage },
+        ageCookie,
+      );
+      assert.equal(rejectedEdit.status, 400);
+      assert.deepEqual(await snapshots(), saved);
+      const older = new Date(`${cutoff}T00:00:00Z`);
+      older.setUTCDate(older.getUTCDate() - 1);
+      const acceptedEdit = await send(
+        "/api/v1/account/profile",
+        { ...editedAnswers, birthDate: older.toISOString().slice(0, 10) },
+        ageCookie,
+      );
+      assert.equal(acceptedEdit.status, 200, await acceptedEdit.clone().text());
+      assert.equal(
+        (await snapshots()).profile?.birth_date,
+        older.toISOString().slice(0, 10),
+      );
     });
 
     test("registration and edits round-trip through the real API", async () => {

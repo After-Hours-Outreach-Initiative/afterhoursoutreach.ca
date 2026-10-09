@@ -1,6 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { RegistrationAnswers } from "../../data/registration";
+import {
+  latestRegistrationBirthDate,
+  registrationBirthDateError,
+  type RegistrationAnswers,
+} from "../../data/registration";
 import {
   codeOfConductError,
   codeOfConductVersion,
@@ -23,16 +27,16 @@ export const profileSchema = z.strictObject({
   phone,
   birthDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .regex(/^\d{4}-\d{2}-\d{2}$/, registrationBirthDateError)
     .refine((value) => {
       const date = new Date(`${value}T00:00:00Z`);
       return (
         !Number.isNaN(date.getTime()) &&
         date.toISOString().slice(0, 10) === value &&
         value >= "1900-01-01" &&
-        value <= new Date().toISOString().slice(0, 10)
+        value <= latestRegistrationBirthDate()
       );
-    }, "Choose a valid date of birth."),
+    }, registrationBirthDateError),
   emergencyName: shortAnswer,
   emergencyPhone: phone,
   emergencyRelationship: shortAnswer,
@@ -96,7 +100,9 @@ export async function saveProfile(
   if (!parsed.success)
     throw new RequestError(
       400,
-      "Check the required fields, phone numbers, date of birth, and team selection.",
+      parsed.error.issues.some((issue) => issue.path[0] === "birthDate")
+        ? registrationBirthDateError
+        : "Check the required fields, phone numbers, date of birth, and team selection.",
     );
   const { codeOfConductAccepted, ...submitted } = parsed.data;
   if (!old && codeOfConductAccepted !== true)
