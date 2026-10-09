@@ -32,6 +32,10 @@ for (const failFirst of [false, true]) {
       await page.route("**/*", async (route) => {
         const request = route.request();
         if (!request.url().startsWith(origin)) return route.abort();
+        // Playwright route.fulfill buffers bodies; live SSE is covered by the
+        // streaming endpoint and multi-viewer browser tests instead.
+        if (new URL(request.url()).pathname === "/api/v1/events/stream")
+          return route.abort();
         const response = await worker.fetch(request.url(), {
           headers: await request.allHeaders(),
         });

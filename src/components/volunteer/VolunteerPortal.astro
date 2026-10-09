@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
 import { listEvents, listRosters } from "@/server/db/events";
+import { eventViewVersion } from "@/server/events/stream";
 import { countNotifications } from "@/server/db/notifications";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
@@ -23,6 +24,7 @@ try {
   /* Organizer actions remain locked. */
 }
 const events = await listEvents(env.DB, actor);
+const eventVersion = await eventViewVersion(events, actor);
 const rosters =
   organizer && actor
     ? await listRosters(
@@ -90,6 +92,7 @@ const filter = ["patrol", "orientation"].includes(
   <section
     class="volunteer-events"
     data-event-browser
+    data-event-version={eventVersion}
     aria-labelledby="events-heading"
   >
     <div class="volunteer-section-heading">

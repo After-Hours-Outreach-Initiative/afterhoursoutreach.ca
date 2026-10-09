@@ -874,6 +874,9 @@ describe(
           await page.route("**/*", async (route) => {
             const request = route.request();
             if (!request.url().startsWith(origin)) return route.abort();
+            // This route bridge buffers responses and cannot forward live SSE.
+            if (new URL(request.url()).pathname === "/api/v1/events/stream")
+              return route.abort();
             const response = await worker.fetch(request.url(), {
               method: request.method(),
               headers: {

@@ -4,6 +4,8 @@ import { chooseNotification } from "./notification-choice";
 
 // Compare against the server HTML, not transient loading/filter/expanded state.
 const renderedCards = new WeakMap<HTMLElement, string>();
+let deferredEventRefresh = false;
+let refreshDeferredEvents = () => {};
 for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
   renderedCards.set(card, card.outerHTML);
 
@@ -61,6 +63,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   // Reuse server rendering for authoritative capacity, eligibility, rosters,
   // destination options and optimistic edit versions.
   const refreshed = actionFragment(page, "[data-event-browser]");
+  deferredEventRefresh = false;
   const list = root.querySelector<HTMLElement>("[data-event-list]")!;
   const previous = new Map(
     [...list.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
@@ -68,14 +71,21 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       card,
     ]),
   );
+  const focused = document.activeElement;
+  const focusedCard =
+    focused instanceof HTMLElement
+      ? focused.closest<HTMLElement>("[data-live-event]")
+      : null;
   const eventId =
-    element?.closest<HTMLElement>("[data-live-event]")?.dataset.liveEvent;
+    element?.closest<HTMLElement>("[data-live-event]")?.dataset.liveEvent ??
+    focusedCard?.dataset.liveEvent;
   const dialog = element?.closest<HTMLDialogElement>("dialog");
   const restoreFocus = Boolean(
-    element &&
-    (element.contains(document.activeElement) ||
-      dialog?.contains(document.activeElement) ||
-      document.activeElement === document.body),
+    element
+      ? element.contains(focused) ||
+          dialog?.contains(focused) ||
+          focused === document.body
+      : focusedCard,
   );
   dialog?.close();
   let added: HTMLElement | undefined;
@@ -95,6 +105,20 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
             'form[data-submitting="true"]',
           ),
         ].some((form) => form !== element));
+    if (
+      card &&
+      protectedCard &&
+      renderedCards.get(card) !== updated.outerHTML
+    ) {
+      deferredEventRefresh = true;
+      // A live count must not overwrite an open editor or an in-flight signup.
+      const availability = card.querySelector("[data-event-availability]");
+      const nextAvailability = updated.querySelector(
+        "[data-event-availability]",
+      );
+      if (availability && nextAvailability)
+        availability.replaceWith(document.importNode(nextAvailability, true));
+    }
     if (
       !card ||
       (!protectedCard && renderedCards.get(card) !== updated.outerHTML)
@@ -125,18 +149,25 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     root,
     new URL(location.href).searchParams.get("type") ?? "all",
   );
+  root.dataset.eventVersion = refreshed.dataset.eventVersion;
   if (element?.matches("[data-event-save]") && !eventId) element.reset();
-  if (restoreFocus) {
+  if (restoreFocus && (element || !focused?.isConnected)) {
     const card = eventId
       ? [...list.querySelectorAll<HTMLElement>("[data-live-event]")].find(
           (card) => card.dataset.liveEvent === eventId,
         )
       : added;
-    const selector = element?.matches("[data-live-signup]")
-      ? '[data-live-signup] button[type="submit"]'
-      : element?.matches("[data-event-save]")
-        ? "[data-show-dialog]"
-        : ".volunteer-roster summary";
+    const selector =
+      element?.matches("[data-live-signup]") ||
+      (!element && focused?.closest("[data-live-signup]"))
+        ? '[data-live-signup] button[type="submit"]'
+        : element?.matches("[data-event-save]")
+          ? "[data-show-dialog]"
+          : !element &&
+              focused instanceof HTMLElement &&
+              focused.dataset.showDialog
+            ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+            : ".volunteer-roster summary";
     (card && !card.hidden
       ? card.querySelector<HTMLElement>(selector)
       : null
@@ -215,6 +246,64 @@ interface Result {
   localNotifications?: { to: string; subject: string; body: string }[];
 }
 let pendingRefresh = Promise.resolve();
+
+const eventBrowser = document.querySelector<HTMLElement>(
+  "[data-event-browser]",
+);
+if (eventBrowser && "EventSource" in window) {
+  let source: EventSource | undefined;
+  let liveRefreshQueued = false;
+  const refreshLiveEvents = () => {
+    if (liveRefreshQueued || document.hidden) return;
+    liveRefreshQueued = true;
+    // Share the action refresh queue so an older SSE-triggered GET cannot undo
+    // a newer signup, and coalesce notifications while a GET is in flight.
+    const refresh = pendingRefresh.then(async () => {
+      if (document.hidden) return;
+      const page = await loadActionPage();
+      if (!document.hidden) syncEvents(page);
+    });
+    pendingRefresh = refresh.catch(() => {});
+    void pendingRefresh.finally(() => {
+      liveRefreshQueued = false;
+    });
+  };
+  refreshDeferredEvents = refreshLiveEvents;
+  const disconnect = () => {
+    source?.close();
+    source = undefined;
+  };
+  const connect = () => {
+    if (source || document.hidden) return;
+    const current = new EventSource("/api/v1/events/stream");
+    source = current;
+    current.addEventListener("events", (event) => {
+      if (source !== current) return;
+      const data = (event as MessageEvent<string>).data;
+      if (!/^"[a-f0-9]{64}"$/.test(data)) return;
+      const version: string = JSON.parse(data);
+      if (version !== eventBrowser.dataset.eventVersion) refreshLiveEvents();
+    });
+  };
+  document.addEventListener("visibilitychange", () =>
+    document.hidden ? disconnect() : connect(),
+  );
+  window.addEventListener("pagehide", disconnect);
+  window.addEventListener("pageshow", connect);
+  document.addEventListener(
+    "close",
+    (event) => {
+      if (
+        deferredEventRefresh &&
+        event.target instanceof HTMLDialogElement &&
+        event.target.closest("[data-live-event]")
+      )
+        refreshLiveEvents();
+    },
+    true,
+  );
+  connect();
+}
 
 function form(
   selector: string,
@@ -315,6 +404,8 @@ function form(
       if (loading) loading.hidden = true;
       delete element.dataset.submitting;
       delete scope.dataset.submitting;
+      if (!saved && deferredEventRefresh && !element.closest("dialog[open]"))
+        refreshDeferredEvents();
       if (
         !saved &&
         focused instanceof HTMLElement &&
