@@ -118,8 +118,22 @@ try {
                 </button>
               </form>
               <div data-factor-setup class="mt-8" hidden>
-                <p>Add this setup key to your authenticator app:</p>
-                <code data-factor-key />
+                <div data-factor-qr class="mb-6" hidden>
+                  <p>Scan this QR code with your authenticator app:</p>
+                  <canvas
+                    class="mt-4 block h-auto max-w-full"
+                    width="256"
+                    height="256"
+                    role="img"
+                    aria-label="QR code for authenticator setup"
+                  />
+                </div>
+                <p data-factor-qr-error role="status" hidden>
+                  The QR code could not be displayed. Use the setup key below
+                  instead.
+                </p>
+                <p>You can enter this setup key manually:</p>
+                <code data-factor-key class="break-all" />
                 <p class="mt-6">
                   Save these one-use backup codes somewhere safe:
                 </p>
