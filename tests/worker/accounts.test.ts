@@ -737,6 +737,9 @@ describe(
         await expect(
           newPage.locator("[data-error=codeOfConductAccepted]"),
         ).toHaveText(codeOfConductError);
+        await expect(
+          newPage.locator("[data-error=codeOfConductAccepted]"),
+        ).toBeVisible();
         await expect(confirmation).toBeFocused();
         await confirmation.check();
         await newPage

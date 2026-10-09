@@ -47,13 +47,12 @@ import {
         value="true"
         required
         aria-describedby="error-codeOfConductAccepted"
-        data-validation-message={codeOfConductError}
       />
       <span>
         {codeOfConductConfirmation}
         <span class="volunteer-required" aria-hidden="true"> *</span>
       </span>
     </label>
-    <FieldError field="codeOfConductAccepted" />
+    <FieldError field="codeOfConductAccepted" message={codeOfConductError} />
   </div>
 </section>

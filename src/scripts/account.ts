@@ -5,10 +5,8 @@ import {
   accountErrorMessage,
   clearFormMessage,
   initAccountFormChanges,
-  initAccountFormValidation,
-  resetFormFeedback,
+  initRequiredCheckboxes,
   showFormMessage as message,
-  validateAccountForm,
 } from "./account-forms";
 
 if (import.meta.env.DEV) {
@@ -60,7 +58,7 @@ function form(
   >();
   const initialize = (element: HTMLFormElement) => {
     if (!initialized.has(element)) {
-      initAccountFormValidation(element);
+      initRequiredCheckboxes(element);
       initialized.set(
         element,
         element.hasAttribute("data-save-changes")
@@ -83,7 +81,7 @@ function form(
       'button[type="submit"]',
     );
     if (button?.disabled || button?.hidden) return;
-    if (!validateAccountForm(element)) return;
+    clearFormMessage(element);
     element.dataset.submitting = "true";
     const values = new FormData(element);
     const label = button?.textContent;
@@ -230,7 +228,7 @@ document
         return;
       for (const element of [email, code]) {
         element.reset();
-        resetFormFeedback(element);
+        clearFormMessage(element);
       }
       code.querySelector<HTMLInputElement>('input[name="email"]')!.value = "";
       delete code.dataset.returnTo;

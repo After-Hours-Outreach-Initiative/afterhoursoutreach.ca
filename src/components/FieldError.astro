@@ -1,19 +1,23 @@
 ---
 interface Props {
-  /** Matches the field name passed to showError on the page. */
+  /** Used by the control's aria-describedby attribute. */
   field: string;
-  /** Spacing belongs on the message itself, so a hidden one takes no room. */
+  message?: string;
+  /** Optional spacing for the feedback slot. */
   class?: string;
 }
 
-const { field, class: className } = Astro.props;
+const {
+  field,
+  message = "This field is required.",
+  class: className,
+} = Astro.props;
 ---
 
 <p
   class:list={["m-0 flex items-center gap-2 text-base text-red-400", className]}
   id={`error-${field}`}
   data-error={field}
-  hidden
 >
   {/* lucide: circle-alert */}
   <svg
@@ -28,5 +32,5 @@ const { field, class: className } = Astro.props;
     <path d="M12 8v4"></path>
     <path d="M12 16h.01"></path>
   </svg>
-  <span></span>
+  <span>{message}</span>
 </p>

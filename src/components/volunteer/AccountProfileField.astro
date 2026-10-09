@@ -10,6 +10,15 @@ interface Props {
   values?: RegistrationAnswers | null;
 }
 const { field, values } = Astro.props;
+const phone = field.name === "phone" || field.name === "emergencyPhone";
+const message =
+  field.name === "birthDate"
+    ? "Choose a date of birth between January 1, 1900 and today."
+    : phone
+      ? "Enter a valid phone number with at least 7 characters."
+      : field.required
+        ? "This field is required."
+        : `Keep this answer to ${"multiline" in field ? 2000 : 200} characters or fewer.`;
 ---
 
 <div
@@ -48,11 +57,15 @@ const { field, values } = Astro.props;
         autocomplete={"autocomplete" in field ? field.autocomplete : "off"}
         value={values?.[field.name] ?? ""}
         required={field.required}
-        maxlength={
-          field.name === "phone" || field.name === "emergencyPhone"
-            ? "40"
-            : "200"
+        pattern={
+          phone
+            ? String.raw`(?=.*\S)[\d+\(\).\s\-xX]{7,}`
+            : field.required && field.name !== "birthDate"
+              ? String.raw`.*\S.*`
+              : undefined
         }
+        minlength={phone ? "7" : undefined}
+        maxlength={phone ? "40" : "200"}
         min={field.name === "birthDate" ? "1900-01-01" : undefined}
         max={
           field.name === "birthDate"
@@ -69,5 +82,5 @@ const { field, values } = Astro.props;
       </span>
     )
   }
-  <FieldError field={field.name} />
+  <FieldError field={field.name} message={message} />
 </div>

@@ -1,6 +1,7 @@
 ---
 import type { EventRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
+import FieldError from "@/components/FieldError.astro";
 interface Props {
   event?: EventRow;
 }
@@ -54,43 +55,72 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
           </label>
         )
       }
-      <label class="volunteer-field"
-        >Start date and time<input
+      <div class="volunteer-field">
+        <label for={`${dialogId}-startsAt`}>Start date and time</label>
+        <input
+          id={`${dialogId}-startsAt`}
           type="datetime-local"
           name="startsAt"
+          aria-describedby={`error-${dialogId}-startsAt ${dialogId}-time-help`}
           required
           value={event ? vancouverInput(event.startsAt) : ""}
-        /><span class="volunteer-help"
+        /><span class="volunteer-help" id={`${dialogId}-time-help`}
           >Vancouver time, regardless of your device’s time zone.</span
-        ></label
-      >
-      <label class="volunteer-field"
-        >Volunteer spots<input
+        >
+        <FieldError
+          field={`${dialogId}-startsAt`}
+          message="Choose a valid start date and time."
+        />
+      </div>
+      <div class="volunteer-field">
+        <label for={`${dialogId}-spots`}>Volunteer spots</label>
+        <input
+          id={`${dialogId}-spots`}
           name="spots"
           type="number"
           min="1"
           max="100"
+          aria-describedby={`error-${dialogId}-spots`}
           required
           value={event?.spots ?? 8}
-        /></label
-      >
-      <label class="volunteer-field"
-        >Meeting point<input
+        />
+        <FieldError
+          field={`${dialogId}-spots`}
+          message="Enter a whole number from 1 to 100."
+        />
+      </div>
+      <div class="volunteer-field">
+        <label for={`${dialogId}-meetingPoint`}>Meeting point</label>
+        <input
+          id={`${dialogId}-meetingPoint`}
           name="meetingPoint"
+          aria-describedby={`error-${dialogId}-meetingPoint`}
           required
+          pattern={String.raw`.*\S.*`}
           maxlength="500"
           value={event?.meetingPoint}
-        /></label
-      >
-      <label class="volunteer-field"
-        >Map link (optional)<input
+        />
+        <FieldError
+          field={`${dialogId}-meetingPoint`}
+          message="Enter a meeting point (up to 500 characters)."
+        />
+      </div>
+      <div class="volunteer-field">
+        <label for={`${dialogId}-meetingPointUrl`}>Map link (optional)</label>
+        <input
+          id={`${dialogId}-meetingPointUrl`}
           type="url"
           name="meetingPointUrl"
+          aria-describedby={`error-${dialogId}-meetingPointUrl`}
           maxlength="2048"
           value={event?.meetingPointUrl ?? ""}
           placeholder="https://"
-        /></label
-      >
+        />
+        <FieldError
+          field={`${dialogId}-meetingPointUrl`}
+          message="Enter a valid map URL (up to 2048 characters)."
+        />
+      </div>
       <fieldset class="volunteer-state-field">
         <legend>Signups</legend>
         <div class="volunteer-state-selector">
@@ -163,10 +193,20 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
         <h3>Cancel event</h3>
         <input type="hidden" name="id" value={event.id} />
         <input type="hidden" name="version" value={event.updatedAt} />
-        <label class="volunteer-field">
-          Reason (optional)
-          <textarea name="reason" maxlength="1000" rows="3" />
-        </label>
+        <div class="volunteer-field">
+          <label for={`${dialogId}-reason`}>Reason (optional)</label>
+          <textarea
+            id={`${dialogId}-reason`}
+            name="reason"
+            aria-describedby={`error-${dialogId}-reason`}
+            maxlength="1000"
+            rows="3"
+          />
+          <FieldError
+            field={`${dialogId}-reason`}
+            message="Keep the reason to 1000 characters or fewer."
+          />
+        </div>
         <p class="volunteer-help">
           Cancels all spots. You can choose whether to email volunteers. Records
           are retained, not permanently deleted.

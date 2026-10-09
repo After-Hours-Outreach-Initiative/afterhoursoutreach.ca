@@ -43,7 +43,7 @@ const ready = Boolean(
         required
         disabled={!ready}
       />
-      <FieldError field="email" />
+      <FieldError field="email" message="Enter a valid email address." />
     </div>
     <p data-form-message role="status" aria-live="polite" hidden></p>
     <button
@@ -73,8 +73,6 @@ const ready = Boolean(
       <input
         id="sign-in-code"
         name="code"
-        data-error-field="email-code"
-        data-validation-message="Enter a six-digit code."
         aria-describedby="error-email-code"
         inputmode="numeric"
         autocomplete="one-time-code"
@@ -82,7 +80,7 @@ const ready = Boolean(
         maxlength="6"
         required
       />
-      <FieldError field="email-code" />
+      <FieldError field="email-code" message="Enter a six-digit code." />
     </div>
     <p data-form-message role="status" aria-live="polite" hidden></p>
     <button type="submit" class="btn btn-primary">Sign in with code</button>

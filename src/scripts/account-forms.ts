@@ -1,5 +1,3 @@
-type FormControl = HTMLInputElement | HTMLTextAreaElement;
-
 const requestFailed = "The request failed. Please try again.";
 
 export function accountErrorMessage(error: unknown): string {
@@ -50,121 +48,22 @@ export function clearFormMessage(element: Element) {
   delete target.dataset.messageKind;
 }
 
-export function resetFormFeedback(element: HTMLFormElement) {
-  clearFormMessage(element);
-  delete element.dataset.validationAttempted;
-  element.querySelectorAll<HTMLElement>("[data-error]").forEach((target) => {
-    target.hidden = true;
-    const text = target.querySelector("span");
-    if (text) text.textContent = "";
-  });
-  element.querySelectorAll("[aria-invalid]").forEach((control) => {
-    control.removeAttribute("aria-invalid");
-  });
-}
-
-function fieldMessage(control: FormControl): string {
-  if (control instanceof HTMLInputElement && control.type === "checkbox")
-    return control.required && !control.checked
-      ? (control.dataset.validationMessage ?? "This field is required.")
-      : "";
-  const value = control.value.trim();
-  const validity = control.validity;
-  if (validity.badInput) return "Enter a valid value.";
-  if (control.required && !value) return "This field is required.";
-  if (value && control instanceof HTMLInputElement && control.type === "tel") {
-    if (value.length < 7 || !/^[\d+().\s\-x]+$/i.test(value))
-      return "Enter a valid phone number with at least 7 characters.";
-  }
-  if (validity.typeMismatch) return "Enter a valid email address.";
-  if (validity.patternMismatch)
-    return control.dataset.validationMessage ?? "Enter a valid value.";
-  if (validity.rangeUnderflow || validity.rangeOverflow)
-    return "Choose a date of birth between January 1, 1900 and today.";
-  return validity.valid ? "" : control.validationMessage;
-}
-
-function setFieldError(
-  element: HTMLFormElement,
-  field: string,
-  controls: HTMLElement[],
-  text: string,
-) {
-  const target = [
-    ...element.querySelectorAll<HTMLElement>("[data-error]"),
-  ].find((target) => target.dataset.error === field);
-  if (target) {
-    const content = target.querySelector("span");
-    if (content) content.textContent = text;
-    target.hidden = !text;
-  }
-  for (const control of controls) {
-    if (text) control.setAttribute("aria-invalid", "true");
-    else control.removeAttribute("aria-invalid");
-  }
-}
-
-export function validateAccountForm(element: HTMLFormElement, focus = true) {
-  element.dataset.validationAttempted = "true";
-  let firstInvalid: HTMLElement | undefined;
-  const controls = element.querySelectorAll<FormControl>("input, textarea");
-  for (const control of controls) {
-    if (
-      !control.willValidate ||
-      (control.type === "checkbox" && !control.required)
-    )
-      continue;
-    const text = fieldMessage(control);
-    setFieldError(
-      element,
-      control.dataset.errorField ?? control.name,
-      [control],
-      text,
-    );
-    if (text) firstInvalid ??= control;
-  }
+export function initRequiredCheckboxes(element: HTMLFormElement) {
   for (const group of element.querySelectorAll<HTMLElement>(
     "[data-required-checkboxes]",
   )) {
     const boxes = [
       ...group.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
     ];
-    const text = boxes.some((box) => box.checked)
-      ? ""
-      : "Choose at least one team.";
-    setFieldError(
-      element,
-      group.dataset.requiredCheckboxes!,
-      [group, ...boxes],
-      text,
-    );
-    const firstBox = boxes[0];
-    if (
-      text &&
-      firstBox &&
-      (!firstInvalid ||
-        firstBox.compareDocumentPosition(firstInvalid) &
-          Node.DOCUMENT_POSITION_FOLLOWING)
-    )
-      firstInvalid = firstBox;
-  }
-  if (firstInvalid) {
-    showFormMessage(element, "Please correct the highlighted fields.");
-    if (focus) firstInvalid.focus();
-    return false;
-  }
-  clearFormMessage(element);
-  return true;
-}
-
-export function initAccountFormValidation(element: HTMLFormElement) {
-  // Keep native constraints, but replace the browser's single-field popup with inline errors.
-  element.noValidate = true;
-  for (const event of ["input", "change"]) {
-    element.addEventListener(event, () => {
-      if (element.dataset.validationAttempted)
-        validateAccountForm(element, false);
-    });
+    // HTML has no "at least one checkbox" constraint. Keep required in sync;
+    // native validation and CSS still decide when to display errors.
+    const update = () => {
+      const required = !boxes.some((box) => box.checked);
+      for (const box of boxes) box.required = required;
+    };
+    group.addEventListener("change", update);
+    element.addEventListener("reset", () => queueMicrotask(update));
+    update();
   }
 }
 

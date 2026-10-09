@@ -79,6 +79,8 @@ const sections = [
               name="teams"
               value={team}
               checked={values?.teams.includes(team)}
+              required={!values?.teams.length}
+              aria-describedby="error-teams help-teams"
             />
             {team === "non-patrol"
               ? "Non-patrol support"
@@ -89,7 +91,7 @@ const sections = [
         ))
       }
     </div>
-    <FieldError field="teams" />
+    <FieldError field="teams" message="Choose at least one team." />
   </fieldset>
   {registration && <CodeOfConduct />}
   <p data-form-message role="status" aria-live="polite" hidden></p>

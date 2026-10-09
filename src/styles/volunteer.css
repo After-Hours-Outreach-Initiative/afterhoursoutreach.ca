@@ -781,18 +781,31 @@
   color: #f87171;
 }
 .volunteer-portal [data-error] {
+  /* Reserve the message slot so native blur feedback cannot move a submit
+     button between mouse-down and mouse-up and swallow the click. */
+  visibility: hidden;
   font-size: 14px;
   line-height: 1.6;
 }
-.volunteer-portal input[aria-invalid="true"],
-.volunteer-portal textarea[aria-invalid="true"],
-.volunteer-portal select[aria-invalid="true"] {
+.volunteer-field:has(:user-invalid) > [data-error],
+.volunteer-form [data-required-checkboxes]:has(:user-invalid) > [data-error] {
+  visibility: visible;
+}
+.volunteer-portal input:user-invalid,
+.volunteer-portal textarea:user-invalid,
+.volunteer-portal select:user-invalid {
   border-color: #f87171;
 }
-.volunteer-portal [aria-invalid="true"]:focus-visible {
+.volunteer-portal :user-invalid:focus-visible {
   outline-color: #f87171;
 }
-.volunteer-form fieldset[aria-invalid="true"] .volunteer-checks {
+.volunteer-portal input:is([type="checkbox"], [type="radio"]):user-invalid {
+  outline: 2px solid #f87171;
+  outline-offset: 2px;
+}
+.volunteer-form
+  [data-required-checkboxes]:has(:user-invalid)
+  .volunteer-checks {
   border-left: 3px solid #f87171;
   padding-left: 12px;
 }

@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { createLocalAccount, sampleAnswers } from "../helpers/local-account";
+import {
+  createLocalAccount,
+  openLocalAccountSwitcher,
+  sampleAnswers,
+} from "../helpers/local-account";
 import {
   codeOfConductConfirmation,
   codeOfConductError,
@@ -17,6 +21,43 @@ test.beforeEach(async ({ page, baseURL }) => {
   await page.setExtraHTTPHeaders({
     "cf-connecting-ip": `198.18.${ip[0]}.${ip[1]}`,
   });
+});
+
+test("email validation follows native interaction timing without JavaScript", async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({
+    baseURL,
+    javaScriptEnabled: false,
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto("/volunteer/sign-in");
+    const form = page.locator("[data-email-request]");
+    const email = form.getByRole("textbox", { name: "Email", exact: true });
+    const error = form.locator("[data-error=email]");
+    await expect(error).toBeHidden();
+    await expect(email).not.toHaveCSS("border-top-color", "rgb(248, 113, 113)");
+    await email.focus();
+    await email.press("Tab");
+    await expect(error).toBeHidden();
+    await email.fill("not-an-email");
+    await email.press("Tab");
+    await expect(error).toBeVisible();
+    await expect(email).toHaveCSS("border-top-color", "rgb(248, 113, 113)");
+    await email.fill("valid@example.org");
+    await expect(error).toBeHidden();
+    await expect(email).not.toHaveCSS("border-top-color", "rgb(248, 113, 113)");
+    await page.reload();
+    await expect(error).toBeHidden();
+    await form.getByRole("button", { name: "Continue with Email" }).click();
+    await expect(error).toBeVisible();
+    await expect(email).toBeFocused();
+    await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
+  } finally {
+    await context.close();
+  }
 });
 
 test("email sign-in validates, loads, switches to code, and resets", async ({
@@ -53,14 +94,15 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
   const continueButton = page.getByRole("button", {
     name: "Continue with Email",
   });
-  await expect(emailForm).toHaveAttribute("novalidate", "");
+  await expect(emailForm).not.toHaveAttribute("novalidate");
   await expect(emailForm.locator("label")).toHaveText("Email");
+  await expect(emailForm.locator("[data-error=email]")).toBeHidden();
   await continueButton.click();
-  await expect(emailForm.locator("[data-error=email]")).toHaveText(
-    "This field is required.",
-  );
-  await expect(emailInput).toHaveAttribute("aria-invalid", "true");
+  await expect(emailForm.locator("[data-error=email]")).toBeVisible();
+  await expect(emailInput).toBeFocused();
+  await expect(emailInput).toHaveCSS("border-top-color", "rgb(248, 113, 113)");
   await emailInput.fill("not-an-email");
+  await expect(emailForm.locator("[data-error=email]")).toBeVisible();
   await expect(emailForm.locator("[data-error=email]")).toHaveText(
     "Enter a valid email address.",
   );
@@ -93,6 +135,7 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
   expect(emails).toEqual(["first@example.org"]);
   await code.fill("123");
   await page.getByRole("button", { name: "Sign in with code" }).click();
+  await expect(codeForm.locator("[data-error=email-code]")).toBeVisible();
   await expect(codeForm.locator("[data-error=email-code]")).toHaveText(
     "Enter a six-digit code.",
   );
@@ -114,6 +157,7 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
   await expect(code).toHaveValue("");
   await expect(codeForm.locator('input[name="email"]')).toHaveValue("");
   await expect(codeForm.locator("[data-form-message]")).toBeHidden();
+  await expect(emailForm.locator("[data-error=email]")).toBeHidden();
   await expect(
     page.getByRole("link", { name: "Use a different email" }),
   ).toBeHidden();
@@ -146,10 +190,6 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
   );
   expect(sent.status(), await sent.text()).toBe(200);
   await page.goto("/volunteer/sign-in");
-  await expect(page.locator("[data-email-request]")).toHaveAttribute(
-    "novalidate",
-    "",
-  );
   await page.getByRole("textbox", { name: "Email", exact: true }).fill(email);
   const button = page.getByRole("button", { name: "Continue with Email" });
   await button.click();
@@ -300,7 +340,7 @@ test("registration shows all required errors and saves after they are corrected"
       );
     }),
   ).toBe(true);
-  await expect(form).toHaveAttribute("novalidate", "");
+  await expect(form).not.toHaveAttribute("novalidate");
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/account/profile")
@@ -309,13 +349,18 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(
     page.getByRole("button", { name: "Complete registration" }),
   ).toBeEnabled();
+  await expect(form.locator("[data-error]:visible")).toHaveCount(0);
   await page.getByRole("button", { name: "Complete registration" }).click();
-  const required = form.locator("input[required], textarea[required]");
+  const required = form.locator(
+    'input[required]:not([name="teams"]), textarea[required]',
+  );
   const count = await required.count();
   expect(count).toBeGreaterThan(1);
   await expect(form.locator("[data-error]:visible")).toHaveCount(count + 1);
   for (const input of await required.all()) {
-    await expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(
+      await input.evaluate((element) => element.matches(":user-invalid")),
+    ).toBe(true);
     const id = await input.getAttribute("id");
     await expect(
       form.locator(`label[for="${id}"] .volunteer-required`),
@@ -324,6 +369,7 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(form.locator("[data-error=teams]")).toHaveText(
     "Choose at least one team.",
   );
+  await expect(form.locator("[data-error=teams]")).toBeVisible();
   await expect(
     page.getByRole("textbox", { name: "Full or preferred name", exact: true }),
   ).toBeFocused();
@@ -341,8 +387,10 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(form.locator("[data-error=phone]")).toContainText(
     "valid phone number",
   );
+  await expect(form.locator("[data-error=phone]")).toBeVisible();
   await page.getByLabel(/^Date of birth/).fill("2999-01-01");
   await expect(form.locator("[data-error=birthDate]")).toContainText("today");
+  await expect(form.locator("[data-error=birthDate]")).toBeVisible();
   expect(requests).toEqual([]);
   for (const [field, value] of Object.entries(sampleAnswers)) {
     if (field !== "teams")
@@ -352,6 +400,7 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(form.getByLabel("Outreach", { exact: true })).toBeFocused();
   expect(requests).toEqual([]);
   await form.getByLabel("Outreach", { exact: true }).check();
+  await expect(form.locator("[data-error=teams]")).toBeHidden();
   await page.setViewportSize({ width: 375, height: 812 });
   expect(
     await page.evaluate(
@@ -362,11 +411,13 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(form.locator("[data-error=codeOfConductAccepted]")).toHaveText(
     codeOfConductError,
   );
+  await expect(
+    form.locator("[data-error=codeOfConductAccepted]"),
+  ).toBeVisible();
   await expect(confirmation).toBeFocused();
   expect(requests).toEqual([]);
   await confirmation.press("Space");
   await expect(confirmation).toBeChecked();
-  await expect(confirmation).not.toHaveAttribute("aria-invalid");
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await toggle.click();
@@ -470,6 +521,7 @@ test("profile saves enable only for changed answers and disable after saving", a
   await expect(form.locator("[data-error=name]")).toHaveText(
     "This field is required.",
   );
+  await expect(form.locator("[data-error=name]")).toBeVisible();
   expect(requests).toEqual([]);
   await name.fill(sampleAnswers.name);
   await expect(save).toBeDisabled();
@@ -489,6 +541,91 @@ test("profile saves enable only for changed answers and disable after saving", a
   await page.reload();
   await expect(name).toHaveValue("Updated volunteer");
   await expect(save).toBeDisabled();
+});
+
+test("team selection requires any one checkbox and restores constraints on reset", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const form = page.locator("[data-account-profile]");
+  const error = form.locator("[data-error=teams]");
+  const outreach = form.getByLabel("Outreach", { exact: true });
+  const medic = form.getByLabel("Medic", { exact: true });
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/account/profile")
+      requests.push(request.url());
+  });
+  await expect(error).toBeHidden();
+  await outreach.uncheck();
+  await form.getByRole("button", { name: "Save profile" }).click();
+  await expect(error).toBeVisible();
+  await expect(outreach).toBeFocused();
+  expect(requests).toEqual([]);
+  await medic.check();
+  await expect(error).toBeHidden();
+  await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
+  await outreach.check();
+  await medic.uncheck();
+  await expect(error).toBeHidden();
+  await outreach.uncheck();
+  await expect(form.locator('[name="teams"][required]')).toHaveCount(3);
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(outreach).toBeChecked();
+  await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
+  await expect(error).toBeHidden();
+  await expect(
+    form.getByRole("button", { name: "Save profile" }),
+  ).toBeDisabled();
+  expect(requests).toEqual([]);
+});
+
+test("event editor shows native number and URL errors without submitting", async ({
+  page,
+}) => {
+  await page.goto("/volunteer");
+  const profiles = await openLocalAccountSwitcher(page);
+  await profiles
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await page.getByRole("button", { name: "Add an event", exact: true }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Add an event",
+    exact: true,
+  });
+  const form = dialog.locator("[data-event-save]");
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/events/action")
+      requests.push(request.url());
+  });
+  await expect(form.locator("[data-error]:visible")).toHaveCount(0);
+  await form.getByLabel("Start date and time").fill("2030-01-01T20:00");
+  await form
+    .getByLabel("Meeting point", { exact: true })
+    .fill("Test meeting point");
+  const spots = form.getByLabel("Volunteer spots");
+  const map = form.getByLabel("Map link (optional)");
+  await spots.fill("0");
+  await map.fill("not-a-url");
+  await form.getByRole("button", { name: "Save event" }).click();
+  await expect(form.locator("[data-error$='-spots']")).toBeVisible();
+  await expect(form.locator("[data-error$='-meetingPointUrl']")).toBeVisible();
+  await expect(spots).toBeFocused();
+  await expect(spots).toHaveCSS("border-top-color", "rgb(248, 113, 113)");
+  expect(requests).toEqual([]);
+  for (const invalid of ["101", "1.5"]) {
+    await spots.fill(invalid);
+    await form.getByRole("button", { name: "Save event" }).click();
+    await expect(form.locator("[data-error$='-spots']")).toBeVisible();
+    expect(requests).toEqual([]);
+  }
+  await spots.fill("8");
+  await map.fill("https://example.org/map");
+  await expect(form.locator("[data-error]:visible")).toHaveCount(0);
+  expect(requests).toEqual([]);
 });
 
 test("failed profile saves keep unsaved changes retryable", async ({
@@ -570,7 +707,7 @@ test("edits made during a profile save remain unsaved", async ({
   }
 });
 
-test("authenticator setup and sign-in show inline required and code errors", async ({
+test("authenticator setup and sign-in show native inline code errors", async ({
   page,
   baseURL,
 }) => {
@@ -584,15 +721,15 @@ test("authenticator setup and sign-in show inline required and code errors", asy
   await page.getByRole("button", { name: "Set up an authenticator" }).click();
   const setup = page.locator("[data-confirm-factor]");
   await expect(setup).toBeVisible();
+  await expect(setup.locator("[data-error=factor-setup-code]")).toBeHidden();
   await page.getByRole("button", { name: "Verify and enable" }).click();
-  await expect(setup.locator("[data-error=factor-setup-code]")).toHaveText(
-    "This field is required.",
-  );
+  await expect(setup.locator("[data-error=factor-setup-code]")).toBeVisible();
   const code = setup.locator('input[name="code"]');
   await code.fill("123");
   await expect(setup.locator("[data-error=factor-setup-code]")).toHaveText(
     "Enter a six-digit code.",
   );
+  await expect(setup.locator("[data-error=factor-setup-code]")).toBeVisible();
   const key = (await page.locator("[data-factor-key]").textContent())!;
   await code.fill(totpFromSetupKey(key));
   await inPlaceAction(page, {
@@ -615,17 +752,17 @@ test("authenticator setup and sign-in show inline required and code errors", asy
   await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
   await page.goto("/volunteer/sign-in?second-factor=1");
   const challenge = page.locator("[data-second-factor]");
-  await expect(challenge).toHaveAttribute("novalidate", "");
+  await expect(challenge).not.toHaveAttribute("novalidate");
   await expect(challenge).toBeVisible();
   await expect(page.locator("[data-email-request]")).toBeHidden();
   await page.getByRole("button", { name: "Verify code", exact: true }).click();
   await expect(challenge.locator("[data-error=second-factor-code]")).toHaveText(
-    "This field is required.",
+    "Enter an authenticator or backup code.",
   );
-  await expect(challenge.locator('input[name="code"]')).toHaveAttribute(
-    "aria-invalid",
-    "true",
-  );
+  await expect(
+    challenge.locator("[data-error=second-factor-code]"),
+  ).toBeVisible();
+  await expect(challenge.locator('input[name="code"]')).toBeFocused();
   await expect(challenge.locator(".volunteer-required")).toHaveText("*");
 });
 
