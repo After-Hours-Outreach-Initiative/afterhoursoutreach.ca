@@ -135,8 +135,6 @@ try {
                     <input
                       id="factor-setup-code"
                       name="code"
-                      data-error-field="factor-setup-code"
-                      data-validation-message="Enter a six-digit code."
                       aria-describedby="error-factor-setup-code"
                       inputmode="numeric"
                       autocomplete="one-time-code"
@@ -144,7 +142,10 @@ try {
                       maxlength="6"
                       required
                     />
-                    <FieldError field="factor-setup-code" />
+                    <FieldError
+                      field="factor-setup-code"
+                      message="Enter a six-digit code."
+                    />
                   </div>
                   <p
                     data-form-message

@@ -1,6 +1,7 @@
 ---
 import type { EventRow, RosterRow } from "@/server/db/events";
 import { formatEventDate } from "@/data/event-time";
+import FieldError from "@/components/FieldError.astro";
 
 interface Props {
   signup: RosterRow;
@@ -47,10 +48,19 @@ const { signup, destinations } = Astro.props;
         }
       </select>
     </label>
-    <label class="volunteer-field">
-      Reason (optional)
-      <textarea name="reason" rows="3" maxlength="1000"></textarea>
-    </label>
+    <div class="volunteer-field">
+      <label for={`signup-reason-${signup.id}`}>Reason (optional)</label>
+      <textarea
+        id={`signup-reason-${signup.id}`}
+        name="reason"
+        aria-describedby={`error-signup-reason-${signup.id}`}
+        rows="3"
+        maxlength="1000"></textarea>
+      <FieldError
+        field={`signup-reason-${signup.id}`}
+        message="Keep the reason to 1000 characters or fewer."
+      />
+    </div>
     {
       !import.meta.env.DEV && (
         <p class="volunteer-help">

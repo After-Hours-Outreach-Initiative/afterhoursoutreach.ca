@@ -20,13 +20,15 @@ import FieldError from "@/components/FieldError.astro";
     <input
       id="second-factor-code"
       name="code"
-      data-error-field="second-factor-code"
       aria-describedby="error-second-factor-code"
       autocomplete="one-time-code"
       maxlength="100"
       required
     />
-    <FieldError field="second-factor-code" />
+    <FieldError
+      field="second-factor-code"
+      message="Enter an authenticator or backup code."
+    />
   </div>
   <label class="volunteer-check"
     ><input name="backup" type="checkbox" />Use a backup code</label
