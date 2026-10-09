@@ -28,7 +28,7 @@ const allowed = new Map([
 ]);
 
 export const ALL: APIRoute = async ({ request, clientAddress }) => {
-  const path = new URL(request.url).pathname.replace(/^\/api\/auth/, "");
+  const path = new URL(request.url).pathname.replace(/^\/api\/v1\/auth/, "");
   if (path.startsWith("/dev/") && !import.meta.env.DEV)
     return new Response("Not found", { status: 404 });
   if (!allowed.has(path)) return new Response("Not found", { status: 404 });

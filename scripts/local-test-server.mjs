@@ -172,7 +172,7 @@ export async function startLocalTestServer(logs, { signal } = {}) {
       signal?.throwIfAborted();
       try {
         const timeout = AbortSignal.timeout(5000);
-        const response = await fetch(`${origin}/api/auth/dev/users`, {
+        const response = await fetch(`${origin}/api/v1/auth/dev/users`, {
           signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
         });
         ready = response.ok;

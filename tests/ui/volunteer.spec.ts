@@ -19,10 +19,13 @@ test("volunteer-page sign-in is usable on mobile and opens the shared code form"
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   const emails: string[] = [];
-  await page.route("**/api/auth/email-otp/send-verification-otp**", (route) => {
-    emails.push(route.request().postDataJSON().email);
-    return route.fulfill({ json: { success: true } });
-  });
+  await page.route(
+    "**/api/v1/auth/email-otp/send-verification-otp**",
+    (route) => {
+      emails.push(route.request().postDataJSON().email);
+      return route.fulfill({ json: { success: true } });
+    },
+  );
   await page
     .getByRole("textbox", { name: "Email", exact: true })
     .fill("mobile@example.org");
@@ -143,7 +146,7 @@ test("profile buttons disable during switching and recover without changing sele
   const profiles = await openLocalAccountSwitcher(page);
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  await page.route("**/api/auth/dev/switch-user", async (route) => {
+  await page.route("**/api/v1/auth/dev/switch-user", async (route) => {
     await gate;
     await route.fulfill({
       status: 503,
@@ -181,7 +184,7 @@ test("View as lists actual D1 users and switching to Visitor ends only the curre
   baseURL,
 }) => {
   const user = await createLocalAccount(request, baseURL!);
-  const independent = await request.get("/api/auth/get-session");
+  const independent = await request.get("/api/v1/auth/get-session");
   const independentSession: { session: { id: string } } =
     await independent.json();
   await page.reload();
@@ -192,7 +195,7 @@ test("View as lists actual D1 users and switching to Visitor ends only the curre
   await profile.click();
   await expect(page.locator("[data-account-menu]")).toBeVisible();
   await expect(profile).toHaveAttribute("aria-pressed", "true");
-  const selected = await page.request.get("/api/auth/get-session");
+  const selected = await page.request.get("/api/v1/auth/get-session");
   const selectedSession: { user: { id: string }; session: { id: string } } =
     await selected.json();
   expect(selectedSession.user.id).toBe(user.id);
@@ -205,10 +208,10 @@ test("View as lists actual D1 users and switching to Visitor ends only the curre
   await expect(page).toHaveURL(/\/volunteer\/?$/);
   await expect(page.locator("[data-account-menu]")).toHaveCount(0);
   expect(
-    await (await page.request.get("/api/auth/get-session")).json(),
+    await (await page.request.get("/api/v1/auth/get-session")).json(),
   ).toBeNull();
   expect(
-    (await (await request.get("/api/auth/get-session")).json()).session.id,
+    (await (await request.get("/api/v1/auth/get-session")).json()).session.id,
   ).toBe(independentSession.session.id);
 });
 
@@ -305,7 +308,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
   expect(
-    await (await page.request.get("/api/auth/get-session")).json(),
+    await (await page.request.get("/api/v1/auth/get-session")).json(),
   ).toBeNull();
 });
 
@@ -315,26 +318,26 @@ test("local account selection rejects cross-origin writes and unknown users", as
   baseURL,
 }) => {
   const user = await createLocalAccount(request, baseURL!);
-  const response = await request.post("/api/auth/dev/switch-user", {
+  const response = await request.post("/api/v1/auth/dev/switch-user", {
     headers: { origin: "https://evil.example" },
     data: { userId: user.id },
   });
   expect(response.status()).toBe(403);
-  const missingOrigin = await request.post("/api/auth/dev/switch-user", {
+  const missingOrigin = await request.post("/api/v1/auth/dev/switch-user", {
     data: { userId: user.id },
   });
   expect(missingOrigin.status()).toBe(403);
-  const crossSite = await request.get("/api/auth/dev/users", {
+  const crossSite = await request.get("/api/v1/auth/dev/users", {
     headers: { origin: "https://evil.example" },
   });
   expect(crossSite.status()).toBe(403);
-  const unknown = await request.post("/api/auth/dev/switch-user", {
+  const unknown = await request.post("/api/v1/auth/dev/switch-user", {
     headers: { origin: baseURL! },
     data: { userId: "not-a-user" },
   });
   expect(unknown.status()).toBe(404);
   expect(
-    (await (await request.get("/api/auth/get-session")).json()).user.id,
+    (await (await request.get("/api/v1/auth/get-session")).json()).user.id,
   ).toBe(user.id);
   await page.reload();
   await openLocalAccountSwitcher(page);
@@ -346,13 +349,13 @@ test("View as simulates a verified factor without changing the user's real role 
   baseURL,
 }) => {
   const user = await createLocalAccount(request, baseURL!);
-  const enabled = await request.post("/api/auth/two-factor/enable", {
+  const enabled = await request.post("/api/v1/auth/two-factor/enable", {
     headers: { origin: baseURL! },
     data: { method: "totp" },
   });
   expect(enabled.status()).toBe(200);
   const setup: { totpURI: string } = await enabled.json();
-  const verified = await request.post("/api/auth/two-factor/verify-totp", {
+  const verified = await request.post("/api/v1/auth/two-factor/verify-totp", {
     headers: { origin: baseURL! },
     data: {
       code: totpFromSetupKey(
@@ -367,7 +370,7 @@ test("View as simulates a verified factor without changing the user's real role 
   await profile.click();
   await expect(page.locator("[data-account-menu]")).toBeVisible();
   await expect(profile).toHaveAttribute("aria-pressed", "true");
-  const current = await page.request.get("/api/auth/get-session");
+  const current = await page.request.get("/api/v1/auth/get-session");
   const session = await current.json();
   expect(session.user.id).toBe(user.id);
   expect(session.user.role).toBe("volunteer");

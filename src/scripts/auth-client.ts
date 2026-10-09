@@ -19,6 +19,7 @@ export function showSecondFactor() {
 }
 
 export const authClient = createAuthClient({
+  basePath: "/api/v1/auth",
   fetchOptions: { credentials: "same-origin", throw: true },
   plugins: [
     emailOTPClient(),

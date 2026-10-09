@@ -54,7 +54,7 @@ beforeEach(async () => {
 
 function request(path: string, body?: object, cookie?: string) {
   return auth.handler(
-    new Request(`${origin}/api/auth${path}`, {
+    new Request(`${origin}/api/v1/auth${path}`, {
       method: body ? "POST" : "GET",
       headers: {
         origin,
@@ -268,7 +268,7 @@ test("auth uses the configured site origin or request URL without trusting forwa
   ]) {
     const resolved = authBindingsForRequest(
       base,
-      new Request(`${origin}/api/auth/email-otp/send-verification-otp`, {
+      new Request(`${origin}/api/v1/auth/email-otp/send-verification-otp`, {
         headers: { "x-forwarded-host": "evil.example" },
       }),
     );
@@ -982,7 +982,7 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     "//evil.example",
     "/\\evil.example",
     "/volunteer/sign-in",
-    "/api/auth/get-session",
+    "/api/v1/auth/get-session",
   ])
     assert.equal(safeReturnTo(value), "/volunteer/account");
   const request = new Request(origin, {

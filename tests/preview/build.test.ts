@@ -41,13 +41,13 @@ test("preview builds support real account features but reject development endpoi
         page.headers.get("content-security-policy")!,
         /script-src 'self'/,
       );
-      const profile = await worker.fetch(`${origin}/api/account/profile`, {
+      const profile = await worker.fetch(`${origin}/api/v1/account/profile`, {
         method: "POST",
         headers: { origin, "content-type": "application/json" },
         body: "{}",
       });
       assert.equal(profile.status, 401);
-      const session = await worker.fetch(`${origin}/api/auth/get-session`);
+      const session = await worker.fetch(`${origin}/api/v1/auth/get-session`);
       assert.equal(session.status, 200);
       assert.equal(await session.json(), null);
       const legacy = await worker.fetch(`${origin}/patrols`, {
@@ -56,11 +56,11 @@ test("preview builds support real account features but reject development endpoi
       assert.equal(legacy.status, 302);
       assert.equal(legacy.headers.get("location"), "/volunteer");
       assert.equal(
-        (await worker.fetch(`${origin}/api/auth/dev/users`)).status,
+        (await worker.fetch(`${origin}/api/v1/auth/dev/users`)).status,
         404,
       );
       const switchUser = await worker.fetch(
-        `${origin}/api/auth/dev/switch-user`,
+        `${origin}/api/v1/auth/dev/switch-user`,
         {
           method: "POST",
           headers: { origin, "content-type": "application/json" },

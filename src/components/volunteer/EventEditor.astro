@@ -24,7 +24,7 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
     class="volunteer-form"
     data-event-save
     data-email-prompt={event ? "event" : undefined}
-    action="/api/events/action"
+    action="/api/v1/events/action"
     method="post"
   >
     {
@@ -187,7 +187,7 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
         class="volunteer-form volunteer-danger"
         data-event-cancel
         data-email-prompt="event-cancel"
-        action="/api/events/action"
+        action="/api/v1/events/action"
         method="post"
       >
         <h3>Cancel event</h3>

@@ -20,7 +20,7 @@ operations. Edit files here, not generated SQL in `drizzle/`.
 | `errors.ts`          | Safe translation of database invariant errors into application errors.                                                                                |
 | `index.ts`, `sql.ts` | Request-scoped Drizzle connection and shared SQL clock.                                                                                               |
 
-HTTP request parsing and responses remain in `src/pages/api/`. Better Auth's
+HTTP request parsing and responses remain in `src/pages/api/v1/`. Better Auth's
 integration remains in `src/server/auth/`. Email transport and delivery orchestration
 remain in `src/server/events/notifications.ts`; they call the database operations
 here instead of issuing their own SQL. Development fixtures are separate in

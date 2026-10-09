@@ -24,7 +24,7 @@ test("local approval notifications work without crypto.randomUUID", async ({
     <div data-volunteer-profile>
       <h2>Sample volunteer</h2>
       <div class="volunteer-profile-controls" data-volunteer-controls>
-        <form class="volunteer-form" data-organizer-status data-email-prompt="access" action="/api/organizer/action" method="post">
+        <form class="volunteer-form" data-organizer-status data-email-prompt="access" action="/api/v1/organizer/action" method="post">
           <input type="hidden" name="userId" value="test-patrol" />
           <input type="hidden" name="version" value="${version}" />
           <input type="checkbox" name="active" checked hidden />
@@ -35,7 +35,7 @@ test("local approval notifications work without crypto.randomUUID", async ({
       </div>
     </div>`;
   // Keep this regression isolated from the developer's volunteers and email outbox.
-  await page.route("**/api/organizer/action", async (route) => {
+  await page.route("**/api/v1/organizer/action", async (route) => {
     const body = route.request().postDataJSON();
     submissions.push(body);
     approved = body.patrolApproved;

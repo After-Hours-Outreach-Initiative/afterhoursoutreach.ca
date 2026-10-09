@@ -218,6 +218,7 @@ export function createAuth(
   return betterAuth({
     appName: "After Hours Outreach",
     baseURL: origin,
+    basePath: "/api/v1/auth",
     secret: bindings.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db, {
       provider: "sqlite",
