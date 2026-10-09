@@ -806,6 +806,461 @@ test("sign-out revokes the session rather than just removing the browser cookie"
   );
 });
 
+test("email changes verify the new address and keep the same account, profile and approval", async () => {
+  const { cookie } = await signIn();
+  const current = (await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  }))!;
+  await saveProfile(bindings.DB, current.user.id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
+  await bindings.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+    .bind(current.user.id)
+    .run();
+  await bindings.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=1, approved_by=?, approved_at=? WHERE user_id=?",
+  )
+    .bind(current.user.id, Date.now(), current.user.id)
+    .run();
+  const sent = await request(
+    "/email-otp/request-email-change",
+    { newEmail: " New@Example.org " },
+    cookie,
+  );
+  assert.equal(sent.status, 200, await sent.clone().text());
+  const challenge = outbox.at(-1)!;
+  assert.equal(challenge.purpose, "change-email");
+  assert.equal(challenge.email, "new@example.org");
+  assert.equal(challenge.url, `${origin}/volunteer/account`);
+  assert.equal(
+    (await auth.api.getSession({ headers: new Headers({ cookie }) }))?.user
+      .email,
+    current.user.email,
+  );
+  const row = await bindings.DB.prepare(
+    "SELECT value, expires_at FROM verification WHERE identifier=?",
+  )
+    .bind("change-email-otp-volunteer@example.org-new@example.org")
+    .first<{ value: string; expires_at: number }>();
+  assert.ok(row);
+  assert.notEqual(row.value.split(":")[0], challenge.code);
+  assert.ok(row.expires_at > Date.now() + 590_000);
+  const confirmed = await request(
+    "/email-otp/change-email",
+    { newEmail: "New@Example.org", otp: challenge.code },
+    cookie,
+  );
+  assert.equal(confirmed.status, 200, await confirmed.clone().text());
+  const updated = (await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  }))!;
+  assert.equal(updated.user.id, current.user.id);
+  assert.equal(updated.user.email, "new@example.org");
+  assert.equal(updated.user.emailVerified, true);
+  assert.equal(updated.user.role, "organizer");
+  assert.deepEqual(await loadProfile(bindings.DB, current.user.id), answers);
+  assert.equal(
+    (
+      await bindings.DB.prepare(
+        "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
+      )
+        .bind(current.user.id)
+        .first()
+    )?.patrol_approved,
+    1,
+  );
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail: "new@example.org", otp: challenge.code },
+        cookie,
+      )
+    ).status,
+    400,
+  );
+  const nextSignIn = await request(
+    "/sign-in/email-otp",
+    await createSignInOTP(
+      bindings.DB,
+      bindings.BETTER_AUTH_SECRET,
+      "new@example.org",
+    ),
+  );
+  assert.equal(nextSignIn.status, 200, await nextSignIn.clone().text());
+  assert.equal(
+    (
+      await auth.api.getSession({
+        headers: new Headers({ cookie: cookies(nextSignIn) }),
+      })
+    )?.user.id,
+    current.user.id,
+  );
+  assert.equal(
+    (await bindings.DB.prepare("SELECT count(*) AS n FROM user").first())?.n,
+    1,
+  );
+});
+
+test("email changes require a fresh verified session and validate inputs before sending", async () => {
+  for (const path of [
+    "/email-otp/request-email-change",
+    "/email-otp/change-email",
+  ])
+    assert.equal(
+      (
+        await request(path, {
+          newEmail: "new@example.org",
+          ...(path.endsWith("/change-email") && { otp: "123456" }),
+        })
+      ).status,
+      401,
+    );
+  const { cookie } = await signIn();
+  const current = (await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  }))!;
+  for (const body of [
+    { newEmail: "not-an-email" },
+    { newEmail: "x".repeat(255) + "@example.org" },
+    { newEmail: "Volunteer@Example.org" },
+    { newEmail: "new@example.org", userId: "someone-else" },
+  ])
+    assert.equal(
+      (await request("/email-otp/request-email-change", body, cookie)).status,
+      400,
+    );
+  await bindings.DB.prepare("UPDATE session SET created_at=? WHERE id=?")
+    .bind(Date.now() - 2 * 86_400_000, current.session.id)
+    .run();
+  for (const path of [
+    "/email-otp/request-email-change",
+    "/email-otp/change-email",
+  ])
+    assert.equal(
+      (
+        await request(
+          path,
+          {
+            newEmail: "new@example.org",
+            ...(path.endsWith("/change-email") && { otp: "123456" }),
+          },
+          cookie,
+        )
+      ).status,
+      403,
+    );
+  assert.equal(outbox.length, 1);
+  assert.equal(
+    (
+      await bindings.DB.prepare(
+        "SELECT count(*) AS n FROM verification WHERE identifier LIKE 'change-email-otp-%'",
+      ).first()
+    )?.n,
+    0,
+  );
+});
+
+test("email-change codes cannot sign in, change another account or change a different address", async () => {
+  const { cookie } = await signIn();
+  const other = await signIn("other@example.org");
+  assert.equal(
+    (
+      await request(
+        "/email-otp/request-email-change",
+        { newEmail: "new@example.org" },
+        cookie,
+      )
+    ).status,
+    200,
+  );
+  const code = outbox.at(-1)!.code;
+  assert.equal(
+    (
+      await request("/sign-in/email-otp", {
+        email: "new@example.org",
+        otp: code,
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail: "new@example.org", otp: code },
+        other.cookie,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail: "different@example.org", otp: code },
+        cookie,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail: "new@example.org", otp: code },
+        cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await auth.api.getSession({
+        headers: new Headers({ cookie: other.cookie }),
+      })
+    )?.user.email,
+    "other@example.org",
+  );
+});
+
+test("email-change codes expire, limit wrong attempts, and resending replaces the code", async () => {
+  const { cookie } = await signIn();
+  const newEmail = "new@example.org";
+  assert.equal(
+    (await request("/email-otp/request-email-change", { newEmail }, cookie))
+      .status,
+    200,
+  );
+  const original = outbox.at(-1)!.code;
+  const wrong = original === "000000" ? "000001" : "000000";
+  for (let i = 0; i < 3; i++)
+    assert.equal(
+      (
+        await request(
+          "/email-otp/change-email",
+          { newEmail, otp: wrong },
+          cookie,
+        )
+      ).status,
+      400,
+    );
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail, otp: original },
+        cookie,
+      )
+    ).status,
+    403,
+  );
+  const cooldown = await hashAuthValue(
+    bindings.BETTER_AUTH_SECRET,
+    `send-cooldown:${newEmail}`,
+  );
+  await bindings.DB.prepare(
+    "UPDATE auth_rate_limit SET expires_at=0 WHERE key=?",
+  )
+    .bind(cooldown)
+    .run();
+  assert.equal(
+    (await request("/email-otp/request-email-change", { newEmail }, cookie))
+      .status,
+    200,
+  );
+  const expired = outbox.at(-1)!.code;
+  await bindings.DB.prepare(
+    "UPDATE verification SET expires_at=0 WHERE identifier=?",
+  )
+    .bind(`change-email-otp-volunteer@example.org-${newEmail}`)
+    .run();
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail, otp: expired },
+        cookie,
+      )
+    ).status,
+    400,
+  );
+  await bindings.DB.prepare(
+    "UPDATE auth_rate_limit SET expires_at=0 WHERE key=?",
+  )
+    .bind(cooldown)
+    .run();
+  assert.equal(
+    (await request("/email-otp/request-email-change", { newEmail }, cookie))
+      .status,
+    200,
+  );
+  const latest = outbox.at(-1)!.code;
+  if (latest !== original)
+    assert.equal(
+      (
+        await request(
+          "/email-otp/change-email",
+          { newEmail, otp: original },
+          cookie,
+        )
+      ).status,
+      400,
+    );
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail, otp: latest },
+        cookie,
+      )
+    ).status,
+    200,
+  );
+});
+
+test("email-change requests share email budgets and never expose codes in hosted responses", async () => {
+  const { cookie } = await signIn();
+  auth = createAuth(bindings, "192.0.2.1", {
+    sendEmail: async (email) => {
+      outbox.push(email);
+      return email;
+    },
+  });
+  const body = { newEmail: "new@example.org" };
+  const sent = await request("/email-otp/request-email-change", body, cookie);
+  assert.equal(sent.status, 200);
+  assert.deepEqual(await sent.json(), { success: true });
+  assert.equal(
+    (await request("/email-otp/request-email-change", body, cookie)).status,
+    429,
+  );
+  assert.equal(
+    (
+      await request("/email-otp/send-verification-otp", {
+        email: body.newEmail,
+        type: "sign-in",
+      })
+    ).status,
+    429,
+  );
+  assert.equal(outbox.length, 2);
+});
+
+test("resending an email-change code invalidates the previous one and concurrent confirmation succeeds once", async () => {
+  const { cookie } = await signIn();
+  const newEmail = "new@example.org";
+  await request("/email-otp/request-email-change", { newEmail }, cookie);
+  const original = outbox.at(-1)!.code;
+  const cooldown = await hashAuthValue(
+    bindings.BETTER_AUTH_SECRET,
+    `send-cooldown:${newEmail}`,
+  );
+  await bindings.DB.prepare(
+    "UPDATE auth_rate_limit SET expires_at=0 WHERE key=?",
+  )
+    .bind(cooldown)
+    .run();
+  await request("/email-otp/request-email-change", { newEmail }, cookie);
+  const latest = outbox.at(-1)!.code;
+  if (latest !== original)
+    assert.equal(
+      (
+        await request(
+          "/email-otp/change-email",
+          { newEmail, otp: original },
+          cookie,
+        )
+      ).status,
+      400,
+    );
+  const responses = await Promise.all([
+    request("/email-otp/change-email", { newEmail, otp: latest }, cookie),
+    request("/email-otp/change-email", { newEmail, otp: latest }, cookie),
+  ]);
+  assert.equal(responses.filter((response) => response.ok).length, 1);
+});
+
+test("existing addresses cannot be taken over and failed delivery leaves no usable email-change code", async () => {
+  const { cookie } = await signIn();
+  const other = await signIn("taken@example.org");
+  const cooldown = await hashAuthValue(
+    bindings.BETTER_AUTH_SECRET,
+    "send-cooldown:taken@example.org",
+  );
+  await bindings.DB.prepare(
+    "UPDATE auth_rate_limit SET expires_at=0 WHERE key=?",
+  )
+    .bind(cooldown)
+    .run();
+  const taken = await request(
+    "/email-otp/request-email-change",
+    { newEmail: "Taken@Example.org" },
+    cookie,
+  );
+  assert.equal(taken.status, 200);
+  assert.deepEqual(await taken.json(), { success: true });
+  assert.equal(outbox.length, 2);
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail: "taken@example.org", otp: "123456" },
+        cookie,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await auth.api.getSession({
+        headers: new Headers({ cookie: other.cookie }),
+      })
+    )?.user.email,
+    "taken@example.org",
+  );
+  auth = createAuth(bindings, "192.0.2.1", {
+    sendEmail: async (email) => {
+      outbox.push(email);
+      throw new Error("private delivery details");
+    },
+  });
+  const failure = await request(
+    "/email-otp/request-email-change",
+    { newEmail: "failure@example.org" },
+    cookie,
+  );
+  assert.equal(failure.status, 503);
+  assert.doesNotMatch(
+    await failure.text(),
+    /private delivery details|localEmail/,
+  );
+  assert.equal(
+    (
+      await bindings.DB.prepare(
+        "SELECT count(*) AS n FROM verification WHERE identifier LIKE 'change-email-otp-%'",
+      ).first()
+    )?.n,
+    0,
+  );
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail: "failure@example.org", otp: outbox.at(-1)!.code },
+        cookie,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (await auth.api.getSession({ headers: new Headers({ cookie }) }))?.user
+      .email,
+    "volunteer@example.org",
+  );
+});
+
 test("passwordless two-factor enrollment and login cannot bypass the authenticator", async () => {
   const signedIn = await signIn();
   const initial = await auth.api.getSession({
@@ -840,11 +1295,70 @@ test("passwordless two-factor enrollment and login cannot bypass the authenticat
   });
   assert.equal(current?.user.twoFactorEnabled, true);
   assert.equal(current?.session.twoFactorVerified, true);
+  assert.equal(
+    (
+      await request(
+        "/email-otp/request-email-change",
+        { newEmail: "factor-new@example.org" },
+        currentCookie,
+      )
+    ).status,
+    200,
+  );
+  const emailChange = outbox.at(-1)!;
+  await bindings.DB.prepare(
+    "UPDATE session SET two_factor_verified=0 WHERE id=?",
+  )
+    .bind(current!.session.id)
+    .run();
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail: emailChange.email, otp: emailChange.code },
+        currentCookie,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request(
+        "/email-otp/request-email-change",
+        { newEmail: "factor-other@example.org" },
+        currentCookie,
+      )
+    ).status,
+    403,
+  );
+  await bindings.DB.prepare(
+    "UPDATE session SET two_factor_verified=1 WHERE id=?",
+  )
+    .bind(current!.session.id)
+    .run();
+  assert.equal(
+    (
+      await request(
+        "/email-otp/change-email",
+        { newEmail: emailChange.email, otp: emailChange.code },
+        currentCookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await auth.api.getSession({
+        headers: new Headers({ cookie: currentCookie }),
+      })
+    )?.user.twoFactorEnabled,
+    true,
+  );
   await request("/sign-out", {}, currentCookie);
   const proof = await createSignInOTP(
     bindings.DB,
     bindings.BETTER_AUTH_SECRET!,
-    "volunteer@example.org",
+    "factor-new@example.org",
   );
   const pending = await request(
     "/sign-in/email-otp?returnTo=%2Fvolunteer%2Faccount%3Ftab%3Dsample",
@@ -936,6 +1450,30 @@ test("Resend receives the same sign-in message in every hosted environment and h
       ),
     (error: unknown) =>
       error instanceof RequestError && !error.message.includes("private"),
+  );
+});
+
+test("email-change messages contain a verification code rather than a sign-in link", async () => {
+  await sendSignInEmail(
+    "test-only-key",
+    {
+      email: "new@example.org",
+      code: "123456",
+      url: `${origin}/volunteer/account`,
+      id: "email-change",
+      purpose: "change-email",
+    },
+    "production",
+    async (_url, options) => {
+      const body = JSON.parse(String(options?.body));
+      assert.equal(
+        body.subject,
+        "Confirm your After Hours Outreach email change",
+      );
+      assert.match(body.text, /account settings.*123456/);
+      assert.doesNotMatch(body.text, /Sign in:|sign-in\/complete/);
+      return Response.json({ id: "email-id" });
+    },
   );
 });
 

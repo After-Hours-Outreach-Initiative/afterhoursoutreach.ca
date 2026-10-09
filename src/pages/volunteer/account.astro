@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { APIError } from "better-auth/api";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
+import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import FieldError from "@/components/FieldError.astro";
 import {
   authBindingsForRequest,
@@ -20,6 +21,7 @@ let twoFactorEnabled = false;
 let organizer = false;
 let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
 let sessionsNeedSignIn = false;
+let emailNeedsSignIn = false;
 if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");
 try {
   const auth = createAuth(authBindingsForRequest(env, Astro.request));
@@ -33,6 +35,11 @@ try {
   values = await loadProfile(env.DB, current.user.id);
   if (!values) return Astro.redirect("/volunteer/register");
   email = current.user.email;
+  const { sessionConfig } = await auth.$context;
+  emailNeedsSignIn =
+    sessionConfig.freshAge !== 0 &&
+    Date.now() - current.session.createdAt.getTime() >=
+      sessionConfig.freshAge * 1000;
   currentId = current.session.id;
   twoFactorEnabled = Boolean(current.user.twoFactorEnabled);
   organizer = current.user.role === "organizer";
@@ -79,9 +86,7 @@ try {
   </section>
   <section class="volunteer-panel">
     <h2>Account settings</h2>
-    <div class="volunteer-setting">
-      <div><h3>Email address</h3><p>{email}</p></div>
-    </div>
+    <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />
     <div class="volunteer-setting" data-factor-settings>
       <div>
         <h3 tabindex="-1">Two-factor authentication</h3>

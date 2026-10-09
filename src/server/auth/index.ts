@@ -1,5 +1,9 @@
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { expireCookie } from "better-auth/cookies";
 import { emailOTP } from "better-auth/plugins/email-otp";
 import { twoFactor } from "better-auth/plugins/two-factor";
@@ -70,6 +74,10 @@ const verifySchema = z.strictObject({
   email: emailSchema,
   otp: z.string().regex(/^\d{6}$/),
 });
+const emailChangeRequestSchema = z.strictObject({ newEmail: emailSchema });
+const emailChangeSchema = emailChangeRequestSchema.extend({
+  otp: z.string().regex(/^\d{6}$/),
+});
 const signInResultSchema = z.looseObject({
   token: z.string(),
   user: z.looseObject({ id: z.string() }),
@@ -114,20 +122,27 @@ export function createAuth(
     expiresIn: 600,
     allowedAttempts: 3,
     storeOTP: "hashed",
-    async sendVerificationOTP({ email, otp }, ctx) {
-      const url = new URL("/volunteer/sign-in/complete", origin);
+    changeEmail: { enabled: true },
+    async sendVerificationOTP({ email, otp, type }, ctx) {
+      const changing = type === "change-email";
+      const url = new URL(
+        changing ? "/volunteer/account" : "/volunteer/sign-in/complete",
+        origin,
+      );
       // Fragments keep the email and OTP out of HTTP request URLs/referrers.
-      url.hash = new URLSearchParams({
-        email,
-        otp,
-        returnTo: signInReturnTo(ctx?.query),
-      }).toString();
+      if (!changing)
+        url.hash = new URLSearchParams({
+          email,
+          otp,
+          returnTo: signInReturnTo(ctx?.query),
+        }).toString();
       try {
         const localEmail = await services.sendEmail({
           id: crypto.randomUUID(),
           email,
           code: otp,
           url: url.href,
+          ...(changing && { purpose: "change-email" as const }),
         });
         if (development && localEmail && ctx)
           emailDeliveries.set(ctx.context, { localEmail });
@@ -143,7 +158,9 @@ export function createAuth(
           });
         // An undelivered code must not remain usable.
         await ctx?.context.internalAdapter.deleteVerificationByIdentifier(
-          `sign-in-otp-${email}`,
+          changing
+            ? `change-email-otp-${ctx?.context.session?.user.email.toLowerCase()}-${email}`
+            : `sign-in-otp-${email}`,
         );
         if (!ctx) authError(error);
       }
@@ -296,6 +313,67 @@ export function createAuth(
     logger: { disabled: true },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        const requestingChange = ctx.path === "/email-otp/request-email-change";
+        const confirmingChange = ctx.path === "/email-otp/change-email";
+        if (requestingChange || confirmingChange) {
+          const parsed = (
+            requestingChange ? emailChangeRequestSchema : emailChangeSchema
+          ).safeParse(ctx.body);
+          if (!parsed.success)
+            throw new APIError("BAD_REQUEST", {
+              message: "Enter a valid new email address and verification code.",
+            });
+          const current = await getSessionFromCtx<
+            { twoFactorEnabled?: boolean },
+            { twoFactorVerified?: boolean }
+          >(ctx);
+          if (!current?.user.emailVerified)
+            throw new APIError("UNAUTHORIZED", {
+              message: "Sign in to change your email address.",
+            });
+          if (
+            current.user.twoFactorEnabled &&
+            !current.session.twoFactorVerified
+          )
+            throw new APIError("FORBIDDEN", {
+              message:
+                "Sign in with your authenticator to change your email address.",
+            });
+          const freshAge = ctx.context.sessionConfig.freshAge;
+          if (
+            freshAge !== 0 &&
+            Date.now() - current.session.createdAt.getTime() >= freshAge * 1000
+          )
+            throw new APIError("FORBIDDEN", {
+              message: "Sign in again to change your email address.",
+              code: "SESSION_NOT_FRESH",
+            });
+          if (parsed.data.newEmail === current.user.email.toLowerCase())
+            throw new APIError("BAD_REQUEST", {
+              message: "Enter a different email address.",
+            });
+          try {
+            if (requestingChange) {
+              await limitEmailRequests(
+                bindings.DB,
+                bindings.BETTER_AUTH_SECRET,
+                parsed.data.newEmail,
+                ip,
+              );
+              await cleanupAuthRecords(bindings.DB);
+            } else {
+              await limitEmailVerification(
+                bindings.DB,
+                bindings.BETTER_AUTH_SECRET,
+                parsed.data.newEmail,
+                ip,
+              );
+            }
+          } catch (error) {
+            authError(error);
+          }
+          return { context: { body: parsed.data } };
+        }
         const sending = ctx.path === "/email-otp/send-verification-otp";
         if (!sending && ctx.path !== "/sign-in/email-otp") return;
         const parsed = (sending ? requestSchema : verifySchema).safeParse(
@@ -328,7 +406,10 @@ export function createAuth(
         return { context: { body: parsed.data } };
       }),
       after: createAuthMiddleware(async (ctx) => {
-        if (ctx.path === "/email-otp/send-verification-otp") {
+        if (
+          ctx.path === "/email-otp/send-verification-otp" ||
+          ctx.path === "/email-otp/request-email-change"
+        ) {
           const delivery = emailDeliveries.get(ctx.context);
           if (delivery && "error" in delivery)
             return Response.json({ message: delivery.error }, { status: 503 });

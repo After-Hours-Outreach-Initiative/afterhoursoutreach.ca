@@ -685,6 +685,110 @@ test("team selection requires any one checkbox and restores constraints on reset
   expect(requests).toEqual([]);
 });
 
+test("email changes verify the new address in place and preserve unsaved profile answers", async ({
+  page,
+  baseURL,
+}) => {
+  const { id, email } = await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const name = page.getByRole("textbox", {
+    name: "Full or preferred name",
+    exact: true,
+  });
+  await name.fill("Unsaved email-change draft");
+  const request = page.locator("[data-email-change-request]");
+  const confirm = page.locator("[data-email-change-confirm]");
+  await request.getByRole("button", { name: "Send verification code" }).click();
+  await expect(request.locator("[data-error=new-email]")).toBeVisible();
+  await expect(confirm).toBeHidden();
+  const newEmail = `changed-${crypto.randomUUID()}@example.org`;
+  await request.getByLabel("New email address").fill(newEmail);
+  await request.getByRole("button", { name: "Send verification code" }).click();
+  await page.getByRole("button", { name: "Fill verification code" }).click();
+  await expect(confirm).toBeVisible();
+  const code = confirm.getByLabel("Verification code");
+  await expect(code).toHaveValue(/^\d{6}$/);
+  const proof = await code.inputValue();
+  await expect(
+    page.locator("[data-email-settings] [data-account-email]"),
+  ).toHaveText(email);
+  await code.fill("123");
+  await confirm.getByRole("button", { name: "Confirm email change" }).click();
+  await expect(confirm.locator("[data-error=email-change-code]")).toBeVisible();
+  await code.fill(proof === "000000" ? "000001" : "000000");
+  await confirm.getByRole("button", { name: "Confirm email change" }).click();
+  await expect(confirm.locator("[data-form-message]")).toHaveAttribute(
+    "role",
+    "alert",
+  );
+  await expect(
+    confirm.getByRole("button", { name: "Confirm email change" }),
+  ).toBeEnabled();
+  await expect(name).toHaveValue("Unsaved email-change draft");
+  await code.fill(proof);
+  await inPlaceAction(page, {
+    endpoint: "/api/v1/auth/email-otp/change-email",
+    form: confirm,
+    trigger: () =>
+      confirm.getByRole("button", { name: "Confirm email change" }).click(),
+    updated: () => expect(confirm).toBeHidden(),
+    loadingLabel: "Changing email…",
+  });
+  await expect(page.locator("[data-account-email]")).toHaveText([
+    newEmail,
+    newEmail,
+  ]);
+  await expect(request.locator("[data-form-message]")).toHaveAttribute(
+    "data-message-kind",
+    "success",
+  );
+  await expect(name).toHaveValue("Unsaved email-change draft");
+  await expect(
+    page.getByRole("button", { name: "Save profile" }),
+  ).toBeEnabled();
+  await page.reload();
+  await expect(
+    page.locator("[data-email-settings] [data-account-email]"),
+  ).toHaveText(newEmail);
+  await expect(name).toHaveValue(sampleAnswers.name);
+  const current = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  expect(current.user.id).toBe(id);
+  expect(current.user.email).toBe(newEmail);
+});
+
+test("failed email-change requests remain retryable without changing the account address", async ({
+  page,
+  baseURL,
+}) => {
+  const { email } = await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const request = page.locator("[data-email-change-request]");
+  await request.getByLabel("New email address").fill("failed@example.org");
+  await page.route("**/api/v1/auth/email-otp/request-email-change", (route) =>
+    route.fulfill({
+      status: 503,
+      json: { message: "We could not send the email. Try again later." },
+    }),
+  );
+  const button = request.getByRole("button", {
+    name: "Send verification code",
+  });
+  await button.click();
+  await expect(request.locator("[data-form-message]")).toHaveText(
+    "We could not send the email. Try again later.",
+  );
+  await expect(button).toBeEnabled();
+  await expect(request.getByLabel("New email address")).toHaveValue(
+    "failed@example.org",
+  );
+  await expect(page.locator("[data-email-change-confirm]")).toBeHidden();
+  await expect(
+    page.locator("[data-email-settings] [data-account-email]"),
+  ).toHaveText(email);
+});
+
 test("event editor shows native number and URL errors without submitting", async ({
   page,
 }) => {

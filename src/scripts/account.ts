@@ -315,6 +315,71 @@ form("[data-account-profile]", async (element, values) => {
     location.assign(result.next ?? "/volunteer/account");
 });
 
+form("[data-email-change-request]", async (element, values) => {
+  const newEmail = String(values.get("newEmail") ?? "")
+    .trim()
+    .toLowerCase();
+  const result: { success: boolean; localEmail?: SignInEmail } =
+    await authClient.emailOtp.requestEmailChange({ newEmail });
+  if (!result.success) throw new Error("Could not request an email change.");
+  const confirm = element
+    .closest("[data-email-settings]")!
+    .querySelector<HTMLFormElement>("[data-email-change-confirm]")!;
+  confirm.reset();
+  clearFormMessage(confirm);
+  confirm.querySelector<HTMLInputElement>('[name="newEmail"]')!.value =
+    newEmail;
+  confirm.hidden = false;
+  message(
+    element,
+    `If ${newEmail} is available, a verification code has been sent. Enter it below.`,
+    "success",
+  );
+  const code = confirm.querySelector<HTMLInputElement>('[name="code"]')!;
+  code.focus();
+  if (import.meta.env.DEV && result.localEmail) {
+    const { localEmailDialog } =
+      await import("../dev/scripts/local-email-dialog");
+    const outcome = await localEmailDialog({
+      title: "Local email-change code",
+      emails: [
+        {
+          to: result.localEmail.email,
+          subject: "Confirm your email change",
+          body: `Your verification code is ${result.localEmail.code}. It expires in ten minutes. Your email address has not changed yet.`,
+        },
+      ],
+      actions: [{ value: "fill", label: "Fill verification code" }],
+    });
+    if (outcome === "fill") code.value = result.localEmail.code;
+    code.focus();
+  }
+});
+
+form("[data-email-change-confirm]", async (element, values) => {
+  const newEmail = String(values.get("newEmail"));
+  await authClient.emailOtp.changeEmail({
+    newEmail,
+    otp: String(values.get("code")),
+  });
+  for (const address of document.querySelectorAll<HTMLElement>(
+    "[data-account-email]",
+  ))
+    address.textContent = newEmail;
+  const request = element
+    .closest("[data-email-settings]")!
+    .querySelector<HTMLFormElement>("[data-email-change-request]")!;
+  request.reset();
+  element.reset();
+  element.hidden = true;
+  message(
+    request,
+    "Email address changed. Use your new address the next time you sign in.",
+    "success",
+  );
+  request.querySelector<HTMLInputElement>('[name="newEmail"]')?.focus();
+});
+
 form("[data-sign-out]", async () => {
   await authClient.signOut();
   location.assign("/volunteer/sign-in");

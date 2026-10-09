@@ -14,6 +14,8 @@ export const prerender = false;
 const allowed = new Map([
   ["/email-otp/send-verification-otp", "POST"],
   ["/sign-in/email-otp", "POST"],
+  ["/email-otp/request-email-change", "POST"],
+  ["/email-otp/change-email", "POST"],
   ["/get-session", "GET"],
   ["/sign-out", "POST"],
   ["/two-factor/enable", "POST"],
