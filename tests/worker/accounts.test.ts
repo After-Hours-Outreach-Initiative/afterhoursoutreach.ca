@@ -157,14 +157,14 @@ describe(
       assert.match(prompt, /volunteer-registration-warning/);
       assert.match(prompt, /volunteer-warning-icon/);
       assert.match(prompt, /volunteer-registration-warning-arrow/);
-      assert.match(prompt, /Complete your registration to sign up for events/);
+      assert.match(prompt, /Complete your registration to register for events/);
       assert.match(
         prompt,
         /<a\b[^>]*class="volunteer-registration-warning"[^>]*href="\/volunteer\/register"/,
       );
       assert.doesNotMatch(
         prompt,
-        /Continue registration|Complete your profile before signing up for events\./,
+        /Continue registration|Complete your profile before registering for events\./,
       );
       for (const input of [
         answers,

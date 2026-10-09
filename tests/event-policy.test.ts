@@ -25,9 +25,9 @@ test("approval allows patrol signup without orientation completion", () => {
 });
 
 test("patrols require explicit approval", () => {
-  assert.match(
+  assert.equal(
     signupBlockReason({ ...volunteer, patrolApproved: false }, event, 0, now)!,
-    /Organizer approval/,
+    "Organizer approval is required to register for patrols.",
   );
 });
 
@@ -44,10 +44,10 @@ test("unapproved volunteers can sign up for orientations", () => {
 });
 
 test("sign-in, registration and active status are required", () => {
-  assert.match(signupBlockReason(null, event, 0, now)!, /Sign in/);
-  assert.match(
+  assert.equal(signupBlockReason(null, event, 0, now), "Sign in to register.");
+  assert.equal(
     signupBlockReason({ ...volunteer, registered: false }, event, 0, now)!,
-    /registration/,
+    "Complete volunteer registration before registering for events.",
   );
   assert.match(
     signupBlockReason({ ...volunteer, active: false }, event, 0, now)!,
@@ -62,9 +62,9 @@ test("full, closed, started and invalid-date events reject signups", () => {
     /closed/,
   );
   for (const startsAt of [now, new Date(0), new Date("invalid")]) {
-    assert.match(
+    assert.equal(
       signupBlockReason(volunteer, { ...event, startsAt }, 0, now)!,
-      /event starts/,
+      "Registration closes when the event starts.",
     );
   }
 });

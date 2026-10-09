@@ -19,14 +19,15 @@ export function signupBlockReason(
   confirmed: number,
   now = new Date(),
 ): string | null {
-  if (!volunteer) return "Sign in to take a spot.";
-  if (!volunteer.registered) return "Complete registration before signing up.";
+  if (!volunteer) return "Sign in to register.";
+  if (!volunteer.registered)
+    return "Complete volunteer registration before registering for events.";
   if (!volunteer.active) return "Your volunteer account is inactive.";
   if (!event.open) return "This event is closed.";
   if (!Number.isFinite(event.startsAt.getTime()) || event.startsAt <= now)
-    return "Signups close when the event starts.";
+    return "Registration closes when the event starts.";
   if (event.type === "patrol" && !volunteer.patrolApproved)
-    return "Organizer approval is required to sign up for patrols.";
+    return "Organizer approval is required to register for patrols.";
   if (confirmed >= event.spots) return "This event is full.";
   return null;
 }

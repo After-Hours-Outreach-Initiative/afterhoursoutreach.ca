@@ -50,7 +50,7 @@ const filter = ["patrol", "orientation"].includes(
 
 <AccountLayout
   title="Volunteer"
-  description="Sign up for volunteer orientations and patrols."
+  description="Register for volunteer orientations and patrols."
   signedIn={Boolean(actor)}
   organizer={actor?.role === "organizer"}
   name={actor?.name}
@@ -63,7 +63,7 @@ const filter = ["patrol", "orientation"].includes(
       <a class="volunteer-registration-warning" href="/volunteer/register">
         <WarningIcon class="volunteer-warning-icon" />
         <span class="volunteer-registration-warning-text">
-          Complete your registration to sign up for events
+          Complete your registration to register for events
         </span>
         <svg
           class="volunteer-registration-warning-arrow"
@@ -177,7 +177,7 @@ const filter = ["patrol", "orientation"].includes(
   }
   <noscript
     ><p class="volunteer-notice">
-      JavaScript is required to save changes and sign up for events.
+      JavaScript is required to save changes and register for events.
     </p></noscript
   >
 </AccountLayout>

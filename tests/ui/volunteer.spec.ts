@@ -39,7 +39,7 @@ for (const width of [1280, 375, 320]) {
         .toBeGreaterThanOrEqual(16);
     };
     await page
-      .getByRole("link", { name: "Sign in to sign up", exact: true })
+      .getByRole("link", { name: "Sign in to register", exact: true })
       .last()
       .click();
     await expect(page).toHaveURL(/#volunteer-signin$/);

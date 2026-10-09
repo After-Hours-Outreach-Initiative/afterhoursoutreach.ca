@@ -79,7 +79,7 @@ test("other viewers see signups and cancellations through SSE without losing fil
       .getByLabel("Meeting point", { exact: true })
       .fill("Unsaved organizer draft");
     await card(viewer)
-      .getByRole("button", { name: "Sign up", exact: true })
+      .getByRole("button", { name: "Register", exact: true })
       .focus();
     const documents: string[] = [];
     viewer.on("request", (request) => {
@@ -92,15 +92,21 @@ test("other viewers see signups and cancellations through SSE without losing fil
       return route.continue();
     });
     await card(attendee)
-      .getByRole("button", { name: "Sign up", exact: true })
+      .getByRole("button", { name: "Register", exact: true })
       .click();
+    await expect(
+      card(attendee).getByText("Registered", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      card(attendee).getByRole("button", { name: "Unregister", exact: true }),
+    ).toBeEnabled();
     for (const current of [visitor, viewer, page])
       await expect(card(current).locator(".volunteer-spots")).toHaveText(
         "Full",
         { timeout: 15_000 },
       );
     await expect(
-      card(viewer).getByRole("button", { name: "Sign up", exact: true }),
+      card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
     await expect(
       viewer.getByRole("button", { name: "Orientations", exact: true }),
@@ -127,8 +133,14 @@ test("other viewers see signups and cancellations through SSE without losing fil
       document.dispatchEvent(new Event("visibilitychange"));
     });
     await card(attendee)
-      .getByRole("button", { name: "Cancel my spot", exact: true })
+      .getByRole("button", { name: "Unregister", exact: true })
       .click();
+    await expect(
+      card(attendee).getByText("Registered", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      card(attendee).getByRole("button", { name: "Register", exact: true }),
+    ).toBeEnabled();
     await expect(card(visitor).locator(".volunteer-spots")).toHaveText(
       "1 spots left",
       { timeout: 15_000 },
@@ -142,7 +154,7 @@ test("other viewers see signups and cancellations through SSE without losing fil
       { timeout: 15_000 },
     );
     await expect(
-      card(viewer).getByRole("button", { name: "Sign up", exact: true }),
+      card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toBeEnabled();
     await expect(organizerCard.locator("summary")).toHaveText("Volunteers (0)");
     expect(documents).toEqual([]);

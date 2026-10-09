@@ -340,7 +340,7 @@ describe(
         assert.equal(result.sent, 0);
         assert.equal(result.failed, 0);
         assert.equal(result.pending, 0);
-        assert.equal(result.message, "Your spot is confirmed.");
+        assert.equal(result.message, "Your registration is confirmed.");
         assert.equal(result.localNotifications, undefined);
         assert.equal(
           (
@@ -423,8 +423,8 @@ describe(
             assert.equal(result.localNotifications, undefined);
             assert.ok(
               [
-                "Your spot is confirmed.",
-                "Your signup was cancelled.",
+                "Your registration is confirmed.",
+                "Your registration was cancelled.",
               ].includes(result.message),
             );
           }
@@ -706,7 +706,7 @@ describe(
       test("deactivation silently cancels future spots and last organizer cannot be removed", async () => {
         await ok(await status(alice.id, false, false));
         const notifications = await DB.prepare(
-          "SELECT count(*) AS n FROM event_notification WHERE user_id=? AND subject='Your After Hours Outreach signup was cancelled' AND body LIKE '%volunteer access changed%'",
+          "SELECT count(*) AS n FROM event_notification WHERE user_id=? AND subject='Your After Hours Outreach event registration was cancelled' AND body LIKE '%volunteer access changed%'",
         )
           .bind(alice.id)
           .first<{ n: number }>();
@@ -1144,7 +1144,7 @@ describe(
             dialog.getByRole("combobox", { name: "Event type", exact: true }),
           ).toBeEnabled();
           const signupChoices = dialog.getByRole("group", {
-            name: "Signups",
+            name: "Registration",
             exact: true,
           });
           const visibilityChoices = dialog.getByRole("group", {
@@ -1215,7 +1215,7 @@ describe(
               editor.locator('input[type="hidden"][name="type"]'),
             ).toHaveValue("patrol");
             const signupState = editor.getByRole("group", {
-              name: "Signups",
+              name: "Registration",
               exact: true,
             });
             const visibility = editor.getByRole("group", {
@@ -1352,7 +1352,7 @@ describe(
             }),
           );
           await card
-            .getByRole("button", { name: "Sign up", exact: true })
+            .getByRole("button", { name: "Register", exact: true })
             .click();
           await card
             .getByText("This event is full.", { exact: true })
@@ -1363,7 +1363,7 @@ describe(
           );
           await page.unroute("**/api/v1/events/action");
           await expect(
-            card.getByRole("button", { name: "Sign up", exact: true }),
+            card.getByRole("button", { name: "Register", exact: true }),
           ).toBeEnabled();
           await expect(
             card.locator("[data-live-signup] button"),
@@ -1379,7 +1379,8 @@ describe(
               trigger: () =>
                 target.locator("[data-live-signup] button").click(),
               updated,
-              loadingLabel: action === "join" ? "Signing up…" : "Cancelling…",
+              loadingLabel:
+                action === "join" ? "Registering…" : "Unregistering…",
               pending: () =>
                 expect(
                   target.locator("[data-live-signup] button"),
@@ -1393,13 +1394,13 @@ describe(
             .getByRole("button", { name: "Patrols", exact: true })
             .click();
           await changeSpot("join", () =>
-            card.getByText("Signed up", { exact: true }).waitFor(),
+            card.getByText("Registered", { exact: true }).waitFor(),
           );
           await expect(card.locator(".volunteer-spots")).toHaveText(
             "7 spots left",
           );
           await expect(
-            card.getByRole("button", { name: "Cancel my spot", exact: true }),
+            card.getByRole("button", { name: "Unregister", exact: true }),
           ).toBeFocused();
           await expect(page).toHaveURL(/\?type=patrol$/);
           await volunteerFilters
@@ -1413,7 +1414,7 @@ describe(
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           assert.equal(
             await page
-              .getByText("Your spot is confirmed.", { exact: true })
+              .getByText("Your registration is confirmed.", { exact: true })
               .count(),
             0,
           );
@@ -1424,7 +1425,7 @@ describe(
             .getByRole("button", { name: "Move or remove", exact: true })
             .click();
           const signupDialog = page.getByRole("dialog", {
-            name: "Change a signup",
+            name: "Change a registration",
             exact: true,
           });
           const sourceId = (await card.getAttribute("data-live-event"))!;
@@ -1507,23 +1508,23 @@ describe(
           routeCookie = bob.cookie;
           await page.goto(`${origin}/volunteer`);
           await changeSpot("join", () =>
-            card.getByText("Signed up", { exact: true }).waitFor(),
+            card.getByText("Registered", { exact: true }).waitFor(),
           );
           await changeSpot("cancel", () =>
             card
-              .getByRole("button", { name: "Sign up", exact: true })
+              .getByRole("button", { name: "Register", exact: true })
               .waitFor(),
           );
           await expect(card.locator(".volunteer-spots")).toHaveText(
             "8 spots left",
           );
           await expect(
-            card.getByText("Signed up", { exact: true }),
+            card.getByText("Registered", { exact: true }),
           ).toHaveCount(0);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           assert.equal(
             await page
-              .getByText("Your signup was cancelled.", { exact: true })
+              .getByText("Your registration was cancelled.", { exact: true })
               .count(),
             0,
           );
@@ -1534,7 +1535,7 @@ describe(
             null,
           );
           await changeSpot("join", () =>
-            card.getByText("Signed up", { exact: true }).waitFor(),
+            card.getByText("Registered", { exact: true }).waitFor(),
           );
           const hiddenEventId = await card.getAttribute("data-live-event");
           await DB.prepare("UPDATE event SET hidden=1 WHERE id=?")

@@ -12,16 +12,16 @@ export function databaseWriteError(error: unknown): never {
   if (message.includes("signup_not_eligible"))
     throw new RequestError(
       403,
-      "This event is closed or you are not eligible to sign up.",
+      "This event is closed or you are not eligible to register.",
     );
   if (message.includes("capacity_below_signups"))
     throw new RequestError(
       409,
-      "Capacity cannot be lower than the number of signups.",
+      "Capacity cannot be lower than the number of registrations.",
     );
   if (message.includes("last_organizer"))
     throw new RequestError(409, "Keep at least one active organizer.");
   if (message.includes("UNIQUE constraint failed: signup"))
-    throw new RequestError(409, "You are already signed up.");
+    throw new RequestError(409, "You are already registered for this event.");
   throw error;
 }

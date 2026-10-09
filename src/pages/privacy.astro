@@ -38,15 +38,15 @@ export const prerender = false;
         must use it when signing in. Full profile views and edits are logged;
         audit entries do not copy sensitive answers. Event rosters contain
         volunteer names, not medical or emergency-contact answers. Event
-        signups, attendance, access decisions, cancellations, and notification
-        records are saved in D1. {
+        registrations, attendance, access decisions, cancellations, and
+        notification records are saved in D1. {
           import.meta.env.DEV
             ? "Notification delivery is simulated locally."
             : "Event and access changes send notifications through Resend."
         }
         Do not include sensitive personal information in an organizer’s emailed reason.
-        Cancelled event and signup records are retained while retention rules are
-        reviewed.
+        Cancelled event and registration records are retained while retention rules
+        are reviewed.
       </p>
       <h2 class="mt-12">Before launch</h2>
       <p class="mt-6">
