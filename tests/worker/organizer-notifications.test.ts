@@ -257,6 +257,31 @@ describe(
           role: "volunteer",
         });
         volunteer.cookie = await signIn(volunteer.email);
+        if (notify) {
+          const notifications = (
+            await DB.prepare(
+              "SELECT subject, body FROM event_notification",
+            ).all<{
+              subject: string;
+              body: string;
+            }>()
+          ).results;
+          for (const action of ["moved", "removed", "cancelled"]) {
+            assert.ok(
+              notifications.some(
+                (mail) =>
+                  mail.subject ===
+                  `Your After Hours Outreach event registration was ${action}`,
+              ),
+            );
+          }
+          assert.ok(
+            notifications.some((mail) =>
+              mail.body.includes("Registration is open."),
+            ),
+          );
+          assert.doesNotMatch(JSON.stringify(notifications), /sign.?up/i);
+        }
         if (!notify) {
           // Retrying must not resurrect emails skipped or omitted in the request.
           const retry = (await (
@@ -271,6 +296,45 @@ describe(
         }
       });
     }
+    test("closed registration emails preserve reserved spots and use consistent wording", async () => {
+      const event = await createEvent();
+      await send(
+        "/api/v1/events/action",
+        { action: "join", id: event.id },
+        volunteer.cookie,
+      );
+      await send(
+        "/api/v1/events/action",
+        {
+          action: "save",
+          id: event.id,
+          version: event.version,
+          event: { ...eventData, open: false },
+          notify: true,
+        },
+        organizer.cookie,
+      );
+      const mail = await DB.prepare(
+        "SELECT body FROM event_notification WHERE user_id=? AND subject='Your After Hours Outreach event changed' ORDER BY created_at DESC LIMIT 1",
+      )
+        .bind(volunteer.id)
+        .first<{ body: string }>();
+      assert.ok(
+        mail?.body.includes(
+          "Registration is closed. Your existing spot is still reserved.",
+        ),
+      );
+      assert.equal(
+        (
+          await DB.prepare(
+            "SELECT status FROM signup WHERE event_id=? AND user_id=?",
+          )
+            .bind(event.id, volunteer.id)
+            .first()
+        )?.status,
+        "confirmed",
+      );
+    });
     afterAll(async () => {
       await server.close();
     });

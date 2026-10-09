@@ -38,7 +38,7 @@ const blocked = signupBlockReason(
     <div>
       {
         Boolean(event.signedUp) && (
-          <span class="volunteer-badge">Signed up</span>
+          <span class="volunteer-badge">Registered</span>
         )
       }
       {
@@ -47,7 +47,9 @@ const blocked = signupBlockReason(
         ) : Boolean(event.hidden) ? (
           <p class="volunteer-hidden">Hidden from public list</p>
         ) : (
-          !event.open && <p class="volunteer-hidden">Closed for new signups</p>
+          !event.open && (
+            <p class="volunteer-hidden">Closed for new registrations</p>
+          )
         )
       }
       <h3>
@@ -91,15 +93,15 @@ const blocked = signupBlockReason(
             <button
               class="btn btn-red"
               type="submit"
-              data-loading-label="Cancelling…"
+              data-loading-label="Unregistering…"
             >
-              Cancel my spot
+              Unregister
             </button>
             <p data-form-message role="status" hidden />
           </form>
         ) : !actor ? (
           <a class="btn btn-outline" href="#volunteer-signin">
-            Sign in to sign up
+            Sign in to register
           </a>
         ) : !blocked ? (
           <form data-live-signup action="/api/v1/events/action" method="post">
@@ -108,9 +110,9 @@ const blocked = signupBlockReason(
             <button
               class="btn btn-green"
               type="submit"
-              data-loading-label="Signing up…"
+              data-loading-label="Registering…"
             >
-              Sign up
+              Register
             </button>
             <p data-form-message role="status" hidden />
           </form>

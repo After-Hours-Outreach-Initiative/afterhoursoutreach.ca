@@ -189,8 +189,8 @@ export async function setVolunteerStatus(
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
           SELECT lower(hex(randomblob(16))), ?, s.user_id,
-            'Your After Hours Outreach signup was cancelled',
-            'Your signup for ' || e.type || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.', ?
+            'Your After Hours Outreach event registration was cancelled',
+            'Your registration for ' || e.type || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.', ?
           FROM signup s
           JOIN event e ON e.id = s.event_id
           WHERE s.user_id = ?
@@ -378,7 +378,7 @@ export async function completeOrientation(
   if (!eligible)
     throw new RequestError(
       409,
-      "Only attendees signed up for an orientation that has started can be marked completed.",
+      "Only attendees registered for an orientation that has started can be marked completed.",
     );
   const operation = crypto.randomUUID();
   const results = await db.batch([

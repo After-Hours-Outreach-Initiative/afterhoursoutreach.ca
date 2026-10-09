@@ -1,5 +1,52 @@
 import { expect, test } from "@playwright/test";
 
+for (const [kind, description] of [
+  [
+    "signup",
+    "You can email this volunteer about the moved or removed registration, including any reason you entered.",
+  ],
+  [
+    "event",
+    "You can email the volunteers registered for this event about the updated details.",
+  ],
+  [
+    "event-cancel",
+    "You can email the volunteers registered for this event about its cancellation, including any reason you entered.",
+  ],
+]) {
+  test(`${kind} email choice uses event registration wording`, async ({
+    page,
+  }) => {
+    await page.goto("/volunteer");
+    await page.evaluate((promptKind) => {
+      const form = document.createElement("form");
+      form.setAttribute("data-manage-signup", "");
+      form.dataset.emailPrompt = promptKind;
+      form.innerHTML =
+        '<button type="submit">Test registration change</button>';
+      document.querySelector(".volunteer-wrap")!.appendChild(form);
+    }, kind);
+    await page
+      .getByRole("button", { name: "Test registration change", exact: true })
+      .click();
+    const choice = page.getByRole("dialog", {
+      name: "Send an email?",
+      exact: true,
+    });
+    await expect(choice.locator(".volunteer-help")).toHaveText(description);
+    await choice
+      .getByRole("button", { name: "Cancel change", exact: true })
+      .click();
+    await expect(choice).toHaveCount(0);
+    await expect(
+      page.getByRole("button", {
+        name: "Test registration change",
+        exact: true,
+      }),
+    ).toBeEnabled();
+  });
+}
+
 test("organizer email choice defaults to no email and cancellation restores controls", async ({
   page,
 }) => {

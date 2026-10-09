@@ -24,7 +24,7 @@ test("unfinished registration shows a clickable yellow warning card without clip
 }) => {
   await page.goto("/volunteer");
   const warning = page.getByRole("link", {
-    name: "Complete your registration to sign up for events",
+    name: "Complete your registration to register for events",
     exact: true,
   });
   await expect(warning).toHaveCount(0);
@@ -34,7 +34,7 @@ test("unfinished registration shows a clickable yellow warning card without clip
   await expect(warning).toHaveClass(/volunteer-registration-warning/);
   await expect(warning).toHaveAttribute("href", "/volunteer/register");
   await expect(warning).toHaveText(
-    "Complete your registration to sign up for events",
+    "Complete your registration to register for events",
   );
   await expect(warning).toHaveCSS("background-color", "rgb(33, 26, 8)");
   await expect(warning).toHaveCSS("border-top-color", "rgb(161, 98, 7)");

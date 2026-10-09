@@ -277,7 +277,7 @@ export async function saveEvent(
           operation,
           id,
           "Your After Hours Outreach event changed",
-          `${eventDescription({ ...old, startsAt, meetingPoint: data.meetingPoint })}\n\n${data.open ? "Signups are open." : "Signups are closed. Your existing spot is still reserved."}`,
+          `${eventDescription({ ...old, startsAt, meetingPoint: data.meetingPoint })}\n\n${data.open ? "Registration is open." : "Registration is closed. Your existing spot is still reserved."}`,
           notify,
         ),
       ]);
@@ -351,7 +351,7 @@ export async function cancelEvent(
     );
   return {
     operation,
-    message: "Event cancelled. Existing signups were cancelled too.",
+    message: "Event cancelled. Existing registrations were cancelled too.",
   };
 }
 
@@ -361,11 +361,11 @@ export async function changeSignup(
   eventId: string,
   action: "join" | "cancel",
 ) {
-  if (!actor) throw new RequestError(401, "Sign in to take a spot.");
+  if (!actor) throw new RequestError(401, "Sign in to register.");
   if (action === "join") requireVolunteer(actor);
   const event = await findEvent(db, eventId);
   if (event.startsAt <= Date.now())
-    throw new RequestError(409, "Signups close when the event starts.");
+    throw new RequestError(409, "Registration closes when the event starts.");
   const operation = crypto.randomUUID();
   const now = Date.now();
   try {
@@ -409,14 +409,14 @@ export async function changeSignup(
         eventAudit(db, operation, eventId, actor.id, "signup_cancelled"),
       ]);
       if (!results[0].meta.changes)
-        throw new RequestError(409, "You are not signed up for this event.");
+        throw new RequestError(409, "You are not registered for this event.");
     }
     return {
       operation,
       message:
         action === "join"
-          ? "Your spot is confirmed."
-          : "Your signup was cancelled.",
+          ? "Your registration is confirmed."
+          : "Your registration was cancelled.",
     };
   } catch (error) {
     return databaseWriteError(error);
@@ -465,10 +465,13 @@ export async function manageSignup(
     )
     .bind(signupId)
     .first<{ eventId: string; userId: string }>();
-  if (!row) throw new RequestError(404, "Signup not found.");
+  if (!row) throw new RequestError(404, "Registration not found.");
   const old = await findEvent(db, row.eventId);
   if (old.startsAt <= Date.now())
-    throw new RequestError(409, "Past signups cannot be removed or moved.");
+    throw new RequestError(
+      409,
+      "Past registrations cannot be removed or moved.",
+    );
   if (destination === row.eventId)
     throw new RequestError(400, "Choose a different event.");
   const next = destination ? await findEvent(db, destination) : null;
@@ -520,9 +523,9 @@ export async function manageSignup(
           operation,
           row.userId,
           next
-            ? "Your After Hours Outreach signup was moved"
-            : "Your After Hours Outreach signup was removed",
-          `${eventDescription(old)}\n\n${next ? `An organizer moved your signup to:\n${eventDescription(next)}` : "An organizer removed your signup."}${reason ? `\nReason: ${reason}` : ""}`,
+            ? "Your After Hours Outreach event registration was moved"
+            : "Your After Hours Outreach event registration was removed",
+          `${eventDescription(old)}\n\n${next ? `An organizer moved your registration to:\n${eventDescription(next)}` : "An organizer removed your registration."}${reason ? `\nReason: ${reason}` : ""}`,
           now,
           operation,
           Number(notify),
@@ -530,8 +533,14 @@ export async function manageSignup(
     );
     const results = await db.batch(statements);
     if (!results[0].meta.changes)
-      throw new RequestError(409, "This signup changed. Reload the page.");
-    return { operation, message: next ? "Signup moved." : "Signup removed." };
+      throw new RequestError(
+        409,
+        "This registration changed. Reload the page.",
+      );
+    return {
+      operation,
+      message: next ? "Registration moved." : "Registration removed.",
+    };
   } catch (error) {
     return databaseWriteError(error);
   }
