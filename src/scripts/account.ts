@@ -410,6 +410,25 @@ form("[data-enable-factor]", async (element) => {
   ).searchParams.get("secret");
   setup.querySelector<HTMLElement>("[data-backup-codes]")!.textContent =
     result.backupCodes.join("\n");
+  const qr = setup.querySelector<HTMLElement>("[data-factor-qr]")!;
+  try {
+    // Generate locally: the setup URI contains the authenticator secret.
+    const { default: QRCode } = await import("qrcode");
+    const canvas = qr.querySelector<HTMLCanvasElement>("canvas")!;
+    await QRCode.toCanvas(canvas, result.totpURI, {
+      width: 256,
+      margin: 4,
+      errorCorrectionLevel: "M",
+    });
+    // Let responsive CSS preserve the square when the container is narrower.
+    canvas.style.removeProperty("width");
+    canvas.style.removeProperty("height");
+    qr.hidden = false;
+  } catch {
+    // Keep manual enrollment usable if the QR module or canvas is unavailable.
+    qr.hidden = true;
+    setup.querySelector<HTMLElement>("[data-factor-qr-error]")!.hidden = false;
+  }
   setup.hidden = false;
   element.hidden = true;
 });
