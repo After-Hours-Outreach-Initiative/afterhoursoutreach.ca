@@ -192,6 +192,8 @@
   max-width: 560px;
   margin-inline: auto;
   text-align: left;
+  /* Clear the sticky site header and volunteer navigation on anchor jumps. */
+  scroll-margin-top: 10rem;
 }
 .volunteer-signin-panel .volunteer-form {
   max-width: none;
