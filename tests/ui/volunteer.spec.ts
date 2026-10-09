@@ -14,6 +14,42 @@ test.beforeEach(async ({ page, baseURL }) => {
   await page.goto("/volunteer");
 });
 
+for (const width of [1280, 375, 320]) {
+  test(`event sign-in links keep the card below sticky navigation at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 812 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const expectCardBelowNavigation = async () => {
+      await expect
+        .poll(async () => {
+          const [card, header, navigation] = await Promise.all([
+            page.locator("#volunteer-signin").boundingBox(),
+            page.locator("header").boundingBox(),
+            page
+              .getByRole("navigation", { name: "Volunteer account" })
+              .boundingBox(),
+          ]);
+          if (!card || !header || !navigation) return -1;
+          return (
+            card.y -
+            Math.max(header.y + header.height, navigation.y + navigation.height)
+          );
+        })
+        .toBeGreaterThanOrEqual(16);
+    };
+    await page
+      .getByRole("link", { name: "Sign in to sign up", exact: true })
+      .last()
+      .click();
+    await expect(page).toHaveURL(/#volunteer-signin$/);
+    await expectCardBelowNavigation();
+
+    await page.reload();
+    await expectCardBelowNavigation();
+  });
+}
+
 test("volunteer-page sign-in is usable on mobile and opens the shared code form", async ({
   page,
 }) => {
