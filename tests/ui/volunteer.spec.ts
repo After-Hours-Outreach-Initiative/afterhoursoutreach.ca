@@ -54,6 +54,24 @@ test("event type buttons filter instantly, preserve deep links, and never submit
   const types = await cards.evaluateAll((nodes) =>
     nodes.map((node) => (node as HTMLElement).dataset.eventType),
   );
+  // SSE may add events from another test/viewer while this filter is active.
+  // Verify every current card's visibility, not a stale initial list length.
+  const expectFilter = (type: string) =>
+    expect
+      .poll(() =>
+        cards.evaluateAll(
+          (nodes, selected) =>
+            nodes.every((node) => {
+              const card = node as HTMLElement;
+              return (
+                card.hidden ===
+                (selected !== "all" && card.dataset.eventType !== selected)
+              );
+            }),
+          type,
+        ),
+      )
+      .toBe(true);
   const filters = page.getByRole("group", { name: "Filter events" });
   expect(types).toContain("orientation");
   expect(types).toContain("patrol");
@@ -63,32 +81,22 @@ test("event type buttons filter instantly, preserve deep links, and never submit
   await expect(
     filters.getByRole("button", { name: "Orientations", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-live-event]:visible")).toHaveCount(
-    types.filter((type) => type === "orientation").length,
-  );
+  await expectFilter("orientation");
   await expect(page).toHaveURL(/\?type=orientation$/);
   await filters.getByRole("button", { name: "Patrols", exact: true }).click();
-  await expect(page.locator("[data-live-event]:visible")).toHaveCount(
-    types.filter((type) => type === "patrol").length,
-  );
+  await expectFilter("patrol");
   await page.goBack();
   await expect(
     filters.getByRole("button", { name: "Orientations", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-live-event]:visible")).toHaveCount(
-    types.filter((type) => type === "orientation").length,
-  );
+  await expectFilter("orientation");
   expect(documents).toEqual([]);
   await page.reload();
-  await expect(page.locator("[data-live-event]:visible")).toHaveCount(
-    types.filter((type) => type === "orientation").length,
-  );
+  await expectFilter("orientation");
   await filters
     .getByRole("button", { name: "All events", exact: true })
     .click();
-  await expect(page.locator("[data-live-event]:visible")).toHaveCount(
-    types.length,
-  );
+  await expectFilter("all");
 });
 
 test("View as has a button for every seeded profile and supports keyboard switching on mobile", async ({
