@@ -6,6 +6,7 @@ export interface SignInEmail {
   code: string;
   url: string;
   id: string;
+  purpose?: "change-email";
 }
 
 export async function sendSignInEmail(
@@ -29,8 +30,14 @@ export async function sendSignInEmail(
     body: JSON.stringify({
       from: "After Hours Outreach <noreply@afterhoursoutreach.ca>",
       to: [email.email],
-      subject: "Your After Hours Outreach sign-in",
-      text: `Sign in: ${email.url}\n\nOr enter this code on the device that requested it: ${email.code}\n\nThe link and code expire in ten minutes. Using either one invalidates both. Requesting a new email replaces the previous code.\n\nIf you did not request this, ignore this email.`,
+      subject:
+        email.purpose === "change-email"
+          ? "Confirm your After Hours Outreach email change"
+          : "Your After Hours Outreach sign-in",
+      text:
+        email.purpose === "change-email"
+          ? `Enter this code in your account settings to confirm your new email address: ${email.code}\n\nThe code expires in ten minutes and can only be used once. Requesting a new code for this address replaces the previous code. Your email address will not change until you confirm it.\n\nIf you did not request this, ignore this email.`
+          : `Sign in: ${email.url}\n\nOr enter this code on the device that requested it: ${email.code}\n\nThe link and code expire in ten minutes. Using either one invalidates both. Requesting a new email replaces the previous code.\n\nIf you did not request this, ignore this email.`,
     }),
   });
   // Provider bodies can contain recipient details; never expose or log them.

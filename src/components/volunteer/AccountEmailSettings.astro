@@ -1,0 +1,113 @@
+---
+import FieldError from "@/components/FieldError.astro";
+interface Props {
+  email: string;
+  needsSignIn: boolean;
+}
+const { email, needsSignIn } = Astro.props;
+---
+
+<div class="volunteer-setting" data-email-settings>
+  <div class="w-full">
+    <h3>Email address</h3>
+    <p data-account-email>{email}</p>
+    {
+      needsSignIn ? (
+        <form
+          data-sign-out
+          action="/api/v1/auth/sign-out"
+          method="post"
+          class="mt-6"
+        >
+          <p>Sign in again before changing your email address.</p>
+          <button class="btn btn-outline mt-4" type="submit">
+            Sign out to sign in again
+          </button>
+          <p data-form-message role="status" hidden />
+        </form>
+      ) : (
+        <>
+          <p class="volunteer-help mt-4">
+            Verify your new address before it replaces your current sign-in
+            email.
+          </p>
+          <form
+            data-email-change-request
+            class="volunteer-form volunteer-small mt-6"
+            action="/api/v1/auth/email-otp/request-email-change"
+            method="post"
+          >
+            <div class="volunteer-field">
+              <label for="new-email">
+                New email address{" "}
+                <span class="volunteer-required" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <input
+                id="new-email"
+                name="newEmail"
+                type="email"
+                autocomplete="email"
+                maxlength="254"
+                aria-describedby="error-new-email"
+                required
+              />
+              <FieldError
+                field="new-email"
+                message="Enter a valid email address."
+              />
+            </div>
+            <p data-form-message role="status" aria-live="polite" hidden />
+            <button
+              class="btn btn-outline"
+              type="submit"
+              data-loading-label="Sending code…"
+            >
+              Send verification code
+            </button>
+          </form>
+          <form
+            data-email-change-confirm
+            class="volunteer-form volunteer-small mt-6"
+            action="/api/v1/auth/email-otp/change-email"
+            method="post"
+            hidden
+          >
+            <input name="newEmail" type="hidden" />
+            <div class="volunteer-field">
+              <label for="email-change-code">
+                Verification code{" "}
+                <span class="volunteer-required" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <input
+                id="email-change-code"
+                name="code"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                aria-describedby="error-email-change-code"
+                required
+              />
+              <FieldError
+                field="email-change-code"
+                message="Enter a six-digit code."
+              />
+            </div>
+            <p data-form-message role="status" aria-live="polite" hidden />
+            <button
+              class="btn btn-primary"
+              type="submit"
+              data-loading-label="Changing email…"
+            >
+              Confirm email change
+            </button>
+          </form>
+        </>
+      )
+    }
+  </div>
+</div>

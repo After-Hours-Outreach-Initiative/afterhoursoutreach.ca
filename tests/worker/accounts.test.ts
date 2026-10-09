@@ -522,6 +522,54 @@ describe(
       assert.equal(after.session.id, before.session.id);
     });
 
+    test("email-change endpoints enforce authentication, same-origin POSTs and fail closed without delivery", async () => {
+      for (const path of [
+        "/email-otp/request-email-change",
+        "/email-otp/change-email",
+      ]) {
+        const input = {
+          newEmail: "worker-new@example.org",
+          ...(path.endsWith("/change-email") && { otp: "123456" }),
+        };
+        assert.equal((await send(`/api/v1/auth${path}`)).status, 405);
+        assert.equal((await send(`/api/v1/auth${path}`, input)).status, 401);
+        assert.equal(
+          (
+            await send(
+              `/api/v1/auth${path}`,
+              input,
+              cookie,
+              "https://evil.example.org",
+            )
+          ).status,
+          403,
+        );
+      }
+      const sent = await send(
+        "/api/v1/auth/email-otp/request-email-change",
+        { newEmail: "worker-new@example.org" },
+        cookie,
+      );
+      assert.equal(sent.status, 503, await sent.clone().text());
+      assert.doesNotMatch(await sent.text(), /localEmail|"code"/);
+      assert.equal(
+        (
+          await DB.prepare(
+            "SELECT count(*) AS n FROM verification WHERE identifier LIKE 'change-email-otp-%'",
+          ).first()
+        )?.n,
+        0,
+      );
+      assert.equal(
+        (
+          await DB.prepare("SELECT email FROM user WHERE id=?")
+            .bind(current.user.id)
+            .first()
+        )?.email,
+        "worker-volunteer@example.org",
+      );
+    });
+
     test("sign-in pages request no third-party scripts or frames", async () => {
       const browser = await chromium.launch({
         executablePath:
