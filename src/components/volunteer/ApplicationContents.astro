@@ -1,0 +1,44 @@
+---
+interface Props {
+  sections: { key: string; heading: string }[];
+}
+const { sections } = Astro.props;
+---
+
+<nav
+  class="volunteer-application-contents"
+  data-application-contents
+  aria-label="Application contents"
+>
+  <details data-application-contents-menu>
+    <summary data-application-step-heading>
+      <span>Application contents</span>
+      <span class="volunteer-application-current" data-application-current>
+        {sections[0]?.heading}
+      </span>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <path d="m6 9 6 6 6-6"></path>
+      </svg>
+    </summary>
+    <ol>
+      {
+        sections.map((section, index) => (
+          <li>
+            <a
+              href={`#application-${section.key}`}
+              aria-current={index === 0 ? "location" : undefined}
+            >
+              {section.heading}
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </details>
+</nav>

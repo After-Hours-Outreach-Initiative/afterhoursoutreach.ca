@@ -5,12 +5,12 @@ import {
   applicationSubmissionValues,
   initApplicationReview,
 } from "./application-review";
+import { initApplicationSections } from "./application-sections";
 import type { SignInEmail } from "../server/auth/services";
 import {
   accountErrorMessage,
   clearFormMessage,
   initAccountFormChanges,
-  initApplicationSections,
   initMedicCertifications,
   initMotivationWordLimit,
   initReferralSources,
