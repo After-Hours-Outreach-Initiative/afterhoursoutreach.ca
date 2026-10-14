@@ -1168,37 +1168,6 @@ describe(
           })
           .waitFor();
         await expect(newPage.locator("[data-account-menu]")).toBeVisible();
-        const conduct = newPage.getByRole("region", {
-          name: "Code of Conduct",
-          exact: true,
-        });
-        await expect(conduct.getByRole("listitem")).toHaveText(
-          codeOfConductRules.slice(0, 2),
-        );
-        const toggle = conduct.locator("summary");
-        await expect(toggle).toHaveAccessibleName("Read all rules");
-        await toggle.click();
-        await expect(conduct.getByRole("listitem")).toHaveText([
-          ...codeOfConductRules,
-        ]);
-        await expect(toggle).toHaveAccessibleName("Show fewer rules");
-        const lastRule = await conduct
-          .getByRole("listitem")
-          .last()
-          .boundingBox();
-        const collapse = await toggle.boundingBox();
-        assert.ok(
-          lastRule && collapse && collapse.y >= lastRule.y + lastRule.height,
-          "Show fewer rules appears below the final rule.",
-        );
-        await toggle.click();
-        await expect(conduct.getByRole("listitem")).toHaveCount(2);
-        const confirmation = newPage.getByRole("checkbox", {
-          name: codeOfConductConfirmation,
-          exact: true,
-        });
-        await expect(confirmation).not.toBeChecked();
-        await expect(confirmation).toBeVisible();
         await expect(
           newPage.getByRole("group", {
             name: "Training and safety",
@@ -1230,7 +1199,41 @@ describe(
           newPage.getByRole("checkbox", { name: "Outreach", exact: true }),
         ).toBeDisabled();
         await newPage
-          .getByRole("button", { name: "Complete application" })
+          .getByRole("button", { name: "Review application" })
+          .click();
+        const conduct = newPage.getByRole("region", {
+          name: "Code of Conduct",
+          exact: true,
+        });
+        await expect(conduct.getByRole("listitem")).toHaveText(
+          codeOfConductRules.slice(0, 2),
+        );
+        const toggle = conduct.locator("summary");
+        await expect(toggle).toHaveAccessibleName("Read all rules");
+        await toggle.click();
+        await expect(conduct.getByRole("listitem")).toHaveText([
+          ...codeOfConductRules,
+        ]);
+        await expect(toggle).toHaveAccessibleName("Show fewer rules");
+        const lastRule = await conduct
+          .getByRole("listitem")
+          .last()
+          .boundingBox();
+        const collapse = await toggle.boundingBox();
+        assert.ok(
+          lastRule && collapse && collapse.y >= lastRule.y + lastRule.height,
+          "Show fewer rules appears below the final rule.",
+        );
+        await toggle.click();
+        await expect(conduct.getByRole("listitem")).toHaveCount(2);
+        const confirmation = newPage.getByRole("checkbox", {
+          name: codeOfConductConfirmation,
+          exact: true,
+        });
+        await expect(confirmation).not.toBeChecked();
+        await expect(confirmation).toBeVisible();
+        await newPage
+          .getByRole("button", { name: "Submit application" })
           .click();
         await expect(
           newPage.locator("[data-error=codeOfConductAccepted]"),
@@ -1241,7 +1244,7 @@ describe(
         await expect(confirmation).toBeFocused();
         await confirmation.check();
         await newPage
-          .getByRole("button", { name: "Complete application" })
+          .getByRole("button", { name: "Submit application" })
           .click();
         await newPage
           .getByRole("heading", { name: "Your account", exact: true })

@@ -261,6 +261,52 @@
 .volunteer-profile-form {
   gap: 32px;
 }
+.volunteer-application-step {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.volunteer-application-step > .btn {
+  align-self: flex-start;
+}
+.volunteer-application-progress ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  color: #a1a1aa;
+}
+.volunteer-application-progress [aria-current="step"] {
+  color: #f4f4f5;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+.volunteer-application-review,
+.volunteer-application-review dl {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.volunteer-application-review .volunteer-section-heading {
+  margin-bottom: 20px;
+}
+.volunteer-application-review dt {
+  margin-bottom: 6px;
+  color: #a1a1aa;
+}
+.volunteer-application-review dd {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.volunteer-application-review ul {
+  padding-left: 24px;
+  list-style: disc;
+  white-space: normal;
+}
 .volunteer-profile-section {
   min-width: 0;
   margin: 0;
@@ -321,6 +367,8 @@
   outline-offset: 4px;
 }
 .volunteer-application-section,
+[data-application] [data-application-step-heading],
+[data-application] .volunteer-application-section > summary,
 [data-application] #code-of-conduct-heading {
   /* Clear the sticky site header and wrapped volunteer navigation. */
   scroll-margin-top: 12rem;

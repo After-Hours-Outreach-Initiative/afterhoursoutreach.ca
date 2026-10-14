@@ -44,6 +44,27 @@ export function withOutreachTeam(teams: string[]): string[] {
   return ["outreach", ...teams.filter((team) => team !== "outreach")];
 }
 
+export const applicationTeamOptions = [
+  {
+    value: "outreach",
+    label: "Outreach",
+    description: "Hand out supplies and connect with the DTES community.",
+  },
+  {
+    value: "medic",
+    label: "Medic",
+    description: "Provide first aid and assist in emergency overdose response.",
+    requirement:
+      "Minimum requirement: Valid OFA Level 3 or Advanced First Aid certification.",
+  },
+  {
+    value: "non-patrol",
+    label: "Non-patrol support",
+    description:
+      "Assist with inventory, logistics, grant writing, community partnerships, and other operational needs.",
+  },
+] as const;
+
 export const heardAboutUsQuestion = "How did you find out about us?";
 export const heardAboutUsOptions = [
   { value: "social-media", label: "Social Media" },

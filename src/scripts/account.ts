@@ -1,6 +1,10 @@
 import { authClient, showSecondFactor } from "./auth-client";
 import { actionFragment, loadActionPage } from "./action-page";
 import { applicationDisplayName } from "../data/application";
+import {
+  applicationSubmissionValues,
+  initApplicationReview,
+} from "./application-review";
 import type { SignInEmail } from "../server/auth/services";
 import {
   accountErrorMessage,
@@ -68,6 +72,7 @@ function form(
       initRelevantTraining(element);
       initReferralSources(element);
       initMotivationWordLimit(element);
+      initApplicationReview(element);
       initialized.set(
         element,
         element.hasAttribute("data-save-changes")
@@ -86,13 +91,16 @@ function form(
     event.preventDefault();
     if (element.dataset.submitting) return;
     const changes = initialize(element);
-    const button = element.querySelector<HTMLButtonElement>(
-      'button[type="submit"]',
-    );
+    const button =
+      event.submitter instanceof HTMLButtonElement
+        ? event.submitter
+        : element.querySelector<HTMLButtonElement>('button[type="submit"]');
     if (button?.disabled || button?.hidden) return;
     clearFormMessage(element);
     element.dataset.submitting = "true";
-    const values = new FormData(element);
+    const values = element.hasAttribute("data-application")
+      ? applicationSubmissionValues(element)
+      : new FormData(element);
     const label = button?.textContent;
     element.setAttribute("aria-busy", "true");
     if (button) {
