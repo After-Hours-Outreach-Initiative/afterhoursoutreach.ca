@@ -114,7 +114,15 @@ test.each([
 ])("birth date %s is eligible: %s", (birthDate, eligible) => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-09T12:00:00Z"));
-  expect(birthDateSchema.safeParse(birthDate).success).toBe(eligible);
+  const result = birthDateSchema.safeParse(birthDate);
+  expect(result.success).toBe(eligible);
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      expect(issue.message).toBe(
+        "You must be at least 19 years old. Choose a valid date of birth.",
+      );
+    }
+  }
 });
 
 test.each([
