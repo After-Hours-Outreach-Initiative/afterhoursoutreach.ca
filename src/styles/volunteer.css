@@ -436,12 +436,6 @@ body:has([data-application]) {
   min-width: 0;
 }
 @media (width < 64rem) {
-  .volunteer-application-contents summary {
-    font-size: 16px;
-  }
-  .volunteer-application-contents-toggle {
-    min-height: 44px;
-  }
   .volunteer-application-contents a {
     min-height: 48px;
     padding-block: 10px;
