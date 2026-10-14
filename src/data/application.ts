@@ -241,21 +241,6 @@ export const applicationFields = [
     required: true,
   },
   {
-    name: "heardAboutUs",
-    section: "about-volunteering",
-    label: heardAboutUsQuestion,
-    required: true,
-    applicationOnly: true,
-  },
-  {
-    name: "motivation",
-    section: "about-volunteering",
-    label: "Why do you want to volunteer?",
-    required: true,
-    multiline: true,
-    applicationOnly: true,
-  },
-  {
     name: "certificationExpiry",
     section: "training-and-safety",
     label: "Certification expiry date",
@@ -275,6 +260,21 @@ export const applicationFields = [
     label: "Other relevant training or experience",
     required: true,
     multiline: true,
+  },
+  {
+    name: "heardAboutUs",
+    section: "about-volunteering",
+    label: heardAboutUsQuestion,
+    required: true,
+    applicationOnly: true,
+  },
+  {
+    name: "motivation",
+    section: "about-volunteering",
+    label: "Why do you want to volunteer?",
+    required: true,
+    multiline: true,
+    applicationOnly: true,
   },
 ] as const;
 
