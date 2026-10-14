@@ -5,6 +5,7 @@ import {
   type ApplicationAnswers,
 } from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
+import AccountProfileSection from "./AccountProfileSection.astro";
 import CodeOfConduct from "./CodeOfConduct.astro";
 import MedicalCertifications from "./MedicalCertifications.astro";
 import RelevantTraining from "./RelevantTraining.astro";
@@ -63,16 +64,36 @@ const sections = [
   method="post"
 >
   {
+    application && (
+      <nav
+        class="volunteer-application-contents"
+        data-application-contents
+        aria-labelledby="application-contents-heading"
+      >
+        <h3 id="application-contents-heading">Application contents</h3>
+        <ol>
+          {sections.map((section) => (
+            <li>
+              <a href={`#application-${section.key}`}>{section.heading}</a>
+            </li>
+          ))}
+          <li>
+            <a href="#code-of-conduct-heading">Code of Conduct</a>
+          </li>
+        </ol>
+      </nav>
+    )
+  }
+  {
     sections.map((section) => (
-      <fieldset
-        class="volunteer-profile-section"
-        aria-describedby={
+      <AccountProfileSection
+        id={`application-${section.key}`}
+        heading={section.heading}
+        collapsible={application}
+        describedBy={
           section.key === "team-interests" ? "help-teams" : undefined
         }
       >
-        <legend>
-          <h3 class="volunteer-profile-heading">{section.heading}</h3>
-        </legend>
         {section.key === "team-interests" ? (
           <>
             <input type="hidden" name="teams" value="outreach" />
@@ -176,7 +197,7 @@ const sections = [
             )}
           </div>
         )}
-      </fieldset>
+      </AccountProfileSection>
     ))
   }
   {application && <CodeOfConduct />}

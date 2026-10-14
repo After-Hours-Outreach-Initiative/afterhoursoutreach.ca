@@ -232,6 +232,7 @@ test("application shows all required errors and saves after they are corrected",
   await page.goto("/apply");
   const form = page.locator("[data-account-profile]");
   await expect(form.getByRole("heading", { level: 3 })).toHaveText([
+    "Application contents",
     "Personal info",
     "Emergency contact",
     "Team interests",
@@ -898,6 +899,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     }),
   ).toHaveCount(0);
   await expect(form.getByRole("heading", { level: 3 })).toHaveText([
+    "Application contents",
     "Personal info",
     "Emergency contact",
     "Team interests",

@@ -54,6 +54,63 @@ export function clearFormMessage(element: Element) {
   delete target.dataset.messageKind;
 }
 
+export function initApplicationSections(element: HTMLFormElement) {
+  if (!element.hasAttribute("data-application")) return;
+  const links = [
+    ...element.querySelectorAll<HTMLAnchorElement>(
+      "[data-application-contents] a",
+    ),
+  ];
+  const reveal = (target: HTMLElement) => {
+    for (
+      let parent: HTMLElement | null = target;
+      parent && parent !== element;
+      parent = parent.parentElement
+    ) {
+      if (parent instanceof HTMLDetailsElement) parent.open = true;
+    }
+  };
+  const visit = (hash: string) => {
+    if (!links.some((link) => link.hash === hash)) return;
+    const target = document.getElementById(hash.slice(1));
+    if (!target || !element.contains(target)) return;
+    reveal(target);
+    const focusTarget =
+      target instanceof HTMLDetailsElement
+        ? target.querySelector<HTMLElement>("summary")
+        : target;
+    focusTarget?.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "start" });
+  };
+  for (const link of links) {
+    link.addEventListener("click", (event) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
+      )
+        return;
+      event.preventDefault();
+      if (location.hash !== link.hash) location.hash = link.hash;
+      visit(link.hash);
+    });
+  }
+  window.addEventListener("hashchange", () => visit(location.hash));
+  // `invalid` does not bubble. Reveal all ancestors synchronously, before the
+  // browser tries to focus its first invalid control (including nested fields).
+  element.addEventListener(
+    "invalid",
+    (event) => {
+      if (event.target instanceof HTMLElement) reveal(event.target);
+    },
+    true,
+  );
+  visit(location.hash);
+}
+
 export function initMedicCertifications(element: HTMLFormElement) {
   const section = element.querySelector<HTMLElement>(
     "[data-medic-certifications]",

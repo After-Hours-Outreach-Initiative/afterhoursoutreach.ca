@@ -1,0 +1,48 @@
+---
+interface Props {
+  id: string;
+  heading: string;
+  collapsible?: boolean;
+  describedBy?: string;
+}
+const { id, heading, collapsible = false, describedBy } = Astro.props;
+---
+
+{
+  collapsible ? (
+    <details
+      id={id}
+      class="volunteer-application-section"
+      data-application-section
+      aria-label={`${heading} section`}
+      open
+    >
+      <summary>
+        <h3 class="volunteer-profile-heading">{heading}</h3>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="m9 5 7 7-7 7" />
+        </svg>
+      </summary>
+      <fieldset
+        class="volunteer-profile-section"
+        aria-describedby={describedBy}
+      >
+        <legend class="sr-only">{heading}</legend>
+        <slot />
+      </fieldset>
+    </details>
+  ) : (
+    <fieldset class="volunteer-profile-section" aria-describedby={describedBy}>
+      <legend>
+        <h3 class="volunteer-profile-heading">{heading}</h3>
+      </legend>
+      <slot />
+    </fieldset>
+  )
+}

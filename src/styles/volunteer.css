@@ -267,7 +267,7 @@
   padding: 0;
   border: 0;
 }
-.volunteer-profile-section > legend {
+.volunteer-profile-section > legend:not(.sr-only) {
   width: 100%;
   margin-bottom: 24px;
   padding: 0;
@@ -278,6 +278,86 @@
   font-size: 22px;
   font-weight: normal;
   line-height: 1.4;
+}
+.volunteer-application-contents {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+}
+.volunteer-application-contents h3 {
+  font-size: 18px;
+  font-weight: normal;
+}
+.volunteer-application-contents ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
+  margin-top: 12px;
+  padding: 0;
+  list-style: none;
+}
+.volunteer-application-contents li {
+  min-width: 0;
+}
+.volunteer-application-contents a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 4px;
+  color: #c7d2fe;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+.volunteer-application-contents a:hover {
+  background: #171a20;
+  color: white;
+}
+.volunteer-application-contents a:focus-visible,
+.volunteer-application-section > summary:focus-visible {
+  outline: 3px solid #4169e1;
+  outline-offset: 4px;
+}
+.volunteer-application-section,
+[data-application] #code-of-conduct-heading {
+  /* Clear the sticky site header and wrapped volunteer navigation. */
+  scroll-margin-top: 12rem;
+}
+.volunteer-application-section {
+  min-width: 0;
+}
+.volunteer-application-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #3f3f46;
+  cursor: pointer;
+  list-style: none;
+}
+.volunteer-application-section > summary::-webkit-details-marker {
+  display: none;
+}
+.volunteer-application-section > summary .volunteer-profile-heading {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.volunteer-application-section > summary svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: #a1a1aa;
+}
+.volunteer-application-section[open] > summary svg {
+  transform: rotate(90deg);
+}
+.volunteer-application-section > .volunteer-profile-section {
+  margin-top: 24px;
 }
 .volunteer-portal input:not([type="checkbox"], [type="radio"]),
 .volunteer-portal textarea,
@@ -968,6 +1048,9 @@
   }
   .volunteer-fields {
     grid-template-columns: 1fr;
+  }
+  .volunteer-application-contents ol {
+    grid-template-columns: minmax(0, 1fr);
   }
   .volunteer-team-options {
     grid-template-columns: 1fr;
