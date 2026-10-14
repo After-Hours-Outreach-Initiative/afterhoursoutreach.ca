@@ -133,7 +133,7 @@ export function initApplicationSections(element: HTMLFormElement) {
     focusTarget?.focus({ preventScroll: true });
     if (hash === "#application-overview")
       window.scrollTo({ top: 0, behavior: "instant" });
-    else section.target.scrollIntoView({ block: "start" });
+    else section.target.scrollIntoView({ block: "start", behavior: "instant" });
     schedule();
   };
   for (const { links, target } of sections) {
