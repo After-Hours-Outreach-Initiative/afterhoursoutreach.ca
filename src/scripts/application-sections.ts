@@ -15,19 +15,21 @@ export function initApplicationSections(element: HTMLFormElement) {
     "[data-application-current]",
   );
   if (!flow || !questions || !contents || !menu || !toggle || !current) return;
-  const sections = [...contents.querySelectorAll<HTMLAnchorElement>("a")]
-    .map((link) => ({
-      link,
-      target: document.getElementById(link.hash.slice(1)),
+  const links = [...contents.querySelectorAll<HTMLAnchorElement>("a")];
+  // Both responsive lists share each section, so targets are measured and
+  // observed once while all of their links stay in sync.
+  const sections = [
+    ...questions.querySelectorAll<HTMLElement>("[data-application-section]"),
+  ]
+    .map((target) => ({
+      target,
+      links: links.filter((link) => link.hash === `#${target.id}`),
     }))
-    .filter(
-      (section): section is { link: HTMLAnchorElement; target: HTMLElement } =>
-        Boolean(section.target && questions.contains(section.target)),
-    );
+    .filter((section) => section.links.length);
   const header = document.querySelector<HTMLElement>("body > header");
   const navigation = document.querySelector<HTMLElement>(".volunteer-nav");
   let stickyHeight = 0;
-  let contentsHeight = 0;
+  let barHeight = 0;
   let frame = 0;
 
   const measure = () => {
@@ -36,20 +38,23 @@ export function initApplicationSections(element: HTMLFormElement) {
     navigation?.style.setProperty("top", `${headerHeight}px`);
     stickyHeight =
       headerHeight + (navigation?.getBoundingClientRect().height ?? 0);
-    contentsHeight = contents.getBoundingClientRect().height;
+    // CSS hides the mobile disclosure at the sidebar breakpoint. Its absolute
+    // dropdown never adds height, and the desktop sidebar must not affect jumps.
+    barHeight = menu.getBoundingClientRect().height;
+    if (!barHeight) menu.open = false;
     flow.style.setProperty("--application-sticky-offset", `${stickyHeight}px`);
     flow.style.setProperty(
       "--application-scroll-offset",
-      `${stickyHeight + contentsHeight}px`,
+      `${stickyHeight + barHeight}px`,
     );
   };
-  const activate = (link: HTMLAnchorElement) => {
-    current.textContent = link.textContent?.trim() ?? "";
-    for (const section of sections) {
-      if (section.link === link)
-        section.link.setAttribute("aria-current", "location");
-      else section.link.removeAttribute("aria-current");
-    }
+  const activate = (active: (typeof sections)[number]) => {
+    current.textContent = active.links[0].textContent?.trim() ?? "";
+    for (const section of sections)
+      for (const link of section.links) {
+        if (section === active) link.setAttribute("aria-current", "location");
+        else link.removeAttribute("aria-current");
+      }
   };
   const update = () => {
     frame = 0;
@@ -59,15 +64,16 @@ export function initApplicationSections(element: HTMLFormElement) {
     }
     // Use the reading edge, not intersection ratios: a tall section remains
     // current throughout its fields, and collapsed summaries still participate.
-    const readingEdge = stickyHeight + contentsHeight + 16;
+    const readingEdge = stickyHeight + barHeight + 16;
     let active = sections[0];
     for (const section of sections) {
       if (section.target.getBoundingClientRect().top > readingEdge + 1) break;
       active = section;
     }
-    if (active && active.link.getAttribute("aria-current") !== "location")
-      activate(active.link);
-    const bounds = contents.getBoundingClientRect();
+    if (active && active.links[0].getAttribute("aria-current") !== "location")
+      activate(active);
+    if (!barHeight) return;
+    const bounds = menu.getBoundingClientRect();
     const availableBottom = Math.min(
       window.innerHeight,
       flow.getBoundingClientRect().bottom,
@@ -97,12 +103,12 @@ export function initApplicationSections(element: HTMLFormElement) {
     }
   };
   const visit = (hash: string) => {
-    const section = sections.find(({ link }) => link.hash === hash);
+    const section = sections.find(({ target }) => `#${target.id}` === hash);
     if (!section || questions.hidden) return;
     reveal(section.target);
     menu.open = false;
     measure();
-    activate(section.link);
+    activate(section);
     const focusTarget =
       section.target instanceof HTMLDetailsElement
         ? section.target.querySelector<HTMLElement>("summary")
@@ -111,24 +117,25 @@ export function initApplicationSections(element: HTMLFormElement) {
     section.target.scrollIntoView({ block: "start" });
     schedule();
   };
-  for (const { link, target } of sections) {
-    link.addEventListener("click", (event) => {
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.shiftKey
-      )
-        return;
-      event.preventDefault();
-      // Preserve the review step's history state without a native anchor jump
-      // racing the reveal/focus and measured scroll offset.
-      if (location.hash !== link.hash)
-        history.pushState(history.state, "", link.hash);
-      visit(link.hash);
-    });
+  for (const { links, target } of sections) {
+    for (const link of links)
+      link.addEventListener("click", (event) => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey
+        )
+          return;
+        event.preventDefault();
+        // Preserve the review step's history state without a native anchor jump
+        // racing the reveal/focus and measured scroll offset.
+        if (location.hash !== link.hash)
+          history.pushState(history.state, "", link.hash);
+        visit(link.hash);
+      });
     target.addEventListener("toggle", refresh);
   }
   document.addEventListener("click", (event) => {
@@ -163,6 +170,7 @@ export function initApplicationSections(element: HTMLFormElement) {
     header,
     navigation,
     contents,
+    menu,
     flow,
     questions,
     ...sections.map(({ target }) => target),
