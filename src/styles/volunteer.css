@@ -324,6 +324,7 @@ body:has([data-application]) {
   line-height: 1.4;
 }
 .volunteer-application-contents {
+  --application-contents-padding: 24px;
   position: fixed;
   inset-inline: 0;
   top: var(--application-sticky-offset, 10rem);
@@ -341,7 +342,7 @@ body:has([data-application]) {
   align-items: center;
   gap: 12px;
   min-height: 52px;
-  padding: 4px 24px;
+  padding: 4px var(--application-contents-padding);
   cursor: pointer;
   list-style: none;
   font-size: 14px;
@@ -393,8 +394,7 @@ body:has([data-application]) {
   max-height: min(24rem, var(--application-dropdown-space));
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px 0;
-  border: 1px solid #3f3f46;
+  padding: 4px var(--application-contents-padding);
   border-radius: 0 0 6px 6px;
   background: #0c0d10;
   box-shadow: 0 12px 30px #0008;
@@ -1199,8 +1199,8 @@ body:has([data-application]) {
   .volunteer-wrap {
     padding: 0 16px 64px;
   }
-  .volunteer-application-contents summary {
-    padding-inline: 16px;
+  .volunteer-application-contents {
+    --application-contents-padding: 16px;
   }
   .volunteer-application-warning {
     gap: 8px;
