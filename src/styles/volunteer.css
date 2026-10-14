@@ -1,4 +1,5 @@
 .volunteer-portal {
+  --volunteer-nav-border: 1px solid #3f3f46;
   background: var(--color-black);
   color: #f4f4f5;
 }
@@ -20,7 +21,7 @@ body:has([data-application]) {
   top: 5.5rem;
   z-index: 40;
   width: 100%;
-  border-bottom: 1px solid #3f3f46;
+  border-bottom: var(--volunteer-nav-border);
   background: var(--color-black);
   margin-bottom: 32px;
 }
@@ -335,14 +336,18 @@ body:has([data-application]) {
 }
 .volunteer-application-contents-menu {
   position: relative;
-  border-block: 1px solid #3f3f46;
+  border-top: var(--volunteer-nav-border);
 }
 .volunteer-application-contents summary {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 52px;
+  min-height: 53px;
   padding: 4px var(--application-contents-padding);
+  border-bottom: var(--volunteer-nav-border);
+  background: var(--color-black);
   cursor: pointer;
   list-style: none;
   font-size: 14px;
