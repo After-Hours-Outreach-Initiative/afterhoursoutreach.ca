@@ -304,7 +304,7 @@ export const applicationFields = [
     required: true,
     multiline: true,
     applicationOnly: true,
-    help: `${motivationMaxWords} words maximum. Words are separated by spaces, tabs, or line breaks.`,
+    help: `${motivationMaxWords} words maximum.`,
   },
 ] as const;
 
