@@ -5,7 +5,10 @@ import {
   permissionValues,
   type Actor,
 } from "./access";
-import type { RegistrationAnswers } from "../../data/registration";
+import {
+  withOutreachTeam,
+  type RegistrationAnswers,
+} from "../../data/registration";
 import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
 import { nowMsSql } from "./sql";
@@ -106,7 +109,9 @@ export async function viewVolunteerProfile(
     );
   const row = results[1].results[0] as
     (Omit<RegistrationAnswers, "teams"> & { teams: string }) | undefined;
-  return row ? { ...row, teams: JSON.parse(row.teams) as string[] } : null;
+  return row
+    ? { ...row, teams: withOutreachTeam(JSON.parse(row.teams) as string[]) }
+    : null;
 }
 
 export const statusSchema = z.strictObject({

@@ -5,7 +5,6 @@ import {
   accountErrorMessage,
   clearFormMessage,
   initAccountFormChanges,
-  initRequiredCheckboxes,
   showFormMessage as message,
 } from "./account-forms";
 
@@ -58,7 +57,6 @@ function form(
   >();
   const initialize = (element: HTMLFormElement) => {
     if (!initialized.has(element)) {
-      initRequiredCheckboxes(element);
       initialized.set(
         element,
         element.hasAttribute("data-save-changes")

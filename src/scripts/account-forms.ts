@@ -48,25 +48,6 @@ export function clearFormMessage(element: Element) {
   delete target.dataset.messageKind;
 }
 
-export function initRequiredCheckboxes(element: HTMLFormElement) {
-  for (const group of element.querySelectorAll<HTMLElement>(
-    "[data-required-checkboxes]",
-  )) {
-    const boxes = [
-      ...group.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
-    ];
-    // HTML has no "at least one checkbox" constraint. Keep required in sync;
-    // native validation and CSS still decide when to display errors.
-    const update = () => {
-      const required = !boxes.some((box) => box.checked);
-      for (const box of boxes) box.required = required;
-    };
-    group.addEventListener("change", update);
-    element.addEventListener("reset", () => queueMicrotask(update));
-    update();
-  }
-}
-
 export function initAccountFormChanges(element: HTMLFormElement) {
   const button = element.querySelector<HTMLButtonElement>(
     'button[type="submit"]',

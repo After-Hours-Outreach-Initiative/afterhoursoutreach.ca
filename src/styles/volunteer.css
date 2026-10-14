@@ -391,16 +391,68 @@
 .volunteer-small {
   max-width: 440px;
 }
-.volunteer-checks {
-  display: flex;
-  flex-wrap: wrap;
-  margin-top: 12px;
-  gap: 24px;
+.volunteer-team-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
+  gap: 12px;
 }
-.volunteer-checks label {
+.volunteer-team-option {
   display: flex;
-  gap: 10px;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px 16px;
+  border: 1px solid #52525b;
+  border-radius: 8px;
+  background: #0c0d10;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+}
+.volunteer-team-option:hover:not(:has(input:disabled)) {
+  border-color: #a1a1aa;
+}
+.volunteer-team-option:has(input:checked) {
+  border-color: #4169e1;
+  background: #16214a;
+}
+.volunteer-team-option:has(input:focus-visible) {
+  outline: 3px solid #4169e1;
+  outline-offset: 3px;
+}
+.volunteer-team-option[data-included] {
+  cursor: default;
+}
+.volunteer-team-option:has(input:disabled):not([data-included]) {
+  opacity: 0.6;
+  cursor: wait;
+}
+.volunteer-team-option input {
+  margin-top: 3px;
+  cursor: inherit;
+}
+.volunteer-team-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.volunteer-team-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.volunteer-team-description {
+  color: #a1a1aa;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.volunteer-team-requirement {
+  display: block;
+  margin-top: 12px;
+  color: #f87171;
 }
 .volunteer-setting {
   display: flex;
@@ -789,8 +841,7 @@
   font-size: 14px;
   line-height: 1.6;
 }
-.volunteer-field:has(:user-invalid) > [data-error],
-.volunteer-form [data-required-checkboxes]:has(:user-invalid) > [data-error] {
+.volunteer-field:has(:user-invalid) > [data-error] {
   visibility: visible;
 }
 .volunteer-portal input:user-invalid,
@@ -804,12 +855,6 @@
 .volunteer-portal input:is([type="checkbox"], [type="radio"]):user-invalid {
   outline: 2px solid #f87171;
   outline-offset: 2px;
-}
-.volunteer-form
-  [data-required-checkboxes]:has(:user-invalid)
-  .volunteer-checks {
-  border-left: 3px solid #f87171;
-  padding-left: 12px;
 }
 .volunteer-form fieldset > [data-error] {
   margin-top: 8px;
@@ -847,6 +892,9 @@
   .volunteer-control-loading::before {
     animation: none;
   }
+  .volunteer-team-option {
+    transition: none;
+  }
 }
 .volunteer-control-loading {
   display: inline-flex;
@@ -881,6 +929,9 @@
     padding: 20px;
   }
   .volunteer-fields {
+    grid-template-columns: 1fr;
+  }
+  .volunteer-team-options {
     grid-template-columns: 1fr;
   }
   .volunteer-nav {

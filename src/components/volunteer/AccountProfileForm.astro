@@ -4,7 +4,6 @@ import {
   registrationFields,
   type RegistrationAnswers,
 } from "@/data/registration";
-import FieldError from "@/components/FieldError.astro";
 import AccountProfileField from "./AccountProfileField.astro";
 import CodeOfConduct from "./CodeOfConduct.astro";
 interface Props {
@@ -14,17 +13,40 @@ interface Props {
 }
 const { email, values, registration = false } = Astro.props;
 const fields = registration ? registrationFields : profileFields;
+const teams = [
+  {
+    value: "outreach",
+    label: "Outreach",
+    description: "Hand out supplies and connect with the DTES community.",
+  },
+  {
+    value: "medic",
+    label: "Medic",
+    description: "Provide first aid and assist in emergency overdose response.",
+    requirement:
+      "Minimum requirement: Valid OFA Level 3 or Advanced First Aid certification.",
+  },
+  {
+    value: "non-patrol",
+    label: "Non-patrol support",
+    description:
+      "Assist with inventory, logistics, grant writing, community partnerships, and other operational needs.",
+  },
+] as const;
 const sections = [
   { key: "personal-info", heading: "Personal info" },
   { key: "emergency-contact", heading: "Emergency contact" },
-  { key: "about-volunteering", heading: "About volunteering" },
+  { key: "team-interests", heading: "Team interests" },
   { key: "training-and-safety", heading: "Training and safety" },
+  { key: "about-volunteering", heading: "About volunteering" },
 ]
   .map((section) => ({
     ...section,
     fields: fields.filter((field) => field.section === section.key),
   }))
-  .filter((section) => section.fields.length);
+  .filter(
+    (section) => section.key === "team-interests" || section.fields.length,
+  );
 ---
 
 <form
@@ -37,62 +59,86 @@ const sections = [
 >
   {
     sections.map((section) => (
-      <fieldset class="volunteer-profile-section">
+      <fieldset
+        class="volunteer-profile-section"
+        aria-describedby={
+          section.key === "team-interests" ? "help-teams" : undefined
+        }
+      >
         <legend>
           <h3 class="volunteer-profile-heading">{section.heading}</h3>
         </legend>
-        <div class="volunteer-fields">
-          {registration && section.key === "personal-info" && (
-            <label class="volunteer-field">
-              Email
-              <input type="email" value={email} readonly />
-            </label>
-          )}
-          {section.fields.map((field) => (
-            <AccountProfileField field={field} values={values} />
-          ))}
-        </div>
+        {section.key === "team-interests" ? (
+          <>
+            <input type="hidden" name="teams" value="outreach" />
+            <div class="volunteer-field">
+              <span>
+                Which teams interest you?{" "}
+                <span class="volunteer-required" aria-hidden="true">
+                  *
+                </span>
+              </span>
+              <span class="volunteer-help" id="help-teams">
+                Outreach is included for everyone. Other teams are optional.
+              </span>
+            </div>
+            <div class="volunteer-team-options">
+              {teams.map((team) => (
+                <label
+                  class="volunteer-team-option"
+                  data-included={team.value === "outreach" || undefined}
+                >
+                  <input
+                    type="checkbox"
+                    name="teams"
+                    value={team.value}
+                    checked={
+                      team.value === "outreach" ||
+                      values?.teams.includes(team.value)
+                    }
+                    disabled={team.value === "outreach"}
+                    aria-labelledby={`team-${team.value}-label`}
+                    aria-describedby={`team-${team.value}-description help-teams`}
+                  />
+                  <span class="volunteer-team-content">
+                    <span
+                      class="volunteer-team-title"
+                      id={`team-${team.value}-label`}
+                    >
+                      {team.label}
+                    </span>
+                    <span
+                      class="volunteer-team-description"
+                      id={`team-${team.value}-description`}
+                    >
+                      {team.description}
+                      {"requirement" in team && (
+                        <span class="volunteer-team-requirement">
+                          {team.requirement}
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div class="volunteer-fields">
+            {registration && section.key === "personal-info" && (
+              <label class="volunteer-field">
+                Email
+                <input type="email" value={email} readonly />
+              </label>
+            )}
+            {section.fields.map((field) => (
+              <AccountProfileField field={field} values={values} />
+            ))}
+          </div>
+        )}
       </fieldset>
     ))
   }
-  <fieldset
-    class="volunteer-profile-section"
-    data-required-checkboxes="teams"
-    aria-describedby="error-teams help-teams"
-  >
-    <legend><h3 class="volunteer-profile-heading">Team interests</h3></legend>
-    <div class="volunteer-field">
-      <span>
-        Which teams interest you? <span
-          class="volunteer-required"
-          aria-hidden="true">*</span
-        >
-      </span>
-      <span class="volunteer-help" id="help-teams">Choose at least one.</span>
-    </div>
-    <div class="volunteer-checks">
-      {
-        ["outreach", "medic", "non-patrol"].map((team) => (
-          <label>
-            <input
-              type="checkbox"
-              name="teams"
-              value={team}
-              checked={values?.teams.includes(team)}
-              required={!values?.teams.length}
-              aria-describedby="error-teams help-teams"
-            />
-            {team === "non-patrol"
-              ? "Non-patrol support"
-              : team === "medic"
-                ? "Medic"
-                : "Outreach"}
-          </label>
-        ))
-      }
-    </div>
-    <FieldError field="teams" message="Choose at least one team." />
-  </fieldset>
   {registration && <CodeOfConduct />}
   <p data-form-message role="status" aria-live="polite" hidden></p>
   <button type="submit" class="btn btn-primary" disabled={!registration}

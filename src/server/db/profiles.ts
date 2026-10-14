@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   latestRegistrationBirthDate,
   registrationBirthDateError,
+  withOutreachTeam,
   type RegistrationAnswers,
 } from "../../data/registration";
 import {
@@ -44,9 +45,10 @@ export const profileSchema = z.strictObject({
   motivation: longAnswer,
   teams: z
     .array(z.enum(["outreach", "medic", "non-patrol"]))
-    .min(1)
     .max(3)
-    .refine((values) => new Set(values).size === values.length),
+    .refine((values) => new Set(values).size === values.length)
+    .default([])
+    .transform(withOutreachTeam),
   certification: shortAnswer,
   experience: longAnswer,
   medicalConditions: z.string().trim().max(2000),
@@ -83,7 +85,7 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
     emergencyRelationship: row.emergency_contact_relationship,
     heardAboutUs: row.heard_about_us,
     motivation: row.motivation,
-    teams: row.teams,
+    teams: withOutreachTeam(row.teams),
     certification: row.medical_certification,
     experience: row.training_experience,
     medicalConditions: row.medical_conditions ?? "",

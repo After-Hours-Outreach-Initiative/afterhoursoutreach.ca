@@ -804,7 +804,7 @@ test("existing profiles can be edited without inventing Code of Conduct acknowle
   );
 });
 
-test("profile validation rejects privilege fields, invalid dates, absent/duplicate teams and oversized answers", () => {
+test("profile validation rejects privilege fields, invalid dates, unknown/duplicate teams and oversized answers", () => {
   for (const input of [
     { ...answers, role: "organizer" },
     { ...answers, patrolApproved: true },
@@ -813,7 +813,7 @@ test("profile validation rejects privilege fields, invalid dates, absent/duplica
     { ...answers, codeOfConductAcceptedAt: 0 },
     { ...answers, birthDate: "1995-02-31" },
     { ...answers, birthDate: "2999-01-01" },
-    { ...answers, teams: [] },
+    { ...answers, teams: ["unknown"] },
     { ...answers, teams: ["outreach", "outreach"] },
     { ...answers, medicalConditions: "x".repeat(2001) },
   ])
