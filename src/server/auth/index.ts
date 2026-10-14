@@ -17,7 +17,7 @@ import {
   limitEmailRequests,
   limitEmailVerification,
 } from "../db/rate-limits";
-import { isRegistered } from "../db/profiles";
+import { hasApplied } from "../db/profiles";
 import { markSessionSecondFactorVerified } from "../db/sessions";
 import { sendSignInEmail, type SignInEmail } from "./services";
 
@@ -424,10 +424,13 @@ export function createAuth(
         const current = ctx.context.newSession;
         const result = signInResultSchema.safeParse(ctx.context.returned);
         if (!current || !result.success) return;
-        const registered = await isRegistered(bindings.DB, current.user.id);
-        const next = registered
+        const applicationSubmitted = await hasApplied(
+          bindings.DB,
+          current.user.id,
+        );
+        const next = applicationSubmitted
           ? signInReturnTo(ctx.query)
-          : "/volunteer/register";
+          : "/apply";
         // This hook runs before the two-factor plugin replaces the session
         // with a pending challenge for accounts that opted into an authenticator.
         if (current.user.twoFactorEnabled) {

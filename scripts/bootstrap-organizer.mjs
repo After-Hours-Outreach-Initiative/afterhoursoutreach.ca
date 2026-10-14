@@ -48,7 +48,7 @@ const result = spawnSync(
 // Suppress CLI output, including submitted SQL and the recipient's email.
 if (result.error || result.status !== 0) {
   console.error(
-    "Bootstrap failed. Apply migrations and verify that this account has a verified email and active registration, and that no organizer already exists.",
+    "Bootstrap failed. Apply migrations and verify that this account has a verified email and active application, and that no organizer already exists.",
   );
   process.exit(1);
 }

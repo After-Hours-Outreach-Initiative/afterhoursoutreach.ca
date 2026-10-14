@@ -1,4 +1,4 @@
-export interface RegistrationAnswers {
+export interface ApplicationAnswers {
   name: string;
   pronouns: string;
   phone: string;
@@ -116,10 +116,10 @@ export function normalizeCertifications(values: string[]): string[] {
   ];
 }
 
-export const registrationBirthDateError =
+export const applicationBirthDateError =
   "You must be at least 19 years old. Choose a valid date of birth.";
 
-export function latestRegistrationBirthDate(today = new Date()): string {
+export function latestApplicationBirthDate(today = new Date()): string {
   // Match the UTC calendar dates used by server validation, not elapsed days.
   const year = today.getUTCFullYear() - 19;
   const month = today.getUTCMonth();
@@ -130,7 +130,7 @@ export function latestRegistrationBirthDate(today = new Date()): string {
     .slice(0, 10);
 }
 
-export const registrationFields = [
+export const applicationFields = [
   {
     name: "name",
     section: "personal-info",
@@ -158,7 +158,7 @@ export const registrationFields = [
     label: "Date of birth",
     required: true,
     type: "date",
-    help: "You must be at least 19 years old to register.",
+    help: "You must be at least 19 years old to apply.",
   },
   {
     name: "medicalConditions",
@@ -193,7 +193,7 @@ export const registrationFields = [
     section: "about-volunteering",
     label: "How did you hear about us?",
     required: true,
-    registrationOnly: true,
+    applicationOnly: true,
   },
   {
     name: "motivation",
@@ -201,7 +201,7 @@ export const registrationFields = [
     label: "Why do you want to volunteer?",
     required: true,
     multiline: true,
-    registrationOnly: true,
+    applicationOnly: true,
   },
   {
     name: "certificationExpiry",
@@ -226,6 +226,6 @@ export const registrationFields = [
   },
 ] as const;
 
-export const profileFields = registrationFields.filter(
-  (field) => !("registrationOnly" in field),
+export const profileFields = applicationFields.filter(
+  (field) => !("applicationOnly" in field),
 );

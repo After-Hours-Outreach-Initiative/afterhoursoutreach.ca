@@ -160,7 +160,7 @@ describe(
       await ok(await send("/api/v1/events"), 401);
     });
 
-    test("bootstrap requires verified registration but not two-factor, is atomic and one-time", async () => {
+    test("bootstrap requires verified application but not two-factor, is atomic and one-time", async () => {
       await DB.prepare("UPDATE user SET email_verified=0 WHERE id=?")
         .bind(organizer.id)
         .run();
@@ -296,7 +296,7 @@ describe(
             userId,
             version: row!.version,
             active,
-            registrationApproved: true,
+            applicationApproved: true,
             patrolApproved,
           },
           organizer.cookie,
@@ -326,13 +326,13 @@ describe(
         );
       });
 
-      test("registration approval gates listings and orientations independently of patrol approval", async () => {
+      test("application approval gates listings and orientations independently of patrol approval", async () => {
         for (const person of [alice, bob]) {
           const page = await ok(
             await send("/volunteer", undefined, person.cookie),
           );
           const html = await page.text();
-          assert.match(html, /Registration awaiting approval/);
+          assert.match(html, /Application awaiting approval/);
           assert.doesNotMatch(
             html,
             /Sample meeting point|data-live-event=|data-event-list/,
@@ -347,7 +347,7 @@ describe(
                 userId: person.id,
                 version: 0,
                 active: true,
-                registrationApproved: true,
+                applicationApproved: true,
                 patrolApproved: false,
               },
               person.cookie,
@@ -377,7 +377,7 @@ describe(
           )
             .bind(person.id)
             .first();
-          assert.equal(audit?.changed_fields, '["registrationApproved"]');
+          assert.equal(audit?.changed_fields, '["applicationApproved"]');
         }
       });
 
@@ -792,7 +792,7 @@ describe(
         await ok(await status(organizer.id, false, false), 409);
       });
 
-      test("revoking registration approval cancels future orientations and patrols without changing patrol approval", async () => {
+      test("revoking application approval cancels future orientations and patrols without changing patrol approval", async () => {
         await ok(await status(alice.id, true, true));
         const orientationEvent = await createEvent("orientation");
         const patrolEvent = await createEvent("patrol");
@@ -808,7 +808,7 @@ describe(
           userId: alice.id,
           version: row!.version,
           active: true,
-          registrationApproved: false,
+          applicationApproved: false,
           patrolApproved: true,
         };
         await ok(
@@ -817,7 +817,7 @@ describe(
         await ok(
           await send(
             "/api/v1/organizer/action",
-            { ...change, registrationApproved: true },
+            { ...change, applicationApproved: true },
             organizer.cookie,
           ),
           409,
@@ -900,7 +900,7 @@ describe(
         );
       });
 
-      test("organizer promotions require verified registration, not two-factor, and revoke sessions", async () => {
+      test("organizer promotions require verified application, not two-factor, and revoke sessions", async () => {
         await DB.prepare("UPDATE user SET email_verified=0 WHERE id=?")
           .bind(bob.id)
           .run();

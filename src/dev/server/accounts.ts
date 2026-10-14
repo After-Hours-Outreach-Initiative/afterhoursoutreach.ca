@@ -104,15 +104,15 @@ export function developmentAccounts(bindings: AuthBindings) {
               message: "Could not switch accounts.",
             });
           await setSessionCookie(ctx, { session, user: person });
-          const registered = await createDatabase(
+          const applicationSubmitted = await createDatabase(
             bindings.DB,
           ).query.profile.findFirst({
             where: eq(profile.user_id, person.id),
             columns: { user_id: true },
           });
           let next = safeReturnTo(ctx.body.returnTo);
-          if (!registered) next = "/volunteer/register";
-          else if (next.startsWith("/volunteer/register"))
+          if (!applicationSubmitted) next = "/apply";
+          else if (/^\/apply\/?(?:\?|$)/.test(next))
             next = "/volunteer/account";
           else if (
             next.startsWith("/volunteer/volunteers") &&

@@ -69,14 +69,14 @@ const filter = ["patrol", "orientation"].includes(
     {
       !actor ? (
         <SignInPanel returnTo="/volunteer" />
-      ) : !actor.registered ? (
-        <a class="volunteer-registration-warning" href="/volunteer/register">
+      ) : !actor.applicationSubmitted ? (
+        <a class="volunteer-application-warning" href="/apply">
           <WarningIcon class="volunteer-warning-icon" />
-          <span class="volunteer-registration-warning-text">
-            Complete your registration to request volunteer access
+          <span class="volunteer-application-warning-text">
+            Complete your application to request volunteer access
           </span>
           <svg
-            class="volunteer-registration-warning-arrow"
+            class="volunteer-application-warning-arrow"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -93,12 +93,12 @@ const filter = ["patrol", "orientation"].includes(
           Your volunteer account is inactive. Contact an organizer to restore
           access.
         </p>
-      ) : !actor.registrationApproved && actor.role !== "organizer" ? (
-        <section class="volunteer-panel" data-registration-pending>
-          <h2>Registration awaiting approval</h2>
+      ) : !actor.applicationApproved && actor.role !== "organizer" ? (
+        <section class="volunteer-panel" data-application-pending>
+          <h2>Application awaiting approval</h2>
           <p>
-            An organizer will review your registration before you can view
-            events or sign up for an orientation.
+            An organizer will review your application before you can view events
+            or sign up for an orientation.
           </p>
           <a class="btn btn-outline mt-6" href="/volunteer/account">
             Your account
@@ -109,7 +109,7 @@ const filter = ["patrol", "orientation"].includes(
     {
       actor?.role === "organizer" && !organizer && (
         <p class="volunteer-notice">
-          Organizer tools require an active registration. If you enabled an
+          Organizer tools require an active application. If you enabled an
           authenticator, finish signing in with it.{" "}
           <a href="/volunteer/account">Go to Your account</a>.
         </p>

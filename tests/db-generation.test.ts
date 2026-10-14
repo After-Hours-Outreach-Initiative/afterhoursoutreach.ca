@@ -84,7 +84,7 @@ test("the Code of Conduct migration preserves existing profiles without inventin
   assert.deepEqual(answers, { ...before });
 });
 
-test("registration approval migration gates existing volunteers without dropping profiles, patrol approvals or signups", () => {
+test("application approval migration gates existing volunteers without dropping profiles, patrol approvals or signups", () => {
   const db = database();
   for (const name of ["0000_database", "0001_code_of_conduct"])
     db.exec(

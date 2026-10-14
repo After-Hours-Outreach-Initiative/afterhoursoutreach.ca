@@ -10,7 +10,7 @@ const { person } = Astro.props;
   <form
     class="volunteer-form"
     data-organizer-status
-    data-access-kind="registration"
+    data-access-kind="application"
     data-email-prompt="access"
     action="/api/v1/organizer/action"
     method="post"
@@ -31,22 +31,19 @@ const { person } = Astro.props;
     />
     <input
       type="checkbox"
-      name="registrationApproved"
-      checked={!person.registrationApproved}
+      name="applicationApproved"
+      checked={!person.applicationApproved}
       hidden
     />
     <p data-form-message role="status" hidden></p>
     <button
-      class:list={[
-        "btn",
-        person.registrationApproved ? "btn-red" : "btn-green",
-      ]}
+      class:list={["btn", person.applicationApproved ? "btn-red" : "btn-green"]}
       type="submit"
       data-loading-label="Saving…"
       >{
-        person.registrationApproved
-          ? "Revoke registration approval"
-          : "Approve registration"
+        person.applicationApproved
+          ? "Revoke application approval"
+          : "Approve application"
       }</button
     >
   </form>
@@ -62,8 +59,8 @@ const { person } = Astro.props;
     <input type="hidden" name="version" value={person.updatedAt} />
     <input
       type="checkbox"
-      name="registrationApproved"
-      checked={Boolean(person.registrationApproved)}
+      name="applicationApproved"
+      checked={Boolean(person.applicationApproved)}
       hidden
     />
     <input
@@ -101,8 +98,8 @@ const { person } = Astro.props;
     <input type="hidden" name="version" value={person.updatedAt} />
     <input
       type="checkbox"
-      name="registrationApproved"
-      checked={Boolean(person.registrationApproved)}
+      name="applicationApproved"
+      checked={Boolean(person.applicationApproved)}
       hidden
     />
     <input

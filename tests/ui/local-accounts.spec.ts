@@ -18,23 +18,23 @@ test.beforeEach(async ({ page, baseURL }) => {
   ).toBeVisible();
 });
 
-test("unfinished registration shows a clickable yellow warning card without clipping", async ({
+test("unfinished application shows a clickable yellow warning card without clipping", async ({
   page,
   baseURL,
 }) => {
   await page.goto("/volunteer");
   const warning = page.getByRole("link", {
-    name: "Complete your registration to request volunteer access",
+    name: "Complete your application to request volunteer access",
     exact: true,
   });
   await expect(warning).toHaveCount(0);
   await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/volunteer");
   await expect(warning).toBeVisible();
-  await expect(warning).toHaveClass(/volunteer-registration-warning/);
-  await expect(warning).toHaveAttribute("href", "/volunteer/register");
+  await expect(warning).toHaveClass(/volunteer-application-warning/);
+  await expect(warning).toHaveAttribute("href", "/apply");
   await expect(warning).toHaveText(
-    "Complete your registration to request volunteer access",
+    "Complete your application to request volunteer access",
   );
   await expect(warning).toHaveCSS("background-color", "rgb(33, 26, 8)");
   await expect(warning).toHaveCSS("border-top-color", "rgb(161, 98, 7)");
@@ -42,10 +42,10 @@ test("unfinished registration shows a clickable yellow warning card without clip
   await expect(icon).toBeVisible();
   await expect(icon).toHaveAttribute("aria-hidden", "true");
   await expect(icon).toHaveCSS("color", "rgb(250, 204, 21)");
-  const arrow = warning.locator("svg.volunteer-registration-warning-arrow");
+  const arrow = warning.locator("svg.volunteer-application-warning-arrow");
   await expect(arrow).toBeVisible();
   await expect(arrow).toHaveAttribute("aria-hidden", "true");
-  const text = warning.locator(".volunteer-registration-warning-text");
+  const text = warning.locator(".volunteer-application-warning-text");
   expect(
     await text.evaluate(
       (element) =>
@@ -69,16 +69,16 @@ test("unfinished registration shows a clickable yellow warning card without clip
   }
   await warning.focus();
   await warning.press("Enter");
-  await expect(page).toHaveURL(/\/volunteer\/register$/);
+  await expect(page).toHaveURL(/\/apply$/);
   await page.goto("/volunteer");
   // The padding is clickable too, not just the text or arrow.
   await warning.click({ position: { x: 4, y: 4 } });
-  await expect(page).toHaveURL(/\/volunteer\/register$/);
-  const registered = await page.request.post("/api/v1/account/profile", {
+  await expect(page).toHaveURL(/\/apply$/);
+  const application = await page.request.post("/api/v1/account/profile", {
     headers: { origin: baseURL! },
     data: { ...sampleAnswers, codeOfConductAccepted: true },
   });
-  expect(registered.status(), await registered.text()).toBe(200);
+  expect(application.status(), await application.text()).toBe(200);
   await page.goto("/volunteer");
   await expect(warning).toHaveCount(0);
 });
@@ -118,13 +118,13 @@ test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async
   ).toContainText("Invalid");
   await page.getByLabel("Six-digit code").fill(code);
   await page.getByRole("button", { name: "Sign in with code" }).click();
-  await expect(page).toHaveURL(/\/volunteer\/register/);
+  await expect(page).toHaveURL(/\/apply/);
   await expect(
     page.getByRole("navigation", { name: "Volunteer account" }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Volunteer registration" }),
+    page.getByRole("heading", { name: "Volunteer application" }),
   ).toBeVisible();
 });
 
@@ -153,7 +153,7 @@ test("local D1 email links are one-use and sign-in pages have no third-party req
   ).toBeEnabled();
   expect(new URL(page.url()).hash).toBe("");
   await page.getByRole("button", { name: "Confirm sign-in" }).click();
-  await expect(page).toHaveURL(/\/volunteer\/register/);
+  await expect(page).toHaveURL(/\/apply/);
   const replay = await request.post("/api/v1/auth/sign-in/email-otp", {
     headers: { origin: url.origin },
     data: { email: proof.email, otp: proof.otp },

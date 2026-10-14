@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   createLocalAccount,
-  approveLocalRegistration,
+  approveLocalApplication,
   openLocalAccountSwitcher,
 } from "../helpers/local-account";
 
@@ -151,8 +151,8 @@ test("other viewers see signups and cancellations through polling without losing
       attendee.request,
       baseURL!,
     );
-    await approveLocalRegistration(page.request, baseURL!, viewerAccount.id);
-    await approveLocalRegistration(page.request, baseURL!, attendeeAccount.id);
+    await approveLocalApplication(page.request, baseURL!, viewerAccount.id);
+    await approveLocalApplication(page.request, baseURL!, attendeeAccount.id);
     const errors: string[] = [];
     for (const current of [page, visitor, viewer, attendee])
       current.on("pageerror", (error) => errors.push(error.message));

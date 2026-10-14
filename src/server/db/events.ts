@@ -69,7 +69,7 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
   if (!canViewEvents(actor)) return [];
   const organizer = Boolean(
     actor?.role === "organizer" &&
-    actor.registered &&
+    actor.applicationSubmitted &&
     actor.active &&
     (!actor.twoFactorEnabled || actor.twoFactorVerified),
   );

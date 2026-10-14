@@ -15,8 +15,8 @@ const event: SignupEvent = {
   spots: 8,
 };
 const volunteer: SignupVolunteer = {
-  registered: true,
-  registrationApproved: true,
+  applicationSubmitted: true,
+  applicationApproved: true,
   active: true,
   patrolApproved: true,
 };
@@ -32,7 +32,7 @@ test("patrols require explicit approval", () => {
   );
 });
 
-test("registration-approved volunteers need no patrol approval for orientations", () => {
+test("application-approved volunteers need no patrol approval for orientations", () => {
   assert.equal(
     signupBlockReason(
       { ...volunteer, patrolApproved: false },
@@ -44,9 +44,9 @@ test("registration-approved volunteers need no patrol approval for orientations"
   );
 });
 
-test("pending registrations cannot sign up for any event; organizers retain access", () => {
+test("pending applications cannot sign up for any event; organizers retain access", () => {
   for (const type of ["patrol", "orientation"] as const) {
-    const pending = { ...volunteer, registrationApproved: false };
+    const pending = { ...volunteer, applicationApproved: false };
     assert.match(
       signupBlockReason(pending, { ...event, type }, 0, now)!,
       /awaiting organizer approval/,
@@ -63,11 +63,16 @@ test("pending registrations cannot sign up for any event; organizers retain acce
   }
 });
 
-test("sign-in, registration and active status are required", () => {
+test("sign-in, application and active status are required", () => {
   assert.equal(signupBlockReason(null, event, 0, now), "Sign in to register.");
   assert.equal(
-    signupBlockReason({ ...volunteer, registered: false }, event, 0, now)!,
-    "Complete volunteer registration before registering for events.",
+    signupBlockReason(
+      { ...volunteer, applicationSubmitted: false },
+      event,
+      0,
+      now,
+    )!,
+    "Complete your volunteer application before registering for events.",
   );
   assert.match(
     signupBlockReason({ ...volunteer, active: false }, event, 0, now)!,

@@ -20,7 +20,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     await volunteer.goto(`${baseURL}/volunteer`);
     await expect(
       volunteer.getByRole("heading", {
-        name: "Registration awaiting approval",
+        name: "Application awaiting approval",
       }),
     ).toBeVisible();
     await expect(
@@ -48,21 +48,21 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     ).toBeVisible();
     await page.goto(`/volunteer/volunteers/${account.id}`);
     await page
-      .getByRole("button", { name: "Approve registration", exact: true })
+      .getByRole("button", { name: "Approve application", exact: true })
       .click();
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(
       page.getByRole("button", {
-        name: "Revoke registration approval",
+        name: "Revoke application approval",
         exact: true,
       }),
     ).toBeEnabled();
     await expect(volunteer.locator("[data-event-list]")).toBeVisible({
       timeout: 15_000,
     });
-    await expect(volunteer.locator("[data-registration-pending]")).toHaveCount(
+    await expect(volunteer.locator("[data-application-pending]")).toHaveCount(
       0,
     );
     await volunteer
@@ -84,7 +84,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
 
     await page
       .getByRole("button", {
-        name: "Revoke registration approval",
+        name: "Revoke application approval",
         exact: true,
       })
       .click();
@@ -92,11 +92,11 @@ test("organizer approval unlocks events in place; revocation hides them again", 
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "Approve registration", exact: true }),
+      page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeEnabled();
     await expect(
       volunteer.getByRole("heading", {
-        name: "Registration awaiting approval",
+        name: "Application awaiting approval",
       }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(

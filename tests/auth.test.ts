@@ -12,10 +12,7 @@ import {
   codeOfConductError,
   codeOfConductVersion,
 } from "../src/data/code-of-conduct";
-import {
-  certificationOptions,
-  trainingOptions,
-} from "../src/data/registration";
+import { certificationOptions, trainingOptions } from "../src/data/application";
 import { viewVolunteerProfile } from "../src/server/db/volunteers";
 import { accountContext } from "../src/server/db/access";
 import { hashAuthValue, takeRateLimit } from "../src/server/db/rate-limits";
@@ -313,10 +310,7 @@ test("auth uses the configured site origin or request URL without trusting forwa
 
 test("real passwordless sign-in creates a verified volunteer and a host-only secure session", async () => {
   const { response, cookie, challenge } = await signIn("Volunteer@Example.org");
-  assert.equal(
-    ((await response.json()) as { next: string }).next,
-    "/volunteer/register",
-  );
+  assert.equal(((await response.json()) as { next: string }).next, "/apply");
   const header = response.headers.get("set-cookie")!;
   assert.match(header, /HttpOnly/i);
   assert.match(header, /Secure/i);
@@ -588,7 +582,7 @@ test("invalid email requests send no email and create no challenge", async () =>
   assert.equal(count?.count, 0);
 });
 
-test("registration requires explicit Code of Conduct acknowledgement before any profile writes", async () => {
+test("application requires explicit Code of Conduct acknowledgement before any profile writes", async () => {
   const { cookie } = await signIn();
   const current = await auth.api.getSession({
     headers: new Headers({ cookie }),
@@ -623,7 +617,7 @@ test("registration requires explicit Code of Conduct acknowledgement before any 
   assert.notEqual(person?.name, answers.name);
 });
 
-test("registration/editing persists all answers, keeps approval, and audits only changed field names", async () => {
+test("application/editing persists all answers, keeps approval, and audits only changed field names", async () => {
   const { cookie } = await signIn();
   const current = await auth.api.getSession({
     headers: new Headers({ cookie }),
@@ -645,7 +639,7 @@ test("registration/editing persists all answers, keeps approval, and audits only
   await saveProfile(bindings.DB, id, answers);
   await assert.rejects(
     () =>
-      saveProfile(bindings.DB, id, { ...answers, registrationApproved: true }),
+      saveProfile(bindings.DB, id, { ...answers, applicationApproved: true }),
     RequestError,
   );
   assert.equal(
@@ -715,14 +709,14 @@ test("registration/editing persists all answers, keeps approval, and audits only
     JSON.stringify(logs),
     /Sample private answer|Changed sample private answer|1993-03-15/,
   );
-  const registered = await createSignInOTP(
+  const applicationSignIn = await createSignInOTP(
     bindings.DB,
     bindings.BETTER_AUTH_SECRET!,
     "volunteer@example.org",
   );
   const response = await request(
     "/sign-in/email-otp?returnTo=%2Fvolunteer%2Faccount%3Ftab%3Dprofile",
-    registered,
+    applicationSignIn,
   );
   assert.equal(
     ((await response.json()) as { next: string }).next,
@@ -730,7 +724,7 @@ test("registration/editing persists all answers, keeps approval, and audits only
   );
 });
 
-test("registration-only questions are required once and preserved through profile edits", async () => {
+test("application-only questions are required once and preserved through profile edits", async () => {
   const { cookie } = await signIn();
   const current = await auth.api.getSession({
     headers: new Headers({ cookie }),
@@ -762,7 +756,7 @@ test("registration-only questions are required once and preserved through profil
     ...answers,
     name: "Updated volunteer",
   });
-  // A stale client sending the old form cannot replace registration-only answers.
+  // A stale client sending the old form cannot replace application-only answers.
   await saveProfile(bindings.DB, id, {
     ...editable,
     name: "Updated again",

@@ -56,6 +56,7 @@ export const POST: APIRoute = async ({ request }) => {
             userId: input.userId,
             version: input.version,
             active: input.active,
+            applicationApproved: input.applicationApproved,
             registrationApproved: input.registrationApproved,
             patrolApproved: input.patrolApproved,
             notify: input.notify,

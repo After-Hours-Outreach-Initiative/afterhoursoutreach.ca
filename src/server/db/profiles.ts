@@ -3,13 +3,13 @@ import { z } from "zod";
 import {
   certificationOptions,
   legacyCertificationValues,
-  latestRegistrationBirthDate,
+  latestApplicationBirthDate,
   normalizeCertifications,
-  registrationBirthDateError,
+  applicationBirthDateError,
   withOutreachTeam,
   trainingOptions,
-  type RegistrationAnswers,
-} from "../../data/registration";
+  type ApplicationAnswers,
+} from "../../data/application";
 import {
   codeOfConductError,
   codeOfConductVersion,
@@ -32,16 +32,16 @@ const profileAnswersSchema = z.strictObject({
   phone,
   birthDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, registrationBirthDateError)
+    .regex(/^\d{4}-\d{2}-\d{2}$/, applicationBirthDateError)
     .refine((value) => {
       const date = new Date(`${value}T00:00:00Z`);
       return (
         !Number.isNaN(date.getTime()) &&
         date.toISOString().slice(0, 10) === value &&
         value >= "1900-01-01" &&
-        value <= latestRegistrationBirthDate()
+        value <= latestApplicationBirthDate()
       );
-    }, registrationBirthDateError),
+    }, applicationBirthDateError),
   emergencyName: shortAnswer,
   emergencyPhone: phone,
   emergencyRelationship: shortAnswer,
@@ -101,7 +101,7 @@ const profileAnswersSchema = z.strictObject({
 
 function validateTraining(
   answers: Pick<
-    RegistrationAnswers,
+    ApplicationAnswers,
     | "teams"
     | "certifications"
     | "experience"
@@ -148,7 +148,7 @@ const profileEditSchema = profileAnswersSchema
   })
   .superRefine(validateTraining);
 
-export async function isRegistered(binding: Env["DB"], userId: string) {
+export async function hasApplied(binding: Env["DB"], userId: string) {
   return Boolean(
     await createDatabase(binding).query.profile.findFirst({
       where: eq(profile.user_id, userId),
@@ -180,7 +180,7 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
     training: row.relevant_training,
     otherTraining: row.other_training,
     medicalConditions: row.medical_conditions ?? "",
-  } satisfies RegistrationAnswers;
+  } satisfies ApplicationAnswers;
 }
 
 export async function saveProfile(
@@ -208,19 +208,19 @@ export async function saveProfile(
     throw new RequestError(
       400,
       parsed.error.issues.some((issue) => issue.path[0] === "birthDate")
-        ? registrationBirthDateError
+        ? applicationBirthDateError
         : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
     );
   const { codeOfConductAccepted, ...submitted } = parsed.data;
   if (!old && codeOfConductAccepted !== true)
     throw new RequestError(400, codeOfConductError);
-  const answers: RegistrationAnswers = {
+  const answers: ApplicationAnswers = {
     ...submitted,
     heardAboutUs: old?.heardAboutUs ?? submitted.heardAboutUs!,
     motivation: old?.motivation ?? submitted.motivation!,
   };
   const changedFields = (
-    Object.keys(answers) as (keyof RegistrationAnswers)[]
+    Object.keys(answers) as (keyof ApplicationAnswers)[]
   ).filter(
     (key) => JSON.stringify(old?.[key]) !== JSON.stringify(answers[key]),
   );

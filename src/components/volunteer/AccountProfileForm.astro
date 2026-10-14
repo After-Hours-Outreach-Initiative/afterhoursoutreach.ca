@@ -1,20 +1,20 @@
 ---
 import {
   profileFields,
-  registrationFields,
-  type RegistrationAnswers,
-} from "@/data/registration";
+  applicationFields,
+  type ApplicationAnswers,
+} from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
 import CodeOfConduct from "./CodeOfConduct.astro";
 import MedicalCertifications from "./MedicalCertifications.astro";
 import RelevantTraining from "./RelevantTraining.astro";
 interface Props {
   email: string;
-  values?: RegistrationAnswers | null;
-  registration?: boolean;
+  values?: ApplicationAnswers | null;
+  application?: boolean;
 }
-const { email, values, registration = false } = Astro.props;
-const fields = registration ? registrationFields : profileFields;
+const { email, values, application = false } = Astro.props;
+const fields = application ? applicationFields : profileFields;
 const medicSelected = values?.teams.includes("medic") ?? false;
 const teams = [
   {
@@ -54,8 +54,8 @@ const sections = [
 
 <form
   data-account-profile
-  data-registration={registration || undefined}
-  data-save-changes={!registration || undefined}
+  data-application={application || undefined}
+  data-save-changes={!application || undefined}
   class="volunteer-form volunteer-profile-form"
   action="/api/v1/account/profile"
   method="post"
@@ -131,7 +131,7 @@ const sections = [
             {section.key === "training-and-safety" && (
               <MedicalCertifications values={values} active={medicSelected} />
             )}
-            {registration && section.key === "personal-info" && (
+            {application && section.key === "personal-info" && (
               <label class="volunteer-field">
                 Email
                 <input type="email" value={email} readonly />
@@ -157,10 +157,10 @@ const sections = [
       </fieldset>
     ))
   }
-  {registration && <CodeOfConduct />}
+  {application && <CodeOfConduct />}
   <p data-form-message role="status" aria-live="polite" hidden></p>
-  <button type="submit" class="btn btn-primary" disabled={!registration}
-    >{registration ? "Complete registration" : "Save profile"}</button
+  <button type="submit" class="btn btn-primary" disabled={!application}
+    >{application ? "Complete application" : "Save profile"}</button
   >
   <noscript><p>JavaScript is required to submit this form.</p></noscript>
 </form>

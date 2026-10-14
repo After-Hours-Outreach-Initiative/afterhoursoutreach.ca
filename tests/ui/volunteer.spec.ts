@@ -263,7 +263,7 @@ test("View as lists actual D1 users and switching to Visitor ends only the curre
   ).toBe(independentSession.session.id);
 });
 
-test("View as can choose an unregistered D1 account without changing it", async ({
+test("View as can choose a D1 account without an application without changing it", async ({
   page,
   request,
   baseURL,
@@ -273,9 +273,9 @@ test("View as can choose an unregistered D1 account without changing it", async 
   const profiles = await openLocalAccountSwitcher(page);
   const profile = profiles.locator(`[data-switch-user="${user.id}"]`);
   await profile.click();
-  await expect(page).toHaveURL(/\/volunteer\/register$/);
+  await expect(page).toHaveURL(/\/apply$/);
   await expect(
-    page.getByRole("heading", { name: "Volunteer registration" }),
+    page.getByRole("heading", { name: "Volunteer application" }),
   ).toBeVisible();
   await expect(page.getByRole("textbox", { name: /^Email/ })).toHaveValue(
     user.email,

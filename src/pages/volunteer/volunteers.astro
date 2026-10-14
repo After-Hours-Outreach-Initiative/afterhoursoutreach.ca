@@ -102,9 +102,9 @@ try {
                       <p>
                         {person.role === "organizer"
                           ? "Event access through organizer role"
-                          : person.registrationApproved
-                            ? "Registration approved"
-                            : "Registration awaiting approval"}
+                          : person.applicationApproved
+                            ? "Application approved"
+                            : "Application awaiting approval"}
                       </p>
                       <p>
                         <span
@@ -132,7 +132,7 @@ try {
             </ul>
             {!team.rows.length && (
               <p class="volunteer-notice">
-                No registered volunteers match your search.
+                No volunteer applicants match your search.
               </p>
             )}
             <div class="volunteer-actions">

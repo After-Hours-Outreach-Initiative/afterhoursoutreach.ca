@@ -51,7 +51,7 @@ test("account and organizer routes require sign-in without loading mockups", asy
   request,
 }) => {
   for (const path of [
-    "/volunteer/register",
+    "/apply",
     "/volunteer/account",
     "/volunteer/volunteers",
   ]) {
