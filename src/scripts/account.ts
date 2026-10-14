@@ -6,6 +6,7 @@ import {
   accountErrorMessage,
   clearFormMessage,
   initAccountFormChanges,
+  initApplicationSections,
   initMedicCertifications,
   initMotivationWordLimit,
   initReferralSources,
@@ -62,6 +63,7 @@ function form(
   >();
   const initialize = (element: HTMLFormElement) => {
     if (!initialized.has(element)) {
+      initApplicationSections(element);
       initMedicCertifications(element);
       initRelevantTraining(element);
       initReferralSources(element);
