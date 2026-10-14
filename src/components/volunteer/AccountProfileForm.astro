@@ -52,7 +52,13 @@ const sections = [
           data-application-contents
           aria-labelledby="application-contents-heading"
         >
-          <h3 id="application-contents-heading">Application contents</h3>
+          <h3
+            id="application-contents-heading"
+            data-application-step-heading
+            tabindex="-1"
+          >
+            Application contents
+          </h3>
           <ol>
             {sections.map((section) => (
               <li>

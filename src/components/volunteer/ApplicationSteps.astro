@@ -65,25 +65,10 @@ const reviewSections = sections.map((section) => {
 {
   application ? (
     <>
-      <nav
-        aria-label="Application steps"
-        class="volunteer-application-progress"
-      >
-        <ol>
-          <li data-application-progress="questions" aria-current="step">
-            1. Application questions
-          </li>
-          <li data-application-progress="review">2. Review and submit</li>
-        </ol>
-      </nav>
       <div data-application-questions class="volunteer-application-step">
-        <h2 data-application-step-heading tabindex="-1">
-          Step 1 of 2: Application questions
-        </h2>
         <p>
           Complete the questions, then review your answers and the Code of
-          Conduct before submitting. Reloading or leaving this page may lose
-          your progress.
+          Conduct before submitting.
         </p>
         <slot />
         <button
@@ -103,7 +88,7 @@ const reviewSections = sections.map((section) => {
       >
         <legend class="sr-only">Review and submit application</legend>
         <h2 data-application-step-heading tabindex="-1">
-          Step 2 of 2: Review application
+          Review application
         </h2>
         <p>
           Check your answers below. Nothing has been submitted yet. You can edit
