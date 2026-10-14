@@ -163,13 +163,10 @@ export function initMotivationWordLimit(element: HTMLFormElement) {
   const input = element.querySelector<HTMLTextAreaElement>(
     'textarea[name="motivation"]',
   );
-  const count = element.querySelector<HTMLElement>(
-    "[data-motivation-word-count]",
-  );
   const feedback = element.querySelector<HTMLElement>(
     '[data-error="motivation"] span',
   );
-  if (!input || !count) return;
+  if (!input) return;
   const update = () => {
     const words = countWords(input.value);
     const over = words - motivationMaxWords;
@@ -182,7 +179,6 @@ export function initMotivationWordLimit(element: HTMLFormElement) {
     input.setCustomValidity(input.readOnly ? "" : error);
     if (over > 0 && !input.readOnly) input.setAttribute("aria-invalid", "true");
     else input.removeAttribute("aria-invalid");
-    count.textContent = `${words} of ${motivationMaxWords} words.${over > 0 ? ` ${over} ${over === 1 ? "word" : "words"} over the limit.` : ""}`;
     if (feedback) feedback.textContent = error || "This field is required.";
   };
   input.addEventListener("input", update);
