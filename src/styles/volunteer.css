@@ -431,7 +431,16 @@ body:has([data-application]) {
   color: #c7d2fe;
 }
 .volunteer-application-contents-sidebar a {
+  min-height: 0;
+  padding: 4px 0;
   border-inline-start: 0;
+}
+.volunteer-application-contents-sidebar a:hover {
+  background: none;
+  color: #fff;
+}
+.volunteer-application-contents-sidebar a[aria-current="location"] {
+  color: #c7d2fe;
 }
 .volunteer-application-contents a:focus-visible,
 .volunteer-application-contents summary:focus-visible,
@@ -488,7 +497,7 @@ body:has([data-application]) {
     max-height: calc(100dvh - var(--application-sticky-offset, 10rem) - 48px);
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 8px;
+    padding: 4px 0;
   }
   [data-application-flow] .volunteer-team-options {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
