@@ -1,9 +1,13 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import {
+  certificationOptions,
+  legacyCertificationValues,
   latestRegistrationBirthDate,
+  normalizeCertifications,
   registrationBirthDateError,
   withOutreachTeam,
+  trainingOptions,
   type RegistrationAnswers,
 } from "../../data/registration";
 import {
@@ -22,7 +26,7 @@ const phone = z
   .min(7)
   .max(40)
   .regex(/^[\d+().\s\-x]+$/i);
-export const profileSchema = z.strictObject({
+const profileAnswersSchema = z.strictObject({
   name: shortAnswer,
   pronouns: z.string().trim().max(200),
   phone,
@@ -49,17 +53,100 @@ export const profileSchema = z.strictObject({
     .refine((values) => new Set(values).size === values.length)
     .default([])
     .transform(withOutreachTeam),
-  certification: shortAnswer,
-  experience: longAnswer,
+  certification: z.string().trim().max(200).default(""),
+  certifications: z
+    .array(
+      z.enum([
+        ...certificationOptions.map((option) => option.value),
+        ...legacyCertificationValues,
+      ]),
+    )
+    .max(certificationOptions.length + legacyCertificationValues.length)
+    .refine((values) => new Set(values).size === values.length)
+    .default([])
+    .transform((values) => {
+      const normalized = normalizeCertifications(values);
+      return certificationOptions
+        .filter((option) => normalized.includes(option.value))
+        .map((option) => option.value);
+    }),
+  experience: z.string().trim().max(2000).default(""),
+  training: z
+    .array(z.enum(trainingOptions.map((option) => option.value)))
+    .max(trainingOptions.length)
+    .refine((values) => new Set(values).size === values.length)
+    .default([])
+    .transform((values) =>
+      trainingOptions
+        .filter((option) => values.includes(option.value))
+        .map((option) => option.value),
+    ),
+  otherTraining: z.string().trim().max(2000).default(""),
+  certificationExpiry: z
+    .string()
+    .trim()
+    .refine((value) => {
+      if (!value) return true;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const date = new Date(`${value}T00:00:00Z`);
+      return (
+        !Number.isNaN(date.getTime()) &&
+        date.toISOString().slice(0, 10) === value
+      );
+    }, "Enter a valid certification expiry date.")
+    .default(""),
   medicalConditions: z.string().trim().max(2000),
   codeOfConductAccepted: z.boolean().optional(),
 });
 
+function validateTraining(
+  answers: Pick<
+    RegistrationAnswers,
+    | "teams"
+    | "certifications"
+    | "experience"
+    | "certificationExpiry"
+    | "training"
+    | "otherTraining"
+  >,
+  context: z.RefinementCtx,
+) {
+  if (answers.training.includes("other") && !answers.otherTraining)
+    context.addIssue({
+      code: "custom",
+      path: ["otherTraining"],
+      message: "Describe your other relevant training or experience.",
+    });
+  if (!answers.teams.includes("medic")) return;
+  if (answers.certifications.length !== 1)
+    context.addIssue({
+      code: "custom",
+      path: ["certifications"],
+      message: "Select your highest certification or licence.",
+    });
+  if (answers.certifications.includes("other") && !answers.experience)
+    context.addIssue({
+      code: "custom",
+      path: ["experience"],
+      message: "Describe your other training and experience.",
+    });
+  if (!answers.certificationExpiry)
+    context.addIssue({
+      code: "custom",
+      path: ["certificationExpiry"],
+      message: "Enter a valid certification expiry date.",
+    });
+}
+
+export const profileSchema = profileAnswersSchema.superRefine(validateTraining);
+
 // Older clients may still send these answers; profile edits never replace them.
-const profileEditSchema = profileSchema.partial({
-  heardAboutUs: true,
-  motivation: true,
-});
+const profileEditSchema = profileAnswersSchema
+  .partial({
+    heardAboutUs: true,
+    motivation: true,
+  })
+  .superRefine(validateTraining);
 
 export async function isRegistered(binding: Env["DB"], userId: string) {
   return Boolean(
@@ -87,7 +174,11 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
     motivation: row.motivation,
     teams: withOutreachTeam(row.teams),
     certification: row.medical_certification,
+    certifications: normalizeCertifications(row.medical_certifications),
+    certificationExpiry: row.medical_certification_expiry ?? "",
     experience: row.training_experience,
+    training: row.relevant_training,
+    otherTraining: row.other_training,
     medicalConditions: row.medical_conditions ?? "",
   } satisfies RegistrationAnswers;
 }
@@ -98,13 +189,27 @@ export async function saveProfile(
   input: unknown,
 ) {
   const old = await loadProfile(binding, userId);
-  const parsed = (old ? profileEditSchema : profileSchema).safeParse(input);
+  const submittedInput =
+    old && input && typeof input === "object" && !Array.isArray(input)
+      ? {
+          certification: old.certification,
+          certifications: old.certifications,
+          experience: old.experience,
+          training: old.training,
+          otherTraining: old.otherTraining,
+          certificationExpiry: old.certificationExpiry,
+          ...input,
+        }
+      : input;
+  const parsed = (old ? profileEditSchema : profileSchema).safeParse(
+    submittedInput,
+  );
   if (!parsed.success)
     throw new RequestError(
       400,
       parsed.error.issues.some((issue) => issue.path[0] === "birthDate")
         ? registrationBirthDateError
-        : "Check the required fields, phone numbers, date of birth, and team selection.",
+        : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
     );
   const { codeOfConductAccepted, ...submitted } = parsed.data;
   if (!old && codeOfConductAccepted !== true)
@@ -134,7 +239,11 @@ export async function saveProfile(
     motivation: answers.motivation,
     teams: answers.teams,
     medical_certification: answers.certification,
+    medical_certifications: answers.certifications,
+    medical_certification_expiry: answers.certificationExpiry || null,
     training_experience: answers.experience,
+    relevant_training: answers.training,
+    other_training: answers.otherTraining,
     medical_conditions: answers.medicalConditions || null,
     updated_at: now,
   };

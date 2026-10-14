@@ -5,6 +5,8 @@ import {
   accountErrorMessage,
   clearFormMessage,
   initAccountFormChanges,
+  initMedicCertifications,
+  initRelevantTraining,
   showFormMessage as message,
 } from "./account-forms";
 
@@ -57,6 +59,8 @@ function form(
   >();
   const initialize = (element: HTMLFormElement) => {
     if (!initialized.has(element)) {
+      initMedicCertifications(element);
+      initRelevantTraining(element);
       initialized.set(
         element,
         element.hasAttribute("data-save-changes")
@@ -292,12 +296,18 @@ form("[data-second-factor]", async (_element, values) => {
 form("[data-account-profile]", async (element, values) => {
   const body = Object.fromEntries(
     [...values].filter(
-      ([key]) => key !== "teams" && key !== "codeOfConductAccepted",
+      ([key]) =>
+        key !== "teams" &&
+        key !== "certifications" &&
+        key !== "training" &&
+        key !== "codeOfConductAccepted",
     ),
   );
   const result = await post("/api/v1/account/profile", {
     ...body,
     teams: values.getAll("teams"),
+    certifications: values.getAll("certifications"),
+    training: values.getAll("training"),
     ...(element.hasAttribute("data-registration") && {
       codeOfConductAccepted: values.get("codeOfConductAccepted") === "true",
     }),

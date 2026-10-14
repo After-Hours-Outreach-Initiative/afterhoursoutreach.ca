@@ -131,7 +131,17 @@ export const profile = sqliteTable("profile", {
   motivation: text().notNull(),
   teams: text({ mode: "json" }).$type<string[]>().notNull(),
   medical_certification: text().notNull(),
+  medical_certifications: text({ mode: "json" })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+  medical_certification_expiry: text(),
   training_experience: text().notNull(),
+  relevant_training: text({ mode: "json" })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+  other_training: text().notNull().default(""),
   medical_conditions: text(),
   // Nullable for existing/synthetic profiles; never invent an acknowledgement.
   code_of_conduct_version: text(),

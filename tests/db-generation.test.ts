@@ -138,6 +138,78 @@ test("registration approval migration gates existing volunteers without dropping
   );
 });
 
+test("medical certification migrations preserve legacy answers without guessing selections or expiry", () => {
+  const db = database();
+  for (const name of [
+    "0000_database",
+    "0001_code_of_conduct",
+    "0002_registration_approval",
+  ])
+    db.exec(
+      readFileSync(new URL(`../drizzle/${name}.sql`, import.meta.url), "utf8"),
+    );
+  db.exec(`
+    INSERT INTO user (id, name, email, created_at, updated_at)
+      VALUES ('existing', 'Existing volunteer', 'existing@example.org', 1, 1);
+    INSERT INTO profile (
+      user_id, preferred_name, phone, birth_date, emergency_contact_name,
+      emergency_contact_phone, emergency_contact_relationship, heard_about_us,
+      motivation, teams, medical_certification, training_experience, registered_at, updated_at
+    ) VALUES ('existing', 'Existing volunteer', '604-555-0100', '1995-04-12',
+      'Contact', '604-555-0101', 'Friend', 'Friend', 'Help', '["outreach","medic"]', 'Legacy certification', 'Training', 1, 1);
+  `);
+  const before = db.prepare("SELECT * FROM profile").get();
+  const triggersBefore = db
+    .prepare(
+      "SELECT name, sql FROM sqlite_master WHERE type='trigger' ORDER BY name",
+    )
+    .all();
+  db.exec(
+    readFileSync(
+      new URL("../drizzle/0003_medical_certifications.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  const { medical_certifications, ...after } = db
+    .prepare("SELECT * FROM profile")
+    .get()!;
+  assert.equal(medical_certifications, "[]");
+  assert.deepEqual(after, { ...before });
+  const beforeExpiry = db.prepare("SELECT * FROM profile").get();
+  db.exec(
+    readFileSync(
+      new URL("../drizzle/0004_certification_expiry.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  const { medical_certification_expiry, ...afterExpiry } = db
+    .prepare("SELECT * FROM profile")
+    .get()!;
+  assert.equal(medical_certification_expiry, null);
+  assert.deepEqual(afterExpiry, { ...beforeExpiry });
+  const beforeTraining = db.prepare("SELECT * FROM profile").get();
+  db.exec(
+    readFileSync(
+      new URL("../drizzle/0005_relevant_training.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  const { relevant_training, other_training, ...afterTraining } = db
+    .prepare("SELECT * FROM profile")
+    .get()!;
+  assert.equal(relevant_training, "[]");
+  assert.equal(other_training, "");
+  assert.deepEqual(afterTraining, { ...beforeTraining });
+  assert.deepEqual(
+    db
+      .prepare(
+        "SELECT name, sql FROM sqlite_master WHERE type='trigger' ORDER BY name",
+      )
+      .all(),
+    triggersBefore,
+  );
+});
+
 test("generation creates runnable schema and triggers and is a no-op without changes", async () => {
   const directory = scratchDirectory();
   const options = { directory, schema, triggers };

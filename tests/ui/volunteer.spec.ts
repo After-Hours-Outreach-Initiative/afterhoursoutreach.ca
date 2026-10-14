@@ -350,6 +350,79 @@ test("account navigation and profile controls are usable on desktop and mobile",
             getComputedStyle(element).gridTemplateColumns.split(" ").length,
         ),
     ).toBe(width <= 640 ? 1 : 3);
+    const medic = form.getByLabel("Medic", { exact: true });
+    await medic.check();
+    const certifications = form.locator("[data-medic-certifications]");
+    await expect(certifications).toBeVisible();
+    expect(
+      await certifications
+        .locator(".volunteer-certification-options")
+        .evaluate(
+          (element) =>
+            getComputedStyle(element).gridTemplateColumns.split(" ").length,
+        ),
+    ).toBe(1);
+    const certificationOptions = certifications.locator(
+      ".volunteer-certification-options > label",
+    );
+    await expect(certificationOptions).toHaveCount(6);
+    for (const option of await certificationOptions.all()) {
+      await expect(option).toHaveCSS("align-items", "flex-start");
+      await expect(option).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await expect(option).toHaveCSS("padding", "0px");
+      await expect(option).toHaveCSS("border-top-width", "0px");
+    }
+    await certifications
+      .getByText(
+        "Respiratory Therapist (RT) / Nurse Practitioner (NP) / Physician",
+        { exact: true },
+      )
+      .click();
+    const practitioner = certifications.getByRole("radio", {
+      name: "Respiratory Therapist (RT) / Nurse Practitioner (NP) / Physician",
+      exact: true,
+    });
+    await expect(practitioner).toBeChecked();
+    await certifications
+      .getByRole("radio", { name: "Other", exact: true })
+      .check();
+    const otherTraining = certifications.locator(
+      'label:has([value="other"]) + [data-other-training]',
+    );
+    await expect(otherTraining).toBeVisible();
+    await expect(otherTraining.locator("label")).toHaveClass("sr-only");
+    await expect(otherTraining.locator("label")).toHaveCSS(
+      "position",
+      "absolute",
+    );
+    await expect(otherTraining.locator(".volunteer-help")).toHaveCount(0);
+    await expect(
+      otherTraining.getByRole("textbox", {
+        name: "Other training and experience",
+        exact: true,
+      }),
+    ).toBeEditable();
+    expect(
+      await form.evaluate((element) => {
+        const other = element
+          .querySelector('[name="certifications"][value="other"]')!
+          .closest("label")!;
+        const details = element.querySelector("[data-other-training]")!;
+        const expiry = element.querySelector("[data-certification-expiry]")!;
+        return (
+          details.getBoundingClientRect().top >=
+            other.getBoundingClientRect().bottom &&
+          expiry.getBoundingClientRect().top >=
+            details.getBoundingClientRect().bottom
+        );
+      }),
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+    await form.evaluate((element: HTMLFormElement) => element.reset());
     const save = page.getByRole("button", { name: "Save profile" });
     await expect(save).toBeDisabled();
     await name.fill("Unsaved layout draft");

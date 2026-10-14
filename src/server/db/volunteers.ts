@@ -6,6 +6,7 @@ import {
   type Actor,
 } from "./access";
 import {
+  normalizeCertifications,
   withOutreachTeam,
   type RegistrationAnswers,
 } from "../../data/registration";
@@ -96,6 +97,9 @@ export async function viewVolunteerProfile(
           emergency_contact_relationship AS emergencyRelationship,
           heard_about_us AS heardAboutUs, motivation, teams,
           medical_certification AS certification, training_experience AS experience,
+          medical_certifications AS certifications,
+          relevant_training AS training, other_training AS otherTraining,
+          coalesce(medical_certification_expiry, '') AS certificationExpiry,
           coalesce(medical_conditions, '') AS medicalConditions
         FROM profile
         WHERE user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
@@ -108,9 +112,21 @@ export async function viewVolunteerProfile(
       "Organizer authorization changed. Sign in again.",
     );
   const row = results[1].results[0] as
-    (Omit<RegistrationAnswers, "teams"> & { teams: string }) | undefined;
+    | (Omit<RegistrationAnswers, "teams" | "certifications" | "training"> & {
+        teams: string;
+        certifications: string;
+        training: string;
+      })
+    | undefined;
   return row
-    ? { ...row, teams: withOutreachTeam(JSON.parse(row.teams) as string[]) }
+    ? {
+        ...row,
+        teams: withOutreachTeam(JSON.parse(row.teams) as string[]),
+        certifications: normalizeCertifications(
+          JSON.parse(row.certifications) as string[],
+        ),
+        training: JSON.parse(row.training) as string[],
+      }
     : null;
 }
 

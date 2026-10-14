@@ -1,0 +1,70 @@
+---
+import {
+  certificationOptions,
+  certificationQuestion,
+  registrationFields,
+  type RegistrationAnswers,
+} from "@/data/registration";
+import FieldError from "@/components/FieldError.astro";
+import AccountProfileField from "./AccountProfileField.astro";
+
+interface Props {
+  values?: RegistrationAnswers | null;
+  active: boolean;
+}
+const { values, active } = Astro.props;
+const legacy = values?.certification?.trim();
+const selected =
+  values?.certifications.length === 1 ? values.certifications[0] : undefined;
+const otherTrainingField = registrationFields.find(
+  (field) => field.name === "experience",
+)!;
+---
+
+<fieldset
+  class="volunteer-certifications volunteer-wide"
+  data-medic-certifications
+  hidden={!active}
+  aria-describedby="error-certifications"
+>
+  <legend>
+    {certificationQuestion}
+    <span class="volunteer-required" aria-hidden="true"> *</span>
+  </legend>
+  <div class="volunteer-certification-options">
+    {
+      certificationOptions.map((option) => (
+        <>
+          <label class="volunteer-check">
+            <input
+              type="radio"
+              name="certifications"
+              value={option.value}
+              checked={selected === option.value}
+              required={active}
+              aria-describedby="error-certifications"
+            />
+            <span>{option.label}</span>
+          </label>
+          {option.value === "other" && (
+            <AccountProfileField
+              field={otherTrainingField}
+              values={values}
+              active={active && selected === "other"}
+              hideLabel
+            />
+          )}
+        </>
+      ))
+    }
+  </div>
+  {
+    legacy && legacy.toLowerCase() !== "none" && (
+      <p class="volunteer-help">Previously recorded certification: {legacy}</p>
+    )
+  }
+  <FieldError
+    field="certifications"
+    message="Select your highest certification or licence."
+  />
+</fieldset>

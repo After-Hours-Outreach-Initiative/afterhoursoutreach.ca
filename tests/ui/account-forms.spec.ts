@@ -11,7 +11,13 @@ import {
 } from "../../src/data/code-of-conduct";
 import { totpFromSetupKey } from "../helpers/totp";
 import { inPlaceAction } from "../helpers/in-place-action";
-import { registrationBirthDateError } from "../../src/data/registration";
+import {
+  certificationOptions,
+  certificationQuestion,
+  registrationBirthDateError,
+  trainingOptions,
+  trainingQuestion,
+} from "../../src/data/registration";
 
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
@@ -257,7 +263,9 @@ test("registration shows all required errors and saves after they are corrected"
     exact: true,
   });
   await expect(training).toBeVisible();
-  await expect(training.locator("input, textarea")).toHaveCount(2);
+  await expect(training.locator('[name="experience"]')).toBeHidden();
+  await expect(training.locator("[data-medic-certifications]")).toBeHidden();
+  await expect(training.locator("[required]")).toHaveCount(0);
   await expect(
     form
       .getByRole("group", { name: "Team interests", exact: true })
@@ -406,7 +414,17 @@ test("registration shows all required errors and saves after they are corrected"
   await expect(form.locator("[data-error=birthDate]")).toBeVisible();
   expect(requests).toEqual([]);
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field !== "teams")
+    if (
+      ![
+        "teams",
+        "certification",
+        "certifications",
+        "certificationExpiry",
+        "experience",
+        "training",
+        "otherTraining",
+      ].includes(field)
+    )
       await form.locator(`[name="${field}"]`).fill(String(value));
   }
   await page.setViewportSize({ width: 375, height: 812 });
@@ -489,7 +507,17 @@ test("registration and profile edits block underage birth dates at the birthday 
       : today.toISOString().slice(5, 10),
   );
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field !== "teams")
+    if (
+      ![
+        "teams",
+        "certification",
+        "certifications",
+        "certificationExpiry",
+        "experience",
+        "training",
+        "otherTraining",
+      ].includes(field)
+    )
       await form.locator(`[name="${field}"]`).fill(String(value));
   }
   await expect(form.getByLabel("Outreach", { exact: true })).toBeChecked();
@@ -541,7 +569,17 @@ test("the birth-date cutoff blocks native submission without JavaScript", async 
     await page.goto("/volunteer/register");
     const form = page.locator("[data-account-profile]");
     for (const [field, value] of Object.entries(sampleAnswers)) {
-      if (field !== "teams")
+      if (
+        ![
+          "teams",
+          "certification",
+          "certifications",
+          "certificationExpiry",
+          "experience",
+          "training",
+          "otherTraining",
+        ].includes(field)
+      )
         await form.locator(`[name="${field}"]`).fill(String(value));
     }
     const confirmation = form.getByRole("checkbox", {
@@ -570,6 +608,444 @@ test("the birth-date cutoff blocks native submission without JavaScript", async 
   } finally {
     await context.close();
   }
+});
+
+test("all teams can select multiple relevant training answers and add Other details", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/volunteer/register");
+  const form = page.locator("[data-account-profile]");
+  const training = form.getByRole("group", {
+    name: trainingQuestion,
+    exact: true,
+  });
+  const details = training.locator("[data-other-relevant-training]");
+  const otherText = details.locator('[name="otherTraining"]');
+  const other = training.getByRole("checkbox", { name: "Other", exact: true });
+  const naloxone = training.getByRole("checkbox", {
+    name: "Naloxone administration training",
+    exact: true,
+  });
+  const crisis = training.getByRole("checkbox", {
+    name: "Crisis intervention and de-escalation training (specify under Other)",
+    exact: true,
+  });
+  const medic = form.getByLabel("Medic", { exact: true });
+  const support = form.getByLabel("Non-patrol support", { exact: true });
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/account/profile")
+      requests.push(request.url());
+  });
+  await expect(training).toBeVisible();
+  await expect(details).toBeHidden();
+  await expect(otherText).not.toHaveAttribute("required");
+  await expect(otherText).toHaveAttribute("readonly", "");
+  await expect(
+    training.locator(".volunteer-training-options > label"),
+  ).toHaveText(trainingOptions.map((option) => option.label));
+  for (const width of [1280, 375, 320]) {
+    await page.setViewportSize({ width, height: 812 });
+    expect(
+      await training
+        .locator(".volunteer-training-options")
+        .evaluate(
+          (element) =>
+            getComputedStyle(element).gridTemplateColumns.split(" ").length,
+        ),
+    ).toBe(1);
+    const alignment = await training
+      .locator(".volunteer-check")
+      .evaluateAll((labels) =>
+        labels.map((label) => {
+          const input = label.querySelector("input")!.getBoundingClientRect();
+          const text = label.querySelector("span")!;
+          const bounds = text.getBoundingClientRect();
+          const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+          return {
+            lines: Math.round(bounds.height / lineHeight),
+            offset:
+              input.top + input.height / 2 - (bounds.top + lineHeight / 2),
+          };
+        }),
+      );
+    for (const option of alignment)
+      expect(Math.abs(option.offset)).toBeLessThanOrEqual(1);
+    if (width <= 375)
+      expect(alignment.some((option) => option.lines > 1)).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+  }
+  for (const [field, value] of Object.entries(sampleAnswers)) {
+    if (
+      ![
+        "teams",
+        "certification",
+        "certifications",
+        "certificationExpiry",
+        "experience",
+        "training",
+        "otherTraining",
+      ].includes(field)
+    )
+      await form.locator(`[name="${field}"]`).fill(String(value));
+  }
+  await form
+    .getByRole("checkbox", { name: codeOfConductConfirmation, exact: true })
+    .check();
+  await naloxone.check();
+  await crisis.check();
+  await other.check();
+  await expect(training.locator(":checked")).toHaveCount(3);
+  await expect(otherText).toBeEditable();
+  await expect(otherText).toHaveAttribute("required", "");
+  await expect(
+    training.locator(
+      'label:has([value="other"]) + [data-other-relevant-training]',
+    ),
+  ).toBeVisible();
+  await expect(details.locator("label")).toHaveClass("sr-only");
+  await expect(details.locator(".volunteer-help")).toHaveCount(0);
+  for (const blank of ["", " \t\n\u00a0 "]) {
+    await otherText.fill(blank);
+    await form.getByRole("button", { name: "Complete registration" }).click();
+    await expect(otherText).toBeFocused();
+    await expect(details.locator("[data-error=otherTraining]")).toBeVisible();
+    expect(requests).toHaveLength(0);
+  }
+  await otherText.fill("Crisis intervention course");
+  await medic.check();
+  await expect(training).toBeVisible();
+  await expect(otherText).toBeEditable();
+  await expect(training.locator(":checked")).toHaveCount(3);
+  await support.check();
+  await medic.uncheck();
+  await expect(training).toBeVisible();
+  await form.getByRole("button", { name: "Complete registration" }).click();
+  await expect(page).toHaveURL(/\/volunteer\/account$/);
+  await page.reload();
+  await expect(medic).not.toBeChecked();
+  await expect(support).toBeChecked();
+  await expect(naloxone).toBeChecked();
+  await expect(crisis).toBeChecked();
+  await expect(other).toBeChecked();
+  await expect(otherText).toHaveValue("Crisis intervention course");
+  const save = form.getByRole("button", { name: "Save profile" });
+  await expect(save).toBeDisabled();
+  await other.uncheck();
+  await expect(details).toBeHidden();
+  await expect(otherText).not.toHaveAttribute("required");
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(other).toBeChecked();
+  await expect(otherText).toBeEditable();
+  await expect(save).toBeDisabled();
+  await other.uncheck();
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveText(
+    "Profile saved.",
+  );
+  await page.reload();
+  await expect(other).not.toBeChecked();
+  await expect(details).toBeHidden();
+  await other.check();
+  await expect(otherText).toHaveValue("Crisis intervention course");
+  const savedRequests = requests.length;
+  await otherText.fill(" ");
+  await save.click();
+  await expect(otherText).toBeFocused();
+  await expect(details.locator("[data-error=otherTraining]")).toBeVisible();
+  expect(requests).toHaveLength(savedRequests);
+  await other.uncheck();
+  await naloxone.uncheck();
+  await crisis.uncheck();
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveText(
+    "Profile saved.",
+  );
+  await page.reload();
+  await expect(training).toBeVisible();
+  await expect(training.locator(":checked")).toHaveCount(0);
+  await expect(details).toBeHidden();
+});
+
+test("Medic selects one highest certification, expiry and conditional Other details", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/volunteer/register");
+  const profileRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/account/profile")
+      profileRequests.push(request.url());
+  });
+  const form = page.locator("[data-account-profile]");
+  const training = form.getByRole("group", {
+    name: "Training and safety",
+    exact: true,
+  });
+  const certifications = form.locator("[data-medic-certifications]");
+  const medic = form.getByLabel("Medic", { exact: true });
+  const firstAid = certifications.getByRole("radio", {
+    name: "Advanced First Aid (formerly OFA Level 3)",
+    exact: true,
+  });
+  const nurse = certifications.getByRole("radio", {
+    name: "Nurse (LPN, RN)",
+    exact: true,
+  });
+  const practitioner = certifications.getByRole("radio", {
+    name: "Respiratory Therapist (RT) / Nurse Practitioner (NP) / Physician",
+    exact: true,
+  });
+  const paramedic = certifications.getByRole("radio", {
+    name: "Paramedic (PCP, ACP, CCP)",
+    exact: true,
+  });
+  const experience = form.locator('[name="experience"]');
+  const other = certifications.getByRole("radio", {
+    name: "Other",
+    exact: true,
+  });
+  const expiry = form.locator('[name="certificationExpiry"]');
+  await expect(training).toBeVisible();
+  await expect(experience).toBeHidden();
+  await expect(experience).not.toHaveAttribute("required");
+  await expect(experience).toHaveAttribute("readonly", "");
+  await expect(certifications).toBeHidden();
+  await expect(expiry).toBeHidden();
+  await expect(expiry).not.toHaveAttribute("required");
+  for (const [field, value] of Object.entries(sampleAnswers)) {
+    if (
+      ![
+        "teams",
+        "certification",
+        "certifications",
+        "certificationExpiry",
+        "experience",
+        "training",
+        "otherTraining",
+      ].includes(field)
+    )
+      await form.locator(`[name="${field}"]`).fill(String(value));
+  }
+  await expect(form.getByLabel("Outreach", { exact: true })).toBeChecked();
+  await medic.check();
+  await expect(certifications).toBeVisible();
+  await expect(experience).toBeHidden();
+  await expect(expiry).toBeVisible();
+  await expect(expiry).toHaveAttribute("type", "date");
+  await expect(expiry).toHaveAttribute("required", "");
+  await expect(expiry).toHaveAccessibleName("Certification expiry date");
+  await expect(
+    form.locator("[data-certification-expiry] .volunteer-required"),
+  ).toHaveText("*");
+  await expect(
+    form.locator("[data-certification-expiry] .volunteer-help"),
+  ).toHaveCount(0);
+  await expect(certifications).toHaveAccessibleName(certificationQuestion);
+  await expect(
+    certifications.getByText("Select one.", { exact: true }),
+  ).toHaveCount(0);
+  await expect(certifications).toHaveAttribute(
+    "aria-describedby",
+    "error-certifications",
+  );
+  await expect(
+    certifications.locator(".volunteer-certification-options > label"),
+  ).toHaveText(certificationOptions.map((option) => option.label));
+  await expect(
+    certifications.getByRole("radio", {
+      name: "First Responder (FR)",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(form.getByRole("heading", { level: 3 })).toHaveText([
+    "Personal info",
+    "Emergency contact",
+    "Team interests",
+    "Training and safety",
+    "About volunteering",
+    "Code of Conduct",
+  ]);
+  await form
+    .getByRole("checkbox", { name: codeOfConductConfirmation, exact: true })
+    .check();
+  await form.getByRole("button", { name: "Complete registration" }).click();
+  await expect(firstAid).toBeFocused();
+  await expect(
+    certifications.locator("[data-error=certifications]"),
+  ).toBeVisible();
+  await firstAid.press("Space");
+  await expect(firstAid).toBeChecked();
+  await form.getByRole("button", { name: "Complete registration" }).click();
+  await expect(expiry).toBeFocused();
+  await expect(form.locator("[data-error=certificationExpiry]")).toBeVisible();
+  expect(profileRequests).toHaveLength(0);
+  await expiry.fill("2030-10-14");
+  await expect(form.locator("[data-error=certificationExpiry]")).toBeHidden();
+  await nurse.check();
+  await expect(firstAid).not.toBeChecked();
+  await expect(nurse).toBeChecked();
+  await paramedic.check();
+  await expect(nurse).not.toBeChecked();
+  await expect(paramedic).toBeChecked();
+  await practitioner.check();
+  await expect(paramedic).not.toBeChecked();
+  await expect(practitioner).toBeChecked();
+  await expect(certifications.locator(":checked")).toHaveCount(1);
+  await expect(
+    certifications.locator("[data-error=certifications]"),
+  ).toBeHidden();
+  await expect(experience).toBeHidden();
+  await other.check();
+  await expect(practitioner).not.toBeChecked();
+  await expect(experience).toBeVisible();
+  await expect(form.locator('[name="experience"]')).toHaveCount(1);
+  await expect(
+    certifications.locator(
+      'label:has([value="other"]) + [data-other-training]',
+    ),
+  ).toBeVisible();
+  await expect(experience).toBeEditable();
+  await expect(experience).toHaveAttribute("required", "");
+  await expect(form.locator("[data-other-training] > label")).toHaveClass(
+    "sr-only",
+  );
+  await expect(
+    form.locator("[data-other-training] .volunteer-help"),
+  ).toHaveCount(0);
+  await expect(experience).toHaveAttribute(
+    "aria-describedby",
+    "error-experience",
+  );
+  for (const blank of ["", " \t\n\u00a0 "]) {
+    await experience.fill(blank);
+    await form.getByRole("button", { name: "Complete registration" }).click();
+    await expect(experience).toBeFocused();
+    await expect(form.locator("[data-error=experience]")).toBeVisible();
+    expect(profileRequests).toHaveLength(0);
+  }
+  await expect(
+    certifications.locator("[data-error=certifications]"),
+  ).toBeHidden();
+  await experience.fill("Naloxone training");
+  await expect(experience).toHaveJSProperty("validationMessage", "");
+  await firstAid.check();
+  await expect(experience).toBeHidden();
+  await expect(experience).not.toHaveAttribute("required");
+  await other.check();
+  await expect(experience).toHaveValue("Naloxone training");
+  await medic.uncheck();
+  await expect(training).toBeVisible();
+  await expect(certifications).toBeHidden();
+  await expect(certifications.locator("[required]")).toHaveCount(0);
+  await expect(expiry).toBeHidden();
+  await expect(expiry).not.toHaveAttribute("required");
+  await expect(experience).toBeHidden();
+  await expect(experience).not.toHaveAttribute("required");
+  await medic.check();
+  await expect(other).toBeChecked();
+  await expect(expiry).toHaveValue("2030-10-14");
+  await expect(expiry).toHaveAttribute("required", "");
+  await expect(experience).toHaveValue("Naloxone training");
+  await form.getByRole("button", { name: "Complete registration" }).click();
+  await expect(page).toHaveURL(/\/volunteer\/account$/);
+  await page.reload();
+  await expect(medic).toBeChecked();
+  await expect(certifications).toBeVisible();
+  await expect(other).toBeChecked();
+  await expect(certifications.locator(":checked")).toHaveCount(1);
+  await expect(expiry).toHaveValue("2030-10-14");
+  await expect(experience).toBeEditable();
+  await expect(experience).toHaveValue("Naloxone training");
+  const save = form.getByRole("button", { name: "Save profile" });
+  await expect(save).toBeDisabled();
+  const registeredRequests = profileRequests.length;
+  await expiry.fill("");
+  await save.click();
+  await expect(expiry).toBeFocused();
+  await expect(form.locator("[data-error=certificationExpiry]")).toBeVisible();
+  expect(profileRequests).toHaveLength(registeredRequests);
+  await medic.uncheck();
+  await expect(expiry).toBeHidden();
+  await expect(expiry).not.toHaveAttribute("required");
+  expect(
+    await form.evaluate((element: HTMLFormElement) => element.checkValidity()),
+  ).toBe(true);
+  await medic.check();
+  await expect(expiry).toHaveAttribute("required", "");
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(expiry).toHaveValue("2030-10-14");
+  await expect(expiry).toHaveAttribute("required", "");
+  await expect(save).toBeDisabled();
+  await nurse.check();
+  await expect(save).toBeEnabled();
+  await expect(experience).toBeHidden();
+  await other.check();
+  await expect(save).toBeDisabled();
+
+  // Deselecting Medic retains saved selections, even while the question is hidden.
+  await medic.uncheck();
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveText(
+    "Profile saved.",
+  );
+  await page.reload();
+  await expect(certifications).toBeHidden();
+  await expect(expiry).toBeHidden();
+  await medic.check();
+  await expect(other).toBeChecked();
+  await expect(experience).toHaveValue("Naloxone training");
+
+  // Blank Other details block edits, but not saving a different certification.
+  const savedRequests = profileRequests.length;
+  for (const blank of ["", " \t\n\u00a0 "]) {
+    await experience.fill(blank);
+    await save.click();
+    await expect(experience).toBeFocused();
+    await expect(form.locator("[data-error=experience]")).toBeVisible();
+    expect(profileRequests).toHaveLength(savedRequests);
+  }
+  await firstAid.check();
+  await expect(experience).toBeHidden();
+  expect(
+    await experience.evaluate(
+      (field: HTMLTextAreaElement) => field.validity.customError,
+    ),
+  ).toBe(false);
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveText(
+    "Profile saved.",
+  );
+  await page.reload();
+  await expect(firstAid).toBeChecked();
+  await expect(other).not.toBeChecked();
+  await expect(experience).toBeHidden();
+  await expect(expiry).toHaveValue("2030-10-14");
+  await other.check();
+  await expect(experience).toBeEditable();
+  await expect(experience).toHaveValue("");
+  await experience.fill(" \t\n\u00a0 ");
+  expect(
+    await experience.evaluate(
+      (field: HTMLTextAreaElement) => field.validity.customError,
+    ),
+  ).toBe(true);
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(firstAid).toBeChecked();
+  await expect(experience).toBeHidden();
+  expect(
+    await experience.evaluate(
+      (field: HTMLTextAreaElement) => field.validity.customError,
+    ),
+  ).toBe(false);
+  await expect(save).toBeDisabled();
 });
 
 test("profile saves enable only for changed answers and disable after saving", async ({
@@ -663,6 +1139,8 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   const support = form.getByLabel("Non-patrol support", { exact: true });
   const save = form.getByRole("button", { name: "Save profile" });
   const cards = form.locator(".volunteer-team-option");
+  const training = form.locator("[data-medic-certifications]");
+  await expect(training).toBeHidden();
   await expect(cards).toHaveCount(3);
   await expect(outreach).toHaveAccessibleDescription(
     /Hand out supplies and connect with the DTES community/,
@@ -708,6 +1186,7 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await medicRequirement.click();
   await expect(medic).toBeChecked();
   await expect(cards.nth(1)).toHaveCSS("background-color", "rgb(22, 33, 74)");
+  await expect(training).toBeVisible();
   await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
   await medic.press("Tab");
   await expect(support).toBeFocused();
@@ -718,15 +1197,30 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await medic.focus();
   await medic.press("Space");
   await expect(medic).not.toBeChecked();
+  await expect(training).toBeHidden();
   await support.uncheck();
   await expect(save).toBeDisabled();
   await medic.check();
   await support.check();
+  const other = training.getByRole("radio", {
+    name: "Other",
+    exact: true,
+    includeHidden: true,
+  });
+  await other.check();
+  await expect(form.locator('[name="experience"]')).toBeVisible();
   await form.evaluate((element: HTMLFormElement) => element.reset());
   await expect(outreach).toBeChecked();
   await expect(outreach).toBeDisabled();
   await expect(medic).not.toBeChecked();
   await expect(support).not.toBeChecked();
+  await expect(training).toBeHidden();
+  await expect(training.locator("[required]")).toHaveCount(0);
+  await expect(other).not.toBeChecked();
+  await expect(form.locator('[name="experience"]')).toBeHidden();
+  await expect(form.locator('[name="experience"]')).not.toHaveAttribute(
+    "required",
+  );
   await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
   await expect(save).toBeDisabled();
   expect(requests).toEqual([]);
@@ -739,6 +1233,7 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(outreach).toBeChecked();
   await expect(outreach).toBeDisabled();
   await expect(support).toBeChecked();
+  await expect(training).toBeHidden();
   expect(requests).toHaveLength(1);
 });
 

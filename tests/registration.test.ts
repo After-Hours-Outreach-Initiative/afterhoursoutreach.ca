@@ -1,10 +1,87 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { latestRegistrationBirthDate } from "../src/data/registration";
+import {
+  latestRegistrationBirthDate,
+  normalizeCertifications,
+} from "../src/data/registration";
 import { profileSchema } from "../src/server/db/profiles";
 
 const birthDateSchema = profileSchema.shape.birthDate;
 
 afterEach(() => vi.useRealTimers());
+
+test.each([
+  ["primary-care-paramedic", "paramedic"],
+  ["advanced-care-paramedic", "paramedic"],
+  ["critical-care-paramedic", "paramedic"],
+  ["licensed-practical-nurse", "nurse"],
+  ["registered-nurse", "nurse"],
+  ["respiratory-therapist", "nurse-practitioner-physician"],
+  ["nurse-practitioner", "nurse-practitioner-physician"],
+  ["physician", "nurse-practitioner-physician"],
+])("legacy %s maps to the combined %s option", (certification, combined) => {
+  expect(normalizeCertifications([certification])).toEqual([combined]);
+  expect(profileSchema.shape.certifications.parse([certification])).toEqual([
+    combined,
+  ]);
+});
+
+test("combined selections deduplicate without replacing other certifications", () => {
+  const certifications = [
+    "advanced-first-aid",
+    "paramedic",
+    "nurse",
+    "nurse-practitioner-physician",
+  ];
+  expect(
+    normalizeCertifications([
+      "advanced-first-aid",
+      "primary-care-paramedic",
+      "advanced-care-paramedic",
+      "critical-care-paramedic",
+      "paramedic",
+      "licensed-practical-nurse",
+      "registered-nurse",
+      "nurse",
+      "nurse-practitioner",
+      "physician",
+      "nurse-practitioner-physician",
+      "respiratory-therapist",
+    ]),
+  ).toEqual(certifications);
+  const schema = profileSchema.shape.certifications;
+  expect(schema.parse(["advanced-care-paramedic"])).toEqual(["paramedic"]);
+  expect(
+    schema.parse([
+      "registered-nurse",
+      "primary-care-paramedic",
+      "critical-care-paramedic",
+    ]),
+  ).toEqual(["paramedic", "nurse"]);
+});
+
+test("First Responder is no longer a selectable certification", () => {
+  expect(
+    normalizeCertifications(["first-responder", "registered-nurse"]),
+  ).toEqual(["nurse"]);
+  expect(
+    profileSchema.shape.certifications.safeParse(["first-responder"]).success,
+  ).toBe(false);
+});
+
+test.each([
+  ["", true],
+  ["2030-10-14", true],
+  ["2028-02-29", true],
+  ["2027-02-29", false],
+  ["2030-02-30", false],
+  ["2030-13-01", false],
+  ["2030-1-1", false],
+  ["not-a-date", false],
+])("certification expiry %s is valid: %s", (value, valid) => {
+  expect(profileSchema.shape.certificationExpiry.safeParse(value).success).toBe(
+    valid,
+  );
+});
 
 test.each([
   ["2026-10-09T00:00:00Z", "2007-10-09"],

@@ -48,6 +48,77 @@ export function clearFormMessage(element: Element) {
   delete target.dataset.messageKind;
 }
 
+export function initMedicCertifications(element: HTMLFormElement) {
+  const section = element.querySelector<HTMLElement>(
+    "[data-medic-certifications]",
+  );
+  const medic = element.querySelector<HTMLInputElement>(
+    '[name="teams"][value="medic"]',
+  );
+  if (!section || !medic) return;
+  const fields = [
+    ...section.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
+  ];
+  const other = section.querySelector<HTMLInputElement>('[value="other"]');
+  const training = element.querySelector<HTMLElement>("[data-other-training]");
+  const experience = training?.querySelector<HTMLTextAreaElement>("textarea");
+  const expiry = element.querySelector<HTMLElement>(
+    "[data-certification-expiry]",
+  );
+  const expiryInput = expiry?.querySelector<HTMLInputElement>("input");
+  const update = () => {
+    section.hidden = !medic.checked;
+    // Retain checked answers in FormData and drafts without hidden validation.
+    for (const field of fields) field.required = medic.checked;
+    if (expiry && expiryInput) {
+      expiry.hidden = !medic.checked;
+      expiryInput.required = medic.checked;
+      expiryInput.readOnly = !medic.checked;
+    }
+    if (training && experience) {
+      const active = medic.checked && Boolean(other?.checked);
+      training.hidden = !active;
+      experience.required = active;
+      experience.readOnly = !active;
+      experience.setCustomValidity(
+        active && !experience.value.trim()
+          ? "Describe your other training and experience."
+          : "",
+      );
+    }
+  };
+  medic.addEventListener("change", update);
+  section.addEventListener("change", update);
+  experience?.addEventListener("input", update);
+  element.addEventListener("reset", () => queueMicrotask(update));
+  update();
+}
+
+export function initRelevantTraining(element: HTMLFormElement) {
+  const other = element.querySelector<HTMLInputElement>(
+    '[name="training"][value="other"]',
+  );
+  const details = element.querySelector<HTMLElement>(
+    "[data-other-relevant-training]",
+  );
+  const input = details?.querySelector<HTMLTextAreaElement>("textarea");
+  if (!other || !details || !input) return;
+  const update = () => {
+    details.hidden = !other.checked;
+    input.required = other.checked;
+    input.readOnly = !other.checked;
+    input.setCustomValidity(
+      other.checked && !input.value.trim()
+        ? "Describe your other relevant training or experience."
+        : "",
+    );
+  };
+  other.addEventListener("change", update);
+  input.addEventListener("input", update);
+  element.addEventListener("reset", () => queueMicrotask(update));
+  update();
+}
+
 export function initAccountFormChanges(element: HTMLFormElement) {
   const button = element.querySelector<HTMLButtonElement>(
     'button[type="submit"]',
