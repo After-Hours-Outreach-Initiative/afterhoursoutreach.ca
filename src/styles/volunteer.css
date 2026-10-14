@@ -273,17 +273,6 @@
 .volunteer-application-step > .btn {
   align-self: flex-start;
 }
-.volunteer-application-progress ol {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 32px;
-  color: #a1a1aa;
-}
-.volunteer-application-progress [aria-current="step"] {
-  color: #f4f4f5;
-  text-decoration: underline;
-  text-underline-offset: 6px;
-}
 .volunteer-application-review,
 .volunteer-application-review dl {
   display: grid;

@@ -69,16 +69,9 @@ export function initApplicationReview(element: HTMLFormElement) {
     // The hidden acknowledgement must not block first-step native validation.
     // Questions stay enabled on review so FormData still contains every answer.
     review.disabled = next !== "review";
-    for (const item of element.querySelectorAll<HTMLElement>(
-      "[data-application-progress]",
-    )) {
-      if (item.dataset.applicationProgress === next)
-        item.setAttribute("aria-current", "step");
-      else item.removeAttribute("aria-current");
-    }
     document.title =
       next === "review"
-        ? `Review application (step 2 of 2) | ${originalTitle}`
+        ? `Review application | ${originalTitle}`
         : originalTitle;
     clearFormMessage(element);
     if (!moveFocus) return;
