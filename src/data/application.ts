@@ -53,6 +53,14 @@ export const heardAboutUsOptions = [
 ] as const;
 export const heardAboutUsOtherMaxLength = 200;
 
+export const motivationMaxWords = 150;
+export const motivationWordLimitError = `Keep this answer to ${motivationMaxWords} words or fewer.`;
+
+/** Count whitespace-separated words identically in the browser and on the server. */
+export function countWords(value: string): number {
+  return value.match(/\S+/gu)?.length ?? 0;
+}
+
 export const certificationQuestion =
   "Select the highest first-aid, medical, or health care certification or licence that you currently hold or are presently enrolled in schooling for.";
 
@@ -275,6 +283,7 @@ export const applicationFields = [
     required: true,
     multiline: true,
     applicationOnly: true,
+    help: `${motivationMaxWords} words maximum. Words are separated by spaces, tabs, or line breaks.`,
   },
 ] as const;
 

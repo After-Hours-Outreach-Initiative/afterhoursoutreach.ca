@@ -7,6 +7,7 @@ import {
   clearFormMessage,
   initAccountFormChanges,
   initMedicCertifications,
+  initMotivationWordLimit,
   initReferralSources,
   initRelevantTraining,
   showFormMessage as message,
@@ -64,6 +65,7 @@ function form(
       initMedicCertifications(element);
       initRelevantTraining(element);
       initReferralSources(element);
+      initMotivationWordLimit(element);
       initialized.set(
         element,
         element.hasAttribute("data-save-changes")

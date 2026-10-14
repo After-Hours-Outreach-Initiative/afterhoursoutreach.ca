@@ -11,6 +11,9 @@ import {
   applicationDisplayName,
   heardAboutUsOptions,
   heardAboutUsOtherMaxLength,
+  countWords,
+  motivationMaxWords,
+  motivationWordLimitError,
   type ApplicationAnswers,
 } from "../../data/application";
 import {
@@ -23,7 +26,6 @@ import { RequestError } from "../http";
 
 const shortAnswer = z.string().trim().min(1).max(200);
 const optionalShortAnswer = z.string().trim().max(200).default("");
-const longAnswer = z.string().trim().min(1).max(2000);
 const phone = z
   .string()
   .trim()
@@ -65,7 +67,15 @@ const profileAnswersSchema = z.strictObject({
     ),
   // Only selected Other details are validated/persisted; ignore stale hidden text.
   heardAboutUsOther: z.string().trim().default(""),
-  motivation: longAnswer,
+  // The API's bounded JSON reader protects request size; this limit is in words.
+  motivation: z
+    .string()
+    .trim()
+    .min(1, "This field is required.")
+    .refine(
+      (value) => countWords(value) <= motivationMaxWords,
+      motivationWordLimitError,
+    ),
   teams: z
     .array(z.enum(["outreach", "medic", "non-patrol"]))
     .max(3)
@@ -272,7 +282,11 @@ export async function saveProfile(
                 ),
               )
             ? `Select at least one way you found out about us. If you select Other, add a short description (${heardAboutUsOtherMaxLength} characters or fewer).`
-            : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
+            : parsed.error.issues.some(
+                  (issue) => issue.path[0] === "motivation",
+                )
+              ? `Explain why you want to volunteer (${motivationMaxWords} words or fewer).`
+              : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
     );
   const { codeOfConductAccepted, ...submitted } = parsed.data;
   if (!old && codeOfConductAccepted !== true)

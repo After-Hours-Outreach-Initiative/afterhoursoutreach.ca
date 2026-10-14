@@ -2,6 +2,8 @@
 import {
   latestApplicationBirthDate,
   applicationBirthDateError,
+  countWords,
+  motivationMaxWords,
   type applicationFields,
   type ApplicationAnswers,
 } from "@/data/application";
@@ -22,6 +24,8 @@ const {
   required = field.required,
 } = Astro.props;
 const phone = field.name === "phone" || field.name === "emergencyPhone";
+const motivation = field.name === "motivation";
+const describedBy = `error-${field.name}${"help" in field ? ` help-${field.name}` : ""}${motivation ? ` word-count-${field.name}` : ""}`;
 const message =
   field.name === "birthDate"
     ? applicationBirthDateError
@@ -59,18 +63,18 @@ const message =
       <textarea
         id={`profile-${field.name}`}
         name={field.name}
-        aria-describedby={`error-${field.name}${"help" in field ? ` help-${field.name}` : ""}`}
+        aria-describedby={describedBy}
         required={required && active}
         readonly={!active}
         rows="3"
-        maxlength="2000"
+        maxlength={motivation ? undefined : 2000}
         set:text={values?.[field.name] ?? ""}
       />
     ) : (
       <input
         id={`profile-${field.name}`}
         name={field.name}
-        aria-describedby={`error-${field.name}${"help" in field ? ` help-${field.name}` : ""}`}
+        aria-describedby={describedBy}
         type={"type" in field ? field.type : "text"}
         autocomplete={"autocomplete" in field ? field.autocomplete : "off"}
         value={values?.[field.name] ?? ""}
@@ -96,6 +100,20 @@ const message =
     "help" in field && (
       <span class="volunteer-help" id={`help-${field.name}`}>
         {field.help}
+      </span>
+    )
+  }
+  {
+    motivation && (
+      <span
+        class="volunteer-help"
+        id={`word-count-${field.name}`}
+        data-motivation-word-count
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {countWords(values?.motivation ?? "")} of {motivationMaxWords} words.
       </span>
     )
   }
