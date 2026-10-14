@@ -3,6 +3,7 @@ interface Props {
   sections: { key: string; heading: string }[];
 }
 const { sections } = Astro.props;
+const entries = [{ key: "overview", heading: "Overview" }, ...sections];
 ---
 
 <nav
@@ -16,6 +17,7 @@ const { sections } = Astro.props;
   >
     <summary data-application-step-heading>
       <span class="volunteer-application-contents-toggle">
+        On this page
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -25,15 +27,14 @@ const { sections } = Astro.props;
         >
           <path d="m9 5 7 7-7 7"></path>
         </svg>
-        On this page
       </span>
       <span class="volunteer-application-current" data-application-current>
-        {sections[0]?.heading}
+        Overview
       </span>
     </summary>
     <ol>
       {
-        sections.map((section, index) => (
+        entries.map((section, index) => (
           <li>
             <a
               href={`#application-${section.key}`}
@@ -50,7 +51,7 @@ const { sections } = Astro.props;
     <h2>On this page</h2>
     <ol>
       {
-        sections.map((section, index) => (
+        entries.map((section, index) => (
           <li>
             <a
               href={`#application-${section.key}`}

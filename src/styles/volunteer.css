@@ -324,7 +324,8 @@ body:has([data-application]) {
   line-height: 1.4;
 }
 .volunteer-application-contents {
-  position: sticky;
+  position: fixed;
+  inset-inline: 0;
   top: var(--application-sticky-offset, 10rem);
   z-index: 30;
   flex-shrink: 0;
@@ -340,7 +341,7 @@ body:has([data-application]) {
   align-items: center;
   gap: 12px;
   min-height: 52px;
-  padding-block: 4px;
+  padding: 4px 24px;
   cursor: pointer;
   list-style: none;
   font-size: 14px;
@@ -444,6 +445,16 @@ body:has([data-application]) {
 [data-application-flow] > [data-application] {
   min-width: 0;
 }
+@media (width < 64rem) {
+  [data-application-flow]:has(> [data-application-contents]:not([hidden])) {
+    /* Reserve the fixed bar above the intro, retaining the navigation's gap. */
+    padding-top: var(--application-bar-height, 54px);
+  }
+  [data-application-flow]:has(> [data-application-contents]:not([hidden]))
+    > .volunteer-application-intro {
+    margin-top: 0;
+  }
+}
 @media (min-width: 64rem) {
   [data-application-flow] {
     display: grid;
@@ -466,11 +477,11 @@ body:has([data-application]) {
     grid-row: 2;
   }
   [data-application-flow] > .volunteer-application-contents {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    align-self: start;
+    inset-inline: auto;
+    inset-inline-start: var(--application-sidebar-start, auto);
+    inline-size: var(--application-sidebar-width, 13rem);
+    justify-self: end;
     top: calc(var(--application-sticky-offset, 10rem) + 24px);
-    margin-block: 28px;
   }
   .volunteer-application-contents-menu {
     display: none;
@@ -1197,6 +1208,9 @@ body:has([data-application]) {
 @media (max-width: 640px) {
   .volunteer-wrap {
     padding: 0 16px 64px;
+  }
+  .volunteer-application-contents summary {
+    padding-inline: 16px;
   }
   .volunteer-application-warning {
     gap: 8px;

@@ -19,7 +19,7 @@ export function initApplicationSections(element: HTMLFormElement) {
   // Both responsive lists share each section, so targets are measured and
   // observed once while all of their links stay in sync.
   const sections = [
-    ...questions.querySelectorAll<HTMLElement>("[data-application-section]"),
+    ...flow.querySelectorAll<HTMLElement>("[data-application-section]"),
   ]
     .map((target) => ({
       target,
@@ -33,16 +33,38 @@ export function initApplicationSections(element: HTMLFormElement) {
   let frame = 0;
 
   const measure = () => {
-    const headerHeight = header?.getBoundingClientRect().height ?? 0;
-    // Keep the existing navigation attached too, including when text wraps.
-    navigation?.style.setProperty("top", `${headerHeight}px`);
+    // Measure the actual stack bottom: a preview banner can initially shift the
+    // header down, and the account navigation can wrap onto another line.
+    const headerBottom = Math.max(
+      0,
+      header?.getBoundingClientRect().bottom ?? 0,
+    );
+    navigation?.style.setProperty("top", `${headerBottom}px`);
     stickyHeight =
-      headerHeight + (navigation?.getBoundingClientRect().height ?? 0);
+      headerBottom + (navigation?.getBoundingClientRect().height ?? 0);
     // CSS hides the mobile disclosure at the sidebar breakpoint. Its absolute
     // dropdown never adds height, and the desktop sidebar must not affect jumps.
     barHeight = menu.getBoundingClientRect().height;
     if (!barHeight) menu.open = false;
+    if (!barHeight && !contents.hidden) {
+      // The fixed sidebar still aligns with the reserved second grid track.
+      // Read the track, never the nav's possibly stale width after a breakpoint.
+      const sidebarWidth = Number.parseFloat(
+        getComputedStyle(flow).gridTemplateColumns.split(" ")[1] ?? "",
+      );
+      if (sidebarWidth > 0) {
+        flow.style.setProperty(
+          "--application-sidebar-start",
+          `${flow.getBoundingClientRect().right - sidebarWidth}px`,
+        );
+        flow.style.setProperty(
+          "--application-sidebar-width",
+          `${sidebarWidth}px`,
+        );
+      }
+    }
     flow.style.setProperty("--application-sticky-offset", `${stickyHeight}px`);
+    flow.style.setProperty("--application-bar-height", `${barHeight}px`);
     flow.style.setProperty(
       "--application-scroll-offset",
       `${stickyHeight + barHeight}px`,
@@ -58,6 +80,8 @@ export function initApplicationSections(element: HTMLFormElement) {
   };
   const update = () => {
     frame = 0;
+    // Sticky headers can move without resizing as the preview banner scrolls.
+    measure();
     if (questions.hidden) {
       menu.open = false;
       return;
@@ -74,17 +98,10 @@ export function initApplicationSections(element: HTMLFormElement) {
       activate(active);
     if (!barHeight) return;
     const bounds = menu.getBoundingClientRect();
-    const availableBottom = Math.min(
-      window.innerHeight,
-      flow.getBoundingClientRect().bottom,
-    );
     flow.style.setProperty(
       "--application-dropdown-space",
-      `${Math.max(0, availableBottom - bounds.bottom - 16)}px`,
+      `${Math.max(0, window.innerHeight - bounds.bottom - 16)}px`,
     );
-    // The sticky bar is bounded by the application flow, never the footer.
-    // Close its absolute dropdown as the bar leaves that boundary as well.
-    if (bounds.top < stickyHeight - 1) menu.open = false;
   };
   const schedule = () => {
     if (!frame) frame = requestAnimationFrame(update);
@@ -96,7 +113,7 @@ export function initApplicationSections(element: HTMLFormElement) {
   const reveal = (target: HTMLElement) => {
     for (
       let parent: HTMLElement | null = target;
-      parent && parent !== element;
+      parent && parent !== flow;
       parent = parent.parentElement
     ) {
       if (parent instanceof HTMLDetailsElement) parent.open = true;
@@ -114,7 +131,9 @@ export function initApplicationSections(element: HTMLFormElement) {
         ? section.target.querySelector<HTMLElement>("summary")
         : section.target;
     focusTarget?.focus({ preventScroll: true });
-    section.target.scrollIntoView({ block: "start" });
+    if (hash === "#application-overview")
+      window.scrollTo({ top: 0, behavior: "instant" });
+    else section.target.scrollIntoView({ block: "start" });
     schedule();
   };
   for (const { links, target } of sections) {
@@ -186,7 +205,13 @@ export function initApplicationSections(element: HTMLFormElement) {
   });
   window.addEventListener("scroll", schedule, { passive: true });
   window.addEventListener("resize", refresh);
-  window.addEventListener("pageshow", refresh);
+  window.addEventListener("pageshow", (event) => {
+    refresh();
+    // Override the browser's initial fragment jump to the intro heading, while
+    // leaving bfcache scroll restoration alone on subsequent page visits.
+    if (!event.persisted && location.hash === "#application-overview")
+      visit(location.hash);
+  });
   window.addEventListener("hashchange", () => visit(location.hash));
   window.addEventListener("popstate", schedule);
   refresh();
