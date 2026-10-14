@@ -24,7 +24,7 @@ test("unfinished application shows a clickable yellow warning card without clipp
 }) => {
   await page.goto("/volunteer");
   const warning = page.getByRole("link", {
-    name: "Complete your application to request volunteer access",
+    name: "Please complete your Volunteer Application",
     exact: true,
   });
   await expect(warning).toHaveCount(0);
@@ -34,7 +34,7 @@ test("unfinished application shows a clickable yellow warning card without clipp
   await expect(warning).toHaveClass(/volunteer-application-warning/);
   await expect(warning).toHaveAttribute("href", "/apply");
   await expect(warning).toHaveText(
-    "Complete your application to request volunteer access",
+    "Please complete your Volunteer Application",
   );
   await expect(warning).toHaveCSS("background-color", "rgb(33, 26, 8)");
   await expect(warning).toHaveCSS("border-top-color", "rgb(161, 98, 7)");

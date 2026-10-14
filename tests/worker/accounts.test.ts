@@ -537,10 +537,7 @@ describe(
       assert.match(prompt, /volunteer-application-warning/);
       assert.match(prompt, /volunteer-warning-icon/);
       assert.match(prompt, /volunteer-application-warning-arrow/);
-      assert.match(
-        prompt,
-        /Complete your application to request volunteer access/,
-      );
+      assert.match(prompt, /Please complete your Volunteer Application/);
       assert.match(
         prompt,
         /<a\b[^>]*class="volunteer-application-warning"[^>]*href="\/apply"/,
