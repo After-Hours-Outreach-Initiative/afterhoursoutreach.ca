@@ -203,7 +203,7 @@ export const applicationFields = [
   {
     name: "medicalConditions",
     section: "personal-info",
-    label: "Medical conditions or triggers",
+    label: "Medical conditions/allergies/anything else we should know",
     required: false,
     multiline: true,
     help: "Optional. Used to help organizers support your safety during events.",

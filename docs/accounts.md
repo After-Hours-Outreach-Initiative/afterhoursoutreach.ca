@@ -135,7 +135,7 @@ and organizers can see the remaining profile answers.
 | Teams (outreach, medic, non-patrol)      | Yes            |
 | Highest medical certification            | Yes            |
 | Other training and experience, and other | Yes            |
-| Medical conditions or triggers           | No             |
+| Medical conditions/allergies/anything else we should know | No             |
 | Code of Conduct acknowledgement          | On application |
 
 New applicants must provide first and last names. Middle names, preferred name,

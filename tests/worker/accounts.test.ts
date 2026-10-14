@@ -1027,7 +1027,10 @@ describe(
         const changedName = "Worker Updated Volunteer";
         await page.getByLabel("Preferred name").fill(changedName);
         await page
-          .getByLabel("Medical conditions or triggers", { exact: false })
+          .getByLabel(
+            "Medical conditions/allergies/anything else we should know",
+            { exact: false },
+          )
           .fill("Changed browser sample");
         await expect(saveProfile).toBeEnabled();
         for (const id of siblings) {
@@ -1048,9 +1051,10 @@ describe(
             changedName,
           );
           await expect(
-            page.getByLabel("Medical conditions or triggers", {
-              exact: false,
-            }),
+            page.getByLabel(
+              "Medical conditions/allergies/anything else we should know",
+              { exact: false },
+            ),
           ).toHaveValue("Changed browser sample");
           assert.equal(
             await DB.prepare("SELECT id FROM session WHERE id=?")
@@ -1103,7 +1107,10 @@ describe(
         );
         assert.equal(
           await page
-            .getByLabel("Medical conditions or triggers", { exact: false })
+            .getByLabel(
+              "Medical conditions/allergies/anything else we should know",
+              { exact: false },
+            )
             .inputValue(),
           "Changed browser sample",
         );
