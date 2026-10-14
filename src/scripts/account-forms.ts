@@ -119,6 +119,40 @@ export function initRelevantTraining(element: HTMLFormElement) {
   update();
 }
 
+export function initReferralSources(element: HTMLFormElement) {
+  const section = element.querySelector<HTMLElement>("[data-referral-sources]");
+  const choices = [
+    ...(section?.querySelectorAll<HTMLInputElement>(
+      '[name="heardAboutUsSources"]',
+    ) ?? []),
+  ];
+  const first = choices[0];
+  const other = choices.find((choice) => choice.value === "other");
+  const details = section?.querySelector<HTMLElement>("[data-other-referral]");
+  const input = details?.querySelector<HTMLInputElement>("input");
+  if (!section || !first || !other || !details || !input) return;
+  const update = () => {
+    const selected = choices.some((choice) => choice.checked);
+    first.required = !selected;
+    first.setCustomValidity(
+      selected ? "" : "Select at least one way you found out about us.",
+    );
+    details.hidden = !other.checked;
+    input.required = other.checked;
+    input.disabled = !other.checked;
+    if (!other.checked) input.value = "";
+    input.setCustomValidity(
+      other.checked && !input.value.trim()
+        ? "Briefly describe how you found out about us."
+        : "",
+    );
+  };
+  section.addEventListener("change", update);
+  input.addEventListener("input", update);
+  element.addEventListener("reset", () => queueMicrotask(update));
+  update();
+}
+
 export function initAccountFormChanges(element: HTMLFormElement) {
   const button = element.querySelector<HTMLButtonElement>(
     'button[type="submit"]',

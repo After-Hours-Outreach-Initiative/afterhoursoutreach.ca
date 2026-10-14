@@ -8,6 +8,7 @@ import AccountProfileField from "./AccountProfileField.astro";
 import CodeOfConduct from "./CodeOfConduct.astro";
 import MedicalCertifications from "./MedicalCertifications.astro";
 import RelevantTraining from "./RelevantTraining.astro";
+import ReferralSources from "./ReferralSources.astro";
 interface Props {
   email: string;
   values?: ApplicationAnswers | null;
@@ -150,20 +151,26 @@ const sections = [
                 (field) =>
                   field.name !== "experience" && field.name !== "otherTraining",
               )
-              .map((field) => (
-                <AccountProfileField
-                  field={field}
-                  values={values}
-                  required={
-                    field.required &&
-                    !(
-                      legacyName &&
-                      ["firstName", "lastName"].includes(field.name)
-                    )
-                  }
-                  active={field.name !== "certificationExpiry" || medicSelected}
-                />
-              ))}
+              .map((field) =>
+                field.name === "heardAboutUs" ? (
+                  <ReferralSources values={values} />
+                ) : (
+                  <AccountProfileField
+                    field={field}
+                    values={values}
+                    required={
+                      field.required &&
+                      !(
+                        legacyName &&
+                        ["firstName", "lastName"].includes(field.name)
+                      )
+                    }
+                    active={
+                      field.name !== "certificationExpiry" || medicSelected
+                    }
+                  />
+                ),
+              )}
             {section.key === "training-and-safety" && (
               <RelevantTraining values={values} />
             )}

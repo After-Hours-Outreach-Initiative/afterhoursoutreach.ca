@@ -98,7 +98,10 @@ export async function viewVolunteerProfile(
           emergency_contact_name AS emergencyName,
           emergency_contact_phone AS emergencyPhone,
           emergency_contact_relationship AS emergencyRelationship,
-          heard_about_us AS heardAboutUs, motivation, teams,
+          heard_about_us AS heardAboutUs,
+          heard_about_us_sources AS heardAboutUsSources,
+          coalesce(heard_about_us_other, '') AS heardAboutUsOther,
+          motivation, teams,
           medical_certification AS certification, training_experience AS experience,
           medical_certifications AS certifications,
           relevant_training AS training, other_training AS otherTraining,
@@ -115,22 +118,30 @@ export async function viewVolunteerProfile(
       "Organizer authorization changed. Sign in again.",
     );
   const row = results[1].results[0] as
-    | (Omit<ApplicationAnswers, "teams" | "certifications" | "training"> & {
+    | (Omit<
+        ApplicationAnswers,
+        "teams" | "certifications" | "training" | "heardAboutUsSources"
+      > & {
         teams: string;
         certifications: string;
         training: string;
+        heardAboutUsSources: string | null;
       })
     | undefined;
-  return row
-    ? {
-        ...row,
-        teams: withOutreachTeam(JSON.parse(row.teams) as string[]),
-        certifications: normalizeCertifications(
-          JSON.parse(row.certifications) as string[],
-        ),
-        training: JSON.parse(row.training) as string[],
-      }
-    : null;
+  if (!row) return null;
+  const sources = row.heardAboutUsSources
+    ? (JSON.parse(row.heardAboutUsSources) as string[])
+    : [];
+  return {
+    ...row,
+    heardAboutUsSources: sources,
+    heardAboutUsOther: sources.includes("other") ? row.heardAboutUsOther : "",
+    teams: withOutreachTeam(JSON.parse(row.teams) as string[]),
+    certifications: normalizeCertifications(
+      JSON.parse(row.certifications) as string[],
+    ),
+    training: JSON.parse(row.training) as string[],
+  } satisfies ApplicationAnswers;
 }
 
 export const statusSchema = z.strictObject({

@@ -14,6 +14,8 @@ const answers = {
   emergencyPhone: "604-555-0101",
   emergencyRelationship: "Friend",
   heardAboutUs: "Friend",
+  heardAboutUsSources: ["friend-word-of-mouth"],
+  heardAboutUsOther: "",
   motivation: "Sample answer",
   teams: ["outreach"],
   certification: "None",

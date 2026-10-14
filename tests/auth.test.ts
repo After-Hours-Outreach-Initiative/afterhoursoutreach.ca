@@ -104,6 +104,8 @@ const answers = {
   emergencyPhone: "604-555-0101",
   emergencyRelationship: "Friend",
   heardAboutUs: "A friend",
+  heardAboutUsSources: ["friend-word-of-mouth"],
+  heardAboutUsOther: "",
   motivation: "Sample volunteering answer",
   teams: ["outreach"],
   certification: "None",
@@ -734,10 +736,10 @@ test("application-only questions are required once and preserved through profile
   });
   assert.ok(current);
   const id = current.user.id;
-  const { heardAboutUs, motivation, ...editable } = answers;
+  const { heardAboutUsSources, motivation, ...editable } = answers;
   for (const input of [
     editable,
-    { ...editable, heardAboutUs },
+    { ...editable, heardAboutUsSources },
     { ...editable, motivation },
   ]) {
     await assert.rejects(

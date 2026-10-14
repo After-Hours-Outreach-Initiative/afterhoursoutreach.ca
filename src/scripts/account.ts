@@ -7,6 +7,7 @@ import {
   clearFormMessage,
   initAccountFormChanges,
   initMedicCertifications,
+  initReferralSources,
   initRelevantTraining,
   showFormMessage as message,
 } from "./account-forms";
@@ -62,6 +63,7 @@ function form(
     if (!initialized.has(element)) {
       initMedicCertifications(element);
       initRelevantTraining(element);
+      initReferralSources(element);
       initialized.set(
         element,
         element.hasAttribute("data-save-changes")
@@ -301,6 +303,7 @@ form("[data-account-profile]", async (element, values) => {
         key !== "teams" &&
         key !== "certifications" &&
         key !== "training" &&
+        key !== "heardAboutUsSources" &&
         key !== "codeOfConductAccepted",
     ),
   );
@@ -310,6 +313,10 @@ form("[data-account-profile]", async (element, values) => {
     certifications: values.getAll("certifications"),
     training: values.getAll("training"),
     ...(element.hasAttribute("data-application") && {
+      heardAboutUsSources: values.getAll("heardAboutUsSources"),
+      heardAboutUsOther: values.getAll("heardAboutUsSources").includes("other")
+        ? String(values.get("heardAboutUsOther") ?? "")
+        : "",
       codeOfConductAccepted: values.get("codeOfConductAccepted") === "true",
     }),
   });

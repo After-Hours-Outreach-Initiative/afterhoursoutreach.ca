@@ -134,6 +134,9 @@ export const profile = sqliteTable("profile", {
   emergency_contact_phone: text().notNull(),
   emergency_contact_relationship: text().notNull(),
   heard_about_us: text().notNull(),
+  // Null on legacy profiles: keep the original free-text answer above untouched.
+  heard_about_us_sources: text({ mode: "json" }).$type<string[]>(),
+  heard_about_us_other: text(),
   motivation: text().notNull(),
   teams: text({ mode: "json" }).$type<string[]>().notNull(),
   medical_certification: text().notNull(),

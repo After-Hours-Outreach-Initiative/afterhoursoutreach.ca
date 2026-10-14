@@ -35,6 +35,8 @@ export const sampleAnswers = {
   emergencyPhone: "604-555-0101",
   emergencyRelationship: "Friend",
   heardAboutUs: "A friend",
+  heardAboutUsSources: ["friend-word-of-mouth"],
+  heardAboutUsOther: "",
   motivation: "Sample answer",
   teams: ["outreach"],
   certification: "None",
