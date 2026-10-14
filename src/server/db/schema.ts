@@ -147,6 +147,9 @@ export const volunteerStatus = sqliteTable(
       .primaryKey()
       .references(() => user.id, { onDelete: "cascade" }),
     active: integer({ mode: "boolean" }).notNull().default(true),
+    registration_approved: integer({ mode: "boolean" })
+      .notNull()
+      .default(false),
     patrol_approved: integer({ mode: "boolean" }).notNull().default(false),
     approved_by: text().references(() => user.id),
     approved_at: timestamp(),

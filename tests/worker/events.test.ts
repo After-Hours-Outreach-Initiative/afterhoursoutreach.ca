@@ -151,13 +151,13 @@ describe(
       hidden: false,
     });
 
-    test("new databases show a genuine empty event list, not sample fixtures", async () => {
+    test("visitors cannot view events, including on an empty database", async () => {
       const response = await ok(await send("/volunteer"));
-      assert.match(await response.text(), /No upcoming events are scheduled/);
-      const list = (await (await ok(await send("/api/v1/events"))).json()) as {
-        events: unknown[];
-      };
-      assert.deepEqual(list.events, []);
+      assert.doesNotMatch(
+        await response.text(),
+        /data-live-event=|data-event-list|No upcoming events are scheduled/,
+      );
+      await ok(await send("/api/v1/events"), 401);
     });
 
     test("bootstrap requires verified registration but not two-factor, is atomic and one-time", async () => {
@@ -296,6 +296,7 @@ describe(
             userId,
             version: row!.version,
             active,
+            registrationApproved: true,
             patrolApproved,
           },
           organizer.cookie,
@@ -306,20 +307,78 @@ describe(
         const response = await ok(await send("/volunteer"));
         const html = await response.text();
         assert.doesNotMatch(html, /Preview · public test site/);
-        assert.match(html, /Sample meeting point/);
+        assert.doesNotMatch(
+          html,
+          /Sample meeting point|data-live-event=|data-event-list/,
+        );
         assert.doesNotMatch(
           html,
           /preview-event|data-account-switcher|View as|Sample Alice|PRIVATE HEALTH ANSWER|data-account-menu/,
         );
         assert.match(response.headers.get("cache-control")!, /no-store/);
         const summaries = (await (
-          await ok(await send("/api/v1/events"))
+          await ok(await send("/api/v1/events", undefined, organizer.cookie))
         ).json()) as { events: unknown[] };
         assert.equal(summaries.events.length, 3);
         assert.doesNotMatch(
           JSON.stringify(summaries),
           /PRIVATE HEALTH ANSWER|Sample Alice|userId|confirmed|signedUp|version/,
         );
+      });
+
+      test("registration approval gates listings and orientations independently of patrol approval", async () => {
+        for (const person of [alice, bob]) {
+          const page = await ok(
+            await send("/volunteer", undefined, person.cookie),
+          );
+          const html = await page.text();
+          assert.match(html, /Registration awaiting approval/);
+          assert.doesNotMatch(
+            html,
+            /Sample meeting point|data-live-event=|data-event-list/,
+          );
+          await ok(await send("/api/v1/events", undefined, person.cookie), 403);
+          await ok(await join(orientation.id, person.cookie), 403);
+          await ok(
+            await send(
+              "/api/v1/organizer/action",
+              {
+                action: "status",
+                userId: person.id,
+                version: 0,
+                active: true,
+                registrationApproved: true,
+                patrolApproved: false,
+              },
+              person.cookie,
+            ),
+            403,
+          );
+          await ok(
+            await send(
+              "/api/v1/organizer/action",
+              {
+                action: "role",
+                userId: person.id,
+                role: "organizer",
+              },
+              organizer.cookie,
+            ),
+            409,
+          );
+          await ok(await status(person.id, true, false));
+          const events = await ok(
+            await send("/api/v1/events", undefined, person.cookie),
+          );
+          assert.match(await events.text(), /Sample meeting point/);
+          await ok(await join(patrol.id, person.cookie), 403);
+          const audit = await DB.prepare(
+            "SELECT changed_fields FROM audit_log WHERE subject_id=? AND action='approval_changed'",
+          )
+            .bind(person.id)
+            .first();
+          assert.equal(audit?.changed_fields, '["registrationApproved"]');
+        }
       });
 
       test("last spot is atomic across simultaneous signups without queuing email", async () => {
@@ -733,6 +792,64 @@ describe(
         await ok(await status(organizer.id, false, false), 409);
       });
 
+      test("revoking registration approval cancels future orientations and patrols without changing patrol approval", async () => {
+        await ok(await status(alice.id, true, true));
+        const orientationEvent = await createEvent("orientation");
+        const patrolEvent = await createEvent("patrol");
+        for (const event of [orientationEvent, patrolEvent])
+          await ok(await join(event.id, alice.cookie));
+        const row = await DB.prepare(
+          "SELECT updated_at AS version FROM volunteer_status WHERE user_id=?",
+        )
+          .bind(alice.id)
+          .first<{ version: number }>();
+        const change = {
+          action: "status",
+          userId: alice.id,
+          version: row!.version,
+          active: true,
+          registrationApproved: false,
+          patrolApproved: true,
+        };
+        await ok(
+          await send("/api/v1/organizer/action", change, organizer.cookie),
+        );
+        await ok(
+          await send(
+            "/api/v1/organizer/action",
+            { ...change, registrationApproved: true },
+            organizer.cookie,
+          ),
+          409,
+        );
+        const statusRow = await DB.prepare(
+          "SELECT registration_approved, patrol_approved FROM volunteer_status WHERE user_id=?",
+        )
+          .bind(alice.id)
+          .first();
+        assert.equal(statusRow?.registration_approved, 0);
+        assert.equal(statusRow?.patrol_approved, 1);
+        for (const event of [orientationEvent, patrolEvent]) {
+          assert.equal(
+            (
+              await DB.prepare(
+                "SELECT status FROM signup WHERE event_id=? AND user_id=?",
+              )
+                .bind(event.id, alice.id)
+                .first()
+            )?.status,
+            "cancelled",
+          );
+          await ok(await join(event.id, alice.cookie), 403);
+        }
+        await ok(await send("/api/v1/events", undefined, alice.cookie), 403);
+        assert.doesNotMatch(
+          await (await send("/volunteer", undefined, alice.cookie)).text(),
+          /data-live-event=/,
+        );
+        await ok(await status(alice.id, false, false));
+      });
+
       test("opted-in cancellation preserves records, cancels spots and queues notifications atomically", async () => {
         const event = await createEvent("patrol", 2);
         await ok(await join(event.id, bob.cookie));
@@ -978,7 +1095,7 @@ describe(
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
             form: profileDialog.locator(
-              "[data-organizer-status]:not([data-submit-on-change])",
+              '[data-organizer-status][data-access-kind="patrol"]',
             ),
             notify: true,
             trigger: () =>
@@ -1145,7 +1262,7 @@ describe(
             exact: true,
           });
           const visibilityChoices = dialog.getByRole("group", {
-            name: "Public event list",
+            name: "Volunteer event list",
             exact: true,
           });
           await expect(
@@ -1216,7 +1333,7 @@ describe(
               exact: true,
             });
             const visibility = editor.getByRole("group", {
-              name: "Public event list",
+              name: "Volunteer event list",
               exact: true,
             });
             // Reopening the editor must explicitly show the saved states.

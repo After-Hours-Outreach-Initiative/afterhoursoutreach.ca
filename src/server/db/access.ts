@@ -41,6 +41,7 @@ export async function accountContext(
       twoFactorVerified: current.session.twoFactorVerified,
       registered,
       active: status?.active ?? false,
+      registrationApproved: status?.registration_approved ?? false,
       patrolApproved: status?.patrol_approved ?? false,
     },
     email: person.email,
@@ -72,11 +73,25 @@ export function requireVolunteer(actor: Actor | null): asserts actor is Actor {
     throw new RequestError(403, "Complete registration first.");
   if (!actor.active)
     throw new RequestError(403, "Your volunteer account is inactive.");
+  if (!actor.registrationApproved && actor.role !== "organizer")
+    throw new RequestError(
+      403,
+      "Your registration is awaiting organizer approval.",
+    );
+  if (actor.twoFactorEnabled && !actor.twoFactorVerified)
+    throw new RequestError(403, "Sign in with your authenticator to continue.");
+}
+export function canViewEvents(actor: Actor | null): boolean {
+  // Organizers must retain access to review registrations, including after migration.
+  return Boolean(
+    actor?.registered &&
+    actor.active &&
+    (actor.registrationApproved || actor.role === "organizer") &&
+    (!actor.twoFactorEnabled || actor.twoFactorVerified),
+  );
 }
 export function requireOrganizer(actor: Actor | null): asserts actor is Actor {
   requireVolunteer(actor);
   if (actor.role !== "organizer")
     throw new RequestError(403, "Organizer access is required.");
-  if (actor.twoFactorEnabled && !actor.twoFactorVerified)
-    throw new RequestError(403, "Sign in with your authenticator to continue.");
 }

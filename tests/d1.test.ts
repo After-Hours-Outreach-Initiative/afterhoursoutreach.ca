@@ -32,7 +32,7 @@ test("Drizzle and capacity constraints work in the D1 runtime", async () => {
       .run();
     await binding
       .prepare(
-        "INSERT INTO volunteer_status (user_id, updated_at) VALUES (?, 0)",
+        "INSERT INTO volunteer_status (user_id, registration_approved, updated_at) VALUES (?, 1, 0)",
       )
       .bind(id)
       .run();

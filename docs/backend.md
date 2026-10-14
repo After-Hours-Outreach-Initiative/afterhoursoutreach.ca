@@ -84,9 +84,9 @@ This is a one-time, audited D1 transaction. It ends the account's sessions;
 sign in again. It cannot target production. No organizer
 is promoted automatically or based on the email address supplied to a web form.
 
-Organizers manage active status, patrol approval, and roles at
+Organizers manage registration approval, active status, patrol approval, and roles at
 `/volunteer/volunteers`. Promotions require an active, registered account with
-a verified email. Role changes revoke
+a verified email and approved registration. Role changes revoke
 the target's sessions. The last active organizer cannot be demoted/deactivated.
 Two-factor authentication is optional for organizers and volunteers; accounts
 that enable it must complete it when signing in. Full profile
@@ -102,6 +102,9 @@ access, the browser still navigates to sign-in or the volunteer portal.
 ## Events
 
 `/volunteer` is request-rendered and lists D1 events, never invented fixtures.
+Visitors and volunteers awaiting registration approval cannot view event details
+on pages or through the event API. Existing volunteers also require registration
+approval after applying `0002_registration_approval.sql`; organizers retain access.
 Organizers create/edit events, separately close signups or hide listings, view
 rosters, move/remove signups with an optional emailed reason, and mark past
 orientation attendance. Volunteers can sign up and cancel before the event

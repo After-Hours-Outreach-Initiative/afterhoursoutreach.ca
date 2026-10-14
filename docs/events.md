@@ -1,7 +1,8 @@
 # Events
 
 Patrols and orientations show up at the bottom of the `/volunteer` page. An
-account is required to sign up for either.
+active account with organizer-approved registration is required to view events or
+sign up for either. Organizers retain access through their role.
 
 ## Orientations
 
@@ -33,14 +34,17 @@ There are 3 types of users:
 
 ### 1. Visitors
 
-The homepage shows sign in and lists upcoming events.
+The homepage links to volunteer registration/sign-in. Event details are not
+available to visitors, including through `/api/v1/events`. Polling versions contain
+no event details and do not change with event activity for visitors or pending accounts.
 
 ### 2. Volunteers
 
 Each event has a sign up button, which adds a green "Signed up"
 badge and the sign up button turns into a cancel button.
 
-Volunteers who have not been approved for patrols can sign up for orientations.
+Volunteers awaiting registration approval cannot view events. After registration
+approval, volunteers who have not been approved for patrols can sign up for orientations.
 Patrols are shown without a sign up button, with a note that organizer approval
 is required.
 

@@ -51,10 +51,20 @@ record. Existing and synthetic profiles are not backfilled with invented consent
 The additive `code_of_conduct` migration must be applied before deploying this
 change; it preserves existing accounts and profile answers.
 
-After registration is complete the new volunteer account will only be able to
-sign up for orientation events until an organizer manually approves patrol
-access. Completing orientation is the most common path to approval, but is not
-required and does not automatically grant approval.
+After registration, volunteers wait for an organizer to approve their registration
+from **Volunteers → View profile and approval → Approve registration**. Until then,
+they can edit their account but cannot view events or sign up for orientations.
+Pending registrations appear first in the volunteer list. Organizers retain event
+and review access through their role, with an active, completed registration.
+
+Registration approval enables event viewing and orientation sign-ups. Patrol
+approval remains a separate decision; completing orientation does not grant it
+automatically. Both approval changes are audited, and emails require organizer
+opt-in. Revoking registration approval cancels future volunteer event sign-ups.
+
+Apply `0002_registration_approval.sql` before deploying. Existing volunteers also
+start awaiting approval, including those already approved for patrols. Profiles,
+patrol approvals, and existing sign-up records are preserved by the migration.
 
 ### Profile
 

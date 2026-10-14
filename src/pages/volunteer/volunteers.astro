@@ -100,6 +100,13 @@ try {
                         · {person.orientations} orientations completed
                       </p>
                       <p>
+                        {person.role === "organizer"
+                          ? "Event access through organizer role"
+                          : person.registrationApproved
+                            ? "Registration approved"
+                            : "Registration awaiting approval"}
+                      </p>
+                      <p>
                         <span
                           class:list={{
                             "volunteer-spots": Boolean(person.patrolApproved),

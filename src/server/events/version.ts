@@ -14,6 +14,7 @@ export async function eventViewVersion(
       role: actor.role,
       registered: actor.registered,
       active: actor.active,
+      registrationApproved: actor.registrationApproved,
       patrolApproved: actor.patrolApproved,
       twoFactorEnabled: actor.twoFactorEnabled,
       twoFactorVerified: actor.twoFactorVerified,

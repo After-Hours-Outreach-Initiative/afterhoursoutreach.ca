@@ -15,6 +15,7 @@ export interface VolunteerRow {
   name: string;
   role: "volunteer" | "organizer";
   active: number;
+  registrationApproved: number;
   patrolApproved: number;
   updatedAt: number;
   twoFactorEnabled: number;
@@ -32,13 +33,13 @@ export async function listVolunteers(
   const rows = await db
     .prepare(
       `SELECT u.id, p.preferred_name AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
-        v.active, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        v.active, v.registration_approved AS registrationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       FROM user u
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
       WHERE instr(lower(p.preferred_name), lower(?)) > 0
-      ORDER BY p.preferred_name, u.id
+      ORDER BY v.registration_approved, p.preferred_name, u.id
       LIMIT ? OFFSET ?`,
     )
     .bind(search.slice(0, 100), volunteerPageSize + 1, offset)
@@ -54,7 +55,7 @@ export function findVolunteer(db: Env["DB"], actor: Actor, userId: string) {
   return db
     .prepare(
       `SELECT u.id, u.name, u.role, u.two_factor_enabled AS twoFactorEnabled,
-        v.active, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        v.active, v.registration_approved AS registrationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
       FROM user u JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
     )
@@ -112,6 +113,7 @@ export const statusSchema = z.strictObject({
   userId: z.string().min(1).max(200),
   version: z.number().int().nonnegative(),
   active: z.boolean(),
+  registrationApproved: z.boolean().optional(),
   patrolApproved: z.boolean(),
   notify: z.boolean().default(false),
 });
@@ -127,15 +129,25 @@ export async function setVolunteerStatus(
   const { userId, version, active, patrolApproved, notify } = parsed.data;
   const old = await db
     .prepare(
-      `SELECT active, patrol_approved AS patrolApproved
+      `SELECT active, registration_approved AS registrationApproved, patrol_approved AS patrolApproved
       FROM volunteer_status
       WHERE user_id = ?`,
     )
     .bind(userId)
-    .first<{ active: number; patrolApproved: number }>();
+    .first<{
+      active: number;
+      registrationApproved: number;
+      patrolApproved: number;
+    }>();
   if (!old) throw new RequestError(404, "Volunteer not found.");
+  // Older clients can change active/patrol status without changing registration approval.
+  const registrationApproved =
+    parsed.data.registrationApproved ?? Boolean(old.registrationApproved);
   const fields = [
     old.active !== Number(active) ? "active" : "",
+    old.registrationApproved !== Number(registrationApproved)
+      ? "registrationApproved"
+      : "",
     old.patrolApproved !== Number(patrolApproved) ? "patrolApproved" : "",
   ].filter(Boolean);
   if (!fields.length)
@@ -148,6 +160,7 @@ export async function setVolunteerStatus(
         .prepare(
           `UPDATE volunteer_status
           SET active = ?,
+              registration_approved = ?,
               patrol_approved = ?,
               approved_by = CASE WHEN patrol_approved = ? THEN approved_by ELSE ? END,
               approved_at = CASE WHEN patrol_approved = ? THEN approved_at ELSE ? END,
@@ -158,6 +171,7 @@ export async function setVolunteerStatus(
         )
         .bind(
           Number(active),
+          Number(registrationApproved),
           Number(patrolApproved),
           Number(patrolApproved),
           patrolApproved ? actor.id : null,
@@ -178,7 +192,8 @@ export async function setVolunteerStatus(
           operation,
           actor.id,
           userId,
-          fields.includes("patrolApproved")
+          fields.includes("patrolApproved") ||
+            fields.includes("registrationApproved")
             ? "approval_changed"
             : "active_changed",
           JSON.stringify(fields),
@@ -196,7 +211,7 @@ export async function setVolunteerStatus(
           WHERE s.user_id = ?
             AND s.status = 'confirmed'
             AND e.starts_at > ?
-            AND (? = 0 OR (? = 0 AND e.type = 'patrol'))
+            AND (? = 0 OR (? = 0 AND EXISTS(SELECT 1 FROM user WHERE id = s.user_id AND role != 'organizer')) OR (? = 0 AND e.type = 'patrol'))
             AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)
             AND ? = 1`,
         )
@@ -206,6 +221,7 @@ export async function setVolunteerStatus(
           userId,
           now,
           Number(active),
+          Number(registrationApproved),
           Number(patrolApproved),
           operation,
           Number(notify),
@@ -218,7 +234,7 @@ export async function setVolunteerStatus(
             AND status = 'confirmed'
             AND event_id IN(
               SELECT id FROM event
-              WHERE starts_at > ? AND (? = 0 OR (? = 0 AND type = 'patrol'))
+              WHERE starts_at > ? AND (? = 0 OR (? = 0 AND EXISTS(SELECT 1 FROM user WHERE id = signup.user_id AND role != 'organizer')) OR (? = 0 AND type = 'patrol'))
             )
             AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
         )
@@ -227,6 +243,7 @@ export async function setVolunteerStatus(
           userId,
           now,
           Number(active),
+          Number(registrationApproved),
           Number(patrolApproved),
           operation,
         ),
@@ -240,7 +257,7 @@ export async function setVolunteerStatus(
           crypto.randomUUID(),
           operation,
           userId,
-          `Volunteer account: ${active ? "active" : "inactive"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. Orientation attendance does not automatically grant patrol approval.`,
+          `Volunteer account: ${active ? "active" : "inactive"}. Registration: ${registrationApproved ? "approved" : "awaiting organizer approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. Sign in to view your events. Orientation attendance does not automatically grant patrol approval.`,
           now,
           operation,
           Number(notify),
@@ -267,7 +284,7 @@ export async function setRole(
   requireOrganizer(actor);
   const target = await db
     .prepare(
-      `SELECT u.role, u.email_verified AS verified, v.active
+      `SELECT u.role, u.email_verified AS verified, v.active, v.registration_approved AS registrationApproved
       FROM user u
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
@@ -278,14 +295,18 @@ export async function setRole(
       role: string;
       verified: number;
       active: number;
+      registrationApproved: number;
     }>();
   if (!target) throw new RequestError(404, "Registered volunteer not found.");
   if (target.role === role)
     return { operation: crypto.randomUUID(), message: "Role is unchanged." };
-  if (role === "organizer" && (!target.verified || !target.active))
+  if (
+    role === "organizer" &&
+    (!target.verified || !target.active || !target.registrationApproved)
+  )
     throw new RequestError(
       409,
-      "New organizers need a verified email and an active registration first.",
+      "New organizers need a verified email and an active, approved registration first.",
     );
   const operation = crypto.randomUUID();
   const now = Date.now();
@@ -299,7 +320,7 @@ export async function setRole(
             AND role = ?
             AND ${writePermission(true)}
             AND (? = 'volunteer' OR (email_verified = 1 AND EXISTS(
-              SELECT 1 FROM volunteer_status WHERE user_id = ? AND active = 1
+              SELECT 1 FROM volunteer_status WHERE user_id = ? AND active = 1 AND registration_approved = 1
             )))`,
         )
         .bind(

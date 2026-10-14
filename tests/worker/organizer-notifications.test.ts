@@ -161,6 +161,7 @@ describe(
               userId: volunteer.id,
               version: row.version,
               active,
+              registrationApproved: true,
               patrolApproved,
             },
             row.active === Number(active) &&

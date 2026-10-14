@@ -1,6 +1,10 @@
 ---
 import { env } from "cloudflare:workers";
-import { accountContext, requireOrganizer } from "@/server/db/access";
+import {
+  accountContext,
+  canViewEvents,
+  requireOrganizer,
+} from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
 import { listEvents, listRosters } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
@@ -24,6 +28,7 @@ try {
   /* Organizer actions remain locked. */
 }
 const events = await listEvents(env.DB, actor);
+const eventAccess = canViewEvents(actor);
 const eventVersion = await eventViewVersion(events, actor);
 const rosters =
   organizer && actor
@@ -56,125 +61,146 @@ const filter = ["patrol", "orientation"].includes(
   name={actor?.name}
   email={email}
 >
-  {
-    !actor ? (
-      <SignInPanel returnTo="/volunteer" />
-    ) : !actor.registered ? (
-      <a class="volunteer-registration-warning" href="/volunteer/register">
-        <WarningIcon class="volunteer-warning-icon" />
-        <span class="volunteer-registration-warning-text">
-          Complete your registration to register for events
-        </span>
-        <svg
-          class="volunteer-registration-warning-arrow"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M5 12h14m-6-6 6 6-6 6" />
-        </svg>
-      </a>
-    ) : null
-  }
-  {
-    actor?.role === "organizer" && !organizer && (
-      <p class="volunteer-notice">
-        Organizer tools require an active registration. If you enabled an
-        authenticator, finish signing in with it.{" "}
-        <a href="/volunteer/account">Go to Your account</a>.
-      </p>
-    )
-  }
-  <section
-    class="volunteer-events"
+  <div
     data-event-browser
     data-event-version={eventVersion}
-    aria-labelledby="events-heading"
+    data-event-access={String(eventAccess)}
   >
-    <div class="volunteer-section-heading">
-      <div>
-        <h2 id="events-heading">{organizer ? "Events" : "Upcoming events"}</h2>
-      </div>
-      {
-        organizer && (
-          <button
-            class="btn btn-primary"
-            data-show-dialog="event-editor-new"
-            type="button"
+    {
+      !actor ? (
+        <SignInPanel returnTo="/volunteer" />
+      ) : !actor.registered ? (
+        <a class="volunteer-registration-warning" href="/volunteer/register">
+          <WarningIcon class="volunteer-warning-icon" />
+          <span class="volunteer-registration-warning-text">
+            Complete your registration to request volunteer access
+          </span>
+          <svg
+            class="volunteer-registration-warning-arrow"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
           >
-            Add an event
-          </button>
-        )
-      }
-    </div>
-    <form
-      class="volunteer-filters"
-      method="get"
-      role="group"
-      aria-label="Filter events"
-    >
-      {
-        [
-          ["all", "All events"],
-          ["orientation", "Orientations"],
-          ["patrol", "Patrols"],
-        ].map(([type, label]) => (
-          <button
-            class="btn btn-quiet"
-            type="submit"
-            name="type"
-            value={type}
-            data-event-filter={type}
-            aria-pressed={filter === type ? "true" : "false"}
+            <path d="M5 12h14m-6-6 6 6-6 6" />
+          </svg>
+        </a>
+      ) : !actor.active ? (
+        <p class="volunteer-notice" role="status">
+          Your volunteer account is inactive. Contact an organizer to restore
+          access.
+        </p>
+      ) : !actor.registrationApproved && actor.role !== "organizer" ? (
+        <section class="volunteer-panel" data-registration-pending>
+          <h2>Registration awaiting approval</h2>
+          <p>
+            An organizer will review your registration before you can view
+            events or sign up for an orientation.
+          </p>
+          <a class="btn btn-outline mt-6" href="/volunteer/account">
+            Your account
+          </a>
+        </section>
+      ) : null
+    }
+    {
+      actor?.role === "organizer" && !organizer && (
+        <p class="volunteer-notice">
+          Organizer tools require an active registration. If you enabled an
+          authenticator, finish signing in with it.{" "}
+          <a href="/volunteer/account">Go to Your account</a>.
+        </p>
+      )
+    }
+    {
+      eventAccess && (
+        <section class="volunteer-events" aria-labelledby="events-heading">
+          <div class="volunteer-section-heading">
+            <div>
+              <h2 id="events-heading">
+                {organizer ? "Events" : "Upcoming events"}
+              </h2>
+            </div>
+            {organizer && (
+              <button
+                class="btn btn-primary"
+                data-show-dialog="event-editor-new"
+                type="button"
+              >
+                Add an event
+              </button>
+            )}
+          </div>
+          <form
+            class="volunteer-filters"
+            method="get"
+            role="group"
+            aria-label="Filter events"
           >
-            {label}
-          </button>
-        ))
-      }
-    </form>
-    <ul class="volunteer-event-list" data-event-list>
-      {
-        events.map((event) => (
-          <EventCard
-            event={event}
-            actor={actor}
-            organizer={organizer}
-            roster={rosters.filter((person) => person.eventId === event.id)}
-            destinations={destinations}
-            filter={filter}
-          />
-        ))
-      }
-    </ul>
-    <p
-      class="volunteer-notice"
-      data-empty-events
-      role="status"
-      hidden={events.some((event) => filter === "all" || event.type === filter)}
-    >
-      {
-        events.length
-          ? "No upcoming events match this filter. Check back soon."
-          : "No upcoming events are scheduled. Check back soon."
-      }
-    </p>
-    <p class="volunteer-help" data-event-limit hidden={events.length !== 100}>
-      Showing up to 100 events.
-    </p>
-  </section>
-  {
-    organizer && notifications && (
-      <>
-        <EventEditor />
-        <VolunteerProfileDialog />
-        <EventNotifications counts={notifications} />
-      </>
-    )
-  }
+            {[
+              ["all", "All events"],
+              ["orientation", "Orientations"],
+              ["patrol", "Patrols"],
+            ].map(([type, label]) => (
+              <button
+                class="btn btn-quiet"
+                type="submit"
+                name="type"
+                value={type}
+                data-event-filter={type}
+                aria-pressed={filter === type ? "true" : "false"}
+              >
+                {label}
+              </button>
+            ))}
+          </form>
+          <ul class="volunteer-event-list" data-event-list>
+            {events.map((event) => (
+              <EventCard
+                event={event}
+                actor={actor}
+                organizer={organizer}
+                roster={rosters.filter((person) => person.eventId === event.id)}
+                destinations={destinations}
+                filter={filter}
+              />
+            ))}
+          </ul>
+          <p
+            class="volunteer-notice"
+            data-empty-events
+            role="status"
+            hidden={events.some(
+              (event) => filter === "all" || event.type === filter,
+            )}
+          >
+            {events.length
+              ? "No upcoming events match this filter. Check back soon."
+              : "No upcoming events are scheduled. Check back soon."}
+          </p>
+          <p
+            class="volunteer-help"
+            data-event-limit
+            hidden={events.length !== 100}
+          >
+            Showing up to 100 events.
+          </p>
+        </section>
+      )
+    }
+    {
+      organizer && notifications && (
+        <>
+          <EventEditor />
+          <VolunteerProfileDialog />
+          <EventNotifications counts={notifications} />
+        </>
+      )
+    }
+  </div>
   <noscript
     ><p class="volunteer-notice">
       JavaScript is required to save changes and register for events.

@@ -626,6 +626,28 @@ test("registration/editing persists all answers, keeps approval, and audits only
     codeOfConductAccepted: true,
   });
   assert.deepEqual(await loadProfile(bindings.DB, id), answers);
+  const initialStatus = await bindings.DB.prepare(
+    "SELECT registration_approved FROM volunteer_status WHERE user_id=?",
+  )
+    .bind(id)
+    .first();
+  assert.equal(initialStatus?.registration_approved, 0);
+  await saveProfile(bindings.DB, id, answers);
+  await assert.rejects(
+    () =>
+      saveProfile(bindings.DB, id, { ...answers, registrationApproved: true }),
+    RequestError,
+  );
+  assert.equal(
+    (
+      await bindings.DB.prepare(
+        "SELECT registration_approved FROM volunteer_status WHERE user_id=?",
+      )
+        .bind(id)
+        .first()
+    )?.registration_approved,
+    0,
+  );
   const acknowledgement = await bindings.DB.prepare(
     "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
   )
@@ -644,7 +666,7 @@ test("registration/editing persists all answers, keeps approval, and audits only
     "INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at) VALUES ('organizer', 'Organizer', 'organizer@example.org', 1, 'organizer', 0, 0)",
   ).run();
   await bindings.DB.prepare(
-    "UPDATE volunteer_status SET patrol_approved = 1, approved_by = 'organizer', approved_at = ? WHERE user_id = ?",
+    "UPDATE volunteer_status SET registration_approved = 1, patrol_approved = 1, approved_by = 'organizer', approved_at = ? WHERE user_id = ?",
   )
     .bind(Date.now(), id)
     .run();
@@ -664,11 +686,12 @@ test("registration/editing persists all answers, keeps approval, and audits only
     acknowledgement,
   );
   const status = await bindings.DB.prepare(
-    "SELECT patrol_approved FROM volunteer_status WHERE user_id = ?",
+    "SELECT registration_approved, patrol_approved FROM volunteer_status WHERE user_id = ?",
   )
     .bind(id)
     .first();
   assert.equal(status?.patrol_approved, 1);
+  assert.equal(status?.registration_approved, 1);
   const logs = await bindings.DB.prepare(
     "SELECT changed_fields FROM audit_log WHERE subject_id = ? ORDER BY created_at",
   )

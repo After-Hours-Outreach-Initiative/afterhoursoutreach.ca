@@ -12,6 +12,9 @@ import {
   readAccountSession,
 } from "@/server/auth";
 import { loadProfile } from "@/server/db/profiles";
+import { createDatabase } from "@/server/db";
+import { volunteerStatus } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 import type { RegistrationAnswers } from "@/data/registration";
 export const prerender = false;
 let values: RegistrationAnswers | null = null;
@@ -19,6 +22,8 @@ let email = "";
 let currentId = "";
 let twoFactorEnabled = false;
 let organizer = false;
+let registrationApproved = false;
+let active = false;
 let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
 let sessionsNeedSignIn = false;
 let emailNeedsSignIn = false;
@@ -43,6 +48,11 @@ try {
   currentId = current.session.id;
   twoFactorEnabled = Boolean(current.user.twoFactorEnabled);
   organizer = current.user.role === "organizer";
+  const status = await createDatabase(env.DB).query.volunteerStatus.findFirst({
+    where: eq(volunteerStatus.user_id, current.user.id),
+  });
+  registrationApproved = status?.registration_approved ?? false;
+  active = status?.active ?? false;
   try {
     const listed = await auth.api.listSessions({
       headers: Astro.request.headers,
@@ -80,6 +90,20 @@ try {
   name={values?.name}
   email={email}
 >
+  {
+    !active ? (
+      <p class="volunteer-notice" role="status">
+        Your volunteer account is inactive. Contact an organizer to restore
+        access.
+      </p>
+    ) : !registrationApproved && !organizer ? (
+      <p class="volunteer-notice" role="status">
+        Your registration is awaiting organizer approval. You can update your
+        profile while you wait. Events and orientation sign-ups will be
+        available once approved.
+      </p>
+    ) : null
+  }
   <section class="volunteer-panel">
     <h2>Your profile</h2>
     <AccountProfileForm email={email} values={values} />

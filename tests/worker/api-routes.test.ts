@@ -23,7 +23,7 @@ test("API routes use the v1 prefix and retain private headers on workers.dev", a
     await worker.applyD1Migrations("DB");
     for (const [path, method, status] of [
       ["health", "GET", 200],
-      ["events", "GET", 200],
+      ["events", "GET", 401],
       ["auth/get-session", "GET", 200],
       ["account/profile", "POST", 401],
       ["account/session", "POST", 401],
@@ -63,7 +63,9 @@ test("API routes use the v1 prefix and retain private headers on workers.dev", a
           path,
         );
         if (path === "events")
-          assert.deepEqual(await response.json(), { events: [] });
+          assert.deepEqual(await response.json(), {
+            message: "Sign in to continue.",
+          });
         if (path === "auth/get-session")
           assert.equal(await response.json(), null);
       }

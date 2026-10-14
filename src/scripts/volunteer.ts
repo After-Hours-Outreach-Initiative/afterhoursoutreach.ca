@@ -30,20 +30,21 @@ function applyEventFilter(root: HTMLElement, type: string) {
 document
   .querySelectorAll<HTMLElement>("[data-event-browser]")
   .forEach((root) => {
-    const filters = root.querySelectorAll<HTMLButtonElement>(
-      "[data-event-filter]",
-    );
     const applyFilter = (type: string) => applyEventFilter(root, type);
-    for (const button of filters)
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        const type = button.dataset.eventFilter ?? "all";
-        applyFilter(type);
-        const url = new URL(location.href);
-        if (type === "all") url.searchParams.delete("type");
-        else url.searchParams.set("type", type);
-        history.pushState(null, "", url);
-      });
+    root.addEventListener("click", (event) => {
+      if (!(event.target instanceof Element)) return;
+      const button = event.target.closest<HTMLButtonElement>(
+        "[data-event-filter]",
+      );
+      if (!button) return;
+      event.preventDefault();
+      const type = button.dataset.eventFilter ?? "all";
+      applyFilter(type);
+      const url = new URL(location.href);
+      if (type === "all") url.searchParams.delete("type");
+      else url.searchParams.set("type", type);
+      history.pushState(null, "", url);
+    });
     window.addEventListener("popstate", () =>
       applyFilter(new URL(location.href).searchParams.get("type") ?? "all"),
     );
@@ -64,6 +65,23 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   // destination options and optimistic edit versions.
   const refreshed = actionFragment(page, "[data-event-browser]");
   deferredEventRefresh = false;
+  if (root.dataset.eventAccess !== refreshed.dataset.eventAccess) {
+    root.replaceChildren(...refreshed.childNodes);
+    root.dataset.eventAccess = refreshed.dataset.eventAccess;
+    root.dataset.eventVersion = refreshed.dataset.eventVersion;
+    for (const card of root.querySelectorAll<HTMLElement>("[data-live-event]"))
+      renderedCards.set(card, card.outerHTML);
+    applyEventFilter(
+      root,
+      new URL(location.href).searchParams.get("type") ?? "all",
+    );
+    return;
+  }
+  if (root.dataset.eventAccess !== "true") {
+    root.replaceChildren(...refreshed.childNodes);
+    root.dataset.eventVersion = refreshed.dataset.eventVersion;
+    return;
+  }
   const list = root.querySelector<HTMLElement>("[data-event-list]")!;
   const previous = new Map(
     [...list.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
@@ -219,7 +237,7 @@ async function refreshVolunteer(element: HTMLFormElement) {
     ? '[data-organizer-role] select[name="role"]'
     : element.hasAttribute("data-submit-on-change")
       ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
-      : '[data-organizer-status]:not([data-submit-on-change]) button[type="submit"]';
+      : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
   if (profile.isConnected && (!dialog || dialog.open)) {
     profile.replaceWith(replacement);
     if (dialog && scroll !== undefined) dialog.scrollTop = scroll;
@@ -495,6 +513,7 @@ form(
     userId: str(v, "userId"),
     version: Number(v.get("version")),
     active: v.has("active"),
+    registrationApproved: v.has("registrationApproved"),
     patrolApproved: v.has("patrolApproved"),
   }),
   refreshVolunteer,

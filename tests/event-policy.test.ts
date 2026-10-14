@@ -16,6 +16,7 @@ const event: SignupEvent = {
 };
 const volunteer: SignupVolunteer = {
   registered: true,
+  registrationApproved: true,
   active: true,
   patrolApproved: true,
 };
@@ -31,7 +32,7 @@ test("patrols require explicit approval", () => {
   );
 });
 
-test("unapproved volunteers can sign up for orientations", () => {
+test("registration-approved volunteers need no patrol approval for orientations", () => {
   assert.equal(
     signupBlockReason(
       { ...volunteer, patrolApproved: false },
@@ -41,6 +42,25 @@ test("unapproved volunteers can sign up for orientations", () => {
     ),
     null,
   );
+});
+
+test("pending registrations cannot sign up for any event; organizers retain access", () => {
+  for (const type of ["patrol", "orientation"] as const) {
+    const pending = { ...volunteer, registrationApproved: false };
+    assert.match(
+      signupBlockReason(pending, { ...event, type }, 0, now)!,
+      /awaiting organizer approval/,
+    );
+    assert.equal(
+      signupBlockReason(
+        { ...pending, role: "organizer" },
+        { ...event, type },
+        0,
+        now,
+      ),
+      null,
+    );
+  }
 });
 
 test("sign-in, registration and active status are required", () => {

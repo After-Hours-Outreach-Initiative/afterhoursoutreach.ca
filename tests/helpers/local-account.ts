@@ -75,3 +75,28 @@ export async function createLocalAccount(
   const { user }: { user: { id: string } } = await current.json();
   return { id: user.id, email, name: sampleAnswers.name };
 }
+
+export async function approveLocalRegistration(
+  organizer: APIRequestContext,
+  origin: string,
+  userId: string,
+) {
+  const profile = await organizer.get(`/volunteer/volunteers/${userId}`);
+  expect(profile.status(), await profile.text()).toBe(200);
+  const version = (await profile.text()).match(
+    /name="version" value="(\d+)"/,
+  )?.[1];
+  expect(version).toBeDefined();
+  const approved = await organizer.post("/api/v1/organizer/action", {
+    headers: { origin },
+    data: {
+      action: "status",
+      userId,
+      version: Number(version),
+      active: true,
+      registrationApproved: true,
+      patrolApproved: false,
+    },
+  });
+  expect(approved.status(), await approved.text()).toBe(200);
+}

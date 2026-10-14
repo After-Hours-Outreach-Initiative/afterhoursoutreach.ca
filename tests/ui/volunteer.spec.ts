@@ -15,7 +15,7 @@ test.beforeEach(async ({ page, baseURL }) => {
 });
 
 for (const width of [1280, 375, 320]) {
-  test(`event sign-in links keep the card below sticky navigation at ${width}px`, async ({
+  test(`signed-out volunteer page hides events and keeps sign-in below navigation at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 812 });
@@ -38,11 +38,9 @@ for (const width of [1280, 375, 320]) {
         })
         .toBeGreaterThanOrEqual(16);
     };
-    await page
-      .getByRole("link", { name: "Sign in to register", exact: true })
-      .last()
-      .click();
-    await expect(page).toHaveURL(/#volunteer-signin$/);
+    await expect(
+      page.locator("[data-live-event], [data-event-list]"),
+    ).toHaveCount(0);
     await expectCardBelowNavigation();
 
     await page.reload();
@@ -82,6 +80,12 @@ test("volunteer-page sign-in is usable on mobile and opens the shared code form"
 test("event type buttons filter instantly, preserve deep links, and never submit a confirmation form", async ({
   page,
 }) => {
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-casey"]')
+    .click();
+  await expect(page.locator("[data-event-list]")).toBeVisible();
   const documents: string[] = [];
   page.on("request", (request) => {
     if (request.resourceType() === "document") documents.push(request.url());
