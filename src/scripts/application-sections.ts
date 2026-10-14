@@ -1,9 +1,10 @@
 export function initApplicationSections(element: HTMLFormElement) {
   if (!element.hasAttribute("data-application")) return;
+  const flow = element.closest<HTMLElement>("[data-application-flow]");
   const questions = element.querySelector<HTMLElement>(
     "[data-application-questions]",
   );
-  const contents = element.querySelector<HTMLElement>(
+  const contents = flow?.querySelector<HTMLElement>(
     "[data-application-contents]",
   );
   const menu = contents?.querySelector<HTMLDetailsElement>(
@@ -13,7 +14,7 @@ export function initApplicationSections(element: HTMLFormElement) {
   const current = contents?.querySelector<HTMLElement>(
     "[data-application-current]",
   );
-  if (!questions || !contents || !menu || !toggle || !current) return;
+  if (!flow || !questions || !contents || !menu || !toggle || !current) return;
   const sections = [...contents.querySelectorAll<HTMLAnchorElement>("a")]
     .map((link) => ({
       link,
@@ -36,11 +37,8 @@ export function initApplicationSections(element: HTMLFormElement) {
     stickyHeight =
       headerHeight + (navigation?.getBoundingClientRect().height ?? 0);
     contentsHeight = contents.getBoundingClientRect().height;
-    element.style.setProperty(
-      "--application-sticky-offset",
-      `${stickyHeight}px`,
-    );
-    element.style.setProperty(
+    flow.style.setProperty("--application-sticky-offset", `${stickyHeight}px`);
+    flow.style.setProperty(
       "--application-scroll-offset",
       `${stickyHeight + contentsHeight}px`,
     );
@@ -72,14 +70,14 @@ export function initApplicationSections(element: HTMLFormElement) {
     const bounds = contents.getBoundingClientRect();
     const availableBottom = Math.min(
       window.innerHeight,
-      questions.getBoundingClientRect().bottom,
+      flow.getBoundingClientRect().bottom,
     );
-    element.style.setProperty(
+    flow.style.setProperty(
       "--application-dropdown-space",
       `${Math.max(0, availableBottom - bounds.bottom - 16)}px`,
     );
-    // The sticky bar is bounded by the questions, never the footer. Close its
-    // absolute dropdown as the bar leaves that boundary as well.
+    // The sticky bar is bounded by the application flow, never the footer.
+    // Close its absolute dropdown as the bar leaves that boundary as well.
     if (bounds.top < stickyHeight - 1) menu.open = false;
   };
   const schedule = () => {
@@ -165,6 +163,7 @@ export function initApplicationSections(element: HTMLFormElement) {
     header,
     navigation,
     contents,
+    flow,
     questions,
     ...sections.map(({ target }) => target),
   ])

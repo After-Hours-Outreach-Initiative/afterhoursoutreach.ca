@@ -28,6 +28,9 @@ export function applicationSubmissionValues(
 
 export function initApplicationReview(element: HTMLFormElement) {
   if (!element.hasAttribute("data-application")) return;
+  const contents = element
+    .closest("[data-application-flow]")
+    ?.querySelector<HTMLElement>("[data-application-contents]");
   const questions = element.querySelector<HTMLElement>(
     "[data-application-questions]",
   );
@@ -60,16 +63,16 @@ export function initApplicationReview(element: HTMLFormElement) {
       if (!target || target.closest("[hidden]")) return;
       target.focus({ preventScroll: true });
       // A sticky disclosure's own position cannot return to the answers' start.
-      const scrollTarget =
-        target
-          .closest("[data-application-contents]")
-          ?.closest<HTMLElement>("[data-application-questions]") ?? target;
+      const scrollTarget = target.closest("[data-application-contents]")
+        ? questions
+        : target;
       scrollTarget.scrollIntoView({ block: "start" });
     });
   };
   const display = (next: typeof step, moveFocus = true) => {
     step = next;
     questions.hidden = next !== "questions";
+    if (contents) contents.hidden = next !== "questions";
     review.hidden = next !== "review";
     // The hidden acknowledgement must not block first-step native validation.
     // Questions stay enabled on review so FormData still contains every answer.
@@ -91,9 +94,15 @@ export function initApplicationReview(element: HTMLFormElement) {
       focus(section.querySelector<HTMLElement>("summary"));
     } else {
       focus(
-        (next === "questions" ? questions : review).querySelector<HTMLElement>(
-          "[data-application-step-heading]",
-        ),
+        next === "questions"
+          ? (questions.querySelector<HTMLElement>(
+              "[data-application-section] > summary",
+            ) ??
+              contents?.querySelector<HTMLElement>("summary") ??
+              null)
+          : review.querySelector<HTMLElement>(
+              "[data-application-step-heading]",
+            ),
       );
     }
   };
