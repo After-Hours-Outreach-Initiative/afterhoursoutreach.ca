@@ -336,7 +336,6 @@ body:has([data-application]) {
 }
 .volunteer-application-contents-menu {
   position: relative;
-  border-top: var(--volunteer-nav-border);
 }
 .volunteer-application-contents summary {
   position: relative;
@@ -344,7 +343,7 @@ body:has([data-application]) {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 53px;
+  min-height: 54px;
   padding: 4px var(--application-contents-padding);
   border-bottom: var(--volunteer-nav-border);
   background: var(--color-black);
