@@ -1,0 +1,85 @@
+---
+import {
+  heardAboutUsOptions,
+  heardAboutUsOtherMaxLength,
+  heardAboutUsQuestion,
+  type ApplicationAnswers,
+} from "@/data/application";
+import FieldError from "@/components/FieldError.astro";
+
+interface Props {
+  values?: ApplicationAnswers | null;
+}
+const { values } = Astro.props;
+const sources = values?.heardAboutUsSources ?? [];
+const otherSelected = sources.includes("other");
+---
+
+<fieldset
+  class="volunteer-referral-sources volunteer-wide"
+  data-referral-sources
+  aria-describedby="help-heardAboutUsSources error-heardAboutUsSources"
+>
+  <legend>
+    {heardAboutUsQuestion}
+    <span class="volunteer-required" aria-hidden="true"> *</span>
+  </legend>
+  <p class="volunteer-help" id="help-heardAboutUsSources">
+    Select at least one option. You can choose more than one.
+  </p>
+  <div class="volunteer-referral-options">
+    {
+      heardAboutUsOptions.map((option, index) => (
+        <label class="volunteer-check">
+          <input
+            type="checkbox"
+            name="heardAboutUsSources"
+            value={option.value}
+            checked={sources.includes(option.value)}
+            required={index === 0 && !sources.length}
+            aria-describedby="help-heardAboutUsSources error-heardAboutUsSources"
+            aria-controls={
+              option.value === "other" ? "other-referral" : undefined
+            }
+          />
+          <span>{option.label}</span>
+        </label>
+      ))
+    }
+  </div>
+  <FieldError
+    field="heardAboutUsSources"
+    message="Select at least one way you found out about us."
+  />
+  <div
+    class="volunteer-field"
+    id="other-referral"
+    data-other-referral
+    hidden={!otherSelected}
+  >
+    <label for="profile-heardAboutUsOther">
+      Other source
+      <span class="volunteer-required" aria-hidden="true"> *</span>
+    </label>
+    <input
+      type="text"
+      id="profile-heardAboutUsOther"
+      name="heardAboutUsOther"
+      value={otherSelected ? values?.heardAboutUsOther : ""}
+      autocomplete="off"
+      required={otherSelected}
+      disabled={!otherSelected}
+      maxlength={heardAboutUsOtherMaxLength}
+      pattern={String.raw`.*\S.*`}
+      aria-describedby="help-heardAboutUsOther error-heardAboutUsOther"
+    />
+    <span class="volunteer-help" id="help-heardAboutUsOther">
+      Briefly describe how you found out about us ({heardAboutUsOtherMaxLength}
+      characters or fewer).
+    </span>
+    <FieldError
+      field="heardAboutUsOther"
+      message="Briefly describe how you found out about us."
+    />
+  </div>
+</fieldset>

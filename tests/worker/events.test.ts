@@ -18,6 +18,8 @@ const answers = {
   emergencyPhone: "604-555-0101",
   emergencyRelationship: "Friend",
   heardAboutUs: "Friend",
+  heardAboutUsSources: ["friend-word-of-mouth"],
+  heardAboutUsOther: "",
   motivation: "Sample answer",
   teams: ["outreach"],
   certification: "None",
@@ -547,7 +549,7 @@ describe(
         assert.match(profileHtml, /PRIVATE HEALTH ANSWER/);
         assert.doesNotMatch(
           profileHtml,
-          /How did you hear about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
+          /Why do you want to volunteer\?|code-of-conduct-heading/,
         );
         const logs = await DB.prepare(
           "SELECT * FROM audit_log WHERE action='profile_viewed' AND subject_id=?",

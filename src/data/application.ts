@@ -9,7 +9,10 @@ export interface ApplicationAnswers {
   emergencyName: string;
   emergencyPhone: string;
   emergencyRelationship: string;
+  // Original free-text answer, retained without inferring multiple-choice answers.
   heardAboutUs: string;
+  heardAboutUsSources: string[];
+  heardAboutUsOther: string;
   motivation: string;
   teams: string[];
   certifications: string[];
@@ -40,6 +43,15 @@ export function applicationDisplayName(
 export function withOutreachTeam(teams: string[]): string[] {
   return ["outreach", ...teams.filter((team) => team !== "outreach")];
 }
+
+export const heardAboutUsQuestion = "How did you find out about us?";
+export const heardAboutUsOptions = [
+  { value: "social-media", label: "Social Media" },
+  { value: "friend-word-of-mouth", label: "Friend/Word of mouth" },
+  { value: "internet", label: "Internet" },
+  { value: "other", label: "Other" },
+] as const;
+export const heardAboutUsOtherMaxLength = 200;
 
 export const certificationQuestion =
   "Select the highest first-aid, medical, or health care certification or licence that you currently hold or are presently enrolled in schooling for.";
@@ -231,7 +243,7 @@ export const applicationFields = [
   {
     name: "heardAboutUs",
     section: "about-volunteering",
-    label: "How did you hear about us?",
+    label: heardAboutUsQuestion,
     required: true,
     applicationOnly: true,
   },

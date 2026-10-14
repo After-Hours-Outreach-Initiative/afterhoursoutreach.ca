@@ -340,8 +340,8 @@ test("application shows all required errors and saves after they are corrected",
   await expect(confirmation).toBeVisible();
   await expect(confirmation).toHaveAttribute("required", "");
   await expect(
-    form.getByRole("textbox", {
-      name: "How did you hear about us?",
+    form.getByRole("group", {
+      name: "How did you find out about us?",
       exact: true,
     }),
   ).toBeVisible();
@@ -388,9 +388,11 @@ test("application shows all required errors and saves after they are corrected",
       await input.evaluate((element) => element.matches(":user-invalid")),
     ).toBe(true);
     const id = await input.getAttribute("id");
-    await expect(
-      form.locator(`label[for="${id}"] .volunteer-required`),
-    ).toHaveText("*");
+    const label =
+      (await input.getAttribute("name")) === "heardAboutUsSources"
+        ? form.locator("[data-referral-sources] > legend")
+        : form.locator(`label[for="${id}"]`);
+    await expect(label.locator(".volunteer-required")).toHaveText("*");
   }
   await expect(
     page.getByRole("textbox", { name: "First name", exact: true }),
@@ -417,8 +419,13 @@ test("application shows all required errors and saves after they are corrected",
   await expect(form.locator("[data-error=birthDate]")).toBeVisible();
   expect(requests).toEqual([]);
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (
+    if (field === "heardAboutUsSources") {
+      for (const source of sampleAnswers.heardAboutUsSources)
+        await form.locator(`[name="${field}"][value="${source}"]`).check();
+    } else if (
       ![
+        "heardAboutUs",
+        "heardAboutUsOther",
         "teams",
         "certification",
         "certifications",
@@ -472,7 +479,9 @@ test("application shows all required errors and saves after they are corrected",
     page.getByRole("region", { name: "Code of Conduct", exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.locator('[name="heardAboutUs"], [name="motivation"]'),
+    page.locator(
+      '[name="heardAboutUsSources"], [name="heardAboutUsOther"], [name="motivation"]',
+    ),
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Save profile" }),
@@ -510,8 +519,13 @@ test("application and profile edits block underage birth dates at the birthday b
       : today.toISOString().slice(5, 10),
   );
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (
+    if (field === "heardAboutUsSources") {
+      for (const source of sampleAnswers.heardAboutUsSources)
+        await form.locator(`[name="${field}"][value="${source}"]`).check();
+    } else if (
       ![
+        "heardAboutUs",
+        "heardAboutUsOther",
         "teams",
         "certification",
         "certifications",
@@ -572,8 +586,13 @@ test("the birth-date cutoff blocks native submission without JavaScript", async 
     await page.goto("/apply");
     const form = page.locator("[data-account-profile]");
     for (const [field, value] of Object.entries(sampleAnswers)) {
-      if (
+      if (field === "heardAboutUsSources") {
+        for (const source of sampleAnswers.heardAboutUsSources)
+          await form.locator(`[name="${field}"][value="${source}"]`).check();
+      } else if (
         ![
+          "heardAboutUs",
+          "heardAboutUsOther",
           "teams",
           "certification",
           "certifications",
@@ -685,8 +704,13 @@ test("all teams can select multiple relevant training answers and add Other deta
     ).toBe(false);
   }
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (
+    if (field === "heardAboutUsSources") {
+      for (const source of sampleAnswers.heardAboutUsSources)
+        await form.locator(`[name="${field}"][value="${source}"]`).check();
+    } else if (
       ![
+        "heardAboutUs",
+        "heardAboutUsOther",
         "teams",
         "certification",
         "certifications",
@@ -824,8 +848,13 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).toBeHidden();
   await expect(expiry).not.toHaveAttribute("required");
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (
+    if (field === "heardAboutUsSources") {
+      for (const source of sampleAnswers.heardAboutUsSources)
+        await form.locator(`[name="${field}"][value="${source}"]`).check();
+    } else if (
       ![
+        "heardAboutUs",
+        "heardAboutUsOther",
         "teams",
         "certification",
         "certifications",

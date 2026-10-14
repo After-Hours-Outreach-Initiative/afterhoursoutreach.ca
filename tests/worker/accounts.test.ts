@@ -31,6 +31,8 @@ const answers = {
   emergencyPhone: "604-555-0101",
   emergencyRelationship: "Friend",
   heardAboutUs: "A friend",
+  heardAboutUsSources: ["friend-word-of-mouth"],
+  heardAboutUsOther: "",
   motivation: "Sample answer",
   teams: ["outreach"],
   certification: "None",
@@ -559,7 +561,7 @@ describe(
         { ...answers, codeOfConductAccepted: "true" },
         {
           ...answers,
-          heardAboutUs: undefined,
+          heardAboutUsSources: undefined,
           motivation: undefined,
           codeOfConductAccepted: true,
         },
@@ -606,7 +608,7 @@ describe(
       assert.match(html, /Sample private answer/);
       assert.doesNotMatch(
         html,
-        /How did you hear about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
+        /How did you find out about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
       );
       assert.doesNotMatch(
         html,
@@ -996,7 +998,7 @@ describe(
           .waitFor();
         await expect(
           page.locator(
-            '[data-account-profile] input[type="email"], [name="heardAboutUs"], [name="motivation"], .volunteer-code-of-conduct',
+            '[data-account-profile] input[type="email"], [name="heardAboutUsSources"], [name="heardAboutUsOther"], [name="motivation"], .volunteer-code-of-conduct',
           ),
         ).toHaveCount(0);
         const saveProfile = page.getByRole("button", { name: "Save profile" });

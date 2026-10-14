@@ -13,6 +13,8 @@ import {
   profileFields,
   trainingOptions,
   applicationDisplayName,
+  heardAboutUsOptions,
+  heardAboutUsQuestion,
 } from "@/data/application";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
@@ -83,6 +85,33 @@ if (!values || !person)
       }
       <VolunteerControls person={person} />
       <dl class="volunteer-profile-details">
+        <div>
+          <dt>{heardAboutUsQuestion}</dt>
+          <dd>
+            {
+              heardAboutUsOptions
+                .filter((option) =>
+                  values.heardAboutUsSources.includes(option.value),
+                )
+                .map((option) =>
+                  option.value === "other"
+                    ? `Other: ${values.heardAboutUsOther}`
+                    : option.label,
+                )
+                .join(", ") ||
+                values.heardAboutUs ||
+                "Not provided"
+            }
+          </dd>
+        </div>
+        {
+          values.heardAboutUs && values.heardAboutUsSources.length > 0 && (
+            <div>
+              <dt>Previously recorded referral answer</dt>
+              <dd>{values.heardAboutUs}</dd>
+            </div>
+          )
+        }
         {
           profileFields.map((field) => (
             <div>

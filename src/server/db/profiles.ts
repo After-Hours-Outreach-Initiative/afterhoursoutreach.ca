@@ -9,6 +9,8 @@ import {
   withOutreachTeam,
   trainingOptions,
   applicationDisplayName,
+  heardAboutUsOptions,
+  heardAboutUsOtherMaxLength,
   type ApplicationAnswers,
 } from "../../data/application";
 import {
@@ -50,7 +52,19 @@ const profileAnswersSchema = z.strictObject({
   emergencyName: shortAnswer,
   emergencyPhone: phone,
   emergencyRelationship: shortAnswer,
-  heardAboutUs: shortAnswer,
+  heardAboutUs: optionalShortAnswer,
+  heardAboutUsSources: z
+    .array(z.enum(heardAboutUsOptions.map((option) => option.value)))
+    .min(1, "Select at least one way you found out about us.")
+    .max(heardAboutUsOptions.length)
+    .refine((values) => new Set(values).size === values.length)
+    .transform((values) =>
+      heardAboutUsOptions
+        .filter((option) => values.includes(option.value))
+        .map((option) => option.value),
+    ),
+  // Only selected Other details are validated/persisted; ignore stale hidden text.
+  heardAboutUsOther: z.string().trim().default(""),
   motivation: longAnswer,
   teams: z
     .array(z.enum(["outreach", "medic", "non-patrol"]))
@@ -143,13 +157,29 @@ function validateTraining(
     });
 }
 
-export const profileSchema = profileAnswersSchema.superRefine(validateTraining);
+export const profileSchema = profileAnswersSchema.superRefine(
+  (answers, context) => {
+    validateTraining(answers, context);
+    if (
+      answers.heardAboutUsSources.includes("other") &&
+      (!answers.heardAboutUsOther ||
+        answers.heardAboutUsOther.length > heardAboutUsOtherMaxLength)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["heardAboutUsOther"],
+        message: `Briefly describe how you found out about us (${heardAboutUsOtherMaxLength} characters or fewer).`,
+      });
+  },
+);
 
 // Older clients may still send these answers; profile edits never replace them.
 const profileEditSchema = profileAnswersSchema
   .extend({ firstName: optionalShortAnswer, lastName: optionalShortAnswer })
   .partial({
     heardAboutUs: true,
+    heardAboutUsSources: true,
+    heardAboutUsOther: true,
     motivation: true,
   })
   .superRefine(validateTraining);
@@ -180,6 +210,10 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
     emergencyPhone: row.emergency_contact_phone,
     emergencyRelationship: row.emergency_contact_relationship,
     heardAboutUs: row.heard_about_us,
+    heardAboutUsSources: row.heard_about_us_sources ?? [],
+    heardAboutUsOther: row.heard_about_us_sources?.includes("other")
+      ? (row.heard_about_us_other ?? "")
+      : "",
     motivation: row.motivation,
     teams: withOutreachTeam(row.teams),
     certification: row.medical_certification,
@@ -213,6 +247,11 @@ export async function saveProfile(
           otherTraining: old.otherTraining,
           certificationExpiry: old.certificationExpiry,
           ...input,
+          // Application-only answers cannot be replaced or block account edits.
+          heardAboutUs: undefined,
+          heardAboutUsSources: undefined,
+          heardAboutUsOther: undefined,
+          motivation: undefined,
         }
       : input;
   const parsed = (old ? profileEditSchema : profileSchema).safeParse(
@@ -227,7 +266,13 @@ export async function saveProfile(
               ["firstName", "lastName"].includes(String(issue.path[0])),
             )
           ? "Enter your first and last names (200 characters or fewer each)."
-          : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
+          : parsed.error.issues.some((issue) =>
+                ["heardAboutUsSources", "heardAboutUsOther"].includes(
+                  String(issue.path[0]),
+                ),
+              )
+            ? `Select at least one way you found out about us. If you select Other, add a short description (${heardAboutUsOtherMaxLength} characters or fewer).`
+            : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
     );
   const { codeOfConductAccepted, ...submitted } = parsed.data;
   if (!old && codeOfConductAccepted !== true)
@@ -235,6 +280,13 @@ export async function saveProfile(
   const answers: ApplicationAnswers = {
     ...submitted,
     heardAboutUs: old?.heardAboutUs ?? submitted.heardAboutUs!,
+    heardAboutUsSources:
+      old?.heardAboutUsSources ?? submitted.heardAboutUsSources!,
+    heardAboutUsOther:
+      old?.heardAboutUsOther ??
+      (submitted.heardAboutUsSources!.includes("other")
+        ? submitted.heardAboutUsOther!
+        : ""),
     motivation: old?.motivation ?? submitted.motivation!,
   };
   // Existing combined-name profiles may stay unsplit. Once components are supplied,
@@ -273,8 +325,6 @@ export async function saveProfile(
     emergency_contact_name: answers.emergencyName,
     emergency_contact_phone: answers.emergencyPhone,
     emergency_contact_relationship: answers.emergencyRelationship,
-    heard_about_us: answers.heardAboutUs,
-    motivation: answers.motivation,
     teams: answers.teams,
     medical_certification: answers.certification,
     medical_certifications: answers.certifications,
@@ -292,6 +342,11 @@ export async function saveProfile(
       .values({
         user_id: userId,
         ...values,
+        // Insert-only: preserve legacy text, nullable choices, and saved details on edits.
+        heard_about_us: answers.heardAboutUs,
+        heard_about_us_sources: answers.heardAboutUsSources,
+        heard_about_us_other: answers.heardAboutUsOther || null,
+        motivation: answers.motivation,
         code_of_conduct_version: codeOfConductVersion,
         code_of_conduct_accepted_at: now,
         registered_at: now,

@@ -48,6 +48,14 @@ first and last names; `preferred_name` may be empty. Profile saves synchronize
 Legacy profiles may retain their unsplit answer until the volunteer supplies both
 first and last names. No names are inferred or backfilled.
 
+Referral multi-selects use nullable `heard_about_us_sources` (JSON) and
+`heard_about_us_other` (short text) columns. The original `heard_about_us`
+free-text answer is kept unchanged; null choices on legacy profiles are not
+inferred or backfilled. New applications require at least one choice and a
+nonblank detail of at most 200 characters for Other; unselected Other text is
+ignored. All referral columns are insert-only in profile saves, so account
+edits preserve both legacy and structured answers exactly.
+
 ## Generated migrations
 
 ```sh

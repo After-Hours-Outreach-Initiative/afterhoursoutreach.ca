@@ -98,10 +98,11 @@ the saved profile. Reverting every change disables it again. Successful saves
 establish the new baseline; failed saves remain retryable, and edits made while
 a save is pending stay unsaved. **Complete application** is unaffected.
 
-“How did you hear about us?”, “Why do you want to volunteer?”, and the Code of
-Conduct appear only during application, not on the volunteer's profile or
-organizer profile pages/dialogs. The server preserves these application-only
-answers and the acknowledgement record when a profile is edited. New
+“How did you find out about us?”, “Why do you want to volunteer?”, and the Code of
+Conduct are editable only during application, not on the volunteer's profile.
+Organizers can view referral answers on profile pages/dialogs; motivation and
+the acknowledgement are not displayed there. The server preserves these
+application-only answers and the acknowledgement record when a profile is edited. New
 applications still require both questions and the acknowledgement; profile
 updates omit them, and older clients cannot overwrite the saved answers.
 
@@ -114,8 +115,8 @@ enabled must verify it when signing in.
 ### Fields
 
 Questions are based on the current Google Form. The referral and motivation
-questions and Code of Conduct confirmation are application-only; the volunteer
-and organizers can see the remaining profile answers.
+questions and Code of Conduct confirmation are application-only. Organizers can
+view referral answers and the remaining profile answers.
 
 | Field                                    | Required       |
 | ---------------------------------------- | -------------- |
@@ -130,7 +131,7 @@ and organizers can see the remaining profile answers.
 | Emergency contact name                   | Yes            |
 | Emergency contact phone                  | Yes            |
 | Emergency contact relationship           | Yes            |
-| How did you hear about us                | Yes            |
+| How did you find out about us            | At least one choice; short detail required for Other |
 | Why do you want to volunteer             | Yes            |
 | Teams (outreach, medic, non-patrol)      | Yes            |
 | Highest medical certification            | Yes            |
@@ -149,6 +150,16 @@ name components; it never splits or guesses anyone's name. Existing account and
 organizer views explain that the old answer is retained in Preferred name. Those
 volunteers may keep editing with both first and last names blank, provided their
 previous name remains, or supply both. Once supplied, both remain required.
+
+Referral choices are Social Media, Friend/Word of mouth, Internet, and Other.
+Other requires a nonblank detail of at most 200 characters. Unchecking Other
+clears its text; the server ignores stale detail text when Other is not selected.
+Apply `0007_profile_referral_sources.sql` before deploying. Its nullable JSON
+`heard_about_us_sources` and text `heard_about_us_other` columns follow the
+existing multi-select storage convention. The original `heard_about_us` column
+is kept verbatim for legacy answers, without guessing choices or backfilling
+details. Account edits do not rewrite any referral columns, including legacy
+nulls, and organizers see the original free text when present.
 
 Date of birth, emergency contact, and medical conditions each have a short line
 under them saying what the information is used for.
