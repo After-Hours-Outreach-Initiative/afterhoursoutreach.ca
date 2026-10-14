@@ -4,7 +4,92 @@ import {
   openLocalAccountSwitcher,
 } from "../helpers/local-account";
 
-test("other viewers see signups and cancellations through SSE without losing filters, focus or drafts", async ({
+test("event checks run every five seconds, retry failures, and pause without overlapping requests", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
+  let checks = 0;
+  let version: string | null = null;
+  let release!: () => void;
+  const heldCheck = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/v1/events/version", async (route) => {
+    const check = ++checks;
+    version ??= await page
+      .locator("[data-event-browser]")
+      .getAttribute("data-event-version");
+    if (check === 5) await heldCheck;
+    await route.fulfill(
+      check === 3
+        ? { status: 503, body: "Temporary failure" }
+        : { json: { version } },
+    );
+  });
+  let pageRefreshes = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname === "/volunteer" &&
+      request.resourceType() !== "document"
+    )
+      pageRefreshes++;
+  });
+  try {
+    await page.goto("/volunteer");
+    await expect.poll(() => checks).toBe(1);
+    await page.clock.runFor(4_999);
+    expect(checks).toBe(1);
+    await page.clock.runFor(1);
+    await expect.poll(() => checks).toBe(2);
+    await page.clock.runFor(5_000);
+    await expect.poll(() => checks).toBe(3);
+    await page.clock.runFor(5_000);
+    await expect.poll(() => checks).toBe(4);
+    expect(pageRefreshes).toBe(0);
+
+    await page.clock.runFor(5_000);
+    await expect.poll(() => checks).toBe(5);
+    await page.clock.runFor(15_000);
+    expect(checks).toBe(5);
+    const completed = page.waitForEvent("requestfinished", {
+      predicate: (request) => request.url().endsWith("/api/v1/events/version"),
+    });
+    release();
+    await completed;
+    await page.clock.runFor(5_000);
+    await expect.poll(() => checks).toBe(6);
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", {
+        configurable: true,
+        value: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.clock.runFor(15_000);
+    expect(checks).toBe(6);
+    await page.evaluate(() => {
+      Reflect.deleteProperty(document, "hidden");
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect.poll(() => checks).toBe(7);
+
+    await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+    await page.clock.runFor(15_000);
+    expect(checks).toBe(7);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("pageshow"));
+      window.dispatchEvent(new Event("pageshow"));
+    });
+    await expect.poll(() => checks).toBe(8);
+    await page.clock.runFor(5_000);
+    await expect.poll(() => checks).toBe(9);
+    expect(pageRefreshes).toBe(0);
+  } finally {
+    release();
+  }
+});
+
+test("other viewers see signups and cancellations through polling without losing filters, focus or drafts", async ({
   page,
   browser,
   baseURL,
@@ -123,8 +208,8 @@ test("other viewers see signups and cancellations through SSE without losing fil
     ).toHaveCount(0);
     await editor.getByRole("button", { name: "Close", exact: true }).click();
     await expect(organizerCard.locator("summary")).toHaveText("Volunteers (1)");
-    // Force a reconnect while the attendee cancels. The initial stream version
-    // must catch up even though the cancellation happened while disconnected.
+    // Pause polling while the attendee cancels. Becoming visible must catch up
+    // even though the cancellation happened while this viewer was hidden.
     await viewer.evaluate(() => {
       Object.defineProperty(document, "hidden", {
         configurable: true,

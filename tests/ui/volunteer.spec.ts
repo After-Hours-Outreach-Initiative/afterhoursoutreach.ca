@@ -90,7 +90,7 @@ test("event type buttons filter instantly, preserve deep links, and never submit
   const types = await cards.evaluateAll((nodes) =>
     nodes.map((node) => (node as HTMLElement).dataset.eventType),
   );
-  // SSE may add events from another test/viewer while this filter is active.
+  // Polling may add events from another test/viewer while this filter is active.
   // Verify every current card's visibility, not a stale initial list length.
   const expectFilter = (type: string) =>
     expect

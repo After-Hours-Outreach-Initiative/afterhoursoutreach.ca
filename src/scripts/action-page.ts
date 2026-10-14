@@ -3,11 +3,15 @@
 export const savedRefreshError =
   "Your change was saved, but the view could not be updated. Refresh the page to see it.";
 
-export async function loadActionPage(url: string = location.href) {
+export async function loadActionPage(
+  url: string = location.href,
+  signal?: AbortSignal,
+) {
   try {
     const response = await fetch(url, {
       credentials: "same-origin",
       cache: "no-store",
+      signal,
     });
     if (response.redirected) {
       const next = new URL(response.url);

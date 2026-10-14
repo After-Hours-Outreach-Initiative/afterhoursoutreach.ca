@@ -3,9 +3,9 @@ import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { sampleAnswers } from "../helpers/local-account";
 
-test("built Worker streams scoped versions for signups, cancellations and revoked sessions", async () => {
+test("built Worker returns scoped versions for signups, cancellations and revoked sessions", async () => {
   const origin = "https://afterhoursoutreach.ca";
-  const secret = "event-stream-worker-secret-12345678901234567890";
+  const secret = "event-version-worker-secret-12345678901234567890";
   const server = createTestHarness({
     workers: [
       {
@@ -15,7 +15,6 @@ test("built Worker streams scoped versions for signups, cancellations and revoke
       },
     ],
   });
-  const readers: ReadableStreamDefaultReader<Uint8Array>[] = [];
   try {
     await server.listen();
     const worker = server.getWorker<Env>();
@@ -53,8 +52,8 @@ test("built Worker streams scoped versions for signups, cancellations and revoke
       };
       return { cookie, id: session.user.id, sessionId: session.session.id };
     };
-    const organizer = await person("stream-organizer@example.org");
-    const attendee = await person("stream-attendee@example.org");
+    const organizer = await person("version-organizer@example.org");
+    const attendee = await person("version-attendee@example.org");
     await DB.prepare("INSERT INTO organizer_bootstrap VALUES(1,?,?)")
       .bind(organizer.id, Date.now())
       .run();
@@ -63,7 +62,7 @@ test("built Worker streams scoped versions for signups, cancellations and revoke
     await DB.prepare(
       `INSERT INTO event
       (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
-      VALUES ('live','orientation',?,'Stream meeting point',1,?,?,?)`,
+       VALUES ('live','orientation',?,'Polling meeting point',1,?,?,?)`,
     )
       .bind(now + 86_400_000, organizer.id, now, now)
       .run();
@@ -73,12 +72,10 @@ test("built Worker streams scoped versions for signups, cancellations and revoke
       expect(version).toBeDefined();
       return version;
     };
-    const stream = async (cookie = "") => {
-      const response = await send("/api/v1/events/stream", undefined, cookie);
+    const readVersion = async (cookie = "") => {
+      const response = await send("/api/v1/events/version", undefined, cookie);
       expect(response.status).toBe(200);
-      expect(response.headers.get("content-type")).toBe(
-        "text/event-stream; charset=utf-8",
-      );
+      expect(response.headers.get("content-type")).toBe("application/json");
       expect(response.headers.get("cache-control")).toBe("no-store");
       expect(response.headers.get("x-robots-tag")).toBe(
         "noindex, nofollow, noarchive",
@@ -86,34 +83,16 @@ test("built Worker streams scoped versions for signups, cancellations and revoke
       expect(response.headers.get("content-security-policy")).toContain(
         "connect-src 'self'",
       );
-      const reader = response.body!.getReader();
-      readers.push(reader);
-      let buffered = "";
-      return async () => {
-        while (true) {
-          const boundary = buffered.indexOf("\n\n");
-          if (boundary !== -1) {
-            const frame = buffered.slice(0, boundary);
-            buffered = buffered.slice(boundary + 2);
-            if (frame.startsWith("retry:")) {
-              expect(frame).toBe("retry: 2000");
-              continue;
-            }
-            expect(frame).toMatch(/^event: events\ndata: "[a-f0-9]{64}"$/);
-            return JSON.parse(
-              frame.slice("event: events\ndata: ".length),
-            ) as string;
-          }
-          const next = await reader.read();
-          expect(next.done).toBe(false);
-          buffered += new TextDecoder().decode(next.value);
-        }
-      };
+      const result = (await response.json()) as { version: string };
+      expect(result).toEqual({
+        version: expect.stringMatching(/^[a-f0-9]{64}$/),
+      });
+      return result.version;
     };
     const publicVersion = await listingVersion();
-    const publicNext = await stream();
+    const publicNext = () => readVersion();
+    const signedInNext = () => readVersion(attendee.cookie);
     expect(await publicNext()).toBe(publicVersion);
-    const signedInNext = await stream(attendee.cookie);
     expect(await signedInNext()).toBe(await listingVersion(attendee.cookie));
 
     const joined = await send(
@@ -124,8 +103,8 @@ test("built Worker streams scoped versions for signups, cancellations and revoke
     expect(joined.status, await joined.text()).toBe(200);
     const joinedVersion = await listingVersion();
     expect(joinedVersion).not.toBe(publicVersion);
-    await expect.poll(publicNext).toBe(joinedVersion);
-    await expect.poll(signedInNext).toBe(await listingVersion(attendee.cookie));
+    expect(await publicNext()).toBe(joinedVersion);
+    expect(await signedInNext()).toBe(await listingVersion(attendee.cookie));
 
     const cancelled = await send(
       "/api/v1/events/action",
@@ -133,8 +112,8 @@ test("built Worker streams scoped versions for signups, cancellations and revoke
       attendee.cookie,
     );
     expect(cancelled.status, await cancelled.text()).toBe(200);
-    await expect.poll(publicNext).toBe(publicVersion);
-    await expect.poll(signedInNext).toBe(await listingVersion(attendee.cookie));
+    expect(await publicNext()).toBe(publicVersion);
+    expect(await signedInNext()).toBe(await listingVersion(attendee.cookie));
 
     // A hidden event never changes a visitor's version, but an existing
     // attendee can still see its availability through their scoped view.
@@ -146,26 +125,25 @@ test("built Worker streams scoped versions for signups, cancellations and revoke
     expect(joinedAgain.status, await joinedAgain.text()).toBe(200);
     await DB.prepare("UPDATE event SET hidden=1 WHERE id='live'").run();
     const hiddenPublicVersion = await listingVersion();
-    await expect.poll(publicNext).toBe(hiddenPublicVersion);
+    expect(await publicNext()).toBe(hiddenPublicVersion);
     const hiddenPersonalVersion = await listingVersion(attendee.cookie);
-    await expect.poll(signedInNext).toBe(hiddenPersonalVersion);
+    expect(await signedInNext()).toBe(hiddenPersonalVersion);
     await DB.prepare("UPDATE event SET spots=2 WHERE id='live'").run();
     expect(await listingVersion()).toBe(hiddenPublicVersion);
     const capacityVersion = await listingVersion(attendee.cookie);
     expect(capacityVersion).not.toBe(hiddenPersonalVersion);
-    await expect.poll(signedInNext).toBe(capacityVersion);
-    await expect.poll(publicNext).toBe(hiddenPublicVersion);
+    expect(await signedInNext()).toBe(capacityVersion);
+    expect(await publicNext()).toBe(hiddenPublicVersion);
 
     await DB.prepare("DELETE FROM session WHERE id=?")
       .bind(attendee.sessionId)
       .run();
-    await expect.poll(signedInNext).toBe(hiddenPublicVersion);
+    expect(await signedInNext()).toBe(hiddenPublicVersion);
     const crossOrigin = await worker.fetch(
-      "https://evil.example/api/v1/events/stream",
+      "https://evil.example/api/v1/events/version",
     );
     expect(crossOrigin.status).toBe(403);
   } finally {
-    await Promise.all(readers.map((reader) => reader.cancel()));
     await server.close();
   }
 });

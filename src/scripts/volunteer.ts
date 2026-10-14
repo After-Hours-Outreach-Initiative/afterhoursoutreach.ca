@@ -250,46 +250,76 @@ let pendingRefresh = Promise.resolve();
 const eventBrowser = document.querySelector<HTMLElement>(
   "[data-event-browser]",
 );
-if (eventBrowser && "EventSource" in window) {
-  let source: EventSource | undefined;
+if (eventBrowser) {
+  let timer: number | undefined;
+  let polling = false;
+  let pendingPoll: AbortController | undefined;
   let liveRefreshQueued = false;
-  const refreshLiveEvents = () => {
-    if (liveRefreshQueued || document.hidden) return;
+  let forceRefresh = false;
+  const refreshLiveEvents = (force = false) => {
+    forceRefresh ||= force;
+    if (liveRefreshQueued || !polling || document.hidden) return;
     liveRefreshQueued = true;
-    // Share the action refresh queue so an older SSE-triggered GET cannot undo
-    // a newer signup, and coalesce notifications while a GET is in flight.
+    const controller = new AbortController();
+    pendingPoll = controller;
+    // Share the action refresh queue so an older poll cannot undo a newer
+    // signup. Skip timer ticks while a check or page refresh is in flight.
     const refresh = pendingRefresh.then(async () => {
-      if (document.hidden) return;
-      const page = await loadActionPage();
-      if (!document.hidden) syncEvents(page);
+      if (controller.signal.aborted) return;
+      if (!forceRefresh) {
+        const response = await fetch("/api/v1/events/version", {
+          credentials: "same-origin",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok || response.redirected)
+          throw new Error("Event updates are unavailable.");
+        const result: { version?: unknown } = await response.json();
+        const needsDeferredRefresh =
+          deferredEventRefresh &&
+          !eventBrowser.querySelector(
+            'dialog[open], form[data-submitting="true"]',
+          );
+        if (
+          !forceRefresh &&
+          (typeof result.version !== "string" ||
+            !/^[a-f0-9]{64}$/.test(result.version) ||
+            (result.version === eventBrowser.dataset.eventVersion &&
+              !needsDeferredRefresh))
+        )
+          return;
+      }
+      forceRefresh = false;
+      const page = await loadActionPage(location.href, controller.signal);
+      if (!controller.signal.aborted) syncEvents(page);
     });
+    // A failed check or refresh is retried on the next five-second tick.
     pendingRefresh = refresh.catch(() => {});
     void pendingRefresh.finally(() => {
+      pendingPoll = undefined;
       liveRefreshQueued = false;
+      if (polling && (forceRefresh || controller.signal.aborted))
+        refreshLiveEvents();
     });
   };
-  refreshDeferredEvents = refreshLiveEvents;
-  const disconnect = () => {
-    source?.close();
-    source = undefined;
+  refreshDeferredEvents = () => refreshLiveEvents(true);
+  const stopPolling = () => {
+    polling = false;
+    window.clearInterval(timer);
+    timer = undefined;
+    pendingPoll?.abort();
   };
-  const connect = () => {
-    if (source || document.hidden) return;
-    const current = new EventSource("/api/v1/events/stream");
-    source = current;
-    current.addEventListener("events", (event) => {
-      if (source !== current) return;
-      const data = (event as MessageEvent<string>).data;
-      if (!/^"[a-f0-9]{64}"$/.test(data)) return;
-      const version: string = JSON.parse(data);
-      if (version !== eventBrowser.dataset.eventVersion) refreshLiveEvents();
-    });
+  const startPolling = () => {
+    if (polling || document.hidden) return;
+    polling = true;
+    timer = window.setInterval(() => refreshLiveEvents(), 5_000);
+    refreshLiveEvents();
   };
   document.addEventListener("visibilitychange", () =>
-    document.hidden ? disconnect() : connect(),
+    document.hidden ? stopPolling() : startPolling(),
   );
-  window.addEventListener("pagehide", disconnect);
-  window.addEventListener("pageshow", connect);
+  window.addEventListener("pagehide", stopPolling);
+  window.addEventListener("pageshow", startPolling);
   document.addEventListener(
     "close",
     (event) => {
@@ -298,11 +328,11 @@ if (eventBrowser && "EventSource" in window) {
         event.target instanceof HTMLDialogElement &&
         event.target.closest("[data-live-event]")
       )
-        refreshLiveEvents();
+        refreshDeferredEvents();
     },
     true,
   );
-  connect();
+  startPolling();
 }
 
 function form(
