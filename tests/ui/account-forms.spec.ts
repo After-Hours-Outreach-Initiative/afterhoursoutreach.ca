@@ -246,7 +246,10 @@ test("application shows all required errors and saves after they are corrected",
   await expect(
     form
       .getByRole("group", { name: "Personal info", exact: true })
-      .getByLabel("Medical conditions or triggers (optional)", { exact: true }),
+      .getByLabel(
+        "Medical conditions/allergies/anything else we should know (optional)",
+        { exact: true },
+      ),
   ).toBeVisible();
   const emergencyContact = form.getByRole("group", {
     name: "Emergency contact",
