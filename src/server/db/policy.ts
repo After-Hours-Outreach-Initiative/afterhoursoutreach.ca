@@ -1,8 +1,8 @@
 // User-facing previews of the rules enforced by database writes and triggers.sql.
 export interface SignupVolunteer {
-  registered: boolean;
+  applicationSubmitted: boolean;
   active: boolean;
-  registrationApproved: boolean;
+  applicationApproved: boolean;
   patrolApproved: boolean;
   role?: "volunteer" | "organizer";
 }
@@ -22,11 +22,11 @@ export function signupBlockReason(
   now = new Date(),
 ): string | null {
   if (!volunteer) return "Sign in to register.";
-  if (!volunteer.registered)
-    return "Complete volunteer registration before registering for events.";
+  if (!volunteer.applicationSubmitted)
+    return "Complete your volunteer application before registering for events.";
   if (!volunteer.active) return "Your volunteer account is inactive.";
-  if (!volunteer.registrationApproved && volunteer.role !== "organizer")
-    return "Your registration is awaiting organizer approval.";
+  if (!volunteer.applicationApproved && volunteer.role !== "organizer")
+    return "Your application is awaiting organizer approval.";
   if (!event.open) return "This event is closed.";
   if (!Number.isFinite(event.startsAt.getTime()) || event.startsAt <= now)
     return "Registration closes when the event starts.";

@@ -14,10 +14,10 @@ import { inPlaceAction } from "../helpers/in-place-action";
 import {
   certificationOptions,
   certificationQuestion,
-  registrationBirthDateError,
+  applicationBirthDateError,
   trainingOptions,
   trainingQuestion,
-} from "../../src/data/registration";
+} from "../../src/data/application";
 
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
@@ -224,12 +224,12 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
   await expect(page.locator("[data-email-code]")).toBeHidden();
 });
 
-test("registration shows all required errors and saves after they are corrected", async ({
+test("application shows all required errors and saves after they are corrected", async ({
   page,
   baseURL,
 }) => {
   const { email } = await createLocalAccount(page.request, baseURL!, false);
-  await page.goto("/volunteer/register");
+  await page.goto("/apply");
   const form = page.locator("[data-account-profile]");
   await expect(form.getByRole("heading", { level: 3 })).toHaveText([
     "Personal info",
@@ -372,10 +372,10 @@ test("registration shows all required errors and saves after they are corrected"
       requests.push(request.url());
   });
   await expect(
-    page.getByRole("button", { name: "Complete registration" }),
+    page.getByRole("button", { name: "Complete application" }),
   ).toBeEnabled();
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
-  await page.getByRole("button", { name: "Complete registration" }).click();
+  await page.getByRole("button", { name: "Complete application" }).click();
   const required = form.locator("input[required], textarea[required]");
   const count = await required.count();
   expect(count).toBeGreaterThan(1);
@@ -433,7 +433,7 @@ test("registration shows all required errors and saves after they are corrected"
       () => document.documentElement.scrollWidth > innerWidth,
     ),
   ).toBe(false);
-  await page.getByRole("button", { name: "Complete registration" }).click();
+  await page.getByRole("button", { name: "Complete application" }).click();
   await expect(form.locator("[data-error=codeOfConductAccepted]")).toHaveText(
     codeOfConductError,
   );
@@ -459,7 +459,7 @@ test("registration shows all required errors and saves after they are corrected"
   ).toBe(false);
   await toggle.click();
   await expect(confirmation).toBeChecked();
-  await page.getByRole("button", { name: "Complete registration" }).click();
+  await page.getByRole("button", { name: "Complete application" }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await expect(
@@ -490,12 +490,12 @@ test("registration shows all required errors and saves after they are corrected"
   ).toHaveValue("Updated volunteer");
 });
 
-test("registration and profile edits block underage birth dates at the birthday boundary", async ({
+test("application and profile edits block underage birth dates at the birthday boundary", async ({
   page,
   baseURL,
 }) => {
   await createLocalAccount(page.request, baseURL!, false);
-  await page.goto("/volunteer/register");
+  await page.goto("/apply");
   const form = page.locator("[data-account-profile]");
   const birthDate = form.locator('[name="birthDate"]');
   const cutoff = (await birthDate.getAttribute("max"))!;
@@ -532,18 +532,18 @@ test("registration and profile edits block underage birth dates at the birthday 
   const underage = younger.toISOString().slice(0, 10);
   for (const invalid of [underage, today.toISOString().slice(0, 10)]) {
     await birthDate.fill(invalid);
-    await form.getByRole("button", { name: "Complete registration" }).click();
+    await form.getByRole("button", { name: "Complete application" }).click();
     await expect(birthDate).toBeFocused();
     await expect(form.locator("[data-error=birthDate]")).toBeVisible();
     await expect(form.locator("[data-error=birthDate]")).toHaveText(
-      registrationBirthDateError,
+      applicationBirthDateError,
     );
     expect(requests).toEqual([]);
-    await expect(page).toHaveURL(/\/volunteer\/register$/);
+    await expect(page).toHaveURL(/\/apply$/);
   }
   await birthDate.fill(cutoff);
   await expect(form.locator("[data-error=birthDate]")).toBeHidden();
-  await form.getByRole("button", { name: "Complete registration" }).click();
+  await form.getByRole("button", { name: "Complete application" }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await expect(birthDate).toHaveValue(cutoff);
@@ -566,7 +566,7 @@ test("the birth-date cutoff blocks native submission without JavaScript", async 
   try {
     await createLocalAccount(context.request, baseURL!, false);
     const page = await context.newPage();
-    await page.goto("/volunteer/register");
+    await page.goto("/apply");
     const form = page.locator("[data-account-profile]");
     for (const [field, value] of Object.entries(sampleAnswers)) {
       if (
@@ -593,12 +593,12 @@ test("the birth-date cutoff blocks native submission without JavaScript", async 
     const younger = new Date(`${cutoff}T00:00:00Z`);
     younger.setUTCDate(younger.getUTCDate() + 1);
     await birthDate.fill(younger.toISOString().slice(0, 10));
-    const submit = form.getByRole("button", { name: "Complete registration" });
+    const submit = form.getByRole("button", { name: "Complete application" });
     await submit.focus();
     await submit.press("Enter");
     await expect(birthDate).toBeFocused();
     await expect(form.locator("[data-error=birthDate]")).toBeVisible();
-    await expect(page).toHaveURL(/\/volunteer\/register$/);
+    await expect(page).toHaveURL(/\/apply$/);
     await birthDate.fill(cutoff);
     expect(
       await birthDate.evaluate(
@@ -615,7 +615,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   baseURL,
 }) => {
   await createLocalAccount(page.request, baseURL!, false);
-  await page.goto("/volunteer/register");
+  await page.goto("/apply");
   const form = page.locator("[data-account-profile]");
   const training = form.getByRole("group", {
     name: trainingQuestion,
@@ -713,7 +713,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(details.locator(".volunteer-help")).toHaveCount(0);
   for (const blank of ["", " \t\n\u00a0 "]) {
     await otherText.fill(blank);
-    await form.getByRole("button", { name: "Complete registration" }).click();
+    await form.getByRole("button", { name: "Complete application" }).click();
     await expect(otherText).toBeFocused();
     await expect(details.locator("[data-error=otherTraining]")).toBeVisible();
     expect(requests).toHaveLength(0);
@@ -726,7 +726,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await support.check();
   await medic.uncheck();
   await expect(training).toBeVisible();
-  await form.getByRole("button", { name: "Complete registration" }).click();
+  await form.getByRole("button", { name: "Complete application" }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   await expect(medic).not.toBeChecked();
@@ -778,7 +778,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   baseURL,
 }) => {
   await createLocalAccount(page.request, baseURL!, false);
-  await page.goto("/volunteer/register");
+  await page.goto("/apply");
   const profileRequests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/account/profile")
@@ -876,14 +876,14 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await form
     .getByRole("checkbox", { name: codeOfConductConfirmation, exact: true })
     .check();
-  await form.getByRole("button", { name: "Complete registration" }).click();
+  await form.getByRole("button", { name: "Complete application" }).click();
   await expect(firstAid).toBeFocused();
   await expect(
     certifications.locator("[data-error=certifications]"),
   ).toBeVisible();
   await firstAid.press("Space");
   await expect(firstAid).toBeChecked();
-  await form.getByRole("button", { name: "Complete registration" }).click();
+  await form.getByRole("button", { name: "Complete application" }).click();
   await expect(expiry).toBeFocused();
   await expect(form.locator("[data-error=certificationExpiry]")).toBeVisible();
   expect(profileRequests).toHaveLength(0);
@@ -926,7 +926,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   );
   for (const blank of ["", " \t\n\u00a0 "]) {
     await experience.fill(blank);
-    await form.getByRole("button", { name: "Complete registration" }).click();
+    await form.getByRole("button", { name: "Complete application" }).click();
     await expect(experience).toBeFocused();
     await expect(form.locator("[data-error=experience]")).toBeVisible();
     expect(profileRequests).toHaveLength(0);
@@ -954,7 +954,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).toHaveValue("2030-10-14");
   await expect(expiry).toHaveAttribute("required", "");
   await expect(experience).toHaveValue("Naloxone training");
-  await form.getByRole("button", { name: "Complete registration" }).click();
+  await form.getByRole("button", { name: "Complete application" }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   await expect(medic).toBeChecked();
@@ -966,12 +966,12 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(experience).toHaveValue("Naloxone training");
   const save = form.getByRole("button", { name: "Save profile" });
   await expect(save).toBeDisabled();
-  const registeredRequests = profileRequests.length;
+  const submittedRequests = profileRequests.length;
   await expiry.fill("");
   await save.click();
   await expect(expiry).toBeFocused();
   await expect(form.locator("[data-error=certificationExpiry]")).toBeVisible();
-  expect(profileRequests).toHaveLength(registeredRequests);
+  expect(profileRequests).toHaveLength(submittedRequests);
   await medic.uncheck();
   await expect(expiry).toBeHidden();
   await expect(expiry).not.toHaveAttribute("required");

@@ -117,7 +117,7 @@ function finish(result: object) {
   // The client plugin has already displayed the challenge. Do not navigate away.
   if ("twoFactorRedirect" in result && result.twoFactorRedirect === true)
     return;
-  // `next` is added by our registration/return-to hooks, not a built-in field.
+  // `next` is added by our application/return-to hooks, not a built-in field.
   location.assign(
     "next" in result && typeof result.next === "string"
       ? result.next
@@ -308,7 +308,7 @@ form("[data-account-profile]", async (element, values) => {
     teams: values.getAll("teams"),
     certifications: values.getAll("certifications"),
     training: values.getAll("training"),
-    ...(element.hasAttribute("data-registration") && {
+    ...(element.hasAttribute("data-application") && {
       codeOfConductAccepted: values.get("codeOfConductAccepted") === "true",
     }),
   });
@@ -319,7 +319,7 @@ form("[data-account-profile]", async (element, values) => {
     menuName.textContent =
       String(values.get("name") ?? "").trim() || "Your account";
   message(element, result.message || "Profile saved.", "success");
-  if (element.hasAttribute("data-registration"))
+  if (element.hasAttribute("data-application"))
     location.assign(result.next ?? "/volunteer/account");
 });
 

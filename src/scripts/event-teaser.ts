@@ -15,7 +15,7 @@ async function renderEvents(root: HTMLElement) {
       loading.textContent =
         response.status === 401
           ? "Sign in with an approved volunteer account to view upcoming events."
-          : "Event access requires an active, approved registration. Visit the volunteer page to check your account.";
+          : "Event access requires an active, approved application. Visit the volunteer page to check your account.";
       return;
     }
     if (!response.ok) throw new Error("Unavailable events");

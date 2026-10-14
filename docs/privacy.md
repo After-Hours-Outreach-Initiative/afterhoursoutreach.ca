@@ -16,7 +16,7 @@ not apply, since the society is not in the EU and does not target people there.
 
 ## Privacy page
 
-A `/privacy` page, linked from the footer and the registration form, covering:
+A `/privacy` page, linked from the footer and the application form at `/apply`, covering:
 
 - What is collected and why.
 - The Discord user id and display name saved when someone optionally connects
@@ -52,7 +52,7 @@ documented legal or operational purpose.
 
 | Information                                                                              | Proposed retention                                                                                                                                                                                                            |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Verified accounts without registration                                                   | Delete after 90 days without sign-in.                                                                                                                                                                                         |
+| Verified accounts without an application                                                 | Delete after 90 days without sign-in.                                                                                                                                                                                         |
 | Active volunteer profiles                                                                | Keep while the volunteer participates. Review after 24 months without sign-in or event participation; give 30 days' notice before deletion.                                                                                   |
 | Event signups and orientation attendance                                                 | Keep identifiable records for 12 months after the event, then delete or keep only anonymous totals, unless still needed as a decision record.                                                                                 |
 | Information used for approval, denial, or other decisions directly affecting a volunteer | Preserve the information actually used for at least one year after each decision, including the applicable version if the profile later changes. Review and delete when that minimum and any other justified need have ended. |

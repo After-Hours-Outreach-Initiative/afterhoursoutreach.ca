@@ -46,7 +46,7 @@ export const sampleAnswers = {
 export async function createLocalAccount(
   request: APIRequestContext,
   origin: string,
-  registered = true,
+  applicationSubmitted = true,
 ) {
   const email = `ui-${crypto.randomUUID()}@example.org`;
   const bytes = crypto.getRandomValues(new Uint8Array(2));
@@ -68,7 +68,7 @@ export async function createLocalAccount(
     data: { email, otp: proof.localEmail.code },
   });
   expect(verified.status(), await verified.text()).toBe(200);
-  if (registered) {
+  if (applicationSubmitted) {
     const profile = await request.post("/api/v1/account/profile", {
       headers,
       data: { ...sampleAnswers, codeOfConductAccepted: true },
@@ -80,7 +80,7 @@ export async function createLocalAccount(
   return { id: user.id, email, name: sampleAnswers.name };
 }
 
-export async function approveLocalRegistration(
+export async function approveLocalApplication(
   organizer: APIRequestContext,
   origin: string,
   userId: string,
@@ -98,7 +98,7 @@ export async function approveLocalRegistration(
       userId,
       version: Number(version),
       active: true,
-      registrationApproved: true,
+      applicationApproved: true,
       patrolApproved: false,
     },
   });

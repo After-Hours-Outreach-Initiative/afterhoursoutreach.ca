@@ -7,7 +7,7 @@ import {
 import type { AuthBindings } from "../auth";
 import { createDatabase } from ".";
 import { volunteerStatus } from "./schema";
-import { isRegistered } from "./profiles";
+import { hasApplied } from "./profiles";
 import { RequestError, requireSameOrigin } from "../http";
 
 export async function accountContext(
@@ -30,7 +30,7 @@ export async function accountContext(
   const status = await db.query.volunteerStatus.findFirst({
     where: eq(volunteerStatus.user_id, person.id),
   });
-  const registered = await isRegistered(bindings.DB, person.id);
+  const applicationSubmitted = await hasApplied(bindings.DB, person.id);
   return {
     actor: {
       id: person.id,
@@ -39,9 +39,9 @@ export async function accountContext(
       role: person.role,
       twoFactorEnabled: person.twoFactorEnabled,
       twoFactorVerified: current.session.twoFactorVerified,
-      registered,
+      applicationSubmitted,
       active: status?.active ?? false,
-      registrationApproved: status?.registration_approved ?? false,
+      applicationApproved: status?.registration_approved ?? false,
       patrolApproved: status?.patrol_approved ?? false,
     },
     email: person.email,
@@ -69,24 +69,24 @@ export const permissionValues = (actor: Actor) => [
 
 export function requireVolunteer(actor: Actor | null): asserts actor is Actor {
   if (!actor) throw new RequestError(401, "Sign in to continue.");
-  if (!actor.registered)
-    throw new RequestError(403, "Complete registration first.");
+  if (!actor.applicationSubmitted)
+    throw new RequestError(403, "Complete your application first.");
   if (!actor.active)
     throw new RequestError(403, "Your volunteer account is inactive.");
-  if (!actor.registrationApproved && actor.role !== "organizer")
+  if (!actor.applicationApproved && actor.role !== "organizer")
     throw new RequestError(
       403,
-      "Your registration is awaiting organizer approval.",
+      "Your application is awaiting organizer approval.",
     );
   if (actor.twoFactorEnabled && !actor.twoFactorVerified)
     throw new RequestError(403, "Sign in with your authenticator to continue.");
 }
 export function canViewEvents(actor: Actor | null): boolean {
-  // Organizers must retain access to review registrations, including after migration.
+  // Organizers must retain access to review applications, including after migration.
   return Boolean(
-    actor?.registered &&
+    actor?.applicationSubmitted &&
     actor.active &&
-    (actor.registrationApproved || actor.role === "organizer") &&
+    (actor.applicationApproved || actor.role === "organizer") &&
     (!actor.twoFactorEnabled || actor.twoFactorVerified),
   );
 }

@@ -1,8 +1,8 @@
 import { afterEach, expect, test, vi } from "vitest";
 import {
-  latestRegistrationBirthDate,
+  latestApplicationBirthDate,
   normalizeCertifications,
-} from "../src/data/registration";
+} from "../src/data/application";
 import { profileSchema } from "../src/server/db/profiles";
 
 const birthDateSchema = profileSchema.shape.birthDate;
@@ -91,7 +91,7 @@ test.each([
   ["2027-02-28T12:00:00Z", "2008-02-28"],
   ["2027-03-01T00:00:00Z", "2008-03-01"],
 ])("the cutoff at %s is %s", (today, cutoff) => {
-  expect(latestRegistrationBirthDate(new Date(today))).toBe(cutoff);
+  expect(latestApplicationBirthDate(new Date(today))).toBe(cutoff);
 });
 
 test.each([

@@ -71,7 +71,7 @@ Playwright arguments are forwarded normally:
 
 ```sh
 pnpm test:ui tests/ui/local-accounts.spec.ts
-pnpm test:ui --grep "registration"
+pnpm test:ui --grep "application"
 ```
 
 Local `PLAYWRIGHT_BASE_URL` overrides and the benchmark's former `--local-url`

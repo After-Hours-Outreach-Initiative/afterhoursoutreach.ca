@@ -2,21 +2,21 @@
 import {
   certificationOptions,
   certificationQuestion,
-  registrationFields,
-  type RegistrationAnswers,
-} from "@/data/registration";
+  applicationFields,
+  type ApplicationAnswers,
+} from "@/data/application";
 import FieldError from "@/components/FieldError.astro";
 import AccountProfileField from "./AccountProfileField.astro";
 
 interface Props {
-  values?: RegistrationAnswers | null;
+  values?: ApplicationAnswers | null;
   active: boolean;
 }
 const { values, active } = Astro.props;
 const legacy = values?.certification?.trim();
 const selected =
   values?.certifications.length === 1 ? values.certifications[0] : undefined;
-const otherTrainingField = registrationFields.find(
+const otherTrainingField = applicationFields.find(
   (field) => field.name === "experience",
 )!;
 ---

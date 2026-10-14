@@ -40,7 +40,7 @@ seed run; rerunning does not reschedule existing events.
 
 Seeding sends no email and creates no sign-in credentials, sessions, patrol
 approvals, or organizer roles. Use `pnpm organizer:bootstrap --preview --email
-verified@example.org` for your own verified, registered preview account if the
+verified@example.org` for your own verified preview account with a completed application if the
 database has no organizer yet. Volunteer-management pages remain organizer-only.
 
 `pnpm build` includes all account and event features for production. There is no

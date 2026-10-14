@@ -15,14 +15,14 @@ import { loadProfile } from "@/server/db/profiles";
 import { createDatabase } from "@/server/db";
 import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import type { RegistrationAnswers } from "@/data/registration";
+import type { ApplicationAnswers } from "@/data/application";
 export const prerender = false;
-let values: RegistrationAnswers | null = null;
+let values: ApplicationAnswers | null = null;
 let email = "";
 let currentId = "";
 let twoFactorEnabled = false;
 let organizer = false;
-let registrationApproved = false;
+let applicationApproved = false;
 let active = false;
 let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
 let sessionsNeedSignIn = false;
@@ -38,7 +38,7 @@ try {
   if (!current)
     return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/account");
   values = await loadProfile(env.DB, current.user.id);
-  if (!values) return Astro.redirect("/volunteer/register");
+  if (!values) return Astro.redirect("/apply");
   email = current.user.email;
   const { sessionConfig } = await auth.$context;
   emailNeedsSignIn =
@@ -51,7 +51,7 @@ try {
   const status = await createDatabase(env.DB).query.volunteerStatus.findFirst({
     where: eq(volunteerStatus.user_id, current.user.id),
   });
-  registrationApproved = status?.registration_approved ?? false;
+  applicationApproved = status?.registration_approved ?? false;
   active = status?.active ?? false;
   try {
     const listed = await auth.api.listSessions({
@@ -96,9 +96,9 @@ try {
         Your volunteer account is inactive. Contact an organizer to restore
         access.
       </p>
-    ) : !registrationApproved && !organizer ? (
+    ) : !applicationApproved && !organizer ? (
       <p class="volunteer-notice" role="status">
-        Your registration is awaiting organizer approval. You can update your
+        Your application is awaiting organizer approval. You can update your
         profile while you wait. Events and orientation sign-ups will be
         available once approved.
       </p>

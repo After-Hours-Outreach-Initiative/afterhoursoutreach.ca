@@ -513,7 +513,7 @@ form(
     userId: str(v, "userId"),
     version: Number(v.get("version")),
     active: v.has("active"),
-    registrationApproved: v.has("registrationApproved"),
+    applicationApproved: v.has("applicationApproved"),
     patrolApproved: v.has("patrolApproved"),
   }),
   refreshVolunteer,

@@ -149,7 +149,7 @@
   margin: 16px 0 24px;
   color: #a1a1aa;
 }
-.volunteer-registration-warning {
+.volunteer-application-warning {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -168,22 +168,22 @@
     background-color 150ms,
     border-color 150ms;
 }
-.volunteer-registration-warning:hover {
+.volunteer-application-warning:hover {
   border-color: #eab308;
   background: #2f2308;
 }
-.volunteer-registration-warning:focus-visible {
+.volunteer-application-warning:focus-visible {
   outline: 2px solid #facc15;
   outline-offset: 4px;
 }
 .volunteer-warning-icon,
-.volunteer-registration-warning-arrow {
+.volunteer-application-warning-arrow {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
   color: #facc15;
 }
-.volunteer-registration-warning-text {
+.volunteer-application-warning-text {
   flex: 1;
   min-width: 0;
   white-space: normal;
@@ -945,13 +945,13 @@
   .volunteer-wrap {
     padding: 0 16px 64px;
   }
-  .volunteer-registration-warning {
+  .volunteer-application-warning {
     gap: 8px;
     padding: 14px 12px;
     font-size: 14px;
   }
   .volunteer-warning-icon,
-  .volunteer-registration-warning-arrow {
+  .volunteer-application-warning-arrow {
     width: 18px;
     height: 18px;
   }

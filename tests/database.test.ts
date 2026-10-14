@@ -58,7 +58,7 @@ function signUp(id: string, eventId: string, userId: string) {
   ).run(id, eventId, userId);
 }
 
-test("registration approval is required for orientation inserts, reactivation and moves", () => {
+test("application approval is required for orientation inserts, reactivation and moves", () => {
   db.exec(
     "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='alice'",
   );
@@ -147,7 +147,7 @@ test("duplicate confirmed signup is rejected, cancelled signup permits a new one
   signUp("replacement", "orientation", "alice");
 });
 
-test("inactive, unregistered, closed, hidden, cancelled and started events reject signups", () => {
+test("inactive accounts, missing applications, closed, hidden, cancelled and started events reject signups", () => {
   db.exec("UPDATE volunteer_status SET active = 0 WHERE user_id = 'alice'");
   assert.throws(
     () => signUp("inactive", "orientation", "alice"),
@@ -157,7 +157,7 @@ test("inactive, unregistered, closed, hidden, cancelled and started events rejec
     "UPDATE volunteer_status SET active = 1 WHERE user_id = 'alice'; DELETE FROM profile WHERE user_id = 'alice'",
   );
   assert.throws(
-    () => signUp("unregistered", "orientation", "alice"),
+    () => signUp("no-application", "orientation", "alice"),
     /signup_not_eligible/,
   );
   db.exec("UPDATE event SET open = 0 WHERE id = 'orientation'");

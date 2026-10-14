@@ -21,14 +21,14 @@ export function localEventFixtures(now = Date.now()) {
     { key: "alex", name: "Alex Chen" },
     { key: "jamie", name: "Jamie Park", approved: true, inactive: true },
     { key: "sam", name: "Sam Rivera", role: "organizer", approved: true },
-    { key: "first-sign-in", name: "", unregistered: true },
+    { key: "first-sign-in", name: "", applicationPending: true },
   ];
   for (const person of people) {
     const id = quote(fixtureUserId(person.key));
     statements.push(`INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at)
       VALUES (${id}, ${quote(person.name)}, ${quote(`${person.key}.local@example.org`)}, 1, ${quote(person.role ?? "volunteer")}, ${now}, ${now})
       ON CONFLICT(id) DO NOTHING`);
-    if (person.unregistered) continue;
+    if (person.applicationPending) continue;
     statements.push(`INSERT INTO profile (
       user_id, preferred_name, pronouns, phone, birth_date, emergency_contact_name,
       emergency_contact_phone, emergency_contact_relationship, heard_about_us,

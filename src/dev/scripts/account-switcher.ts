@@ -121,7 +121,7 @@ export async function initAccountSwitcher() {
       button.className = "btn btn-quiet account-profile-button";
       button.dataset.switchUser = user.id;
       const name = document.createElement("span");
-      name.textContent = user.name || "Not registered";
+      name.textContent = user.name || "Not yet applied";
       const detail = document.createElement("span");
       detail.className = "account-profile-detail";
       detail.textContent = `${user.email}${user.role === "organizer" ? " · Organizer" : ""}`;

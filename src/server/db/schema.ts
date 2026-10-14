@@ -146,6 +146,7 @@ export const profile = sqliteTable("profile", {
   // Nullable for existing/synthetic profiles; never invent an acknowledgement.
   code_of_conduct_version: text(),
   code_of_conduct_accepted_at: timestamp(),
+  // Legacy SQL name: when the volunteer application was submitted.
   registered_at: timestamp().notNull(),
   updated_at: timestamp().notNull(),
 });
@@ -157,6 +158,7 @@ export const volunteerStatus = sqliteTable(
       .primaryKey()
       .references(() => user.id, { onDelete: "cascade" }),
     active: integer({ mode: "boolean" }).notNull().default(true),
+    // Legacy SQL name, mapped to applicationApproved outside the storage layer.
     registration_approved: integer({ mode: "boolean" })
       .notNull()
       .default(false),

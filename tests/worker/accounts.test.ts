@@ -7,9 +7,9 @@ import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
 import {
-  latestRegistrationBirthDate,
-  registrationBirthDateError,
-} from "../../src/data/registration";
+  latestApplicationBirthDate,
+  applicationBirthDateError,
+} from "../../src/data/application";
 import {
   codeOfConductConfirmation,
   codeOfConductError,
@@ -121,12 +121,12 @@ describe(
         .join("; ");
     };
 
-    test("unauthenticated profile access is rejected and registration redirects to sign-in", async () => {
+    test("unauthenticated profile access is rejected and application redirects to sign-in", async () => {
       const profile = await send("/api/v1/account/profile", answers);
       assert.equal(profile.status, 401, await profile.clone().text());
-      const register = await send("/volunteer/register");
-      assert.equal(register.status, 302);
-      assert.match(register.headers.get("location")!, /sign-in/);
+      const application = await send("/apply");
+      assert.equal(application.status, 302);
+      assert.match(application.headers.get("location")!, /sign-in/);
       assert.equal((await send("/api/v1/auth/sign-in/email-otp")).status, 405);
       assert.equal(
         (await send("/api/v1/auth/email-otp/get-verification-otp")).status,
@@ -158,12 +158,12 @@ describe(
       }
     });
 
-    test("the API rejects underage registration and edits without writing profile data", async () => {
+    test("the API rejects underage application and edits without writing profile data", async () => {
       const ageCookie = await signIn("worker-age-boundary@example.org");
       const account = (await (
         await send("/api/v1/auth/get-session", undefined, ageCookie)
       ).json()) as typeof current;
-      const cutoff = latestRegistrationBirthDate();
+      const cutoff = latestApplicationBirthDate();
       const younger = new Date(`${cutoff}T00:00:00Z`);
       younger.setUTCDate(younger.getUTCDate() + 1);
       const underage = younger.toISOString().slice(0, 10);
@@ -185,7 +185,7 @@ describe(
           .bind(account.user.id)
           .first(),
       });
-      const unregistered = await snapshots();
+      const beforeApplication = await snapshots();
       for (const birthDate of [underage, "2999-01-01", "2005-02-29"]) {
         const response = await send(
           "/api/v1/account/profile",
@@ -195,16 +195,16 @@ describe(
         assert.equal(response.status, 400, await response.clone().text());
         assert.equal(
           ((await response.json()) as { message: string }).message,
-          registrationBirthDateError,
+          applicationBirthDateError,
         );
-        assert.deepEqual(await snapshots(), unregistered);
+        assert.deepEqual(await snapshots(), beforeApplication);
       }
-      const registered = await send(
+      const application = await send(
         "/api/v1/account/profile",
         { ...answers, birthDate: cutoff, codeOfConductAccepted: true },
         ageCookie,
       );
-      assert.equal(registered.status, 200, await registered.clone().text());
+      assert.equal(application.status, 200, await application.clone().text());
       const saved = await snapshots();
       assert.equal(saved.profile?.birth_date, cutoff);
       const { heardAboutUs: _, motivation: __, ...editedAnswers } = answers;
@@ -244,12 +244,12 @@ describe(
           .first<{ teams: string }>();
         return JSON.parse(row!.teams);
       };
-      const registered = await send(
+      const application = await send(
         "/api/v1/account/profile",
         { ...answers, teams: undefined, codeOfConductAccepted: true },
         outreachCookie,
       );
-      assert.equal(registered.status, 200, await registered.clone().text());
+      assert.equal(application.status, 200, await application.clone().text());
       assert.deepEqual(await savedTeams(), ["outreach"]);
       for (const [teams, expected] of [
         [[], ["outreach"]],
@@ -277,7 +277,7 @@ describe(
       }
     });
 
-    test("Medic registration and edits require a certification expiry date", async () => {
+    test("Medic application and edits require a certification expiry date", async () => {
       const expiryCookie = await signIn("worker-medic-expiry@example.org");
       const account = (await (
         await send("/api/v1/auth/get-session", undefined, expiryCookie)
@@ -301,12 +301,12 @@ describe(
         assert.equal(rejected.status, 400);
         assert.equal(await savedProfile(), null);
       }
-      const registered = await send(
+      const application = await send(
         "/api/v1/account/profile",
         { ...medicAnswers, certificationExpiry: "2030-10-14" },
         expiryCookie,
       );
-      assert.equal(registered.status, 200, await registered.clone().text());
+      assert.equal(application.status, 200, await application.clone().text());
       const original = await savedProfile();
       for (const certificationExpiry of ["", " \t\n\u00a0 "]) {
         const rejected = await send(
@@ -351,7 +351,7 @@ describe(
         assert.equal(rejected.status, 400);
         assert.equal(await savedProfile(), null);
       }
-      const registered = await send(
+      const application = await send(
         "/api/v1/account/profile",
         {
           ...trainingAnswers,
@@ -359,7 +359,7 @@ describe(
         },
         trainingCookie,
       );
-      assert.equal(registered.status, 200, await registered.clone().text());
+      assert.equal(application.status, 200, await application.clone().text());
       const original = await savedProfile();
       assert.equal(
         original?.relevant_training,
@@ -432,12 +432,12 @@ describe(
       assert.equal(missingOtherDetails.status, 400);
       assert.equal(await savedProfile(), null);
 
-      const registered = await send(
+      const application = await send(
         "/api/v1/account/profile",
         { ...withoutCertifications, codeOfConductAccepted: true },
         trainingCookie,
       );
-      assert.equal(registered.status, 200, await registered.clone().text());
+      assert.equal(application.status, 200, await application.clone().text());
       const original = await savedProfile();
       assert.equal(original?.medical_certification, "");
       assert.equal(original?.medical_certifications, "[]");
@@ -530,24 +530,24 @@ describe(
       );
     });
 
-    test("registration and edits round-trip through the real API", async () => {
-      const unregisteredPortal = await send("/volunteer", undefined, cookie);
-      assert.equal(unregisteredPortal.status, 200);
-      const prompt = await unregisteredPortal.text();
-      assert.match(prompt, /volunteer-registration-warning/);
+    test("application and edits round-trip through the real API", async () => {
+      const beforeApplication = await send("/volunteer", undefined, cookie);
+      assert.equal(beforeApplication.status, 200);
+      const prompt = await beforeApplication.text();
+      assert.match(prompt, /volunteer-application-warning/);
       assert.match(prompt, /volunteer-warning-icon/);
-      assert.match(prompt, /volunteer-registration-warning-arrow/);
+      assert.match(prompt, /volunteer-application-warning-arrow/);
       assert.match(
         prompt,
-        /Complete your registration to request volunteer access/,
+        /Complete your application to request volunteer access/,
       );
       assert.match(
         prompt,
-        /<a\b[^>]*class="volunteer-registration-warning"[^>]*href="\/volunteer\/register"/,
+        /<a\b[^>]*class="volunteer-application-warning"[^>]*href="\/apply"/,
       );
       assert.doesNotMatch(
         prompt,
-        /Continue registration|Complete your profile before registering for events\./,
+        /Continue application|Complete your profile before registering for events\./,
       );
       for (const input of [
         answers,
@@ -575,11 +575,11 @@ describe(
         cookie,
       );
       assert.equal(response.status, 200, await response.clone().text());
-      const registeredPortal = await send("/volunteer", undefined, cookie);
-      assert.equal(registeredPortal.status, 200);
+      const submittedPortal = await send("/volunteer", undefined, cookie);
+      assert.equal(submittedPortal.status, 200);
       assert.doesNotMatch(
-        await registeredPortal.text(),
-        /volunteer-registration-warning/,
+        await submittedPortal.text(),
+        /volunteer-application-warning/,
       );
       const acknowledgement = await DB.prepare(
         "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
@@ -1150,7 +1150,7 @@ describe(
         await newPage.getByRole("button", { name: "Confirm sign-in" }).click();
         await newPage
           .getByRole("heading", {
-            name: "Volunteer registration",
+            name: "Volunteer application",
             exact: true,
           })
           .waitFor();
@@ -1217,7 +1217,7 @@ describe(
           newPage.getByRole("checkbox", { name: "Outreach", exact: true }),
         ).toBeDisabled();
         await newPage
-          .getByRole("button", { name: "Complete registration" })
+          .getByRole("button", { name: "Complete application" })
           .click();
         await expect(
           newPage.locator("[data-error=codeOfConductAccepted]"),
@@ -1228,7 +1228,7 @@ describe(
         await expect(confirmation).toBeFocused();
         await confirmation.check();
         await newPage
-          .getByRole("button", { name: "Complete registration" })
+          .getByRole("button", { name: "Complete application" })
           .click();
         await newPage
           .getByRole("heading", { name: "Your account", exact: true })
@@ -1297,12 +1297,12 @@ describe(
     test("the Worker encrypts authenticator data and requires a second factor after email sign-in", async () => {
       const email = "worker-factor@example.org";
       const initialCookie = await signIn(email);
-      const registered = await send(
+      const application = await send(
         "/api/v1/account/profile",
         { ...answers, codeOfConductAccepted: true },
         initialCookie,
       );
-      assert.equal(registered.status, 200, await registered.clone().text());
+      assert.equal(application.status, 200, await application.clone().text());
       const enabled = await send(
         "/api/v1/auth/two-factor/enable",
         { method: "totp" },

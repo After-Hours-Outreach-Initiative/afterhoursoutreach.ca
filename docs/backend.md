@@ -1,11 +1,11 @@
 # Backend
 
-The server side behind accounts, registration, and event signups.
+The server side behind accounts, applications, and event signups.
 
 ## Stack
 
-- `@astrojs/cloudflare` adapter. Account and event related pages under
-  `/volunteer` will render on the server, while everything else can be static.
+- `@astrojs/cloudflare` adapter. The application at `/apply` and account/event
+  pages under `/volunteer` render on the server; public content can be static.
 - Cloudflare D1 for the database.
 - Drizzle for the schema and migrations.
 - Better Auth with the official Email OTP plugin for sign in and sessions. See
@@ -47,7 +47,7 @@ See [testing.md](testing.md).
 
 On localhost or the dev server's LAN address, the shared account layout includes
 a **View as** button for every user in local D1, including accounts that have
-not finished registration. Choosing a user replaces only this browser's
+not finished their application. Choosing a user replaces only this browser's
 session; choosing Visitor signs out. Switching simulates a verified two-factor
 session for users with an enrolled authenticator, without changing their role,
 email verification, active status, profile, or patrol approval. Create new
@@ -73,7 +73,7 @@ builds; deployment readiness is controlled by the developer, not a feature flag.
 ## Organizer access
 
 Outside the explicit local fixtures, the first organizer must sign in and finish
-registration. A developer then runs one of:
+their application. A developer then runs one of:
 
 ```sh
 pnpm organizer:bootstrap --local --email verified@example.org
@@ -84,9 +84,9 @@ This is a one-time, audited D1 transaction. It ends the account's sessions;
 sign in again. It cannot target production. No organizer
 is promoted automatically or based on the email address supplied to a web form.
 
-Organizers manage registration approval, active status, patrol approval, and roles at
-`/volunteer/volunteers`. Promotions require an active, registered account with
-a verified email and approved registration. Role changes revoke
+Organizers manage application approval, active status, patrol approval, and roles at
+`/volunteer/volunteers`. Promotions require an active account with
+a verified email and approved application. Role changes revoke
 the target's sessions. The last active organizer cannot be demoted/deactivated.
 Two-factor authentication is optional for organizers and volunteers; accounts
 that enable it must complete it when signing in. Full profile
@@ -102,8 +102,8 @@ access, the browser still navigates to sign-in or the volunteer portal.
 ## Events
 
 `/volunteer` is request-rendered and lists D1 events, never invented fixtures.
-Visitors and volunteers awaiting registration approval cannot view event details
-on pages or through the event API. Existing volunteers also require registration
+Visitors and volunteers awaiting application approval cannot view event details
+on pages or through the event API. Existing volunteers also require application
 approval after applying `0002_registration_approval.sql`; organizers retain access.
 Organizers create/edit events, separately close signups or hide listings, view
 rosters, move/remove signups with an optional emailed reason, and mark past

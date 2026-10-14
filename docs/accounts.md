@@ -1,6 +1,6 @@
 # Accounts
 
-How volunteers register and sign in, and how organizers are told apart from
+How volunteers apply and sign in, and how organizers are told apart from
 volunteers.
 
 ## Authentication
@@ -18,7 +18,7 @@ Authentication is passwordless, using an emailed link or code.
 5. Requesting another email replaces the previous code and link.
 
 The first sign in with a new address creates the account and goes to the
-registration form. See [Registration](#registration).
+application form at `/apply`. See [Application](#application).
 
 Better Auth's official Email OTP plugin generates, stores, expires, and consumes
 the code, creates verified accounts, and manages sessions. The link carries that
@@ -31,19 +31,19 @@ The generated database baseline uses Better Auth's verification table, not the
 old email-challenge table. See [database migrations](../src/server/db/README.md)
 before rebuilding a pre-production database that used the old migration history.
 
-## Registration
+## Application
 
 1. `/volunteer` has a button to create an account.
 2. The person signs in. See [Authentication](#authentication).
-3. A new account goes to the registration form. The privacy notice is shown at
+3. A new account goes to the application form at `/apply`. The privacy notice is shown at
    the top.
 4. After the team choices, the Code of Conduct initially shows the first two
    rules, fading into the dark background near the bottom. **Read all rules**
    expands the remaining rules and removes the fade; **Show fewer rules** appears
    below the final rule and collapses them again. The required, initially unchecked
-   acknowledgement stays visible below in both states, before **Complete registration**.
+   acknowledgement stays visible below in both states, before **Complete application**.
 
-New registration requires `codeOfConductAccepted: true` in the profile API too;
+New applications require `codeOfConductAccepted: true` in the profile API too;
 omitted, false, and non-boolean values cannot create a profile. The server saves
 the rules version and acknowledgement time with the profile in the same
 transaction. Profile edits neither require the checkbox again nor change that
@@ -51,44 +51,58 @@ record. Existing and synthetic profiles are not backfilled with invented consent
 The additive `code_of_conduct` migration must be applied before deploying this
 change; it preserves existing accounts and profile answers.
 
-After registration, volunteers wait for an organizer to approve their registration
-from **Volunteers → View profile and approval → Approve registration**. Until then,
+After applying, volunteers wait for an organizer to approve their application
+from **Volunteers → View profile and approval → Approve application**. Until then,
 they can edit their account but cannot view events or sign up for orientations.
-Pending registrations appear first in the volunteer list. Organizers retain event
-and review access through their role, with an active, completed registration.
+Pending applications appear first in the volunteer list. Organizers retain event
+and review access through their role, with an active, completed application.
 
-Registration approval enables event viewing and orientation sign-ups. Patrol
+Application approval enables event viewing and orientation sign-ups. Patrol
 approval remains a separate decision; completing orientation does not grant it
 automatically. Both approval changes are audited, and emails require organizer
-opt-in. Revoking registration approval cancels future volunteer event sign-ups.
+opt-in. Revoking application approval cancels future volunteer event sign-ups.
 
 Apply `0002_registration_approval.sql` before deploying. Existing volunteers also
 start awaiting approval, including those already approved for patrols. Profiles,
 patrol approvals, and existing sign-up records are preserved by the migration.
 
+`/apply` is the canonical application URL. GET requests to `/register` and
+`/volunteer/register` redirect there permanently; legacy query strings are not
+forwarded. Sign-in return URLs also normalize those older paths to `/apply`.
+The application and redirects retain private-page headers (no caching/indexing).
+Event registrations reserve event spots; they are separate from volunteer applications.
+
+The form definitions live in `src/data/application.ts`. The profile endpoint
+remains `/api/v1/account/profile`, since it also handles ongoing profile edits.
+Organizer status requests use `applicationApproved`; the old `registrationApproved`
+input is accepted for older open forms, but conflicting values are rejected.
+See [storage compatibility](../src/server/db/README.md#application-storage-compatibility)
+for the unchanged SQL names and historical records. No data migration is needed
+for this terminology change.
+
 ### Profile
 
-Registration answers are saved with the person's profile. Ongoing contact,
+Application answers are saved with the person's profile. Ongoing contact,
 safety, training, and team-interest answers can be seen and edited at
 `/volunteer/account`.
 
-Email appears first during registration. On the account page it appears in
+Email appears first during application. On the account page it appears in
 **Account settings**, not in the profile form.
 
 Both forms use larger section headings with horizontal dividers: **Personal
 info**, **Emergency contact**, **Training and safety**, and **Team interests**.
-Registration also includes **About volunteering** and **Code of Conduct**.
+Application also includes **About volunteering** and **Code of Conduct**.
 
 **Save profile** is greyed out until an answer or team selection differs from
 the saved profile. Reverting every change disables it again. Successful saves
 establish the new baseline; failed saves remain retryable, and edits made while
-a save is pending stay unsaved. **Complete registration** is unaffected.
+a save is pending stay unsaved. **Complete application** is unaffected.
 
 “How did you hear about us?”, “Why do you want to volunteer?”, and the Code of
-Conduct appear only during registration, not on the volunteer's profile or
-organizer profile pages/dialogs. The server preserves these registration-only
+Conduct appear only during application, not on the volunteer's profile or
+organizer profile pages/dialogs. The server preserves these application-only
 answers and the acknowledgement record when a profile is edited. New
-registration still requires both questions and the acknowledgement; profile
+applications still require both questions and the acknowledgement; profile
 updates omit them, and older clients cannot overwrite the saved answers.
 
 Volunteers can edit ongoing profile answers. Changes are logged without copying
@@ -100,26 +114,26 @@ enabled must verify it when signing in.
 ### Fields
 
 Questions are based on the current Google Form. The referral and motivation
-questions and Code of Conduct confirmation are registration-only; the volunteer
+questions and Code of Conduct confirmation are application-only; the volunteer
 and organizers can see the remaining profile answers.
 
-| Field                                    | Required        |
-| ---------------------------------------- | --------------- |
-| Full or preferred name                   | Yes             |
-| Email (from the account)                 | Yes             |
-| Pronouns                                 | No              |
-| Phone number                             | Yes             |
-| Date of birth                            | Yes             |
-| Emergency contact name                   | Yes             |
-| Emergency contact phone                  | Yes             |
-| Emergency contact relationship           | Yes             |
-| How did you hear about us                | Yes             |
-| Why do you want to volunteer             | Yes             |
-| Teams (outreach, medic, non-patrol)      | Yes             |
-| Highest medical certification            | Yes             |
-| Other training and experience, and other | Yes             |
-| Medical conditions or triggers           | No              |
-| Code of Conduct acknowledgement          | On registration |
+| Field                                    | Required       |
+| ---------------------------------------- | -------------- |
+| Full or preferred name                   | Yes            |
+| Email (from the account)                 | Yes            |
+| Pronouns                                 | No             |
+| Phone number                             | Yes            |
+| Date of birth                            | Yes            |
+| Emergency contact name                   | Yes            |
+| Emergency contact phone                  | Yes            |
+| Emergency contact relationship           | Yes            |
+| How did you hear about us                | Yes            |
+| Why do you want to volunteer             | Yes            |
+| Teams (outreach, medic, non-patrol)      | Yes            |
+| Highest medical certification            | Yes            |
+| Other training and experience, and other | Yes            |
+| Medical conditions or triggers           | No             |
+| Code of Conduct acknowledgement          | On application |
 
 Date of birth, emergency contact, and medical conditions each have a short line
 under them saying what the information is used for.
@@ -210,4 +224,4 @@ Dev-tool assets must not be placed in `public/`, which is copied into builds.
   need R2 storage and more privacy work.
 - TODO: fix the typos in the current form options when copying them over
   ("Nalaxone", "wiith", "Pa:ramedic", "relatons", "opiod", "ventiliation").
-- TODO: decide if volunteers also need a waiver as part of registering.
+- TODO: decide if volunteers also need a waiver as part of applying.

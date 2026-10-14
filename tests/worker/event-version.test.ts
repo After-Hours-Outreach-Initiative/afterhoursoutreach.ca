@@ -35,7 +35,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
         .filter((value) => !value.includes("Max-Age=0"))
         .map((value) => value.split(";")[0])
         .join("; ");
-      const registered = await send(
+      const application = await send(
         "/api/v1/account/profile",
         {
           ...sampleAnswers,
@@ -43,7 +43,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
         },
         cookie,
       );
-      expect(registered.status, await registered.text()).toBe(200);
+      expect(application.status, await application.text()).toBe(200);
       const session = (await (
         await send("/api/v1/auth/get-session", undefined, cookie)
       ).json()) as {
@@ -97,7 +97,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     // Pending accounts see no event activity; approval immediately changes their scoped view.
     expect(
       await (await send("/volunteer", undefined, attendee.cookie)).text(),
-    ).toContain("Registration awaiting approval");
+    ).toContain("Application awaiting approval");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
     )

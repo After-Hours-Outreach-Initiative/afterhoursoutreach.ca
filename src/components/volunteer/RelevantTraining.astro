@@ -1,17 +1,17 @@
 ---
 import {
-  registrationFields,
+  applicationFields,
   trainingOptions,
   trainingQuestion,
-  type RegistrationAnswers,
-} from "@/data/registration";
+  type ApplicationAnswers,
+} from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
 
 interface Props {
-  values?: RegistrationAnswers | null;
+  values?: ApplicationAnswers | null;
 }
 const { values } = Astro.props;
-const otherTrainingField = registrationFields.find(
+const otherTrainingField = applicationFields.find(
   (field) => field.name === "otherTraining",
 )!;
 ---

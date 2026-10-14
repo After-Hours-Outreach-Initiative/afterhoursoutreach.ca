@@ -12,9 +12,9 @@ export async function eventViewVersion(
     actor: actor && {
       id: actor.id,
       role: actor.role,
-      registered: actor.registered,
+      applicationSubmitted: actor.applicationSubmitted,
       active: actor.active,
-      registrationApproved: actor.registrationApproved,
+      applicationApproved: actor.applicationApproved,
       patrolApproved: actor.patrolApproved,
       twoFactorEnabled: actor.twoFactorEnabled,
       twoFactorVerified: actor.twoFactorVerified,

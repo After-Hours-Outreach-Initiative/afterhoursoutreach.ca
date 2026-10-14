@@ -11,7 +11,7 @@ operations. Edit files here, not generated SQL in `drizzle/`.
 | `triggers.sql`       | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation event types, visibility, and organizer protection/bootstrap. |
 | `events.ts`          | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                        |
 | `volunteers.ts`      | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                |
-| `profiles.ts`        | Registration validation and transactional profile updates.                                                                                            |
+| `profiles.ts`        | Application validation and transactional profile updates.                                                                                             |
 | `access.ts`          | Verified account context and authorization, rechecked inside writes.                                                                                  |
 | `policy.ts`          | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                 |
 | `sessions.ts`        | Ownership-scoped session lookup and second-factor verification markers.                                                                               |
@@ -25,6 +25,20 @@ integration remains in `src/server/auth/`. Email transport and delivery orchestr
 remain in `src/server/events/notifications.ts`; they call the database operations
 here instead of issuing their own SQL. Development fixtures are separate in
 `src/dev/` and `scripts/`.
+
+## Application storage compatibility
+
+Volunteer application terminology does not rename deployed storage:
+
+- `profile.registered_at` is the application submission time.
+- `volunteer_status.registration_approved` stores application approval; query
+  aliases and account context expose it as `applicationApproved`.
+- `applicationSubmitted` / `hasApplied()` mean a saved profile exists, not approval.
+- Historical migrations, snapshots, and trigger definitions keep their original
+  names/text, including `0002_registration_approval.sql`. No schema change is needed.
+- New approval audit entries use `applicationApproved`. Existing `registrationApproved`
+  audit field names and queued notification text remain historical records; they are
+  not rewritten. Event registration records describe event spots, not applications.
 
 ## Generated migrations
 

@@ -23,8 +23,8 @@ test("view versions detect capacity, signups, visibility and access changes with
     name: "Volunteer",
     sessionId: "session",
     role: "volunteer",
-    registered: true,
-    registrationApproved: true,
+    applicationSubmitted: true,
+    applicationApproved: true,
     active: true,
     patrolApproved: false,
     twoFactorEnabled: false,
@@ -50,7 +50,7 @@ test("view versions detect capacity, signups, visibility and access changes with
     original,
   );
   expect(
-    await eventViewVersion([event], { ...actor, registrationApproved: false }),
+    await eventViewVersion([event], { ...actor, applicationApproved: false }),
   ).not.toBe(original);
   expect(
     await eventViewVersion([event], { ...actor, sessionId: "renewed" }),
