@@ -1,0 +1,163 @@
+---
+import {
+  applicationFields,
+  certificationQuestion,
+  trainingQuestion,
+} from "@/data/application";
+import CodeOfConduct from "./CodeOfConduct.astro";
+
+interface Props {
+  application: boolean;
+  email: string;
+  sections: {
+    key: string;
+    heading: string;
+    fields: (typeof applicationFields)[number][];
+  }[];
+}
+const { application, email, sections } = Astro.props;
+interface ReviewRow {
+  name: string;
+  label: string;
+  condition?: string;
+}
+const reviewSections = sections.map((section) => {
+  let rows: ReviewRow[] = section.fields
+    .filter((field) => !["experience", "otherTraining"].includes(field.name))
+    .map((field) => ({
+      name: field.name === "heardAboutUs" ? "heardAboutUsSources" : field.name,
+      label: field.label + (field.required ? "" : " (optional)"),
+    }));
+  if (section.key === "personal-info")
+    rows.unshift({ name: "email", label: "Email" });
+  if (section.key === "team-interests")
+    rows = [{ name: "teams", label: "Which teams interest you?" }];
+  if (section.key === "training-and-safety")
+    rows = [
+      {
+        name: "certifications",
+        label: certificationQuestion,
+        condition: "medic",
+      },
+      {
+        name: "experience",
+        label: "Other training and experience",
+        condition: "other-certification",
+      },
+      ...rows.map((row) => ({ ...row, condition: "medic" })),
+      { name: "training", label: trainingQuestion },
+      {
+        name: "otherTraining",
+        label: "Other relevant training or experience",
+        condition: "other-training",
+      },
+    ];
+  if (section.key === "about-volunteering")
+    rows.splice(1, 0, {
+      name: "heardAboutUsOther",
+      label: "Other source",
+      condition: "other-referral",
+    });
+  return { ...section, rows };
+});
+---
+
+{
+  application ? (
+    <>
+      <nav
+        aria-label="Application steps"
+        class="volunteer-application-progress"
+      >
+        <ol>
+          <li data-application-progress="questions" aria-current="step">
+            1. Application questions
+          </li>
+          <li data-application-progress="review">2. Review and submit</li>
+        </ol>
+      </nav>
+      <div data-application-questions class="volunteer-application-step">
+        <h2 data-application-step-heading tabindex="-1">
+          Step 1 of 2: Application questions
+        </h2>
+        <p>
+          Complete the questions, then review your answers and the Code of
+          Conduct before submitting. Reloading or leaving this page may lose
+          your progress.
+        </p>
+        <slot />
+        <button
+          type="submit"
+          data-application-review
+          class="btn btn-primary"
+          disabled
+        >
+          Review application
+        </button>
+      </div>
+      <fieldset
+        data-application-review-step
+        class="volunteer-application-step"
+        hidden
+        disabled
+      >
+        <legend class="sr-only">Review and submit application</legend>
+        <h2 data-application-step-heading tabindex="-1">
+          Step 2 of 2: Review application
+        </h2>
+        <p>
+          Check your answers below. Nothing has been submitted yet. You can edit
+          any section before accepting the Code of Conduct and submitting.
+        </p>
+        <button type="button" data-application-edit class="btn btn-quiet">
+          Back to answers
+        </button>
+        <div class="volunteer-application-review">
+          {reviewSections.map((section) => (
+            <section aria-labelledby={`review-${section.key}`}>
+              <div class="volunteer-section-heading">
+                <h3 id={`review-${section.key}`}>{section.heading}</h3>
+                <button
+                  type="button"
+                  class="btn btn-quiet"
+                  data-application-edit={`application-${section.key}`}
+                  aria-label={`Edit ${section.heading.toLowerCase()}`}
+                >
+                  Edit
+                </button>
+              </div>
+              <dl>
+                {section.rows.map((row) => (
+                  <div
+                    data-review-condition={row.condition}
+                    hidden={Boolean(row.condition)}
+                  >
+                    <dt>{row.label}</dt>
+                    <dd data-review-answer={row.name}>
+                      {row.name === "email" ? email : "Not provided"}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+        </div>
+        <CodeOfConduct />
+        <p>
+          Your application will be sent to the organizers when you select Submit
+          application.
+        </p>
+        <button
+          type="submit"
+          data-application-submit
+          class="btn btn-primary"
+          data-loading-label="Submitting application…"
+        >
+          Submit application
+        </button>
+      </fieldset>
+    </>
+  ) : (
+    <slot />
+  )
+}

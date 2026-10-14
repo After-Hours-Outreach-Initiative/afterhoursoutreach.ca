@@ -48,6 +48,16 @@ export const sampleAnswers = {
   medicalConditions: "Sample private answer",
 };
 
+export async function submitLocalApplication(page: Page) {
+  await page
+    .getByRole("button", { name: "Review application", exact: true })
+    .click();
+  await page.locator('[name="codeOfConductAccepted"]').check();
+  await page
+    .getByRole("button", { name: "Submit application", exact: true })
+    .click();
+}
+
 export async function createLocalAccount(
   request: APIRequestContext,
   origin: string,
