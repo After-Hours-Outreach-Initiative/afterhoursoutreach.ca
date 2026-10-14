@@ -390,11 +390,10 @@ body:has([data-application]) {
   position: absolute;
   inset: 100% 0 auto;
   display: grid;
-  gap: 4px;
   max-height: min(24rem, var(--application-dropdown-space));
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 8px;
+  padding: 4px 0;
   border: 1px solid #3f3f46;
   border-radius: 0 0 6px 6px;
   background: #0c0d10;
@@ -414,32 +413,17 @@ body:has([data-application]) {
 .volunteer-application-contents a {
   display: flex;
   align-items: center;
-  min-height: 44px;
-  padding: 8px 12px;
-  border-inline-start: 2px solid transparent;
+  min-height: 0;
+  padding: 4px 0;
   color: #a1a1aa;
   font-size: 14px;
   text-decoration: none;
   overflow-wrap: anywhere;
 }
 .volunteer-application-contents a:hover {
-  background: #171a20;
-  color: white;
-}
-.volunteer-application-contents a[aria-current="location"] {
-  border-inline-start-color: #818cf8;
-  color: #c7d2fe;
-}
-.volunteer-application-contents-sidebar a {
-  min-height: 0;
-  padding: 4px 0;
-  border-inline-start: 0;
-}
-.volunteer-application-contents-sidebar a:hover {
-  background: none;
   color: #fff;
 }
-.volunteer-application-contents-sidebar a[aria-current="location"] {
+.volunteer-application-contents a[aria-current="location"] {
   color: #c7d2fe;
 }
 .volunteer-application-contents a:focus-visible,
