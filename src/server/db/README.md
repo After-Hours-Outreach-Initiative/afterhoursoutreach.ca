@@ -40,6 +40,14 @@ Volunteer application terminology does not rename deployed storage:
   audit field names and queued notification text remain historical records; they are
   not rewritten. Event registration records describe event spots, not applications.
 
+`profile.preferred_name` historically stored a combined full-or-preferred-name
+answer. The name-component migration adds nullable `first_name`, `middle_names`,
+and `last_name`, without modifying existing answers. New applications require
+first and last names; `preferred_name` may be empty. Profile saves synchronize
+`user.name` to the preferred name or assembled full name in the same transaction.
+Legacy profiles may retain their unsplit answer until the volunteer supplies both
+first and last names. No names are inferred or backfilled.
+
 ## Generated migrations
 
 ```sh

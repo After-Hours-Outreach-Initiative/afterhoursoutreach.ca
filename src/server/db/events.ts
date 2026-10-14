@@ -8,7 +8,7 @@ import {
   permissionValues,
 } from "./access";
 import { RequestError } from "../http";
-import { nowMsSql } from "./sql";
+import { nowMsSql, profileDisplayNameSql } from "./sql";
 import { databaseWriteError } from "./errors";
 
 export const eventSchema = z.strictObject({
@@ -436,13 +436,14 @@ export async function listRosters(
   const placeholders = ids.map(() => "?").join(", ");
   const rows = await db
     .prepare(
-      `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, p.preferred_name AS name,
+      `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, ${profileDisplayNameSql} AS name,
         EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
       FROM signup s
       JOIN profile p ON p.user_id = s.user_id
+      JOIN user u ON u.id = s.user_id
       WHERE s.event_id IN (${placeholders}) AND s.status = 'confirmed'
-      ORDER BY p.preferred_name
+      ORDER BY name
       LIMIT 10000`,
     )
     .bind(...ids)

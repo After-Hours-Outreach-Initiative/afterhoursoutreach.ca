@@ -119,7 +119,10 @@ and organizers can see the remaining profile answers.
 
 | Field                                    | Required       |
 | ---------------------------------------- | -------------- |
-| Full or preferred name                   | Yes            |
+| First name                               | Yes            |
+| Middle name(s)                           | No             |
+| Last name                                | Yes            |
+| Preferred name                           | No             |
 | Email (from the account)                 | Yes            |
 | Pronouns                                 | No             |
 | Phone number                             | Yes            |
@@ -134,6 +137,18 @@ and organizers can see the remaining profile answers.
 | Other training and experience, and other | Yes            |
 | Medical conditions or triggers           | No             |
 | Code of Conduct acknowledgement          | On application |
+
+New applicants must provide first and last names. Middle names, preferred name,
+and pronouns are optional. Account menus, volunteer lists, and event rosters use
+the preferred name when supplied, otherwise the first, middle, and last names
+together. Organizers can view each component and search by full or preferred name.
+
+Apply `0006_profile_name_components.sql` before deploying. This additive migration
+leaves existing combined-name answers untouched in `preferred_name`, with null
+name components; it never splits or guesses anyone's name. Existing account and
+organizer views explain that the old answer is retained in Preferred name. Those
+volunteers may keep editing with both first and last names blank, provided their
+previous name remains, or supply both. Once supplied, both remain required.
 
 Date of birth, emergency contact, and medical conditions each have a short line
 under them saying what the information is used for.

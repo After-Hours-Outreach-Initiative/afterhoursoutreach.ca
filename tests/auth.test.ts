@@ -93,7 +93,10 @@ async function signIn(email = "volunteer@example.org") {
 }
 
 const answers = {
-  name: "Sample Volunteer",
+  firstName: "Sample",
+  middleNames: "",
+  lastName: "Volunteer",
+  preferredName: "Sample Volunteer",
   pronouns: "they/them",
   phone: "604-555-0100",
   birthDate: "1995-04-12",
@@ -614,7 +617,7 @@ test("application requires explicit Code of Conduct acknowledgement before any p
   const person = await bindings.DB.prepare("SELECT name FROM user WHERE id=?")
     .bind(current.user.id)
     .first();
-  assert.notEqual(person?.name, answers.name);
+  assert.notEqual(person?.name, answers.preferredName);
 });
 
 test("application/editing persists all answers, keeps approval, and audits only changed field names", async () => {
@@ -750,22 +753,22 @@ test("application-only questions are required once and preserved through profile
   });
   await saveProfile(bindings.DB, id, {
     ...editable,
-    name: "Updated volunteer",
+    preferredName: "Updated volunteer",
   });
   assert.deepEqual(await loadProfile(bindings.DB, id), {
     ...answers,
-    name: "Updated volunteer",
+    preferredName: "Updated volunteer",
   });
   // A stale client sending the old form cannot replace application-only answers.
   await saveProfile(bindings.DB, id, {
     ...editable,
-    name: "Updated again",
+    preferredName: "Updated again",
     heardAboutUs: "Replacement referral",
     motivation: "Replacement motivation",
   });
   assert.deepEqual(await loadProfile(bindings.DB, id), {
     ...answers,
-    name: "Updated again",
+    preferredName: "Updated again",
   });
   const logs = await bindings.DB.prepare(
     "SELECT changed_fields FROM audit_log WHERE subject_id=?",
@@ -775,7 +778,7 @@ test("application-only questions are required once and preserved through profile
   const edits = logs.results
     .map((row) => JSON.parse(String(row.changed_fields)) as string[])
     .filter((fields) => fields.length === 1);
-  assert.deepEqual(edits, [["name"], ["name"]]);
+  assert.deepEqual(edits, [["preferredName"], ["preferredName"]]);
 });
 
 test("existing profiles can be edited without inventing Code of Conduct acknowledgement", async () => {
@@ -796,7 +799,7 @@ test("existing profiles can be edited without inventing Code of Conduct acknowle
     .run();
   await saveProfile(bindings.DB, id, {
     ...answers,
-    name: "Existing volunteer",
+    preferredName: "Existing volunteer",
   });
   assert.deepEqual(
     await bindings.DB.prepare(

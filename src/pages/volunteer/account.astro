@@ -15,7 +15,10 @@ import { loadProfile } from "@/server/db/profiles";
 import { createDatabase } from "@/server/db";
 import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import type { ApplicationAnswers } from "@/data/application";
+import {
+  applicationDisplayName,
+  type ApplicationAnswers,
+} from "@/data/application";
 export const prerender = false;
 let values: ApplicationAnswers | null = null;
 let email = "";
@@ -87,7 +90,7 @@ try {
   description="Edit your volunteer profile and manage your sessions."
   signedIn
   organizer={organizer}
-  name={values?.name}
+  name={values ? applicationDisplayName(values) : undefined}
   email={email}
 >
   {

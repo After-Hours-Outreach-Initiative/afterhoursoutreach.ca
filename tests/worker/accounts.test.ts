@@ -20,7 +20,10 @@ import {
 const origin = "https://afterhoursoutreach.ca";
 const secret = "test-only-worker-auth-secret-12345678901234567890";
 const answers = {
-  name: "Worker Test Volunteer",
+  firstName: "Worker",
+  middleNames: "Test",
+  lastName: "Volunteer",
+  preferredName: "Worker Test Volunteer",
   pronouns: "they/them",
   phone: "604-555-0100",
   birthDate: "1995-04-12",
@@ -210,7 +213,11 @@ describe(
       const { heardAboutUs: _, motivation: __, ...editedAnswers } = answers;
       const rejectedEdit = await send(
         "/api/v1/account/profile",
-        { ...editedAnswers, name: "Underage edit", birthDate: underage },
+        {
+          ...editedAnswers,
+          preferredName: "Underage edit",
+          birthDate: underage,
+        },
         ageCookie,
       );
       assert.equal(rejectedEdit.status, 400);
@@ -1007,7 +1014,7 @@ describe(
           (
             await menu.locator("[data-account-menu-name]").textContent()
           )?.trim(),
-          answers.name,
+          answers.preferredName,
         );
         await menu.locator("summary").click();
         assert.equal(
@@ -1018,7 +1025,7 @@ describe(
         );
         await menu.locator("summary").click();
         const changedName = "Worker Updated Volunteer";
-        await page.getByLabel("Full or preferred name").fill(changedName);
+        await page.getByLabel("Preferred name").fill(changedName);
         await page
           .getByLabel("Medical conditions or triggers", { exact: false })
           .fill("Changed browser sample");
@@ -1037,7 +1044,7 @@ describe(
             updated: () => expect(sessionForm).toHaveCount(0),
             loadingLabel: "Ending session…",
           });
-          await expect(page.getByLabel("Full or preferred name")).toHaveValue(
+          await expect(page.getByLabel("Preferred name")).toHaveValue(
             changedName,
           );
           await expect(
@@ -1231,14 +1238,14 @@ describe(
           .getByRole("heading", { name: "Your account", exact: true })
           .waitFor();
         assert.equal(
-          await newPage.locator('[name="name"]').inputValue(),
-          answers.name,
+          await newPage.locator('[name="preferredName"]').inputValue(),
+          answers.preferredName,
         );
         assert.equal(
           (
             await newPage.locator("[data-account-menu-name]").textContent()
           )?.trim(),
-          answers.name,
+          answers.preferredName,
         );
         assert.equal(newPage.url(), `${origin}/volunteer/account`);
         await expect(

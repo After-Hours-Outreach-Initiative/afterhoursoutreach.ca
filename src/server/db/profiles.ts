@@ -8,6 +8,7 @@ import {
   applicationBirthDateError,
   withOutreachTeam,
   trainingOptions,
+  applicationDisplayName,
   type ApplicationAnswers,
 } from "../../data/application";
 import {
@@ -19,6 +20,7 @@ import { profile, user, volunteerStatus, auditLog } from "./schema";
 import { RequestError } from "../http";
 
 const shortAnswer = z.string().trim().min(1).max(200);
+const optionalShortAnswer = z.string().trim().max(200).default("");
 const longAnswer = z.string().trim().min(1).max(2000);
 const phone = z
   .string()
@@ -27,8 +29,11 @@ const phone = z
   .max(40)
   .regex(/^[\d+().\s\-x]+$/i);
 const profileAnswersSchema = z.strictObject({
-  name: shortAnswer,
-  pronouns: z.string().trim().max(200),
+  firstName: shortAnswer,
+  middleNames: optionalShortAnswer,
+  lastName: shortAnswer,
+  preferredName: optionalShortAnswer,
+  pronouns: optionalShortAnswer,
   phone,
   birthDate: z
     .string()
@@ -142,6 +147,7 @@ export const profileSchema = profileAnswersSchema.superRefine(validateTraining);
 
 // Older clients may still send these answers; profile edits never replace them.
 const profileEditSchema = profileAnswersSchema
+  .extend({ firstName: optionalShortAnswer, lastName: optionalShortAnswer })
   .partial({
     heardAboutUs: true,
     motivation: true,
@@ -163,7 +169,10 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
   });
   if (!row) return null;
   return {
-    name: row.preferred_name,
+    firstName: row.first_name ?? "",
+    middleNames: row.middle_names ?? "",
+    lastName: row.last_name ?? "",
+    preferredName: row.preferred_name,
     pronouns: row.pronouns ?? "",
     phone: row.phone,
     birthDate: row.birth_date,
@@ -192,6 +201,11 @@ export async function saveProfile(
   const submittedInput =
     old && input && typeof input === "object" && !Array.isArray(input)
       ? {
+          firstName: old.firstName,
+          middleNames: old.middleNames,
+          lastName: old.lastName,
+          preferredName: old.preferredName,
+          pronouns: old.pronouns,
           certification: old.certification,
           certifications: old.certifications,
           experience: old.experience,
@@ -209,7 +223,11 @@ export async function saveProfile(
       400,
       parsed.error.issues.some((issue) => issue.path[0] === "birthDate")
         ? applicationBirthDateError
-        : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
+        : parsed.error.issues.some((issue) =>
+              ["firstName", "lastName"].includes(String(issue.path[0])),
+            )
+          ? "Enter your first and last names (200 characters or fewer each)."
+          : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
     );
   const { codeOfConductAccepted, ...submitted } = parsed.data;
   if (!old && codeOfConductAccepted !== true)
@@ -219,6 +237,23 @@ export async function saveProfile(
     heardAboutUs: old?.heardAboutUs ?? submitted.heardAboutUs!,
     motivation: old?.motivation ?? submitted.motivation!,
   };
+  // Existing combined-name profiles may stay unsplit. Once components are supplied,
+  // require both, and do not allow later edits to erase an established full name.
+  if (
+    (old?.firstName ||
+      old?.middleNames ||
+      old?.lastName ||
+      answers.firstName ||
+      answers.middleNames ||
+      answers.lastName) &&
+    (!answers.firstName || !answers.lastName)
+  )
+    throw new RequestError(400, "Enter both your first and last names.");
+  if (!applicationDisplayName(answers))
+    throw new RequestError(
+      400,
+      "Enter your first and last names, or keep your previously saved name.",
+    );
   const changedFields = (
     Object.keys(answers) as (keyof ApplicationAnswers)[]
   ).filter(
@@ -228,7 +263,10 @@ export async function saveProfile(
   const db = createDatabase(binding);
   const now = new Date();
   const values = {
-    preferred_name: answers.name,
+    first_name: answers.firstName || null,
+    middle_names: answers.middleNames || null,
+    last_name: answers.lastName || null,
+    preferred_name: answers.preferredName,
     pronouns: answers.pronouns || null,
     phone: answers.phone,
     birth_date: answers.birthDate,
@@ -261,7 +299,7 @@ export async function saveProfile(
       .onConflictDoUpdate({ target: profile.user_id, set: values }),
     db
       .update(user)
-      .set({ name: answers.name, updated_at: now })
+      .set({ name: applicationDisplayName(answers), updated_at: now })
       .where(eq(user.id, userId)),
     // Existing approval and active status are deliberately not overwritten.
     db

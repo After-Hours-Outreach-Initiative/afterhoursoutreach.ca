@@ -12,6 +12,7 @@ import {
   certificationOptions,
   profileFields,
   trainingOptions,
+  applicationDisplayName,
 } from "@/data/application";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
@@ -55,7 +56,16 @@ if (!values || !person)
 >
   <section class="volunteer-panel">
     <div data-volunteer-profile>
-      <h2>{values.name}</h2>
+      <h2>{applicationDisplayName(values)}</h2>
+      {
+        !values.firstName && !values.lastName && (
+          <p class="volunteer-help">
+            This profile predates separate name fields. The original full or
+            preferred name is preserved in Preferred name; no name components
+            have been inferred.
+          </p>
+        )
+      }
       <p class="volunteer-help">
         {
           person.orientations

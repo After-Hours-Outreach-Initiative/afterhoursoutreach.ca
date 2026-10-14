@@ -12,8 +12,15 @@ interface Props {
   values?: ApplicationAnswers | null;
   active?: boolean;
   hideLabel?: boolean;
+  required?: boolean;
 }
-const { field, values, active = true, hideLabel = false } = Astro.props;
+const {
+  field,
+  values,
+  active = true,
+  hideLabel = false,
+  required = field.required,
+} = Astro.props;
 const phone = field.name === "phone" || field.name === "emergencyPhone";
 const message =
   field.name === "birthDate"
@@ -22,7 +29,7 @@ const message =
       ? "Enter a valid certification expiry date."
       : phone
         ? "Enter a valid phone number with at least 7 characters."
-        : field.required
+        : required
           ? "This field is required."
           : `Keep this answer to ${"multiline" in field ? 2000 : 200} characters or fewer.`;
 ---
@@ -37,7 +44,7 @@ const message =
   <label for={`profile-${field.name}`} class:list={{ "sr-only": hideLabel }}>
     {field.label}
     {
-      field.required ? (
+      required ? (
         <span class="volunteer-required" aria-hidden="true">
           {" "}
           *
@@ -53,7 +60,7 @@ const message =
         id={`profile-${field.name}`}
         name={field.name}
         aria-describedby={`error-${field.name}${"help" in field ? ` help-${field.name}` : ""}`}
-        required={field.required && active}
+        required={required && active}
         readonly={!active}
         rows="3"
         maxlength="2000"
@@ -67,12 +74,12 @@ const message =
         type={"type" in field ? field.type : "text"}
         autocomplete={"autocomplete" in field ? field.autocomplete : "off"}
         value={values?.[field.name] ?? ""}
-        required={field.required && active}
+        required={required && active}
         readonly={!active}
         pattern={
           phone
             ? String.raw`(?=.*\S)[\d+\(\).\s\-xX]{7,}`
-            : field.required && field.name !== "birthDate"
+            : required && field.name !== "birthDate"
               ? String.raw`.*\S.*`
               : undefined
         }

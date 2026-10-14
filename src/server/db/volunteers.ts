@@ -12,7 +12,7 @@ import {
 } from "../../data/application";
 import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
-import { nowMsSql } from "./sql";
+import { nowMsSql, profileDisplayNameSql, profileFullNameSql } from "./sql";
 
 export interface VolunteerRow {
   id: string;
@@ -36,14 +36,14 @@ export async function listVolunteers(
   requireOrganizer(actor);
   const rows = await db
     .prepare(
-      `SELECT u.id, p.preferred_name AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+      `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       FROM user u
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
-      WHERE instr(lower(p.preferred_name), lower(?)) > 0
-      ORDER BY v.registration_approved, p.preferred_name, u.id
+      WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
+      ORDER BY v.registration_approved, name, u.id
       LIMIT ? OFFSET ?`,
     )
     .bind(search.slice(0, 100), volunteerPageSize + 1, offset)
@@ -58,10 +58,11 @@ export function findVolunteer(db: Env["DB"], actor: Actor, userId: string) {
   requireOrganizer(actor);
   return db
     .prepare(
-      `SELECT u.id, u.name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+      `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
-      FROM user u JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
+      FROM user u JOIN profile p ON p.user_id=u.id
+      JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
     )
     .bind(userId)
     .first<VolunteerRow>();
@@ -90,7 +91,9 @@ export async function viewVolunteerProfile(
       .bind(accessId, actor.id, userId, Date.now(), ...permissionValues(actor)),
     db
       .prepare(
-        `SELECT preferred_name AS name, coalesce(pronouns, '') AS pronouns,
+        `SELECT coalesce(first_name, '') AS firstName, coalesce(middle_names, '') AS middleNames,
+          coalesce(last_name, '') AS lastName, preferred_name AS preferredName,
+          coalesce(pronouns, '') AS pronouns,
           phone, birth_date AS birthDate,
           emergency_contact_name AS emergencyName,
           emergency_contact_phone AS emergencyPhone,
