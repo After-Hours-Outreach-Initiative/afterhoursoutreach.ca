@@ -1,3 +1,9 @@
+import {
+  countWords,
+  motivationMaxWords,
+  motivationWordLimitError,
+} from "../data/application";
+
 const requestFailed = "The request failed. Please try again.";
 
 export function accountErrorMessage(error: unknown): string {
@@ -149,6 +155,38 @@ export function initReferralSources(element: HTMLFormElement) {
   };
   section.addEventListener("change", update);
   input.addEventListener("input", update);
+  element.addEventListener("reset", () => queueMicrotask(update));
+  update();
+}
+
+export function initMotivationWordLimit(element: HTMLFormElement) {
+  const input = element.querySelector<HTMLTextAreaElement>(
+    'textarea[name="motivation"]',
+  );
+  const count = element.querySelector<HTMLElement>(
+    "[data-motivation-word-count]",
+  );
+  const feedback = element.querySelector<HTMLElement>(
+    '[data-error="motivation"] span',
+  );
+  if (!input || !count) return;
+  const update = () => {
+    const words = countWords(input.value);
+    const over = words - motivationMaxWords;
+    const error =
+      input.required && words === 0
+        ? "This field is required."
+        : over > 0
+          ? motivationWordLimitError
+          : "";
+    input.setCustomValidity(input.readOnly ? "" : error);
+    if (over > 0 && !input.readOnly) input.setAttribute("aria-invalid", "true");
+    else input.removeAttribute("aria-invalid");
+    count.textContent = `${words} of ${motivationMaxWords} words.${over > 0 ? ` ${over} ${over === 1 ? "word" : "words"} over the limit.` : ""}`;
+    if (feedback) feedback.textContent = error || "This field is required.";
+  };
+  input.addEventListener("input", update);
+  input.addEventListener("change", update);
   element.addEventListener("reset", () => queueMicrotask(update));
   update();
 }
