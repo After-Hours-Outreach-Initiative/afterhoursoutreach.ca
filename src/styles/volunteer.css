@@ -997,9 +997,7 @@
   color: #f87171;
 }
 .volunteer-portal [data-error] {
-  /* Reserve the message slot so native blur feedback cannot move a submit
-     button between mouse-down and mouse-up and swallow the click. */
-  visibility: hidden;
+  display: none;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -1008,7 +1006,7 @@
   > [data-error],
 .volunteer-referral-sources:has(input[name="heardAboutUsSources"]:user-invalid)
   > [data-error] {
-  visibility: visible;
+  display: flex;
 }
 .volunteer-portal input:user-invalid,
 .volunteer-portal textarea:user-invalid,
