@@ -3,7 +3,7 @@ interface Props {
   /** Used by the control's aria-describedby attribute. */
   field: string;
   message?: string;
-  /** Optional spacing for the feedback slot. */
+  /** Optional spacing for displayed feedback. */
   class?: string;
 }
 
@@ -34,3 +34,42 @@ const {
   </svg>
   <span>{message}</span>
 </p>
+
+<script>
+  // Expanding blur feedback can move a submit button between mouse-down and
+  // mouse-up. Let its native click validation reveal the error instead. Delegate
+  // so refreshed forms receive the same protection without reinitialization.
+  document.addEventListener("mousedown", (event) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      !(event.target instanceof Element)
+    )
+      return;
+    const button = event.target.closest<HTMLButtonElement>("button");
+    const control = document.activeElement;
+    if (
+      button?.type !== "submit" ||
+      button.disabled ||
+      button.formNoValidate ||
+      !button.form ||
+      button.form.noValidate ||
+      !button.closest(".volunteer-portal") ||
+      !(
+        control instanceof HTMLInputElement ||
+        control instanceof HTMLTextAreaElement ||
+        control instanceof HTMLSelectElement
+      ) ||
+      control.form !== button.form ||
+      !control.matches(":invalid:not(:user-invalid)")
+    )
+      return;
+    const descriptions = control.getAttribute("aria-describedby")?.split(/\s+/);
+    if (
+      descriptions?.some((id) =>
+        document.getElementById(id)?.hasAttribute("data-error"),
+      )
+    )
+      event.preventDefault();
+  });
+</script>
