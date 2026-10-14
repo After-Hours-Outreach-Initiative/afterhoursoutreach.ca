@@ -117,7 +117,7 @@ export function normalizeCertifications(values: string[]): string[] {
 }
 
 export const registrationBirthDateError =
-  "You must be at least 19 years old. Choose a valid date of birth on or after January 1, 1900.";
+  "You must be at least 19 years old. Choose a valid date of birth.";
 
 export function latestRegistrationBirthDate(today = new Date()): string {
   // Match the UTC calendar dates used by server validation, not elapsed days.
