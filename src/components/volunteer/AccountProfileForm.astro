@@ -37,16 +37,20 @@ const sections = [
   );
 ---
 
+{application && <ApplicationContents sections={sections} />}
 <form
   data-account-profile
   data-application={application || undefined}
   data-save-changes={!application || undefined}
-  class="volunteer-form volunteer-profile-form"
+  class:list={[
+    "volunteer-form",
+    "volunteer-profile-form",
+    { "volunteer-panel": application },
+  ]}
   action="/api/v1/account/profile"
   method="post"
 >
   <ApplicationSteps application={application} email={email} sections={sections}>
-    {application && <ApplicationContents sections={sections} />}
     {
       sections.map((section) => (
         <AccountProfileSection

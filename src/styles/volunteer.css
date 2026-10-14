@@ -146,6 +146,10 @@ body:has([data-application]) {
   margin: 28px 0;
   background: #0c0d10;
 }
+.volunteer-application-intro {
+  margin: 28px 0 32px;
+}
+.volunteer-application-intro h2,
 .volunteer-panel h2,
 .volunteer-dialog h2 {
   font-size: 26px;
@@ -403,9 +407,7 @@ body:has([data-application]) {
   outline: 3px solid #4169e1;
   outline-offset: 4px;
 }
-[data-application-questions] {
-  scroll-margin-top: var(--application-sticky-offset);
-}
+[data-application-questions],
 .volunteer-application-section,
 [data-application] [data-application-step-heading],
 [data-application] .volunteer-application-section > summary,
