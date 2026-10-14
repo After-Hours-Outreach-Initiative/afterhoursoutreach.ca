@@ -6,6 +6,8 @@ import {
 } from "@/data/registration";
 import AccountProfileField from "./AccountProfileField.astro";
 import CodeOfConduct from "./CodeOfConduct.astro";
+import MedicalCertifications from "./MedicalCertifications.astro";
+import RelevantTraining from "./RelevantTraining.astro";
 interface Props {
   email: string;
   values?: RegistrationAnswers | null;
@@ -13,6 +15,7 @@ interface Props {
 }
 const { email, values, registration = false } = Astro.props;
 const fields = registration ? registrationFields : profileFields;
+const medicSelected = values?.teams.includes("medic") ?? false;
 const teams = [
   {
     value: "outreach",
@@ -125,15 +128,30 @@ const sections = [
           </>
         ) : (
           <div class="volunteer-fields">
+            {section.key === "training-and-safety" && (
+              <MedicalCertifications values={values} active={medicSelected} />
+            )}
             {registration && section.key === "personal-info" && (
               <label class="volunteer-field">
                 Email
                 <input type="email" value={email} readonly />
               </label>
             )}
-            {section.fields.map((field) => (
-              <AccountProfileField field={field} values={values} />
-            ))}
+            {section.fields
+              .filter(
+                (field) =>
+                  field.name !== "experience" && field.name !== "otherTraining",
+              )
+              .map((field) => (
+                <AccountProfileField
+                  field={field}
+                  values={values}
+                  active={field.name !== "certificationExpiry" || medicSelected}
+                />
+              ))}
+            {section.key === "training-and-safety" && (
+              <RelevantTraining values={values} />
+            )}
           </div>
         )}
       </fieldset>

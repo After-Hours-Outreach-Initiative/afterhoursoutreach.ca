@@ -8,7 +8,11 @@ import {
 } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
-import { profileFields } from "@/data/registration";
+import {
+  certificationOptions,
+  profileFields,
+  trainingOptions,
+} from "@/data/registration";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
 import "@/styles/volunteer.css";
@@ -80,7 +84,42 @@ if (!values || !person)
               </>
             </div>
           ))
-        }<div><dt>Teams</dt><dd>{values.teams.join(", ")}</dd></div>
+        }
+        <div>
+          <dt>Highest medical certification or licence</dt>
+          <dd>
+            {
+              certificationOptions
+                .filter((option) =>
+                  values.certifications.includes(option.value),
+                )
+                .map((option) => option.label)
+                .join(", ") || "Not provided"
+            }
+          </dd>
+        </div>
+        {
+          values.certification && (
+            <div>
+              <>
+                <dt>Previously recorded medical certification</dt>
+                <dd>{values.certification}</dd>
+              </>
+            </div>
+          )
+        }
+        <div><dt>Teams</dt><dd>{values.teams.join(", ")}</dd></div>
+        <div>
+          <dt>Relevant training and experience</dt>
+          <dd>
+            {
+              trainingOptions
+                .filter((option) => values.training.includes(option.value))
+                .map((option) => option.label)
+                .join(", ") || "Not provided"
+            }
+          </dd>
+        </div>
       </dl>
     </div>
   </section>

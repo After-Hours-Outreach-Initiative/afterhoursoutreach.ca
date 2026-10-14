@@ -1,0 +1,49 @@
+---
+import {
+  registrationFields,
+  trainingOptions,
+  trainingQuestion,
+  type RegistrationAnswers,
+} from "@/data/registration";
+import AccountProfileField from "./AccountProfileField.astro";
+
+interface Props {
+  values?: RegistrationAnswers | null;
+}
+const { values } = Astro.props;
+const otherTrainingField = registrationFields.find(
+  (field) => field.name === "otherTraining",
+)!;
+---
+
+<fieldset
+  class="volunteer-relevant-training volunteer-wide"
+  data-relevant-training
+>
+  <legend>{trainingQuestion}</legend>
+  <div class="volunteer-training-options">
+    {
+      trainingOptions.map((option) => (
+        <>
+          <label class="volunteer-check">
+            <input
+              type="checkbox"
+              name="training"
+              value={option.value}
+              checked={values?.training.includes(option.value)}
+            />
+            <span>{option.label}</span>
+          </label>
+          {option.value === "other" && (
+            <AccountProfileField
+              field={otherTrainingField}
+              values={values}
+              active={values?.training.includes("other") ?? false}
+              hideLabel
+            />
+          )}
+        </>
+      ))
+    }
+  </div>
+</fieldset>

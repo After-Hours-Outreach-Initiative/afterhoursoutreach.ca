@@ -22,6 +22,27 @@
       "when": 1791999893578,
       "tag": "0002_registration_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792009774592,
+      "tag": "0003_medical_certifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792011599581,
+      "tag": "0004_certification_expiry",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792013468034,
+      "tag": "0005_relevant_training",
+      "breakpoints": true
     }
   ]
 }

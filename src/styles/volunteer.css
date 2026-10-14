@@ -291,7 +291,8 @@
   width: 100%;
   color-scheme: dark;
 }
-.volunteer-portal input[type="checkbox"] {
+.volunteer-portal input[type="checkbox"],
+.volunteer-portal input[type="radio"] {
   width: 18px;
   height: 18px;
   accent-color: #4169e1;
@@ -454,6 +455,32 @@
   margin-top: 12px;
   color: #f87171;
 }
+.volunteer-certifications,
+.volunteer-relevant-training {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 16px;
+}
+.volunteer-certifications legend,
+.volunteer-relevant-training legend {
+  margin-bottom: 8px;
+  font-weight: normal;
+}
+.volunteer-certification-options,
+.volunteer-training-options {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-block: 16px;
+}
+.volunteer-certification-options > label,
+.volunteer-training-options > label {
+  min-width: 0;
+  min-height: 44px;
+  cursor: pointer;
+}
 .volunteer-setting {
   display: flex;
   flex-wrap: wrap;
@@ -505,7 +532,10 @@
 .volunteer-check {
   display: flex;
   gap: 10px;
-  align-items: center;
+  align-items: flex-start;
+}
+.volunteer-check > input {
+  margin-top: calc(0.5lh - 9px);
 }
 .volunteer-code-of-conduct ul {
   display: grid;
@@ -841,7 +871,9 @@
   font-size: 14px;
   line-height: 1.6;
 }
-.volunteer-field:has(:user-invalid) > [data-error] {
+.volunteer-field:has(:user-invalid) > [data-error],
+.volunteer-certifications:has(input[name="certifications"]:user-invalid)
+  > [data-error] {
   visibility: visible;
 }
 .volunteer-portal input:user-invalid,

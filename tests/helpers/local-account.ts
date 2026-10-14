@@ -35,7 +35,11 @@ export const sampleAnswers = {
   motivation: "Sample answer",
   teams: ["outreach"],
   certification: "None",
+  certifications: [],
+  certificationExpiry: "",
   experience: "None",
+  training: [],
+  otherTraining: "",
   medicalConditions: "Sample private answer",
 };
 

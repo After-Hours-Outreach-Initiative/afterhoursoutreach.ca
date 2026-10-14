@@ -12,6 +12,12 @@ import {
   codeOfConductError,
   codeOfConductVersion,
 } from "../src/data/code-of-conduct";
+import {
+  certificationOptions,
+  trainingOptions,
+} from "../src/data/registration";
+import { viewVolunteerProfile } from "../src/server/db/volunteers";
+import { accountContext } from "../src/server/db/access";
 import { hashAuthValue, takeRateLimit } from "../src/server/db/rate-limits";
 import { sendSignInEmail, type SignInEmail } from "../src/server/auth/services";
 import { deliverNotifications } from "../src/server/events/notifications";
@@ -101,7 +107,11 @@ const answers = {
   motivation: "Sample volunteering answer",
   teams: ["outreach"],
   certification: "None",
+  certifications: [] as string[],
+  certificationExpiry: "",
   experience: "None",
+  training: [] as string[],
+  otherTraining: "",
   medicalConditions: "Sample private answer",
 };
 
@@ -818,6 +828,276 @@ test("profile validation rejects privilege fields, invalid dates, unknown/duplic
     { ...answers, medicalConditions: "x".repeat(2001) },
   ])
     assert.equal(profileSchema.safeParse(input).success, false);
+});
+
+test("one highest certification is required for Medic and training details only for Other", () => {
+  assert.equal(profileSchema.safeParse(answers).success, true);
+  for (const teams of [["outreach"], ["medic"], ["non-patrol"]]) {
+    for (const certifications of [[], ["advanced-first-aid"], ["other"]]) {
+      for (const experience of [undefined, "", " ", " \t\n\u00a0 "]) {
+        assert.equal(
+          profileSchema.safeParse({
+            ...answers,
+            teams,
+            certifications,
+            experience,
+            certificationExpiry: "2030-10-14",
+          }).success,
+          !teams.includes("medic") ||
+            (certifications.length > 0 && !certifications.includes("other")),
+        );
+      }
+    }
+  }
+  for (const certifications of [
+    undefined,
+    [],
+    ["unknown"],
+    ["nurse-practitioner-physician", "nurse-practitioner-physician"],
+    ["advanced-first-aid", "nurse"],
+    "physician",
+    null,
+  ]) {
+    assert.equal(
+      profileSchema.safeParse({
+        ...answers,
+        teams: ["medic"],
+        certifications,
+        certificationExpiry: "2030-10-14",
+      }).success,
+      false,
+    );
+  }
+  for (const option of certificationOptions) {
+    assert.equal(
+      profileSchema.safeParse({
+        ...answers,
+        teams: ["medic"],
+        certifications: [option.value],
+        certificationExpiry: "2030-10-14",
+      }).success,
+      true,
+    );
+  }
+});
+
+test("relevant training allows multiple selections for every team and requires details only for Other", () => {
+  for (const teams of [["outreach"], ["medic"], ["non-patrol"]]) {
+    for (const training of [
+      [],
+      ["naloxone-administration", "overdose-response"],
+      ["other"],
+    ]) {
+      for (const otherTraining of [
+        undefined,
+        "",
+        " \t\n\u00a0 ",
+        "Crisis intervention course",
+      ]) {
+        assert.equal(
+          profileSchema.safeParse({
+            ...answers,
+            teams,
+            certifications: ["advanced-first-aid"],
+            certificationExpiry: "2030-10-14",
+            training,
+            otherTraining,
+          }).success,
+          !training.includes("other") || Boolean(otherTraining?.trim()),
+        );
+      }
+    }
+  }
+  for (const training of [
+    null,
+    "naloxone-trainer",
+    ["unknown"],
+    ["naloxone-trainer", "naloxone-trainer"],
+  ])
+    assert.equal(
+      profileSchema.safeParse({ ...answers, training }).success,
+      false,
+    );
+  assert.equal(
+    profileSchema.safeParse({ ...answers, otherTraining: "x".repeat(2001) })
+      .success,
+    false,
+  );
+  const all = trainingOptions.map((option) => option.value);
+  assert.deepEqual(
+    profileSchema.parse({
+      ...answers,
+      training: [...all].reverse(),
+      otherTraining: "Details",
+    }).training,
+    all,
+  );
+});
+
+test("relevant training and Other details round-trip independently of medical certifications and appear in organizer views", async () => {
+  const { cookie } = await signIn();
+  const current = (await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  }))!;
+  const id = current.user.id;
+  const training = ["naloxone-administration", "crisis-intervention", "other"];
+  const otherTraining = "Crisis intervention course";
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    training: [...training].reverse(),
+    otherTraining: ` ${otherTraining} `,
+    codeOfConductAccepted: true,
+  });
+  const expected = { ...answers, training, otherTraining };
+  assert.deepEqual(await loadProfile(bindings.DB, id), expected);
+  await bindings.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+    .bind(id)
+    .run();
+  const { actor } = await accountContext(
+    bindings,
+    new Request(origin, { headers: { cookie } }),
+  );
+  assert.ok(actor);
+  assert.deepEqual(
+    await viewVolunteerProfile(bindings.DB, actor, id),
+    expected,
+  );
+  await assert.rejects(
+    () => saveProfile(bindings.DB, id, { ...expected, otherTraining: " " }),
+    RequestError,
+  );
+  assert.deepEqual(await loadProfile(bindings.DB, id), expected);
+  const { otherTraining: _, ...hiddenDetails } = expected;
+  await saveProfile(bindings.DB, id, {
+    ...hiddenDetails,
+    training: ["naloxone-administration"],
+  });
+  assert.deepEqual(await loadProfile(bindings.DB, id), {
+    ...expected,
+    training: ["naloxone-administration"],
+  });
+});
+
+test("certification expiry is required only for Medic", () => {
+  for (const teams of [["outreach"], ["medic"], ["outreach", "non-patrol"]]) {
+    for (const certificationExpiry of [
+      undefined,
+      "",
+      " \t\n\u00a0 ",
+      "2030-10-14",
+      "2020-01-01",
+    ]) {
+      const parsed = profileSchema.safeParse({
+        ...answers,
+        teams,
+        certifications: ["advanced-first-aid"],
+        certificationExpiry,
+      });
+      assert.equal(
+        parsed.success,
+        !teams.includes("medic") || Boolean(certificationExpiry?.trim()),
+      );
+      if (!parsed.success)
+        assert.deepEqual(
+          parsed.error.issues.map((issue) => issue.path),
+          [["certificationExpiry"]],
+        );
+    }
+  }
+});
+
+test("highest certification and expiry round-trip, preserve legacy answers and appear in organizer views", async () => {
+  const { cookie } = await signIn();
+  const current = (await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  }))!;
+  const id = current.user.id;
+  const { certification: _, ...editable } = answers;
+  const legacy = "Previously recorded medical training";
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    certification: legacy,
+    codeOfConductAccepted: true,
+  });
+  const certifications = ["nurse-practitioner-physician"];
+  const certificationExpiry = "2030-10-14";
+  await saveProfile(bindings.DB, id, {
+    ...editable,
+    teams: ["medic"],
+    certifications,
+    certificationExpiry,
+  });
+  const expected = {
+    ...answers,
+    certification: legacy,
+    teams: ["outreach", "medic"],
+    certifications,
+    certificationExpiry,
+  };
+  assert.deepEqual(await loadProfile(bindings.DB, id), expected);
+  const {
+    certifications: __,
+    certificationExpiry: ___,
+    ...olderClient
+  } = editable;
+  await saveProfile(bindings.DB, id, { ...olderClient, teams: ["medic"] });
+  assert.deepEqual(await loadProfile(bindings.DB, id), expected);
+  await bindings.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+    .bind(id)
+    .run();
+  const { actor: organizer } = await accountContext(
+    bindings,
+    new Request(origin, { headers: { cookie } }),
+  );
+  assert.ok(organizer);
+  // Existing separate credentials still display under their combined options.
+  await bindings.DB.prepare(
+    "UPDATE profile SET medical_certifications=? WHERE user_id=?",
+  )
+    .bind(
+      JSON.stringify([
+        "respiratory-therapist",
+        "nurse-practitioner",
+        "physician",
+      ]),
+      id,
+    )
+    .run();
+  assert.deepEqual(await loadProfile(bindings.DB, id), expected);
+  assert.deepEqual(
+    await viewVolunteerProfile(bindings.DB, organizer, id),
+    expected,
+  );
+  // Do not invent a highest credential or discard old multiselect answers.
+  await bindings.DB.prepare(
+    "UPDATE profile SET medical_certifications=? WHERE user_id=?",
+  )
+    .bind(
+      JSON.stringify(["advanced-first-aid", "paramedic", "registered-nurse"]),
+      id,
+    )
+    .run();
+  assert.deepEqual((await loadProfile(bindings.DB, id))?.certifications, [
+    "advanced-first-aid",
+    "paramedic",
+    "nurse",
+  ]);
+  await assert.rejects(
+    () => saveProfile(bindings.DB, id, { ...olderClient, teams: ["medic"] }),
+    RequestError,
+  );
+  await saveProfile(bindings.DB, id, {
+    ...olderClient,
+    teams: ["medic"],
+    certifications: ["nurse"],
+  });
+  assert.deepEqual((await loadProfile(bindings.DB, id))?.certifications, [
+    "nurse",
+  ]);
+  assert.equal(
+    (await loadProfile(bindings.DB, id))?.certificationExpiry,
+    certificationExpiry,
+  );
 });
 
 test("sign-out revokes the session rather than just removing the browser cookie", async () => {

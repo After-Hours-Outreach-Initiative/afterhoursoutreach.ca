@@ -31,7 +31,11 @@ const answers = {
   motivation: "Sample answer",
   teams: ["outreach"],
   certification: "None",
+  certifications: [] as string[],
+  certificationExpiry: "",
   experience: "None",
+  training: [] as string[],
+  otherTraining: "",
   medicalConditions: "Sample private answer",
 };
 
@@ -261,12 +265,269 @@ describe(
           {
             ...answers,
             teams,
+            certifications: teams.includes("medic")
+              ? ["advanced-first-aid"]
+              : [],
+            certificationExpiry: teams.includes("medic") ? "2030-10-14" : "",
           },
           outreachCookie,
         );
         assert.equal(edited.status, 200, await edited.clone().text());
         assert.deepEqual(await savedTeams(), expected);
       }
+    });
+
+    test("Medic registration and edits require a certification expiry date", async () => {
+      const expiryCookie = await signIn("worker-medic-expiry@example.org");
+      const account = (await (
+        await send("/api/v1/auth/get-session", undefined, expiryCookie)
+      ).json()) as typeof current;
+      const savedProfile = () =>
+        DB.prepare("SELECT * FROM profile WHERE user_id=?")
+          .bind(account.user.id)
+          .first();
+      const medicAnswers = {
+        ...answers,
+        teams: ["medic"],
+        certifications: ["advanced-first-aid"],
+        codeOfConductAccepted: true,
+      };
+      for (const certificationExpiry of [undefined, "", " \t\n\u00a0 "]) {
+        const rejected = await send(
+          "/api/v1/account/profile",
+          { ...medicAnswers, certificationExpiry },
+          expiryCookie,
+        );
+        assert.equal(rejected.status, 400);
+        assert.equal(await savedProfile(), null);
+      }
+      const registered = await send(
+        "/api/v1/account/profile",
+        { ...medicAnswers, certificationExpiry: "2030-10-14" },
+        expiryCookie,
+      );
+      assert.equal(registered.status, 200, await registered.clone().text());
+      const original = await savedProfile();
+      for (const certificationExpiry of ["", " \t\n\u00a0 "]) {
+        const rejected = await send(
+          "/api/v1/account/profile",
+          { ...medicAnswers, certificationExpiry },
+          expiryCookie,
+        );
+        assert.equal(rejected.status, 400);
+        assert.deepEqual(await savedProfile(), original);
+      }
+    });
+
+    test("relevant training supports multiple answers and conditional Other details without Medic", async () => {
+      const trainingCookie = await signIn(
+        "worker-relevant-training@example.org",
+      );
+      const account = (await (
+        await send("/api/v1/auth/get-session", undefined, trainingCookie)
+      ).json()) as typeof current;
+      const savedProfile = () =>
+        DB.prepare("SELECT * FROM profile WHERE user_id=?")
+          .bind(account.user.id)
+          .first();
+      const trainingAnswers = {
+        ...answers,
+        training: ["naloxone-administration", "crisis-intervention", "other"],
+        otherTraining: "Crisis intervention course",
+        codeOfConductAccepted: true,
+      };
+      for (const invalid of [
+        { training: ["unknown"] },
+        { training: ["naloxone-trainer", "naloxone-trainer"] },
+        { otherTraining: undefined },
+        { otherTraining: "" },
+        { otherTraining: " \t\n\u00a0 " },
+      ]) {
+        const rejected = await send(
+          "/api/v1/account/profile",
+          { ...trainingAnswers, ...invalid },
+          trainingCookie,
+        );
+        assert.equal(rejected.status, 400);
+        assert.equal(await savedProfile(), null);
+      }
+      const registered = await send(
+        "/api/v1/account/profile",
+        {
+          ...trainingAnswers,
+          training: [...trainingAnswers.training].reverse(),
+        },
+        trainingCookie,
+      );
+      assert.equal(registered.status, 200, await registered.clone().text());
+      const original = await savedProfile();
+      assert.equal(
+        original?.relevant_training,
+        JSON.stringify(trainingAnswers.training),
+      );
+      assert.equal(original?.other_training, trainingAnswers.otherTraining);
+      assert.equal(original?.medical_certifications, "[]");
+      const rejectedEdit = await send(
+        "/api/v1/account/profile",
+        { ...trainingAnswers, otherTraining: " " },
+        trainingCookie,
+      );
+      assert.equal(rejectedEdit.status, 400);
+      assert.deepEqual(await savedProfile(), original);
+      const edited = await send(
+        "/api/v1/account/profile",
+        {
+          ...trainingAnswers,
+          teams: ["non-patrol"],
+          training: ["overdose-response", "lived-experience"],
+          otherTraining: "",
+        },
+        trainingCookie,
+      );
+      assert.equal(edited.status, 200, await edited.clone().text());
+      assert.equal(
+        (await savedProfile())?.relevant_training,
+        JSON.stringify(["overdose-response", "lived-experience"]),
+      );
+      assert.equal((await savedProfile())?.other_training, "");
+    });
+
+    test("one highest certification is required for Medic with expiry and Other details saved", async () => {
+      const trainingCookie = await signIn("worker-medic-training@example.org");
+      const account = (await (
+        await send("/api/v1/auth/get-session", undefined, trainingCookie)
+      ).json()) as typeof current;
+      const {
+        certification: _,
+        certifications: __,
+        experience: _experience,
+        ...withoutCertifications
+      } = answers;
+      const rejected = await send(
+        "/api/v1/account/profile",
+        {
+          ...withoutCertifications,
+          teams: ["medic"],
+          codeOfConductAccepted: true,
+        },
+        trainingCookie,
+      );
+      assert.equal(rejected.status, 400);
+      const savedProfile = () =>
+        DB.prepare("SELECT * FROM profile WHERE user_id=?")
+          .bind(account.user.id)
+          .first();
+      assert.equal(await savedProfile(), null);
+      const missingOtherDetails = await send(
+        "/api/v1/account/profile",
+        {
+          ...withoutCertifications,
+          teams: ["medic"],
+          certifications: ["other"],
+          certificationExpiry: "2030-10-14",
+          codeOfConductAccepted: true,
+        },
+        trainingCookie,
+      );
+      assert.equal(missingOtherDetails.status, 400);
+      assert.equal(await savedProfile(), null);
+
+      const registered = await send(
+        "/api/v1/account/profile",
+        { ...withoutCertifications, codeOfConductAccepted: true },
+        trainingCookie,
+      );
+      assert.equal(registered.status, 200, await registered.clone().text());
+      const original = await savedProfile();
+      assert.equal(original?.medical_certification, "");
+      assert.equal(original?.medical_certifications, "[]");
+      assert.equal(original?.training_experience, "");
+      const {
+        heardAboutUs: ___,
+        motivation: ____,
+        ...edits
+      } = withoutCertifications;
+      const medicAnswers = {
+        ...edits,
+        teams: ["outreach", "medic"],
+        certifications: ["other"],
+        certificationExpiry: "2030-10-14",
+        experience: "Naloxone training",
+      };
+      for (const invalid of [
+        { certifications: [] },
+        { certifications: ["unknown"] },
+        { certifications: ["nurse", "nurse"] },
+        { certifications: ["advanced-first-aid", "nurse"] },
+        { certificationExpiry: "2030-02-30" },
+        { certificationExpiry: "invalid" },
+        { experience: " " },
+        { experience: "" },
+        { experience: undefined },
+      ]) {
+        const invalidEdit = await send(
+          "/api/v1/account/profile",
+          { ...medicAnswers, ...invalid },
+          trainingCookie,
+        );
+        assert.equal(invalidEdit.status, 400);
+        assert.deepEqual(await savedProfile(), original);
+      }
+      const validEdit = await send(
+        "/api/v1/account/profile",
+        medicAnswers,
+        trainingCookie,
+      );
+      assert.equal(validEdit.status, 200, await validEdit.clone().text());
+      assert.equal(
+        (await savedProfile())?.medical_certifications,
+        JSON.stringify(medicAnswers.certifications),
+      );
+      assert.equal(
+        (await savedProfile())?.training_experience,
+        "Naloxone training",
+      );
+      assert.equal(
+        (await savedProfile())?.medical_certification_expiry,
+        "2030-10-14",
+      );
+      const nonMedicEdit = await send(
+        "/api/v1/account/profile",
+        { ...edits, teams: ["non-patrol"], certifications: [] },
+        trainingCookie,
+      );
+      assert.equal(nonMedicEdit.status, 200, await nonMedicEdit.clone().text());
+      assert.equal((await savedProfile())?.medical_certifications, "[]");
+      assert.equal(
+        (await savedProfile())?.training_experience,
+        "Naloxone training",
+      );
+      const missingExperience = await send(
+        "/api/v1/account/profile",
+        { ...edits, experience: " " },
+        trainingCookie,
+      );
+      assert.equal(
+        missingExperience.status,
+        200,
+        await missingExperience.clone().text(),
+      );
+      assert.equal((await savedProfile())?.training_experience, "");
+      const medicWithoutOther = await send(
+        "/api/v1/account/profile",
+        {
+          ...edits,
+          teams: ["medic"],
+          certifications: ["advanced-first-aid"],
+          certificationExpiry: "2030-10-14",
+        },
+        trainingCookie,
+      );
+      assert.equal(
+        medicWithoutOther.status,
+        200,
+        await medicWithoutOther.clone().text(),
+      );
     });
 
     test("registration and edits round-trip through the real API", async () => {
@@ -925,8 +1186,28 @@ describe(
         });
         await expect(confirmation).not.toBeChecked();
         await expect(confirmation).toBeVisible();
+        await expect(
+          newPage.getByRole("group", {
+            name: "Training and safety",
+            exact: true,
+          }),
+        ).toBeVisible();
+        await expect(
+          newPage.locator("[data-medic-certifications]"),
+        ).toBeHidden();
         for (const [name, value] of Object.entries(answers)) {
-          if (name === "teams") continue;
+          if (
+            [
+              "teams",
+              "certification",
+              "certifications",
+              "certificationExpiry",
+              "experience",
+              "training",
+              "otherTraining",
+            ].includes(name)
+          )
+            continue;
           await newPage.locator(`[name="${name}"]`).fill(String(value));
         }
         await expect(

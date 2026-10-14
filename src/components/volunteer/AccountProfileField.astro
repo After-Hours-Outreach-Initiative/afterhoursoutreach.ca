@@ -10,23 +10,31 @@ import FieldError from "@/components/FieldError.astro";
 interface Props {
   field: (typeof registrationFields)[number];
   values?: RegistrationAnswers | null;
+  active?: boolean;
+  hideLabel?: boolean;
 }
-const { field, values } = Astro.props;
+const { field, values, active = true, hideLabel = false } = Astro.props;
 const phone = field.name === "phone" || field.name === "emergencyPhone";
 const message =
   field.name === "birthDate"
     ? registrationBirthDateError
-    : phone
-      ? "Enter a valid phone number with at least 7 characters."
-      : field.required
-        ? "This field is required."
-        : `Keep this answer to ${"multiline" in field ? 2000 : 200} characters or fewer.`;
+    : field.name === "certificationExpiry"
+      ? "Enter a valid certification expiry date."
+      : phone
+        ? "Enter a valid phone number with at least 7 characters."
+        : field.required
+          ? "This field is required."
+          : `Keep this answer to ${"multiline" in field ? 2000 : 200} characters or fewer.`;
 ---
 
 <div
   class:list={["volunteer-field", { "volunteer-wide": "multiline" in field }]}
+  data-other-training={field.name === "experience" || undefined}
+  data-other-relevant-training={field.name === "otherTraining" || undefined}
+  data-certification-expiry={field.name === "certificationExpiry" || undefined}
+  hidden={!active}
 >
-  <label for={`profile-${field.name}`}>
+  <label for={`profile-${field.name}`} class:list={{ "sr-only": hideLabel }}>
     {field.label}
     {
       field.required ? (
@@ -45,7 +53,8 @@ const message =
         id={`profile-${field.name}`}
         name={field.name}
         aria-describedby={`error-${field.name}${"help" in field ? ` help-${field.name}` : ""}`}
-        required={field.required}
+        required={field.required && active}
+        readonly={!active}
         rows="3"
         maxlength="2000"
         set:text={values?.[field.name] ?? ""}
@@ -58,7 +67,8 @@ const message =
         type={"type" in field ? field.type : "text"}
         autocomplete={"autocomplete" in field ? field.autocomplete : "off"}
         value={values?.[field.name] ?? ""}
-        required={field.required}
+        required={field.required && active}
+        readonly={!active}
         pattern={
           phone
             ? String.raw`(?=.*\S)[\d+\(\).\s\-xX]{7,}`
