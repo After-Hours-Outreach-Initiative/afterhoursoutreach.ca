@@ -1,5 +1,8 @@
 export interface ApplicationAnswers {
-  name: string;
+  firstName: string;
+  middleNames: string;
+  lastName: string;
+  preferredName: string;
   pronouns: string;
   phone: string;
   birthDate: string;
@@ -17,6 +20,21 @@ export interface ApplicationAnswers {
   training: string[];
   otherTraining: string;
   medicalConditions: string;
+}
+
+export function applicationDisplayName(
+  answers: Pick<
+    ApplicationAnswers,
+    "firstName" | "middleNames" | "lastName" | "preferredName"
+  >,
+): string {
+  return (
+    answers.preferredName.trim() ||
+    [answers.firstName, answers.middleNames, answers.lastName]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(" ")
+  );
 }
 
 export function withOutreachTeam(teams: string[]): string[] {
@@ -132,11 +150,33 @@ export function latestApplicationBirthDate(today = new Date()): string {
 
 export const applicationFields = [
   {
-    name: "name",
+    name: "firstName",
     section: "personal-info",
-    label: "Full or preferred name",
+    label: "First name",
     required: true,
-    autocomplete: "name",
+    autocomplete: "given-name",
+  },
+  {
+    name: "middleNames",
+    section: "personal-info",
+    label: "Middle name(s)",
+    required: false,
+    autocomplete: "additional-name",
+  },
+  {
+    name: "lastName",
+    section: "personal-info",
+    label: "Last name",
+    required: true,
+    autocomplete: "family-name",
+  },
+  {
+    name: "preferredName",
+    section: "personal-info",
+    label: "Preferred name",
+    required: false,
+    autocomplete: "nickname",
+    help: "If provided, this is the name shown in your account and event rosters.",
   },
   {
     name: "pronouns",

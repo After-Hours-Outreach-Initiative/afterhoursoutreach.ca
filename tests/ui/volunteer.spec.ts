@@ -280,7 +280,7 @@ test("View as can choose a D1 account without an application without changing it
   await expect(page.getByRole("textbox", { name: /^Email/ })).toHaveValue(
     user.email,
   );
-  await expect(page.getByLabel("Full or preferred name")).toHaveValue("");
+  await expect(page.getByLabel("First name")).toHaveValue("");
   await expect(profile).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -311,8 +311,8 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(
       form.getByRole("group", { name: "About volunteering", exact: true }),
     ).toHaveCount(0);
-    const name = page.getByLabel("Full or preferred name");
-    await expect(name).toHaveValue(user.name);
+    const name = page.getByLabel("First name");
+    await expect(name).toHaveValue(sampleAnswers.firstName);
     await expect(name).toBeEditable();
     const emergencyContact = page.getByRole("group", {
       name: "Emergency contact",
@@ -427,7 +427,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(save).toBeDisabled();
     await name.fill("Unsaved layout draft");
     await expect(save).toBeEnabled();
-    await name.fill(user.name);
+    await name.fill(sampleAnswers.firstName);
     await expect(save).toBeDisabled();
     expect(
       await page.evaluate(

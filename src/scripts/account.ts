@@ -1,5 +1,6 @@
 import { authClient, showSecondFactor } from "./auth-client";
 import { actionFragment, loadActionPage } from "./action-page";
+import { applicationDisplayName } from "../data/application";
 import type { SignInEmail } from "../server/auth/services";
 import {
   accountErrorMessage,
@@ -317,7 +318,12 @@ form("[data-account-profile]", async (element, values) => {
   );
   if (menuName)
     menuName.textContent =
-      String(values.get("name") ?? "").trim() || "Your account";
+      applicationDisplayName({
+        firstName: String(values.get("firstName") ?? ""),
+        middleNames: String(values.get("middleNames") ?? ""),
+        lastName: String(values.get("lastName") ?? ""),
+        preferredName: String(values.get("preferredName") ?? ""),
+      }) || "Your account";
   message(element, result.message || "Profile saved.", "success");
   if (element.hasAttribute("data-application"))
     location.assign(result.next ?? "/volunteer/account");

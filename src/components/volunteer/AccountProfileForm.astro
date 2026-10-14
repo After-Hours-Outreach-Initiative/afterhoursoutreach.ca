@@ -16,6 +16,7 @@ interface Props {
 const { email, values, application = false } = Astro.props;
 const fields = application ? applicationFields : profileFields;
 const medicSelected = values?.teams.includes("medic") ?? false;
+const legacyName = Boolean(values && !values.firstName && !values.lastName);
 const teams = [
   {
     value: "outreach",
@@ -137,6 +138,13 @@ const sections = [
                 <input type="email" value={email} readonly />
               </label>
             )}
+            {legacyName && section.key === "personal-info" && (
+              <p class="volunteer-help volunteer-wide">
+                Your previous full or preferred name is kept unchanged in
+                Preferred name. You can leave first and last names blank, or
+                provide both.
+              </p>
+            )}
             {section.fields
               .filter(
                 (field) =>
@@ -146,6 +154,13 @@ const sections = [
                 <AccountProfileField
                   field={field}
                   values={values}
+                  required={
+                    field.required &&
+                    !(
+                      legacyName &&
+                      ["firstName", "lastName"].includes(field.name)
+                    )
+                  }
                   active={field.name !== "certificationExpiry" || medicSelected}
                 />
               ))}

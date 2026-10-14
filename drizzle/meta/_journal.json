@@ -43,6 +43,13 @@
       "when": 1792013468034,
       "tag": "0005_relevant_training",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792015220143,
+      "tag": "0006_profile_name_components",
+      "breakpoints": true
     }
   ]
 }

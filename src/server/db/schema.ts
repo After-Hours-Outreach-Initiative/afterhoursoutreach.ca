@@ -119,6 +119,12 @@ export const profile = sqliteTable("profile", {
   user_id: text()
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
+  // Nullable for legacy profiles: never infer components from the old combined answer.
+  first_name: text(),
+  middle_names: text(),
+  last_name: text(),
+  // Legacy profiles retain their original full-or-preferred-name answer here.
+  // New profiles may leave this empty and use their full name for display.
   preferred_name: text().notNull(),
   pronouns: text(),
   phone: text().notNull(),

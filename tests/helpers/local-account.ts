@@ -24,7 +24,10 @@ export async function openLocalAccountSwitcher(page: Page) {
 }
 
 export const sampleAnswers = {
-  name: "Database Test Volunteer",
+  firstName: "Database",
+  middleNames: "Test",
+  lastName: "Volunteer",
+  preferredName: "Database Test Volunteer",
   pronouns: "they/them",
   phone: "604-555-0100",
   birthDate: "1995-04-12",
@@ -77,7 +80,7 @@ export async function createLocalAccount(
   }
   const current = await request.get("/api/v1/auth/get-session", { headers });
   const { user }: { user: { id: string } } = await current.json();
-  return { id: user.id, email, name: sampleAnswers.name };
+  return { id: user.id, email, name: sampleAnswers.preferredName };
 }
 
 export async function approveLocalApplication(
