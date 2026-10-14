@@ -225,6 +225,50 @@ describe(
       );
     });
 
+    test("Outreach is always saved even when no team or only other teams are submitted", async () => {
+      const outreachCookie = await signIn(
+        "worker-default-outreach@example.org",
+      );
+      const account = (await (
+        await send("/api/v1/auth/get-session", undefined, outreachCookie)
+      ).json()) as typeof current;
+      const savedTeams = async () => {
+        const row = await DB.prepare(
+          "SELECT teams FROM profile WHERE user_id=?",
+        )
+          .bind(account.user.id)
+          .first<{ teams: string }>();
+        return JSON.parse(row!.teams);
+      };
+      const registered = await send(
+        "/api/v1/account/profile",
+        { ...answers, teams: undefined, codeOfConductAccepted: true },
+        outreachCookie,
+      );
+      assert.equal(registered.status, 200, await registered.clone().text());
+      assert.deepEqual(await savedTeams(), ["outreach"]);
+      for (const [teams, expected] of [
+        [[], ["outreach"]],
+        [["medic"], ["outreach", "medic"]],
+        [["non-patrol"], ["outreach", "non-patrol"]],
+        [
+          ["medic", "non-patrol"],
+          ["outreach", "medic", "non-patrol"],
+        ],
+      ]) {
+        const edited = await send(
+          "/api/v1/account/profile",
+          {
+            ...answers,
+            teams,
+          },
+          outreachCookie,
+        );
+        assert.equal(edited.status, 200, await edited.clone().text());
+        assert.deepEqual(await savedTeams(), expected);
+      }
+    });
+
     test("registration and edits round-trip through the real API", async () => {
       const unregisteredPortal = await send("/volunteer", undefined, cookie);
       assert.equal(unregisteredPortal.status, 200);
@@ -885,7 +929,12 @@ describe(
           if (name === "teams") continue;
           await newPage.locator(`[name="${name}"]`).fill(String(value));
         }
-        await newPage.locator('[name="teams"][value="outreach"]').check();
+        await expect(
+          newPage.getByRole("checkbox", { name: "Outreach", exact: true }),
+        ).toBeChecked();
+        await expect(
+          newPage.getByRole("checkbox", { name: "Outreach", exact: true }),
+        ).toBeDisabled();
         await newPage
           .getByRole("button", { name: "Complete registration" })
           .click();

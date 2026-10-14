@@ -305,8 +305,8 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(form.getByRole("heading", { level: 3 })).toHaveText([
       "Personal info",
       "Emergency contact",
-      "Training and safety",
       "Team interests",
+      "Training and safety",
     ]);
     await expect(
       form.getByRole("group", { name: "About volunteering", exact: true }),
@@ -342,6 +342,14 @@ test("account navigation and profile controls are usable on desktop and mobile",
             getComputedStyle(element).gridTemplateColumns.split(" ").length,
         ),
     ).toBe(width <= 640 ? 1 : 2);
+    expect(
+      await form
+        .locator(".volunteer-team-options")
+        .evaluate(
+          (element) =>
+            getComputedStyle(element).gridTemplateColumns.split(" ").length,
+        ),
+    ).toBe(width <= 640 ? 1 : 3);
     const save = page.getByRole("button", { name: "Save profile" });
     await expect(save).toBeDisabled();
     await name.fill("Unsaved layout draft");

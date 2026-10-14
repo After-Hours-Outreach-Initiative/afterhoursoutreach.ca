@@ -14,6 +14,10 @@ export interface RegistrationAnswers {
   medicalConditions: string;
 }
 
+export function withOutreachTeam(teams: string[]): string[] {
+  return ["outreach", ...teams.filter((team) => team !== "outreach")];
+}
+
 export const registrationBirthDateError =
   "You must be at least 19 years old. Choose a valid date of birth on or after January 1, 1900.";
 
@@ -57,6 +61,14 @@ export const registrationFields = [
     required: true,
     type: "date",
     help: "You must be at least 19 years old to register.",
+  },
+  {
+    name: "medicalConditions",
+    section: "personal-info",
+    label: "Medical conditions or triggers",
+    required: false,
+    multiline: true,
+    help: "Optional. Used to help organizers support your safety during events.",
   },
   {
     name: "emergencyName",
@@ -107,14 +119,6 @@ export const registrationFields = [
     required: true,
     multiline: true,
     help: "Write “None” if this is your first experience.",
-  },
-  {
-    name: "medicalConditions",
-    section: "training-and-safety",
-    label: "Medical conditions or triggers",
-    required: false,
-    multiline: true,
-    help: "Optional. Used to help organizers support your safety during events.",
   },
 ] as const;
 
