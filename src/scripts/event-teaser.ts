@@ -1,4 +1,4 @@
-interface PublicEvent {
+interface EventSummary {
   id: string;
   type: "patrol" | "orientation";
   startsAt: number;
@@ -8,10 +8,18 @@ const root = document.querySelector<HTMLElement>("[data-live-event-teaser]");
 async function renderEvents(root: HTMLElement) {
   const loading = root.querySelector<HTMLElement>("[data-events-loading]")!;
   try {
-    // Public event summaries have no session, roster, or profile information.
-    const response = await fetch("/api/v1/events", { credentials: "omit" });
+    const response = await fetch("/api/v1/events", {
+      credentials: "same-origin",
+    });
+    if (response.status === 401 || response.status === 403) {
+      loading.textContent =
+        response.status === 401
+          ? "Sign in with an approved volunteer account to view upcoming events."
+          : "Event access requires an active, approved registration. Visit the volunteer page to check your account.";
+      return;
+    }
     if (!response.ok) throw new Error("Unavailable events");
-    const { events } = (await response.json()) as { events: PublicEvent[] };
+    const { events } = (await response.json()) as { events: EventSummary[] };
     if (!events.length) {
       loading.textContent =
         "No upcoming events are scheduled. Check back soon.";

@@ -24,10 +24,11 @@ test("local approval notifications work without crypto.randomUUID", async ({
     <div data-volunteer-profile>
       <h2>Sample volunteer</h2>
       <div class="volunteer-profile-controls" data-volunteer-controls>
-        <form class="volunteer-form" data-organizer-status data-email-prompt="access" action="/api/v1/organizer/action" method="post">
+        <form class="volunteer-form" data-organizer-status data-access-kind="patrol" data-email-prompt="access" action="/api/v1/organizer/action" method="post">
           <input type="hidden" name="userId" value="test-patrol" />
           <input type="hidden" name="version" value="${version}" />
           <input type="checkbox" name="active" checked hidden />
+          <input type="checkbox" name="registrationApproved" checked hidden />
           <input type="checkbox" name="patrolApproved" ${approved ? "" : "checked"} hidden />
           <button class="btn btn-green" type="submit" data-loading-label="Saving…">${approved ? "Revoke patrol approval" : "Approve for patrols"}</button>
           <p data-form-message role="status" hidden></p>
@@ -120,6 +121,7 @@ test("local approval notifications work without crypto.randomUUID", async ({
       userId: "test-patrol",
       version: 1,
       active: true,
+      registrationApproved: true,
       patrolApproved: true,
       notify: true,
     },
@@ -128,6 +130,7 @@ test("local approval notifications work without crypto.randomUUID", async ({
       userId: "test-patrol",
       version: 2,
       active: true,
+      registrationApproved: true,
       patrolApproved: false,
       notify: true,
     },

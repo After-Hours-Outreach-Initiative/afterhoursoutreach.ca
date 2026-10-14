@@ -38,8 +38,8 @@ export function localEventFixtures(now = Date.now()) {
       'I would like to help our neighbours and support evening outreach.',
       '["outreach"]', 'Standard first aid', 'Community volunteering', ${now}, ${now})
       ON CONFLICT(user_id) DO NOTHING`);
-    statements.push(`INSERT INTO volunteer_status (user_id, active, patrol_approved, approved_by, approved_at, updated_at)
-      SELECT ${id}, ${person.inactive ? 0 : 1}, ${person.approved ? 1 : 0},
+    statements.push(`INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at)
+      SELECT ${id}, ${person.inactive ? 0 : 1}, 1, ${person.approved ? 1 : 0},
       ${person.approved ? robin : "NULL"}, ${person.approved ? now : "NULL"}, ${now}
       WHERE NOT EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = ${id})`);
   }
@@ -111,7 +111,7 @@ export function localEventFixtures(now = Date.now()) {
       AND EXISTS (SELECT 1 FROM event e JOIN volunteer_status v ON v.user_id = ${user}
         JOIN profile p ON p.user_id = v.user_id
         WHERE e.id = ${eventId} AND e.open = 1 AND e.hidden = 0 AND e.cancelled_at IS NULL
-        AND e.starts_at > (julianday('now') - 2440587.5) * 86400000 AND v.active = 1
+        AND e.starts_at > (julianday('now') - 2440587.5) * 86400000 AND v.active = 1 AND v.registration_approved = 1
         AND (e.type = 'orientation' OR v.patrol_approved = 1)
         AND (SELECT count(*) FROM signup WHERE event_id = e.id AND status = 'confirmed') < e.spots)`);
   }

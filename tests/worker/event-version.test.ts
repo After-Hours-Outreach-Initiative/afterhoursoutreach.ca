@@ -94,6 +94,17 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     const signedInNext = () => readVersion(attendee.cookie);
     expect(await publicNext()).toBe(publicVersion);
     expect(await signedInNext()).toBe(await listingVersion(attendee.cookie));
+    // Pending accounts see no event activity; approval immediately changes their scoped view.
+    expect(
+      await (await send("/volunteer", undefined, attendee.cookie)).text(),
+    ).toContain("Registration awaiting approval");
+    await DB.prepare(
+      "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+    )
+      .bind(attendee.id)
+      .run();
+    const approvedVersion = await listingVersion(attendee.cookie);
+    expect(await signedInNext()).toBe(approvedVersion);
 
     const joined = await send(
       "/api/v1/events/action",
@@ -102,8 +113,9 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     );
     expect(joined.status, await joined.text()).toBe(200);
     const joinedVersion = await listingVersion();
-    expect(joinedVersion).not.toBe(publicVersion);
+    expect(joinedVersion).toBe(publicVersion);
     expect(await publicNext()).toBe(joinedVersion);
+    expect(await signedInNext()).not.toBe(approvedVersion);
     expect(await signedInNext()).toBe(await listingVersion(attendee.cookie));
 
     const cancelled = await send(

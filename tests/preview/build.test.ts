@@ -76,9 +76,11 @@ test("preview builds support real account features but reject development endpoi
     );
     assert.equal(seeded.status, 200);
     const listing = await seeded.text();
-    assert.equal((listing.match(/data-live-event=/g) ?? []).length, 4);
-    assert.match(listing, /\[Sample\] Strathcona Community Centre/);
-    assert.match(listing, /\[Sample\] Lord Strathcona Elementary School/);
+    assert.equal((listing.match(/data-live-event=/g) ?? []).length, 0);
+    assert.doesNotMatch(
+      listing,
+      /\[Sample\] Strathcona Community Centre|\[Sample\] Lord Strathcona Elementary School/,
+    );
     assert.doesNotMatch(
       listing,
       new RegExp(previewEventId("hidden-orientation")),

@@ -11,6 +11,7 @@ BEGIN
     JOIN volunteer_status v ON v.user_id = NEW.user_id
     JOIN profile p ON p.user_id = v.user_id
     WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1
+      AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
       AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
       AND (e.type = 'orientation' OR v.patrol_approved = 1)
   );
@@ -28,6 +29,7 @@ BEGIN
     JOIN volunteer_status v ON v.user_id = NEW.user_id
     JOIN profile p ON p.user_id = v.user_id
     WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1
+      AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
       AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
       AND (e.type = 'orientation' OR v.patrol_approved = 1)
   );

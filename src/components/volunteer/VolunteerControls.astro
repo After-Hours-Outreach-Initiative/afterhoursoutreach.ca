@@ -10,12 +10,62 @@ const { person } = Astro.props;
   <form
     class="volunteer-form"
     data-organizer-status
+    data-access-kind="registration"
     data-email-prompt="access"
     action="/api/v1/organizer/action"
     method="post"
   >
     <input type="hidden" name="userId" value={person.id} />
     <input type="hidden" name="version" value={person.updatedAt} />
+    <input
+      type="checkbox"
+      name="active"
+      checked={Boolean(person.active)}
+      hidden
+    />
+    <input
+      type="checkbox"
+      name="patrolApproved"
+      checked={Boolean(person.patrolApproved)}
+      hidden
+    />
+    <input
+      type="checkbox"
+      name="registrationApproved"
+      checked={!person.registrationApproved}
+      hidden
+    />
+    <p data-form-message role="status" hidden></p>
+    <button
+      class:list={[
+        "btn",
+        person.registrationApproved ? "btn-red" : "btn-green",
+      ]}
+      type="submit"
+      data-loading-label="Saving…"
+      >{
+        person.registrationApproved
+          ? "Revoke registration approval"
+          : "Approve registration"
+      }</button
+    >
+  </form>
+  <form
+    class="volunteer-form"
+    data-organizer-status
+    data-access-kind="patrol"
+    data-email-prompt="access"
+    action="/api/v1/organizer/action"
+    method="post"
+  >
+    <input type="hidden" name="userId" value={person.id} />
+    <input type="hidden" name="version" value={person.updatedAt} />
+    <input
+      type="checkbox"
+      name="registrationApproved"
+      checked={Boolean(person.registrationApproved)}
+      hidden
+    />
     <input
       type="checkbox"
       name="active"
@@ -41,6 +91,7 @@ const { person } = Astro.props;
   <form
     class="volunteer-form"
     data-organizer-status
+    data-access-kind="active"
     data-submit-on-change
     data-email-prompt="access"
     action="/api/v1/organizer/action"
@@ -48,6 +99,12 @@ const { person } = Astro.props;
   >
     <input type="hidden" name="userId" value={person.id} />
     <input type="hidden" name="version" value={person.updatedAt} />
+    <input
+      type="checkbox"
+      name="registrationApproved"
+      checked={Boolean(person.registrationApproved)}
+      hidden
+    />
     <input
       type="checkbox"
       name="patrolApproved"

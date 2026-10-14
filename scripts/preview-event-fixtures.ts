@@ -41,8 +41,8 @@ export function previewEventFixtures(now = Date.now()) {
       'Sample answer: help our neighbours through evening outreach.',
       '["outreach"]', 'Sample first aid certification', 'Sample volunteering experience', ${now}, ${now})
       ON CONFLICT(user_id) DO NOTHING`);
-    statements.push(`INSERT INTO volunteer_status (user_id, active, updated_at)
-      VALUES (${id}, ${person.inactive ? 0 : 1}, ${now})
+    statements.push(`INSERT INTO volunteer_status (user_id, active, registration_approved, updated_at)
+      VALUES (${id}, ${person.inactive ? 0 : 1}, 1, ${now})
       ON CONFLICT(user_id) DO NOTHING`);
   }
   const events = [
@@ -115,7 +115,7 @@ export function previewEventFixtures(now = Date.now()) {
       AND EXISTS (SELECT 1 FROM event e JOIN volunteer_status v ON v.user_id = ${user}
         JOIN profile p ON p.user_id = v.user_id
         WHERE e.id = ${eventId} AND e.open = 1 AND e.hidden = 0 AND e.cancelled_at IS NULL
-        AND e.starts_at > ${nowMsSql} AND v.active = 1
+        AND e.starts_at > ${nowMsSql} AND v.active = 1 AND v.registration_approved = 1
         AND (e.type = 'orientation' OR v.patrol_approved = 1)
         AND (SELECT count(*) FROM signup WHERE event_id = e.id AND status = 'confirmed') < e.spots)`);
   }

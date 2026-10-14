@@ -33,7 +33,7 @@ beforeEach(() => {
     ) VALUES (?, ?, '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', '[]', 'None', 'None', 0, 0)`,
     ).run(id, id);
     db.prepare(
-      "INSERT INTO volunteer_status (user_id, updated_at) VALUES (?, 0)",
+      "INSERT INTO volunteer_status (user_id, registration_approved, updated_at) VALUES (?, 1, 0)",
     ).run(id);
   }
   for (const type of ["patrol", "orientation"]) {
@@ -57,6 +57,34 @@ function signUp(id: string, eventId: string, userId: string) {
     "INSERT INTO signup (id, event_id, user_id, created_at, updated_at) VALUES (?, ?, ?, 0, 0)",
   ).run(id, eventId, userId);
 }
+
+test("registration approval is required for orientation inserts, reactivation and moves", () => {
+  db.exec(
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='alice'",
+  );
+  approve("alice");
+  for (const eventId of ["orientation", "patrol"])
+    assert.throws(
+      () => signUp(eventId, eventId, "alice"),
+      /signup_not_eligible/,
+    );
+  db.exec(
+    "UPDATE volunteer_status SET registration_approved=1 WHERE user_id='alice'",
+  );
+  signUp("spot", "orientation", "alice");
+  db.exec(
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='alice'",
+  );
+  assert.throws(
+    () => db.exec("UPDATE signup SET event_id='patrol' WHERE id='spot'"),
+    /signup_not_eligible/,
+  );
+  db.exec("UPDATE signup SET status='cancelled' WHERE id='spot'");
+  assert.throws(
+    () => db.exec("UPDATE signup SET status='confirmed' WHERE id='spot'"),
+    /signup_not_eligible/,
+  );
+});
 
 test("approval is independent of orientation completion", () => {
   assert.throws(

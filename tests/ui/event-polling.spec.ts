@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   createLocalAccount,
+  approveLocalRegistration,
   openLocalAccountSwitcher,
 } from "../helpers/local-account";
 
@@ -10,6 +11,10 @@ test("event checks run every five seconds, retry failures, and pause without ove
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   let checks = 0;
+  let finishedChecks = 0;
+  page.on("requestfinished", (request) => {
+    if (request.url().endsWith("/api/v1/events/version")) finishedChecks++;
+  });
   let version: string | null = null;
   let release!: () => void;
   const heldCheck = new Promise<void>((resolve) => (release = resolve));
@@ -36,14 +41,18 @@ test("event checks run every five seconds, retry failures, and pause without ove
   try {
     await page.goto("/volunteer");
     await expect.poll(() => checks).toBe(1);
+    await expect.poll(() => finishedChecks).toBe(1);
     await page.clock.runFor(4_999);
     expect(checks).toBe(1);
     await page.clock.runFor(1);
     await expect.poll(() => checks).toBe(2);
+    await expect.poll(() => finishedChecks).toBe(2);
     await page.clock.runFor(5_000);
     await expect.poll(() => checks).toBe(3);
+    await expect.poll(() => finishedChecks).toBe(3);
     await page.clock.runFor(5_000);
     await expect.poll(() => checks).toBe(4);
+    await expect.poll(() => finishedChecks).toBe(4);
     expect(pageRefreshes).toBe(0);
 
     await page.clock.runFor(5_000);
@@ -137,8 +146,13 @@ test("other viewers see signups and cancellations through polling without losing
     const visitor = await visitorContext.newPage();
     const viewer = await viewerContext.newPage();
     const attendee = await attendeeContext.newPage();
-    await createLocalAccount(viewer.request, baseURL!);
-    await createLocalAccount(attendee.request, baseURL!);
+    const viewerAccount = await createLocalAccount(viewer.request, baseURL!);
+    const attendeeAccount = await createLocalAccount(
+      attendee.request,
+      baseURL!,
+    );
+    await approveLocalRegistration(page.request, baseURL!, viewerAccount.id);
+    await approveLocalRegistration(page.request, baseURL!, attendeeAccount.id);
     const errors: string[] = [];
     for (const current of [page, visitor, viewer, attendee])
       current.on("pageerror", (error) => errors.push(error.message));
@@ -149,7 +163,10 @@ test("other viewers see signups and cancellations through polling without losing
     ]);
     const card = (current: typeof page) =>
       current.locator(`[data-live-event="${eventId}"]`);
-    for (const current of [visitor, viewer, attendee])
+    await expect(
+      visitor.locator("[data-live-event], [data-event-list]"),
+    ).toHaveCount(0);
+    for (const current of [viewer, attendee])
       await expect(card(current).locator(".volunteer-spots")).toHaveText(
         "1 spots left",
       );
@@ -185,7 +202,7 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       card(attendee).getByRole("button", { name: "Unregister", exact: true }),
     ).toBeEnabled();
-    for (const current of [visitor, viewer, page])
+    for (const current of [viewer, page])
       await expect(card(current).locator(".volunteer-spots")).toHaveText(
         "Full",
         { timeout: 15_000 },
@@ -226,10 +243,7 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       card(attendee).getByRole("button", { name: "Register", exact: true }),
     ).toBeEnabled();
-    await expect(card(visitor).locator(".volunteer-spots")).toHaveText(
-      "1 spots left",
-      { timeout: 15_000 },
-    );
+    await expect(card(visitor)).toHaveCount(0);
     await viewer.evaluate(() => {
       Reflect.deleteProperty(document, "hidden");
       document.dispatchEvent(new Event("visibilitychange"));

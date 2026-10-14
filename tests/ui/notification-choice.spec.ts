@@ -59,10 +59,11 @@ test("organizer email choice defaults to no email and cancellation restores cont
     <div data-volunteer-profile>
       <h2>Sample volunteer</h2>
       <div data-volunteer-controls>
-        <form data-organizer-status data-email-prompt="access" action="/api/v1/organizer/action" method="post">
+        <form data-organizer-status data-access-kind="patrol" data-email-prompt="access" action="/api/v1/organizer/action" method="post">
           <input type="hidden" name="userId" value="test-email-choice" />
           <input type="hidden" name="version" value="${version}" />
           <input type="checkbox" name="active" checked hidden />
+          <input type="checkbox" name="registrationApproved" checked hidden />
           <input type="checkbox" name="patrolApproved" ${approved ? "" : "checked"} hidden />
           <button type="submit" data-loading-label="Saving…">${approved ? "Revoke patrol approval" : "Approve for patrols"}</button>
           <p data-form-message hidden></p>
@@ -71,6 +72,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
           <input type="hidden" name="userId" value="test-email-choice" />
           <input type="hidden" name="version" value="${version}" />
           <label><input type="checkbox" name="active" checked />Active volunteer</label>
+          <input type="checkbox" name="registrationApproved" checked hidden />
           <input type="checkbox" name="patrolApproved" ${approved ? "checked" : ""} hidden />
           <span data-action-loading hidden>Saving…</span>
           <p data-form-message hidden></p>
@@ -173,6 +175,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
       userId: "test-email-choice",
       version: 1,
       active: true,
+      registrationApproved: true,
       patrolApproved: true,
       notify: false,
     },

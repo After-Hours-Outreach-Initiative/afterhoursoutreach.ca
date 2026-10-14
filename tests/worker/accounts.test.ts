@@ -232,7 +232,10 @@ describe(
       assert.match(prompt, /volunteer-registration-warning/);
       assert.match(prompt, /volunteer-warning-icon/);
       assert.match(prompt, /volunteer-registration-warning-arrow/);
-      assert.match(prompt, /Complete your registration to register for events/);
+      assert.match(
+        prompt,
+        /Complete your registration to request volunteer access/,
+      );
       assert.match(
         prompt,
         /<a\b[^>]*class="volunteer-registration-warning"[^>]*href="\/volunteer\/register"/,

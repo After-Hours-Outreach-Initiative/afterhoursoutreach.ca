@@ -84,6 +84,60 @@ test("the Code of Conduct migration preserves existing profiles without inventin
   assert.deepEqual(answers, { ...before });
 });
 
+test("registration approval migration gates existing volunteers without dropping profiles, patrol approvals or signups", () => {
+  const db = database();
+  for (const name of ["0000_database", "0001_code_of_conduct"])
+    db.exec(
+      readFileSync(new URL(`../drizzle/${name}.sql`, import.meta.url), "utf8"),
+    );
+  db.exec(`
+    INSERT INTO user (id, name, email, role, created_at, updated_at)
+      VALUES ('organizer', 'Organizer', 'organizer@example.org', 'organizer', 1, 1),
+        ('existing', 'Existing volunteer', 'existing@example.org', 'volunteer', 1, 1);
+    INSERT INTO profile (
+      user_id, preferred_name, phone, birth_date, emergency_contact_name,
+      emergency_contact_phone, emergency_contact_relationship, heard_about_us,
+      motivation, teams, medical_certification, training_experience, registered_at, updated_at
+    ) VALUES ('existing', 'Existing volunteer', '604-555-0100', '1995-04-12',
+      'Contact', '604-555-0101', 'Friend', 'Friend', 'Help', '["outreach"]', 'None', 'None', 1, 1);
+    INSERT INTO volunteer_status (user_id, patrol_approved, approved_by, approved_at, updated_at)
+      VALUES ('existing', 1, 'organizer', 1, 1);
+    INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
+      VALUES ('orientation', 'orientation', ${Date.now() + 86_400_000}, 'Meeting point', 2, 'organizer', 1, 1);
+    INSERT INTO signup (id, event_id, user_id, created_at, updated_at)
+      VALUES ('existing-signup', 'orientation', 'existing', 1, 1);
+  `);
+  const tables = ["user", "profile", "event", "signup"];
+  const before = tables.map((table) =>
+    db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+  );
+  const beforeStatus = db.prepare("SELECT * FROM volunteer_status").get();
+  db.exec(
+    readFileSync(
+      new URL("../drizzle/0002_registration_approval.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(
+    tables.map((table) =>
+      db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+    ),
+    before,
+  );
+  const { registration_approved, ...status } = db
+    .prepare("SELECT * FROM volunteer_status")
+    .get()!;
+  assert.equal(registration_approved, 0);
+  assert.deepEqual(status, { ...beforeStatus });
+  assert.throws(
+    () =>
+      db.exec(
+        "INSERT INTO signup (id, event_id, user_id, created_at, updated_at) VALUES ('blocked', 'orientation', 'existing', 1, 1)",
+      ),
+    /signup_not_eligible/,
+  );
+});
+
 test("generation creates runnable schema and triggers and is a no-op without changes", async () => {
   const directory = scratchDirectory();
   const options = { directory, schema, triggers };

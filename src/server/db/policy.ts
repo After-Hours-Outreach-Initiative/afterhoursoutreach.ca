@@ -2,7 +2,9 @@
 export interface SignupVolunteer {
   registered: boolean;
   active: boolean;
+  registrationApproved: boolean;
   patrolApproved: boolean;
+  role?: "volunteer" | "organizer";
 }
 
 export interface SignupEvent {
@@ -23,6 +25,8 @@ export function signupBlockReason(
   if (!volunteer.registered)
     return "Complete volunteer registration before registering for events.";
   if (!volunteer.active) return "Your volunteer account is inactive.";
+  if (!volunteer.registrationApproved && volunteer.role !== "organizer")
+    return "Your registration is awaiting organizer approval.";
   if (!event.open) return "This event is closed.";
   if (!Number.isFinite(event.startsAt.getTime()) || event.startsAt <= now)
     return "Registration closes when the event starts.";

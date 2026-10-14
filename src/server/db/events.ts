@@ -3,6 +3,7 @@ import type { Actor } from "./access";
 import {
   requireOrganizer,
   requireVolunteer,
+  canViewEvents,
   writePermission,
   permissionValues,
 } from "./access";
@@ -65,6 +66,7 @@ export function eventDescription(
   ).format(new Date(event.startsAt))}\nMeeting point: ${event.meetingPoint}`;
 }
 export async function listEvents(db: Env["DB"], actor: Actor | null) {
+  if (!canViewEvents(actor)) return [];
   const organizer = Boolean(
     actor?.role === "organizer" &&
     actor.registered &&
@@ -362,7 +364,7 @@ export async function changeSignup(
   action: "join" | "cancel",
 ) {
   if (!actor) throw new RequestError(401, "Sign in to register.");
-  if (action === "join") requireVolunteer(actor);
+  requireVolunteer(actor);
   const event = await findEvent(db, eventId);
   if (event.startsAt <= Date.now())
     throw new RequestError(409, "Registration closes when the event starts.");

@@ -45,7 +45,7 @@ for (const failFirst of [false, true]) {
       page.on("pageerror", (error) => errors.push(error.message));
       const signedUp = new Set<string>();
       const listing = () => `
-    <section data-event-browser>
+    <section data-event-browser data-event-access="true">
       <ul data-event-list>
         ${["first", "second"]
           .map(
@@ -76,6 +76,9 @@ for (const failFirst of [false, true]) {
           .replaceChildren(
             ...parsed.querySelector("[data-event-browser]")!.childNodes,
           );
+        (
+          document.querySelector("[data-event-browser]") as HTMLElement
+        ).dataset.eventAccess = "true";
       }, listing());
       await page.route("**/api/v1/events/action", async (route) => {
         signedUp.add(route.request().postDataJSON().id);
