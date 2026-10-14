@@ -59,7 +59,12 @@ export function initApplicationReview(element: HTMLFormElement) {
     requestAnimationFrame(() => {
       if (!target || target.closest("[hidden]")) return;
       target.focus({ preventScroll: true });
-      target.scrollIntoView({ block: "start" });
+      // A sticky disclosure's own position cannot return to the answers' start.
+      const scrollTarget =
+        target
+          .closest("[data-application-contents]")
+          ?.closest<HTMLElement>("[data-application-questions]") ?? target;
+      scrollTarget.scrollIntoView({ block: "start" });
     });
   };
   const display = (next: typeof step, moveFocus = true) => {
