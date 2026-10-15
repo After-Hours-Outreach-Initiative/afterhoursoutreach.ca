@@ -240,6 +240,41 @@ test("other referral help separates the character limit from its unit", async ({
   );
 });
 
+test("mobile contents bar contrasts with the header and keeps its toggle black", async ({
+  page,
+  baseURL,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  const contents = page.getByRole("navigation", { name: "On this page" });
+  const menu = contents.locator("[data-application-contents-menu]");
+  const bar = menu.locator("summary");
+  const toggle = bar.locator(".volunteer-application-contents-toggle");
+  await expect(page.locator(".site-header")).toHaveCSS(
+    "background-color",
+    "rgb(0, 0, 0)",
+  );
+  await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
+  await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  const current = bar.locator("[data-application-current]");
+  await expect(current).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(current).toHaveCSS("font-size", "16px");
+  await toggle.click();
+  await expect(menu).toHaveAttribute("open", "");
+  await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
+  await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await page.keyboard.press("Escape");
+  await expect(menu).not.toHaveAttribute("open");
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(menu).toBeHidden();
+  await expect(
+    contents.locator(".volunteer-application-contents-sidebar"),
+  ).toBeVisible();
+  await expect(contents).toHaveCSS("background-color", "rgb(0, 0, 0)");
+});
+
 test("both phone inputs format typing, paste and edits without trapping the caret", async ({
   page,
   baseURL,
