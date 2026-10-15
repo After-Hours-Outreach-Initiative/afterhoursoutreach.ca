@@ -33,7 +33,18 @@ export const POST: APIRoute = async ({ request }) => {
       20,
       60_000,
     );
-    await saveProfile(env.DB, current.user.id, await readJson(request));
+    const input = await readJson(request);
+    // Older clients omit this field. New application tabs bind submission to the
+    // account they were opened for, just like autosave does.
+    if (input && typeof input === "object" && "applicationUserId" in input) {
+      if (input.applicationUserId !== current.user.id)
+        throw new RequestError(
+          403,
+          "Your account changed. Reload before continuing.",
+        );
+      delete input.applicationUserId;
+    }
+    await saveProfile(env.DB, current.user.id, input);
     const response = Response.json(
       { next: "/volunteer/account", message: "Profile saved." },
       { headers: { "Cache-Control": "no-store" } },

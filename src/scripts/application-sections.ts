@@ -27,21 +27,13 @@ export function initApplicationSections(element: HTMLFormElement) {
     }))
     .filter((section) => section.links.length);
   const header = document.querySelector<HTMLElement>("body > header");
-  const navigation = document.querySelector<HTMLElement>(".volunteer-nav");
   let stickyHeight = 0;
   let barHeight = 0;
   let frame = 0;
 
   const measure = () => {
-    // Measure the actual stack bottom: a preview banner can initially shift the
-    // header down, and the account navigation can wrap onto another line.
-    const headerBottom = Math.max(
-      0,
-      header?.getBoundingClientRect().bottom ?? 0,
-    );
-    navigation?.style.setProperty("top", `${headerBottom}px`);
-    stickyHeight =
-      headerBottom + (navigation?.getBoundingClientRect().height ?? 0);
+    // A preview banner can initially shift the sticky header down.
+    stickyHeight = Math.max(0, header?.getBoundingClientRect().bottom ?? 0);
     // CSS hides the mobile disclosure at the sidebar breakpoint. Its absolute
     // dropdown never adds height, and the desktop sidebar must not affect jumps.
     barHeight = menu.getBoundingClientRect().height;
@@ -187,7 +179,6 @@ export function initApplicationSections(element: HTMLFormElement) {
   const resize = new ResizeObserver(refresh);
   for (const target of [
     header,
-    navigation,
     contents,
     menu,
     flow,

@@ -57,6 +57,13 @@
       "when": 1792015642060,
       "tag": "0007_profile_referral_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792099026165,
+      "tag": "0008_application_drafts",
+      "breakpoints": true
     }
   ]
 }

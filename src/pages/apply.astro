@@ -9,8 +9,12 @@ import {
   readAccountSession,
 } from "@/server/auth";
 import { loadProfile } from "@/server/db/profiles";
+import { loadApplicationDraft } from "@/server/db/application-drafts";
+import type { ApplicationDraft } from "@/data/application-draft";
 export const prerender = false;
 let email = "";
+let userId = "";
+let draft: ApplicationDraft | null = null;
 if (!env.BETTER_AUTH_SECRET)
   return Astro.redirect("/volunteer/sign-in?returnTo=/apply");
 try {
@@ -19,10 +23,16 @@ try {
     Astro.request,
   );
   forwardCookies(headers, Astro.response.headers);
-  if (!current) return Astro.redirect("/volunteer/sign-in?returnTo=/apply");
+  if (
+    !current?.user.emailVerified ||
+    (current.user.twoFactorEnabled && !current.session.twoFactorVerified)
+  )
+    return Astro.redirect("/volunteer/sign-in?returnTo=/apply");
   if (await loadProfile(env.DB, current.user.id))
     return Astro.redirect("/volunteer/account");
   email = current.user.email;
+  userId = current.user.id;
+  draft = await loadApplicationDraft(env.DB, userId);
 } catch {
   return new Response("Your account is temporarily unavailable.", {
     status: 503,
@@ -51,6 +61,11 @@ try {
         </li>
       </ol>
     </div>
-    <AccountProfileForm email={email} application />
+    <AccountProfileForm
+      email={email}
+      userId={userId}
+      draft={draft}
+      application
+    />
   </section>
 </AccountLayout>

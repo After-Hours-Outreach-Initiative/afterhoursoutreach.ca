@@ -15,6 +15,7 @@ let team: Awaited<ReturnType<typeof listVolunteers>> = {
 };
 let lock = "";
 let accountName = "";
+let accountGreeting = "";
 let accountEmail = "";
 const search = (Astro.url.searchParams.get("q") ?? "").slice(0, 100);
 const offset = Math.min(
@@ -25,13 +26,17 @@ const offset = Math.min(
   ),
 );
 try {
-  const { actor, headers, email } = await accountContext(env, Astro.request);
+  const { actor, headers, email, greetingName } = await accountContext(
+    env,
+    Astro.request,
+  );
   forwardCookies(headers, Astro.response.headers);
   if (!actor)
     return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/volunteers");
   if (actor.role !== "organizer")
     return new Response("Organizer access is required.", { status: 403 });
   accountName = actor.name;
+  accountGreeting = greetingName;
   accountEmail = email;
   try {
     requireOrganizer(actor);
@@ -53,6 +58,7 @@ try {
   signedIn
   organizer
   name={accountName}
+  greetingName={accountGreeting}
   email={accountEmail}
 >
   {
@@ -62,7 +68,14 @@ try {
       </p>
     ) : (
       <>
-        <section class="volunteer-events" data-volunteer-browser>
+        <section
+          class="volunteer-events"
+          data-volunteer-browser
+          aria-labelledby="volunteers-heading"
+        >
+          <div class="volunteer-section-heading">
+            <h2 id="volunteers-heading">Volunteers</h2>
+          </div>
           <form
             class="volunteer-search"
             method="get"

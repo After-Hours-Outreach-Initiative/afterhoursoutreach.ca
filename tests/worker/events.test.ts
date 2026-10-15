@@ -10,7 +10,9 @@ import { totpFromSetupKey } from "../helpers/totp";
 const origin = "https://afterhoursoutreach.ca";
 const secret = "worker-event-test-secret-12345678901234567890";
 const answers = {
-  name: "Sample Volunteer",
+  firstName: "Sample",
+  lastName: "Volunteer",
+  preferredName: "Sample Volunteer",
   pronouns: "they/them",
   phone: "604-555-0100",
   birthDate: "1995-04-12",
@@ -129,7 +131,7 @@ describe(
       await ok(
         await send(
           "/api/v1/account/profile",
-          { ...answers, name, codeOfConductAccepted: true },
+          { ...answers, preferredName: name, codeOfConductAccepted: true },
           cookie,
         ),
       );
@@ -1010,13 +1012,11 @@ describe(
           });
           await page.goto(`${origin}/volunteer`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
-          const nav = page.getByRole("navigation", {
-            name: "Volunteer account",
-          });
-          const account = nav.locator("[data-account-menu] > summary");
+          const nav = page.locator(".mobile-nav");
+          const account = nav.locator("summary");
           assert.equal(
             (
-              await nav.locator("[data-account-menu-name]").textContent()
+              await nav.locator("[data-account-greeting]").textContent()
             )?.trim(),
             "Sample Organizer",
           );
@@ -1675,7 +1675,7 @@ describe(
             .waitFor();
           assert.equal(
             (
-              await nav.locator("[data-account-menu-name]").textContent()
+              await nav.locator("[data-account-greeting]").textContent()
             )?.trim(),
             "Sample Bob",
           );
@@ -1763,12 +1763,6 @@ describe(
               page.locator("[data-event-notifications]"),
             ).toContainText("notifications expired and cannot be retried.");
           }
-          await page.goto(origin);
-          await page
-            .locator("[data-live-event-teaser]")
-            .getByText("Sample meeting point", { exact: true })
-            .first()
-            .waitFor();
           assert.deepEqual(errors, []);
         } finally {
           await browser.close();

@@ -6,8 +6,8 @@ import {
 } from "../auth";
 import type { AuthBindings } from "../auth";
 import { createDatabase } from ".";
-import { volunteerStatus } from "./schema";
-import { hasApplied } from "./profiles";
+import { profile, volunteerStatus } from "./schema";
+import { accountGreeting } from "../../data/account-navigation";
 import { RequestError, requireSameOrigin } from "../http";
 
 export async function accountContext(
@@ -22,7 +22,13 @@ export async function accountContext(
     request,
   );
   if (!current?.user.emailVerified)
-    return { actor: null, email: "", headers, bindings: scoped };
+    return {
+      actor: null,
+      email: "",
+      greetingName: "Account",
+      headers,
+      bindings: scoped,
+    };
   const db = createDatabase(bindings.DB);
   // Better Auth reads this user from D1: cookie caching and secondary storage
   // are disabled. Authorization is still rechecked inside each atomic write.
@@ -30,7 +36,10 @@ export async function accountContext(
   const status = await db.query.volunteerStatus.findFirst({
     where: eq(volunteerStatus.user_id, person.id),
   });
-  const applicationSubmitted = await hasApplied(bindings.DB, person.id);
+  const application = await db.query.profile.findFirst({
+    where: eq(profile.user_id, person.id),
+    columns: { first_name: true, preferred_name: true },
+  });
   return {
     actor: {
       id: person.id,
@@ -39,12 +48,19 @@ export async function accountContext(
       role: person.role,
       twoFactorEnabled: person.twoFactorEnabled,
       twoFactorVerified: current.session.twoFactorVerified,
-      applicationSubmitted,
+      applicationSubmitted: Boolean(application),
       active: status?.active ?? false,
       applicationApproved: status?.registration_approved ?? false,
       patrolApproved: status?.patrol_approved ?? false,
     },
     email: person.email,
+    greetingName: accountGreeting(
+      {
+        firstName: application?.first_name,
+        preferredName: application?.preferred_name,
+      },
+      person.name,
+    ),
     headers,
     bindings: scoped,
   };

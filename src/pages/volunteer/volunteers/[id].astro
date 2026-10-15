@@ -23,9 +23,13 @@ export const prerender = false;
 let values;
 let person: VolunteerRow | null = null;
 let accountName = "";
+let accountGreeting = "";
 let accountEmail = "";
 try {
-  const { actor, headers, email } = await accountContext(env, Astro.request);
+  const { actor, headers, email, greetingName } = await accountContext(
+    env,
+    Astro.request,
+  );
   forwardCookies(headers, Astro.response.headers);
   if (!actor)
     return Astro.redirect(
@@ -33,6 +37,7 @@ try {
     );
   requireOrganizer(actor);
   accountName = actor.name;
+  accountGreeting = greetingName;
   accountEmail = email;
   values = await viewVolunteerProfile(env.DB, actor, Astro.params.id ?? "");
   person = await findVolunteer(env.DB, actor, Astro.params.id ?? "");
@@ -54,6 +59,7 @@ if (!values || !person)
   signedIn
   organizer
   name={accountName}
+  greetingName={accountGreeting}
   email={accountEmail}
 >
   <section class="volunteer-panel">

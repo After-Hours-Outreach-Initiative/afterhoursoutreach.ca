@@ -1,6 +1,13 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import { env } from "cloudflare:workers";
+import { loadAccountNavigation } from "@/server/account-navigation";
 export const prerender = false;
+const account = await loadAccountNavigation(
+  env,
+  Astro.request,
+  Astro.response.headers,
+);
 ---
 
 <Layout
@@ -8,6 +15,7 @@ export const prerender = false;
   description="Draft privacy information for volunteer accounts and events."
   noindex
   privatePage
+  account={account}
 >
   <section class="bg-black px-6 py-20">
     <div class="mx-auto max-w-3xl">
@@ -25,11 +33,20 @@ export const prerender = false;
       <p class="mt-6">
         {
           import.meta.env.DEV
-            ? "Your email identifies your local account. Sign-in emails are shown in a development dialog instead of sent. Profile answers are stored in local D1, not browser storage. Sessions use an HttpOnly cookie. The development View as buttons can switch to any user in the local database without an email or authenticator challenge."
-            : "Your email identifies your account and receives sign-in emails through Resend. Profile answers are saved in Cloudflare D1 in the US. Date of birth is used for age and eligibility; emergency contacts and optional medical information help support volunteer safety. Profile edits are logged by field name, without copying your answers. Sessions use a necessary HttpOnly cookie; profile answers are not saved in browser storage."
+            ? "Your email identifies your local account. Sign-in emails are shown in a development dialog instead of sent. Profile answers and account drafts are stored in local D1. Sessions use an HttpOnly cookie. The development View as buttons can switch to any user in the local database without an email or authenticator challenge."
+            : "Your email identifies your account and receives sign-in emails through Resend. Profile answers and account drafts are saved in Cloudflare D1 in the US. Date of birth is used for age and eligibility; emergency contacts and optional medical information help support volunteer safety. Profile edits are logged by field name, without copying your answers. Sessions use a necessary HttpOnly cookie."
         }
         The Code of Conduct version and the time you acknowledge it are saved with
         your profile to record your application confirmation.
+      </p>
+      <p class="mt-6">
+        Unsubmitted application answers, including personal and medical answers,
+        are also backed up in this browser’s local storage and automatically
+        saved to your account so you can resume on another device. Drafts are
+        not shown to organizers. Successful submission removes the draft copies;
+        signing out removes browser copies that have reached your account.
+        Unsynced browser backups remain on this device to prevent data loss.
+        Avoid shared devices, or clear this site’s browser data after use.
       </p>
       <h2 class="mt-12">Organizer access and events</h2>
       <p class="mt-6">

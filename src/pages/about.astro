@@ -1,6 +1,14 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { organization } from "@/data/organization";
+import { env } from "cloudflare:workers";
+import { loadAccountNavigation } from "@/server/account-navigation";
+export const prerender = false;
+const account = await loadAccountNavigation(
+  env,
+  Astro.request,
+  Astro.response.headers,
+);
 
 const directors = [
   "Ivan Z.",
@@ -33,6 +41,7 @@ const documents = [
 <Layout
   title="About | After Hours Outreach Initiative"
   description="After Hours Outreach Initiative is a volunteer-run non-profit doing evening street outreach in Vancouver's Downtown Eastside."
+  account={account}
 >
   <section class="bg-black text-white" id="about">
     <div

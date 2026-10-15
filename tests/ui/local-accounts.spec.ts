@@ -124,7 +124,11 @@ test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Volunteer application" }),
+    page.getByRole("heading", {
+      name: "Volunteer Application",
+      level: 2,
+      exact: true,
+    }),
   ).toBeVisible();
 });
 

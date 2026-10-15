@@ -654,6 +654,33 @@ describe(
       );
     });
 
+    test("public pages render session-specific headers without caching or exposing profile answers", async () => {
+      for (const path of ["/", "/about", "/donate", "/privacy"]) {
+        const [signedIn, signedOut] = await Promise.all([
+          send(path, undefined, cookie),
+          send(path, undefined, ""),
+        ]);
+        for (const response of [signedIn, signedOut]) {
+          assert.equal(response.status, 200, path);
+          assert.equal(response.headers.get("cache-control"), "no-store", path);
+          if (path !== "/privacy")
+            assert.equal(response.headers.get("x-robots-tag"), null, path);
+        }
+        const signedInHTML = await signedIn.text();
+        const header = signedInHTML.match(/<header\b[\s\S]*?<\/header>/)![0];
+        assert.match(header, /aria-label="Account for Worker Test Volunteer"/);
+        assert.match(header, /data-account-menu(?:=""|[\s>])/);
+        assert.match(header, /data-header-discord[^>]*hidden/);
+        assert.doesNotMatch(signedInHTML, /Sample private answer/);
+        assert.doesNotMatch(signedInHTML, new RegExp(current.session.id));
+        const signedOutHTML = await signedOut.text();
+        assert.doesNotMatch(
+          signedOutHTML,
+          /Worker Test Volunteer|data-account-menu(?:=""|[\s>])/,
+        );
+      }
+    });
+
     test("session management lists only active owned sessions and revokes by ID without exposing tokens", async () => {
       const siblingCookie = await signIn("worker-volunteer@example.org");
       const expiredCookie = await signIn("worker-volunteer@example.org");
@@ -1178,8 +1205,17 @@ describe(
           newPage.locator("[data-medic-certifications]"),
         ).toBeHidden();
         for (const [name, value] of Object.entries(answers)) {
+          if (name === "heardAboutUsSources") {
+            for (const source of answers.heardAboutUsSources)
+              await newPage
+                .locator(`[name="${name}"][value="${source}"]`)
+                .check();
+            continue;
+          }
           if (
             [
+              "heardAboutUs",
+              "heardAboutUsOther",
               "teams",
               "certification",
               "certifications",
@@ -1215,13 +1251,15 @@ describe(
           ...codeOfConductRules,
         ]);
         await expect(toggle).toHaveAccessibleName("Show fewer rules");
-        const lastRule = await conduct
-          .getByRole("listitem")
-          .last()
-          .boundingBox();
-        const collapse = await toggle.boundingBox();
         assert.ok(
-          lastRule && collapse && collapse.y >= lastRule.y + lastRule.height,
+          await conduct.evaluate((element) => {
+            const rules = element.querySelector("#code-of-conduct-more-rules")!;
+            const summary = element.querySelector("summary")!;
+            return (
+              summary.getBoundingClientRect().top >=
+              rules.getBoundingClientRect().bottom
+            );
+          }),
           "Show fewer rules appears below the final rule.",
         );
         await toggle.click();

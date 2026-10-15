@@ -1,0 +1,213 @@
+.site-header [hidden] {
+  display: none !important;
+}
+.header-link,
+.header-account-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  color: #d4d4d8;
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 150ms;
+}
+.header-link:hover,
+.header-link[aria-current],
+.header-menu:has([aria-current]) > summary,
+.header-account-toggle:hover,
+.header-account-toggle[data-current] {
+  color: white;
+}
+.header-menu {
+  position: relative;
+}
+.site-header summary {
+  list-style: none;
+  cursor: pointer;
+}
+.site-header summary::-webkit-details-marker {
+  display: none;
+}
+.header-chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: transform 150ms;
+}
+.header-menu[open] > summary .header-chevron {
+  transform: rotate(180deg);
+}
+.header-account-toggle {
+  min-width: 44px;
+  gap: 10px;
+  padding: 4px;
+  border-radius: 999px;
+}
+.header-account-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 1px solid #334d9d;
+  border-radius: 50%;
+  background: #16214a;
+  color: #c7d2fe;
+}
+.header-account-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.header-account-toggle:hover,
+.header-menu[open] > .header-account-toggle {
+  background: #171a20;
+}
+.header-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 1;
+  padding: 4px;
+  border: 1px solid #3f3f46;
+  border-radius: 10px;
+  background: #0c0d10;
+  box-shadow: 0 12px 30px #0008;
+}
+.header-volunteer-dropdown {
+  left: -12px;
+  width: 200px;
+}
+.header-account-dropdown {
+  right: 0;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+}
+.header-dropdown a,
+.header-dropdown button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #d4d4d8;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+}
+.header-dropdown a:hover,
+.header-dropdown button:hover,
+.header-dropdown a[aria-current] {
+  color: white;
+  background: #171a20;
+}
+.header-account-identity {
+  padding: 12px;
+  border-bottom: 1px solid #27272a;
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+.header-account-name {
+  display: block;
+  font-weight: 600;
+}
+.header-account-email,
+.header-account-message {
+  margin-top: 4px;
+  color: #a1a1aa;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.header-account-message {
+  padding: 8px 12px;
+}
+.header-mobile-panel {
+  max-height: calc(100dvh - 5.5rem);
+  padding-top: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.header-mobile-link {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  width: 100%;
+  padding: 12px 20px;
+  color: #d4d4d8;
+  font-size: 20px;
+  line-height: 1.5;
+  text-align: left;
+}
+.header-mobile-link:hover,
+.header-mobile-link[aria-current] {
+  color: white;
+  background: #171a20;
+}
+.header-mobile-children {
+  margin: 0 20px 0 28px;
+}
+.header-mobile-children .header-mobile-link {
+  padding-left: 20px;
+  font-size: 18px;
+}
+.header-mobile-panel [data-header-discord] {
+  font-size: 18px;
+}
+.header-mobile-account {
+  margin: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #111318;
+  overflow-wrap: anywhere;
+}
+.header-mobile-account-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-mobile-account-details {
+  min-width: 0;
+}
+.header-mobile-account-name {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+}
+.header-mobile-account .header-account-email {
+  font-size: 16px;
+}
+.header-mobile-account .header-account-icon {
+  border: 0;
+}
+.header-mobile-account .header-mobile-children {
+  margin: 16px 0 0 36px;
+}
+.header-mobile-account .header-mobile-link {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+.header-mobile-account [data-sign-out] {
+  margin: 8px 0 0 12px;
+}
+.header-mobile-account .header-mobile-sign-out {
+  justify-content: center;
+  background: #252b36;
+  color: white;
+}
+.header-mobile-account .header-mobile-sign-out:hover {
+  background: #333b4a;
+}
+.header-mobile-account .header-mobile-sign-out:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+@media (max-width: 639px) {
+  .header-mobile-panel {
+    max-height: calc(100dvh - 4.75rem);
+  }
+}

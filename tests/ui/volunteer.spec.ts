@@ -23,18 +23,12 @@ for (const width of [1280, 375, 320]) {
     const expectCardBelowNavigation = async () => {
       await expect
         .poll(async () => {
-          const [card, header, navigation] = await Promise.all([
+          const [card, header] = await Promise.all([
             page.locator("#volunteer-signin").boundingBox(),
             page.locator("header").boundingBox(),
-            page
-              .getByRole("navigation", { name: "Volunteer account" })
-              .boundingBox(),
           ]);
-          if (!card || !header || !navigation) return -1;
-          return (
-            card.y -
-            Math.max(header.y + header.height, navigation.y + navigation.height)
-          );
+          if (!card || !header) return -1;
+          return card.y - (header.y + header.height);
         })
         .toBeGreaterThanOrEqual(16);
     };
@@ -180,9 +174,12 @@ test("View as has a button for every seeded profile and supports keyboard switch
   );
   await robin.focus();
   await robin.press("Enter");
+  await page
+    .getByRole("button", { name: "Open navigation", exact: true })
+    .click();
   await expect(
     page
-      .getByRole("navigation", { name: "Volunteer account" })
+      .getByRole("navigation", { name: "Mobile navigation" })
       .getByRole("link", { name: "Volunteers", exact: true }),
   ).toBeVisible();
   await expect(robin).toHaveAttribute("aria-pressed", "true");
@@ -275,7 +272,11 @@ test("View as can choose a D1 account without an application without changing it
   await profile.click();
   await expect(page).toHaveURL(/\/apply$/);
   await expect(
-    page.getByRole("heading", { name: "Volunteer application" }),
+    page.getByRole("heading", {
+      name: "Volunteer Application",
+      level: 2,
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(page.getByRole("textbox", { name: /^Email/ })).toHaveValue(
     user.email,
@@ -292,9 +293,22 @@ test("account navigation and profile controls are usable on desktop and mobile",
   await page.reload();
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
-    const menu = page.locator("[data-account-menu]");
-    await expect(menu.locator("summary")).toHaveAccessibleName("Account");
-    await menu.locator("summary").click();
+    const menu = page.locator(
+      width < 1024 ? "[data-mobile-account]" : "[data-account-menu]",
+    );
+    if (width < 1024) {
+      await page
+        .getByRole("button", { name: "Open navigation", exact: true })
+        .click();
+      await expect(menu.locator("[data-account-greeting]")).toHaveText(
+        user.name,
+      );
+    } else {
+      await expect(menu.locator("summary")).toHaveAccessibleName(
+        `Account for ${user.name}`,
+      );
+      await menu.locator("summary").click();
+    }
     await expect(menu).toContainText(user.email);
     await menu.getByRole("link", { name: "Account", exact: true }).click();
     await expect(page).toHaveURL(/\/volunteer\/account$/);
@@ -434,10 +448,21 @@ test("account navigation and profile controls are usable on desktop and mobile",
         () => document.documentElement.scrollWidth > innerWidth,
       ),
     ).toBe(false);
-    await page.getByRole("link", { name: "Events", exact: true }).click();
+    if (width < 1024)
+      await page
+        .getByRole("button", { name: "Open navigation", exact: true })
+        .click();
+    await page
+      .getByRole("navigation", {
+        name: width < 1024 ? "Mobile navigation" : "Primary navigation",
+      })
+      .getByRole("link", { name: "Volunteer", exact: true })
+      .click();
     await expect(page).toHaveURL(/\/volunteer\/?$/);
   }
-  await page.locator("[data-account-menu] summary").click();
+  await page
+    .getByRole("button", { name: "Open navigation", exact: true })
+    .click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
   expect(
@@ -509,9 +534,5 @@ test("View as simulates a verified factor without changing the user's real role 
   expect(session.user.role).toBe("volunteer");
   expect(session.user.twoFactorEnabled).toBe(true);
   expect(session.session.twoFactorVerified).toBe(true);
-  await expect(
-    page
-      .getByRole("navigation", { name: "Volunteer account" })
-      .getByRole("link", { name: "Volunteers", exact: true }),
-  ).toHaveCount(0);
+  await expect(page.locator("[data-volunteer-menu]")).toBeHidden();
 });
