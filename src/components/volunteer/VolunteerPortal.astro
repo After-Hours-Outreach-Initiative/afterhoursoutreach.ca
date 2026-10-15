@@ -15,7 +15,9 @@ import EventCard from "./EventCard.astro";
 import EventEditor from "./EventEditor.astro";
 import EventNotifications from "./EventNotifications.astro";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
+import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
+import { social } from "@/data/site";
 import "@/styles/volunteer.css";
 
 const { actor, headers, email } = await accountContext(env, Astro.request);
@@ -55,12 +57,18 @@ const filter = ["patrol", "orientation"].includes(
 
 <AccountLayout
   title="Volunteer"
-  description="Register for volunteer orientations and patrols."
+  description="Volunteer with After Hours Outreach Initiative, doing evening street outreach in Vancouver's Downtown Eastside."
   signedIn={Boolean(actor)}
   organizer={actor?.role === "organizer"}
   name={actor?.name}
   email={email}
 >
+  <h1
+    slot="heading"
+    class:list={["max-w-4xl text-blue", { "sr-only": Boolean(actor) }]}
+  >
+    Volunteer
+  </h1>
   <div
     data-event-browser
     data-event-version={eventVersion}
@@ -68,7 +76,39 @@ const filter = ["patrol", "orientation"].includes(
   >
     {
       !actor ? (
-        <SignInPanel returnTo="/volunteer" />
+        <div class="volunteer-introduction">
+          <p class="mt-8 max-w-3xl text-zinc-300">
+            Our volunteers are community advocates, people with lived experience
+            of recovery, first responders, healthcare workers, students heading
+            into healthcare, and people who simply wanted to help out at night.
+          </p>
+          <p class="mt-6 max-w-3xl text-zinc-300">
+            Patrols typically run Tuesdays and Thursdays, 8:30 PM to midnight.
+            How often we go out depends on how many volunteers are available and
+            what supplies we have on hand.
+          </p>
+          <p class="mt-6 max-w-3xl text-zinc-300">
+            Sign in or create an account below to apply or register for
+            volunteer events.
+          </p>
+
+          <SignInPanel returnTo="/volunteer" />
+
+          <p class="mt-12 max-w-3xl text-zinc-300">
+            Join our Discord for more information and to become more involved.
+          </p>
+          <div class="mt-6 flex flex-wrap gap-3.5 max-sm:flex-col">
+            <a
+              class="btn btn-primary"
+              href={social.discord}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <DiscordIcon class="btn-icon fill-current" />
+              Join Discord
+            </a>
+          </div>
+        </div>
       ) : !actor.applicationSubmitted ? (
         <a class="volunteer-application-warning" href="/apply">
           <WarningIcon class="volunteer-warning-icon" />
