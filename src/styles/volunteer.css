@@ -225,7 +225,7 @@ body:has([data-application]) {
   min-height: 54px;
   padding: 4px var(--application-contents-padding);
   border-bottom: var(--volunteer-border);
-  background: var(--color-black);
+  background: var(--color-panel-soft);
   cursor: pointer;
   list-style: none;
   font-size: 14px;
@@ -243,6 +243,7 @@ body:has([data-application]) {
   padding: 6px 10px;
   border: 1px solid #3f3f46;
   border-radius: 6px;
+  background: var(--color-black);
   color: #d4d4d8;
   white-space: nowrap;
 }
@@ -261,7 +262,8 @@ body:has([data-application]) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: #a1a1aa;
+  color: #fff;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
