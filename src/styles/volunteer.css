@@ -558,6 +558,9 @@ body:has([data-application]) {
   flex-shrink: 0;
 }
 .volunteer-portal textarea {
+  field-sizing: content;
+  /* Keep three lines of space, plus the shared padding and borders. */
+  min-height: calc(3lh + 22px);
   resize: vertical;
 }
 .volunteer-portal input[readonly] {
