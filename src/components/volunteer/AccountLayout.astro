@@ -28,7 +28,6 @@ const {
   privatePage
 >
   <section class="volunteer-portal bg-black">
-    <h1 class="sr-only">{title}</h1>
     <VolunteerNav
       organizer={organizer}
       development={import.meta.env.DEV}
@@ -89,6 +88,9 @@ const {
           </dialog>
         )
       }
+      <slot name="heading">
+        <h1 class="sr-only">{title}</h1>
+      </slot>
       <slot />
     </div>
   </section>
