@@ -226,6 +226,20 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
   await expect(page.locator("[data-email-code]")).toBeHidden();
 });
 
+test("other referral help separates the character limit from its unit", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  const form = page.locator("[data-account-profile]");
+  await form.locator('[name="heardAboutUsSources"][value="other"]').check();
+  await expect(form.locator("#help-heardAboutUsOther")).toBeVisible();
+  await expect(form.locator("#help-heardAboutUsOther")).toHaveText(
+    "Briefly describe how you found out about us (200 characters or fewer).",
+  );
+});
+
 test("application shows all required errors and saves after they are corrected", async ({
   page,
   baseURL,

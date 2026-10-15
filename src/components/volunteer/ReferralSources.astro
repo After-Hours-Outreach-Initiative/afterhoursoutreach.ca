@@ -74,8 +74,9 @@ const otherSelected = sources.includes("other");
       aria-describedby="help-heardAboutUsOther error-heardAboutUsOther"
     />
     <span class="volunteer-help" id="help-heardAboutUsOther">
-      Briefly describe how you found out about us ({heardAboutUsOtherMaxLength}
-      characters or fewer).
+      {
+        `Briefly describe how you found out about us (${heardAboutUsOtherMaxLength} characters or fewer).`
+      }
     </span>
     <FieldError
       field="heardAboutUsOther"
