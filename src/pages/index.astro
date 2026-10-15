@@ -1,6 +1,5 @@
 ---
 import { Image } from "astro:assets";
-import EventTeaser from "@/components/volunteer/EventTeaser.astro";
 import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
 ---
@@ -27,7 +26,6 @@ import outreachTeam from "@/assets/outreach-team.jpg";
         </p>
         <div class="mt-9 flex flex-wrap gap-3.5 max-sm:flex-col">
           <a class="btn btn-primary" href="/volunteer">Volunteer with us</a>
-          <a class="btn btn-subtle" href="#events">See upcoming events</a>
         </div>
       </div>
 
@@ -43,33 +41,6 @@ import outreachTeam from "@/assets/outreach-team.jpg";
           loading="eager"
         />
       </div>
-    </div>
-  </section>
-
-  <section
-    class="scroll-mt-19 bg-black text-white lg:scroll-mt-22"
-    id="events"
-    aria-labelledby="events-heading"
-  >
-    <div
-      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
-    >
-      <h2 class="max-w-3xl" id="events-heading">Upcoming events</h2>
-
-      <p class="mt-6 max-w-3xl text-xl">
-        Complete your volunteer application and wait for organizer approval to
-        view upcoming orientations and patrols.
-      </p>
-
-      <div class="mt-10">
-        <EventTeaser />
-      </div>
-
-      <p class="mt-8">
-        <a class="text-lg text-blue underline" href="/volunteer">
-          Go to the volunteer page
-        </a>
-      </p>
     </div>
   </section>
 </Layout>
