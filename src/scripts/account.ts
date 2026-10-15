@@ -8,6 +8,7 @@ import {
   initApplicationReview,
 } from "./application-review";
 import { initApplicationSections } from "./application-sections";
+import { initPhoneInputs } from "./phone-input";
 import {
   clearApplicationDraft,
   initApplicationDraft,
@@ -66,6 +67,7 @@ function form(
       else if (element.dataset.profileUserId)
         clearApplicationDraft(element.dataset.profileUserId);
       initApplicationSections(element);
+      initPhoneInputs(element);
       initBirthDate(element);
       initMedicCertifications(element);
       initRelevantTraining(element);

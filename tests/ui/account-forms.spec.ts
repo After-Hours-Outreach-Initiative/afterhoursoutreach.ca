@@ -240,6 +240,125 @@ test("other referral help separates the character limit from its unit", async ({
   );
 });
 
+test("both phone inputs format typing, paste and edits without trapping the caret", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  const form = page.locator("[data-account-profile]");
+  for (const name of ["phone", "emergencyPhone"]) {
+    const input = form.locator(`[name="${name}"]`);
+    await input.pressSequentially("6045");
+    await expect(input).toHaveValue("604-5");
+    await input.pressSequentially("550100");
+    await expect(input).toHaveValue("604-555-0100");
+    await expect(input).toBeFocused();
+    expect(
+      await input.evaluate((field: HTMLInputElement) => field.selectionStart),
+    ).toBe(12);
+
+    // Browser insertion follows the same input path as paste/autofill.
+    await input.selectText();
+    await page.keyboard.insertText("+1 (604) 555.0199 x123");
+    await expect(input).toHaveValue("+1-604-555-0199 x123");
+
+    await input.fill("6045550100");
+    await input.evaluate((field: HTMLInputElement) =>
+      field.setSelectionRange(4, 4),
+    );
+    await input.press("Backspace");
+    await expect(input).toHaveValue("605-550-100");
+    expect(
+      await input.evaluate((field: HTMLInputElement) => field.selectionStart),
+    ).toBe(2);
+    await input.pressSequentially("4");
+    await expect(input).toHaveValue("604-555-0100");
+    expect(
+      await input.evaluate((field: HTMLInputElement) => field.selectionStart),
+    ).toBe(3);
+
+    await input.press("Delete");
+    await expect(input).toHaveValue("604-550-100");
+    await input.pressSequentially("5");
+    await expect(input).toHaveValue("604-555-0100");
+    expect(
+      await input.evaluate((field: HTMLInputElement) => field.selectionStart),
+    ).toBe(5);
+
+    await input.evaluate((field: HTMLInputElement) =>
+      field.setSelectionRange(4, 7),
+    );
+    await input.pressSequentially("777");
+    await expect(input).toHaveValue("604-777-0100");
+    await input.fill("+44 20 7946 0958");
+    await expect(input).toHaveValue("+44 20 7946 0958");
+    await input.fill("+44-20-7946-0958");
+    await input.evaluate((field: HTMLInputElement) =>
+      field.setSelectionRange(4, 4),
+    );
+    await input.press("Backspace");
+    await expect(input).toHaveValue("+4420-7946-0958");
+    await input.fill("");
+    await input.pressSequentially("6045550100");
+    for (let count = 0; count < 10; count++) await input.press("Backspace");
+    await expect(input).toHaveValue("");
+  }
+});
+
+test("formatted phones survive draft reloads and profile saves and resets", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  const form = page.locator("[data-account-profile]");
+  const phone = form.locator('[name="phone"]');
+  const emergency = form.locator('[name="emergencyPhone"]');
+  await phone.fill("6045550100");
+  await emergency.fill("7785550101");
+  await page.reload();
+  await expect(phone).toHaveValue("604-555-0100");
+  await expect(emergency).toHaveValue("778-555-0101");
+
+  const submitted = await page.request.post("/api/v1/account/profile", {
+    headers: { origin: baseURL! },
+    data: {
+      ...sampleAnswers,
+      phone: "6045550100",
+      emergencyPhone: "6045550101",
+      codeOfConductAccepted: true,
+    },
+  });
+  expect(submitted.status(), await submitted.text()).toBe(200);
+  await page.goto("/volunteer/account");
+  const save = form.getByRole("button", { name: "Save profile" });
+  await expect(phone).toHaveValue("604-555-0100");
+  await expect(emergency).toHaveValue("604-555-0101");
+  await expect(save).toBeDisabled();
+  await phone.fill("6045550100");
+  await expect(save).toBeDisabled();
+  await phone.fill("7785550199");
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(phone).toHaveValue("604-555-0100");
+  await expect(save).toBeDisabled();
+  await phone.fill("7785550199");
+  await emergency.fill("+1 (604) 555-0199 x123");
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveText(
+    "Profile saved.",
+  );
+  await expect(save).toBeDisabled();
+  await page.reload();
+  await expect(phone).toHaveValue("778-555-0199");
+  await expect(emergency).toHaveValue("+1-604-555-0199 x123");
+  await phone.fill("6045550123");
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(phone).toHaveValue("778-555-0199");
+  await expect(save).toBeDisabled();
+});
+
 test("application shows all required errors and saves after they are corrected", async ({
   page,
   baseURL,
