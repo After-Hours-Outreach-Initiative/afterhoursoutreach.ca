@@ -39,56 +39,8 @@ import { organization } from "@/data/organization";
 
       <nav
         class="mt-8 flex flex-col items-start gap-3 text-base text-zinc-300"
-        aria-label="Contact and social media"
+        aria-label="Contact"
       >
-        <a
-          class="inline-flex items-center gap-2.5 hover:text-white"
-          href={social.instagram}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <svg
-            class="size-[1.25em] shrink-0 text-blue"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="5"></rect>
-            <circle cx="12" cy="12" r="4"></circle>
-            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"
-            ></circle>
-          </svg>
-          Instagram</a
-        >
-        <a
-          class="inline-flex items-center gap-2.5 hover:text-white"
-          href={social.discord}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <DiscordIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
-          Discord</a
-        >
-        <a
-          class="inline-flex items-center gap-2.5 hover:text-white"
-          href={social.linkedin}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <LinkedInIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
-          LinkedIn</a
-        >
-        <a
-          class="inline-flex items-center gap-2.5 hover:text-white"
-          href={social.facebook}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <FacebookIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
-          Facebook</a
-        >
         <a
           class="inline-flex items-center gap-2.5 hover:text-white"
           href={`mailto:${contactEmail}`}
@@ -156,24 +108,61 @@ import { organization } from "@/data/organization";
     </div>
 
     <div>
-      <h2 class="m-0 text-base text-white">Non-profit information</h2>
+      <h2 class="m-0 text-base text-white">Socials</h2>
 
-      <table class="mt-4 text-base leading-7">
-        <tbody>
-          <tr>
-            <th class="pr-6 text-left font-normal text-zinc-400" scope="row"
-              >Incorporation No.</th
-            >
-            <td class="text-zinc-300">{organization.incorporationNumber}</td>
-          </tr>
-          <tr>
-            <th class="pr-6 text-left font-normal text-zinc-400" scope="row"
-              >Business No.</th
-            >
-            <td class="text-zinc-300">{organization.businessNumber}</td>
-          </tr>
-        </tbody>
-      </table>
+      <nav
+        class="mt-4 flex flex-col items-start gap-3 text-base text-zinc-300"
+        aria-label="Social media"
+      >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={social.instagram}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <svg
+            class="size-[1.25em] shrink-0 text-blue"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="5"></rect>
+            <circle cx="12" cy="12" r="4"></circle>
+            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"
+            ></circle>
+          </svg>
+          Instagram</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={social.discord}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <DiscordIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
+          Discord</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={social.linkedin}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <LinkedInIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
+          LinkedIn</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={social.facebook}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <FacebookIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
+          Facebook</a
+        >
+      </nav>
     </div>
   </div>
 
