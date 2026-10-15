@@ -1,11 +1,17 @@
 import { authClient, showSecondFactor } from "./auth-client";
+import { signOut } from "./sign-out";
 import { actionFragment, loadActionPage } from "./action-page";
 import { applicationDisplayName } from "../data/application";
+import { accountGreeting } from "../data/account-navigation";
 import {
   applicationSubmissionValues,
   initApplicationReview,
 } from "./application-review";
 import { initApplicationSections } from "./application-sections";
+import {
+  clearApplicationDraft,
+  initApplicationDraft,
+} from "./application-draft";
 import type { SignInEmail } from "../server/auth/services";
 import {
   accountErrorMessage,
@@ -25,24 +31,10 @@ if (import.meta.env.DEV) {
   );
 }
 
-const accountMenu = document.querySelector<HTMLDetailsElement>(
-  "[data-account-menu]",
-);
-if (accountMenu) {
-  document.addEventListener("click", (event) => {
-    if (
-      accountMenu.open &&
-      event.target instanceof Node &&
-      !accountMenu.contains(event.target)
-    )
-      accountMenu.open = false;
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || !accountMenu.open) return;
-    accountMenu.open = false;
-    accountMenu.querySelector<HTMLElement>("summary")?.focus();
-  });
-}
+const applicationDrafts = new WeakMap<
+  HTMLFormElement,
+  NonNullable<ReturnType<typeof initApplicationDraft>>
+>();
 
 // Volunteer profile and session-ID endpoints are application APIs, not auth routes.
 async function post(path: string, body: object) {
@@ -68,6 +60,11 @@ function form(
   >();
   const initialize = (element: HTMLFormElement) => {
     if (!initialized.has(element)) {
+      // Restore before conditional-field initialization can clear hidden answers.
+      const draft = initApplicationDraft(element);
+      if (draft) applicationDrafts.set(element, draft);
+      else if (element.dataset.profileUserId)
+        clearApplicationDraft(element.dataset.profileUserId);
       initApplicationSections(element);
       initBirthDate(element);
       initMedicCertifications(element);
@@ -75,6 +72,7 @@ function form(
       initReferralSources(element);
       initMotivationWordLimit(element);
       initApplicationReview(element);
+      draft?.start();
       initialized.set(
         element,
         element.hasAttribute("data-save-changes")
@@ -311,29 +309,41 @@ form("[data-second-factor]", async (_element, values) => {
 });
 
 form("[data-account-profile]", async (element, values) => {
-  const body = Object.fromEntries(
-    [...values].filter(
-      ([key]) =>
-        key !== "teams" &&
-        key !== "certifications" &&
-        key !== "training" &&
-        key !== "heardAboutUsSources" &&
-        key !== "codeOfConductAccepted",
-    ),
-  );
-  const result = await post("/api/v1/account/profile", {
-    ...body,
-    teams: values.getAll("teams"),
-    certifications: values.getAll("certifications"),
-    training: values.getAll("training"),
-    ...(element.hasAttribute("data-application") && {
-      heardAboutUsSources: values.getAll("heardAboutUsSources"),
-      heardAboutUsOther: values.getAll("heardAboutUsSources").includes("other")
-        ? String(values.get("heardAboutUsOther") ?? "")
-        : "",
-      codeOfConductAccepted: values.get("codeOfConductAccepted") === "true",
-    }),
-  });
+  const draft = applicationDrafts.get(element);
+  let result: Awaited<ReturnType<typeof post>>;
+  try {
+    await draft?.beforeSubmit();
+    const body = Object.fromEntries(
+      [...values].filter(
+        ([key]) =>
+          key !== "teams" &&
+          key !== "certifications" &&
+          key !== "training" &&
+          key !== "heardAboutUsSources" &&
+          key !== "codeOfConductAccepted",
+      ),
+    );
+    result = await post("/api/v1/account/profile", {
+      ...body,
+      teams: values.getAll("teams"),
+      certifications: values.getAll("certifications"),
+      training: values.getAll("training"),
+      ...(element.hasAttribute("data-application") && {
+        applicationUserId: element.dataset.profileUserId,
+        heardAboutUsSources: values.getAll("heardAboutUsSources"),
+        heardAboutUsOther: values
+          .getAll("heardAboutUsSources")
+          .includes("other")
+          ? String(values.get("heardAboutUsOther") ?? "")
+          : "",
+        codeOfConductAccepted: values.get("codeOfConductAccepted") === "true",
+      }),
+    });
+    draft?.submitted();
+  } catch (error) {
+    draft?.resume();
+    throw error;
+  }
   const menuName = document.querySelector<HTMLElement>(
     "[data-account-menu-name]",
   );
@@ -345,6 +355,21 @@ form("[data-account-profile]", async (element, values) => {
         lastName: String(values.get("lastName") ?? ""),
         preferredName: String(values.get("preferredName") ?? ""),
       }) || "Your account";
+  const name = accountGreeting({
+    firstName: String(values.get("firstName") ?? ""),
+    preferredName: String(values.get("preferredName") ?? ""),
+  });
+  for (const greeting of document.querySelectorAll<HTMLElement>(
+    "[data-account-greeting]",
+  )) {
+    greeting.textContent = name;
+    greeting
+      .closest("summary")
+      ?.setAttribute(
+        "aria-label",
+        name === "Account" ? "Account" : `Account for ${name}`,
+      );
+  }
   message(element, result.message || "Profile saved.", "success");
   if (element.hasAttribute("data-application"))
     location.assign(result.next ?? "/volunteer/account");
@@ -416,7 +441,18 @@ form("[data-email-change-confirm]", async (element, values) => {
 });
 
 form("[data-sign-out]", async () => {
-  await authClient.signOut();
+  const application = document.querySelector<HTMLFormElement>(
+    "[data-account-profile][data-application]",
+  );
+  const draft = application ? applicationDrafts.get(application) : undefined;
+  if (draft && !(await draft.beforeSignOut())) return;
+  try {
+    await signOut();
+  } catch (error) {
+    draft?.resume();
+    throw error;
+  }
+  draft?.signedOut();
   location.assign("/volunteer/sign-in");
 });
 

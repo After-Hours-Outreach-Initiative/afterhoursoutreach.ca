@@ -3,6 +3,17 @@ import { test } from "vitest";
 import { env } from "cloudflare:workers";
 import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
+import {
+  loadApplicationDraft,
+  saveApplicationDraft,
+} from "../src/server/db/application-drafts";
+import { hasApplied, saveProfile } from "../src/server/db/profiles";
+import type { Actor } from "../src/server/db/access";
+import {
+  applicationDraftAnswersSchema,
+  draftProfileValues,
+} from "../src/data/application-draft";
+import { RequestError } from "../src/server/http";
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -75,4 +86,134 @@ test("Drizzle and capacity constraints work in the D1 runtime", async () => {
     .prepare("SELECT count(*) AS count FROM signup WHERE status = 'confirmed'")
     .first<{ count: number }>();
   assert.equal(count?.count, 1);
+});
+
+async function draftActor(id = "draft-volunteer"): Promise<Actor> {
+  await env.DB.prepare(
+    "INSERT INTO user (id, name, email, email_verified, created_at, updated_at) VALUES (?, 'Unsubmitted', ?, 1, 0, 0)",
+  )
+    .bind(id, `${id}@example.org`)
+    .run();
+  await env.DB.prepare(
+    "INSERT INTO session (id, user_id, token, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0)",
+  )
+    .bind(`${id}-session`, id, `${id}-token`, Date.now() + 3_600_000)
+    .run();
+  return {
+    id,
+    name: "Unsubmitted",
+    role: "volunteer",
+    sessionId: `${id}-session`,
+    twoFactorEnabled: false,
+    twoFactorVerified: false,
+    applicationSubmitted: false,
+    active: false,
+    applicationApproved: false,
+    patrolApproved: false,
+  };
+}
+
+const draftInput = (actor: Actor, revision: string | null = null) => ({
+  version: 1,
+  userId: actor.id,
+  revision,
+  answers: { firstName: "  Draft name ", birthDate: "2020-01-01" },
+});
+const statusError = (status: number) => (error: unknown) =>
+  error instanceof RequestError && error.status === status;
+
+test("D1 saves partial private drafts without submitting, approving or auditing them", async () => {
+  const actor = await draftActor();
+  assert.equal(await loadApplicationDraft(env.DB, actor.id), null);
+  const saved = await saveApplicationDraft(env.DB, actor, draftInput(actor));
+  assert.deepEqual(await loadApplicationDraft(env.DB, actor.id), saved);
+  assert.equal(saved.answers.firstName, "  Draft name ");
+  assert.equal(await hasApplied(env.DB, actor.id), false);
+  assert.equal(
+    await env.DB.prepare("SELECT 1 FROM volunteer_status").first(),
+    null,
+  );
+  assert.equal(await env.DB.prepare("SELECT 1 FROM audit_log").first(), null);
+  assert.equal(
+    await env.DB.prepare("SELECT name FROM user WHERE id=?")
+      .bind(actor.id)
+      .first("name"),
+    "Unsubmitted",
+  );
+});
+
+test("D1 draft revisions reject stale/concurrent writers and recheck session ownership", async () => {
+  const actor = await draftActor();
+  const first = await saveApplicationDraft(env.DB, actor, draftInput(actor));
+  await assert.rejects(
+    saveApplicationDraft(env.DB, actor, draftInput(actor)),
+    statusError(409),
+  );
+  const results = await Promise.allSettled([
+    saveApplicationDraft(env.DB, actor, {
+      ...draftInput(actor, first.revision),
+      answers: { firstName: "Device one" },
+    }),
+    saveApplicationDraft(env.DB, actor, {
+      ...draftInput(actor, first.revision),
+      answers: { firstName: "Device two" },
+    }),
+  ]);
+  assert.equal(
+    results.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  await assert.rejects(
+    saveApplicationDraft(env.DB, actor, {
+      ...draftInput(actor),
+      userId: "another-user",
+    }),
+    statusError(403),
+  );
+  await env.DB.prepare("DELETE FROM session WHERE id=?")
+    .bind(actor.sessionId)
+    .run();
+  const latest = await loadApplicationDraft(env.DB, actor.id);
+  await assert.rejects(
+    saveApplicationDraft(env.DB, actor, draftInput(actor, latest!.revision)),
+    statusError(401),
+  );
+  assert.deepEqual(await loadApplicationDraft(env.DB, actor.id), latest);
+});
+
+test("submission atomically removes drafts; failed submissions retain them and late autosaves cannot recreate them", async () => {
+  const actor = await draftActor();
+  const saved = await saveApplicationDraft(env.DB, actor, draftInput(actor));
+  await assert.rejects(saveProfile(env.DB, actor.id, {}), statusError(400));
+  assert.deepEqual(await loadApplicationDraft(env.DB, actor.id), saved);
+  const answers = draftProfileValues(
+    applicationDraftAnswersSchema.parse({
+      firstName: "Draft",
+      lastName: "Volunteer",
+      phone: "604-555-0100",
+      birthDate: "1995-01-01",
+      emergencyName: "Contact",
+      emergencyPhone: "604-555-0101",
+      emergencyRelationship: "Friend",
+      heardAboutUsSources: ["internet"],
+      motivation: "I want to help.",
+    }),
+  );
+  await saveProfile(env.DB, actor.id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
+  assert.equal(await loadApplicationDraft(env.DB, actor.id), null);
+  for (const revision of [saved.revision, null])
+    await assert.rejects(
+      saveApplicationDraft(env.DB, actor, draftInput(actor, revision)),
+      statusError(410),
+    );
+});
+
+test("deleting an account cascades to its private application draft", async () => {
+  const actor = await draftActor();
+  await saveApplicationDraft(env.DB, actor, draftInput(actor));
+  await env.DB.prepare("DELETE FROM user WHERE id=?").bind(actor.id).run();
+  assert.equal(await loadApplicationDraft(env.DB, actor.id), null);
 });

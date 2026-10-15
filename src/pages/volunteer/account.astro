@@ -5,6 +5,7 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import FieldError from "@/components/FieldError.astro";
+import { accountGreeting } from "@/data/account-navigation";
 import {
   authBindingsForRequest,
   createAuth,
@@ -22,6 +23,7 @@ import {
 export const prerender = false;
 let values: ApplicationAnswers | null = null;
 let email = "";
+let userId = "";
 let currentId = "";
 let twoFactorEnabled = false;
 let organizer = false;
@@ -43,6 +45,7 @@ try {
   values = await loadProfile(env.DB, current.user.id);
   if (!values) return Astro.redirect("/apply");
   email = current.user.email;
+  userId = current.user.id;
   const { sessionConfig } = await auth.$context;
   emailNeedsSignIn =
     sessionConfig.freshAge !== 0 &&
@@ -91,6 +94,7 @@ try {
   signedIn
   organizer={organizer}
   name={values ? applicationDisplayName(values) : undefined}
+  greetingName={accountGreeting(values)}
   email={email}
 >
   {
@@ -109,7 +113,7 @@ try {
   }
   <section class="volunteer-panel">
     <h2>Your profile</h2>
-    <AccountProfileForm email={email} values={values} />
+    <AccountProfileForm email={email} values={values} userId={userId} />
   </section>
   <section class="volunteer-panel">
     <h2>Account settings</h2>

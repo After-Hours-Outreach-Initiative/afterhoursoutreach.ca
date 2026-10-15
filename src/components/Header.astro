@@ -1,16 +1,40 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import MoonIcon from "@/components/icons/MoonIcon.astro";
+import AccountIcon from "@/components/icons/AccountIcon.astro";
 import { navLinks, social } from "@/data/site";
+import { accountGreeting } from "@/data/account-navigation";
+import "@/styles/header.css";
 
+interface Props {
+  signedIn: boolean;
+  organizer?: boolean;
+  name?: string;
+  greetingName?: string;
+  email?: string;
+}
+const {
+  signedIn,
+  organizer = false,
+  name,
+  greetingName = accountGreeting(undefined, name),
+  email,
+} = Astro.props;
 const { pathname } = Astro.url;
+const current = pathname.replace(/\/$/, "");
 const isCurrent = (href: string) =>
-  pathname === href || pathname === `${href}/`;
+  current === href ||
+  (href === "/volunteer/volunteers" && current.startsWith(`${href}/`));
+const volunteerLinks = [
+  { label: "Events", href: "/volunteer" },
+  { label: "Volunteers", href: "/volunteer/volunteers" },
+];
+const accountPage = current === "/volunteer/account" || current === "/apply";
 ---
 
-<header class="sticky top-0 z-50 bg-black text-white">
+<header class="site-header sticky top-0 z-50 bg-black text-white">
   <div
-    class="relative mx-auto flex min-h-22 w-full max-w-[1248px] items-center gap-10 px-6 max-sm:min-h-19 max-sm:px-4"
+    class="relative mx-auto flex min-h-22 w-full max-w-[1248px] items-center gap-6 px-6 max-lg:gap-3 max-sm:min-h-19 max-sm:gap-2 max-sm:px-4"
   >
     <a
       class="flex shrink-0 items-center gap-3.5"
@@ -27,24 +51,70 @@ const isCurrent = (href: string) =>
     </a>
 
     <nav
-      class="ml-auto hidden items-center gap-8 lg:flex"
+      class="ml-auto hidden items-center gap-6 lg:flex"
       aria-label="Primary navigation"
     >
       {
         navLinks.map((link) => (
-          <a
-            class="py-2.5 text-base font-medium text-zinc-300 transition-colors hover:text-white aria-[current=page]:text-white"
-            href={link.href}
-            aria-current={isCurrent(link.href) ? "page" : undefined}
-          >
-            {link.label}
-          </a>
+          <Fragment>
+            <a
+              class="header-link"
+              href={link.href}
+              aria-current={isCurrent(link.href) ? "page" : undefined}
+              data-volunteer-link={link.href === "/volunteer" ? "" : undefined}
+              hidden={link.href === "/volunteer" && organizer}
+            >
+              {link.label}
+            </a>
+            {link.href === "/volunteer" && (
+              <details
+                class="header-menu"
+                data-header-menu
+                data-volunteer-menu
+                hidden={!organizer}
+              >
+                <summary
+                  class="header-link"
+                  role="button"
+                  aria-expanded="false"
+                >
+                  Volunteer
+                  <svg
+                    class="header-chevron"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </summary>
+                <ul class="header-dropdown header-volunteer-dropdown">
+                  {volunteerLinks.map((child) => (
+                    <li>
+                      <a
+                        href={child.href}
+                        aria-current={
+                          isCurrent(child.href) ? "page" : undefined
+                        }
+                      >
+                        {child.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </Fragment>
         ))
       }
     </nav>
 
     <a
       class="btn btn-primary max-lg:hidden"
+      data-header-discord
+      hidden={signedIn}
       href={social.discord}
       target="_blank"
       rel="noreferrer"
@@ -53,10 +123,84 @@ const isCurrent = (href: string) =>
       Join Discord
     </a>
 
-    <details class="mobile-nav group ml-auto lg:hidden">
+    <nav
+      class="hidden shrink-0 lg:block"
+      aria-label="Volunteer account"
+      data-header-account
+      hidden={!signedIn}
+    >
+      <details
+        class="header-menu"
+        data-header-menu
+        data-account-menu={signedIn ? "" : undefined}
+      >
+        <summary
+          class="header-account-toggle"
+          role="button"
+          aria-label={greetingName === "Account"
+            ? "Account"
+            : `Account for ${greetingName}`}
+          aria-expanded="false"
+          data-current={accountPage ? "true" : undefined}
+        >
+          <span class="header-account-icon"
+            ><AccountIcon class="size-5 shrink-0" /></span
+          >
+          <span class="header-account-label" data-account-greeting
+            >{greetingName}</span
+          >
+          <svg
+            class="header-chevron"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </summary>
+        <div class="header-dropdown header-account-dropdown">
+          <div class="header-account-identity">
+            <strong
+              class="header-account-name"
+              data-account-menu-name={signedIn ? "" : undefined}
+              >{name?.trim() || "Your account"}</strong
+            >
+            <p
+              class="header-account-email"
+              data-account-email={signedIn ? "" : undefined}
+            >
+              {email}
+            </p>
+          </div>
+          <a
+            href="/volunteer/account"
+            aria-current={accountPage ? "page" : undefined}>Account</a
+          >
+          <form data-sign-out action="/api/v1/auth/sign-out" method="post">
+            <button type="submit">Sign out</button>
+            <p
+              class="header-account-message"
+              data-form-message
+              role="status"
+              hidden
+            >
+            </p>
+          </form>
+        </div>
+      </details>
+    </nav>
+
+    <details
+      class="mobile-nav group ml-auto shrink-0 lg:hidden"
+      data-header-menu
+    >
       <summary
         class="flex size-12 cursor-pointer list-none flex-col items-center justify-center gap-2 rounded-lg"
         aria-label="Open navigation"
+        role="button"
+        aria-expanded="false"
       >
         <span
           class="h-0.5 w-7 bg-white transition-transform group-open:translate-y-2.5 group-open:rotate-45"
@@ -68,22 +212,97 @@ const isCurrent = (href: string) =>
         ></span>
       </summary>
       <nav
-        class="absolute inset-x-0 top-full flex w-full flex-col border-y border-zinc-600 bg-ink"
+        class="header-mobile-panel absolute inset-x-0 top-full w-full bg-ink"
         aria-label="Mobile navigation"
       >
-        {
-          navLinks.map((link) => (
-            <a
-              class="border-b border-zinc-800 px-5 py-4 text-base"
-              href={link.href}
-              aria-current={isCurrent(link.href) ? "page" : undefined}
+        <ul class="header-mobile-links" aria-label="Site pages">
+          {
+            navLinks.map((link) => (
+              <li>
+                <a
+                  class="header-mobile-link"
+                  href={link.href}
+                  aria-current={isCurrent(link.href) ? "page" : undefined}
+                >
+                  {link.label}
+                </a>
+                {link.href === "/volunteer" && (
+                  <ul
+                    class="header-mobile-children"
+                    aria-label="Volunteer pages"
+                    data-volunteer-children
+                    hidden={!organizer}
+                  >
+                    {volunteerLinks.map((child) => (
+                      <li>
+                        <a
+                          class="header-mobile-link"
+                          href={child.href}
+                          aria-current={
+                            isCurrent(child.href) ? "page" : undefined
+                          }
+                        >
+                          {child.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))
+          }
+        </ul>
+        <section
+          class="header-mobile-account"
+          aria-label="Your account"
+          data-mobile-account
+          hidden={!signedIn}
+        >
+          <div class="header-mobile-account-heading">
+            <span class="header-account-icon"
+              ><AccountIcon class="size-5 shrink-0" /></span
             >
-              {link.label}
-            </a>
-          ))
-        }
+            <div class="header-mobile-account-details">
+              <span class="header-mobile-account-name" data-account-greeting
+                >{greetingName}</span
+              >
+              <p
+                class="header-account-email"
+                data-account-email={signedIn ? "" : undefined}
+              >
+                {email}
+              </p>
+            </div>
+          </div>
+          <ul class="header-mobile-children" aria-label="Account actions">
+            <li>
+              <a
+                class="header-mobile-link"
+                href="/volunteer/account"
+                aria-current={accountPage ? "page" : undefined}>Account</a
+              >
+            </li>
+            <li>
+              <form data-sign-out action="/api/v1/auth/sign-out" method="post">
+                <button
+                  class="header-mobile-link header-mobile-sign-out"
+                  type="submit">Sign out</button
+                >
+                <p
+                  class="header-account-message"
+                  data-form-message
+                  role="status"
+                  hidden
+                >
+                </p>
+              </form>
+            </li>
+          </ul>
+        </section>
         <a
           class="flex items-center gap-2.5 bg-blue px-5 py-4 text-base font-bold"
+          data-header-discord
+          hidden={signedIn}
           href={social.discord}
           target="_blank"
           rel="noreferrer"
@@ -97,19 +316,5 @@ const isCurrent = (href: string) =>
 </header>
 
 <script>
-  const mobileNav = document.querySelector<HTMLDetailsElement>(".mobile-nav");
-  const mobileNavToggle = mobileNav?.querySelector("summary");
-
-  mobileNav?.addEventListener("toggle", () => {
-    mobileNavToggle?.setAttribute(
-      "aria-label",
-      mobileNav.open ? "Close navigation" : "Open navigation",
-    );
-  });
-
-  document.querySelectorAll(".mobile-nav a").forEach((link) => {
-    link.addEventListener("click", () =>
-      link.closest("details")?.removeAttribute("open"),
-    );
-  });
+  import "@/scripts/header";
 </script>

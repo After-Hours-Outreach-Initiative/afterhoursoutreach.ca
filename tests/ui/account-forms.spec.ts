@@ -275,7 +275,7 @@ test("application shows all required errors and saves after they are corrected",
     form
       .getByRole("group", { name: "About volunteering", exact: true })
       .locator("input, textarea"),
-  ).toHaveCount(2);
+  ).toHaveCount(6);
   const training = form.getByRole("group", {
     name: "Training and safety",
     exact: true,
@@ -1358,6 +1358,7 @@ test("email changes verify the new address in place and preserve unsaved profile
     loadingLabel: "Changing email…",
   });
   await expect(page.locator("[data-account-email]")).toHaveText([
+    newEmail,
     newEmail,
     newEmail,
   ]);

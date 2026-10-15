@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { ApplicationDraftAnswers } from "../../data/application-draft";
 import {
   check,
   index,
@@ -114,6 +115,17 @@ export const authRateLimit = sqliteTable(
   },
   (table) => [index("auth_rate_limit_expiry").on(table.expires_at)],
 );
+
+// A draft is private to its owner and never counts as a submitted profile.
+export const applicationDraft = sqliteTable("application_draft", {
+  user_id: text()
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  version: integer().notNull(),
+  revision: text().notNull(),
+  answers: text({ mode: "json" }).$type<ApplicationDraftAnswers>().notNull(),
+  updated_at: timestamp().notNull(),
+});
 
 export const profile = sqliteTable("profile", {
   user_id: text()

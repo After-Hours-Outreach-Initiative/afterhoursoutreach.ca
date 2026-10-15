@@ -3,6 +3,14 @@ import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
 import donateTeam from "@/assets/donate-team.jpg";
 import { gofundmeUrl } from "@/data/site";
+import { env } from "cloudflare:workers";
+import { loadAccountNavigation } from "@/server/account-navigation";
+export const prerender = false;
+const account = await loadAccountNavigation(
+  env,
+  Astro.request,
+  Astro.response.headers,
+);
 
 const equipmentNeeds = [
   {
@@ -65,6 +73,7 @@ const equipmentNeeds = [
 ---
 
 <Layout
+  account={account}
   title="Donate | After Hours Outreach Initiative"
   description="Donate to After Hours Outreach Initiative and put supplies and emergency response gear in the hands of volunteers doing evening outreach in Vancouver's Downtown Eastside."
 >

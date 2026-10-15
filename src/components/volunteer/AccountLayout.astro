@@ -2,13 +2,14 @@
 import Layout from "@/layouts/Layout.astro";
 import "@/styles/account.css";
 import "@/styles/volunteer.css";
-import VolunteerNav from "./VolunteerNav.astro";
+import CodeIcon from "@/components/icons/CodeIcon.astro";
 interface Props {
   title: string;
   description: string;
   signedIn?: boolean;
   organizer?: boolean;
   name?: string;
+  greetingName?: string;
   email?: string;
 }
 const {
@@ -17,6 +18,7 @@ const {
   signedIn = false,
   organizer = false,
   name,
+  greetingName,
   email,
 } = Astro.props;
 ---
@@ -26,66 +28,76 @@ const {
   description={description}
   noindex
   privatePage
+  account={{ signedIn, organizer, name, greetingName, email }}
 >
-  <section class="volunteer-portal bg-black">
-    <VolunteerNav
-      organizer={organizer}
-      development={import.meta.env.DEV}
-      signedIn={signedIn}
-      name={name}
-      email={email}
-    />
+  <section class="volunteer-portal bg-black" data-account-layout>
     <div class="volunteer-wrap">
       {
         import.meta.env.DEV && (
-          <dialog
-            id="development-account-dialog"
-            class="dialog-pop volunteer-dialog"
-            data-account-switcher
-            aria-labelledby="development-account-dialog-heading"
-          >
-            <div class="volunteer-section-heading">
-              <h2 id="development-account-dialog-heading">Local development</h2>
-              <button
-                class="btn btn-quiet"
-                type="button"
-                data-close-account-switcher
-                aria-label="Close development controls"
-              >
-                Close
-              </button>
-            </div>
-            <div class="volunteer-form">
-              <div class="account-profile-switcher">
-                <p id="development-account-label">View as</p>
-                <div
-                  class="account-profile-buttons"
-                  data-view-as
-                  role="group"
-                  aria-labelledby="development-account-label"
-                  aria-busy="true"
+          <Fragment>
+            <button
+              class="fixed right-4 bottom-4 z-40 flex size-11 items-center justify-center rounded-lg border border-zinc-600 bg-ink text-amber-300 hover:border-white"
+              type="button"
+              data-open-account-switcher
+              aria-label="Development controls"
+              title="Development controls"
+              aria-haspopup="dialog"
+              aria-controls="development-account-dialog"
+              aria-expanded="false"
+            >
+              <CodeIcon class="size-5" />
+            </button>
+            <dialog
+              id="development-account-dialog"
+              class="dialog-pop volunteer-dialog"
+              data-account-switcher
+              aria-labelledby="development-account-dialog-heading"
+            >
+              <div class="volunteer-section-heading">
+                <h2 id="development-account-dialog-heading">
+                  Local development
+                </h2>
+                <button
+                  class="btn btn-quiet"
+                  type="button"
+                  data-close-account-switcher
+                  aria-label="Close development controls"
                 >
-                  <button
-                    class="btn btn-quiet account-profile-button"
-                    type="button"
-                    data-switch-user=""
-                    aria-pressed="false"
-                    disabled
-                  >
-                    Visitor
-                  </button>
-                </div>
+                  Close
+                </button>
               </div>
-              <a
-                class="btn btn-quiet"
-                href="/volunteer/sign-in"
-                data-create-account
-              >
-                Create an account
-              </a>
-              <p data-switch-message role="status" hidden />
-            </div>
-          </dialog>
+              <div class="volunteer-form">
+                <div class="account-profile-switcher">
+                  <p id="development-account-label">View as</p>
+                  <div
+                    class="account-profile-buttons"
+                    data-view-as
+                    role="group"
+                    aria-labelledby="development-account-label"
+                    aria-busy="true"
+                  >
+                    <button
+                      class="btn btn-quiet account-profile-button"
+                      type="button"
+                      data-switch-user=""
+                      aria-pressed="false"
+                      disabled
+                    >
+                      Visitor
+                    </button>
+                  </div>
+                </div>
+                <a
+                  class="btn btn-quiet"
+                  href="/volunteer/sign-in"
+                  data-create-account
+                >
+                  Create an account
+                </a>
+                <p data-switch-message role="status" hidden />
+              </div>
+            </dialog>
+          </Fragment>
         )
       }
       <slot name="heading">

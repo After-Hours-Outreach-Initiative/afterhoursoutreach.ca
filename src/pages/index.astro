@@ -2,11 +2,20 @@
 import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
+import { env } from "cloudflare:workers";
+import { loadAccountNavigation } from "@/server/account-navigation";
+export const prerender = false;
+const account = await loadAccountNavigation(
+  env,
+  Astro.request,
+  Astro.response.headers,
+);
 ---
 
 <Layout
   title="After Hours Outreach Initiative"
   description="Volunteer-based evening street outreach providing practical care and overdose response in Vancouver's Downtown Eastside."
+  account={account}
 >
   <section class="bg-black text-white" id="top">
     <div

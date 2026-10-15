@@ -20,7 +20,10 @@ import WarningIcon from "@/components/icons/WarningIcon.astro";
 import { social } from "@/data/site";
 import "@/styles/volunteer.css";
 
-const { actor, headers, email } = await accountContext(env, Astro.request);
+const { actor, headers, email, greetingName } = await accountContext(
+  env,
+  Astro.request,
+);
 forwardCookies(headers, Astro.response.headers);
 let organizer = false;
 try {
@@ -61,6 +64,7 @@ const filter = ["patrol", "orientation"].includes(
   signedIn={Boolean(actor)}
   organizer={actor?.role === "organizer"}
   name={actor?.name}
+  greetingName={greetingName}
   email={email}
 >
   <h1

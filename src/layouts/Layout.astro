@@ -1,6 +1,7 @@
 ---
 import Footer from "@/components/Footer.astro";
 import Header from "@/components/Header.astro";
+import type { ComponentProps } from "astro/types";
 import { Font } from "astro:assets";
 import "@/styles/tailwind.css";
 
@@ -14,6 +15,7 @@ interface Props {
   noindex?: boolean;
   /** No third-party resource preconnects on pages containing account information. */
   privatePage?: boolean;
+  account: ComponentProps<typeof Header>;
 }
 
 const {
@@ -21,6 +23,7 @@ const {
   description,
   noindex = false,
   privatePage = false,
+  account,
 } = Astro.props;
 ---
 
@@ -63,7 +66,7 @@ const {
         </aside>
       )
     }
-    <Header />
+    <Header {...account} />
 
     <main id="main-content">
       <slot />

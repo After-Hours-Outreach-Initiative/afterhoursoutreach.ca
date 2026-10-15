@@ -5,20 +5,21 @@ operations. Edit files here, not generated SQL in `drizzle/`.
 
 ## Where rules live
 
-| Source               | Responsibility                                                                                                                                        |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema.ts`          | Tables, defaults, relationships, checks, and unique indexes.                                                                                          |
-| `triggers.sql`       | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation event types, visibility, and organizer protection/bootstrap. |
-| `events.ts`          | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                        |
-| `volunteers.ts`      | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                |
-| `profiles.ts`        | Application validation and transactional profile updates.                                                                                             |
-| `access.ts`          | Verified account context and authorization, rechecked inside writes.                                                                                  |
-| `policy.ts`          | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                 |
-| `sessions.ts`        | Ownership-scoped session lookup and second-factor verification markers.                                                                               |
-| `notifications.ts`   | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                               |
-| `rate-limits.ts`     | Persistent request/email counters and cleanup.                                                                                                        |
-| `errors.ts`          | Safe translation of database invariant errors into application errors.                                                                                |
-| `index.ts`, `sql.ts` | Request-scoped Drizzle connection and shared SQL clock.                                                                                               |
+| Source                  | Responsibility                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema.ts`             | Tables, defaults, relationships, checks, and unique indexes.                                                                                          |
+| `triggers.sql`          | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation event types, visibility, and organizer protection/bootstrap. |
+| `events.ts`             | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                        |
+| `volunteers.ts`         | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                |
+| `profiles.ts`           | Application validation and transactional profile updates.                                                                                             |
+| `application-drafts.ts` | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                        |
+| `access.ts`             | Verified account context and authorization, rechecked inside writes.                                                                                  |
+| `policy.ts`             | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                 |
+| `sessions.ts`           | Ownership-scoped session lookup and second-factor verification markers.                                                                               |
+| `notifications.ts`      | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                               |
+| `rate-limits.ts`        | Persistent request/email counters and cleanup.                                                                                                        |
+| `errors.ts`             | Safe translation of database invariant errors into application errors.                                                                                |
+| `index.ts`, `sql.ts`    | Request-scoped Drizzle connection and shared SQL clock.                                                                                               |
 
 HTTP request parsing and responses remain in `src/pages/api/v1/`. Better Auth's
 integration remains in `src/server/auth/`. Email transport and delivery orchestration
@@ -55,6 +56,17 @@ inferred or backfilled. New applications require at least one choice and a
 nonblank detail of at most 200 characters for Other; unselected Other text is
 ignored. All referral columns are insert-only in profile saves, so account
 edits preserve both legacy and structured answers exactly.
+
+## Application drafts
+
+`application_draft` stores one private, versioned JSON draft per account. Draft
+validation bounds types and sizes but allows incomplete or invalid answers; it
+never records Code of Conduct acceptance, creates a profile/status, updates the
+account name, or queues notifications. The API derives ownership from the session
+and checks the client's expected user ID to protect stale tabs after account
+switching. Each write atomically checks session access, the prior revision, and
+the absence of a submitted profile. Profile submission deletes the draft in the
+same D1 batch; late autosaves cannot recreate it. User deletion cascades to drafts.
 
 ## Generated migrations
 

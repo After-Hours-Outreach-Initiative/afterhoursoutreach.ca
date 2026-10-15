@@ -1,0 +1,408 @@
+import { expect, test, type Page } from "@playwright/test";
+import {
+  createLocalAccount,
+  sampleAnswers,
+  submitLocalApplication,
+} from "../helpers/local-account";
+import {
+  applicationDraftStoragePrefix,
+  type ApplicationDraftAnswers,
+} from "../../src/data/application-draft";
+
+const endpoint = "/api/v1/account/application-draft";
+const statusSelector = "[data-draft-status]";
+const formSelector = "[data-account-profile]";
+
+async function expectDraftSaved(
+  page: Page,
+  answers: Partial<ApplicationDraftAnswers>,
+) {
+  await expect
+    .poll(
+      async () =>
+        (await (await page.request.get(endpoint)).json()).draft?.answers,
+    )
+    .toEqual(expect.objectContaining(answers));
+  await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
+}
+
+test.beforeEach(async ({ baseURL, page }) => {
+  test.skip(
+    !baseURL?.startsWith("http://localhost:"),
+    "Requires local development",
+  );
+  const ip = crypto.getRandomValues(new Uint8Array(2));
+  await page.setExtraHTTPHeaders({
+    "cf-connecting-ip": `198.18.${ip[0]}.${ip[1]}`,
+  });
+});
+
+test("browser drafts preserve incomplete answers through reload and closing the tab, then retry account saving", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  // Keepalive requests on page close can outlive Playwright's request routing.
+  // Simulate failure at fetch so even those writes cannot reach the server.
+  await context.addInitScript(() => {
+    const request = window.fetch.bind(window);
+    let offline = true;
+    window.addEventListener("draft-test-online", () => {
+      offline = false;
+      window.dispatchEvent(new Event("online"));
+    });
+    window.fetch = (input, options) => {
+      if (
+        offline &&
+        String(input).endsWith("/api/v1/account/application-draft") &&
+        options?.method === "PUT"
+      )
+        return Promise.reject(new TypeError("Simulated offline draft save"));
+      return request(input, options);
+    };
+  });
+  await page.goto("/apply");
+  const form = page.locator(formSelector);
+  await form.locator('[name="firstName"]').fill("  Unfinished name ");
+  await form.locator('[name="phone"]').fill("123");
+  await form.locator('[name="medicalConditions"]').fill("Sample medical draft");
+  await form.locator('[name="teams"][value="medic"]').check();
+  await form.locator('[name="certifications"][value="other"]').check();
+  await form.locator('[name="experience"]').fill("Unfinished other experience");
+  await form.locator('[name="teams"][value="medic"]').uncheck();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key)!).answers.firstName,
+        `${applicationDraftStoragePrefix}${id}`,
+      ),
+    )
+    .toBe("  Unfinished name ");
+  await page.reload();
+  await expect(form.locator('[name="firstName"]')).toHaveValue(
+    "  Unfinished name ",
+  );
+  await expect(form.locator('[name="phone"]')).toHaveValue("123");
+  await expect(form.locator('[name="medicalConditions"]')).toHaveValue(
+    "Sample medical draft",
+  );
+  await form.locator('[name="teams"][value="medic"]').check();
+  await expect(
+    form.locator('[name="certifications"][value="other"]'),
+  ).toBeChecked();
+  await expect(form.locator('[name="experience"]')).toHaveValue(
+    "Unfinished other experience",
+  );
+  const reopened = await context.newPage();
+  await page.close();
+  await reopened.goto("/apply");
+  await expect(reopened.locator('[name="firstName"]')).toHaveValue(
+    "  Unfinished name ",
+  );
+  await expect(reopened.locator(statusSelector)).toContainText(
+    "We could not connect",
+  );
+  await reopened.evaluate(() =>
+    window.dispatchEvent(new Event("draft-test-online")),
+  );
+  await expectDraftSaved(reopened, { firstName: "  Unfinished name " });
+});
+
+test("account drafts resume in a separate browser with no local storage and remain unsubmitted", async ({
+  page,
+  context,
+  browser,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  await page.locator('[name="firstName"]').fill("Different device");
+  await page.locator('[name="birthDate"]').fill("2020-01-01");
+  await page.locator('[name="training"][value="other"]').check();
+  await page
+    .locator('[name="otherTraining"]')
+    .fill("Still finishing training answer");
+  await expectDraftSaved(page, {
+    firstName: "Different device",
+    birthDate: "2020-01-01",
+    training: ["other"],
+    otherTraining: "Still finishing training answer",
+  });
+  const device = await browser.newContext({
+    baseURL,
+    storageState: { cookies: await context.cookies(), origins: [] },
+  });
+  try {
+    const resumed = await device.newPage();
+    await resumed.goto("/apply");
+    await expect(resumed.locator('[name="firstName"]')).toHaveValue(
+      "Different device",
+    );
+    await expect(resumed.locator('[name="firstName"]')).toHaveAttribute(
+      "required",
+      "",
+    );
+    await expect(resumed.locator('[name="lastName"]')).toHaveAttribute(
+      "required",
+      "",
+    );
+    await expect(resumed.locator('[name="birthDate"]')).toHaveValue(
+      "2020-01-01",
+    );
+    await expect(resumed.locator('[name="otherTraining"]')).toBeVisible();
+    await expect(resumed.locator('[name="otherTraining"]')).toHaveValue(
+      "Still finishing training answer",
+    );
+    await expect(
+      resumed.locator('[name="codeOfConductAccepted"]'),
+    ).not.toBeChecked();
+    expect((await (await resumed.request.get(endpoint)).json()).submitted).toBe(
+      false,
+    );
+  } finally {
+    await device.close();
+  }
+});
+
+test("edits made during a pending save are backed up immediately and saved afterward", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requests = 0;
+  await page.route(`**${endpoint}`, async (route) => {
+    if (route.request().method() === "PUT" && ++requests === 1) await pending;
+    await route.continue();
+  });
+  await page.goto("/apply");
+  await expect(
+    page.getByText("Your answers save automatically", { exact: false }),
+  ).toHaveCount(0);
+  await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
+  await page.locator('[name="firstName"]').fill("First version");
+  await expect.poll(() => requests).toBe(1);
+  await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
+  await page.locator('[name="firstName"]').fill("Latest version");
+  expect(
+    await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key)!).answers.firstName,
+      `${applicationDraftStoragePrefix}${id}`,
+    ),
+  ).toBe("Latest version");
+  release();
+  await expectDraftSaved(page, { firstName: "Latest version" });
+  await expect(
+    page.getByText("Saved to your account.", { exact: true }),
+  ).toHaveCount(0);
+});
+
+for (const keepLocal of [true, false]) {
+  test(`divergent device drafts require a choice: ${keepLocal ? "keep these answers" : "use account answers"}`, async ({
+    page,
+    baseURL,
+  }) => {
+    const { id } = await createLocalAccount(page.request, baseURL!, false);
+    await page.goto("/apply");
+    await page.locator('[name="firstName"]').fill("Original draft");
+    await expectDraftSaved(page, { firstName: "Original draft" });
+    await page.route(`**${endpoint}`, (route) =>
+      route.request().method() === "PUT" ? route.abort() : route.continue(),
+    );
+    await page.locator('[name="firstName"]').fill("Local changes");
+    const { draft } = await (await page.request.get(endpoint)).json();
+    const remote = await page.request.put(endpoint, {
+      headers: { origin: baseURL! },
+      data: {
+        userId: id,
+        version: 1,
+        revision: draft.revision,
+        answers: { ...draft.answers, firstName: "Other device" },
+      },
+    });
+    expect(remote.ok(), await remote.text()).toBe(true);
+    await page.reload();
+    await expect(page.locator('[name="firstName"]')).toHaveValue(
+      "Local changes",
+    );
+    await expect(page.locator("[data-draft-conflict]")).toBeVisible();
+    await page.unroute(`**${endpoint}`);
+    await page
+      .getByRole("button", {
+        name: keepLocal ? "Keep these answers" : "Use account answers",
+        exact: true,
+      })
+      .click();
+    await expect(page.locator("[data-draft-conflict]")).toBeHidden();
+    await expect(page.locator('[name="firstName"]')).toHaveValue(
+      keepLocal ? "Local changes" : "Other device",
+    );
+    await expectDraftSaved(page, {
+      firstName: keepLocal ? "Local changes" : "Other device",
+    });
+  });
+}
+
+test("disabled or corrupted browser storage does not block server autosave", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  await page.addInitScript((key) => {
+    localStorage.setItem(key, "not valid JSON");
+    Storage.prototype.setItem = () => {
+      throw new DOMException("Storage unavailable", "SecurityError");
+    };
+  }, `${applicationDraftStoragePrefix}${id}`);
+  await page.goto("/apply");
+  await page
+    .locator('[name="firstName"]')
+    .fill("Saved without browser storage");
+  await expect(page.locator(statusSelector)).toContainText(
+    "Browser backup is unavailable",
+  );
+  await expectDraftSaved(page, { firstName: "Saved without browser storage" });
+  await page.reload();
+  await expect(page.locator('[name="firstName"]')).toHaveValue(
+    "Saved without browser storage",
+  );
+});
+
+test("switching accounts never restores or autosaves another account's answers", async ({
+  page,
+  baseURL,
+}) => {
+  const first = await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  await page.locator('[name="firstName"]').fill("First account answers");
+  await expectDraftSaved(page, { firstName: "First account answers" });
+  const second = await createLocalAccount(page.request, baseURL!, false);
+  await page.locator('[name="firstName"]').fill("Stale tab changes");
+  await expect(page.locator(statusSelector)).toContainText(
+    "Sign in again or reload",
+  );
+  expect((await (await page.request.get(endpoint)).json()).draft).toBe(null);
+  await page.goto("/apply");
+  await expect(page.locator('[name="firstName"]')).toHaveValue("");
+  await expect(page.locator(formSelector)).toHaveAttribute(
+    "data-profile-user-id",
+    second.id,
+  );
+  expect(
+    await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key)!).answers.firstName,
+      `${applicationDraftStoragePrefix}${first.id}`,
+    ),
+  ).toBe("Stale tab changes");
+});
+
+test("resuming requires a fresh review and consent; submission clears both draft copies", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  const form = page.locator(formSelector);
+  for (const [name, value] of Object.entries(sampleAnswers)) {
+    if (typeof value !== "string") continue;
+    const field = form.locator(`[name="${name}"]`);
+    if (
+      (await field.count()) &&
+      (await field.isVisible()) &&
+      (await field.isEditable())
+    )
+      await field.fill(value);
+  }
+  await form.locator('[name="heardAboutUsSources"][value="internet"]').check();
+  await page
+    .getByRole("button", { name: "Review application", exact: true })
+    .click();
+  await form.locator('[name="codeOfConductAccepted"]').check();
+  const stored = await page.evaluate(
+    (key) => localStorage.getItem(key),
+    `${applicationDraftStoragePrefix}${id}`,
+  );
+  expect(stored).not.toContain("codeOfConductAccepted");
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Review application", exact: true }),
+  ).toBeVisible();
+  await expect(
+    form.locator('[name="codeOfConductAccepted"]'),
+  ).not.toBeChecked();
+  await submitLocalApplication(page);
+  await expect(page).toHaveURL(/\/volunteer\/account$/);
+  expect(
+    await page.evaluate(
+      (key) => localStorage.getItem(key),
+      `${applicationDraftStoragePrefix}${id}`,
+    ),
+  ).toBe(null);
+  const result = await (await page.request.get(endpoint)).json();
+  expect(result.draft).toBe(null);
+  expect(result.submitted).toBe(true);
+});
+
+test("signing out removes synced browser drafts but retains the account draft", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  await page.locator('[name="firstName"]').fill("Resume after signing out");
+  await expectDraftSaved(page, { firstName: "Resume after signing out" });
+  await page.locator("[data-account-menu] > summary").click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
+  expect(
+    await page.evaluate(
+      (key) => localStorage.getItem(key),
+      `${applicationDraftStoragePrefix}${id}`,
+    ),
+  ).toBe(null);
+  const switched = await page.request.post("/api/v1/auth/dev/switch-user", {
+    headers: { origin: baseURL! },
+    data: { userId: id },
+  });
+  expect(switched.ok()).toBe(true);
+  await page.goto("/apply");
+  await expect(page.locator('[name="firstName"]')).toHaveValue(
+    "Resume after signing out",
+  );
+});
+
+test("expired sessions keep backing up new edits and resume syncing after sign-in", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  await page.request.post("/api/v1/auth/sign-out", {
+    headers: { origin: baseURL! },
+    data: {},
+  });
+  await page
+    .locator('[name="firstName"]')
+    .fill("Before expired session warning");
+  await expect(page.locator(statusSelector)).toContainText(
+    "Sign in again or reload",
+  );
+  await page.locator('[name="firstName"]').fill("Edits after session expiry");
+  expect(
+    await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key)!).answers.firstName,
+      `${applicationDraftStoragePrefix}${id}`,
+    ),
+  ).toBe("Edits after session expiry");
+  const signedIn = await page.request.post("/api/v1/auth/dev/switch-user", {
+    headers: { origin: baseURL! },
+    data: { userId: id },
+  });
+  expect(signedIn.ok()).toBe(true);
+  await page.getByRole("button", { name: "Retry saving" }).click();
+  await expectDraftSaved(page, { firstName: "Edits after session expiry" });
+});

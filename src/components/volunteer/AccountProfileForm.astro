@@ -12,15 +12,32 @@ import ApplicationSteps from "./ApplicationSteps.astro";
 import MedicalCertifications from "./MedicalCertifications.astro";
 import RelevantTraining from "./RelevantTraining.astro";
 import ReferralSources from "./ReferralSources.astro";
+import ApplicationDraftStatus from "./ApplicationDraftStatus.astro";
+import {
+  draftProfileValues,
+  type ApplicationDraft,
+} from "@/data/application-draft";
 interface Props {
   email: string;
+  userId?: string;
   values?: ApplicationAnswers | null;
   application?: boolean;
+  draft?: ApplicationDraft | null;
 }
-const { email, values, application = false } = Astro.props;
+const {
+  email,
+  userId,
+  values: profileValues,
+  application = false,
+  draft,
+} = Astro.props;
+const values =
+  profileValues ?? (draft ? draftProfileValues(draft.answers) : null);
 const fields = application ? applicationFields : profileFields;
 const medicSelected = values?.teams.includes("medic") ?? false;
-const legacyName = Boolean(values && !values.firstName && !values.lastName);
+const legacyName = Boolean(
+  !application && values && !values.firstName && !values.lastName,
+);
 const sections = [
   { key: "personal-info", heading: "Personal info" },
   { key: "emergency-contact", heading: "Emergency contact" },
@@ -41,6 +58,10 @@ const sections = [
 <form
   data-account-profile
   data-application={application || undefined}
+  data-profile-user-id={userId}
+  data-application-draft={application
+    ? JSON.stringify(draft ?? null)
+    : undefined}
   data-save-changes={!application || undefined}
   class:list={[
     "volunteer-form",
@@ -50,6 +71,7 @@ const sections = [
   action="/api/v1/account/profile"
   method="post"
 >
+  {application && <ApplicationDraftStatus />}
   <ApplicationSteps application={application} email={email} sections={sections}>
     {
       sections.map((section) => (

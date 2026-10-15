@@ -6,7 +6,9 @@ import { createSignInOTP } from "../helpers/email-otp";
 const origin = "https://afterhoursoutreach.ca";
 const secret = "organizer-email-test-secret-12345678901234567890";
 const answers = {
-  name: "Sample Volunteer",
+  firstName: "Sample",
+  lastName: "Volunteer",
+  preferredName: "Sample Volunteer",
   pronouns: "they/them",
   phone: "604-555-0100",
   birthDate: "1995-04-12",
@@ -85,7 +87,7 @@ describe(
       const cookie = await signIn(email);
       await send(
         "/api/v1/account/profile",
-        { ...answers, name, codeOfConductAccepted: true },
+        { ...answers, preferredName: name, codeOfConductAccepted: true },
         cookie,
       );
       const session = (await (

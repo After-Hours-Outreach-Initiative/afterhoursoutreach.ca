@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "vitest";
 import { createTestHarness } from "wrangler";
 import {
@@ -8,12 +7,6 @@ import {
 } from "../../scripts/preview-event-fixtures";
 
 test("preview builds support real account features but reject development endpoints", async () => {
-  const html = readFileSync(
-    new URL("../../dist-preview/client/index.html", import.meta.url),
-    "utf8",
-  );
-  assert.match(html, /Preview · public test site/);
-
   const server = createTestHarness({
     workers: [
       {
@@ -34,6 +27,10 @@ test("preview builds support real account features but reject development endpoi
       "https://feature-login-afterhoursoutreach-ca.ivanzheng9905.workers.dev",
       "https://custom-test.example.org",
     ]) {
+      const home = await worker.fetch(origin);
+      assert.equal(home.status, 200);
+      assert.match(await home.text(), /Preview · public test site/);
+      assert.equal(home.headers.get("cache-control"), "no-store");
       const page = await worker.fetch(`${origin}/volunteer`);
       assert.equal(page.status, 200);
       assert.match(await page.text(), /Preview · public test site/);

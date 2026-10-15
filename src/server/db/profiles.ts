@@ -21,7 +21,13 @@ import {
   codeOfConductVersion,
 } from "../../data/code-of-conduct";
 import { createDatabase } from ".";
-import { profile, user, volunteerStatus, auditLog } from "./schema";
+import {
+  profile,
+  user,
+  volunteerStatus,
+  auditLog,
+  applicationDraft,
+} from "./schema";
 import { RequestError } from "../http";
 
 const shortAnswer = z.string().trim().min(1).max(200);
@@ -383,5 +389,6 @@ export async function saveProfile(
       changed_fields: changedFields,
       created_at: now,
     }),
+    db.delete(applicationDraft).where(eq(applicationDraft.user_id, userId)),
   ]);
 }

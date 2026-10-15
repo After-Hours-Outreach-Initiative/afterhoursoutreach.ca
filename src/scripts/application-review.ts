@@ -52,7 +52,7 @@ export function initApplicationReview(element: HTMLFormElement) {
     ...history.state,
     applicationStep: next,
   });
-  // A reload cannot restore the in-memory draft, so never restore a stale review.
+  // Resumed drafts always return to the answers and require a fresh review.
   history.replaceState(state("questions"), "");
   reviewButton.disabled = false;
 
@@ -158,6 +158,10 @@ export function initApplicationReview(element: HTMLFormElement) {
       }
     }
   };
+  element.addEventListener("application-draft-restored", () => {
+    history.replaceState(state("questions"), "");
+    display("questions", false);
+  });
   element.addEventListener("submit", (event) => {
     if (step === "questions") {
       event.preventDefault();

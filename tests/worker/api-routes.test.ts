@@ -26,6 +26,8 @@ test("API routes use the v1 prefix and retain private headers on workers.dev", a
       ["events", "GET", 401],
       ["auth/get-session", "GET", 200],
       ["account/profile", "POST", 401],
+      ["account/application-draft", "GET", 401],
+      ["account/application-draft", "PUT", 401],
       ["account/session", "POST", 401],
       ["events/action", "POST", 401],
       ["organizer/action", "POST", 401],
@@ -33,7 +35,7 @@ test("API routes use the v1 prefix and retain private headers on workers.dev", a
       const options = {
         method,
         headers: { origin, "content-type": "application/json" },
-        ...(method === "POST" ? { body: "{}" } : {}),
+        ...(method !== "GET" ? { body: "{}" } : {}),
         redirect: "manual" as const,
       };
       const response = await worker.fetch(`${origin}/api/v1/${path}`, options);
