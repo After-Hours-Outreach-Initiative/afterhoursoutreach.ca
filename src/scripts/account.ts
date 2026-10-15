@@ -11,6 +11,7 @@ import {
   accountErrorMessage,
   clearFormMessage,
   initAccountFormChanges,
+  initBirthDate,
   initMedicCertifications,
   initMotivationWordLimit,
   initReferralSources,
@@ -68,6 +69,7 @@ function form(
   const initialize = (element: HTMLFormElement) => {
     if (!initialized.has(element)) {
       initApplicationSections(element);
+      initBirthDate(element);
       initMedicCertifications(element);
       initRelevantTraining(element);
       initReferralSources(element);

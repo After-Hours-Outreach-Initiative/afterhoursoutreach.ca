@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { devices, expect, test } from "@playwright/test";
 import {
   createLocalAccount,
   openLocalAccountSwitcher,
@@ -16,6 +16,7 @@ import {
   certificationOptions,
   certificationQuestion,
   applicationBirthDateError,
+  latestApplicationBirthDate,
   trainingOptions,
   trainingQuestion,
 } from "../../src/data/application";
@@ -505,6 +506,53 @@ test("application shows all required errors and saves after they are corrected",
   ).toHaveValue("Updated volunteer");
 });
 
+test("mobile birth-date picker stays blank without a past calendar maximum", async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({
+    ...devices["Pixel 7"],
+    baseURL,
+  });
+  try {
+    await createLocalAccount(context.request, baseURL!, false);
+    const page = await context.newPage();
+    await page.goto("/apply");
+    const form = page.locator("[data-account-profile]");
+    const birthDate = form.locator('[name="birthDate"]');
+    await expect(birthDate).toHaveAttribute("type", "date");
+    await expect(birthDate).toHaveAttribute("min", "1900-01-01");
+    await expect(birthDate).not.toHaveAttribute("max");
+    await birthDate.focus();
+    await expect(birthDate).toHaveValue("");
+    expect(
+      await birthDate.evaluate(
+        (input: HTMLInputElement) => input.validity.valueMissing,
+      ),
+    ).toBe(true);
+
+    // Native pickers can report a selection through change rather than input.
+    await birthDate.evaluate((input: HTMLInputElement) => {
+      input.value = "2999-01-01";
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await expect(birthDate).toHaveJSProperty(
+      "validationMessage",
+      applicationBirthDateError,
+    );
+    await form.evaluate((element: HTMLFormElement) => element.reset());
+    await expect(birthDate).toHaveValue("");
+    expect(
+      await birthDate.evaluate(
+        (input: HTMLInputElement) => input.validity.customError,
+      ),
+    ).toBe(false);
+    await expect(birthDate).not.toHaveAttribute("max");
+  } finally {
+    await context.close();
+  }
+});
+
 test("application and profile edits block underage birth dates at the birthday boundary", async ({
   page,
   baseURL,
@@ -513,7 +561,8 @@ test("application and profile edits block underage birth dates at the birthday b
   await page.goto("/apply");
   const form = page.locator("[data-account-profile]");
   const birthDate = form.locator('[name="birthDate"]');
-  const cutoff = (await birthDate.getAttribute("max"))!;
+  const cutoff = latestApplicationBirthDate();
+  await expect(birthDate).not.toHaveAttribute("max");
   const today = new Date();
   expect(cutoff.slice(0, 4)).toBe(String(today.getUTCFullYear() - 19));
   expect(cutoff.slice(5)).toBe(
@@ -587,27 +636,11 @@ test("the application requires JavaScript and retains birth-date constraints", a
     const page = await context.newPage();
     await page.goto("/apply");
     const form = page.locator("[data-account-profile]");
-    for (const [field, value] of Object.entries(sampleAnswers)) {
-      if (field === "heardAboutUsSources") {
-        for (const source of sampleAnswers.heardAboutUsSources)
-          await form.locator(`[name="${field}"][value="${source}"]`).check();
-      } else if (
-        ![
-          "heardAboutUs",
-          "heardAboutUsOther",
-          "teams",
-          "certification",
-          "certifications",
-          "certificationExpiry",
-          "experience",
-          "training",
-          "otherTraining",
-        ].includes(field)
-      )
-        await form.locator(`[name="${field}"]`).fill(String(value));
-    }
     const birthDate = form.locator('[name="birthDate"]');
     const cutoff = (await birthDate.getAttribute("max"))!;
+    expect(cutoff).toBe(latestApplicationBirthDate());
+    await expect(birthDate).toHaveAttribute("min", "1900-01-01");
+    await expect(birthDate).toHaveValue("");
     const younger = new Date(`${cutoff}T00:00:00Z`);
     younger.setUTCDate(younger.getUTCDate() + 1);
     await birthDate.fill(younger.toISOString().slice(0, 10));

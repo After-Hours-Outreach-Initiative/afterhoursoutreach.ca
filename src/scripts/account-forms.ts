@@ -1,4 +1,5 @@
 import {
+  applicationBirthDateError,
   countWords,
   motivationMaxWords,
   motivationWordLimitError,
@@ -52,6 +53,25 @@ export function clearFormMessage(element: Element) {
   target.hidden = true;
   target.textContent = "";
   delete target.dataset.messageKind;
+}
+
+export function initBirthDate(element: HTMLFormElement) {
+  const input = element.querySelector<HTMLInputElement>('[name="birthDate"]');
+  if (!input?.max) return;
+  const latest = Date.parse(input.max);
+  // Android opens an empty picker at min (1900) when max is before today.
+  // Keep the age limit in validation, not the calendar, without pre-filling a birthday.
+  // The server-rendered max remains the fallback when JavaScript is disabled.
+  input.removeAttribute("max");
+  const update = () => {
+    input.setCustomValidity(
+      input.valueAsNumber > latest ? applicationBirthDateError : "",
+    );
+  };
+  input.addEventListener("input", update);
+  input.addEventListener("change", update);
+  element.addEventListener("reset", () => queueMicrotask(update));
+  update();
 }
 
 export function initMedicCertifications(element: HTMLFormElement) {
