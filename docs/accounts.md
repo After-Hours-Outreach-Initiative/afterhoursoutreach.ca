@@ -118,26 +118,26 @@ Questions are based on the current Google Form. The referral and motivation
 questions and Code of Conduct confirmation are application-only. Organizers can
 view referral answers and the remaining profile answers.
 
-| Field                                    | Required       |
-| ---------------------------------------- | -------------- |
-| First name                               | Yes            |
-| Middle name(s)                           | No             |
-| Last name                                | Yes            |
-| Preferred name                           | No             |
-| Email (from the account)                 | Yes            |
-| Pronouns                                 | No             |
-| Phone number                             | Yes            |
-| Date of birth                            | Yes            |
-| Emergency contact name                   | Yes            |
-| Emergency contact phone                  | Yes            |
-| Emergency contact relationship           | Yes            |
-| How did you find out about us            | At least one choice; short detail required for Other |
-| Why do you want to volunteer             | Yes            |
-| Teams (outreach, medic, non-patrol)      | Yes            |
-| Highest medical certification            | Yes            |
-| Other training and experience, and other | Yes            |
-| Medical conditions/allergies/anything else we should know | No             |
-| Code of Conduct acknowledgement          | On application |
+| Field                                                     | Required                                             |
+| --------------------------------------------------------- | ---------------------------------------------------- |
+| First name                                                | Yes                                                  |
+| Middle name(s)                                            | No                                                   |
+| Last name                                                 | Yes                                                  |
+| Preferred name                                            | No                                                   |
+| Email (from the account)                                  | Yes                                                  |
+| Pronouns                                                  | No                                                   |
+| Phone number                                              | Yes                                                  |
+| Date of birth                                             | Yes                                                  |
+| Emergency contact name                                    | Yes                                                  |
+| Emergency contact phone                                   | Yes                                                  |
+| Emergency contact relationship                            | Yes                                                  |
+| How did you find out about us                             | At least one choice; short detail required for Other |
+| Why do you want to volunteer                              | Yes                                                  |
+| Teams (outreach, medic, non-patrol)                       | Yes                                                  |
+| Highest medical certification                             | Yes                                                  |
+| Other training and experience, and other                  | Yes                                                  |
+| Medical conditions/allergies/anything else we should know | No                                                   |
+| Code of Conduct acknowledgement                           | On application                                       |
 
 New applicants must provide first and last names. Middle names, preferred name,
 and pronouns are optional. Account menus, volunteer lists, and event rosters use
