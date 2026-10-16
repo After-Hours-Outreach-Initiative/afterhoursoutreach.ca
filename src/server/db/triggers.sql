@@ -18,6 +18,18 @@ BEGIN
   SELECT RAISE(ABORT, 'event_full')
   WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed')
     >= (SELECT spots FROM event WHERE id = NEW.event_id);
+  -- Closed/hidden bookings still reserve a spot; past/cancelled events do not.
+  SELECT RAISE(ABORT, 'orientation_signup_limit')
+  WHERE EXISTS (SELECT 1 FROM event WHERE id = NEW.event_id AND type = 'orientation')
+    AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
+    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND EXISTS (
+      SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
+      WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
+        AND s.event_id != NEW.event_id
+        AND e.type = 'orientation' AND e.cancelled_at IS NULL
+        AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+    );
 END;
 --> statement-breakpoint
 CREATE TRIGGER signup_confirm_update
@@ -36,6 +48,17 @@ BEGIN
   SELECT RAISE(ABORT, 'event_full')
   WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id)
     >= (SELECT spots FROM event WHERE id = NEW.event_id);
+  SELECT RAISE(ABORT, 'orientation_signup_limit')
+  WHERE EXISTS (SELECT 1 FROM event WHERE id = NEW.event_id AND type = 'orientation')
+    AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
+    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND EXISTS (
+      SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
+      WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
+        AND s.id != OLD.id AND s.event_id != NEW.event_id
+        AND e.type = 'orientation' AND e.cancelled_at IS NULL
+        AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+    );
 END;
 --> statement-breakpoint
 CREATE TRIGGER event_capacity_update

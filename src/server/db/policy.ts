@@ -12,9 +12,13 @@ export interface SignupEvent {
   startsAt: Date;
   open: boolean;
   spots: number;
+  orientationSignupBlocked?: boolean;
 }
 
-/** UI feedback only; database writes must also enforce capacity atomically. */
+export const orientationSignupLimitMessage =
+  "You can book one upcoming orientation at a time until your first orientation is marked completed. Unregister from your current orientation before choosing another.";
+
+/** UI feedback only; database triggers enforce eligibility and limits atomically. */
 export function signupBlockReason(
   volunteer: SignupVolunteer | null,
   event: SignupEvent,
@@ -33,6 +37,8 @@ export function signupBlockReason(
   if (event.type === "patrol" && !volunteer.patrolApproved)
     return "Organizer approval is required to register for patrols.";
   if (confirmed >= event.spots) return "This event is full.";
+  if (event.type === "orientation" && event.orientationSignupBlocked)
+    return orientationSignupLimitMessage;
   return null;
 }
 

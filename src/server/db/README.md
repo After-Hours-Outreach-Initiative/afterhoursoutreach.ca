@@ -68,6 +68,25 @@ switching. Each write atomically checks session access, the prior revision, and
 the absence of a submitted profile. Profile submission deletes the draft in the
 same D1 batch; late autosaves cannot recreate it. User deletion cascades to drafts.
 
+## First-orientation booking limit
+
+Application-approved volunteers with neither an `orientation_completion` record
+nor current `patrol_approved` status may hold one confirmed upcoming orientation
+booking at a time. Approval dates do not determine who is new: older accounts
+without either status follow the same rule. A recorded completion or explicit
+patrol approval lifts this cap; completion still does not grant patrol approval.
+Organizer role alone does not lift the cap (or grant patrol approval).
+
+Confirmed bookings for future, non-cancelled orientations count even when an
+event is closed or hidden. Cancelled signups, cancelled events, and events that
+have started do not count, so cancellation/rebooking and rebooking after a missed
+orientation are allowed. The insert/update triggers check the limit inside the
+write, including reactivation and organizer moves, not in a race-prone preflight.
+The migration does not change existing bookings. Accounts already above the cap
+keep those spots but cannot add another until none count or the cap is lifted.
+No over-cap cleanup runs on event edits or status changes; existing access-revocation
+and event-cancellation workflows are unchanged.
+
 ## Generated migrations
 
 ```sh
