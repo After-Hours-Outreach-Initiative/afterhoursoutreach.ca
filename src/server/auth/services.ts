@@ -9,10 +9,9 @@ export interface SignInEmail {
   purpose?: "change-email";
 }
 
-const signInExpiry =
-  "The link and code expire in ten minutes. Using either one invalidates both. Requesting a new email replaces the previous link and code.";
+const signInExpiry = "The link and code expire in 10 minutes.";
 const signInSecurity =
-  "If you did not request this, ignore this email. Do not share this email, link or code.";
+  "If you did not request this, you can safely ignore this email.";
 
 function escapeHtml(value: string) {
   return value
@@ -29,21 +28,20 @@ function signInHtml(email: SignInEmail) {
   return `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Your After Hours Outreach sign-in</title></head>
-<body style="margin:0;padding:0;background-color:#f4f4f5;">
+<body style="margin:0;padding:0;background-color:#ffffff;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td align="center" style="padding:24px 12px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;table-layout:fixed;">
-        <tr><td bgcolor="#ffffff" style="padding:24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#18181b;">
-          <h1 style="margin:0 0 16px;font-size:24px;line-height:32px;">Sign in to After Hours Outreach</h1>
-          <p style="margin:0 0 20px;">Use the button below to sign in to your account.</p>
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-            <tr><td bgcolor="#334d9d" style="border-radius:4px;"><a href="${url}" style="display:inline-block;border:14px solid #334d9d;border-radius:4px;background-color:#334d9d;color:#ffffff;font-size:18px;font-weight:bold;line-height:24px;text-decoration:none;">Sign in</a></td></tr>
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;table-layout:fixed;">
+        <tr><td bgcolor="#ffffff" style="padding:24px 40px 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#000000;">
+          <h1 style="margin:0 0 14px;font-size:20px;line-height:28px;font-weight:600;">Sign in to After Hours Outreach</h1>
+          <p style="margin:0 0 22px;">Enter this code on the sign-in page, or click the sign-in link.</p>
+          <p style="margin:0 0 12px;padding:8px 16px;border:1px solid #e7e7e7;border-radius:8px;background-color:#f7f7f7;font-family:monospace;font-size:24px;font-weight:normal;line-height:32px;text-align:center;">${escapeHtml(email.code)}</p>
+          <p style="margin:0 0 12px;text-align:center;">OR</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td align="center" bgcolor="#4169e1" style="border-radius:8px;"><a href="${url}" style="display:block;padding:13px 20px;border-radius:8px;background-color:#4169e1;color:#ffffff;font-size:16px;font-weight:bold;line-height:24px;text-align:center;text-decoration:none;">Sign in</a></td></tr>
           </table>
-          <p style="margin:24px 0 12px;">Or enter this code on the device that requested it:</p>
-          <p style="margin:0 0 24px;padding:16px;background-color:#f4f4f5;font-family:'Courier New',monospace;font-size:36px;font-weight:bold;line-height:44px;">${escapeHtml(email.code)}</p>
-          <p style="margin:0 0 16px;font-size:14px;line-height:22px;">${signInExpiry}</p>
-          <p style="margin:0 0 24px;font-size:14px;line-height:22px;">${signInSecurity}</p>
-          <p style="margin:0;font-size:14px;line-height:22px;">If the button does not work, copy and paste this sign-in URL into your browser:<br><a href="${url}" style="color:#334d9d;word-break:break-all;overflow-wrap:anywhere;">${url}</a></p>
+          <p style="margin:28px 0 8px;">${signInExpiry}</p>
+          <p style="margin:0 0 24px;">${signInSecurity}</p>
         </td></tr>
       </table>
     </td></tr>

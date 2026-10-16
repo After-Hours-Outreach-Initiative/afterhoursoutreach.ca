@@ -1925,18 +1925,13 @@ test("Resend receives the same sign-in message in every hosted environment and h
         const escapedUrl = email.url.replaceAll("&", "&amp;");
         assert.ok(body.html.includes(`href="${escapedUrl}"`));
         assert.match(body.html, />Sign in<\/a>/);
-        assert.match(body.html, /font-size:36px[^>]*>123456<\/p>/);
-        assert.match(body.html, /If the button does not work, copy and paste/);
-        assert.ok(body.html.includes(`>${escapedUrl}</a>`));
+        assert.match(body.html, /font-size:24px[^>]*>123456<\/p>/);
         for (const content of [body.text, body.html]) {
-          assert.match(content, /expire in ten minutes/);
-          assert.match(content, /Using either one invalidates both/);
-          assert.match(content, /replaces the previous link and code/);
+          assert.match(content, /expire in 10 minutes/);
           assert.match(
             content,
-            /If you did not request this, ignore this email/,
+            /If you did not request this, you can safely ignore this email/,
           );
-          assert.match(content, /Do not share this email, link or code/);
         }
         assert.doesNotMatch(body.text, /public branch preview/);
         assert.equal(
@@ -1970,8 +1965,7 @@ test("sign-in HTML escapes the code and URL without changing the plain-text alte
     async (_url, options) => {
       const body = JSON.parse(String(options?.body));
       const escapedUrl = `${origin}/volunteer/sign-in/complete#email=test&amp;value=&quot;&#39;&lt;tag&gt;`;
-      assert.equal(body.html.split(`href="${escapedUrl}"`).length - 1, 2);
-      assert.ok(body.html.includes(`>${escapedUrl}</a>`));
+      assert.equal(body.html.split(`href="${escapedUrl}"`).length - 1, 1);
       assert.ok(body.html.includes("&lt;123&amp;&quot;&#39;&gt;"));
       assert.ok(!body.html.includes(code));
       assert.ok(body.text.includes(url));
