@@ -138,7 +138,7 @@ test("resend failures and cancellations preserve the email and allow retry witho
     else if (failure === "rate")
       await route.fulfill({
         status: 429,
-        json: { message: "Wait one minute before requesting another email." },
+        json: { message: "Too many requests. Try again later." },
       });
     else if (failure === "service")
       await route.fulfill({ status: 503, json: {} });
@@ -160,7 +160,7 @@ test("resend failures and cancellations preserve the email and allow retry witho
   await expect(resend).toBeEnabled();
   expect(sends).toBe(1);
   for (const [kind, expected] of [
-    ["rate", "Wait one minute before requesting another email."],
+    ["rate", "Too many requests. Try again later."],
     ["network", "We could not connect. Check your connection and try again."],
     [
       "service",
@@ -428,11 +428,12 @@ test("local email previews also work after resend, including wrong and valid cod
   ]);
 });
 
-test("a consumed local-D1 link offers same-email resend and preserves the real server rate limit", async ({
+test("a consumed local-D1 link resends successfully after the real 30-second cooldown", async ({
   page,
   request,
   baseURL,
 }) => {
+  test.setTimeout(60_000);
   const email = `consumed-${crypto.randomUUID()}@example.org`;
   const delivered = await page.request.post(
     "/api/v1/auth/email-otp/send-verification-otp?returnTo=%2Fvolunteer%2Fevents",
@@ -442,6 +443,7 @@ test("a consumed local-D1 link offers same-email resend and preserves the real s
     },
   );
   expect(delivered.status(), await delivered.text()).toBe(200);
+  const deliveredAt = Date.now();
   const { localEmail } = await delivered.json();
   // A separate browser/client consumes the proof; this page remains signed out.
   const consumed = await request.post("/api/v1/auth/sign-in/email-otp", {
@@ -461,7 +463,7 @@ test("a consumed local-D1 link offers same-email resend and preserves the real s
   await resend.click();
   await chooseDelivery(page);
   await expect(code.locator("[data-form-message]")).toHaveText(
-    "Wait one minute before requesting another email.",
+    "Wait 30 seconds before requesting another email.",
   );
   await expect(code.locator("[data-form-message]")).toHaveAttribute(
     "role",
@@ -470,6 +472,21 @@ test("a consumed local-D1 link offers same-email resend and preserves the real s
   await expect(resend).toBeEnabled();
   await expect(code.locator('[name="email"]')).toHaveValue(email);
   await expect(page).toHaveURL(/\/volunteer\/sign-in\/complete$/);
+  // Browser clock mocks cannot advance the real Worker. Wait once, without
+  // polling sends (which would spend the unchanged IP/hour budget).
+  await new Promise((resolve) =>
+    setTimeout(resolve, Math.max(0, deliveredAt + 30_000 - Date.now())),
+  );
+  await resend.click();
+  await chooseDelivery(page);
+  const preview = page.getByRole("dialog", { name: "Local sign-in email" });
+  await expect(preview).toContainText(`To: ${email}`);
+  await expect(preview).toContainText(
+    "A new email replaces the previous code.",
+  );
+  await expect(resend).toBeDisabled();
+  await preview.getByRole("button", { name: "Use valid code" }).click();
+  await expect(page).toHaveURL(/\/apply$/);
 });
 
 test("a transient link failure keeps confirmation retryable and blocks resend during verification", async ({

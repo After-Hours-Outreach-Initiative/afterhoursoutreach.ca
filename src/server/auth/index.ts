@@ -487,6 +487,7 @@ export function createAuth(
               bindings.BETTER_AUTH_SECRET,
               parsed.data.email,
               ip,
+              30_000,
             );
             await cleanupAuthRecords(bindings.DB);
           } else {

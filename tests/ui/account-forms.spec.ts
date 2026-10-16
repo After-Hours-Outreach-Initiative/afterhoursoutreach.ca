@@ -207,7 +207,7 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
     .click();
   const error = page.locator("[data-email-request] [data-form-message]");
   await expect(error).toHaveText(
-    "Wait one minute before requesting another email.",
+    "Wait 30 seconds before requesting another email.",
   );
   await expect(error).toHaveAttribute("role", "alert");
   await expect(button).toBeEnabled();
