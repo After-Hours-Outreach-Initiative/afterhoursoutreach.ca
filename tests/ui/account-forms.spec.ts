@@ -1467,6 +1467,28 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   );
   const preferredName = form.locator('[name="preferredName"]');
   const name = form.locator('[name="emergencyName"]');
+  const medicalConditions = form.locator('[name="medicalConditions"]');
+  const expectViewStyles = async () => {
+    for (const group of [
+      editor,
+      ...(await editor
+        .locator(".volunteer-fields, .volunteer-team-options")
+        .all()),
+    ]) {
+      await expect(group).toHaveCSS("opacity", "1");
+    }
+    for (const field of [preferredName, name, medicalConditions]) {
+      await expect(field).toBeDisabled();
+      await expect(field).toHaveCSS("opacity", "1");
+      await expect(field).toHaveCSS("color", "rgb(161, 161, 170)");
+      await expect(field).toHaveCSS("background-color", "rgb(23, 26, 32)");
+      await expect(field).toHaveCSS("cursor", "default");
+    }
+    for (const card of await editor.locator(".volunteer-team-option").all()) {
+      await expect(card).toHaveCSS("opacity", "1");
+      await expect(card).toHaveCSS("cursor", "default");
+    }
+  };
   await expect(editor).toBeVisible();
   await expect(editor).toHaveAccessibleName("Profile details");
   await expect(preferredName).toHaveCount(1);
@@ -1474,10 +1496,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(preferredName).toBeDisabled();
   await expect(name).toBeDisabled();
   await expect(form.getByLabel("Medic", { exact: true })).toBeDisabled();
-  await expect(editor.locator(".volunteer-fields").first()).toHaveCSS(
-    "opacity",
-    "0.8",
-  );
+  await expectViewStyles();
   await expect(actions).toHaveCount(2);
   await expect(
     form.locator(
@@ -1536,6 +1555,11 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
     "opacity",
     "1",
   );
+  for (const field of [preferredName, name, medicalConditions]) {
+    await expect(field).toBeEditable();
+    await expect(field).toHaveCSS("color", "rgb(244, 244, 245)");
+    await expect(field).toHaveCSS("background-color", "rgb(5, 6, 8)");
+  }
   await name.fill("");
   await save.click();
   await cancels.last().click();
@@ -1543,6 +1567,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(editor).toBeVisible();
   await expect(name).toBeDisabled();
   await expect(name).toHaveValue(sampleAnswers.emergencyName);
+  await expectViewStyles();
   await expect(visibleActions).toHaveCount(0);
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await edit.click();
@@ -1602,6 +1627,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(editor).toBeVisible();
   await expect(name).toHaveValue("Updated volunteer");
   await expect(name).toBeDisabled();
+  await expectViewStyles();
   await expect(visibleActions).toHaveCount(0);
   await expect(edit).toBeFocused();
   await edit.click();
@@ -1616,6 +1642,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await page.reload();
   await expect(name).toHaveValue("Updated volunteer");
   await expect(enabledSaves).toHaveCount(0);
+  await expectViewStyles();
 
   // Clearing the preferred name still falls back to the saved legal name.
   await edit.click();

@@ -160,10 +160,6 @@ body:has([data-application], [data-account-contents-flow]) {
   border: 0;
 }
 .volunteer-profile-fields:disabled
-  :is(.volunteer-fields, .volunteer-team-options) {
-  opacity: 0.8;
-}
-.volunteer-profile-fields:disabled
   :is(input, textarea, .volunteer-check, .volunteer-team-option) {
   cursor: default;
 }
@@ -493,7 +489,10 @@ body:has([data-application], [data-account-contents-flow]) {
   min-height: calc(3lh + 22px);
   resize: vertical;
 }
-.volunteer-portal input[readonly] {
+.volunteer-portal input[readonly],
+.volunteer-portal
+  .volunteer-profile-fields:disabled
+  :is(input:not([type="checkbox"], [type="radio"]), textarea) {
   color: #a1a1aa;
   background: #171a20;
 }
