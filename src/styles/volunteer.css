@@ -153,6 +153,20 @@ body:has([data-application]) {
 .volunteer-profile-form {
   gap: 32px;
 }
+.volunteer-profile-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.volunteer-profile-fields:disabled
+  :is(.volunteer-fields, .volunteer-team-options) {
+  opacity: 0.8;
+}
+.volunteer-profile-fields:disabled
+  :is(input, textarea, .volunteer-check, .volunteer-team-option) {
+  cursor: default;
+}
 .volunteer-application-step {
   display: flex;
   flex-direction: column;
@@ -505,7 +519,7 @@ body:has([data-application]) {
 .volunteer-team-option[data-included] {
   cursor: default;
 }
-.volunteer-team-option:has(input:disabled):not([data-included]) {
+.volunteer-team-option:has(input[disabled]):not([data-included]) {
   opacity: 0.6;
   cursor: wait;
 }

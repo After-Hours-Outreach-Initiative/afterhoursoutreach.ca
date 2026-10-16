@@ -7,7 +7,6 @@ import {
   type ApplicationAnswers,
 } from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
-import AccountProfileSummary from "./AccountProfileSummary.astro";
 import AccountProfileSection from "./AccountProfileSection.astro";
 import ApplicationContents from "./ApplicationContents.astro";
 import ApplicationSteps from "./ApplicationSteps.astro";
@@ -80,27 +79,26 @@ const sections = [
   {application && <ApplicationDraftStatus />}
   {
     !application && (
-      <div data-profile-view class="volunteer-form">
-        <button
-          type="button"
-          class="btn btn-outline"
-          data-profile-edit
-          aria-controls="account-profile-editor"
-          aria-expanded="false"
-          disabled
-        >
-          Edit profile
-        </button>
-        <AccountProfileSummary values={values} sections={sections} />
-      </div>
+      <button
+        type="button"
+        class="btn btn-outline"
+        data-profile-edit
+        aria-controls="account-profile-editor"
+        disabled
+      >
+        Edit profile
+      </button>
     )
   }
-  <div
+  <fieldset
     data-profile-editor={!application || undefined}
     id={!application ? "account-profile-editor" : undefined}
-    class="volunteer-form volunteer-profile-form"
-    hidden={!application}
+    class="volunteer-form volunteer-profile-form volunteer-profile-fields"
+    disabled={!application}
   >
+    <legend class="sr-only">
+      {application ? "Application answers" : "Profile details"}
+    </legend>
     <ApplicationSteps
       application={application}
       email={email}
@@ -213,19 +211,19 @@ const sections = [
         ))
       }
     </ApplicationSteps>
-    {
-      !application && (
-        <div class="flex flex-wrap gap-4">
-          <button type="submit" class="btn btn-primary" disabled>
-            Save profile
-          </button>
-          <button type="button" class="btn btn-quiet" data-profile-cancel>
-            Cancel
-          </button>
-        </div>
-      )
-    }
-  </div>
+  </fieldset>
+  {
+    !application && (
+      <div data-profile-actions class="flex flex-wrap gap-4" hidden>
+        <button type="submit" class="btn btn-primary" disabled>
+          Save profile
+        </button>
+        <button type="button" class="btn btn-quiet" data-profile-cancel>
+          Cancel
+        </button>
+      </div>
+    )
+  }
   <p data-form-message role="status" aria-live="polite" hidden></p>
   <noscript
     ><p>

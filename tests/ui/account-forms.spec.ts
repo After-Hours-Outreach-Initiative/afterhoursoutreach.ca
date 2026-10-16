@@ -1330,12 +1330,29 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   });
   await expect(settings.getByText(email, { exact: true })).toBeVisible();
   const edit = page.getByRole("button", { name: "Edit profile" });
-  const summary = form.locator("[data-profile-summary]");
-  await expect(summary).toBeVisible();
-  await expect(form.locator("[data-profile-editor]")).toBeHidden();
-  await expect(
-    summary.locator('[data-profile-answer="preferredName"]'),
-  ).toHaveText(sampleAnswers.preferredName);
+  const editor = form.locator("[data-profile-editor]");
+  const actions = form.locator("[data-profile-actions]");
+  const preferredName = form.locator('[name="preferredName"]');
+  const name = form.locator('[name="emergencyName"]');
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveAccessibleName("Profile details");
+  await expect(preferredName).toHaveCount(1);
+  await expect(preferredName).toHaveValue(sampleAnswers.preferredName);
+  await expect(preferredName).toBeDisabled();
+  await expect(name).toBeDisabled();
+  await expect(form.getByLabel("Medic", { exact: true })).toBeDisabled();
+  await expect(editor.locator(".volunteer-fields").first()).toHaveCSS(
+    "opacity",
+    "0.8",
+  );
+  await expect(actions).toBeHidden();
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/account/profile")
+      requests.push(request.url());
+  });
+  await form.evaluate((element: HTMLFormElement) => element.requestSubmit());
+  expect(requests).toEqual([]);
   const submission = page.locator("[data-submitted-application]");
   await submission
     .getByText("View submitted application", { exact: true })
@@ -1346,9 +1363,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
     ["lastName", "Last name"],
     ["birthDate", "Date of birth"],
   ] as const) {
-    await expect(
-      form.locator(`[name="${field}"], [data-profile-row="${field}"]`),
-    ).toHaveCount(0);
+    await expect(form.locator(`[name="${field}"]`)).toHaveCount(0);
     await expect(
       submission
         .locator("dl > div")
@@ -1366,22 +1381,24 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
     name: "Save profile",
     includeHidden: true,
   });
-  const name = form.locator('[name="emergencyName"]');
-  await expect(form.locator('[name="preferredName"]')).toBeFocused();
+  await expect(preferredName).toBeFocused();
+  await expect(name).toBeEditable();
+  await expect(editor.locator(".volunteer-fields").first()).toHaveCSS(
+    "opacity",
+    "1",
+  );
   await name.fill("");
   await save.click();
   await form.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(edit).toBeFocused();
-  await expect(summary).toBeVisible();
+  await expect(editor).toBeVisible();
+  await expect(name).toBeDisabled();
+  await expect(name).toHaveValue(sampleAnswers.emergencyName);
+  await expect(actions).toBeHidden();
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await edit.click();
   await expect(name).toHaveValue(sampleAnswers.emergencyName);
   await expect(form.locator("[data-error=emergencyName]")).toBeHidden();
-  const requests: string[] = [];
-  page.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/api/v1/account/profile")
-      requests.push(request.url());
-  });
   await expect(save).toBeDisabled();
   await expect(save).toHaveCSS("background-color", "rgb(39, 39, 42)");
   await name.press("Enter");
@@ -1433,10 +1450,10 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   );
   await expect(save).toBeDisabled();
   expect(requests).toHaveLength(1);
-  await expect(summary).toBeVisible();
-  await expect(
-    summary.locator('[data-profile-answer="emergencyName"]'),
-  ).toHaveText("Updated volunteer");
+  await expect(editor).toBeVisible();
+  await expect(name).toHaveValue("Updated volunteer");
+  await expect(name).toBeDisabled();
+  await expect(actions).toBeHidden();
   await expect(edit).toBeFocused();
   await edit.click();
   await name.fill(sampleAnswers.emergencyName);
