@@ -65,30 +65,6 @@ if (!values || !person)
   <section class="volunteer-panel">
     <div data-volunteer-profile>
       <h2>{applicationDisplayName(values)}</h2>
-      {
-        !values.firstName && !values.lastName && (
-          <p class="volunteer-help">
-            This profile predates separate name fields. The original full or
-            preferred name is preserved in Preferred name; no name components
-            have been inferred.
-          </p>
-        )
-      }
-      <p class="volunteer-help">
-        {
-          person.orientations
-            ? "Orientation completion recorded."
-            : "No orientation completion recorded."
-        } Patrol approval is a separate decision.
-      </p>
-      {
-        !import.meta.env.DEV && (
-          <p class="volunteer-notice">
-            This access has been logged. Use these answers only for volunteer
-            coordination and safety; do not copy or share sensitive information.
-          </p>
-        )
-      }
       <VolunteerControls person={person} />
       <dl class="volunteer-profile-details">
         <div>
@@ -110,14 +86,6 @@ if (!values || !person)
             }
           </dd>
         </div>
-        {
-          values.heardAboutUs && values.heardAboutUsSources.length > 0 && (
-            <div>
-              <dt>Previously recorded referral answer</dt>
-              <dd>{values.heardAboutUs}</dd>
-            </div>
-          )
-        }
         {
           profileFields.map((field) => (
             <div>
@@ -143,16 +111,6 @@ if (!values || !person)
             }
           </dd>
         </div>
-        {
-          values.certification && (
-            <div>
-              <>
-                <dt>Previously recorded medical certification</dt>
-                <dd>{values.certification}</dd>
-              </>
-            </div>
-          )
-        }
         <div><dt>Teams</dt><dd>{values.teams.join(", ")}</dd></div>
         <div>
           <dt>Relevant training and experience</dt>

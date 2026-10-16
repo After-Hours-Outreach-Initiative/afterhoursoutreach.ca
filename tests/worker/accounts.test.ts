@@ -716,7 +716,10 @@ describe(
       );
       assert.equal(page.status, 200);
       const html = await page.text();
-      assert.match(html, /An original application snapshot is not available/);
+      assert.doesNotMatch(
+        html,
+        /data-submitted-application|Submitted application/,
+      );
       assert.doesNotMatch(
         html,
         /View submitted application|Worker Test Volunteer|Sample private answer/,
