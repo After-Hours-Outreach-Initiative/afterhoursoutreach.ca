@@ -6,6 +6,7 @@ import { chromium, expect, type Locator } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
+import { hashAuthValue } from "../../src/server/db/rate-limits";
 
 const origin = "https://afterhoursoutreach.ca";
 const secret = "worker-event-test-secret-12345678901234567890";
@@ -1037,6 +1038,15 @@ describe(
       });
 
       test("browser organizer and volunteer workflows save in place and remain usable on mobile", async () => {
+        // Earlier API cases share this actor; give the browser its own action budget.
+        const start = Math.floor(Date.now() / 60_000) * 60_000;
+        const eventRateKey = await hashAuthValue(
+          secret,
+          `rate:events:${organizer.id}:60000:${start}`,
+        );
+        await DB.prepare("DELETE FROM auth_rate_limit WHERE key=?")
+          .bind(eventRateKey)
+          .run();
         const browser = await chromium.launch({
           executablePath:
             process.env.CHROMIUM_PATH ??
