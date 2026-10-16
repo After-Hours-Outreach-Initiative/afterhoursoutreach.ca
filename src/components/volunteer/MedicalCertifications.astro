@@ -13,7 +13,6 @@ interface Props {
   active: boolean;
 }
 const { values, active } = Astro.props;
-const legacy = values?.certification?.trim();
 const selected =
   values?.certifications.length === 1 ? values.certifications[0] : undefined;
 const otherTrainingField = applicationFields.find(
@@ -58,11 +57,6 @@ const otherTrainingField = applicationFields.find(
       ))
     }
   </div>
-  {
-    legacy && legacy.toLowerCase() !== "none" && (
-      <p class="volunteer-help">Previously recorded certification: {legacy}</p>
-    )
-  }
   <FieldError
     field="certifications"
     message="Select your highest certification or licence."

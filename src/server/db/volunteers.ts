@@ -498,6 +498,6 @@ export async function completeOrientation(
   }
   return {
     operation,
-    message: "Orientation marked completed. Patrol approval is unchanged.",
+    message: "Orientation marked completed.",
   };
 }

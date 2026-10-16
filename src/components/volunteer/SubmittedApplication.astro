@@ -108,70 +108,58 @@ const rows =
     : [];
 ---
 
-<section
-  class="volunteer-panel"
-  aria-labelledby="submitted-application-heading"
-  data-submitted-application
->
-  <h2 id="submitted-application-heading">Submitted application</h2>
-  {
-    submission ? (
-      <>
-        <p class="volunteer-help">
-          This is a read-only copy of your application as submitted. Changes to
-          your profile or email do not change this snapshot.
-        </p>
-        <details class="mt-6">
-          <summary class="cursor-pointer text-indigo-300 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4">
-            View submitted application
-          </summary>
-          <div class="account-profile-summary mt-8">
-            {sections.map((section) => (
-              <section
-                class="volunteer-profile-section"
-                aria-labelledby={`submitted-${section.key}`}
+{
+  submission && (
+    <section
+      class="volunteer-panel"
+      aria-labelledby="submitted-application-heading"
+      data-submitted-application
+    >
+      <h2 id="submitted-application-heading">Submitted application</h2>
+      <details class="mt-6">
+        <summary class="cursor-pointer text-indigo-300 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4">
+          View submitted application
+        </summary>
+        <div class="account-profile-summary mt-8">
+          {sections.map((section) => (
+            <section
+              class="volunteer-profile-section"
+              aria-labelledby={`submitted-${section.key}`}
+            >
+              <h3
+                class="volunteer-profile-heading"
+                id={`submitted-${section.key}`}
               >
-                <h3
-                  class="volunteer-profile-heading"
-                  id={`submitted-${section.key}`}
-                >
-                  {section.heading}
-                </h3>
-                <dl>
-                  {rows
-                    .filter((row) => row.section === section.key)
-                    .map((row) => (
-                      <div>
-                        <dt>{row.label}</dt>
-                        <dd>
-                          {Array.isArray(row.value) ? (
-                            row.value.length ? (
-                              <ul>
-                                {row.value.map((value) => (
-                                  <li>{value}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              "None selected"
-                            )
+                {section.heading}
+              </h3>
+              <dl>
+                {rows
+                  .filter((row) => row.section === section.key)
+                  .map((row) => (
+                    <div>
+                      <dt>{row.label}</dt>
+                      <dd>
+                        {Array.isArray(row.value) ? (
+                          row.value.length ? (
+                            <ul>
+                              {row.value.map((value) => (
+                                <li>{value}</li>
+                              ))}
+                            </ul>
                           ) : (
-                            row.value || "Not provided"
-                          )}
-                        </dd>
-                      </div>
-                    ))}
-                </dl>
-              </section>
-            ))}
-          </div>
-        </details>
-      </>
-    ) : (
-      <p class="volunteer-help">
-        An original application snapshot is not available for your account. Your
-        current profile may have changed since you applied, so it is not shown
-        here as your original application.
-      </p>
-    )
-  }
-</section>
+                            "None selected"
+                          )
+                        ) : (
+                          row.value || "Not provided"
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
+            </section>
+          ))}
+        </div>
+      </details>
+    </section>
+  )
+}

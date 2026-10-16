@@ -356,10 +356,7 @@ export async function saveProfile(
     motivation: old?.motivation ?? submitted.motivation!,
   };
   if (!applicationDisplayName(answers))
-    throw new RequestError(
-      400,
-      "Enter a preferred name, or keep your previously saved name.",
-    );
+    throw new RequestError(400, "Enter a preferred name.");
   const changedFields = (
     Object.keys(answers) as (keyof ApplicationAnswers)[]
   ).filter(
