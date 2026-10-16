@@ -1939,7 +1939,7 @@ test("Resend receives the same sign-in message in every hosted environment and h
         assert.doesNotMatch(body.text, /public branch preview/);
         assert.equal(
           body.from,
-          "After Hours Outreach <noreply@afterhoursoutreach.ca>",
+          "After Hours Outreach <accounts@afterhoursoutreach.ca>",
         );
         return Response.json({ id: "email-id" });
       },
