@@ -1,11 +1,12 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
+import { assertDatabaseReady } from "../../../server/db/readiness";
 
 export const prerender = false;
 
 export const GET: APIRoute = async () => {
   try {
-    await env.DB.prepare("SELECT 1").first();
+    await assertDatabaseReady(env.DB);
     return Response.json(
       { status: "ok" },
       { headers: { "Cache-Control": "no-store" } },
