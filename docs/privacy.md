@@ -176,9 +176,6 @@ account pages. These are not a complete privacy management program.
 
 Recommended pre-launch work:
 
-- Require organizer two-factor authentication before access to sensitive
-  information. This is a recommended safeguard, not a claim that PIPA mandates
-  this particular technology.
 - Limit sensitive fields to staff who need them rather than granting every
   organizer identical access. Review developer and provider-console access too.
 - Train organizers on confidentiality, shared devices, exports, screenshots,
@@ -190,6 +187,10 @@ Recommended pre-launch work:
 - Write a breach-response procedure: responsibilities, containment, risk
   assessment, applicable notification duties, communications, and follow-up.
 - Test access restrictions, request handling, deletion, and backup restoration.
+
+Requiring organizer two-factor authentication may be considered in the future.
+It remains optional and is not a launch requirement or a prerequisite for
+organizer access to sensitive information.
 
 ## Retention and deletion proposal
 
@@ -264,8 +265,8 @@ backup and give them authority and resources to handle requests on time.
       lived-experience collection; approve appropriate notices and consent flows.
 - [ ] Explain autosave before collection, review sensitive browser storage, and
       implement draft-discard and abandoned-draft deletion rules.
-- [ ] Approve organizer access restrictions, two-factor requirements, training,
-      and any additional encryption.
+- [ ] Approve organizer access restrictions, training, and any additional
+      encryption.
 - [ ] Verify providers, processing locations, agreements, retention, and backups.
 - [ ] Approve the retention schedule, restricted decision-record storage, legal
       hold procedure, and deletion jobs; test that they work.
