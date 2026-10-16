@@ -77,6 +77,17 @@ export function readDraftAnswers(element: HTMLFormElement) {
 export function initApplicationDraft(element: HTMLFormElement) {
   const userId = element.dataset.profileUserId;
   if (!userId || !element.hasAttribute("data-application")) return;
+  const flow = element.closest("[data-application-flow]")!;
+  const saveIndicator = flow.querySelector<HTMLElement>(
+    "[data-draft-save-indicator]",
+  )!;
+  const saveTimeFormat = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const saveDateFormat = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+  });
   const status = element.querySelector<HTMLElement>("[data-draft-status]")!;
   const statusPanel = element.querySelector<HTMLElement>(
     "[data-draft-status-panel]",
@@ -92,9 +103,9 @@ export function initApplicationDraft(element: HTMLFormElement) {
     element.dataset.draftGeneration ?? "null",
   );
   const discardKey = `${applicationDraftDiscardPrefix}${userId}`;
-  const discardActions = element
-    .closest("[data-application-flow]")!
-    .querySelector<HTMLElement>("[data-application-draft-actions]")!;
+  const discardActions = flow.querySelector<HTMLElement>(
+    "[data-application-draft-actions]",
+  )!;
   const discardButton = discardActions.querySelector<HTMLButtonElement>(
     "[data-draft-discard]",
   )!;
@@ -136,10 +147,12 @@ export function initApplicationDraft(element: HTMLFormElement) {
   let accountDiscarded = false;
   let revision = initial?.revision ?? null;
   let savedAnswers = initial?.answers ?? emptyAnswers();
+  let savedAt = initial?.updatedAt ?? null;
   let conflict: { draft: ApplicationDraft | null } | undefined;
   let inFlight: Promise<void> | undefined;
   let refreshing: Promise<void> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let dateTimer: ReturnType<typeof setTimeout> | undefined;
   let paused = false;
   let stopped = false;
   let blocked = false;
@@ -174,16 +187,54 @@ export function initApplicationDraft(element: HTMLFormElement) {
     }
   };
   const renderStatus = () => {
+    clearTimeout(dateTimer);
+    dateTimer = undefined;
+    const unsaved = dirty();
     conflictPanel.hidden = !conflict;
     retry.hidden = !failure || Boolean(conflict) || stopped;
     const backupWarning =
-      !localAvailable && dirty()
+      !localAvailable && unsaved
         ? "Browser backup is unavailable. Keep this page open until your answers reach your account."
         : "";
     const message = [failure, backupWarning].filter(Boolean).join(" ");
     status.textContent = message;
     status.hidden = !message;
     statusPanel.hidden = !message && !conflict;
+
+    let saveState = "idle";
+    let saveMessage = "Ready to save";
+    if (stopped || paused) {
+      saveState = "paused";
+      saveMessage = "Saving paused";
+    } else if (conflict) {
+      saveState = "error";
+      saveMessage = "Choose which answers to keep";
+    } else if (failure || blocked) {
+      saveState = "error";
+      saveMessage = unsaved
+        ? "Couldn’t save to your account"
+        : "Couldn’t check save status";
+    } else if (inFlight || unsaved) {
+      saveState = "saving";
+      saveMessage = "Saving…";
+    } else if (revision && savedAt !== null) {
+      saveState = "saved";
+      const savedDate = new Date(savedAt);
+      const now = new Date();
+      const date =
+        savedDate.toDateString() === now.toDateString()
+          ? ""
+          : ` on ${saveDateFormat.format(savedDate)}`;
+      saveMessage = `✓ Saved${date} at ${saveTimeFormat.format(savedDate)}`;
+      // Refresh at local midnight without a ticking counter.
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      dateTimer = setTimeout(renderStatus, midnight.getTime() - now.getTime());
+    }
+    saveIndicator.dataset.saveState = saveState;
+    if (saveIndicator.textContent !== saveMessage)
+      saveIndicator.textContent = saveMessage;
+    saveIndicator.hidden = false;
   };
   const restore = (answers: ApplicationDraftAnswers, notify = true) => {
     restoring = true;
@@ -235,6 +286,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
       conflict = { draft: remote };
       cancelTimer();
     }
+    if (!conflict) savedAt = remote?.updatedAt ?? null;
     persist();
     renderStatus();
   };
@@ -250,6 +302,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     failure = "";
     lastAttempt = undefined;
     savedAnswers = emptyAnswers();
+    savedAt = null;
     restore(emptyAnswers(), notify);
     element.dataset.applicationDraft = "null";
     for (const answer of element.querySelectorAll<HTMLElement>(
@@ -405,6 +458,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     stopped = true;
     cancelTimer();
     clearApplicationDraft(userId);
+    renderStatus();
   };
   const fetchRemote = async () => {
     const response = await fetch(endpoint, {
@@ -510,6 +564,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
         if (stopped || checkDiscard()) return;
         revision = draft.revision;
         savedAnswers = draft.answers;
+        savedAt = draft.updatedAt;
         failure = "";
         retryDelay = 2000;
       } catch (error) {
@@ -576,6 +631,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
       if (!conflict) return;
       revision = conflict.draft?.revision ?? null;
       savedAnswers = conflict.draft?.answers ?? emptyAnswers();
+      savedAt = conflict.draft?.updatedAt ?? null;
       conflict = undefined;
       failure = "";
       persist();
@@ -590,6 +646,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
       restore(remote?.answers ?? emptyAnswers());
       revision = remote?.revision ?? null;
       savedAnswers = remote?.answers ?? emptyAnswers();
+      savedAt = remote?.updatedAt ?? null;
       conflict = undefined;
       failure = "";
       persist();
@@ -625,6 +682,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
         );
       paused = true;
       cancelTimer();
+      renderStatus();
       await inFlight;
       await refreshing;
       if (conflict || stopped || blocked)
@@ -653,6 +711,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     signedOut() {
       stopped = true;
       cancelTimer();
+      renderStatus();
     },
     async beforeSignOut() {
       if (stopped) return true;
@@ -660,6 +719,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
       await save();
       paused = true;
       cancelTimer();
+      renderStatus();
       if (
         dirty() &&
         !confirm(
@@ -667,6 +727,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
         )
       ) {
         paused = false;
+        renderStatus();
         schedule();
         return false;
       }

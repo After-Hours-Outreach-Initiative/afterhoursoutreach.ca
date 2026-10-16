@@ -35,6 +35,9 @@ async function expectDeleted(page: Page, id: string) {
   await expect(page.locator('[name="firstName"]')).toHaveValue("");
   await expect(page.locator('[name="firstName"]')).toBeEnabled();
   await expect(page.locator(status)).toBeHidden();
+  await expect(page.locator("[data-draft-save-indicator]")).toHaveText(
+    "Ready to save",
+  );
   expect((await account(page)).draft).toBeNull();
   const backup = JSON.parse((await local(page, id))!);
   const emptyAnswers = applicationDraftAnswersSchema.parse({});
@@ -271,6 +274,9 @@ test("offline deletion reports partial failure, survives reload without restore,
   );
   await expect(page.locator(status)).toContainText(
     "This browser’s draft answers were deleted",
+  );
+  await expect(page.locator("[data-draft-save-indicator]")).toHaveText(
+    "Saving paused",
   );
   expect(await local(page, id)).toBeNull();
   expect((await account(page)).draft.answers.firstName).toBe(

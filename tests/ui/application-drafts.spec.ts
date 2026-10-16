@@ -11,7 +11,27 @@ import {
 
 const endpoint = "/api/v1/account/application-draft";
 const statusSelector = "[data-draft-status]";
+const saveIndicatorSelector = "[data-draft-save-indicator]";
 const formSelector = "[data-account-profile]";
+
+async function expectSaveTime(page: Page) {
+  const { draft } = await (await page.request.get(endpoint)).json();
+  const savedMessage = await page.evaluate((updatedAt) => {
+    const savedDate = new Date(updatedAt);
+    const date =
+      savedDate.toDateString() === new Date().toDateString()
+        ? ""
+        : ` on ${new Intl.DateTimeFormat(undefined, {
+            dateStyle: "medium",
+          }).format(savedDate)}`;
+    const time = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(savedDate);
+    return `✓ Saved${date} at ${time}`;
+  }, draft.updatedAt as number);
+  await expect(page.locator(saveIndicatorSelector)).toHaveText(savedMessage);
+}
 
 async function expectDraftSaved(
   page: Page,
@@ -24,6 +44,7 @@ async function expectDraftSaved(
     )
     .toEqual(expect.objectContaining(answers));
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
+  await expectSaveTime(page);
 }
 
 test.beforeEach(async ({ baseURL, page }) => {
@@ -36,6 +57,57 @@ test.beforeEach(async ({ baseURL, page }) => {
     "cf-connecting-ip": `198.18.${ip[0]}.${ip[1]}`,
   });
 });
+
+for (const timezoneId of ["America/Vancouver", "Asia/Tokyo"]) {
+  test(`save status adds the date after local midnight in ${timezoneId}`, async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({ baseURL, timezoneId });
+    try {
+      const { id } = await createLocalAccount(context.request, baseURL!, false);
+      const response = await context.request.put(endpoint, {
+        headers: { origin: baseURL! },
+        data: {
+          userId: id,
+          version: 1,
+          revision: null,
+          generation: null,
+          answers: { firstName: "Saved before midnight" },
+        },
+      });
+      expect(response.ok(), await response.text()).toBe(true);
+      const { draft } = await response.json();
+      const page = await context.newPage();
+      const beforeMidnight = await page.evaluate((updatedAt) => {
+        const date = new Date(updatedAt);
+        date.setHours(23, 59, 59, 0);
+        return date.getTime();
+      }, draft.updatedAt as number);
+      await page.clock.install({ time: new Date(beforeMidnight - 60_000) });
+      await page.clock.pauseAt(new Date(beforeMidnight));
+      await page.goto("/apply");
+      await expect(page.locator(saveIndicatorSelector)).toHaveText(
+        /^✓ Saved at /,
+      );
+      await expectSaveTime(page);
+
+      await page.clock.runFor(2000);
+
+      await expect(page.locator(saveIndicatorSelector)).toHaveText(
+        /^✓ Saved on /,
+      );
+      await expectSaveTime(page);
+      await page.reload();
+      await expect(page.locator(saveIndicatorSelector)).toHaveText(
+        /^✓ Saved on /,
+      );
+      await expectSaveTime(page);
+    } finally {
+      await context.close();
+    }
+  });
+}
 
 test("browser drafts preserve incomplete answers through reload and closing the tab, then retry account saving", async ({
   page,
@@ -103,6 +175,9 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   await expect(reopened.locator(statusSelector)).toContainText(
     "We could not connect",
   );
+  await expect(reopened.locator(saveIndicatorSelector)).toHaveText(
+    "Couldn’t save to your account",
+  );
   await reopened.evaluate(() =>
     window.dispatchEvent(new Event("draft-test-online")),
   );
@@ -132,13 +207,17 @@ test("account drafts resume in a separate browser with no local storage and rema
   const device = await browser.newContext({
     baseURL,
     storageState: { cookies: await context.cookies(), origins: [] },
+    timezoneId: "America/Vancouver",
   });
   try {
     const resumed = await device.newPage();
+    // The saved time must come from the account, not the device's current clock.
+    await resumed.clock.setFixedTime(new Date(Date.now() + 3 * 60 * 60 * 1000));
     await resumed.goto("/apply");
     await expect(resumed.locator('[name="firstName"]')).toHaveValue(
       "Different device",
     );
+    await expectSaveTime(resumed);
     await expect(resumed.locator('[name="firstName"]')).toHaveAttribute(
       "required",
       "",
@@ -160,6 +239,12 @@ test("account drafts resume in a separate browser with no local storage and rema
     expect((await (await resumed.request.get(endpoint)).json()).submitted).toBe(
       false,
     );
+    await resumed
+      .locator('[name="firstName"]')
+      .fill("Updated on another device");
+    await expectDraftSaved(resumed, { firstName: "Updated on another device" });
+    await resumed.reload();
+    await expectSaveTime(resumed);
   } finally {
     await device.close();
   }
@@ -174,9 +259,17 @@ test("edits made during a pending save are backed up immediately and saved after
   const pending = new Promise<void>((resolve) => {
     release = resolve;
   });
+  let releaseLatest!: () => void;
+  const latestPending = new Promise<void>((resolve) => {
+    releaseLatest = resolve;
+  });
   let requests = 0;
   await page.route(`**${endpoint}`, async (route) => {
-    if (route.request().method() === "PUT" && ++requests === 1) await pending;
+    if (route.request().method() === "PUT") {
+      const attempt = ++requests;
+      if (attempt === 1) await pending;
+      if (attempt === 2) await latestPending;
+    }
     await route.continue();
   });
   await page.goto("/apply");
@@ -184,9 +277,12 @@ test("edits made during a pending save are backed up immediately and saved after
     page.getByText("Your answers save automatically", { exact: false }),
   ).toHaveCount(0);
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
+  await expect(page.locator(saveIndicatorSelector)).toHaveText("Ready to save");
   await page.locator('[name="firstName"]').fill("First version");
+  await expect(page.locator(saveIndicatorSelector)).toHaveText("Saving…");
   await expect.poll(() => requests).toBe(1);
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
+  await expect(page.locator(saveIndicatorSelector)).toHaveText("Saving…");
   await page.locator('[name="firstName"]').fill("Latest version");
   expect(
     await page.evaluate(
@@ -195,10 +291,13 @@ test("edits made during a pending save are backed up immediately and saved after
     ),
   ).toBe("Latest version");
   release();
+  await expect.poll(() => requests).toBe(2);
+  await expect(page.locator(saveIndicatorSelector)).toHaveText("Saving…");
+  expect(
+    (await (await page.request.get(endpoint)).json()).draft.answers.firstName,
+  ).toBe("First version");
+  releaseLatest();
   await expectDraftSaved(page, { firstName: "Latest version" });
-  await expect(
-    page.getByText("Saved to your account.", { exact: true }),
-  ).toHaveCount(0);
 });
 
 for (const keepLocal of [true, false]) {
@@ -230,6 +329,9 @@ for (const keepLocal of [true, false]) {
       "Local changes",
     );
     await expect(page.locator("[data-draft-conflict]")).toBeVisible();
+    await expect(page.locator(saveIndicatorSelector)).toHaveText(
+      "Choose which answers to keep",
+    );
     await page.unroute(`**${endpoint}`);
     await page
       .getByRole("button", {
@@ -284,6 +386,9 @@ test("switching accounts never restores or autosaves another account's answers",
   await page.locator('[name="firstName"]').fill("Stale tab changes");
   await expect(page.locator(statusSelector)).toContainText(
     "Sign in again or reload",
+  );
+  await expect(page.locator(saveIndicatorSelector)).toHaveText(
+    "Couldn’t save to your account",
   );
   expect((await (await page.request.get(endpoint)).json()).draft).toBe(null);
   await page.goto("/apply");
