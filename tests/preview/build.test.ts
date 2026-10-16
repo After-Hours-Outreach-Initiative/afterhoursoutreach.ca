@@ -29,11 +29,17 @@ test("preview builds support real account features but reject development endpoi
     ]) {
       const home = await worker.fetch(origin);
       assert.equal(home.status, 200);
-      assert.match(await home.text(), /Preview · public test site/);
+      assert.match(
+        await home.text(),
+        /<aside\b[^>]*aria-label="Preview environment"/,
+      );
       assert.equal(home.headers.get("cache-control"), "no-store");
       const page = await worker.fetch(`${origin}/volunteer`);
       assert.equal(page.status, 200);
-      assert.match(await page.text(), /Preview · public test site/);
+      assert.match(
+        await page.text(),
+        /<aside\b[^>]*aria-label="Preview environment"/,
+      );
       assert.match(
         page.headers.get("content-security-policy")!,
         /script-src 'self'/,
