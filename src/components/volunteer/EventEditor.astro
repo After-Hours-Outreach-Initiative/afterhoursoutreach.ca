@@ -121,60 +121,30 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
           message="Enter a valid map URL (up to 2048 characters)."
         />
       </div>
-      <fieldset class="volunteer-state-field">
-        <legend>Registration</legend>
-        <div class="volunteer-state-selector">
-          <label class="volunteer-state-option volunteer-state-positive">
-            <input
-              class="sr-only"
-              type="radio"
-              name="open"
-              value="true"
-              checked={event ? Boolean(event.open) : true}
-            />
-            <span>Open</span>
-          </label>
-          <label class="volunteer-state-option volunteer-state-negative">
-            <input
-              class="sr-only"
-              type="radio"
-              name="open"
-              value="false"
-              checked={event ? !event.open : false}
-            />
-            <span>Closed</span>
-          </label>
-        </div>
-      </fieldset>
-      <fieldset class="volunteer-state-field">
-        <legend>Volunteer event list</legend>
-        <div class="volunteer-state-selector">
-          <label class="volunteer-state-option volunteer-state-positive">
-            <input
-              class="sr-only"
-              type="radio"
-              name="hidden"
-              value="false"
-              checked={!event?.hidden}
-            />
-            <span>Visible</span>
-          </label>
-          <label class="volunteer-state-option volunteer-state-negative">
-            <input
-              class="sr-only"
-              type="radio"
-              name="hidden"
-              value="true"
-              checked={Boolean(event?.hidden)}
-            />
-            <span>Hidden</span>
-          </label>
-        </div>
-      </fieldset>
+      <div class="volunteer-field volunteer-wide">
+        <label class="volunteer-visibility">
+          <input
+            class="switch"
+            type="checkbox"
+            role="switch"
+            name="publicVisibility"
+            checked={Boolean(event?.open && !event.hidden)}
+            aria-describedby={`${dialogId}-visibility-help`}
+          />
+          <span class="switch-track" aria-hidden="true">
+            <span class="switch-thumb"></span>
+          </span>
+          Public visibility
+        </label>
+        <p class="volunteer-help" id={`${dialogId}-visibility-help`}>
+          When on, shown to approved volunteers and open for registration. When
+          off, only organizers and existing registrants can see it. Existing
+          spots are kept.
+        </p>
+      </div>
     </div>
     <p class="volunteer-help">
-      Closing or hiding an event does not cancel existing spots. You can choose
-      whether to email registered volunteers when saving changes.
+      You can choose whether to email registered volunteers when saving changes.
     </p>
     <p data-form-message role="status" hidden></p>
     <button class="btn btn-primary" type="submit" data-loading-label="Saving…"

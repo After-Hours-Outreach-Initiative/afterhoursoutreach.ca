@@ -481,8 +481,9 @@ form("[data-event-save]", "/api/v1/events/action", (v) => ({
     meetingPoint: str(v, "meetingPoint"),
     meetingPointUrl: str(v, "meetingPointUrl"),
     spots: Number(v.get("spots")),
-    open: str(v, "open") === "true",
-    hidden: str(v, "hidden") === "true",
+    // Keep the existing API/storage flags in sync from the single control.
+    open: v.has("publicVisibility"),
+    hidden: !v.has("publicVisibility"),
   },
 }));
 form("[data-event-cancel]", "/api/v1/events/action", (v) => ({

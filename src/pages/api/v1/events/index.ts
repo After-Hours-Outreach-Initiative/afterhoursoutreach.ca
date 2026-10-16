@@ -13,7 +13,10 @@ export const GET: APIRoute = async ({ request }) => {
     const events = (await listEvents(env.DB, actor))
       .filter(
         (event) =>
-          event.startsAt > Date.now() && !event.cancelledAt && !event.hidden,
+          event.startsAt > Date.now() &&
+          !event.cancelledAt &&
+          Boolean(event.open) &&
+          !event.hidden,
       )
       .map(({ id, type, startsAt, meetingPoint }) => ({
         id,

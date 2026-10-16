@@ -448,87 +448,20 @@ body:has([data-application]) {
   color: #a1a1aa;
   background: #171a20;
 }
-.volunteer-state-field {
-  min-width: 0;
-}
-.volunteer-state-field legend {
-  margin-bottom: 8px;
-  font-size: 16px;
-  font-weight: normal;
-}
-.volunteer-state-selector {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid #52525b;
-  border-radius: 6px;
-  background: #050608;
-}
-.volunteer-state-selector::before {
-  content: "";
-  position: absolute;
-  inset: 4px auto 4px 4px;
-  width: calc((100% - 12px) / 2);
-  border: 1px solid #15803d;
-  border-radius: 4px;
-  background: #052e16;
-  pointer-events: none;
-  transform: translateX(0);
-  transition:
-    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    background-color 220ms,
-    border-color 220ms;
-}
-.volunteer-state-selector:has(
-    .volunteer-state-option:last-child input:checked
-  )::before {
-  transform: translateX(calc(100% + 4px));
-}
-.volunteer-state-selector:has(.volunteer-state-negative input:checked)::before {
-  border-color: #b91c1c;
-  background: #450a0a;
-}
-.volunteer-state-selector:has(input:disabled)::before {
-  opacity: 0.6;
-}
-.volunteer-state-option {
-  position: relative;
-  min-width: 0;
-}
-.volunteer-state-positive {
-  --state-color: #4ade80;
-}
-.volunteer-state-negative {
-  --state-color: #f87171;
-}
-.volunteer-state-option span {
+.volunteer-visibility {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
   min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: #a1a1aa;
   cursor: pointer;
-  transition: color 150ms;
 }
-.volunteer-state-option input:checked + span {
-  color: var(--state-color);
-}
-.volunteer-state-option input:focus-visible + span {
-  outline: 3px solid #4169e1;
-  outline-offset: 2px;
-}
-.volunteer-state-option input:disabled + span {
+.volunteer-visibility:has(input:disabled) {
   opacity: 0.6;
   cursor: wait;
 }
 @media (prefers-reduced-motion: reduce) {
-  .volunteer-state-selector::before,
-  .volunteer-state-option span {
+  .volunteer-visibility .switch-track,
+  .volunteer-visibility .switch-thumb {
     transition: none;
   }
 }

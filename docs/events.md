@@ -54,8 +54,17 @@ Each event has an extra edit button and a roster details dropdown.
 
 ### Edit view
 
-A popup that lets all fields be changed and the event be hidden/closed or
-deleted.
+A popup for editing event details, public visibility, or cancelling the event.
+The single **Public visibility** toggle shows the event to approved volunteers
+and opens registration when on; when off, only organizers and existing
+registrants can see it, and new registrations are blocked. Existing spots are
+not cancelled. New events default to off. “Public” does not grant visitor or
+pending-account access.
+
+The existing `open`/`hidden` API and database fields remain compatible. The
+editor saves them together (`true`/`false` when on, `false`/`true` when off).
+Older events with either registration closed or the event hidden are treated
+as off until an organizer explicitly turns visibility on.
 
 ### Event volunteers list
 
