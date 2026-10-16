@@ -315,6 +315,13 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(
       page.getByRole("heading", { name: "Your account", exact: true }),
     ).toBeVisible();
+    await expect(page.locator("[data-profile-summary]")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+    await page.getByRole("button", { name: "Edit profile" }).click();
     const form = page.locator("[data-account-profile]");
     await expect(form.getByRole("heading", { level: 3 })).toHaveText([
       "Personal info",

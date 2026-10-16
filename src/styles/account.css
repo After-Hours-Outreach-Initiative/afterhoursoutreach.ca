@@ -40,6 +40,30 @@
   gap: 8px;
   min-width: 0;
 }
+.account-profile-summary {
+  display: grid;
+  gap: 32px;
+}
+.account-profile-summary dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.account-profile-summary dt {
+  margin-bottom: 6px;
+  font-weight: 400;
+  color: #a1a1aa;
+}
+.account-profile-summary dd {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.account-profile-summary ul {
+  padding-left: 24px;
+  list-style: disc;
+  white-space: normal;
+}
 .account-sessions {
   display: flex;
   flex-direction: column;
@@ -67,7 +91,8 @@
   user-select: all;
 }
 @media (max-width: 640px) {
-  .account-profile-buttons {
+  .account-profile-buttons,
+  .account-profile-summary dl {
     grid-template-columns: 1fr;
   }
 }

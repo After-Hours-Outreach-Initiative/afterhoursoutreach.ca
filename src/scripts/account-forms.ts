@@ -4,6 +4,7 @@ import {
   motivationMaxWords,
   motivationWordLimitError,
 } from "../data/application";
+import { profileSummaryRows } from "../data/account-profile";
 
 const requestFailed = "The request failed. Please try again.";
 
@@ -211,17 +212,47 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   const button = element.querySelector<HTMLButtonElement>(
     'button[type="submit"]',
   );
+  const view = element.querySelector<HTMLElement>("[data-profile-view]")!;
+  const editor = element.querySelector<HTMLElement>("[data-profile-editor]")!;
+  const edit = element.querySelector<HTMLButtonElement>("[data-profile-edit]")!;
+  const cancel = element.querySelector<HTMLButtonElement>(
+    "[data-profile-cancel]",
+  )!;
   // Profile answers are text and checkbox values; the server trims text on save.
   const snapshot = (values: FormData) =>
     JSON.stringify(
       [...values].map(([name, value]) => [name, String(value).trim()]),
     );
   let saved = snapshot(new FormData(element));
+  const changed = () => snapshot(new FormData(element)) !== saved;
+  const setEditing = (editing: boolean) => {
+    const restoreFocus =
+      editor.contains(document.activeElement) ||
+      document.activeElement === document.body;
+    view.hidden = editing;
+    editor.hidden = !editing;
+    edit.setAttribute("aria-expanded", String(editing));
+    if (editing) {
+      clearFormMessage(element);
+      editor
+        .querySelector<HTMLElement>(
+          'input:not([type="hidden"]):enabled:not([readonly])',
+        )
+        ?.focus();
+    } else if (restoreFocus) edit.focus({ preventScroll: true });
+  };
+  edit.disabled = false;
+  edit.addEventListener("click", () => setEditing(true));
+  cancel.addEventListener("click", () => {
+    if (element.dataset.submitting) return;
+    element.reset();
+    clearFormMessage(element);
+    setEditing(false);
+  });
   const update = () => {
     if (button)
-      button.disabled =
-        Boolean(element.dataset.submitting) ||
-        snapshot(new FormData(element)) === saved;
+      button.disabled = Boolean(element.dataset.submitting) || !changed();
+    cancel.disabled = Boolean(element.dataset.submitting);
   };
   for (const event of ["input", "change"])
     element.addEventListener(event, update);
@@ -232,6 +263,53 @@ export function initAccountFormChanges(element: HTMLFormElement) {
     markSaved(values: FormData) {
       // Edits made while the request is pending must remain unsaved.
       saved = snapshot(values);
+      // Cancel/reset must return to the latest save, not the initial page load.
+      for (const control of element.querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement
+      >("input[name], textarea[name]")) {
+        if (
+          control instanceof HTMLInputElement &&
+          ["radio", "checkbox"].includes(control.type)
+        ) {
+          const checked = control.checked;
+          control.defaultChecked = control.disabled
+            ? checked
+            : values.getAll(control.name).includes(control.value);
+          control.checked = checked;
+        } else {
+          const value = control.value;
+          control.defaultValue = String(values.get(control.name) ?? "").trim();
+          control.value = value;
+        }
+      }
+      const answers = {
+        ...Object.fromEntries(
+          [...values].map(([name, value]) => [name, String(value)]),
+        ),
+        teams: values.getAll("teams").map(String),
+        certifications: values.getAll("certifications").map(String),
+        training: values.getAll("training").map(String),
+      };
+      for (const row of profileSummaryRows(answers)) {
+        const target = view.querySelector<HTMLElement>(
+          `[data-profile-row="${row.name}"]`,
+        )!;
+        target.hidden = row.hidden;
+        const answer = target.querySelector<HTMLElement>("dd")!;
+        if (Array.isArray(row.value) && row.value.length) {
+          const list = document.createElement("ul");
+          for (const value of row.value) {
+            const item = document.createElement("li");
+            item.textContent = value;
+            list.appendChild(item);
+          }
+          answer.replaceChildren(list);
+        } else
+          answer.textContent = Array.isArray(row.value)
+            ? "None selected"
+            : row.value;
+      }
+      if (!changed()) setEditing(false);
     },
   };
 }
