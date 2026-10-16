@@ -128,6 +128,17 @@ export const applicationDraft = sqliteTable("application_draft", {
   updated_at: timestamp().notNull(),
 });
 
+// Answer-free tombstones invalidate delayed saves even when no draft row exists.
+export const applicationDraftGeneration = sqliteTable(
+  "application_draft_generation",
+  {
+    user_id: text()
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    generation: text().notNull(),
+  },
+);
+
 export const profile = sqliteTable("profile", {
   user_id: text()
     .primaryKey()

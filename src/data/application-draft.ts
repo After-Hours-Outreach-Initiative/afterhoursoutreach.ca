@@ -46,6 +46,7 @@ export type ApplicationDraftAnswers = z.infer<
 export const applicationDraftSchema = z.strictObject({
   version: z.literal(1),
   revision: z.uuid(),
+  generation: z.uuid().nullable().default(null),
   answers: applicationDraftAnswersSchema,
   updatedAt: z.number().int().nonnegative(),
 });
@@ -55,22 +56,39 @@ export const applicationDraftWriteSchema = z.strictObject({
   userId: z.string().min(1).max(200),
   version: z.literal(1),
   revision: z.uuid().nullable(),
+  generation: z.uuid().nullable().default(null),
   answers: applicationDraftAnswersSchema,
 });
 
 export const localApplicationDraftSchema = z.strictObject({
   version: z.literal(1),
   revision: z.uuid().nullable(),
+  generation: z.uuid().nullable().default(null),
   answers: applicationDraftAnswersSchema,
   savedAnswers: applicationDraftAnswersSchema,
 });
 
 export const applicationDraftBodyLimit = 65_536;
 export const applicationDraftStoragePrefix = "aho:application-draft:v1:";
+export const applicationDraftDiscardPrefix =
+  "aho:application-draft-discard:v1:";
+export const applicationDraftDiscardSchema = z.strictObject({
+  userId: z.string().min(1).max(200),
+  generation: z.uuid().nullable(),
+  discardId: z.uuid(),
+});
+export const localDraftDiscardSchema = applicationDraftDiscardSchema.extend({
+  completed: z.boolean(),
+});
+export const applicationDraftDiscardResponseSchema = z.strictObject({
+  userId: z.string(),
+  generation: z.uuid(),
+});
 
 export const applicationDraftReadResponseSchema = z.strictObject({
   userId: z.string(),
   submitted: z.boolean(),
+  generation: z.uuid().nullable(),
   draft: applicationDraftSchema.nullable(),
 });
 export const applicationDraftSaveResponseSchema = z.strictObject({

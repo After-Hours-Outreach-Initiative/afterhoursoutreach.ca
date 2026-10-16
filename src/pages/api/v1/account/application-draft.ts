@@ -4,7 +4,8 @@ import { applicationDraftBodyLimit } from "@/data/application-draft";
 import { forwardCookies } from "@/server/auth";
 import { accountContext } from "@/server/db/access";
 import {
-  loadApplicationDraft,
+  loadApplicationDraftState,
+  discardApplicationDraft,
   saveApplicationDraft,
 } from "@/server/db/application-drafts";
 import { takeRateLimit } from "@/server/db/rate-limits";
@@ -25,9 +26,9 @@ export const GET: APIRoute = async ({ request }) => {
       {
         userId: actor.id,
         submitted: actor.applicationSubmitted,
-        draft: actor.applicationSubmitted
-          ? null
-          : await loadApplicationDraft(env.DB, actor.id),
+        ...(actor.applicationSubmitted
+          ? { draft: null, generation: null }
+          : await loadApplicationDraftState(env.DB, actor.id)),
       },
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -58,6 +59,25 @@ export const PUT: APIRoute = async ({ request }) => {
       { userId: actor.id, draft },
       { headers: { "Cache-Control": "no-store" } },
     );
+    forwardCookies(headers, response.headers);
+    return response;
+  } catch (error) {
+    return errorResponse(error);
+  }
+};
+
+export const DELETE: APIRoute = async ({ request }) => {
+  try {
+    const { actor, headers } = await accountContext(env, request, true);
+    if (!actor) throw new RequestError(401, "Sign in to discard your draft.");
+    const result = await discardApplicationDraft(
+      env.DB,
+      actor,
+      await readJson(request, 1024),
+    );
+    const response = Response.json(result, {
+      headers: { "Cache-Control": "no-store" },
+    });
     forwardCookies(headers, response.headers);
     return response;
   } catch (error) {

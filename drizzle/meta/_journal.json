@@ -85,6 +85,13 @@
       "when": 1792133939144,
       "tag": "0011_medic_certification_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792187391866,
+      "tag": "0012_draft_discard_generation",
+      "breakpoints": true
     }
   ]
 }

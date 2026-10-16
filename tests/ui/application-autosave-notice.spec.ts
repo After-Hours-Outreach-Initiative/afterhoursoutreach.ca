@@ -47,6 +47,11 @@ for (const [layout, viewport] of [
       "clearing this site’s browser data does not delete your account draft",
     );
     await expect(notice).toContainText("Saving a draft is not submission");
+    await expect(notice).toContainText("Use Discard application draft below");
+    await expect(notice).toContainText(
+      "including unsynced answers, after confirmation",
+    );
+    await expect(notice).toContainText("If either deletion fails");
     await expect(notice).toContainText(
       "Drafts are not shown in organizer views",
     );

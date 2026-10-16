@@ -3,6 +3,10 @@ import {
   applicationDraftSchema,
   applicationDraftReadResponseSchema,
   applicationDraftSaveResponseSchema,
+  applicationDraftDiscardSchema,
+  applicationDraftDiscardResponseSchema,
+  applicationDraftDiscardPrefix,
+  localDraftDiscardSchema,
   applicationDraftStoragePrefix,
   localApplicationDraftSchema,
   sameDraftAnswers,
@@ -84,6 +88,48 @@ export function initApplicationDraft(element: HTMLFormElement) {
   const initial = applicationDraftSchema
     .nullable()
     .parse(JSON.parse(element.dataset.applicationDraft ?? "null"));
+  const generation: string | null = JSON.parse(
+    element.dataset.draftGeneration ?? "null",
+  );
+  const discardKey = `${applicationDraftDiscardPrefix}${userId}`;
+  const discardButton = element.querySelector<HTMLButtonElement>(
+    "[data-draft-discard]",
+  )!;
+  const discardStatus = element.querySelector<HTMLElement>(
+    "[data-draft-discard-status]",
+  )!;
+  const newDraft = element.querySelector<HTMLElement>("[data-draft-new]")!;
+  discardButton.disabled = false;
+  const readDiscard = () => {
+    try {
+      const parsed = localDraftDiscardSchema.safeParse(
+        JSON.parse(localStorage.getItem(discardKey) ?? "null"),
+      );
+      return parsed.success && parsed.data.userId === userId
+        ? parsed.data
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const initialDiscard = readDiscard();
+  // A newer server generation (or deliberately authored post-discard draft)
+  // supersedes an old failed retry. Do not trap this account in a retry loop or
+  // let that retry delete newer answers; local generation checks still apply.
+  const supersededDiscard =
+    initialDiscard &&
+    generation !== initialDiscard.generation &&
+    (generation !== initialDiscard.discardId || Boolean(initial));
+  const acceptedDiscardId =
+    initialDiscard &&
+    ((initialDiscard.completed && initialDiscard.discardId === generation) ||
+      supersededDiscard)
+      ? initialDiscard.discardId
+      : undefined;
+  let discardRequest:
+    ReturnType<typeof applicationDraftDiscardSchema.parse> | undefined;
+  let deleting = false;
+  let accountDiscarded = false;
   let revision = initial?.revision ?? null;
   let savedAnswers = initial?.answers ?? emptyAnswers();
   let conflict: { draft: ApplicationDraft | null } | undefined;
@@ -106,13 +152,14 @@ export function initApplicationDraft(element: HTMLFormElement) {
     timer = undefined;
   };
   const persist = () => {
-    if (stopped) return;
+    if (stopped || checkDiscard()) return;
     try {
       localStorage.setItem(
         storageKey(userId),
         JSON.stringify({
           version: 1,
           revision,
+          generation,
           answers: readDraftAnswers(element),
           savedAnswers,
         }),
@@ -192,6 +239,163 @@ export function initApplicationDraft(element: HTMLFormElement) {
     if (!paused && !stopped && !blocked && !conflict && dirty())
       timer = setTimeout(() => void save(), delay);
   };
+  const stopForDiscard = (message: string, notify = true) => {
+    stopped = true;
+    cancelTimer();
+    conflict = undefined;
+    failure = "";
+    lastAttempt = undefined;
+    savedAnswers = emptyAnswers();
+    restore(emptyAnswers(), notify);
+    element.dataset.applicationDraft = "null";
+    for (const answer of element.querySelectorAll<HTMLElement>(
+      "[data-review-answer]",
+    ))
+      if (answer.dataset.reviewAnswer !== "email")
+        answer.textContent = "Not provided";
+    // Native form reset must not recover the server-rendered draft either.
+    for (const control of element.querySelectorAll<
+      HTMLInputElement | HTMLTextAreaElement
+    >("input[name], textarea[name]")) {
+      control.defaultValue = control.value;
+      if (control instanceof HTMLInputElement)
+        control.defaultChecked = control.checked;
+    }
+    // Freeze this page; starting over requires a fresh server generation.
+    for (const fieldset of element.querySelectorAll<HTMLFieldSetElement>(
+      "fieldset",
+    ))
+      fieldset.disabled = true;
+    discardStatus.textContent = message;
+    discardStatus.hidden = false;
+    newDraft.hidden = false;
+    renderStatus();
+  };
+  const clearOldLocal = () => {
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem(storageKey(userId)) ?? "null",
+      );
+      const local = localApplicationDraftSchema.safeParse(stored);
+      if (!local.success || local.data.generation === generation)
+        localStorage.removeItem(storageKey(userId));
+    } catch {
+      /* The discard UI reports storage failures on explicit retry. */
+    }
+  };
+  const checkDiscard = () => {
+    const marker = readDiscard();
+    if (!marker || marker.discardId === acceptedDiscardId) return false;
+    if (!stopped) {
+      stopForDiscard(
+        "A draft discard was requested in another tab. Saving is paused. Reload to check its result.",
+      );
+      discardButton.hidden = true;
+      clearOldLocal();
+    }
+    return true;
+  };
+  const discard = async () => {
+    if (deleting) return;
+    if (!discardRequest) {
+      // A submitted/in-progress submission must not race destructive UI work.
+      if (paused || stopped) return;
+      if (
+        !confirm(
+          "Discard application draft? This deletes the draft saved with your account and this browser’s copy on this device, including unsynced answers. This cannot be undone. Your account and any submitted application are not deleted.",
+        )
+      )
+        return;
+      discardRequest = { userId, generation, discardId: crypto.randomUUID() };
+    }
+    deleting = true;
+    discardButton.disabled = true;
+    stopForDiscard("Discarding your draft. Saving is paused.");
+    let localCleared = false;
+    try {
+      // The answer-free marker also survives an offline reload and notifies tabs
+      // before removing answers, so their pagehide handlers cannot restore them.
+      localStorage.setItem(
+        discardKey,
+        JSON.stringify({ ...discardRequest, completed: accountDiscarded }),
+      );
+      localStorage.removeItem(storageKey(userId));
+      localCleared = localStorage.getItem(storageKey(userId)) === null;
+    } catch {
+      /* Do not claim this device is clear if storage denied the write. */
+    }
+    let accountFailure = "";
+    if (!accountDiscarded) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "DELETE",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(discardRequest),
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403)
+            throw new Error(
+              "Sign in to the same account, then retry discarding.",
+            );
+          if (response.status === 409 || response.status === 410)
+            throw new Error(
+              "Reload to check your account before discarding again. A submitted application is never changed.",
+            );
+          throw new Error(
+            "Retry discarding when your connection is available.",
+          );
+        }
+        const result = applicationDraftDiscardResponseSchema.parse(
+          await response.json(),
+        );
+        if (
+          result.userId !== userId ||
+          result.generation !== discardRequest.discardId
+        )
+          throw new Error(
+            "Your account changed. Reload to check before continuing.",
+          );
+        accountDiscarded = true;
+      } catch (error) {
+        accountFailure =
+          error instanceof Error && error.name === "Error"
+            ? error.message
+            : "Reconnect, then retry discarding.";
+      }
+    }
+    if (accountDiscarded && localCleared) {
+      try {
+        localStorage.setItem(
+          discardKey,
+          JSON.stringify({ ...discardRequest, completed: true }),
+        );
+      } catch {
+        localCleared = false;
+      }
+    }
+    // A late save response must never restore memory or browser answers.
+    clearOldLocal();
+    discardStatus.textContent =
+      accountDiscarded && localCleared
+        ? "Application draft deleted from your account and this browser on this device, including unsynced answers. Your account has not been deleted."
+        : `${localCleared ? "This browser’s draft answers were deleted." : "We could not confirm deletion of this browser’s copy. Clear this site’s browser data if retrying does not work."} ${accountDiscarded ? "Your account draft was deleted." : `Account draft deletion is not confirmed; it may still be saved. ${accountFailure}`} Saving remains paused on this page.`;
+    discardButton.textContent = "Retry discarding application draft";
+    discardButton.hidden = accountDiscarded && localCleared;
+    discardButton.disabled = false;
+    deleting = false;
+  };
+  discardButton.addEventListener("click", () => void discard());
+  window.addEventListener("storage", (event) => {
+    if (event.key === discardKey) checkDiscard();
+    if (
+      event.key === storageKey(userId) &&
+      stopped &&
+      discardStatus.textContent
+    )
+      clearOldLocal();
+  });
   const finishSubmitted = () => {
     stopped = true;
     cancelTimer();
@@ -207,6 +411,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     const result = applicationDraftReadResponseSchema.parse(
       await response.json(),
     );
+    if (stopped || checkDiscard()) return;
     if (result.userId !== userId) {
       blocked = true;
       throw new Error("Your account changed. Reload before continuing.");
@@ -217,16 +422,26 @@ export function initApplicationDraft(element: HTMLFormElement) {
       return;
     }
     blocked = false;
+    if (result.generation !== generation) {
+      stopForDiscard(
+        "Your draft was discarded on another tab or device. Old answers were cleared and saving is paused. Reload to start or check your draft.",
+      );
+      discardButton.hidden = true;
+      clearOldLocal();
+      return;
+    }
     reconcile(applicationDraftSchema.nullable().parse(result.draft));
   };
   const refresh = () => {
-    if (paused || stopped || inFlight || refreshing) return refreshing;
+    if (paused || stopped || checkDiscard() || inFlight || refreshing)
+      return refreshing;
     refreshing = (async () => {
       try {
         await fetchRemote();
         failure = "";
         retryDelay = 2000;
       } catch (error) {
+        if (stopped) return;
         failure =
           error instanceof Error
             ? error.message
@@ -241,6 +456,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
   };
   const save = (keepalive = false): Promise<void> | undefined => {
     if (inFlight) return inFlight;
+    if (checkDiscard()) return;
     if (paused || stopped || blocked || conflict || refreshing || !dirty())
       return;
     cancelTimer();
@@ -253,10 +469,17 @@ export function initApplicationDraft(element: HTMLFormElement) {
           method: "PUT",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, version: 1, revision, answers }),
+          body: JSON.stringify({
+            userId,
+            version: 1,
+            revision,
+            generation,
+            answers,
+          }),
           signal: AbortSignal.timeout(15_000),
           keepalive,
         });
+        if (stopped || checkDiscard()) return;
         if (response.status === 409 || response.status === 410) {
           await fetchRemote();
           return;
@@ -279,11 +502,13 @@ export function initApplicationDraft(element: HTMLFormElement) {
           throw new Error("Your account changed. Reload before continuing.");
         }
         const draft = applicationDraftSchema.parse(result.draft);
+        if (stopped || checkDiscard()) return;
         revision = draft.revision;
         savedAnswers = draft.answers;
         failure = "";
         retryDelay = 2000;
       } catch (error) {
+        if (stopped) return;
         failure =
           error instanceof Error && error.name === "Error"
             ? error.message
@@ -302,10 +527,21 @@ export function initApplicationDraft(element: HTMLFormElement) {
   };
 
   try {
+    if (initialDiscard && initialDiscard.discardId !== acceptedDiscardId) {
+      const { completed: _completed, ...request } = initialDiscard;
+      discardRequest = request;
+      accountDiscarded = initialDiscard.completed;
+      stopForDiscard(
+        "A previous draft discard needs checking. Old answers will not be restored. Retry discarding to confirm both copies are deleted.",
+        false,
+      );
+      clearOldLocal();
+      discardButton.textContent = "Retry discarding application draft";
+    }
     const stored = localStorage.getItem(storageKey(userId));
-    if (stored) {
+    if (stored && !stopped) {
       const local = localApplicationDraftSchema.safeParse(JSON.parse(stored));
-      if (local.success) {
+      if (local.success && local.data.generation === generation) {
         revision = local.data.revision;
         savedAnswers = local.data.savedAnswers;
         restore(local.data.answers, false);
@@ -378,6 +614,10 @@ export function initApplicationDraft(element: HTMLFormElement) {
       schedule();
     },
     async beforeSubmit() {
+      if (stopped || checkDiscard())
+        throw new Error(
+          "This draft was discarded. Reload before starting a new application.",
+        );
       paused = true;
       cancelTimer();
       await inFlight;
@@ -410,6 +650,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
       cancelTimer();
     },
     async beforeSignOut() {
+      if (stopped) return true;
       await refreshing;
       await save();
       paused = true;
