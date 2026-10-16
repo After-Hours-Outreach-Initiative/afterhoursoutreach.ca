@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   certificationOptions,
@@ -16,6 +16,7 @@ import {
   motivationWordLimitError,
   profileIdentityFields,
   type ApplicationAnswers,
+  type SubmittedApplication,
 } from "../../data/application";
 import {
   codeOfConductError,
@@ -249,6 +250,17 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
   } satisfies ApplicationAnswers;
 }
 
+export async function loadSubmittedApplication(
+  binding: Env["DB"],
+  userId: string,
+) {
+  const row = await createDatabase(binding).query.profile.findFirst({
+    where: eq(profile.user_id, userId),
+    columns: { submitted_application: true },
+  });
+  return row?.submitted_application ?? null;
+}
+
 export async function saveProfile(
   binding: Env["DB"],
   userId: string,
@@ -339,6 +351,13 @@ export async function saveProfile(
   if (!changedFields.length) return;
   const db = createDatabase(binding);
   const now = new Date();
+  const submission = {
+    version: 1,
+    answers,
+    submittedAt: now.toISOString(),
+    codeOfConductVersion,
+    codeOfConductAcceptedAt: now.toISOString(),
+  } satisfies Omit<SubmittedApplication, "email">;
   const values = {
     preferred_name: answers.preferredName,
     pronouns: answers.pronouns || null,
@@ -375,6 +394,11 @@ export async function saveProfile(
         motivation: answers.motivation,
         code_of_conduct_version: codeOfConductVersion,
         code_of_conduct_accepted_at: now,
+        // Capture the account email in the same write as the answers. On conflict,
+        // neither replace a snapshot nor backfill a legacy profile from edits.
+        submitted_application: old
+          ? null
+          : sql`json_set(${JSON.stringify(submission)}, '$.email', (SELECT email FROM user WHERE id = ${userId}))`,
         registered_at: now,
       })
       .onConflictDoUpdate({ target: profile.user_id, set: values }),

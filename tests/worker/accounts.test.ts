@@ -618,8 +618,10 @@ describe(
       assert.match(html, /Worker Test Volunteer/);
       assert.match(html, /aria-label="Volunteer account"/);
       assert.match(html, /Sample private answer/);
+      assert.match(html, /Submitted application/);
+      assert.match(html, /Why do you want to volunteer\?/);
       assert.doesNotMatch(
-        html,
+        html.match(/<form\b[^>]*data-account-profile[\s\S]*?<\/form>/)![0],
         /How did you find out about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
       );
       assert.doesNotMatch(
@@ -663,6 +665,71 @@ describe(
           )
         ).status,
         403,
+      );
+    });
+
+    test("submitted applications stay private and legacy profile edits do not invent an original snapshot", async () => {
+      const legacyCookie = await signIn(
+        "worker-legacy-application@example.org",
+      );
+      const legacy = (await (
+        await send("/api/v1/auth/get-session", undefined, legacyCookie)
+      ).json()) as typeof current;
+      await DB.prepare(
+        `INSERT INTO profile (
+        user_id, preferred_name, phone, birth_date, emergency_contact_name,
+        emergency_contact_phone, emergency_contact_relationship, heard_about_us,
+        motivation, teams, medical_certification, training_experience, registered_at, updated_at
+      ) VALUES (?, 'Legacy current name', '604-555-0100', '1995-04-12',
+        'Contact', '604-555-0101', 'Friend', 'Friend', 'Legacy motivation', '[]', '', '', 1, 1)`,
+      )
+        .bind(legacy.user.id)
+        .run();
+      const edited = await send(
+        "/api/v1/account/profile",
+        {
+          ...answers,
+          firstName: "",
+          middleNames: "",
+          lastName: "",
+          preferredName: "Changed legacy name",
+          medicalConditions: "Legacy private answer",
+        },
+        legacyCookie,
+      );
+      assert.equal(edited.status, 200, await edited.clone().text());
+      assert.equal(
+        await DB.prepare(
+          "SELECT submitted_application FROM profile WHERE user_id=?",
+        )
+          .bind(legacy.user.id)
+          .first("submitted_application"),
+        null,
+      );
+
+      const page = await send(
+        `/volunteer/account?userId=${current.user.id}`,
+        undefined,
+        legacyCookie,
+      );
+      assert.equal(page.status, 200);
+      const html = await page.text();
+      assert.match(html, /An original application snapshot is not available/);
+      assert.doesNotMatch(
+        html,
+        /View submitted application|Worker Test Volunteer|Sample private answer/,
+      );
+      const ownPage = await send(
+        `/volunteer/account?userId=${legacy.user.id}`,
+        undefined,
+        cookie,
+      );
+      assert.equal(ownPage.status, 200);
+      const ownHTML = await ownPage.text();
+      assert.match(ownHTML, /View submitted application/);
+      assert.doesNotMatch(
+        ownHTML,
+        /Legacy motivation|Changed legacy name|Legacy private answer/,
       );
     });
 
@@ -1133,6 +1200,26 @@ describe(
           changedName,
         );
         await page.reload();
+        const submittedApplication = page.locator(
+          "[data-submitted-application]",
+        );
+        await submittedApplication.locator("summary").click();
+        await expect(
+          submittedApplication.getByRole("heading", {
+            name: "Submission details",
+          }),
+        ).toBeVisible();
+        await expect(
+          submittedApplication.locator("input, textarea, select, button"),
+        ).toHaveCount(0);
+        await expect(submittedApplication).toContainText(answers.preferredName);
+        await expect(submittedApplication).toContainText(
+          answers.medicalConditions,
+        );
+        await expect(submittedApplication).not.toContainText(changedName);
+        await expect(submittedApplication).not.toContainText(
+          "Changed browser sample",
+        );
         assert.deepEqual(
           await DB.prepare(
             "SELECT heard_about_us, motivation FROM profile WHERE user_id=?",

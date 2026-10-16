@@ -129,3 +129,12 @@ BEGIN
     VALUES(lower(hex(randomblob(16))),NEW.user_id,NEW.user_id,'role_changed','["role"]',NEW.created_at);
   DELETE FROM session WHERE user_id=NEW.user_id;
 END;
+--> statement-breakpoint
+
+-- A missing legacy snapshot must stay missing; current answers are not originals.
+CREATE TRIGGER submitted_application_immutable
+BEFORE UPDATE OF submitted_application ON profile
+WHEN NEW.submitted_application IS NOT OLD.submitted_application
+BEGIN
+  SELECT RAISE(ABORT, 'submitted_application_immutable');
+END;

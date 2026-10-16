@@ -4,6 +4,7 @@ import { APIError } from "better-auth/api";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
+import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
 import FieldError from "@/components/FieldError.astro";
 import { accountGreeting } from "@/data/account-navigation";
 import {
@@ -12,7 +13,7 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import { loadProfile } from "@/server/db/profiles";
+import { loadProfile, loadSubmittedApplication } from "@/server/db/profiles";
 import { createDatabase } from "@/server/db";
 import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -22,6 +23,7 @@ import {
 } from "@/data/application";
 export const prerender = false;
 let values: ApplicationAnswers | null = null;
+let submission: Awaited<ReturnType<typeof loadSubmittedApplication>> = null;
 let email = "";
 let userId = "";
 let currentId = "";
@@ -44,6 +46,7 @@ try {
     return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/account");
   values = await loadProfile(env.DB, current.user.id);
   if (!values) return Astro.redirect("/apply");
+  submission = await loadSubmittedApplication(env.DB, current.user.id);
   email = current.user.email;
   userId = current.user.id;
   const { sessionConfig } = await auth.$context;
@@ -115,6 +118,7 @@ try {
     <h2>Your profile</h2>
     <AccountProfileForm email={email} values={values} userId={userId} />
   </section>
+  <SubmittedApplication submission={submission} />
   <section class="volunteer-panel">
     <h2>Account settings</h2>
     <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />

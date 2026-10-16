@@ -1,0 +1,177 @@
+---
+import {
+  applicationFields,
+  applicationTeamOptions,
+  certificationOptions,
+  heardAboutUsOptions,
+  heardAboutUsQuestion,
+  trainingOptions,
+  type SubmittedApplication,
+} from "@/data/application";
+
+interface Props {
+  submission: SubmittedApplication | null;
+}
+const { submission } = Astro.props;
+const sections = [
+  { key: "submission", heading: "Submission details" },
+  { key: "personal-info", heading: "Personal info" },
+  { key: "emergency-contact", heading: "Emergency contact" },
+  { key: "team-interests", heading: "Team interests" },
+  { key: "training-and-safety", heading: "Training and safety" },
+  { key: "about-volunteering", heading: "About volunteering" },
+];
+const choices = (
+  selected: string[],
+  options: readonly { value: string; label: string }[],
+) =>
+  selected.map(
+    (value) => options.find((option) => option.value === value)?.label ?? value,
+  );
+const submittedTime = (value: string) =>
+  new Date(value).toLocaleString("en-CA", {
+    timeZone: "America/Vancouver",
+    timeZoneName: "short",
+  });
+const answers = submission?.answers;
+const rows =
+  submission && answers
+    ? [
+        {
+          section: "submission",
+          label: "Submitted",
+          value: submittedTime(submission.submittedAt),
+        },
+        {
+          section: "submission",
+          label: "Email at submission",
+          value: submission.email,
+        },
+        {
+          section: "submission",
+          label: "Code of Conduct version accepted",
+          value: submission.codeOfConductVersion,
+        },
+        {
+          section: "submission",
+          label: "Code of Conduct accepted",
+          value: submittedTime(submission.codeOfConductAcceptedAt),
+        },
+        ...applicationFields
+          .filter(
+            (field) => field.name !== "heardAboutUs" || answers.heardAboutUs,
+          )
+          .map((field) => ({
+            section: field.section,
+            label: field.label,
+            value: answers[field.name],
+          })),
+        {
+          section: "team-interests",
+          label: "Teams",
+          value: choices(answers.teams, applicationTeamOptions),
+        },
+        {
+          section: "training-and-safety",
+          label: "Highest medical certification or licence",
+          value: choices(answers.certifications, certificationOptions),
+        },
+        ...(answers.certification
+          ? [
+              {
+                section: "training-and-safety",
+                label: "Additional certification answer",
+                value: answers.certification,
+              },
+            ]
+          : []),
+        {
+          section: "training-and-safety",
+          label: "Relevant training and experience",
+          value: choices(answers.training, trainingOptions),
+        },
+        {
+          section: "about-volunteering",
+          label: heardAboutUsQuestion,
+          value: choices(answers.heardAboutUsSources, heardAboutUsOptions),
+        },
+        ...(answers.heardAboutUsOther
+          ? [
+              {
+                section: "about-volunteering",
+                label: "Other referral details",
+                value: answers.heardAboutUsOther,
+              },
+            ]
+          : []),
+      ]
+    : [];
+---
+
+<section
+  class="volunteer-panel"
+  aria-labelledby="submitted-application-heading"
+  data-submitted-application
+>
+  <h2 id="submitted-application-heading">Submitted application</h2>
+  {
+    submission ? (
+      <>
+        <p class="volunteer-help">
+          This is a read-only copy of your application as submitted. Changes to
+          your profile or email do not change this snapshot.
+        </p>
+        <details class="mt-6">
+          <summary class="cursor-pointer text-indigo-300 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4">
+            View submitted application
+          </summary>
+          <div class="account-profile-summary mt-8">
+            {sections.map((section) => (
+              <section
+                class="volunteer-profile-section"
+                aria-labelledby={`submitted-${section.key}`}
+              >
+                <h3
+                  class="volunteer-profile-heading"
+                  id={`submitted-${section.key}`}
+                >
+                  {section.heading}
+                </h3>
+                <dl>
+                  {rows
+                    .filter((row) => row.section === section.key)
+                    .map((row) => (
+                      <div>
+                        <dt>{row.label}</dt>
+                        <dd>
+                          {Array.isArray(row.value) ? (
+                            row.value.length ? (
+                              <ul>
+                                {row.value.map((value) => (
+                                  <li>{value}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              "None selected"
+                            )
+                          ) : (
+                            row.value || "Not provided"
+                          )}
+                        </dd>
+                      </div>
+                    ))}
+                </dl>
+              </section>
+            ))}
+          </div>
+        </details>
+      </>
+    ) : (
+      <p class="volunteer-help">
+        An original application snapshot is not available for your account. Your
+        current profile may have changed since you applied, so it is not shown
+        here as your original application.
+      </p>
+    )
+  }
+</section>
