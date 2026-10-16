@@ -1326,18 +1326,30 @@ describe(
           await expect(
             dialog.getByRole("combobox", { name: "Event type", exact: true }),
           ).toBeEnabled();
-          const visibilityToggle = dialog.getByRole("switch", {
+          const visibilityChoices = dialog.getByRole("group", {
             name: "Public visibility",
             exact: true,
           });
-          await expect(dialog.getByRole("switch")).toHaveCount(1);
-          await expect(dialog.getByRole("radio")).toHaveCount(0);
-          await expect(visibilityToggle).not.toBeChecked();
+          await expect(dialog.getByRole("switch")).toHaveCount(0);
+          await expect(dialog.getByRole("radio")).toHaveCount(2);
+          const visible = visibilityChoices.getByRole("radio", {
+            name: "Visible",
+            exact: true,
+          });
+          const hidden = visibilityChoices.getByRole("radio", {
+            name: "Hidden",
+            exact: true,
+          });
+          await expect(hidden).toBeChecked();
           // The toggle supports keyboard use and does not save until submission.
           await page.emulateMedia({ reducedMotion: "reduce" });
-          await visibilityToggle.focus();
-          await page.keyboard.press("Space");
-          await expect(visibilityToggle).toBeChecked();
+          await hidden.focus();
+          await page.keyboard.press("ArrowLeft");
+          await expect(visible).toBeChecked();
+          await page.keyboard.press("ArrowRight");
+          await expect(hidden).toBeChecked();
+          await page.keyboard.press("ArrowLeft");
+          await expect(visible).toBeChecked();
           await dialog
             .getByLabel("Start date and time")
             .fill("2031-04-12T20:30");
@@ -1378,16 +1390,26 @@ describe(
             await expect(
               editor.locator('input[type="hidden"][name="type"]'),
             ).toHaveValue("patrol");
-            const visibility = editor.getByRole("switch", {
+            const visibility = editor.getByRole("group", {
               name: "Public visibility",
               exact: true,
             });
             // Reopening the editor shows the saved state of both storage flags.
-            await expect(visibility).toBeChecked({ checked: spots === 9 });
-            await editor
-              .getByText("Public visibility", { exact: true })
+            await expect(
+              visibility.getByRole("radio", {
+                name: spots === 9 ? "Visible" : "Hidden",
+                exact: true,
+              }),
+            ).toBeChecked();
+            await visibility
+              .getByText(spots === 9 ? "Hidden" : "Visible", { exact: true })
               .click();
-            await expect(visibility).toBeChecked({ checked: spots !== 9 });
+            await expect(
+              visibility.getByRole("radio", {
+                name: spots === 9 ? "Hidden" : "Visible",
+                exact: true,
+              }),
+            ).toBeChecked();
             await editor.getByLabel("Volunteer spots").fill(String(spots));
             await inPlaceAction(page, {
               endpoint: "/api/v1/events/action",
@@ -1403,7 +1425,8 @@ describe(
                 ),
               loadingLabel: "Saving…",
               pending: async () => {
-                await expect(visibility).toBeDisabled();
+                for (const radio of await visibility.getByRole("radio").all())
+                  await expect(radio).toBeDisabled();
                 await expect(
                   editor.getByRole("button", {
                     name: "Cancel event",
@@ -1425,8 +1448,8 @@ describe(
           await expect(
             dialog.getByLabel("Meeting point", { exact: true }),
           ).toHaveValue("");
-          await expect(visibilityToggle).not.toBeChecked();
-          await dialog.getByText("Public visibility", { exact: true }).click();
+          await expect(hidden).toBeChecked();
+          await visibilityChoices.getByText("Visible", { exact: true }).click();
           await dialog
             .getByLabel("Start date and time")
             .fill("2031-04-13T20:30");
