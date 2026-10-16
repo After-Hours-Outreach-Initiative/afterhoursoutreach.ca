@@ -33,6 +33,16 @@ export function accountErrorMessage(error: unknown): string {
   return requestFailed;
 }
 
+export function emailCodeErrorMessage(error: unknown): string {
+  const code = (error as { error?: { code?: string } } | null)?.error?.code;
+  if (code === "OTP_EXPIRED")
+    return "That sign-in code has expired. Choose Resend code for a new code and link sent to the same email.";
+  // Better Auth also uses INVALID_OTP when a code/link was already consumed.
+  if (code === "INVALID_OTP")
+    return "Invalid sign-in code. It may be incorrect, expired, or already used. Try the latest email or choose Resend code.";
+  return accountErrorMessage(error);
+}
+
 export function showFormMessage(
   element: Element,
   text: string,
