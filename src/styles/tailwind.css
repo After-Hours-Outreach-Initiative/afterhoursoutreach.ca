@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  --container-site: 1248px;
   --color-ink: #050608;
   --color-panel-soft: #171a20;
   --color-blue: #4169e1;
