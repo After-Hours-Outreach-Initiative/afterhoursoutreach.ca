@@ -1,0 +1,65 @@
+---
+interface Props {
+  entries: { id: string; heading: string; nested?: boolean }[];
+  application?: boolean;
+}
+const { entries, application = false } = Astro.props;
+---
+
+<nav
+  class="volunteer-contents"
+  data-page-contents
+  data-application-contents={application || undefined}
+  aria-label="On this page"
+>
+  <details class="volunteer-contents-menu" data-contents-menu>
+    <summary data-application-step-heading={application || undefined}>
+      <span class="volunteer-contents-toggle">
+        On this page
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="m9 5 7 7-7 7"></path>
+        </svg>
+      </span>
+      <span class="volunteer-contents-current" data-contents-current>
+        {entries[0]?.heading}
+      </span>
+    </summary>
+    <ol>
+      {
+        entries.map((section, index) => (
+          <li class:list={{ "volunteer-contents-nested": section.nested }}>
+            <a
+              href={`#${section.id}`}
+              aria-current={index === 0 ? "location" : undefined}
+            >
+              {section.heading}
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </details>
+  <div class="volunteer-contents-sidebar">
+    <h2>On this page</h2>
+    <ol>
+      {
+        entries.map((section, index) => (
+          <li class:list={{ "volunteer-contents-nested": section.nested }}>
+            <a
+              href={`#${section.id}`}
+              aria-current={index === 0 ? "location" : undefined}
+            >
+              {section.heading}
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</nav>

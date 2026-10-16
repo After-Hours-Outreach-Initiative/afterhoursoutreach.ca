@@ -40,7 +40,14 @@ const { id, heading, collapsible = false, describedBy } = Astro.props;
   ) : (
     <fieldset class="volunteer-profile-section" aria-describedby={describedBy}>
       <legend>
-        <h3 class="volunteer-profile-heading">{heading}</h3>
+        <h3
+          id={id}
+          class="volunteer-profile-heading"
+          data-contents-section
+          tabindex="-1"
+        >
+          {heading}
+        </h3>
       </legend>
       <slot />
     </fieldset>

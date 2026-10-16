@@ -328,3 +328,26 @@ export const profileIdentityFields: readonly (keyof ApplicationAnswers)[] = [
   "lastName",
   "birthDate",
 ];
+
+/** Keep form sections and their contents links in the same order. */
+export function profileFormSections(application = false) {
+  const fields = application
+    ? applicationFields
+    : profileFields.filter(
+        (field) => !profileIdentityFields.includes(field.name),
+      );
+  return [
+    { key: "personal-info", heading: "Personal info" },
+    { key: "emergency-contact", heading: "Emergency contact" },
+    { key: "team-interests", heading: "Team interests" },
+    { key: "training-and-safety", heading: "Training and safety" },
+    { key: "about-volunteering", heading: "About volunteering" },
+  ]
+    .map((section) => ({
+      ...section,
+      fields: fields.filter((field) => field.section === section.key),
+    }))
+    .filter(
+      (section) => section.key === "team-interests" || section.fields.length,
+    );
+}

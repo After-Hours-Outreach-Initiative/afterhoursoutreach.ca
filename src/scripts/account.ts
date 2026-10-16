@@ -11,6 +11,7 @@ import {
   initApplicationReview,
 } from "./application-review";
 import { initApplicationSections } from "./application-sections";
+import { initPageContents } from "./page-contents";
 import { initPhoneInputs } from "./phone-input";
 import {
   clearApplicationDraft,
@@ -159,6 +160,11 @@ function finish(result: object) {
 const pendingFactor = new URLSearchParams(location.search).has("second-factor");
 
 if (pendingFactor) showSecondFactor();
+
+for (const flow of document.querySelectorAll<HTMLElement>(
+  "[data-account-contents-flow]",
+))
+  initPageContents(flow);
 
 function emailOptions(returnTo?: string) {
   return { query: { returnTo: returnTo ?? "/volunteer/account" } };

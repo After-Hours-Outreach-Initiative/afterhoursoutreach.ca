@@ -1,8 +1,6 @@
 ---
 import {
-  profileFields,
-  applicationFields,
-  profileIdentityFields,
+  profileFormSections,
   applicationTeamOptions as teams,
   type ApplicationAnswers,
 } from "@/data/application";
@@ -34,26 +32,8 @@ const {
 } = Astro.props;
 const values =
   profileValues ?? (draft ? draftProfileValues(draft.answers) : null);
-const fields = application
-  ? applicationFields
-  : profileFields.filter(
-      (field) => !profileIdentityFields.includes(field.name),
-    );
 const medicSelected = values?.teams.includes("medic") ?? false;
-const sections = [
-  { key: "personal-info", heading: "Personal info" },
-  { key: "emergency-contact", heading: "Emergency contact" },
-  { key: "team-interests", heading: "Team interests" },
-  { key: "training-and-safety", heading: "Training and safety" },
-  { key: "about-volunteering", heading: "About volunteering" },
-]
-  .map((section) => ({
-    ...section,
-    fields: fields.filter((field) => field.section === section.key),
-  }))
-  .filter(
-    (section) => section.key === "team-interests" || section.fields.length,
-  );
+const sections = profileFormSections(application);
 ---
 
 {application && <ApplicationContents sections={sections} />}
@@ -119,7 +99,7 @@ const sections = [
       {
         sections.map((section) => (
           <AccountProfileSection
-            id={`application-${section.key}`}
+            id={`${application ? "application" : "account-profile"}-${section.key}`}
             heading={section.heading}
             collapsible={application}
             describedBy={
