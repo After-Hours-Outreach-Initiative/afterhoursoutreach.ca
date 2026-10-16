@@ -5,7 +5,11 @@
   "preview_urls": true,
   "compatibility_date": "2026-08-16",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@astrojs/cloudflare/entrypoints/server",
+  "main": "./src/worker.ts",
+  "triggers": {
+    // Daily discovery at 08:00 PST / 09:00 PDT, plus bounded hourly delivery/retries.
+    "crons": ["0 16 * * *", "30 * * * *"],
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -33,6 +37,10 @@
     "head_sampling_rate": 1,
     "logs": {
       "invocation_logs": false,
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
     },
   },
   "previews": {
