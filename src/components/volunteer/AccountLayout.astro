@@ -11,6 +11,7 @@ interface Props {
   name?: string;
   greetingName?: string;
   email?: string;
+  publicSpacing?: boolean;
 }
 const {
   title,
@@ -20,6 +21,7 @@ const {
   name,
   greetingName,
   email,
+  publicSpacing = false,
 } = Astro.props;
 ---
 
@@ -31,7 +33,7 @@ const {
   account={{ signedIn, organizer, name, greetingName, email }}
 >
   <section class="volunteer-portal bg-black" data-account-layout>
-    <div class="volunteer-wrap">
+    <div class:list={["volunteer-wrap", { "volunteer-wrap-public": publicSpacing }]}>
       {
         import.meta.env.DEV && (
           <Fragment>
