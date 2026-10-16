@@ -1,4 +1,8 @@
 import { vancouverInput, vancouverInstant } from "../src/data/event-time";
+import {
+  sampleProfileFixtures,
+  sampleProfileStatement,
+} from "./sample-profile-fixtures";
 
 export const fixtureUserId = (key: string) => `local-fixture-user-${key}`;
 export const fixtureEventId = (key: string) => `local-fixture-event-${key}`;
@@ -14,35 +18,25 @@ export function localEventFixtures(now = Date.now()) {
         `${vancouverInput(now + days * 86_400_000).slice(0, 10)}T${time}`,
       ),
     );
-  const people = [
-    { key: "robin", name: "Robin Vance", role: "organizer", approved: true },
-    { key: "casey", name: "Casey Lee" },
-    { key: "dana", name: "Dana Whitfield", approved: true },
-    { key: "alex", name: "Alex Chen" },
-    { key: "jamie", name: "Jamie Park", approved: true, inactive: true },
-    { key: "sam", name: "Sam Rivera", role: "organizer", approved: true },
-    { key: "first-sign-in", name: "", applicationPending: true },
-  ];
+  const people = sampleProfileFixtures("local", now);
   for (const person of people) {
-    const id = quote(fixtureUserId(person.key));
+    const id = quote(person.id);
+    const organizer = ["robin", "sam"].includes(person.key);
+    const approved = ["robin", "dana", "jamie", "sam"].includes(person.key);
     statements.push(`INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at)
-      VALUES (${id}, ${quote(person.name)}, ${quote(`${person.key}.local@example.org`)}, 1, ${quote(person.role ?? "volunteer")}, ${now}, ${now})
+      VALUES (${id}, ${quote(person.name)}, ${quote(person.email)}, 1, ${quote(organizer ? "organizer" : "volunteer")}, ${now}, ${now})
       ON CONFLICT(id) DO NOTHING`);
-    if (person.applicationPending) continue;
-    statements.push(`INSERT INTO profile (
-      user_id, preferred_name, pronouns, phone, birth_date, emergency_contact_name,
-      emergency_contact_phone, emergency_contact_relationship, heard_about_us,
-      motivation, teams, medical_certification, training_experience, registered_at, updated_at
-    ) VALUES (${id}, ${quote(person.name)}, 'they/them', '604-555-0100', '1995-04-12',
-      'Sample contact', '604-555-0101', 'Friend', 'A friend',
-      'I would like to help our neighbours and support evening outreach.',
-      '["outreach"]', 'Standard first aid', 'Community volunteering', ${now}, ${now})
-      ON CONFLICT(user_id) DO NOTHING`);
+    statements.push(sampleProfileStatement(person, now));
     statements.push(`INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at)
-      SELECT ${id}, ${person.inactive ? 0 : 1}, 1, ${person.approved ? 1 : 0},
-      ${person.approved ? robin : "NULL"}, ${person.approved ? now : "NULL"}, ${now}
-      WHERE NOT EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = ${id})`);
+      SELECT ${id}, ${person.key === "jamie" ? 0 : 1}, 1, ${approved ? 1 : 0},
+      ${approved ? robin : "NULL"}, ${approved ? now : "NULL"}, ${now}
+      WHERE EXISTS (SELECT 1 FROM user WHERE id = ${id} AND email = ${quote(person.email)})
+      AND NOT EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = ${id})`);
   }
+  // Deliberately unsubmitted, so View as can exercise the first-sign-in flow.
+  statements.push(`INSERT INTO user (id, name, email, email_verified, created_at, updated_at)
+    VALUES (${quote(fixtureUserId("first-sign-in"))}, '', 'first-sign-in.local@example.org', 1, ${now}, ${now})
+    ON CONFLICT(id) DO NOTHING`);
   const school = "Lord Strathcona Elementary School";
   const map = "https://maps.app.goo.gl/y4huzDbXZ7eDmgiv5";
   const events = [
@@ -90,10 +84,11 @@ export function localEventFixtures(now = Date.now()) {
   for (const event of events) {
     statements.push(`INSERT INTO event (id, type, starts_at, meeting_point, meeting_point_url,
       spots, open, hidden, created_by, created_at, updated_at)
-      VALUES (${quote(fixtureEventId(event.key))}, ${quote(event.type)}, ${event.startsAt},
+      SELECT ${quote(fixtureEventId(event.key))}, ${quote(event.type)}, ${event.startsAt},
       ${quote(event.point)}, ${event.map ? quote(event.map) : "NULL"}, ${event.spots},
-      ${event.hidden ? 0 : 1}, ${event.hidden ? 1 : 0}, ${robin}, ${now}, ${now})
-      ON CONFLICT(id) DO NOTHING`);
+      ${event.hidden ? 0 : 1}, ${event.hidden ? 1 : 0}, ${robin}, ${now}, ${now}
+      WHERE NOT EXISTS (SELECT 1 FROM event WHERE id = ${quote(fixtureEventId(event.key))})
+      AND EXISTS (SELECT 1 FROM user WHERE id = ${robin} AND email = 'robin.local@example.org')`);
   }
   for (const [person, event] of [
     ["casey", "orientation"],
@@ -107,6 +102,7 @@ export function localEventFixtures(now = Date.now()) {
     statements.push(`INSERT INTO signup (id, user_id, event_id, created_at, updated_at)
       SELECT ${id}, ${user}, ${eventId}, ${now}, ${now}
       WHERE NOT EXISTS (SELECT 1 FROM signup WHERE id = ${id})
+      AND EXISTS (SELECT 1 FROM user WHERE id = ${user} AND email = ${quote(`${person}.local@example.org`)})
       AND NOT EXISTS (SELECT 1 FROM signup WHERE user_id = ${user} AND event_id = ${eventId} AND status = 'confirmed')
       AND EXISTS (SELECT 1 FROM event e JOIN volunteer_status v ON v.user_id = ${user}
         JOIN profile p ON p.user_id = v.user_id
@@ -121,6 +117,8 @@ export function localEventFixtures(now = Date.now()) {
   statements.push(`INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
     SELECT 'local-fixture-completion-alex', ${quote(fixtureUserId("alex"))}, ${past}, ${robin}, ${date(-7, "18:00")}
     WHERE EXISTS (SELECT 1 FROM signup WHERE id = 'local-fixture-signup-alex' AND status = 'confirmed')
+    AND EXISTS (SELECT 1 FROM user WHERE id = ${quote(fixtureUserId("alex"))} AND email = 'alex.local@example.org')
+    AND EXISTS (SELECT 1 FROM user WHERE id = ${robin} AND email = 'robin.local@example.org')
     ON CONFLICT(user_id, event_id) DO NOTHING`);
   return statements;
 }

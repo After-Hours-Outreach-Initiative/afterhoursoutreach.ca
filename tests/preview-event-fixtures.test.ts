@@ -9,6 +9,7 @@ import {
   previewUserId,
 } from "../scripts/preview-event-fixtures";
 import { vancouverInput } from "../src/data/event-time";
+import { assertCompleteSampleProfiles } from "./helpers/sample-profile-fixtures";
 
 function database() {
   const db = new DatabaseSync(":memory:");
@@ -46,6 +47,7 @@ test("preview fixtures use the real schema without credentials, privileges, or q
     db.exec(previewEventFixtures(now).join(";\n"));
     assert.equal(db.prepare("SELECT count(*) AS n FROM user").get()!.n, 6);
     assert.equal(db.prepare("SELECT count(*) AS n FROM profile").get()!.n, 6);
+    assertCompleteSampleProfiles(db, now);
     assert.equal(
       db
         .prepare("SELECT count(*) AS n FROM volunteer_status WHERE active=0")
@@ -198,6 +200,74 @@ test("preview reseeding does not rejoin a cancelled non-fixture signup", () => {
 
     assert.deepEqual(
       db.prepare("SELECT * FROM signup ORDER BY id").all(),
+      before,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("preview reseeding refreshes old sample profiles but not mismatched identities or unrelated profiles", () => {
+  const db = database();
+  try {
+    const now = Date.now();
+    db.exec(previewEventFixtures(now).join(";\n"));
+    for (const key of ["casey", "dana"]) {
+      db.prepare("DELETE FROM profile WHERE user_id = ?").run(
+        previewUserId(key),
+      );
+      db.prepare(
+        `INSERT INTO profile (user_id, preferred_name, phone, birth_date,
+        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+        heard_about_us, motivation, teams, medical_certification, training_experience, registered_at, updated_at)
+        VALUES (?, 'Old sample', '604-555-0100', '1995-04-12', 'Sample contact',
+        '604-555-0101', 'Friend', 'Preview sample data', 'Old answer', '["outreach"]', 'Sample first aid certification', 'Sample volunteering experience', 0, 0)`,
+      ).run(previewUserId(key));
+    }
+    db.prepare(
+      "UPDATE user SET email = 'different@example.invalid' WHERE id = ?",
+    ).run(previewUserId("dana"));
+    db.exec("DELETE FROM signup WHERE id = 'preview-fixture-signup-dana'");
+    db.exec(`INSERT INTO user (id, name, email, created_at, updated_at) VALUES ('unrelated', 'Keep me', 'unrelated@example.invalid', 0, 0);
+      INSERT INTO profile (user_id, preferred_name, phone, birth_date,
+        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+        heard_about_us, motivation, teams, medical_certification, training_experience, registered_at, updated_at)
+      SELECT 'unrelated', preferred_name, phone, birth_date,
+        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+        heard_about_us, motivation, teams, medical_certification, training_experience, registered_at, updated_at
+      FROM profile WHERE user_id = 'preview-fixture-user-dana'`);
+    const protectedProfiles = db
+      .prepare(
+        "SELECT * FROM profile WHERE user_id IN (?, 'unrelated') ORDER BY 1",
+      )
+      .all(previewUserId("dana"));
+    const tables = ["user", "volunteer_status", "event", "signup"];
+    const before = tables.map((table) =>
+      db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+    );
+    db.exec(previewEventFixtures(now + 1000).join(";\n"));
+    const repaired = db
+      .prepare(
+        "SELECT first_name, submitted_application FROM profile WHERE user_id = ?",
+      )
+      .get(previewUserId("casey"))!;
+    assert.equal(repaired.first_name, "Casey");
+    assert.equal(
+      JSON.parse(String(repaired.submitted_application)).email,
+      "casey@preview.example.invalid",
+    );
+    assert.deepEqual(
+      db
+        .prepare(
+          "SELECT * FROM profile WHERE user_id IN (?, 'unrelated') ORDER BY 1",
+        )
+        .all(previewUserId("dana")),
+      protectedProfiles,
+    );
+    assert.deepEqual(
+      tables.map((table) =>
+        db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+      ),
       before,
     );
   } finally {

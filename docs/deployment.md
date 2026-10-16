@@ -34,7 +34,9 @@ five upcoming sample events (including full, closed, and hidden examples), and
 four orientation signups to the shared preview database. Names and meeting points
 are labelled as samples; email addresses use the non-deliverable `.invalid` domain.
 The command verifies the preview binding and refuses production targets. It
-preserves existing accounts, fixture edits, and signup cancellations, and does not
+refreshes incomplete synthetic sample profiles without submission snapshots,
+then preserves their snapshots and subsequent edits; existing accounts, event
+edits, signup cancellations, and unrelated records remain untouched. It does not
 run automatically during builds or deployments. Dates are relative to the first
 seed run; rerunning does not reschedule existing events.
 
