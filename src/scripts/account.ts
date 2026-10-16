@@ -362,20 +362,25 @@ form("[data-account-profile]", async (element, values) => {
     draft?.resume();
     throw error;
   }
+  // Saved legal names are display metadata, not editable profile controls.
+  const nameAnswers = {
+    firstName: String(
+      values.get("firstName") ?? element.dataset.profileFirstName ?? "",
+    ),
+    middleNames: String(
+      values.get("middleNames") ?? element.dataset.profileMiddleNames ?? "",
+    ),
+    lastName: String(
+      values.get("lastName") ?? element.dataset.profileLastName ?? "",
+    ),
+    preferredName: String(values.get("preferredName") ?? ""),
+  };
   for (const menuName of document.querySelectorAll<HTMLElement>(
     "[data-account-menu-name]",
   ))
     menuName.textContent =
-      applicationDisplayName({
-        firstName: String(values.get("firstName") ?? ""),
-        middleNames: String(values.get("middleNames") ?? ""),
-        lastName: String(values.get("lastName") ?? ""),
-        preferredName: String(values.get("preferredName") ?? ""),
-      }) || "Your account";
-  const name = accountGreeting({
-    firstName: String(values.get("firstName") ?? ""),
-    preferredName: String(values.get("preferredName") ?? ""),
-  });
+      applicationDisplayName(nameAnswers) || "Your account";
+  const name = accountGreeting(nameAnswers);
   for (const greeting of document.querySelectorAll<HTMLElement>(
     "[data-account-greeting]",
   )) {

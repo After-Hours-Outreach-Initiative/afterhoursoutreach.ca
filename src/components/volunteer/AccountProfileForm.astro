@@ -35,7 +35,11 @@ const {
 } = Astro.props;
 const values =
   profileValues ?? (draft ? draftProfileValues(draft.answers) : null);
-const fields = application ? applicationFields : profileFields;
+const fields = application
+  ? applicationFields
+  : profileFields.filter(
+      (field) => !profileIdentityFields.includes(field.name),
+    );
 const medicSelected = values?.teams.includes("medic") ?? false;
 const sections = [
   { key: "personal-info", heading: "Personal info" },
@@ -58,6 +62,9 @@ const sections = [
   data-account-profile
   data-application={application || undefined}
   data-profile-user-id={userId}
+  data-profile-first-name={!application ? values?.firstName : undefined}
+  data-profile-middle-names={!application ? values?.middleNames : undefined}
+  data-profile-last-name={!application ? values?.lastName : undefined}
   data-application-draft={application
     ? JSON.stringify(draft ?? null)
     : undefined}
@@ -191,10 +198,6 @@ const sections = [
                       <AccountProfileField
                         field={field}
                         values={values}
-                        readOnly={
-                          !application &&
-                          profileIdentityFields.includes(field.name)
-                        }
                         active={
                           field.name !== "certificationExpiry" || medicSelected
                         }

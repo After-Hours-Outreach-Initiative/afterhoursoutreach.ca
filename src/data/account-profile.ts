@@ -2,6 +2,7 @@ import {
   applicationTeamOptions,
   certificationOptions,
   profileFields,
+  profileIdentityFields,
   trainingOptions,
   type ApplicationAnswers,
 } from "./application";
@@ -15,7 +16,10 @@ export function profileSummaryRows(values: Partial<ApplicationAnswers>) {
     options
       .filter((option) => selected.includes(option.value))
       .map((option) => option.label);
-  const fields = profileFields.map((field) => {
+  const editableFields = profileFields.filter(
+    (field) => !profileIdentityFields.includes(field.name),
+  );
+  const fields = editableFields.map((field) => {
     const value = String(values[field.name] ?? "").trim();
     return {
       name: field.name,

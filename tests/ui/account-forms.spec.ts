@@ -667,9 +667,10 @@ test("application shows all required errors and saves after they are corrected",
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit profile" }).click();
+  await expect(form.locator('[name="firstName"]')).toHaveCount(0);
   await expect(
-    page.getByRole("textbox", { name: "First name", exact: true }),
-  ).toHaveValue(sampleAnswers.firstName);
+    page.getByRole("textbox", { name: /^Preferred name/ }),
+  ).toHaveValue(sampleAnswers.preferredName);
   await expect(
     page.getByRole("region", { name: "Code of Conduct", exact: true }),
   ).toHaveCount(0);
@@ -807,11 +808,19 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit profile" }).click();
-  await expect(birthDate).toHaveValue(cutoff);
-  await expect(birthDate).not.toBeEditable();
+  await expect(birthDate).toHaveCount(0);
+  const submission = page.locator("[data-submitted-application]");
+  await submission
+    .getByText("View submitted application", { exact: true })
+    .click();
+  await expect(submission.getByText(cutoff, { exact: true })).toBeVisible();
   expect(requests).toHaveLength(1);
   await page.reload();
-  await expect(birthDate).toHaveValue(cutoff);
+  await expect(birthDate).toHaveCount(0);
+  await submission
+    .getByText("View submitted application", { exact: true })
+    .click();
+  await expect(submission.getByText(cutoff, { exact: true })).toBeVisible();
 });
 
 test("the application requires JavaScript and retains birth-date constraints", async ({
@@ -1324,9 +1333,34 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   const summary = form.locator("[data-profile-summary]");
   await expect(summary).toBeVisible();
   await expect(form.locator("[data-profile-editor]")).toBeHidden();
-  await expect(summary.locator('[data-profile-answer="firstName"]')).toHaveText(
-    sampleAnswers.firstName,
-  );
+  await expect(
+    summary.locator('[data-profile-answer="preferredName"]'),
+  ).toHaveText(sampleAnswers.preferredName);
+  const submission = page.locator("[data-submitted-application]");
+  await submission
+    .getByText("View submitted application", { exact: true })
+    .click();
+  for (const [field, label] of [
+    ["firstName", "First name"],
+    ["middleNames", "Middle name(s)"],
+    ["lastName", "Last name"],
+    ["birthDate", "Date of birth"],
+  ] as const) {
+    await expect(
+      form.locator(`[name="${field}"], [data-profile-row="${field}"]`),
+    ).toHaveCount(0);
+    await expect(
+      submission
+        .locator("dl > div")
+        .filter({ has: page.getByText(label, { exact: true }) })
+        .locator("dd"),
+    ).toHaveText(sampleAnswers[field]);
+  }
+  await expect(
+    form.locator(
+      '[name="heardAboutUs"], [name="heardAboutUsSources"], [name="heardAboutUsOther"], [name="motivation"]',
+    ),
+  ).toHaveCount(0);
   await edit.click();
   const save = form.getByRole("button", {
     name: "Save profile",
@@ -1414,6 +1448,20 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await page.reload();
   await expect(name).toHaveValue("Updated volunteer");
   await expect(save).toBeDisabled();
+
+  // Clearing the preferred name still falls back to the saved legal name.
+  await edit.click();
+  await form.locator('[name="preferredName"]').fill("");
+  await save.click();
+  await expect(form.locator("[data-form-message]")).toHaveText(
+    "Profile saved.",
+  );
+  await expect(page.locator("[data-account-menu-name]").first()).toHaveText(
+    `${sampleAnswers.firstName} ${sampleAnswers.middleNames} ${sampleAnswers.lastName}`,
+  );
+  await expect(page.locator("[data-account-greeting]")).toHaveText(
+    sampleAnswers.firstName,
+  );
 });
 
 test("Outreach stays selected while optional teams support cards, keyboard input and reset", async ({
