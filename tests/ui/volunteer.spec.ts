@@ -300,7 +300,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
       await page
         .getByRole("button", { name: "Open navigation", exact: true })
         .click();
-      await expect(menu.locator("[data-account-greeting]")).toHaveText(
+      await expect(menu.locator("[data-account-menu-name]")).toHaveText(
         user.name,
       );
     } else {

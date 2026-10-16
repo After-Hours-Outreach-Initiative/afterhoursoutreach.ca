@@ -71,6 +71,9 @@
   position: absolute;
   top: calc(100% + 8px);
   z-index: 1;
+}
+.header-dropdown,
+.header-account-card {
   padding: 4px;
   border: 1px solid #3f3f46;
   border-radius: 10px;
@@ -87,7 +90,9 @@
   max-width: calc(100vw - 32px);
 }
 .header-dropdown a,
-.header-dropdown button {
+.header-dropdown button,
+.header-account-card a,
+.header-account-card button {
   display: flex;
   align-items: center;
   width: 100%;
@@ -101,7 +106,10 @@
 }
 .header-dropdown a:hover,
 .header-dropdown button:hover,
-.header-dropdown a[aria-current] {
+.header-dropdown a[aria-current],
+.header-account-card a:hover,
+.header-account-card button:hover,
+.header-account-card a[aria-current] {
   color: white;
   background: #171a20;
 }
@@ -124,6 +132,10 @@
 }
 .header-account-message {
   padding: 8px 12px;
+}
+.header-account-card button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 .header-mobile-panel {
   max-height: calc(100dvh - 5.5rem);
@@ -159,52 +171,6 @@
 }
 .header-mobile-account {
   margin: 16px;
-  padding: 16px;
-  border-radius: 12px;
-  background: #111318;
-  overflow-wrap: anywhere;
-}
-.header-mobile-account-heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.header-mobile-account-details {
-  min-width: 0;
-}
-.header-mobile-account-name {
-  display: block;
-  font-size: 18px;
-  font-weight: 600;
-}
-.header-mobile-account .header-account-email {
-  font-size: 16px;
-}
-.header-mobile-account .header-account-icon {
-  border: 0;
-}
-.header-mobile-account .header-mobile-children {
-  margin: 16px 0 0 36px;
-}
-.header-mobile-account .header-mobile-link {
-  min-height: 44px;
-  padding: 8px 12px;
-  border-radius: 6px;
-}
-.header-mobile-account [data-sign-out] {
-  margin: 8px 0 0 12px;
-}
-.header-mobile-account .header-mobile-sign-out {
-  justify-content: center;
-  background: #252b36;
-  color: white;
-}
-.header-mobile-account .header-mobile-sign-out:hover {
-  background: #333b4a;
-}
-.header-mobile-account .header-mobile-sign-out:disabled {
-  cursor: wait;
-  opacity: 0.6;
 }
 @media (max-width: 639px) {
   .header-mobile-panel {

@@ -2,6 +2,7 @@
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import MoonIcon from "@/components/icons/MoonIcon.astro";
 import AccountIcon from "@/components/icons/AccountIcon.astro";
+import HeaderAccountCard from "@/components/HeaderAccountCard.astro";
 import { navLinks, social } from "@/data/site";
 import { accountGreeting } from "@/data/account-navigation";
 import "@/styles/header.css";
@@ -160,35 +161,13 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
             <path d="m6 9 6 6 6-6"></path>
           </svg>
         </summary>
-        <div class="header-dropdown header-account-dropdown">
-          <div class="header-account-identity">
-            <strong
-              class="header-account-name"
-              data-account-menu-name={signedIn ? "" : undefined}
-              >{name?.trim() || "Your account"}</strong
-            >
-            <p
-              class="header-account-email"
-              data-account-email={signedIn ? "" : undefined}
-            >
-              {email}
-            </p>
-          </div>
-          <a
-            href="/volunteer/account"
-            aria-current={accountPage ? "page" : undefined}>Account</a
-          >
-          <form data-sign-out action="/api/v1/auth/sign-out" method="post">
-            <button type="submit">Sign out</button>
-            <p
-              class="header-account-message"
-              data-form-message
-              role="status"
-              hidden
-            >
-            </p>
-          </form>
-        </div>
+        <HeaderAccountCard
+          class="header-dropdown header-account-dropdown"
+          {signedIn}
+          {name}
+          {email}
+          {accountPage}
+        />
       </details>
     </nav>
 
@@ -258,46 +237,7 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
           data-mobile-account
           hidden={!signedIn}
         >
-          <div class="header-mobile-account-heading">
-            <span class="header-account-icon"
-              ><AccountIcon class="size-5 shrink-0" /></span
-            >
-            <div class="header-mobile-account-details">
-              <span class="header-mobile-account-name" data-account-greeting
-                >{greetingName}</span
-              >
-              <p
-                class="header-account-email"
-                data-account-email={signedIn ? "" : undefined}
-              >
-                {email}
-              </p>
-            </div>
-          </div>
-          <ul class="header-mobile-children" aria-label="Account actions">
-            <li>
-              <a
-                class="header-mobile-link"
-                href="/volunteer/account"
-                aria-current={accountPage ? "page" : undefined}>Account</a
-              >
-            </li>
-            <li>
-              <form data-sign-out action="/api/v1/auth/sign-out" method="post">
-                <button
-                  class="header-mobile-link header-mobile-sign-out"
-                  type="submit">Sign out</button
-                >
-                <p
-                  class="header-account-message"
-                  data-form-message
-                  role="status"
-                  hidden
-                >
-                </p>
-              </form>
-            </li>
-          </ul>
+          <HeaderAccountCard {signedIn} {name} {email} {accountPage} />
         </section>
         <a
           class="flex items-center gap-2.5 bg-blue px-5 py-4 text-base font-bold"

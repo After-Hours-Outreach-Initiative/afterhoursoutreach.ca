@@ -346,10 +346,9 @@ form("[data-account-profile]", async (element, values) => {
     draft?.resume();
     throw error;
   }
-  const menuName = document.querySelector<HTMLElement>(
+  for (const menuName of document.querySelectorAll<HTMLElement>(
     "[data-account-menu-name]",
-  );
-  if (menuName)
+  ))
     menuName.textContent =
       applicationDisplayName({
         firstName: String(values.get("firstName") ?? ""),
