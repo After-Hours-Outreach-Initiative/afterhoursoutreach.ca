@@ -69,7 +69,7 @@ export async function sendSignInEmail(
     },
     signal: AbortSignal.timeout(emailPolicy.timeoutMs),
     body: JSON.stringify({
-      from: "After Hours Outreach <noreply@afterhoursoutreach.ca>",
+      from: "After Hours Outreach <accounts@afterhoursoutreach.ca>",
       to: [email.email],
       subject:
         email.purpose === "change-email"
