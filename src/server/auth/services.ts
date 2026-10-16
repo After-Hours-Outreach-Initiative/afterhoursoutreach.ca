@@ -74,7 +74,7 @@ export async function sendSignInEmail(
       subject:
         email.purpose === "change-email"
           ? "Confirm your After Hours Outreach email change"
-          : "Your After Hours Outreach sign-in",
+          : `${email.code} is your After Hours Outreach sign-in code`,
       text:
         email.purpose === "change-email"
           ? `Enter this code in your account settings to confirm your new email address: ${email.code}\n\nThe code expires in ten minutes and can only be used once. Requesting a new code for this address replaces the previous code. Your email address will not change until you confirm it.\n\nIf you did not request this, ignore this email.`
