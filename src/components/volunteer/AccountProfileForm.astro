@@ -12,6 +12,7 @@ import MedicalCertifications from "./MedicalCertifications.astro";
 import RelevantTraining from "./RelevantTraining.astro";
 import ReferralSources from "./ReferralSources.astro";
 import ApplicationDraftStatus from "./ApplicationDraftStatus.astro";
+import ApplicationDraftDiscard from "./ApplicationDraftDiscard.astro";
 import {
   draftProfileValues,
   type ApplicationDraft,
@@ -232,3 +233,4 @@ const sections = profileFormSections(application);
     </p></noscript
   >
 </form>
+{application && <ApplicationDraftDiscard />}

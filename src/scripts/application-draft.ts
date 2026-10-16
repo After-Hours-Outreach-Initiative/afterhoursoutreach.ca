@@ -92,13 +92,17 @@ export function initApplicationDraft(element: HTMLFormElement) {
     element.dataset.draftGeneration ?? "null",
   );
   const discardKey = `${applicationDraftDiscardPrefix}${userId}`;
-  const discardButton = element.querySelector<HTMLButtonElement>(
+  const discardActions = element
+    .closest("[data-application-flow]")!
+    .querySelector<HTMLElement>("[data-application-draft-actions]")!;
+  const discardButton = discardActions.querySelector<HTMLButtonElement>(
     "[data-draft-discard]",
   )!;
-  const discardStatus = element.querySelector<HTMLElement>(
+  const discardStatus = discardActions.querySelector<HTMLElement>(
     "[data-draft-discard-status]",
   )!;
-  const newDraft = element.querySelector<HTMLElement>("[data-draft-new]")!;
+  const newDraft =
+    discardActions.querySelector<HTMLElement>("[data-draft-new]")!;
   discardButton.disabled = false;
   const readDiscard = () => {
     try {
@@ -377,12 +381,13 @@ export function initApplicationDraft(element: HTMLFormElement) {
     }
     // A late save response must never restore memory or browser answers.
     clearOldLocal();
-    discardStatus.textContent =
-      accountDiscarded && localCleared
-        ? "Application draft deleted from your account and this browser on this device, including unsynced answers. Your account has not been deleted."
-        : `${localCleared ? "This browser’s draft answers were deleted." : "We could not confirm deletion of this browser’s copy. Clear this site’s browser data if retrying does not work."} ${accountDiscarded ? "Your account draft was deleted." : `Account draft deletion is not confirmed; it may still be saved. ${accountFailure}`} Saving remains paused on this page.`;
+    if (accountDiscarded && localCleared) {
+      location.replace("/apply");
+      return;
+    }
+    discardStatus.textContent = `${localCleared ? "This browser’s draft answers were deleted." : "We could not confirm deletion of this browser’s copy. Clear this site’s browser data if retrying does not work."} ${accountDiscarded ? "Your account draft was deleted." : `Account draft deletion is not confirmed; it may still be saved. ${accountFailure}`} Saving remains paused on this page.`;
     discardButton.textContent = "Retry discarding application draft";
-    discardButton.hidden = accountDiscarded && localCleared;
+    discardButton.hidden = false;
     discardButton.disabled = false;
     deleting = false;
   };
