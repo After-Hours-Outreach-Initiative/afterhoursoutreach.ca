@@ -337,13 +337,14 @@ body:has([data-application], [data-account-contents-flow]) {
   outline: 3px solid #4169e1;
   outline-offset: 4px;
 }
-[data-application-flow] > [data-application] {
+[data-application-flow] > [data-application],
+[data-application-flow] > [data-application-draft-actions] {
   min-width: 0;
 }
 @media (width < 64rem) {
   [data-application-flow] {
     display: grid;
-    grid-template-rows: 0 auto auto;
+    grid-template-rows: 0 auto auto auto;
   }
   [data-application-flow] > .volunteer-contents {
     grid-column: 1;
@@ -362,13 +363,17 @@ body:has([data-application], [data-account-contents-flow]) {
     /* Grid margins no longer collapse with the intro's 32px bottom margin. */
     margin-top: 0;
   }
+  [data-application-flow] > [data-application-draft-actions] {
+    grid-column: 1;
+    grid-row: 4;
+  }
   .volunteer-contents a {
     min-height: 48px;
     padding-block: 10px;
     font-size: 16px;
   }
   [data-application-flow]:has(> [data-application-contents]:not([hidden])) {
-    grid-template-rows: var(--contents-bar-height, 54px) auto auto;
+    grid-template-rows: var(--contents-bar-height, 54px) auto auto auto;
   }
   [data-application-flow]:has(> [data-application-contents]:not([hidden]))
     > .volunteer-application-intro {
@@ -379,7 +384,7 @@ body:has([data-application], [data-account-contents-flow]) {
   [data-application-flow] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 13rem;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto auto auto;
     column-gap: 32px;
   }
   [data-application-flow]:has(> [data-application-contents][hidden]) {
@@ -387,7 +392,8 @@ body:has([data-application], [data-account-contents-flow]) {
     column-gap: 0;
   }
   [data-application-flow] > .volunteer-application-intro,
-  [data-application-flow] > [data-application] {
+  [data-application-flow] > [data-application],
+  [data-application-flow] > [data-application-draft-actions] {
     grid-column: 1;
   }
   [data-application-flow] > .volunteer-application-intro {
@@ -396,6 +402,9 @@ body:has([data-application], [data-account-contents-flow]) {
   }
   [data-application-flow] > [data-application] {
     grid-row: 2;
+  }
+  [data-application-flow] > [data-application-draft-actions] {
+    grid-row: 3;
   }
   [data-application-flow] > .volunteer-contents {
     grid-column: 2;
