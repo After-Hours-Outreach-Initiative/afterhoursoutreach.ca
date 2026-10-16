@@ -7,6 +7,7 @@ interface Props {
 }
 const { event } = Astro.props;
 const dialogId = `event-editor-${event?.id ?? "new"}`;
+const publicVisibility = Boolean(event?.open && !event.hidden);
 ---
 
 <dialog
@@ -121,21 +122,31 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
           message="Enter a valid map URL (up to 2048 characters)."
         />
       </div>
-      <div class="volunteer-field volunteer-wide">
-        <label class="volunteer-visibility">
-          <input
-            class="switch"
-            type="checkbox"
-            role="switch"
-            name="publicVisibility"
-            checked={Boolean(event?.open && !event.hidden)}
-          />
-          <span class="switch-track" aria-hidden="true">
-            <span class="switch-thumb"></span>
-          </span>
-          Public visibility
-        </label>
-      </div>
+      <fieldset class="volunteer-state-field volunteer-wide">
+        <legend>Public visibility</legend>
+        <div class="volunteer-state-selector">
+          <label class="volunteer-state-option volunteer-state-positive">
+            <input
+              class="sr-only"
+              type="radio"
+              name="publicVisibility"
+              value="true"
+              checked={publicVisibility}
+            />
+            <span>Visible</span>
+          </label>
+          <label class="volunteer-state-option volunteer-state-negative">
+            <input
+              class="sr-only"
+              type="radio"
+              name="publicVisibility"
+              value="false"
+              checked={!publicVisibility}
+            />
+            <span>Hidden</span>
+          </label>
+        </div>
+      </fieldset>
     </div>
     <p data-form-message role="status" hidden></p>
     <button class="btn btn-primary" type="submit" data-loading-label="Saving…"
