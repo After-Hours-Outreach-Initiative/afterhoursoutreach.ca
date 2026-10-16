@@ -240,44 +240,45 @@ test("other referral help separates the character limit from its unit", async ({
   );
 });
 
-for (const width of [375, 1280]) {
-  test(`contents navigation starts in its final position before scripts load at ${width}px`, async ({
-    page,
-    baseURL,
-  }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await createLocalAccount(page.request, baseURL!, false);
-    let release!: () => void;
-    const scripts = new Promise<void>((resolve) => (release = resolve));
-    await page.route("**/*", async (route) => {
-      if (route.request().resourceType() === "script") await scripts;
-      await route.continue();
+for (const path of ["/apply", "/volunteer/account"]) {
+  for (const width of [375, 1280]) {
+    test(`${path} contents navigation starts in its final position before scripts load at ${width}px`, async ({
+      page,
+      baseURL,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await createLocalAccount(page.request, baseURL!, path !== "/apply");
+      let release!: () => void;
+      const scripts = new Promise<void>((resolve) => (release = resolve));
+      await page.route("**/*", async (route) => {
+        if (route.request().resourceType() === "script") await scripts;
+        await route.continue();
+      });
+      try {
+        await page.goto(path, { waitUntil: "commit" });
+        const contents = page.locator("[data-page-contents]");
+        await expect(contents).toBeVisible();
+        const initial = await contents.boundingBox();
+        const header = await page.locator(".site-header").boundingBox();
+        expect(initial!.y).toBe(
+          header!.y + header!.height + (width < 1024 ? 0 : 24),
+        );
+        release();
+        await page.waitForLoadState("load");
+        // Measurement enhances anchor offsets, never the navigation's position.
+        await expect(
+          page.locator("[data-application-flow], [data-account-contents-flow]"),
+        ).toHaveAttribute("style", /--contents-scroll-offset:/);
+        expect(await contents.boundingBox()).toEqual(initial);
+        await page.evaluate(() => scrollTo({ top: 500, behavior: "instant" }));
+        await expect
+          .poll(async () => (await contents.boundingBox())!.y)
+          .toBe(initial!.y);
+      } finally {
+        release();
+      }
     });
-    try {
-      await page.goto("/apply", { waitUntil: "commit" });
-      const contents = page.locator("[data-application-contents]");
-      await expect(contents).toBeVisible();
-      const initial = await contents.boundingBox();
-      const header = await page.locator(".site-header").boundingBox();
-      expect(initial!.y).toBe(
-        header!.y + header!.height + (width < 1024 ? 0 : 24),
-      );
-      release();
-      await page.waitForLoadState("load");
-      // This property confirms the application module has initialized.
-      await expect(page.locator("[data-application-flow]")).toHaveAttribute(
-        "style",
-        /--application-scroll-offset:/,
-      );
-      expect(await contents.boundingBox()).toEqual(initial);
-      await page.evaluate(() => scrollTo({ top: 500, behavior: "instant" }));
-      await expect
-        .poll(async () => (await contents.boundingBox())!.y)
-        .toBe(initial!.y);
-    } finally {
-      release();
-    }
-  });
+  }
 }
 
 test("contents navigation contrasts with the header and leaves room for the page heading", async ({
@@ -288,16 +289,16 @@ test("contents navigation contrasts with the header and leaves room for the page
   await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/apply");
   const contents = page.getByRole("navigation", { name: "On this page" });
-  const menu = contents.locator("[data-application-contents-menu]");
+  const menu = contents.locator("[data-contents-menu]");
   const bar = menu.locator("summary");
-  const toggle = bar.locator(".volunteer-application-contents-toggle");
+  const toggle = bar.locator(".volunteer-contents-toggle");
   await expect(page.locator(".site-header")).toHaveCSS(
     "background-color",
     "rgb(0, 0, 0)",
   );
   await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
   await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
-  const current = bar.locator("[data-application-current]");
+  const current = bar.locator("[data-contents-current]");
   await expect(current).toHaveCSS("color", "rgb(255, 255, 255)");
   await expect(current).toHaveCSS("font-size", "16px");
   await toggle.click();
@@ -326,10 +327,49 @@ test("contents navigation contrasts with the header and leaves room for the page
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(menu).toBeHidden();
-  await expect(
-    contents.locator(".volunteer-application-contents-sidebar"),
-  ).toBeVisible();
+  await expect(contents.locator(".volunteer-contents-sidebar")).toBeVisible();
   await expect(contents).toHaveCSS("background-color", "rgb(0, 0, 0)");
+});
+
+test("account contents navigate profile and settings sections on desktop and mobile", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!);
+  for (const width of [1280, 375]) {
+    await page.setViewportSize({ width, height: 812 });
+    await page.goto("/volunteer/account");
+    const contents = page.getByRole("navigation", { name: "On this page" });
+    const menu = contents.locator("[data-contents-menu]");
+    await expect(
+      contents.getByRole("link", {
+        name: "Submitted application",
+        exact: true,
+        includeHidden: true,
+      }),
+    ).toHaveCount(2);
+    for (const [id, heading] of [
+      ["account-profile-emergency-contact", "Emergency contact"],
+      ["account-sessions-heading", "Sessions"],
+    ]) {
+      if (width < 1024) await menu.locator("summary").click();
+      const link = contents.getByRole("link", { name: heading, exact: true });
+      await expect(link).toHaveAttribute("href", `#${id}`);
+      await link.focus();
+      await link.press("Enter");
+      await expect(page).toHaveURL(new RegExp(`#${id}$`));
+      await expect(page.locator(`#${id}`)).toBeFocused();
+      await expect(
+        contents.locator(`a[href="#${id}"][aria-current="location"]`),
+      ).toHaveCount(2);
+      if (width < 1024)
+        await expect(contents.locator("[data-contents-current]")).toHaveText(
+          heading,
+        );
+    }
+    await expect(page.locator('[name="preferredName"]')).toBeDisabled();
+    await expect(page.locator("[data-profile-actions]:visible")).toHaveCount(0);
+  }
 });
 
 test("both phone inputs format typing, paste and edits without trapping the caret", async ({
@@ -485,6 +525,25 @@ test("application shows all required errors and saves after they are corrected",
     name: "Emergency contact",
     exact: true,
   });
+  const contents = page.getByRole("navigation", { name: "On this page" });
+  await form.locator("#application-emergency-contact > summary").click();
+  await contents
+    .getByRole("link", { name: "Emergency contact", exact: true })
+    .click();
+  await expect(form.locator("#application-emergency-contact")).toHaveAttribute(
+    "open",
+    "",
+  );
+  await expect(
+    form.locator("#application-emergency-contact > summary"),
+  ).toBeFocused();
+  await expect(
+    contents.locator(
+      'a[href="#application-emergency-contact"][aria-current="location"]',
+    ),
+  ).toHaveCount(2);
+  await contents.getByRole("link", { name: "Overview", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
   await expect(emergencyContact.locator("input")).toHaveCount(3);
   await expect(
     form
@@ -629,6 +688,15 @@ test("application shows all required errors and saves after they are corrected",
     name: "Code of Conduct",
     exact: true,
   });
+  await expect(contents).toBeHidden();
+  await page
+    .getByRole("button", { name: "Back to answers", exact: true })
+    .click();
+  await expect(contents).toBeVisible();
+  await page
+    .getByRole("button", { name: "Review application", exact: true })
+    .click();
+  await expect(contents).toBeHidden();
   await expect(conduct.getByRole("listitem")).toHaveText(
     codeOfConductRules.slice(0, 2),
   );
@@ -1979,6 +2047,16 @@ test("authenticator setup and sign-in show native inline code errors", async ({
     loadingLabel: "Verifying…",
   });
   await expect(name).toHaveValue("Unsaved authenticator draft");
+  const contents = page.getByRole("navigation", { name: "On this page" });
+  await contents
+    .getByRole("link", { name: "Two-factor authentication", exact: true })
+    .click();
+  await expect(page.locator("#account-factor-heading")).toBeFocused();
+  await expect(
+    contents.locator(
+      'a[href="#account-factor-heading"][aria-current="location"]',
+    ),
+  ).toHaveCount(2);
   await expect(page.locator("[data-account-sessions]")).toContainText(
     "This device",
   );

@@ -5,6 +5,7 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
+import PageContents from "@/components/volunteer/PageContents.astro";
 import FieldError from "@/components/FieldError.astro";
 import { accountGreeting } from "@/data/account-navigation";
 import {
@@ -24,6 +25,7 @@ import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
   applicationDisplayName,
+  profileFormSections,
   type ApplicationAnswers,
 } from "@/data/application";
 export const prerender = false;
@@ -109,6 +111,30 @@ try {
     status: 503,
   });
 }
+const contents = [
+  { id: "account-profile-heading", heading: "Your profile" },
+  ...profileFormSections().map((section) => ({
+    id: `account-profile-${section.key}`,
+    heading: section.heading,
+    nested: true,
+  })),
+  ...(submission
+    ? [
+        {
+          id: "submitted-application-heading",
+          heading: "Submitted application",
+        },
+      ]
+    : []),
+  { id: "account-settings-heading", heading: "Account settings" },
+  { id: "account-email-heading", heading: "Email address", nested: true },
+  {
+    id: "account-factor-heading",
+    heading: "Two-factor authentication",
+    nested: true,
+  },
+  { id: "account-sessions-heading", heading: "Sessions", nested: true },
+];
 ---
 
 <AccountLayout
@@ -120,136 +146,190 @@ try {
   greetingName={accountGreeting(values)}
   email={email}
 >
-  {
-    !active ? (
-      <p class="volunteer-notice" role="status">
-        Your volunteer account is inactive. Contact an organizer to restore
-        access.
-      </p>
-    ) : !applicationApproved && !organizer ? (
-      <p class="volunteer-notice" role="status">
-        Your application is awaiting organizer approval. You can update your
-        profile while you wait. Events and orientation sign-ups will be
-        available once approved.
-      </p>
-    ) : null
-  }
-  <section class="volunteer-panel">
-    <h2>Your profile</h2>
-    <div class="account-profile-summary mb-8">
-      <dl>
-        <div>
-          <dt>Account created</dt>
-          <dd>
-            {
-              accountCreatedAt ? (
-                <time datetime={accountCreatedAt.toISOString()}>
-                  {accountDate.format(accountCreatedAt)}
-                </time>
-              ) : (
-                "Unavailable"
-              )
-            }
-          </dd>
+  <div data-account-contents-flow>
+    <PageContents entries={contents} />
+    <div data-account-contents-body>
+      {
+        !active ? (
+          <p class="volunteer-notice" role="status">
+            Your volunteer account is inactive. Contact an organizer to restore
+            access.
+          </p>
+        ) : !applicationApproved && !organizer ? (
+          <p class="volunteer-notice" role="status">
+            Your application is awaiting organizer approval. You can update your
+            profile while you wait. Events and orientation sign-ups will be
+            available once approved.
+          </p>
+        ) : null
+      }
+      <section class="volunteer-panel">
+        <h2 id="account-profile-heading" data-contents-section tabindex="-1">
+          Your profile
+        </h2>
+        <div class="account-profile-summary mb-8">
+          <dl>
+            <div>
+              <dt>Account created</dt>
+              <dd>
+                {
+                  accountCreatedAt ? (
+                    <time datetime={accountCreatedAt.toISOString()}>
+                      {accountDate.format(accountCreatedAt)}
+                    </time>
+                  ) : (
+                    "Unavailable"
+                  )
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>First completed orientation</dt>
+              <dd>
+                {
+                  firstOrientationAt ? (
+                    <time datetime={firstOrientationAt.toISOString()}>
+                      {accountDate.format(firstOrientationAt)}
+                    </time>
+                  ) : (
+                    "Not yet completed"
+                  )
+                }
+              </dd>
+            </div>
+          </dl>
         </div>
-        <div>
-          <dt>First completed orientation</dt>
-          <dd>
+        <AccountProfileForm email={email} values={values} userId={userId} />
+      </section>
+      <SubmittedApplication submission={submission} />
+      <section class="volunteer-panel">
+        <h2 id="account-settings-heading" data-contents-section tabindex="-1">
+          Account settings
+        </h2>
+        <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />
+        <div class="volunteer-setting" data-factor-settings>
+          <div>
+            <h3 id="account-factor-heading" data-contents-section tabindex="-1">
+              Two-factor authentication
+            </h3>
             {
-              firstOrientationAt ? (
-                <time datetime={firstOrientationAt.toISOString()}>
-                  {accountDate.format(firstOrientationAt)}
-                </time>
-              ) : (
-                "Not yet completed"
-              )
-            }
-          </dd>
-        </div>
-      </dl>
-    </div>
-    <AccountProfileForm email={email} values={values} userId={userId} />
-  </section>
-  <SubmittedApplication submission={submission} />
-  <section class="volunteer-panel">
-    <h2>Account settings</h2>
-    <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />
-    <div class="volunteer-setting" data-factor-settings>
-      <div>
-        <h3 tabindex="-1">Two-factor authentication</h3>
-        {
-          twoFactorEnabled ? (
-            <>
-              <p role="status">
-                Your authenticator is enabled. It is required each time you sign
-                in.
-              </p>
-              <details class="mt-6">
-                <summary>Remove or replace your authenticator</summary>
-                <p class="mt-4">
-                  To use a different app, first remove your current
-                  authenticator, then set up and verify the new one. Two-factor
-                  protection will be off in between, even if you leave setup
-                  unfinished. Your old app and backup codes will stop working,
-                  and other devices will be signed out. Keep your current app
-                  until removal is confirmed.
-                </p>
-                <p class="mt-4">
-                  You need a code from your current app to remove it. Backup
-                  codes cannot authorize removal.
-                </p>
-                {factorNeedsSignIn ? (
-                  <form
-                    data-sign-out
-                    action="/api/v1/auth/sign-out"
-                    method="post"
-                    class="mt-6"
-                  >
-                    <p>
-                      Sign in again before removing your authenticator. A
-                      sign-in within the last ten minutes is required.
+              twoFactorEnabled ? (
+                <>
+                  <p role="status">
+                    Your authenticator is enabled. It is required each time you
+                    sign in.
+                  </p>
+                  <details class="mt-6">
+                    <summary>Remove or replace your authenticator</summary>
+                    <p class="mt-4">
+                      To use a different app, first remove your current
+                      authenticator, then set up and verify the new one.
+                      Two-factor protection will be off in between, even if you
+                      leave setup unfinished. Your old app and backup codes will
+                      stop working, and other devices will be signed out. Keep
+                      your current app until removal is confirmed.
                     </p>
-                    <button class="btn btn-outline mt-4" type="submit">
-                      Sign out to sign in again
-                    </button>
-                    <p data-form-message role="status" hidden />
-                  </form>
-                ) : (
+                    <p class="mt-4">
+                      You need a code from your current app to remove it. Backup
+                      codes cannot authorize removal.
+                    </p>
+                    {factorNeedsSignIn ? (
+                      <form
+                        data-sign-out
+                        action="/api/v1/auth/sign-out"
+                        method="post"
+                        class="mt-6"
+                      >
+                        <p>
+                          Sign in again before removing your authenticator. A
+                          sign-in within the last ten minutes is required.
+                        </p>
+                        <button class="btn btn-outline mt-4" type="submit">
+                          Sign out to sign in again
+                        </button>
+                        <p data-form-message role="status" hidden />
+                      </form>
+                    ) : (
+                      <form
+                        data-disable-factor
+                        class="volunteer-form volunteer-small mt-6"
+                        action="/api/v1/auth/two-factor/disable"
+                        method="post"
+                      >
+                        <div class="volunteer-field">
+                          <label for="factor-remove-code">
+                            Current authenticator code{" "}
+                            <span class="volunteer-required" aria-hidden="true">
+                              *
+                            </span>
+                          </label>
+                          <input
+                            id="factor-remove-code"
+                            name="code"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            pattern="[0-9]{6}"
+                            maxlength="6"
+                            aria-describedby="error-factor-remove-code"
+                            required
+                          />
+                          <FieldError
+                            field="factor-remove-code"
+                            message="Enter a six-digit code from your current app."
+                          />
+                        </div>
+                        <label class="volunteer-check">
+                          <input name="confirm" type="checkbox" required />
+                          <span>
+                            I understand that two-factor protection will be off
+                            until I verify a new authenticator.
+                          </span>
+                        </label>
+                        <p
+                          data-form-message
+                          role="status"
+                          aria-live="polite"
+                          hidden
+                        />
+                        <button
+                          class="btn btn-outline"
+                          type="submit"
+                          data-loading-label="Removing…"
+                        >
+                          Confirm and remove authenticator
+                        </button>
+                      </form>
+                    )}
+                  </details>
+                </>
+              ) : factorNeedsSignIn ? (
+                <form
+                  data-sign-out
+                  action="/api/v1/auth/sign-out"
+                  method="post"
+                  class="mt-6"
+                >
+                  <p>
+                    Sign in again to set up an authenticator. A sign-in within
+                    the last ten minutes is required.
+                  </p>
+                  <button class="btn btn-outline mt-4" type="submit">
+                    Sign out to sign in again
+                  </button>
+                  <p data-form-message role="status" hidden />
+                </form>
+              ) : (
+                <>
+                  <p>
+                    Add an authenticator app for extra sign-in protection. This
+                    is optional for both volunteers and organizers.
+                  </p>
                   <form
-                    data-disable-factor
-                    class="volunteer-form volunteer-small mt-6"
-                    action="/api/v1/auth/two-factor/disable"
+                    data-enable-factor
+                    class="volunteer-form mt-6"
+                    action="/api/v1/auth/two-factor/enable"
                     method="post"
                   >
-                    <div class="volunteer-field">
-                      <label for="factor-remove-code">
-                        Current authenticator code{" "}
-                        <span class="volunteer-required" aria-hidden="true">
-                          *
-                        </span>
-                      </label>
-                      <input
-                        id="factor-remove-code"
-                        name="code"
-                        inputmode="numeric"
-                        autocomplete="one-time-code"
-                        pattern="[0-9]{6}"
-                        maxlength="6"
-                        aria-describedby="error-factor-remove-code"
-                        required
-                      />
-                      <FieldError
-                        field="factor-remove-code"
-                        message="Enter a six-digit code from your current app."
-                      />
-                    </div>
-                    <label class="volunteer-check">
-                      <input name="confirm" type="checkbox" required />
-                      <span>
-                        I understand that two-factor protection will be off
-                        until I verify a new authenticator.
-                      </span>
-                    </label>
                     <p
                       data-form-message
                       role="status"
@@ -259,178 +339,146 @@ try {
                     <button
                       class="btn btn-outline"
                       type="submit"
-                      data-loading-label="Removing…"
+                      data-loading-label="Setting up…"
                     >
-                      Confirm and remove authenticator
+                      Set up an authenticator
                     </button>
                   </form>
-                )}
-              </details>
-            </>
-          ) : factorNeedsSignIn ? (
-            <form
-              data-sign-out
-              action="/api/v1/auth/sign-out"
-              method="post"
-              class="mt-6"
-            >
-              <p>
-                Sign in again to set up an authenticator. A sign-in within the
-                last ten minutes is required.
-              </p>
-              <button class="btn btn-outline mt-4" type="submit">
-                Sign out to sign in again
-              </button>
-              <p data-form-message role="status" hidden />
-            </form>
-          ) : (
-            <>
-              <p>
-                Add an authenticator app for extra sign-in protection. This is
-                optional for both volunteers and organizers.
-              </p>
-              <form
-                data-enable-factor
-                class="volunteer-form mt-6"
-                action="/api/v1/auth/two-factor/enable"
-                method="post"
-              >
-                <p data-form-message role="status" aria-live="polite" hidden />
-                <button
-                  class="btn btn-outline"
-                  type="submit"
-                  data-loading-label="Setting up…"
-                >
-                  Set up an authenticator
-                </button>
-              </form>
-              <div data-factor-setup class="mt-8" hidden>
-                <div data-factor-qr class="mb-6" hidden>
-                  <p>Scan this QR code with your authenticator app:</p>
-                  <img
-                    data-factor-qr-image
-                    class="mt-4 block h-auto max-w-full"
-                    width="256"
-                    height="256"
-                    alt="QR code for authenticator setup"
-                  />
-                </div>
-                <p data-factor-qr-error role="status" hidden>
-                  The QR code could not be displayed. Use the setup key below
-                  instead.
-                </p>
-                <p>You can enter this setup key manually:</p>
-                <code data-factor-key class="break-all" />
-                <p class="mt-6">
-                  Save these one-use backup codes somewhere safe:
-                </p>
-                <pre data-backup-codes class="mt-4" />
-                <form
-                  data-confirm-factor
-                  class="volunteer-form volunteer-small mt-8"
-                  action="/api/v1/auth/two-factor/verify-totp"
-                  method="post"
-                >
-                  <div class="volunteer-field">
-                    <label for="factor-setup-code">
-                      Authenticator code{" "}
-                      <span class="volunteer-required" aria-hidden="true">
-                        *
-                      </span>
-                    </label>
-                    <input
-                      id="factor-setup-code"
-                      name="code"
-                      aria-describedby="error-factor-setup-code"
-                      inputmode="numeric"
-                      autocomplete="one-time-code"
-                      pattern="[0-9]{6}"
-                      maxlength="6"
-                      required
-                    />
-                    <FieldError
-                      field="factor-setup-code"
-                      message="Enter a six-digit code."
-                    />
+                  <div data-factor-setup class="mt-8" hidden>
+                    <div data-factor-qr class="mb-6" hidden>
+                      <p>Scan this QR code with your authenticator app:</p>
+                      <img
+                        data-factor-qr-image
+                        class="mt-4 block h-auto max-w-full"
+                        width="256"
+                        height="256"
+                        alt="QR code for authenticator setup"
+                      />
+                    </div>
+                    <p data-factor-qr-error role="status" hidden>
+                      The QR code could not be displayed. Use the setup key
+                      below instead.
+                    </p>
+                    <p>You can enter this setup key manually:</p>
+                    <code data-factor-key class="break-all" />
+                    <p class="mt-6">
+                      Save these one-use backup codes somewhere safe:
+                    </p>
+                    <pre data-backup-codes class="mt-4" />
+                    <form
+                      data-confirm-factor
+                      class="volunteer-form volunteer-small mt-8"
+                      action="/api/v1/auth/two-factor/verify-totp"
+                      method="post"
+                    >
+                      <div class="volunteer-field">
+                        <label for="factor-setup-code">
+                          Authenticator code{" "}
+                          <span class="volunteer-required" aria-hidden="true">
+                            *
+                          </span>
+                        </label>
+                        <input
+                          id="factor-setup-code"
+                          name="code"
+                          aria-describedby="error-factor-setup-code"
+                          inputmode="numeric"
+                          autocomplete="one-time-code"
+                          pattern="[0-9]{6}"
+                          maxlength="6"
+                          required
+                        />
+                        <FieldError
+                          field="factor-setup-code"
+                          message="Enter a six-digit code."
+                        />
+                      </div>
+                      <p
+                        data-form-message
+                        role="status"
+                        aria-live="polite"
+                        hidden
+                      />
+                      <button
+                        class="btn btn-primary"
+                        type="submit"
+                        data-loading-label="Verifying…"
+                      >
+                        Verify and enable
+                      </button>
+                    </form>
                   </div>
-                  <p
-                    data-form-message
-                    role="status"
-                    aria-live="polite"
-                    hidden
-                  />
-                  <button
-                    class="btn btn-primary"
-                    type="submit"
-                    data-loading-label="Verifying…"
-                  >
-                    Verify and enable
-                  </button>
-                </form>
-              </div>
-            </>
-          )
-        }
-      </div>
-    </div>
-    <div class="volunteer-setting" data-account-sessions>
-      <div class="w-full">
-        <h3 tabindex="-1">Sessions</h3>
-        {
-          sessionsNeedSignIn && (
-            <form
-              data-sign-out
-              action="/api/v1/auth/sign-out"
-              method="post"
-              class="mt-6"
+                </>
+              )
+            }
+          </div>
+        </div>
+        <div class="volunteer-setting" data-account-sessions>
+          <div class="w-full">
+            <h3
+              id="account-sessions-heading"
+              data-contents-section
+              tabindex="-1"
             >
-              <p>Sign in again to view and manage your active sessions.</p>
-              <button class="btn btn-outline mt-4" type="submit">
-                Sign out to sign in again
-              </button>
-              <p data-form-message role="status" hidden />
-            </form>
-          )
-        }
-        <ul class="account-sessions mt-6">
-          {
-            sessions.map((entry) => (
-              <li data-session-row>
-                <div>
-                  <span>
-                    {entry.id === currentId
-                      ? "This device"
-                      : entry.userAgent || "Another device"}
-                  </span>
-                  <span class="volunteer-help">
-                    Last active:{" "}
-                    {entry.updatedAt.toLocaleString("en-CA", {
-                      timeZone: "America/Vancouver",
-                    })}
-                  </span>
-                </div>
-                {entry.id !== currentId && (
-                  <form
-                    data-end-session
-                    action="/api/v1/account/session"
-                    method="post"
-                  >
-                    <input type="hidden" name="id" value={entry.id} />
-                    <button
-                      class="btn btn-outline"
-                      type="submit"
-                      data-loading-label="Ending session…"
-                    >
-                      End session
-                    </button>
-                    <p data-form-message role="status" hidden />
-                  </form>
-                )}
-              </li>
-            ))
-          }
-        </ul>
-      </div>
+              Sessions
+            </h3>
+            {
+              sessionsNeedSignIn && (
+                <form
+                  data-sign-out
+                  action="/api/v1/auth/sign-out"
+                  method="post"
+                  class="mt-6"
+                >
+                  <p>Sign in again to view and manage your active sessions.</p>
+                  <button class="btn btn-outline mt-4" type="submit">
+                    Sign out to sign in again
+                  </button>
+                  <p data-form-message role="status" hidden />
+                </form>
+              )
+            }
+            <ul class="account-sessions mt-6">
+              {
+                sessions.map((entry) => (
+                  <li data-session-row>
+                    <div>
+                      <span>
+                        {entry.id === currentId
+                          ? "This device"
+                          : entry.userAgent || "Another device"}
+                      </span>
+                      <span class="volunteer-help">
+                        Last active:{" "}
+                        {entry.updatedAt.toLocaleString("en-CA", {
+                          timeZone: "America/Vancouver",
+                        })}
+                      </span>
+                    </div>
+                    {entry.id !== currentId && (
+                      <form
+                        data-end-session
+                        action="/api/v1/account/session"
+                        method="post"
+                      >
+                        <input type="hidden" name="id" value={entry.id} />
+                        <button
+                          class="btn btn-outline"
+                          type="submit"
+                          data-loading-label="Ending session…"
+                        >
+                          End session
+                        </button>
+                        <p data-form-message role="status" hidden />
+                      </form>
+                    )}
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
-  </section>
+  </div>
 </AccountLayout>

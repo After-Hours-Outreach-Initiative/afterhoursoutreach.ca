@@ -40,6 +40,43 @@
   gap: 8px;
   min-width: 0;
 }
+/* Like the application, navigation is placed by CSS before scripts run. The
+   spanning grid area lets it stay sticky for the entire account page. */
+[data-account-contents-flow] {
+  display: grid;
+  grid-template-rows: var(--contents-bar-height, 54px) auto;
+}
+[data-account-contents-flow] > .volunteer-contents {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  margin: -32px calc(-1 * var(--contents-padding)) 0;
+}
+[data-account-contents-body] {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+[data-account-contents-flow] [data-contents-section],
+[data-account-contents-flow] :is(input, select, textarea) {
+  scroll-margin-top: calc(
+    var(--contents-scroll-offset, calc(var(--site-header-height) + 54px)) + 16px
+  );
+}
+@media (min-width: 64rem) {
+  [data-account-contents-flow] {
+    grid-template-columns: minmax(0, 1fr) 13rem;
+    grid-template-rows: auto;
+    column-gap: 32px;
+  }
+  [data-account-contents-flow] > .volunteer-contents {
+    grid-column: 2;
+    margin: -8px 0 0;
+    top: calc(var(--site-header-height) + 24px);
+  }
+  [data-account-contents-body] {
+    grid-row: 1;
+  }
+}
 .account-profile-summary {
   display: grid;
   gap: 32px;

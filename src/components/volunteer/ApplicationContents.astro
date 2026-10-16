@@ -1,67 +1,12 @@
 ---
+import PageContents from "./PageContents.astro";
 interface Props {
   sections: { key: string; heading: string }[];
 }
 const { sections } = Astro.props;
-const entries = [{ key: "overview", heading: "Overview" }, ...sections];
+const entries = [{ key: "overview", heading: "Overview" }, ...sections].map(
+  (section) => ({ ...section, id: `application-${section.key}` }),
+);
 ---
 
-<nav
-  class="volunteer-application-contents"
-  data-application-contents
-  aria-label="On this page"
->
-  <details
-    class="volunteer-application-contents-menu"
-    data-application-contents-menu
-  >
-    <summary data-application-step-heading>
-      <span class="volunteer-application-contents-toggle">
-        On this page
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          aria-hidden="true"
-        >
-          <path d="m9 5 7 7-7 7"></path>
-        </svg>
-      </span>
-      <span class="volunteer-application-current" data-application-current>
-        Overview
-      </span>
-    </summary>
-    <ol>
-      {
-        entries.map((section, index) => (
-          <li>
-            <a
-              href={`#application-${section.key}`}
-              aria-current={index === 0 ? "location" : undefined}
-            >
-              {section.heading}
-            </a>
-          </li>
-        ))
-      }
-    </ol>
-  </details>
-  <div class="volunteer-application-contents-sidebar">
-    <h2>On this page</h2>
-    <ol>
-      {
-        entries.map((section, index) => (
-          <li>
-            <a
-              href={`#application-${section.key}`}
-              aria-current={index === 0 ? "location" : undefined}
-            >
-              {section.heading}
-            </a>
-          </li>
-        ))
-      }
-    </ol>
-  </div>
-</nav>
+<PageContents entries={entries} application />

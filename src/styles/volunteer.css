@@ -7,8 +7,8 @@
   display: none !important;
 }
 /* `overflow-x: hidden` traps sticky descendants in a non-scrolling ancestor.
-   Limit the fix to application pages; clip still prevents horizontal overflow. */
-body:has([data-application]) {
+   Clip still prevents horizontal overflow without trapping contents navigation. */
+body:has([data-application], [data-account-contents-flow]) {
   overflow-x: clip;
 }
 .volunteer-wrap {
@@ -220,8 +220,8 @@ body:has([data-application]) {
   font-weight: normal;
   line-height: 1.4;
 }
-.volunteer-application-contents {
-  --application-contents-padding: 24px;
+.volunteer-contents {
+  --contents-padding: 24px;
   position: sticky;
   top: var(--site-header-height);
   z-index: 30;
@@ -230,17 +230,17 @@ body:has([data-application]) {
   min-width: 0;
   background: var(--color-black);
 }
-.volunteer-application-contents-menu {
+.volunteer-contents-menu {
   position: relative;
 }
-.volunteer-application-contents summary {
+.volunteer-contents summary {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 54px;
-  padding: 4px var(--application-contents-padding);
+  padding: 4px var(--contents-padding);
   border-bottom: var(--volunteer-border);
   background: var(--color-panel-soft);
   cursor: pointer;
@@ -248,10 +248,10 @@ body:has([data-application]) {
   font-size: 14px;
   font-weight: normal;
 }
-.volunteer-application-contents summary::-webkit-details-marker {
+.volunteer-contents summary::-webkit-details-marker {
   display: none;
 }
-.volunteer-application-contents-toggle {
+.volunteer-contents-toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -264,18 +264,16 @@ body:has([data-application]) {
   color: #d4d4d8;
   white-space: nowrap;
 }
-.volunteer-application-contents-toggle svg {
+.volunteer-contents-toggle svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
   color: #a1a1aa;
 }
-.volunteer-application-contents-menu[open]
-  .volunteer-application-contents-toggle
-  svg {
+.volunteer-contents-menu[open] .volunteer-contents-toggle svg {
   transform: rotate(90deg);
 }
-.volunteer-application-current {
+.volunteer-contents-current {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -284,35 +282,44 @@ body:has([data-application]) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.volunteer-application-contents ol {
+.volunteer-contents ol {
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.volunteer-application-contents-menu > ol {
+.volunteer-contents-menu > ol {
   position: absolute;
   inset: 100% 0 auto;
   display: grid;
-  max-height: min(24rem, var(--application-dropdown-space));
+  max-height: min(
+    24rem,
+    var(
+      --contents-dropdown-space,
+      calc(100dvh - var(--site-header-height) - 70px)
+    )
+  );
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px var(--application-contents-padding);
+  padding: 4px var(--contents-padding);
   border-radius: 0 0 6px 6px;
   background: #0c0d10;
   box-shadow: 0 12px 30px #0008;
 }
-.volunteer-application-contents-sidebar {
+.volunteer-contents-sidebar {
   display: none;
 }
-.volunteer-application-contents-sidebar h2 {
+.volunteer-contents-sidebar h2 {
   margin-bottom: 12px;
   font-size: 16px;
   font-weight: normal;
 }
-.volunteer-application-contents li {
+.volunteer-contents li {
   min-width: 0;
 }
-.volunteer-application-contents a {
+.volunteer-contents-nested {
+  padding-left: 16px;
+}
+.volunteer-contents a {
   display: flex;
   align-items: center;
   min-height: 0;
@@ -322,14 +329,14 @@ body:has([data-application]) {
   text-decoration: none;
   overflow-wrap: anywhere;
 }
-.volunteer-application-contents a:hover {
+.volunteer-contents a:hover {
   color: #fff;
 }
-.volunteer-application-contents a[aria-current="location"] {
+.volunteer-contents a[aria-current="location"] {
   color: #c7d2fe;
 }
-.volunteer-application-contents a:focus-visible,
-.volunteer-application-contents summary:focus-visible,
+.volunteer-contents a:focus-visible,
+.volunteer-contents summary:focus-visible,
 .volunteer-application-section > summary:focus-visible {
   outline: 3px solid #4169e1;
   outline-offset: 4px;
@@ -342,12 +349,12 @@ body:has([data-application]) {
     display: grid;
     grid-template-rows: 0 auto auto;
   }
-  [data-application-flow] > .volunteer-application-contents {
+  [data-application-flow] > .volunteer-contents {
     grid-column: 1;
     grid-row: 1 / -1;
     /* Start at the header, outside the wrap's padding. The
        spanning grid area keeps the bar sticky throughout the application. */
-    margin: -32px calc(-1 * var(--application-contents-padding)) 0;
+    margin: -32px calc(-1 * var(--contents-padding)) 0;
   }
   [data-application-flow] > .volunteer-application-intro {
     grid-column: 1;
@@ -359,13 +366,13 @@ body:has([data-application]) {
     /* Grid margins no longer collapse with the intro's 32px bottom margin. */
     margin-top: 0;
   }
-  .volunteer-application-contents a {
+  .volunteer-contents a {
     min-height: 48px;
     padding-block: 10px;
     font-size: 16px;
   }
   [data-application-flow]:has(> [data-application-contents]:not([hidden])) {
-    grid-template-rows: var(--application-bar-height, 54px) auto auto;
+    grid-template-rows: var(--contents-bar-height, 54px) auto auto;
   }
   [data-application-flow]:has(> [data-application-contents]:not([hidden]))
     > .volunteer-application-intro {
@@ -394,21 +401,20 @@ body:has([data-application]) {
   [data-application-flow] > [data-application] {
     grid-row: 2;
   }
-  [data-application-flow] > .volunteer-application-contents {
+  [data-application-flow] > .volunteer-contents {
     grid-column: 2;
     grid-row: 1 / -1;
     /* The wrap starts 32px below the header; the sidebar starts 24px below. */
     margin-top: -8px;
     top: calc(var(--site-header-height) + 24px);
   }
-  .volunteer-application-contents-menu {
+  .volunteer-contents-menu {
     display: none;
   }
-  .volunteer-application-contents-sidebar {
+  .volunteer-contents-sidebar {
     display: block;
     max-height: calc(
-      100dvh - var(--application-sticky-offset, var(--site-header-height)) -
-        48px
+      100dvh - var(--contents-sticky-offset, var(--site-header-height)) - 48px
     );
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -424,7 +430,9 @@ body:has([data-application]) {
 [data-application] .volunteer-application-section > summary,
 [data-application] #code-of-conduct-heading,
 [data-application] :is(input, select, textarea) {
-  scroll-margin-top: calc(var(--application-scroll-offset) + 16px);
+  scroll-margin-top: calc(
+    var(--contents-scroll-offset, calc(var(--site-header-height) + 54px)) + 16px
+  );
 }
 .volunteer-application-section {
   min-width: 0;
@@ -1136,8 +1144,8 @@ body:has([data-application]) {
   .volunteer-wrap-public {
     padding-top: 72px;
   }
-  .volunteer-application-contents {
-    --application-contents-padding: 16px;
+  .volunteer-contents {
+    --contents-padding: 16px;
   }
   .volunteer-application-warning {
     gap: 8px;
