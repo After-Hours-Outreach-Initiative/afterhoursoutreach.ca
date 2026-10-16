@@ -97,9 +97,19 @@ function form(
       event.submitter instanceof HTMLButtonElement
         ? event.submitter
         : element.querySelector<HTMLButtonElement>('button[type="submit"]');
-    if (button?.disabled || button?.hidden) return;
+    if (
+      button?.disabled ||
+      button?.closest("[hidden]") ||
+      element.closest("[hidden]")
+    )
+      return;
     clearFormMessage(element);
     element.dataset.submitting = "true";
+    changes?.update();
+    const emailCancel = element
+      .closest("[data-email-settings]")
+      ?.querySelector<HTMLButtonElement>("[data-email-cancel]");
+    if (emailCancel) emailCancel.disabled = true;
     const values = element.hasAttribute("data-application")
       ? applicationSubmissionValues(element)
       : new FormData(element);
@@ -126,6 +136,7 @@ function form(
         if (button.dataset.loadingLabel) button.textContent = label ?? "";
       }
       changes?.update();
+      if (emailCancel) emailCancel.disabled = false;
     }
   });
 }
@@ -376,6 +387,54 @@ form("[data-account-profile]", async (element, values) => {
     location.assign(result.next ?? "/volunteer/account");
 });
 
+function closeEmailEditor(settings: HTMLElement) {
+  const restoreFocus =
+    settings.contains(document.activeElement) ||
+    document.activeElement === document.body;
+  for (const element of settings.querySelectorAll<HTMLFormElement>(
+    "[data-email-change-request], [data-email-change-confirm]",
+  )) {
+    element.reset();
+    clearFormMessage(element);
+  }
+  const confirm = settings.querySelector<HTMLFormElement>(
+    "[data-email-change-confirm]",
+  );
+  if (confirm) {
+    confirm.hidden = true;
+    confirm.querySelector<HTMLInputElement>('[name="newEmail"]')!.value = "";
+  }
+  settings.querySelector<HTMLElement>("[data-email-editor]")!.hidden = true;
+  const edit = settings.querySelector<HTMLButtonElement>("[data-email-edit]")!;
+  edit.hidden = false;
+  edit.setAttribute("aria-expanded", "false");
+  if (restoreFocus) edit.focus({ preventScroll: true });
+}
+
+for (const settings of document.querySelectorAll<HTMLElement>(
+  "[data-email-settings]",
+)) {
+  const edit = settings.querySelector<HTMLButtonElement>("[data-email-edit]")!;
+  edit.disabled = false;
+  edit.addEventListener("click", () => {
+    clearFormMessage(settings);
+    settings.querySelector<HTMLElement>("[data-email-editor]")!.hidden = false;
+    edit.hidden = true;
+    edit.setAttribute("aria-expanded", "true");
+    (
+      settings.querySelector<HTMLInputElement>('[name="newEmail"]') ??
+      settings.querySelector<HTMLButtonElement>("[data-sign-out] button")
+    )?.focus();
+  });
+  settings
+    .querySelector("[data-email-cancel]")!
+    .addEventListener("click", () => {
+      if (settings.querySelector("[data-submitting]")) return;
+      closeEmailEditor(settings);
+      clearFormMessage(settings);
+    });
+}
+
 form("[data-email-change-request]", async (element, values) => {
   const newEmail = String(values.get("newEmail") ?? "")
     .trim()
@@ -427,18 +486,13 @@ form("[data-email-change-confirm]", async (element, values) => {
     "[data-account-email]",
   ))
     address.textContent = newEmail;
-  const request = element
-    .closest("[data-email-settings]")!
-    .querySelector<HTMLFormElement>("[data-email-change-request]")!;
-  request.reset();
-  element.reset();
-  element.hidden = true;
+  const settings = element.closest<HTMLElement>("[data-email-settings]")!;
+  closeEmailEditor(settings);
   message(
-    request,
+    settings,
     "Email address changed. Use your new address the next time you sign in.",
     "success",
   );
-  request.querySelector<HTMLInputElement>('[name="newEmail"]')?.focus();
 });
 
 form("[data-sign-out]", async () => {
