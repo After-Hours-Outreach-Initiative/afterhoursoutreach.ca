@@ -9,6 +9,7 @@ import FieldError from "@/components/FieldError.astro";
 import { accountGreeting } from "@/data/account-navigation";
 import {
   authBindingsForRequest,
+  authenticatorFreshAge,
   createAuth,
   forwardCookies,
   readAccountSession,
@@ -44,6 +45,7 @@ let active = false;
 let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
 let sessionsNeedSignIn = false;
 let emailNeedsSignIn = false;
+let factorNeedsSignIn = false;
 if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");
 try {
   const auth = createAuth(authBindingsForRequest(env, Astro.request));
@@ -70,6 +72,9 @@ try {
     Date.now() - current.session.createdAt.getTime() >=
       sessionConfig.freshAge * 1000;
   currentId = current.session.id;
+  factorNeedsSignIn =
+    Date.now() - current.session.createdAt.getTime() >=
+    authenticatorFreshAge * 1000;
   twoFactorEnabled = Boolean(current.user.twoFactorEnabled);
   organizer = current.user.role === "organizer";
   const status = await createDatabase(env.DB).query.volunteerStatus.findFirst({
@@ -174,10 +179,110 @@ try {
         <h3 tabindex="-1">Two-factor authentication</h3>
         {
           twoFactorEnabled ? (
-            <p role="status">
-              Your authenticator is enabled. It is required each time you sign
-              in.
-            </p>
+            <>
+              <p role="status">
+                Your authenticator is enabled. It is required each time you sign
+                in.
+              </p>
+              <details class="mt-6">
+                <summary>Remove or replace your authenticator</summary>
+                <p class="mt-4">
+                  To use a different app, first remove your current
+                  authenticator, then set up and verify the new one. Two-factor
+                  protection will be off in between, even if you leave setup
+                  unfinished. Your old app and backup codes will stop working,
+                  and other devices will be signed out. Keep your current app
+                  until removal is confirmed.
+                </p>
+                <p class="mt-4">
+                  You need a code from your current app to remove it. Backup
+                  codes cannot authorize removal.
+                </p>
+                {factorNeedsSignIn ? (
+                  <form
+                    data-sign-out
+                    action="/api/v1/auth/sign-out"
+                    method="post"
+                    class="mt-6"
+                  >
+                    <p>
+                      Sign in again before removing your authenticator. A
+                      sign-in within the last ten minutes is required.
+                    </p>
+                    <button class="btn btn-outline mt-4" type="submit">
+                      Sign out to sign in again
+                    </button>
+                    <p data-form-message role="status" hidden />
+                  </form>
+                ) : (
+                  <form
+                    data-disable-factor
+                    class="volunteer-form volunteer-small mt-6"
+                    action="/api/v1/auth/two-factor/disable"
+                    method="post"
+                  >
+                    <div class="volunteer-field">
+                      <label for="factor-remove-code">
+                        Current authenticator code{" "}
+                        <span class="volunteer-required" aria-hidden="true">
+                          *
+                        </span>
+                      </label>
+                      <input
+                        id="factor-remove-code"
+                        name="code"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        pattern="[0-9]{6}"
+                        maxlength="6"
+                        aria-describedby="error-factor-remove-code"
+                        required
+                      />
+                      <FieldError
+                        field="factor-remove-code"
+                        message="Enter a six-digit code from your current app."
+                      />
+                    </div>
+                    <label class="volunteer-check">
+                      <input name="confirm" type="checkbox" required />
+                      <span>
+                        I understand that two-factor protection will be off
+                        until I verify a new authenticator.
+                      </span>
+                    </label>
+                    <p
+                      data-form-message
+                      role="status"
+                      aria-live="polite"
+                      hidden
+                    />
+                    <button
+                      class="btn btn-outline"
+                      type="submit"
+                      data-loading-label="Removing…"
+                    >
+                      Confirm and remove authenticator
+                    </button>
+                  </form>
+                )}
+              </details>
+            </>
+          ) : factorNeedsSignIn ? (
+            <form
+              data-sign-out
+              action="/api/v1/auth/sign-out"
+              method="post"
+              class="mt-6"
+            >
+              <p>
+                Sign in again to set up an authenticator. A sign-in within the
+                last ten minutes is required.
+              </p>
+              <button class="btn btn-outline mt-4" type="submit">
+                Sign out to sign in again
+              </button>
+              <p data-form-message role="status" hidden />
+            </form>
           ) : (
             <>
               <p>
@@ -202,12 +307,12 @@ try {
               <div data-factor-setup class="mt-8" hidden>
                 <div data-factor-qr class="mb-6" hidden>
                   <p>Scan this QR code with your authenticator app:</p>
-                  <canvas
+                  <img
+                    data-factor-qr-image
                     class="mt-4 block h-auto max-w-full"
                     width="256"
                     height="256"
-                    role="img"
-                    aria-label="QR code for authenticator setup"
+                    alt="QR code for authenticator setup"
                   />
                 </div>
                 <p data-factor-qr-error role="status" hidden>

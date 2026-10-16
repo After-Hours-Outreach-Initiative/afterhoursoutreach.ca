@@ -15,11 +15,14 @@ test.beforeEach(async ({ page, baseURL }) => {
   });
 });
 
-test("authenticator QR encodes the complete setup URI locally and is removed after verification", async ({
+test("canvas-free authenticator QR is valid and verified removal allows a new app", async ({
   page,
   baseURL,
 }) => {
   await createLocalAccount(page.request, baseURL!);
+  await page.addInitScript(() => {
+    HTMLCanvasElement.prototype.getContext = () => null;
+  });
   const external: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).origin !== new URL(baseURL!).origin)
@@ -68,6 +71,33 @@ test("authenticator QR encodes the complete setup URI locally and is removed aft
     page.getByText("Your authenticator is enabled.", { exact: false }),
   ).toBeVisible();
   await expect(page.locator("[data-factor-setup]")).toHaveCount(0);
+  await page
+    .getByText("Remove or replace your authenticator", { exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Current authenticator code" })
+    .fill(totpFromSetupKey(secret));
+  await page
+    .getByRole("checkbox", { name: "I understand that two-factor protection" })
+    .check();
+  await page
+    .getByRole("button", { name: "Confirm and remove authenticator" })
+    .click();
+  await expect(
+    page.getByText("Your authenticator was removed.", { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Set up an authenticator" }).click();
+  await expect(qr).toBeVisible();
+  const replacement = (await page.locator("[data-factor-key]").textContent())!;
+  expect(replacement).not.toBe(secret);
+  await page
+    .getByRole("textbox", { name: "Authenticator code", exact: true })
+    .fill(totpFromSetupKey(replacement));
+  await page.getByRole("button", { name: "Verify and enable" }).click();
+  await expect(
+    page.getByText("Your authenticator is enabled.", { exact: false }),
+  ).toBeVisible();
+  await expect(page.locator("[data-factor-setup]")).toHaveCount(0);
   expect(external).toEqual([]);
 });
 
@@ -77,7 +107,9 @@ test("manual authenticator setup still works when QR rendering is unavailable", 
 }) => {
   await createLocalAccount(page.request, baseURL!);
   await page.addInitScript(() => {
-    HTMLCanvasElement.prototype.getContext = () => null;
+    HTMLImageElement.prototype.decode = async () => {
+      throw new Error("Image decoding is unavailable");
+    };
   });
   await page.goto("/volunteer/account");
   await page.getByRole("button", { name: "Set up an authenticator" }).click();
