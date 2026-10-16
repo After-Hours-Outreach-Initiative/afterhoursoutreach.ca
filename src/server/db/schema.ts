@@ -362,3 +362,45 @@ export const organizerBootstrap = sqliteTable(
   },
   (table) => [check("organizer_bootstrap_once", sql`${table.id} = 1`)],
 );
+
+// Keep terminal rows as the delivery ledger for each certification renewal cycle.
+export const medicCertificationNotification = sqliteTable(
+  "medic_certification_notification",
+  {
+    id: text().primaryKey(),
+    user_id: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    expiry: text().notNull(),
+    kind: text({ enum: ["warning", "expired"] }).notNull(),
+    status: text({
+      enum: ["pending", "sending", "sent", "expired", "cancelled"],
+    })
+      .notNull()
+      .default("pending"),
+    // Exact Resend request, frozen on first attempt; cleared on terminal states.
+    delivery_payload: text(),
+    first_attempt_at: timestamp(),
+    attempts: integer().notNull().default(0),
+    lease_token: text(),
+    lease_until: timestamp(),
+    created_at: timestamp().notNull(),
+    sent_at: timestamp(),
+  },
+  (table) => [
+    uniqueIndex("medic_notification_cycle").on(
+      table.user_id,
+      table.expiry,
+      table.kind,
+    ),
+    index("medic_notification_pending").on(table.status, table.created_at),
+    check(
+      "medic_notification_kind",
+      sql`${table.kind} IN ('warning','expired')`,
+    ),
+    check(
+      "medic_notification_status",
+      sql`${table.status} IN ('pending','sending','sent','expired','cancelled')`,
+    ),
+  ],
+);

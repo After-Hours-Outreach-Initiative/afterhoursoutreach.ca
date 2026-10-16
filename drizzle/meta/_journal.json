@@ -78,6 +78,13 @@
       "when": 1792131222826,
       "tag": "0010_first_orientation_signup_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792133939144,
+      "tag": "0011_medic_certification_notifications",
+      "breakpoints": true
     }
   ]
 }

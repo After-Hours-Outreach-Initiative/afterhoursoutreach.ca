@@ -5,25 +5,26 @@ operations. Edit files here, not generated SQL in `drizzle/`.
 
 ## Where rules live
 
-| Source                  | Responsibility                                                                                                                                        |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema.ts`             | Tables, defaults, relationships, checks, and unique indexes.                                                                                          |
-| `triggers.sql`          | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation event types, visibility, and organizer protection/bootstrap. |
-| `events.ts`             | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                        |
-| `volunteers.ts`         | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                |
-| `profiles.ts`           | Application validation and transactional profile updates.                                                                                             |
-| `application-drafts.ts` | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                        |
-| `access.ts`             | Verified account context and authorization, rechecked inside writes.                                                                                  |
-| `policy.ts`             | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                 |
-| `sessions.ts`           | Ownership-scoped session lookup and second-factor verification markers.                                                                               |
-| `notifications.ts`      | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                               |
-| `rate-limits.ts`        | Persistent request/email counters and cleanup.                                                                                                        |
-| `errors.ts`             | Safe translation of database invariant errors into application errors.                                                                                |
-| `index.ts`, `sql.ts`    | Request-scoped Drizzle connection and shared SQL clock.                                                                                               |
+| Source                    | Responsibility                                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema.ts`               | Tables, defaults, relationships, checks, and unique indexes.                                                                                          |
+| `triggers.sql`            | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation event types, visibility, and organizer protection/bootstrap. |
+| `events.ts`               | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                        |
+| `volunteers.ts`           | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                |
+| `profiles.ts`             | Application validation and transactional profile updates.                                                                                             |
+| `application-drafts.ts`   | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                        |
+| `access.ts`               | Verified account context and authorization, rechecked inside writes.                                                                                  |
+| `policy.ts`               | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                 |
+| `sessions.ts`             | Ownership-scoped session lookup and second-factor verification markers.                                                                               |
+| `notifications.ts`        | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                               |
+| `medic-certifications.ts` | Certification reminder eligibility, renewal-cycle ledger, atomic claims, and bounded retry state.                                                     |
+| `rate-limits.ts`          | Persistent request/email counters and cleanup.                                                                                                        |
+| `errors.ts`               | Safe translation of database invariant errors into application errors.                                                                                |
+| `index.ts`, `sql.ts`      | Request-scoped Drizzle connection and shared SQL clock.                                                                                               |
 
 HTTP request parsing and responses remain in `src/pages/api/v1/`. Better Auth's
 integration remains in `src/server/auth/`. Email transport and delivery orchestration
-remain in `src/server/events/notifications.ts`; they call the database operations
+remain in `src/server/events/notifications.ts` and `src/server/medic-certifications.ts`; they call the database operations
 here instead of issuing their own SQL. Development fixtures are separate in
 `src/dev/` and `scripts/`.
 
