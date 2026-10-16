@@ -1291,12 +1291,10 @@ describe(
           await newPage.locator('[name="preferredName"]').inputValue(),
           answers.preferredName,
         );
-        assert.equal(
-          (
-            await newPage.locator("[data-account-menu-name]").textContent()
-          )?.trim(),
+        await expect(newPage.locator("[data-account-menu-name]")).toHaveText([
           answers.preferredName,
-        );
+          answers.preferredName,
+        ]);
         assert.equal(newPage.url(), `${origin}/volunteer/account`);
         await expect(
           newPage.getByRole("checkbox", {

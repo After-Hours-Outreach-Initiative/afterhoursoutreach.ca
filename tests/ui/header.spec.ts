@@ -70,7 +70,11 @@ for (const width of [1280, 375]) {
             if (signedIn) {
               await expect(account).toBeVisible();
               await expect(
-                account.locator("[data-account-greeting]"),
+                account.locator(
+                  width < 1024
+                    ? "[data-account-menu-name]"
+                    : "[data-account-greeting]",
+                ),
               ).toHaveText("Casey Lee");
               for (const discord of await header
                 .locator("[data-header-discord]")
@@ -181,9 +185,11 @@ for (const width of [1280, 1024, 768, 375, 320]) {
         .click();
     }
     await expect(account).toBeVisible();
-    await expect(account.locator("[data-account-greeting]")).toHaveText(
-      "Casey Lee",
-    );
+    await expect(
+      account.locator(
+        mobile ? "[data-account-menu-name]" : "[data-account-greeting]",
+      ),
+    ).toHaveText("Casey Lee");
     for (const discord of await header.locator("[data-header-discord]").all())
       await expect(discord).toBeHidden();
     await expect(header.locator("[data-volunteer-menu]")).toBeHidden();
@@ -262,67 +268,33 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveAttribute("aria-current", "page");
 
-    await expect(account.locator("[data-account-greeting]")).toHaveText(
-      "Robin Vance",
-    );
+    await expect(
+      account.locator(
+        mobile ? "[data-account-menu-name]" : "[data-account-greeting]",
+      ),
+    ).toHaveText("Robin Vance");
     await expect(account.locator("[data-account-email]")).toHaveText(
       "robin.local@example.org",
     );
     if (mobile) {
-      const actions = account.getByRole("list", { name: "Account actions" });
       const sitePages = navigation.getByRole("list", {
         name: "Site pages",
         exact: true,
       });
       await expect(sitePages.locator("[data-mobile-account]")).toHaveCount(0);
-      await expect(account).toHaveCSS("border-top-width", "0px");
-      await expect(account).toHaveCSS("background-color", "rgb(17, 19, 24)");
-      await expect(actions).toHaveCSS("border-left-width", "0px");
-      await expect(account.locator("[data-account-greeting]")).toHaveCSS(
-        "font-size",
-        "18px",
-      );
-      await expect(account.locator("[data-account-email]")).toHaveCSS(
-        "font-size",
-        "16px",
-      );
-      await expect(
-        actions.getByRole("link", { name: "Account", exact: true }),
-      ).toHaveCSS("font-size", "18px");
-      await expect(account.locator(".header-account-icon")).toHaveCSS(
-        "border-width",
-        "0px",
-      );
+      await expect(account.locator(".header-account-icon")).toHaveCount(0);
       const sitePagesBox = await sitePages.boundingBox();
       const accountBox = await account.boundingBox();
       expect(accountBox!.y).toBeGreaterThanOrEqual(
         sitePagesBox!.y + sitePagesBox!.height + 16,
       );
       const nameBox = await account
-        .locator("[data-account-greeting]")
+        .locator("[data-account-menu-name]")
         .boundingBox();
       const emailBox = await account
         .locator("[data-account-email]")
         .boundingBox();
       expect(emailBox!.x).toBe(nameBox!.x);
-      await expect(
-        actions.getByRole("link", { name: "Account", exact: true }),
-      ).toBeVisible();
-      await expect(
-        actions.getByRole("button", { name: "Sign out", exact: true }),
-      ).toBeVisible();
-      const signOut = actions.getByRole("button", {
-        name: "Sign out",
-        exact: true,
-      });
-      await expect(signOut).toHaveCSS("background-color", "rgb(37, 43, 54)");
-      await expect(signOut).toHaveCSS("border-width", "0px");
-      await expect(signOut).toHaveCSS("justify-content", "center");
-      const parentBox = await account
-        .locator(".header-mobile-account-heading")
-        .boundingBox();
-      const childBox = await actions.getByRole("link").boundingBox();
-      expect(childBox!.x).toBeGreaterThan(parentBox!.x);
     } else {
       const accountToggle = account.locator("summary");
       await accountToggle.click();
@@ -339,15 +311,36 @@ for (const width of [1280, 1024, 768, 375, 320]) {
         .boundingBox();
       expect(dropdownBox!.x).toBeGreaterThanOrEqual(0);
       expect(dropdownBox!.x + dropdownBox!.width).toBeLessThanOrEqual(width);
+      await expect(account.locator(".header-account-icon")).toHaveCSS(
+        "border-radius",
+        "50%",
+      );
+      await expect(account.locator(".header-account-icon")).toHaveCSS(
+        "background-color",
+        "rgb(22, 33, 74)",
+      );
     }
-    await expect(account.locator(".header-account-icon")).toHaveCSS(
-      "border-radius",
-      "50%",
+    const card = account.locator(".header-account-card");
+    await expect(card).toHaveCSS("background-color", "rgb(12, 13, 16)");
+    await expect(card).toHaveCSS("border-width", "1px");
+    await expect(card).toHaveCSS("border-radius", "10px");
+    await expect(card.locator("[data-account-menu-name]")).toHaveCSS(
+      "font-size",
+      "16px",
     );
-    await expect(account.locator(".header-account-icon")).toHaveCSS(
-      "background-color",
-      "rgb(22, 33, 74)",
+    await expect(card.locator("[data-account-email]")).toHaveCSS(
+      "font-size",
+      "14px",
     );
+    const accountLink = card.getByRole("link", {
+      name: "Account",
+      exact: true,
+    });
+    await expect(accountLink).toBeVisible();
+    await expect(accountLink).toHaveCSS("font-size", "16px");
+    await expect(
+      card.getByRole("button", { name: "Sign out", exact: true }),
+    ).toBeVisible();
     for (const discord of await header.locator("[data-header-discord]").all())
       await expect(discord).toBeHidden();
     await page.keyboard.press("Escape");
@@ -446,15 +439,22 @@ test("account greeting uses the preferred name or first name and updates after s
   expect(response.status(), await response.text()).toBe(200);
   await page.goto("/volunteer/account");
   const greeting = page.locator("[data-account-greeting]");
-  await expect(greeting).toHaveText(["Taylor", "Taylor"]);
+  const cardNames = page.locator("[data-account-menu-name]");
+  await expect(greeting).toHaveText("Taylor");
+  await expect(cardNames).toHaveText([
+    "Taylor Test Volunteer",
+    "Taylor Test Volunteer",
+  ]);
   await page.getByRole("textbox", { name: /^Preferred name/ }).fill("Tay");
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
-  await expect(greeting).toHaveText(["Tay", "Tay"]);
+  await expect(greeting).toHaveText("Tay");
+  await expect(cardNames).toHaveText(["Tay", "Tay"]);
   await expect(
     page.locator("[data-account-menu] > summary"),
   ).toHaveAccessibleName("Account for Tay");
   const responsePage = await page.goto("/");
-  await expect(greeting).toHaveText(["Tay", "Tay"]);
+  await expect(greeting).toHaveText("Tay");
+  await expect(cardNames).toHaveText(["Tay", "Tay"]);
   expect(responsePage!.headers()["cache-control"]).toBe("no-store");
   expect(await responsePage!.text()).toContain('aria-label="Account for Tay"');
 });
