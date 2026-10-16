@@ -90,6 +90,18 @@ const sections = [
       </button>
     )
   }
+  {
+    !application && (
+      <div data-profile-actions class="flex flex-wrap gap-4" hidden>
+        <button type="submit" class="btn btn-primary" disabled>
+          Save profile
+        </button>
+        <button type="button" class="btn btn-quiet" data-profile-cancel>
+          Cancel
+        </button>
+      </div>
+    )
+  }
   <fieldset
     data-profile-editor={!application || undefined}
     id={!application ? "account-profile-editor" : undefined}

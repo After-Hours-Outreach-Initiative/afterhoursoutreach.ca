@@ -445,7 +445,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
       ),
     ).toBe(false);
     await form.evaluate((element: HTMLFormElement) => element.reset());
-    const save = page.getByRole("button", { name: "Save profile" });
+    const save = page.getByRole("button", { name: "Save profile" }).first();
     await expect(save).toBeDisabled();
     await name.fill("Unsaved layout draft");
     await expect(save).toBeEnabled();

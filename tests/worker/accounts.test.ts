@@ -1112,10 +1112,9 @@ describe(
             '[data-account-profile] input[type="email"], [name="heardAboutUsSources"], [name="heardAboutUsOther"], [name="motivation"], .volunteer-code-of-conduct',
           ),
         ).toHaveCount(0);
-        const saveProfile = page.getByRole("button", {
-          name: "Save profile",
-          includeHidden: true,
-        });
+        const saveProfile = page
+          .getByRole("button", { name: "Save profile", includeHidden: true })
+          .first();
         await page.getByRole("button", { name: "Edit profile" }).click();
         await expect(saveProfile).toBeDisabled();
         await expect(
