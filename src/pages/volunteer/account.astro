@@ -13,7 +13,11 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import { loadProfile, loadSubmittedApplication } from "@/server/db/profiles";
+import {
+  loadProfile,
+  loadSubmittedApplication,
+  loadFirstCompletedOrientation,
+} from "@/server/db/profiles";
 import { createDatabase } from "@/server/db";
 import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -24,6 +28,12 @@ import {
 export const prerender = false;
 let values: ApplicationAnswers | null = null;
 let submission: Awaited<ReturnType<typeof loadSubmittedApplication>> = null;
+let accountCreatedAt: Date | null = null;
+let firstOrientationAt: Date | null = null;
+const accountDate = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Vancouver",
+  dateStyle: "long",
+});
 let email = "";
 let userId = "";
 let currentId = "";
@@ -47,6 +57,11 @@ try {
   values = await loadProfile(env.DB, current.user.id);
   if (!values) return Astro.redirect("/apply");
   submission = await loadSubmittedApplication(env.DB, current.user.id);
+  accountCreatedAt = current.user.createdAt;
+  firstOrientationAt = await loadFirstCompletedOrientation(
+    env.DB,
+    current.user.id,
+  );
   email = current.user.email;
   userId = current.user.id;
   const { sessionConfig } = await auth.$context;
@@ -116,6 +131,38 @@ try {
   }
   <section class="volunteer-panel">
     <h2>Your profile</h2>
+    <div class="account-profile-summary mb-8">
+      <dl>
+        <div>
+          <dt>Account created</dt>
+          <dd>
+            {
+              accountCreatedAt ? (
+                <time datetime={accountCreatedAt.toISOString()}>
+                  {accountDate.format(accountCreatedAt)}
+                </time>
+              ) : (
+                "Unavailable"
+              )
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>First completed orientation</dt>
+          <dd>
+            {
+              firstOrientationAt ? (
+                <time datetime={firstOrientationAt.toISOString()}>
+                  {accountDate.format(firstOrientationAt)}
+                </time>
+              ) : (
+                "Not yet completed"
+              )
+            }
+          </dd>
+        </div>
+      </dl>
+    </div>
     <AccountProfileForm email={email} values={values} userId={userId} />
   </section>
   <SubmittedApplication submission={submission} />
