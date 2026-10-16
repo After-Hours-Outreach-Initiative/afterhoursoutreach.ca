@@ -51,7 +51,11 @@ export async function limitEmailRequests(
   secret: string | undefined,
   email: string,
   ip: string,
+  cooldownMs = 60_000,
 ) {
+  // Internal policy only: callers cannot supply a cooldown through the auth API.
+  if (cooldownMs !== 30_000 && cooldownMs !== 60_000)
+    throw new RangeError("Email request cooldown must be 30 or 60 seconds.");
   // IP first: rotating recipient addresses must not bypass the sending budget.
   await takeRateLimit(binding, secret, `send-ip:${ip}`, 10, 3_600_000);
   const cooldownKey = await hashAuthValue(secret, `send-cooldown:${email}`);
@@ -62,12 +66,14 @@ export async function limitEmailRequests(
      ON CONFLICT (key) DO UPDATE SET count = 1, expires_at = excluded.expires_at
      WHERE expires_at <= ? RETURNING count`,
     )
-    .bind(cooldownKey, now + 60_000, now)
+    .bind(cooldownKey, now + cooldownMs, now)
     .first();
   if (!cooldown)
     throw new RequestError(
       429,
-      "Wait one minute before requesting another email.",
+      cooldownMs === 30_000
+        ? "Wait 30 seconds before requesting another email."
+        : "Wait one minute before requesting another email.",
     );
   await takeRateLimit(binding, secret, `send-email:${email}`, 3, 3_600_000);
   await takeEmailBudget(binding, secret);

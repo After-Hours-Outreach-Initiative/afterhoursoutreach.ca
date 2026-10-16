@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { totpFromSetupKey } from "./helpers/totp";
-import { beforeEach, test } from "vitest";
+import { afterEach, beforeEach, test, vi } from "vitest";
 import { env } from "cloudflare:workers";
 import {
   authBindingsForRequest,
@@ -15,7 +15,11 @@ import {
 import { certificationOptions, trainingOptions } from "../src/data/application";
 import { viewVolunteerProfile } from "../src/server/db/volunteers";
 import { accountContext } from "../src/server/db/access";
-import { hashAuthValue, takeRateLimit } from "../src/server/db/rate-limits";
+import {
+  hashAuthValue,
+  limitEmailRequests,
+  takeRateLimit,
+} from "../src/server/db/rate-limits";
 import { sendSignInEmail, type SignInEmail } from "../src/server/auth/services";
 import { deliverNotifications } from "../src/server/events/notifications";
 import {
@@ -54,6 +58,8 @@ beforeEach(async () => {
     },
   });
 });
+
+afterEach(() => vi.useRealTimers());
 
 function request(path: string, body?: object, cookie?: string) {
   return auth.handler(
@@ -485,12 +491,11 @@ test("rate limits are atomic, persistent, and do not store raw email/IP keys", a
 });
 
 test("email hourly limits still apply after the resend cooldown expires", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  const start = new Date("2026-10-16T12:10:00Z").getTime();
   const email = "hourly@example.org";
-  const cooldown = await hashAuthValue(
-    bindings.BETTER_AUTH_SECRET,
-    `send-cooldown:${email}`,
-  );
   for (let i = 0; i < 3; i++) {
+    vi.setSystemTime(start + i * 30_000);
     assert.equal(
       (
         await request("/email-otp/send-verification-otp", {
@@ -500,12 +505,8 @@ test("email hourly limits still apply after the resend cooldown expires", async 
       ).status,
       200,
     );
-    await bindings.DB.prepare(
-      "UPDATE auth_rate_limit SET expires_at = 0 WHERE key = ?",
-    )
-      .bind(cooldown)
-      .run();
   }
+  vi.setSystemTime(start + 90_000);
   assert.equal(
     (
       await request("/email-otp/send-verification-otp", {
@@ -516,6 +517,178 @@ test("email hourly limits still apply after the resend cooldown expires", async 
     429,
   );
   assert.equal(outbox.length, 3);
+});
+
+test("sign-in resends enforce the real D1 30-second boundary and replace the old challenge", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  const start = new Date("2026-10-16T12:10:00Z").getTime();
+  vi.setSystemTime(start);
+  const email = "resend-boundary@example.org";
+  const body = { email, type: "sign-in" };
+  const cooldownKey = await hashAuthValue(
+    bindings.BETTER_AUTH_SECRET,
+    `send-cooldown:${email}`,
+  );
+  const readChallenge = () =>
+    bindings.DB.prepare(
+      "SELECT id, value, expires_at FROM verification WHERE identifier=? ORDER BY created_at DESC LIMIT 1",
+    )
+      .bind(`sign-in-otp-${email}`)
+      .first<{ id: string; value: string; expires_at: number }>();
+  const readCooldown = () =>
+    bindings.DB.prepare("SELECT expires_at FROM auth_rate_limit WHERE key=?")
+      .bind(cooldownKey)
+      .first<{ expires_at: number }>();
+  assert.equal(
+    (await request("/email-otp/send-verification-otp", body)).status,
+    200,
+  );
+  const original = outbox.at(-1)!;
+  const originalChallenge = await readChallenge();
+  assert.ok(originalChallenge);
+  assert.equal((await readCooldown())?.expires_at, start + 30_000);
+  vi.setSystemTime(start + 29_999);
+  const tooEarly = await request("/email-otp/send-verification-otp", body);
+  assert.equal(tooEarly.status, 429);
+  assert.equal(
+    ((await tooEarly.json()) as { message: string }).message,
+    "Wait 30 seconds before requesting another email.",
+  );
+  assert.deepEqual(await readChallenge(), originalChallenge);
+  assert.equal((await readCooldown())?.expires_at, start + 30_000);
+  assert.equal(outbox.length, 1);
+  vi.setSystemTime(start + 30_000);
+  assert.equal(
+    (await request("/email-otp/send-verification-otp", body)).status,
+    200,
+  );
+  const replacement = await readChallenge();
+  assert.ok(replacement);
+  assert.notEqual(replacement.id, originalChallenge.id);
+  assert.equal(replacement.expires_at, start + 30_000 + 600_000);
+  assert.equal((await readCooldown())?.expires_at, start + 60_000);
+  const latest = outbox.at(-1)!;
+  // Better Auth selects only the latest challenge for an identifier.
+  // Six-digit codes may randomly repeat, in which case both numeric inputs match.
+  if (latest.code !== original.code) {
+    assert.notEqual(replacement.value, originalChallenge.value);
+    assert.equal(
+      (await request("/sign-in/email-otp", { email, otp: original.code }))
+        .status,
+      400,
+    );
+  }
+  assert.equal(
+    (await request("/sign-in/email-otp", { email, otp: latest.code })).status,
+    200,
+  );
+  vi.setSystemTime(start + 60_001);
+  assert.equal(
+    (await request("/email-otp/send-verification-otp", body)).status,
+    200,
+  );
+  assert.equal(outbox.length, 3);
+});
+
+test("the verification budget survives real 30-second resends", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  const start = new Date("2026-10-16T12:10:00Z").getTime();
+  const email = "resend-verification-budget@example.org";
+  for (let resend = 0; resend < 3; resend++) {
+    vi.setSystemTime(start + resend * 30_000);
+    assert.equal(
+      (
+        await request("/email-otp/send-verification-otp", {
+          email,
+          type: "sign-in",
+        })
+      ).status,
+      200,
+    );
+    const code = outbox.at(-1)!.code;
+    const wrong = code === "000000" ? "000001" : "000000";
+    for (let attempt = 0; attempt < 3; attempt++)
+      assert.equal(
+        (await request("/sign-in/email-otp", { email, otp: wrong })).status,
+        400,
+      );
+  }
+  const proof = { email, otp: outbox.at(-1)!.code };
+  assert.equal((await request("/sign-in/email-otp", proof)).status, 403);
+  assert.equal((await request("/sign-in/email-otp", proof)).status, 429);
+  assert.equal(outbox.length, 3);
+});
+
+test("email-change requests retain their default 60-second D1 cooldown", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  const start = new Date("2026-10-16T12:10:00Z").getTime();
+  vi.setSystemTime(start);
+  const { cookie } = await signIn();
+  const newEmail = "change-cooldown@example.org";
+  const body = { newEmail };
+  assert.equal(
+    (await request("/email-otp/request-email-change", body, cookie)).status,
+    200,
+  );
+  const cooldownKey = await hashAuthValue(
+    bindings.BETTER_AUTH_SECRET,
+    `send-cooldown:${newEmail}`,
+  );
+  const row = await bindings.DB.prepare(
+    "SELECT expires_at FROM auth_rate_limit WHERE key=?",
+  )
+    .bind(cooldownKey)
+    .first<{ expires_at: number }>();
+  assert.equal(row?.expires_at, start + 60_000);
+  for (const elapsed of [30_000, 59_999]) {
+    vi.setSystemTime(start + elapsed);
+    const rejected = await request(
+      "/email-otp/request-email-change",
+      body,
+      cookie,
+    );
+    assert.equal(rejected.status, 429);
+    assert.equal(
+      ((await rejected.json()) as { message: string }).message,
+      "Wait one minute before requesting another email.",
+    );
+  }
+  vi.setSystemTime(start + 60_000);
+  assert.equal(
+    (await request("/email-otp/request-email-change", body, cookie)).status,
+    200,
+  );
+  assert.equal(outbox.length, 3);
+});
+
+test("email cooldown policy rejects unsupported internal values and client overrides before writes", async () => {
+  for (const cooldownMs of [0, -30_000, 1, 30_001, 60_000.5, NaN, Infinity])
+    await assert.rejects(
+      () =>
+        limitEmailRequests(
+          bindings.DB,
+          bindings.BETTER_AUTH_SECRET,
+          "policy@example.org",
+          "192.0.2.1",
+          cooldownMs,
+        ),
+      RangeError,
+    );
+  assert.equal(
+    (
+      await request("/email-otp/send-verification-otp", {
+        email: "policy@example.org",
+        type: "sign-in",
+        cooldownMs: 0,
+      })
+    ).status,
+    400,
+  );
+  const counters = await bindings.DB.prepare(
+    "SELECT count(*) AS count FROM auth_rate_limit",
+  ).first<{ count: number }>();
+  assert.equal(counters?.count, 0);
+  assert.equal(outbox.length, 0);
 });
 
 test("IP sending limits prevent cycling recipient addresses", async () => {

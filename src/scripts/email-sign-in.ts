@@ -139,7 +139,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
             owner,
             outcome === "failure"
               ? "We could not send the email. Try again later. (Simulated locally.)"
-              : "Too many email requests. Try again after one minute. (Simulated locally.)",
+              : "Too many email requests. Please wait before trying again. (Simulated locally.)",
           );
           return;
         }
