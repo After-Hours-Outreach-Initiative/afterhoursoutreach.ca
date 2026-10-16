@@ -1,6 +1,20 @@
 -- Current database-enforced business rules. Edit this source, then run pnpm db:generate.
 -- Each trigger is one statement; the generator preserves it in a frozen migration.
 
+-- Advancing a discard generation and removing answers must be one atomic write.
+CREATE TRIGGER application_draft_discard_insert
+AFTER INSERT ON application_draft_generation
+BEGIN
+  DELETE FROM application_draft WHERE user_id = NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER application_draft_discard_update
+AFTER UPDATE OF generation ON application_draft_generation
+BEGIN
+  DELETE FROM application_draft WHERE user_id = NEW.user_id;
+END;
+--> statement-breakpoint
+
 -- Check eligibility and capacity inside SQLite so concurrent writes cannot overbook.
 CREATE TRIGGER signup_confirm_insert
 BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'

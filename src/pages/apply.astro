@@ -9,12 +9,13 @@ import {
   readAccountSession,
 } from "@/server/auth";
 import { loadProfile } from "@/server/db/profiles";
-import { loadApplicationDraft } from "@/server/db/application-drafts";
+import { loadApplicationDraftState } from "@/server/db/application-drafts";
 import type { ApplicationDraft } from "@/data/application-draft";
 export const prerender = false;
 let email = "";
 let userId = "";
 let draft: ApplicationDraft | null = null;
+let generation: string | null = null;
 if (!env.BETTER_AUTH_SECRET)
   return Astro.redirect("/volunteer/sign-in?returnTo=/apply");
 try {
@@ -32,7 +33,7 @@ try {
     return Astro.redirect("/volunteer/account");
   email = current.user.email;
   userId = current.user.id;
-  draft = await loadApplicationDraft(env.DB, userId);
+  ({ draft, generation } = await loadApplicationDraftState(env.DB, userId));
 } catch {
   return new Response("Your account is temporarily unavailable.", {
     status: 503,
@@ -77,6 +78,11 @@ try {
           Signing out clears synced browser copies, but keeps your account draft
           and leaves unsynced answers on this device. Avoid shared devices;
           clearing this site’s browser data does not delete your account draft.
+          Use Discard application draft below to delete your account draft and
+          this browser’s copy, including unsynced answers, after confirmation.
+          If either deletion fails, we will tell you which copy still needs to
+          be cleared. This does not delete your account or a submitted
+          application.
         </p>
         <p>
           Saving a draft is not submission. Drafts are not shown in organizer
@@ -93,6 +99,7 @@ try {
       email={email}
       userId={userId}
       draft={draft}
+      draftGeneration={generation}
       application
     />
   </section>
