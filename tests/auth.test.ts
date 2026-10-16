@@ -1919,7 +1919,10 @@ test("Resend receives the same sign-in message in every hosted environment and h
       environment,
       async (_url, options) => {
         const body = JSON.parse(String(options?.body));
-        assert.equal(body.subject, "Your After Hours Outreach sign-in");
+        assert.equal(
+          body.subject,
+          "123456 is your After Hours Outreach sign-in code",
+        );
         assert.ok(body.text.includes(`Sign in: ${email.url}`));
         assert.match(body.text, /device that requested it: 123456/);
         const escapedUrl = email.url.replaceAll("&", "&amp;");
