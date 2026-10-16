@@ -11,6 +11,7 @@ import {
 } from "../src/server/db/application-drafts";
 import {
   hasApplied,
+  loadFirstCompletedOrientation,
   loadProfile,
   loadSubmittedApplication,
   saveProfile,
@@ -130,6 +131,44 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
 
+test("first completed orientation uses the earliest attended event, not when attendance was recorded", async () => {
+  const actor = await draftActor();
+  const other = await draftActor("other-volunteer");
+  const starts = ["2025-01-01", "2025-02-01", "2025-03-01"].map((date) =>
+    Date.parse(`${date}T02:00:00Z`),
+  );
+  await env.DB.batch(
+    starts.map((startsAt, index) =>
+      env.DB.prepare(
+        `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
+        VALUES (?, 'orientation', ?, 'Meeting point', 3, ?, 0, 0)`,
+      ).bind(`orientation-${index}`, startsAt, actor.id),
+    ),
+  );
+  assert.equal(await loadFirstCompletedOrientation(env.DB, actor.id), null);
+  await env.DB.batch(
+    [
+      [other.id, 0, 1000],
+      [actor.id, 2, 2000],
+      [actor.id, 1, 3000],
+    ].map(([userId, index, markedAt]) =>
+      env.DB.prepare(
+        "INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at) VALUES (?, ?, ?, ?, ?)",
+      ).bind(
+        crypto.randomUUID(),
+        userId,
+        `orientation-${index}`,
+        actor.id,
+        markedAt,
+      ),
+    ),
+  );
+  assert.equal(
+    (await loadFirstCompletedOrientation(env.DB, actor.id))?.getTime(),
+    starts[1],
+  );
+});
+
 test("concurrent first-orientation signups reserve one booking; cancellation and past/cancelled events allow rebooking", async () => {
   const actor = {
     ...(await draftActor("orientation-volunteer")),
@@ -172,6 +211,7 @@ test("concurrent first-orientation signups reserve one booking; cancellation and
   const events = await listEvents(env.DB, actor);
   const booked = events.find((item) => item.signedUp)!;
   const other = events.find((item) => !item.signedUp)!;
+  assert.equal(await loadFirstCompletedOrientation(env.DB, actor.id), null);
   assert.equal(other.orientationSignupBlocked, 1);
   await changeSignup(env.DB, actor, booked.id, "cancel");
   assert.ok(

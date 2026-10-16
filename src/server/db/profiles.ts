@@ -29,6 +29,8 @@ import {
   volunteerStatus,
   auditLog,
   applicationDraft,
+  event,
+  orientationCompletion,
 } from "./schema";
 import { RequestError } from "../http";
 
@@ -259,6 +261,21 @@ export async function loadSubmittedApplication(
     columns: { submitted_application: true },
   });
   return row?.submitted_application ?? null;
+}
+
+export async function loadFirstCompletedOrientation(
+  binding: Env["DB"],
+  userId: string,
+) {
+  const row = await createDatabase(binding)
+    .select({ startsAt: event.starts_at })
+    .from(orientationCompletion)
+    .innerJoin(event, eq(event.id, orientationCompletion.event_id))
+    .where(eq(orientationCompletion.user_id, userId))
+    .orderBy(event.starts_at)
+    .limit(1)
+    .get();
+  return row?.startsAt ?? null;
 }
 
 export async function saveProfile(
