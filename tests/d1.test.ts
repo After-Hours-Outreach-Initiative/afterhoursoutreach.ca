@@ -7,7 +7,13 @@ import {
   loadApplicationDraft,
   saveApplicationDraft,
 } from "../src/server/db/application-drafts";
-import { hasApplied, saveProfile } from "../src/server/db/profiles";
+import {
+  hasApplied,
+  loadProfile,
+  loadSubmittedApplication,
+  saveProfile,
+} from "../src/server/db/profiles";
+import { codeOfConductVersion } from "../src/data/code-of-conduct";
 import type { Actor } from "../src/server/db/access";
 import {
   applicationDraftAnswersSchema,
@@ -203,6 +209,47 @@ test("submission atomically removes drafts; failed submissions retain them and l
     ...answers,
     codeOfConductAccepted: true,
   });
+  const submission = await loadSubmittedApplication(env.DB, actor.id);
+  assert.ok(submission);
+  assert.deepEqual(submission.answers, answers);
+  assert.equal(submission.email, `${actor.id}@example.org`);
+  assert.equal(submission.codeOfConductVersion, codeOfConductVersion);
+  const context = await env.DB.prepare(
+    "SELECT registered_at, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .first();
+  assert.equal(Date.parse(submission.submittedAt), context?.registered_at);
+  assert.equal(
+    Date.parse(submission.codeOfConductAcceptedAt),
+    context?.code_of_conduct_accepted_at,
+  );
+  await env.DB.prepare("UPDATE user SET email=? WHERE id=?")
+    .bind("changed@example.org", actor.id)
+    .run();
+  await saveProfile(env.DB, actor.id, {
+    ...answers,
+    preferredName: "Changed nickname",
+    phone: "604-555-0199",
+    emergencyName: "Changed contact",
+    medicalConditions: "Changed safety answer",
+    teams: ["non-patrol"],
+    training: ["naloxone-administration"],
+  });
+  assert.equal((await loadProfile(env.DB, actor.id))?.phone, "604-555-0199");
+  assert.deepEqual(
+    await loadSubmittedApplication(env.DB, actor.id),
+    submission,
+  );
+  assert.equal(await loadSubmittedApplication(env.DB, "another-user"), null);
+  await assert.rejects(
+    env.DB.prepare(
+      "UPDATE profile SET submitted_application=NULL WHERE user_id=?",
+    )
+      .bind(actor.id)
+      .run(),
+    /submitted_application_immutable/,
+  );
   assert.equal(await loadApplicationDraft(env.DB, actor.id), null);
   for (const revision of [saved.revision, null])
     await assert.rejects(

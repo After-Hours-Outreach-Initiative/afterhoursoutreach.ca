@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { ApplicationDraftAnswers } from "../../data/application-draft";
+import type { SubmittedApplication } from "../../data/application";
 import {
   check,
   index,
@@ -167,6 +168,8 @@ export const profile = sqliteTable("profile", {
   // Nullable for existing/synthetic profiles; never invent an acknowledgement.
   code_of_conduct_version: text(),
   code_of_conduct_accepted_at: timestamp(),
+  // Insert-only submission snapshot. Null means the original was not captured.
+  submitted_application: text({ mode: "json" }).$type<SubmittedApplication>(),
   // Legacy SQL name: when the volunteer application was submitted.
   registered_at: timestamp().notNull(),
   updated_at: timestamp().notNull(),

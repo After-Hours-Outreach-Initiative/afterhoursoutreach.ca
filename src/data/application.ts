@@ -25,6 +25,16 @@ export interface ApplicationAnswers {
   medicalConditions: string;
 }
 
+/** The accepted submission, never rebuilt from the volunteer's current profile. */
+export interface SubmittedApplication {
+  version: 1;
+  answers: ApplicationAnswers;
+  email: string;
+  submittedAt: string;
+  codeOfConductVersion: string;
+  codeOfConductAcceptedAt: string;
+}
+
 export function applicationDisplayName(
   answers: Pick<
     ApplicationAnswers,
