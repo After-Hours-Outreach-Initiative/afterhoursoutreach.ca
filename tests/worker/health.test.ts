@@ -185,7 +185,12 @@ describe("database readiness in the built Worker", () => {
     await health(200);
   });
 
-  test.each(["profile", "session", "application_draft"])(
+  test.each([
+    "profile",
+    "session",
+    "application_draft",
+    "application_draft_generation",
+  ])(
     "a missing %s table is unavailable despite a complete ledger",
     async (table) => {
       await worker.applyD1Migrations("DB");
@@ -198,6 +203,7 @@ describe("database readiness in the built Worker", () => {
   test.each([
     ["user", "image"],
     ["profile", "heard_about_us_sources"],
+    ["application_draft_generation", "generation"],
     ["event_notification", "delivery_origin"],
   ])(
     "a missing %s.%s column is unavailable even on empty tables",
