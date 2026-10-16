@@ -29,6 +29,22 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-application-intro {
   margin: 28px 0 32px;
 }
+.volunteer-draft-save-status {
+  min-height: 21px;
+  margin-top: 8px;
+  color: #a1a1aa;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.volunteer-draft-save-status[data-save-state="saved"] {
+  color: #86efac;
+}
+.volunteer-draft-save-status:is(
+  [data-save-state="error"],
+  [data-save-state="paused"]
+) {
+  color: #fcd34d;
+}
 .volunteer-application-intro h2,
 .volunteer-panel h2,
 .volunteer-dialog h2 {

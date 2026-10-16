@@ -26,6 +26,25 @@ for (const [layout, viewport] of [
     );
     await expect(notice).toBeVisible();
     await expect(notice).toBeInViewport();
+    const saveIndicator = page.locator("[data-draft-save-indicator]");
+    await expect(saveIndicator).toHaveText("Ready to save");
+    await expect(saveIndicator).toBeVisible();
+    await expect(saveIndicator).toHaveAttribute("role", "status");
+    await expect(saveIndicator).toHaveAttribute("aria-live", "polite");
+    expect(
+      await saveIndicator.evaluate((element) => {
+        const notice = element.previousElementSibling!;
+        const form = document.querySelector("form[data-application]")!;
+        return (
+          notice.textContent?.trim() ===
+            "Your application progress is automatically saved to your account." &&
+          element.getBoundingClientRect().top >=
+            notice.getBoundingClientRect().bottom &&
+          element.getBoundingClientRect().bottom <=
+            form.getBoundingClientRect().top
+        );
+      }),
+    ).toBe(true);
     await expect(
       page.getByRole("heading", {
         name: "Draft saving and privacy",
@@ -79,6 +98,7 @@ test("autosave message is present before answers without JavaScript", async ({
       { exact: true },
     );
     await expect(notice).toBeVisible();
+    await expect(page.locator("[data-draft-save-indicator]")).toBeHidden();
     await expect(page.locator('[name="firstName"]')).toHaveValue("");
     await expect(
       page.getByRole("button", { name: "Review application", exact: true }),
