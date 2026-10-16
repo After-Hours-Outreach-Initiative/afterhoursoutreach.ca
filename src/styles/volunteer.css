@@ -16,6 +16,9 @@ body:has([data-application]) {
   margin: auto;
   padding: 32px 24px 96px;
 }
+.volunteer-wrap-public {
+  padding-top: 96px;
+}
 .volunteer-panel {
   border: 1px solid #3f3f46;
   padding: 32px;
@@ -1024,6 +1027,9 @@ body:has([data-application]) {
 @media (max-width: 640px) {
   .volunteer-wrap {
     padding: 32px 16px 64px;
+  }
+  .volunteer-wrap-public {
+    padding-top: 72px;
   }
   .volunteer-application-contents {
     --application-contents-padding: 16px;
