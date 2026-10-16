@@ -12,7 +12,7 @@ for (const [layout, viewport] of [
   ["desktop", { width: 1280, height: 900 }],
   ["mobile", { width: 390, height: 844 }],
 ] as const) {
-  test(`autosave privacy notice precedes unanswered application fields on ${layout}`, async ({
+  test(`autosave message precedes unanswered application fields on ${layout}`, async ({
     page,
     baseURL,
   }) => {
@@ -20,44 +20,18 @@ for (const [layout, viewport] of [
     await createLocalAccount(page.request, baseURL!, false);
     await page.goto("/apply");
 
-    const notice = page.getByRole("complementary", {
-      name: "Draft saving and privacy",
-      exact: true,
-    });
+    const notice = page.getByText(
+      "Your application progress is automatically saved to your account.",
+      { exact: true },
+    );
     await expect(notice).toBeVisible();
-    await expect(notice.getByRole("heading")).toBeInViewport();
-    await expect(notice).toContainText(
-      "including any personal and medical information—is automatically saved before submission",
-    );
-    await expect(notice).toContainText(
-      "stored with your account on our server (Cloudflare D1)",
-    );
-    await expect(notice).toContainText("resume on another device");
-    await expect(notice).toContainText(
-      "this browser’s local storage on this device when available",
-    );
-    await expect(notice).toContainText(
-      "Offline or unsynced answers may be stored only in this browser",
-    );
-    await expect(notice).toContainText(
-      "Signing out clears synced browser copies, but keeps your account draft and leaves unsynced answers on this device",
-    );
-    await expect(notice).toContainText("Avoid shared devices");
-    await expect(notice).toContainText(
-      "clearing this site’s browser data does not delete your account draft",
-    );
-    await expect(notice).toContainText("Saving a draft is not submission");
-    await expect(notice).toContainText("Use Discard application draft below");
-    await expect(notice).toContainText(
-      "including unsynced answers, after confirmation",
-    );
-    await expect(notice).toContainText("If either deletion fails");
-    await expect(notice).toContainText(
-      "Drafts are not shown in organizer views",
-    );
-    await expect(notice).toContainText(
-      "submitted for review only when you choose Submit application",
-    );
+    await expect(notice).toBeInViewport();
+    await expect(
+      page.getByRole("heading", {
+        name: "Draft saving and privacy",
+        exact: true,
+      }),
+    ).toHaveCount(0);
 
     const form = page.locator("form[data-application]");
     await expect(form.locator('[name="firstName"]')).toHaveValue("");
@@ -85,21 +59,10 @@ for (const [layout, viewport] of [
       submitted: false,
       draft: null,
     });
-
-    const privacyLink = notice.getByRole("link", {
-      name: "privacy information",
-      exact: true,
-    });
-    await expect(privacyLink).toHaveAttribute("href", "/privacy");
-    await privacyLink.click();
-    await expect(page).toHaveURL(/\/privacy$/);
-    await expect(
-      page.getByRole("heading", { name: "Privacy", exact: true }),
-    ).toBeVisible();
   });
 }
 
-test("autosave privacy notice is present before answers without JavaScript", async ({
+test("autosave message is present before answers without JavaScript", async ({
   browser,
   baseURL,
 }) => {
@@ -111,13 +74,11 @@ test("autosave privacy notice is present before answers without JavaScript", asy
     await createLocalAccount(context.request, baseURL!, false);
     const page = await context.newPage();
     await page.goto("/apply");
-    const notice = page.getByRole("complementary", {
-      name: "Draft saving and privacy",
-      exact: true,
-    });
+    const notice = page.getByText(
+      "Your application progress is automatically saved to your account.",
+      { exact: true },
+    );
     await expect(notice).toBeVisible();
-    await expect(notice).toContainText("saved before submission");
-    await expect(notice.getByRole("link")).toHaveAttribute("href", "/privacy");
     await expect(page.locator('[name="firstName"]')).toHaveValue("");
     await expect(
       page.getByRole("button", { name: "Review application", exact: true }),
