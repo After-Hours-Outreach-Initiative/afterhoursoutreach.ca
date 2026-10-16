@@ -44,13 +44,9 @@ const blocked = signupBlockReason(
       {
         event.cancelledAt ? (
           <p class="volunteer-hidden">Cancelled</p>
-        ) : Boolean(event.hidden) ? (
-          <p class="volunteer-hidden">Hidden from public list</p>
-        ) : (
-          !event.open && (
-            <p class="volunteer-hidden">Closed for new registrations</p>
-          )
-        )
+        ) : event.hidden || !event.open ? (
+          <p class="volunteer-hidden">Public visibility off</p>
+        ) : null
       }
       <h3>
         {event.type === "patrol" ? "Patrol" : "Orientation"} · {

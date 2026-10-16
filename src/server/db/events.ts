@@ -96,7 +96,7 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
           `${select}
         WHERE e.starts_at > ?
           AND e.cancelled_at IS NULL
-          AND (e.hidden = 0 OR EXISTS(
+          AND ((e.open = 1 AND e.hidden = 0) OR EXISTS(
             SELECT 1 FROM signup
             WHERE event_id = e.id AND user_id = ? AND status = 'confirmed'
           ))

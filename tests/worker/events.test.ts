@@ -632,6 +632,63 @@ describe(
         await ok(await join(patrol.id, bob.cookie), 403);
       });
 
+      test("visibility off, including legacy mixed states, hides listings but preserves existing spots", async () => {
+        const event = await createEvent("orientation");
+        const listed = new RegExp(`data-live-event="${event.id}"`);
+        await ok(await join(event.id, alice.cookie));
+        for (const flags of [
+          { open: false, hidden: true },
+          { open: false, hidden: false },
+          { open: true, hidden: true },
+          { open: true, hidden: false },
+        ]) {
+          const row = await DB.prepare(
+            "SELECT updated_at AS version FROM event WHERE id=?",
+          )
+            .bind(event.id)
+            .first<{ version: number }>();
+          await ok(
+            await send(
+              "/api/v1/events/action",
+              {
+                action: "save",
+                id: event.id,
+                version: row!.version,
+                event: { ...event.data, ...flags },
+              },
+              organizer.cookie,
+            ),
+          );
+          const visible = flags.open && !flags.hidden;
+          const html = await (
+            await ok(await send("/volunteer", undefined, bob.cookie))
+          ).text();
+          assert.equal(listed.test(html), visible);
+          for (const cookie of [alice.cookie, bob.cookie, organizer.cookie]) {
+            const summaries = (await (
+              await ok(await send("/api/v1/events", undefined, cookie))
+            ).json()) as { events: { id: string }[] };
+            assert.equal(
+              summaries.events.some((row) => row.id === event.id),
+              visible,
+            );
+          }
+          assert.match(
+            await (await send("/volunteer", undefined, alice.cookie)).text(),
+            listed,
+          );
+          if (!visible) await ok(await join(event.id, bob.cookie), 403);
+        }
+        assert.equal(
+          await DB.prepare(
+            "SELECT status FROM signup WHERE event_id=? AND user_id=?",
+          )
+            .bind(event.id, alice.id)
+            .first("status"),
+          "confirmed",
+        );
+      });
+
       test("move rollback preserves source signup when destination is full", async () => {
         const signedUp = await DB.prepare(
           "SELECT id,user_id AS userId FROM signup WHERE event_id=? AND status='confirmed'",
@@ -1016,7 +1073,7 @@ describe(
           const account = nav.locator("summary");
           assert.equal(
             (
-              await nav.locator("[data-account-greeting]").textContent()
+              await nav.locator("[data-account-menu-name]").textContent()
             )?.trim(),
             "Sample Organizer",
           );
@@ -1259,37 +1316,18 @@ describe(
           await expect(
             dialog.getByRole("combobox", { name: "Event type", exact: true }),
           ).toBeEnabled();
-          const signupChoices = dialog.getByRole("group", {
-            name: "Registration",
+          const visibilityToggle = dialog.getByRole("switch", {
+            name: "Public visibility",
             exact: true,
           });
-          const visibilityChoices = dialog.getByRole("group", {
-            name: "Volunteer event list",
-            exact: true,
-          });
-          await expect(
-            signupChoices.getByRole("radio", { name: "Open", exact: true }),
-          ).toBeChecked();
-          await expect(
-            visibilityChoices.getByRole("radio", {
-              name: "Visible",
-              exact: true,
-            }),
-          ).toBeChecked();
-          // State controls remain keyboard-operable with reduced motion enabled.
+          await expect(dialog.getByRole("switch")).toHaveCount(1);
+          await expect(dialog.getByRole("radio")).toHaveCount(0);
+          await expect(visibilityToggle).not.toBeChecked();
+          // The toggle supports keyboard use and does not save until submission.
           await page.emulateMedia({ reducedMotion: "reduce" });
-          // Native radio groups support keyboard selection without saving the form.
-          await signupChoices
-            .getByRole("radio", { name: "Open", exact: true })
-            .focus();
-          await page.keyboard.press("ArrowRight");
-          await expect(
-            signupChoices.getByRole("radio", { name: "Closed", exact: true }),
-          ).toBeChecked();
-          await page.keyboard.press("ArrowLeft");
-          await expect(
-            signupChoices.getByRole("radio", { name: "Open", exact: true }),
-          ).toBeChecked();
+          await visibilityToggle.focus();
+          await page.keyboard.press("Space");
+          await expect(visibilityToggle).toBeChecked();
           await dialog
             .getByLabel("Start date and time")
             .fill("2031-04-12T20:30");
@@ -1330,33 +1368,16 @@ describe(
             await expect(
               editor.locator('input[type="hidden"][name="type"]'),
             ).toHaveValue("patrol");
-            const signupState = editor.getByRole("group", {
-              name: "Registration",
+            const visibility = editor.getByRole("switch", {
+              name: "Public visibility",
               exact: true,
             });
-            const visibility = editor.getByRole("group", {
-              name: "Volunteer event list",
-              exact: true,
-            });
-            // Reopening the editor must explicitly show the saved states.
-            await expect(
-              signupState.getByRole("radio", {
-                name: spots === 9 ? "Open" : "Closed",
-                exact: true,
-              }),
-            ).toBeChecked();
-            await expect(
-              visibility.getByRole("radio", {
-                name: spots === 9 ? "Visible" : "Hidden",
-                exact: true,
-              }),
-            ).toBeChecked();
-            await signupState
-              .getByText(spots === 9 ? "Closed" : "Open", { exact: true })
+            // Reopening the editor shows the saved state of both storage flags.
+            await expect(visibility).toBeChecked({ checked: spots === 9 });
+            await editor
+              .getByText("Public visibility", { exact: true })
               .click();
-            await visibility
-              .getByText(spots === 9 ? "Hidden" : "Visible", { exact: true })
-              .click();
+            await expect(visibility).toBeChecked({ checked: spots !== 9 });
             await editor.getByLabel("Volunteer spots").fill(String(spots));
             await inPlaceAction(page, {
               endpoint: "/api/v1/events/action",
@@ -1372,8 +1393,7 @@ describe(
                 ),
               loadingLabel: "Saving…",
               pending: async () => {
-                for (const radio of await editor.getByRole("radio").all())
-                  await expect(radio).toBeDisabled();
+                await expect(visibility).toBeDisabled();
                 await expect(
                   editor.getByRole("button", {
                     name: "Cancel event",
@@ -1395,15 +1415,8 @@ describe(
           await expect(
             dialog.getByLabel("Meeting point", { exact: true }),
           ).toHaveValue("");
-          await expect(
-            signupChoices.getByRole("radio", { name: "Open", exact: true }),
-          ).toBeChecked();
-          await expect(
-            visibilityChoices.getByRole("radio", {
-              name: "Visible",
-              exact: true,
-            }),
-          ).toBeChecked();
+          await expect(visibilityToggle).not.toBeChecked();
+          await dialog.getByText("Public visibility", { exact: true }).click();
           await dialog
             .getByLabel("Start date and time")
             .fill("2031-04-13T20:30");
@@ -1659,7 +1672,7 @@ describe(
             .run();
           await page.goto(`${origin}/volunteer?type=patrol`);
           await expect(
-            card.getByText("Hidden from public list", { exact: true }),
+            card.getByText("Public visibility off", { exact: true }),
           ).toBeVisible();
           await changeSpot("cancel", () => card.waitFor({ state: "detached" }));
           await expect(
@@ -1675,7 +1688,7 @@ describe(
             .waitFor();
           assert.equal(
             (
-              await nav.locator("[data-account-greeting]").textContent()
+              await nav.locator("[data-account-menu-name]").textContent()
             )?.trim(),
             "Sample Bob",
           );
