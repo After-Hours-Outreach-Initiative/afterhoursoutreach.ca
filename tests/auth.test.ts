@@ -1920,7 +1920,24 @@ test("Resend receives the same sign-in message in every hosted environment and h
       async (_url, options) => {
         const body = JSON.parse(String(options?.body));
         assert.equal(body.subject, "Your After Hours Outreach sign-in");
-        assert.match(body.text, /123456/);
+        assert.ok(body.text.includes(`Sign in: ${email.url}`));
+        assert.match(body.text, /device that requested it: 123456/);
+        const escapedUrl = email.url.replaceAll("&", "&amp;");
+        assert.ok(body.html.includes(`href="${escapedUrl}"`));
+        assert.match(body.html, />Sign in<\/a>/);
+        assert.match(body.html, /font-size:36px[^>]*>123456<\/p>/);
+        assert.match(body.html, /If the button does not work, copy and paste/);
+        assert.ok(body.html.includes(`>${escapedUrl}</a>`));
+        for (const content of [body.text, body.html]) {
+          assert.match(content, /expire in ten minutes/);
+          assert.match(content, /Using either one invalidates both/);
+          assert.match(content, /replaces the previous link and code/);
+          assert.match(
+            content,
+            /If you did not request this, ignore this email/,
+          );
+          assert.match(content, /Do not share this email, link or code/);
+        }
         assert.doesNotMatch(body.text, /public branch preview/);
         assert.equal(
           body.from,
@@ -1943,6 +1960,27 @@ test("Resend receives the same sign-in message in every hosted environment and h
   );
 });
 
+test("sign-in HTML escapes the code and URL without changing the plain-text alternative", async () => {
+  const code = `<123&"'>`;
+  const url = `${origin}/volunteer/sign-in/complete#email=test&value="'<tag>`;
+  await sendSignInEmail(
+    "test-only-key",
+    { email: "volunteer@example.org", code, url, id: "escaped" },
+    "production",
+    async (_url, options) => {
+      const body = JSON.parse(String(options?.body));
+      const escapedUrl = `${origin}/volunteer/sign-in/complete#email=test&amp;value=&quot;&#39;&lt;tag&gt;`;
+      assert.equal(body.html.split(`href="${escapedUrl}"`).length - 1, 2);
+      assert.ok(body.html.includes(`>${escapedUrl}</a>`));
+      assert.ok(body.html.includes("&lt;123&amp;&quot;&#39;&gt;"));
+      assert.ok(!body.html.includes(code));
+      assert.ok(body.text.includes(url));
+      assert.ok(body.text.includes(code));
+      return Response.json({ id: "email-id" });
+    },
+  );
+});
+
 test("email-change messages contain a verification code rather than a sign-in link", async () => {
   await sendSignInEmail(
     "test-only-key",
@@ -1962,6 +2000,7 @@ test("email-change messages contain a verification code rather than a sign-in li
       );
       assert.match(body.text, /account settings.*123456/);
       assert.doesNotMatch(body.text, /Sign in:|sign-in\/complete/);
+      assert.equal(body.html, undefined);
       return Response.json({ id: "email-id" });
     },
   );
