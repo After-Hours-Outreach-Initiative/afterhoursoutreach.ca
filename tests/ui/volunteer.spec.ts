@@ -332,8 +332,8 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(
       form.getByRole("group", { name: "About volunteering", exact: true }),
     ).toHaveCount(0);
-    const name = page.getByLabel("First name");
-    await expect(name).toHaveValue(sampleAnswers.firstName);
+    const name = page.getByLabel("Preferred name", { exact: false });
+    await expect(name).toHaveValue(sampleAnswers.preferredName);
     await expect(name).toBeEditable();
     const emergencyContact = page.getByRole("group", {
       name: "Emergency contact",
@@ -448,7 +448,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(save).toBeDisabled();
     await name.fill("Unsaved layout draft");
     await expect(save).toBeEnabled();
-    await name.fill(sampleAnswers.firstName);
+    await name.fill(sampleAnswers.preferredName);
     await expect(save).toBeDisabled();
     expect(
       await page.evaluate(

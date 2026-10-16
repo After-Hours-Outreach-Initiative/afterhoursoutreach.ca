@@ -14,6 +14,7 @@ import {
   countWords,
   motivationMaxWords,
   motivationWordLimitError,
+  profileIdentityFields,
   type ApplicationAnswers,
 } from "../../data/application";
 import {
@@ -191,7 +192,13 @@ export const profileSchema = profileAnswersSchema.superRefine(
 
 // Older clients may still send these answers; profile edits never replace them.
 const profileEditSchema = profileAnswersSchema
-  .extend({ firstName: optionalShortAnswer, lastName: optionalShortAnswer })
+  // Keep stored identity verbatim, without revalidating legacy names or birthdays.
+  .extend({
+    firstName: z.string(),
+    middleNames: z.string(),
+    lastName: z.string(),
+    birthDate: z.string(),
+  })
   .partial({
     heardAboutUs: true,
     heardAboutUsSources: true,
@@ -248,12 +255,22 @@ export async function saveProfile(
   input: unknown,
 ) {
   const old = await loadProfile(binding, userId);
+  if (old && input && typeof input === "object" && !Array.isArray(input)) {
+    const submitted = input as Record<string, unknown>;
+    for (const field of profileIdentityFields)
+      if (field in submitted && submitted[field] !== old[field])
+        throw new RequestError(
+          400,
+          "Your legal name and date of birth cannot be changed from your account.",
+        );
+  }
   const submittedInput =
     old && input && typeof input === "object" && !Array.isArray(input)
       ? {
           firstName: old.firstName,
           middleNames: old.middleNames,
           lastName: old.lastName,
+          birthDate: old.birthDate,
           preferredName: old.preferredName,
           pronouns: old.pronouns,
           certification: old.certification,
@@ -309,22 +326,10 @@ export async function saveProfile(
         : ""),
     motivation: old?.motivation ?? submitted.motivation!,
   };
-  // Existing combined-name profiles may stay unsplit. Once components are supplied,
-  // require both, and do not allow later edits to erase an established full name.
-  if (
-    (old?.firstName ||
-      old?.middleNames ||
-      old?.lastName ||
-      answers.firstName ||
-      answers.middleNames ||
-      answers.lastName) &&
-    (!answers.firstName || !answers.lastName)
-  )
-    throw new RequestError(400, "Enter both your first and last names.");
   if (!applicationDisplayName(answers))
     throw new RequestError(
       400,
-      "Enter your first and last names, or keep your previously saved name.",
+      "Enter a preferred name, or keep your previously saved name.",
     );
   const changedFields = (
     Object.keys(answers) as (keyof ApplicationAnswers)[]
@@ -335,13 +340,9 @@ export async function saveProfile(
   const db = createDatabase(binding);
   const now = new Date();
   const values = {
-    first_name: answers.firstName || null,
-    middle_names: answers.middleNames || null,
-    last_name: answers.lastName || null,
     preferred_name: answers.preferredName,
     pronouns: answers.pronouns || null,
     phone: answers.phone,
-    birth_date: answers.birthDate,
     emergency_contact_name: answers.emergencyName,
     emergency_contact_phone: answers.emergencyPhone,
     emergency_contact_relationship: answers.emergencyRelationship,
@@ -362,6 +363,11 @@ export async function saveProfile(
       .values({
         user_id: userId,
         ...values,
+        // Identity is insert-only, including null/unsplit legacy names on updates.
+        first_name: answers.firstName || null,
+        middle_names: answers.middleNames || null,
+        last_name: answers.lastName || null,
+        birth_date: answers.birthDate,
         // Insert-only: preserve legacy text, nullable choices, and saved details on edits.
         heard_about_us: answers.heardAboutUs,
         heard_about_us_sources: answers.heardAboutUsSources,

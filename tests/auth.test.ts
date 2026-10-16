@@ -682,7 +682,7 @@ test("application/editing persists all answers, keeps approval, and audits only 
   const edit = {
     ...answers,
     medicalConditions: "Changed sample private answer",
-    birthDate: "1993-03-15",
+    preferredName: "Updated volunteer",
   };
   await saveProfile(bindings.DB, id, edit);
   assert.deepEqual(await loadProfile(bindings.DB, id), edit);
@@ -707,7 +707,7 @@ test("application/editing persists all answers, keeps approval, and audits only 
     .bind(id)
     .all();
   assert.deepEqual(JSON.parse(String(logs.results.at(-1)?.changed_fields)), [
-    "birthDate",
+    "preferredName",
     "medicalConditions",
   ]);
   assert.doesNotMatch(
@@ -726,6 +726,52 @@ test("application/editing persists all answers, keeps approval, and audits only 
   assert.equal(
     ((await response.json()) as { next: string }).next,
     "/volunteer/account?tab=profile",
+  );
+});
+
+test("profile edits preserve unsplit legacy names and birthdays without revalidation", async () => {
+  const { cookie } = await signIn();
+  const current = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.ok(current);
+  const id = current.user.id;
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
+  await bindings.DB.prepare(
+    "UPDATE profile SET first_name=NULL, middle_names='', last_name=NULL, birth_date='2020-01-01' WHERE user_id=?",
+  )
+    .bind(id)
+    .run();
+  const { firstName, middleNames, lastName, birthDate, ...editable } = answers;
+  await saveProfile(bindings.DB, id, { ...editable, phone: "604-555-0199" });
+  assert.deepEqual(
+    await bindings.DB.prepare(
+      "SELECT first_name, middle_names, last_name, birth_date, preferred_name FROM profile WHERE user_id=?",
+    )
+      .bind(id)
+      .first(),
+    {
+      first_name: null,
+      middle_names: "",
+      last_name: null,
+      birth_date: "2020-01-01",
+      preferred_name: answers.preferredName,
+    },
+  );
+  await assert.rejects(
+    saveProfile(bindings.DB, id, { ...editable, firstName, lastName }),
+    (error: unknown) => error instanceof RequestError && error.status === 400,
+  );
+  await saveProfile(bindings.DB, id, {
+    ...editable,
+    preferredName: "Legacy nickname",
+  });
+  assert.equal(
+    (await loadProfile(bindings.DB, id))?.preferredName,
+    "Legacy nickname",
   );
 });
 
