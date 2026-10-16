@@ -58,6 +58,58 @@ function signUp(id: string, eventId: string, userId: string) {
   ).run(id, eventId, userId);
 }
 
+function anotherOrientation() {
+  db.exec(`INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
+    SELECT 'other-orientation', type, starts_at, meeting_point, spots, created_by, created_at, updated_at
+    FROM event WHERE id = 'orientation'`);
+}
+
+test("first-orientation cap covers inserts, reactivation and reassignment but allows cancellation and moves", () => {
+  anotherOrientation();
+  signUp("first", "orientation", "alice");
+  assert.throws(
+    () => signUp("blocked", "other-orientation", "alice"),
+    /orientation_signup_limit/,
+  );
+  db.exec("UPDATE signup SET status='cancelled' WHERE id='first'");
+  signUp("replacement", "other-orientation", "alice");
+  assert.throws(
+    () => db.exec("UPDATE signup SET status='confirmed' WHERE id='first'"),
+    /orientation_signup_limit/,
+  );
+  db.exec("UPDATE signup SET event_id='orientation' WHERE id='replacement'");
+  signUp("bob-spot", "other-orientation", "bob");
+  assert.throws(
+    () => db.exec("UPDATE signup SET user_id='bob' WHERE id='replacement'"),
+    /orientation_signup_limit/,
+  );
+});
+
+test("patrol approval or recorded completion lifts the cap; existing excess bookings are preserved", () => {
+  anotherOrientation();
+  approve("alice");
+  signUp("first", "orientation", "alice");
+  signUp("second", "other-orientation", "alice");
+  db.exec(
+    "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id='alice'",
+  );
+  assert.equal(
+    db
+      .prepare("SELECT count(*) AS count FROM signup WHERE status='confirmed'")
+      .get()?.count,
+    2,
+  );
+  db.exec("UPDATE signup SET status='cancelled' WHERE id='first'");
+  assert.throws(
+    () => signUp("blocked", "orientation", "alice"),
+    /orientation_signup_limit/,
+  );
+  db.exec(
+    "INSERT INTO orientation_completion VALUES ('completion', 'alice', 'other-orientation', 'organizer', 0)",
+  );
+  signUp("oriented", "orientation", "alice");
+});
+
 test("application approval is required for orientation inserts, reactivation and moves", () => {
   db.exec(
     "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='alice'",

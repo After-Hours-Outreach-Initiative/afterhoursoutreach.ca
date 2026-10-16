@@ -3,6 +3,8 @@ import { test } from "vitest";
 import { env } from "cloudflare:workers";
 import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
+import { changeSignup, listEvents } from "../src/server/db/events";
+import { orientationSignupLimitMessage } from "../src/server/db/policy";
 import {
   loadApplicationDraft,
   saveApplicationDraft,
@@ -127,6 +129,81 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 });
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
+
+test("concurrent first-orientation signups reserve one booking; cancellation and past/cancelled events allow rebooking", async () => {
+  const actor = {
+    ...(await draftActor("orientation-volunteer")),
+    applicationSubmitted: true,
+    applicationApproved: true,
+    active: true,
+  };
+  const eventIds = ["orientation-one", "orientation-two"];
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO profile (
+      user_id, preferred_name, phone, birth_date, emergency_contact_name,
+      emergency_contact_phone, emergency_contact_relationship, heard_about_us,
+      motivation, teams, medical_certification, training_experience, registered_at, updated_at
+    ) VALUES (?, 'Volunteer', '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', '[]', 'None', 'None', 0, 0)`,
+    ).bind(actor.id),
+    env.DB.prepare(
+      "INSERT INTO volunteer_status (user_id, registration_approved, updated_at) VALUES (?, 1, 0)",
+    ).bind(actor.id),
+    ...eventIds.map((id) =>
+      env.DB.prepare(
+        `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
+        VALUES (?, 'orientation', ?, 'Meeting point', 3, ?, 0, 0)`,
+      ).bind(id, Date.now() + 86_400_000, actor.id),
+    ),
+  ]);
+  const attempts = await Promise.allSettled(
+    eventIds.map((id) => changeSignup(env.DB, actor, id, "join")),
+  );
+  assert.equal(
+    attempts.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  const failure = attempts.find((result) => result.status === "rejected");
+  assert.ok(
+    failure?.status === "rejected" && failure.reason instanceof RequestError,
+  );
+  assert.equal(failure.reason.status, 409);
+  assert.equal(failure.reason.message, orientationSignupLimitMessage);
+  const events = await listEvents(env.DB, actor);
+  const booked = events.find((item) => item.signedUp)!;
+  const other = events.find((item) => !item.signedUp)!;
+  assert.equal(other.orientationSignupBlocked, 1);
+  await changeSignup(env.DB, actor, booked.id, "cancel");
+  assert.ok(
+    (await listEvents(env.DB, actor)).every(
+      (item) => !item.orientationSignupBlocked,
+    ),
+  );
+  await changeSignup(env.DB, actor, other.id, "join");
+
+  // Hiding/closing does not release the reservation, but event cancellation does.
+  await env.DB.prepare("UPDATE event SET open=0, hidden=1 WHERE id=?")
+    .bind(other.id)
+    .run();
+  await assert.rejects(
+    changeSignup(env.DB, actor, booked.id, "join"),
+    statusError(409),
+  );
+  await env.DB.prepare("UPDATE event SET cancelled_at=1 WHERE id=?")
+    .bind(other.id)
+    .run();
+  await changeSignup(env.DB, actor, booked.id, "join");
+  await env.DB.prepare("UPDATE event SET starts_at=0 WHERE id=?")
+    .bind(booked.id)
+    .run();
+  await env.DB.prepare(
+    "UPDATE event SET open=1, hidden=0, cancelled_at=NULL WHERE id=?",
+  )
+    .bind(other.id)
+    .run();
+  await changeSignup(env.DB, actor, other.id, "cancel");
+  await changeSignup(env.DB, actor, other.id, "join");
+});
 
 test("D1 saves partial private drafts without submitting, approving or auditing them", async () => {
   const actor = await draftActor();

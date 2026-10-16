@@ -23,6 +23,7 @@ const blocked = signupBlockReason(
     ...event,
     startsAt: new Date(event.startsAt),
     open: Boolean(event.open) && !event.hidden && !event.cancelledAt,
+    orientationSignupBlocked: Boolean(event.orientationSignupBlocked),
   },
   event.confirmed,
 );

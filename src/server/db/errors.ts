@@ -1,4 +1,5 @@
 import { RequestError } from "../http";
+import { orientationSignupLimitMessage } from "./policy";
 
 /** Translate database invariants into responses without exposing SQL or values. */
 export function databaseWriteError(error: unknown): never {
@@ -9,6 +10,8 @@ export function databaseWriteError(error: unknown): never {
       : "";
   if (message.includes("event_full"))
     throw new RequestError(409, "This event is full.");
+  if (message.includes("orientation_signup_limit"))
+    throw new RequestError(409, orientationSignupLimitMessage);
   if (message.includes("signup_not_eligible"))
     throw new RequestError(
       403,

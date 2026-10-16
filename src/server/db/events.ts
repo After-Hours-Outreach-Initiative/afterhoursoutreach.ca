@@ -39,6 +39,7 @@ export interface EventRow {
   updatedAt: number;
   confirmed: number;
   signedUp: number;
+  orientationSignupBlocked: number;
 }
 export interface RosterRow {
   id: string;
@@ -77,7 +78,18 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
     (SELECT count(*) FROM signup
       WHERE event_id = e.id AND status = 'confirmed') AS confirmed,
     EXISTS(SELECT 1 FROM signup
-      WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp
+      WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp,
+    (e.type = 'orientation' AND EXISTS(
+      SELECT 1 FROM volunteer_status v
+      WHERE v.user_id = ? AND v.patrol_approved = 0
+        AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = v.user_id)
+        AND EXISTS(
+          SELECT 1 FROM signup s JOIN event booked ON booked.id = s.event_id
+          WHERE s.user_id = v.user_id AND s.status = 'confirmed'
+            AND booked.type = 'orientation' AND booked.cancelled_at IS NULL
+            AND booked.starts_at > ${nowMsSql}
+        )
+    )) AS orientationSignupBlocked
     FROM event e`;
   const statement = organizer
     ? db
@@ -90,7 +102,7 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
           e.starts_at DESC
         LIMIT 100`,
         )
-        .bind(actor?.id ?? "")
+        .bind(actor?.id ?? "", actor?.id ?? "")
     : db
         .prepare(
           `${select}
@@ -103,7 +115,7 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
         ORDER BY e.starts_at ASC
         LIMIT 100`,
         )
-        .bind(actor?.id ?? "", Date.now(), actor?.id ?? "");
+        .bind(actor?.id ?? "", actor?.id ?? "", Date.now(), actor?.id ?? "");
   const rows = await statement.all<EventRow>();
   return rows.results;
 }

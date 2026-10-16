@@ -17,6 +17,7 @@ test("view versions detect capacity, signups, visibility and access changes with
     updatedAt: 1,
     confirmed: 0,
     signedUp: 0,
+    orientationSignupBlocked: 0,
   };
   const actor: Actor = {
     id: "volunteer",
@@ -36,6 +37,7 @@ test("view versions detect capacity, signups, visibility and access changes with
   for (const update of [
     { confirmed: 1 },
     { signedUp: 1 },
+    { orientationSignupBlocked: 1 },
     { spots: 2 },
     { open: 0 },
     { hidden: 1 },
