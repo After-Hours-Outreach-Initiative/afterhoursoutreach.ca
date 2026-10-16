@@ -208,17 +208,19 @@ export function initMotivationWordLimit(element: HTMLFormElement) {
 }
 
 export function initAccountFormChanges(element: HTMLFormElement) {
-  const button = element.querySelector<HTMLButtonElement>(
+  const buttons = element.querySelectorAll<HTMLButtonElement>(
     'button[type="submit"]',
   );
   const editor = element.querySelector<HTMLFieldSetElement>(
     "[data-profile-editor]",
   )!;
-  const actions = element.querySelector<HTMLElement>("[data-profile-actions]")!;
+  const actions = [
+    ...element.querySelectorAll<HTMLElement>("[data-profile-actions]"),
+  ];
   const edit = element.querySelector<HTMLButtonElement>("[data-profile-edit]")!;
-  const cancel = element.querySelector<HTMLButtonElement>(
+  const cancels = element.querySelectorAll<HTMLButtonElement>(
     "[data-profile-cancel]",
-  )!;
+  );
   // Profile answers are text and checkbox values; the server trims text on save.
   const snapshot = (values: FormData) =>
     JSON.stringify(
@@ -233,11 +235,11 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   const setEditing = (editing: boolean) => {
     const restoreFocus =
       editor.contains(document.activeElement) ||
-      actions.contains(document.activeElement) ||
+      actions.some((action) => action.contains(document.activeElement)) ||
       document.activeElement === document.body;
     edit.hidden = editing;
     editor.disabled = !editing;
-    actions.hidden = !editing;
+    for (const action of actions) action.hidden = !editing;
     if (editing) {
       clearFormMessage(element);
       editor
@@ -249,17 +251,18 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   };
   edit.disabled = false;
   edit.addEventListener("click", () => setEditing(true));
-  cancel.addEventListener("click", () => {
-    if (element.dataset.submitting) return;
-    element.reset();
-    clearFormMessage(element);
-    setEditing(false);
-  });
+  for (const cancel of cancels)
+    cancel.addEventListener("click", () => {
+      if (element.dataset.submitting) return;
+      element.reset();
+      clearFormMessage(element);
+      setEditing(false);
+    });
   const update = () => {
-    if (button)
-      button.disabled =
-        editor.disabled || Boolean(element.dataset.submitting) || !changed();
-    cancel.disabled = Boolean(element.dataset.submitting);
+    const submitting = Boolean(element.dataset.submitting);
+    const disabled = editor.disabled || submitting || !changed();
+    for (const button of buttons) button.disabled = disabled;
+    for (const cancel of cancels) cancel.disabled = submitting;
   };
   for (const event of ["input", "change"])
     element.addEventListener(event, update);

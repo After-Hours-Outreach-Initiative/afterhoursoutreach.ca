@@ -447,7 +447,10 @@ test("account greeting uses the preferred name or first name and updates after s
   ]);
   await page.getByRole("button", { name: "Edit profile" }).click();
   await page.getByRole("textbox", { name: /^Preferred name/ }).fill("Tay");
-  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save profile", exact: true })
+    .first()
+    .click();
   await expect(greeting).toHaveText("Tay");
   await expect(cardNames).toHaveText(["Tay", "Tay"]);
   await expect(
