@@ -120,8 +120,14 @@ const rows =
         data-contents-section
         tabindex="-1"
       >
-        Submitted application
+        Volunteer Application
       </h2>
+      <p>
+        Submitted:{" "}
+        <time datetime={submission.submittedAt}>
+          {submittedTime(submission.submittedAt)}
+        </time>
+      </p>
       <details class="mt-6">
         <summary class="cursor-pointer text-indigo-300 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4">
           View submitted application

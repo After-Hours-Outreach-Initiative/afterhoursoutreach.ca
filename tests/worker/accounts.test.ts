@@ -11,6 +11,7 @@ import { totpFromSetupKey } from "../helpers/totp";
 import {
   latestApplicationBirthDate,
   applicationBirthDateError,
+  type SubmittedApplication,
 } from "../../src/data/application";
 import {
   codeOfConductConfirmation,
@@ -620,7 +621,36 @@ describe(
       assert.match(html, /Worker Test Volunteer/);
       assert.match(html, /aria-label="Volunteer account"/);
       assert.match(html, /Sample private answer/);
-      assert.match(html, /Submitted application/);
+      assert.match(
+        html,
+        /<h2\b[^>]*id="submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/h2>/,
+      );
+      assert.match(
+        html,
+        /<a\b[^>]*href="#submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/a>/,
+      );
+      assert.doesNotMatch(html, /Submitted application/);
+      const snapshot = await DB.prepare(
+        "SELECT submitted_application FROM profile WHERE user_id=?",
+      )
+        .bind(current.user.id)
+        .first<string>("submitted_application");
+      assert.ok(snapshot);
+      const submission = JSON.parse(snapshot) as SubmittedApplication;
+      const timestamp = html.match(
+        /<p>\s*Submitted:\s*<time datetime="([^"]+)">\s*([^<]+?)\s*<\/time>\s*<\/p>/,
+      );
+      assert.ok(timestamp);
+      assert.equal(timestamp[1], submission.submittedAt);
+      assert.equal(
+        timestamp[2].replace(/\s+/g, " "),
+        new Date(submission.submittedAt)
+          .toLocaleString("en-CA", {
+            timeZone: "America/Vancouver",
+            timeZoneName: "short",
+          })
+          .replace(/\s+/g, " "),
+      );
       assert.match(html, /Why do you want to volunteer\?/);
       assert.doesNotMatch(
         html.match(/<form\b[^>]*data-account-profile[\s\S]*?<\/form>/)![0],
@@ -718,7 +748,7 @@ describe(
       const html = await page.text();
       assert.doesNotMatch(
         html,
-        /data-submitted-application|Submitted application/,
+        /data-submitted-application|submitted-application-heading/,
       );
       assert.doesNotMatch(
         html,

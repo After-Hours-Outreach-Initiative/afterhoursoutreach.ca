@@ -343,13 +343,33 @@ test("account contents navigate profile and settings sections on desktop and mob
     const menu = contents.locator("[data-contents-menu]");
     await expect(
       contents.getByRole("link", {
-        name: "Submitted application",
+        name: "Volunteer Application",
         exact: true,
         includeHidden: true,
       }),
     ).toHaveCount(2);
+    const submission = page.getByRole("region", {
+      name: "Volunteer Application",
+      exact: true,
+    });
+    await expect(
+      submission.getByRole("heading", { name: "Volunteer Application" }),
+    ).toBeVisible();
+    const submitted = submission.locator("#submitted-application-heading + p");
+    const timestamp = submitted.locator("time");
+    await expect(timestamp).toBeVisible();
+    const submittedAt = await timestamp.getAttribute("datetime");
+    expect(submittedAt).toMatch(/^\d{4}-\d{2}-\d{2}T.+Z$/);
+    await expect(submitted).toHaveText(
+      `Submitted: ${new Date(submittedAt!).toLocaleString("en-CA", {
+        timeZone: "America/Vancouver",
+        timeZoneName: "short",
+      })}`,
+    );
+    await expect(submission.locator("details")).not.toHaveAttribute("open");
     for (const [id, heading] of [
       ["account-profile-emergency-contact", "Emergency contact"],
+      ["submitted-application-heading", "Volunteer Application"],
       ["account-sessions-heading", "Sessions"],
     ]) {
       if (width < 1024) await menu.locator("summary").click();
