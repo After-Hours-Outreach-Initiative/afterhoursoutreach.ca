@@ -1,7 +1,10 @@
 import { authClient, showSecondFactor } from "./auth-client";
 import { signOut } from "./sign-out";
 import { actionFragment, loadActionPage } from "./action-page";
-import { applicationDisplayName } from "../data/application";
+import {
+  applicationDisplayName,
+  profileIdentityFields,
+} from "../data/application";
 import { accountGreeting } from "../data/account-navigation";
 import {
   applicationSubmissionValues,
@@ -333,7 +336,9 @@ form("[data-account-profile]", async (element, values) => {
           key !== "certifications" &&
           key !== "training" &&
           key !== "heardAboutUsSources" &&
-          key !== "codeOfConductAccepted",
+          key !== "codeOfConductAccepted" &&
+          (element.hasAttribute("data-application") ||
+            !profileIdentityFields.some((field) => field === key)),
       ),
     );
     result = await post("/api/v1/account/profile", {

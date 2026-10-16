@@ -434,16 +434,16 @@ test("account greeting uses the preferred name or first name and updates after s
   await createLocalAccount(page.request, baseURL!);
   const response = await page.request.post("/api/v1/account/profile", {
     headers: { origin: baseURL! },
-    data: { ...sampleAnswers, firstName: "Taylor", preferredName: "" },
+    data: { ...sampleAnswers, preferredName: "" },
   });
   expect(response.status(), await response.text()).toBe(200);
   await page.goto("/volunteer/account");
   const greeting = page.locator("[data-account-greeting]");
   const cardNames = page.locator("[data-account-menu-name]");
-  await expect(greeting).toHaveText("Taylor");
+  await expect(greeting).toHaveText(sampleAnswers.firstName);
   await expect(cardNames).toHaveText([
-    "Taylor Test Volunteer",
-    "Taylor Test Volunteer",
+    sampleAnswers.preferredName,
+    sampleAnswers.preferredName,
   ]);
   await page.getByRole("button", { name: "Edit profile" }).click();
   await page.getByRole("textbox", { name: /^Preferred name/ }).fill("Tay");

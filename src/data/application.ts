@@ -311,3 +311,10 @@ export const applicationFields = [
 export const profileFields = applicationFields.filter(
   (field) => !("applicationOnly" in field),
 );
+
+export const profileIdentityFields: readonly (keyof ApplicationAnswers)[] = [
+  "firstName",
+  "middleNames",
+  "lastName",
+  "birthDate",
+];

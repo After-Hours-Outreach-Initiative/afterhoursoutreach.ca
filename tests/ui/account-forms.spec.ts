@@ -683,7 +683,7 @@ test("application shows all required errors and saves after they are corrected",
   ).toBeDisabled();
   // Editing reuses validation and identifies successful saves semantically.
   await page
-    .getByRole("textbox", { name: "First name", exact: true })
+    .getByRole("textbox", { name: /^Preferred name/ })
     .fill("Updated volunteer");
   await page.getByRole("button", { name: "Save profile" }).click();
   const saved = page.locator("[data-account-profile] [data-form-message]");
@@ -694,7 +694,7 @@ test("application shows all required errors and saves after they are corrected",
   await page.reload();
   await page.getByRole("button", { name: "Edit profile" }).click();
   await expect(
-    page.getByRole("textbox", { name: "First name", exact: true }),
+    page.getByRole("textbox", { name: /^Preferred name/ }),
   ).toHaveValue("Updated volunteer");
 });
 
@@ -745,7 +745,7 @@ test("mobile birth-date picker stays blank without a past calendar maximum", asy
   }
 });
 
-test("application and profile edits block underage birth dates at the birthday boundary", async ({
+test("applications validate the birthday boundary and profiles keep the saved birth date", async ({
   page,
   baseURL,
 }) => {
@@ -808,9 +808,7 @@ test("application and profile edits block underage birth dates at the birthday b
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit profile" }).click();
   await expect(birthDate).toHaveValue(cutoff);
-  await birthDate.fill(underage);
-  await form.getByRole("button", { name: "Save profile" }).click();
-  await expect(form.locator("[data-error=birthDate]")).toBeVisible();
+  await expect(birthDate).not.toBeEditable();
   expect(requests).toHaveLength(1);
   await page.reload();
   await expect(birthDate).toHaveValue(cutoff);
@@ -1334,8 +1332,8 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
     name: "Save profile",
     includeHidden: true,
   });
-  const name = form.locator('[name="firstName"]');
-  await expect(name).toBeFocused();
+  const name = form.locator('[name="emergencyName"]');
+  await expect(form.locator('[name="preferredName"]')).toBeFocused();
   await name.fill("");
   await save.click();
   await form.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -1343,8 +1341,8 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(summary).toBeVisible();
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await edit.click();
-  await expect(name).toHaveValue(sampleAnswers.firstName);
-  await expect(form.locator("[data-error=firstName]")).toBeHidden();
+  await expect(name).toHaveValue(sampleAnswers.emergencyName);
+  await expect(form.locator("[data-error=emergencyName]")).toBeHidden();
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/account/profile")
@@ -1357,8 +1355,8 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   expect(requests).toEqual([]);
 
   for (const [field, changed] of [
-    ["firstName", "Updated volunteer"],
-    ["birthDate", "1996-05-13"],
+    ["preferredName", "Updated volunteer"],
+    ["phone", "604-555-0198"],
     ["emergencyName", "Updated contact"],
     ["emergencyPhone", "604-555-0199"],
     ["emergencyRelationship", "Sibling"],
@@ -1376,7 +1374,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(save).toBeEnabled();
   await medic.press("Space");
   await expect(save).toBeDisabled();
-  await name.fill(` ${sampleAnswers.firstName} `);
+  await name.fill(` ${sampleAnswers.emergencyName} `);
   await expect(save).toBeDisabled();
   await name.fill("Reset this draft");
   await expect(save).toBeEnabled();
@@ -1385,12 +1383,12 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
 
   await name.fill("");
   await save.click();
-  await expect(form.locator("[data-error=firstName]")).toHaveText(
+  await expect(form.locator("[data-error=emergencyName]")).toHaveText(
     "This field is required.",
   );
-  await expect(form.locator("[data-error=firstName]")).toBeVisible();
+  await expect(form.locator("[data-error=emergencyName]")).toBeVisible();
   expect(requests).toEqual([]);
-  await name.fill(sampleAnswers.firstName);
+  await name.fill(sampleAnswers.emergencyName);
   await expect(save).toBeDisabled();
   await name.fill("Updated volunteer");
   await expect(save).toBeEnabled();
@@ -1402,12 +1400,12 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(save).toBeDisabled();
   expect(requests).toHaveLength(1);
   await expect(summary).toBeVisible();
-  await expect(summary.locator('[data-profile-answer="firstName"]')).toHaveText(
-    "Updated volunteer",
-  );
+  await expect(
+    summary.locator('[data-profile-answer="emergencyName"]'),
+  ).toHaveText("Updated volunteer");
   await expect(edit).toBeFocused();
   await edit.click();
-  await name.fill(sampleAnswers.firstName);
+  await name.fill(sampleAnswers.emergencyName);
   await expect(save).toBeEnabled();
   await form.getByRole("button", { name: "Cancel", exact: true }).click();
   await edit.click();
@@ -1540,8 +1538,7 @@ test("email changes verify the new address in place and preserve unsaved profile
   await page.goto("/volunteer/account");
   await page.getByRole("button", { name: "Edit profile" }).click();
   const name = page.getByRole("textbox", {
-    name: "First name",
-    exact: true,
+    name: /^Preferred name/,
   });
   await name.fill("Unsaved email-change draft");
   const request = page.locator("[data-email-change-request]");
@@ -1621,7 +1618,7 @@ test("email changes verify the new address in place and preserve unsaved profile
     page.locator("[data-email-settings] [data-account-email]"),
   ).toHaveText(newEmail);
   await page.getByRole("button", { name: "Edit profile" }).click();
-  await expect(name).toHaveValue(sampleAnswers.firstName);
+  await expect(name).toHaveValue(sampleAnswers.preferredName);
   const current = await (
     await page.request.get("/api/v1/auth/get-session")
   ).json();
@@ -1735,7 +1732,7 @@ test("failed profile saves keep unsaved changes retryable", async ({
     name: "Save profile",
     includeHidden: true,
   });
-  const name = form.locator('[name="firstName"]');
+  const name = form.locator('[name="preferredName"]');
   await page.route("**/api/v1/account/profile", (route) =>
     route.fulfill({
       status: 503,
@@ -1749,7 +1746,7 @@ test("failed profile saves keep unsaved changes retryable", async ({
   );
   await expect(save).toBeEnabled();
   await expect(name).toHaveValue("Retry this profile");
-  await name.fill(sampleAnswers.firstName);
+  await name.fill(sampleAnswers.preferredName);
   await expect(save).toBeDisabled();
   await name.fill("Retry this profile");
   await page.unroute("**/api/v1/account/profile");
@@ -1773,7 +1770,7 @@ test("edits made during a profile save remain unsaved", async ({
     name: "Save profile",
     includeHidden: true,
   });
-  const name = form.locator('[name="firstName"]');
+  const name = form.locator('[name="preferredName"]');
   let finishSaving!: () => void;
   const saving = new Promise<void>((resolve) => {
     finishSaving = resolve;
@@ -1819,8 +1816,7 @@ test("authenticator setup and sign-in show native inline code errors", async ({
   await page.goto("/volunteer/account");
   await page.getByRole("button", { name: "Edit profile" }).click();
   const name = page.getByRole("textbox", {
-    name: "First name",
-    exact: true,
+    name: /^Preferred name/,
   });
   await name.fill("Unsaved authenticator draft");
   await page.getByRole("button", { name: "Set up an authenticator" }).click();

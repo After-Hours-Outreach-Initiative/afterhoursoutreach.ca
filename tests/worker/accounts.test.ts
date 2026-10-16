@@ -163,7 +163,7 @@ describe(
       }
     });
 
-    test("the API rejects underage application and edits without writing profile data", async () => {
+    test("the API validates application age and rejects identity edits without writing profile data", async () => {
       const ageCookie = await signIn("worker-age-boundary@example.org");
       const account = (await (
         await send("/api/v1/auth/get-session", undefined, ageCookie)
@@ -212,29 +212,41 @@ describe(
       assert.equal(application.status, 200, await application.clone().text());
       const saved = await snapshots();
       assert.equal(saved.profile?.birth_date, cutoff);
-      const { heardAboutUs: _, motivation: __, ...editedAnswers } = answers;
-      const rejectedEdit = await send(
-        "/api/v1/account/profile",
-        {
-          ...editedAnswers,
-          preferredName: "Underage edit",
-          birthDate: underage,
-        },
-        ageCookie,
-      );
-      assert.equal(rejectedEdit.status, 400);
-      assert.deepEqual(await snapshots(), saved);
-      const older = new Date(`${cutoff}T00:00:00Z`);
-      older.setUTCDate(older.getUTCDate() - 1);
+      const { firstName, middleNames, lastName, birthDate, ...editedAnswers } =
+        answers;
+      for (const change of [
+        { firstName: "Changed" },
+        { firstName: "" },
+        { middleNames: "Changed" },
+        { lastName: "Changed" },
+        { lastName: null },
+        { birthDate: underage },
+        { birthDate: "1990-01-01" },
+        { birthDate: "" },
+      ]) {
+        const rejectedEdit = await send(
+          "/api/v1/account/profile",
+          { ...editedAnswers, preferredName: "Rejected edit", ...change },
+          ageCookie,
+        );
+        assert.equal(rejectedEdit.status, 400);
+        assert.deepEqual(await rejectedEdit.json(), {
+          message:
+            "Your legal name and date of birth cannot be changed from your account.",
+        });
+        assert.equal(rejectedEdit.headers.get("cache-control"), "no-store");
+        assert.deepEqual(await snapshots(), saved);
+      }
       const acceptedEdit = await send(
         "/api/v1/account/profile",
-        { ...editedAnswers, birthDate: older.toISOString().slice(0, 10) },
+        { ...editedAnswers, preferredName: "Updated nickname" },
         ageCookie,
       );
       assert.equal(acceptedEdit.status, 200, await acceptedEdit.clone().text());
+      assert.equal((await snapshots()).profile?.birth_date, cutoff);
       assert.equal(
-        (await snapshots()).profile?.birth_date,
-        older.toISOString().slice(0, 10),
+        (await snapshots()).profile?.preferred_name,
+        "Updated nickname",
       );
     });
 

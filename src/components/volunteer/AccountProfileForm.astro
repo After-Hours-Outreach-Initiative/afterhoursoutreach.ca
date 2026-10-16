@@ -2,6 +2,7 @@
 import {
   profileFields,
   applicationFields,
+  profileIdentityFields,
   applicationTeamOptions as teams,
   type ApplicationAnswers,
 } from "@/data/application";
@@ -36,9 +37,6 @@ const values =
   profileValues ?? (draft ? draftProfileValues(draft.answers) : null);
 const fields = application ? applicationFields : profileFields;
 const medicSelected = values?.teams.includes("medic") ?? false;
-const legacyName = Boolean(
-  !application && values && !values.firstName && !values.lastName,
-);
 const sections = [
   { key: "personal-info", heading: "Personal info" },
   { key: "emergency-contact", heading: "Emergency contact" },
@@ -180,11 +178,10 @@ const sections = [
                     <input type="email" value={email} readonly />
                   </label>
                 )}
-                {legacyName && section.key === "personal-info" && (
+                {!application && section.key === "personal-info" && (
                   <p class="volunteer-help volunteer-wide">
-                    Your previous full or preferred name is kept unchanged in
-                    Preferred name. You can leave first and last names blank, or
-                    provide both.
+                    Your legal name and date of birth cannot be changed here.
+                    You can still update your preferred name.
                   </p>
                 )}
                 {section.fields
@@ -200,12 +197,9 @@ const sections = [
                       <AccountProfileField
                         field={field}
                         values={values}
-                        required={
-                          field.required &&
-                          !(
-                            legacyName &&
-                            ["firstName", "lastName"].includes(field.name)
-                          )
+                        readOnly={
+                          !application &&
+                          profileIdentityFields.includes(field.name)
                         }
                         active={
                           field.name !== "certificationExpiry" || medicSelected
