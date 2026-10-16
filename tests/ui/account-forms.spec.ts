@@ -240,7 +240,7 @@ test("other referral help separates the character limit from its unit", async ({
   );
 });
 
-test("mobile contents bar contrasts with the header and keeps its toggle black", async ({
+test("contents navigation contrasts with the header and leaves room for the page heading", async ({
   page,
   baseURL,
 }) => {
@@ -266,6 +266,23 @@ test("mobile contents bar contrasts with the header and keeps its toggle black",
   await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
   await page.keyboard.press("Escape");
   await expect(menu).not.toHaveAttribute("open");
+
+  for (const width of [320, 390, 640, 768, 1023, 1024, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(() =>
+        page.locator("#application-overview").evaluate((heading) => {
+          const title = heading.getBoundingClientRect();
+          const nav = document
+            .querySelector("[data-application-contents]")!
+            .getBoundingClientRect();
+          return innerWidth < 1024
+            ? title.top - nav.bottom
+            : nav.left - title.right;
+        }),
+      )
+      .toBeGreaterThanOrEqual(32);
+  }
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(menu).toBeHidden();
