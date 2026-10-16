@@ -1763,6 +1763,148 @@ test("passwordless two-factor enrollment and login cannot bypass the authenticat
   );
 });
 
+test("authenticator removal requires recent verified sign-in, current TOTP and confirmation before re-enrollment", async () => {
+  const signedIn = await signIn();
+  const sibling = cookies(
+    await request(
+      "/sign-in/email-otp",
+      await createSignInOTP(
+        bindings.DB,
+        bindings.BETTER_AUTH_SECRET,
+        "volunteer@example.org",
+      ),
+    ),
+  );
+  const enabled = await request(
+    "/two-factor/enable",
+    { method: "totp" },
+    signedIn.cookie,
+  );
+  const setup = (await enabled.json()) as {
+    totpURI: string;
+    backupCodes: string[];
+  };
+  const secret = new URL(setup.totpURI).searchParams.get("secret")!;
+  const code = totpFromSetupKey(secret);
+  const confirmed = await request(
+    "/two-factor/verify-totp",
+    { code },
+    signedIn.cookie,
+  );
+  assert.equal(confirmed.status, 200, await confirmed.clone().text());
+  const cookie = cookies(confirmed);
+  const sessionFor = (cookie: string) =>
+    auth.api.getSession({ headers: new Headers({ cookie }) });
+  const remove = (body: object, activeCookie = cookie) =>
+    request("/two-factor/disable", body, activeCookie);
+  const current = await sessionFor(cookie);
+  assert.ok(current);
+  const removal = { code, confirm: true };
+  assert.equal((await remove(removal, "")).status, 401);
+  assert.equal((await remove(removal, sibling)).status, 403);
+  await bindings.DB.prepare("UPDATE session SET created_at=? WHERE id=?")
+    .bind(Date.now() - 601_000, current.session.id)
+    .run();
+  assert.equal((await remove(removal)).status, 403);
+  await bindings.DB.prepare("UPDATE session SET created_at=? WHERE id=?")
+    .bind(Date.now(), current.session.id)
+    .run();
+  assert.equal((await remove({ code })).status, 400);
+  assert.equal(
+    (
+      await remove({
+        code: code === "000000" ? "000001" : "000000",
+        confirm: true,
+      })
+    ).status,
+    401,
+  );
+  assert.equal(
+    (await remove({ code: setup.backupCodes[0], confirm: true })).status,
+    400,
+  );
+  assert.equal((await sessionFor(cookie))?.user.twoFactorEnabled, true);
+  assert.equal(
+    (await request("/two-factor/enable", { method: "totp" }, cookie)).status,
+    400,
+  );
+  const removed = await remove({
+    code: totpFromSetupKey(secret),
+    confirm: true,
+  });
+  assert.equal(removed.status, 200, await removed.clone().text());
+  const replacementCookie = cookies(removed);
+  assert.ok(replacementCookie);
+  assert.equal(await sessionFor(sibling), null);
+  assert.equal(await sessionFor(cookie), null);
+  assert.equal(
+    (await sessionFor(replacementCookie))?.user.twoFactorEnabled,
+    false,
+  );
+  assert.equal(
+    await bindings.DB.prepare("SELECT id FROM two_factor WHERE user_id=?")
+      .bind(current.user.id)
+      .first(),
+    null,
+  );
+  const replacement = await request(
+    "/two-factor/enable",
+    { method: "totp" },
+    replacementCookie,
+  );
+  assert.equal(replacement.status, 200, await replacement.clone().text());
+  const nextSetup = (await replacement.json()) as { totpURI: string };
+  const nextSecret = new URL(nextSetup.totpURI).searchParams.get("secret")!;
+  assert.notEqual(nextSecret, secret);
+  // Starting setup is not the same as enabling protection.
+  assert.equal(
+    (await sessionFor(replacementCookie))?.user.twoFactorEnabled,
+    false,
+  );
+  const nextConfirmed = await request(
+    "/two-factor/verify-totp",
+    { code: totpFromSetupKey(nextSecret) },
+    replacementCookie,
+  );
+  assert.equal(nextConfirmed.status, 200, await nextConfirmed.clone().text());
+  const nextCookie = cookies(nextConfirmed);
+  assert.equal((await sessionFor(nextCookie))?.user.twoFactorEnabled, true);
+  assert.equal(
+    (
+      await request(
+        "/two-factor/verify-backup-code",
+        { code: setup.backupCodes[0] },
+        nextCookie,
+      )
+    ).status,
+    401,
+  );
+  assert.equal(
+    (await remove({ code: "bad", confirm: true }, nextCookie)).status,
+    400,
+  );
+  // The attempt budget is per account, surviving session/secret rotation.
+  assert.equal(
+    (
+      await remove(
+        { code: totpFromSetupKey(nextSecret), confirm: true },
+        nextCookie,
+      )
+    ).status,
+    429,
+  );
+  assert.equal(
+    (
+      await request(
+        "/two-factor/verify-totp",
+        { code: totpFromSetupKey(nextSecret) },
+        nextCookie,
+      )
+    ).status,
+    429,
+  );
+});
+
 test("Resend receives the same sign-in message in every hosted environment and hides provider errors", async () => {
   const email = {
     email: "volunteer@example.org",

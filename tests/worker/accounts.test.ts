@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { chromium, expect } from "@playwright/test";
+import jsQR from "jsqr";
+import sharp from "sharp";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
@@ -148,7 +150,7 @@ describe(
       );
       assert.equal(
         (await send("/api/v1/auth/two-factor/disable", {})).status,
-        404,
+        401,
       );
     });
 
@@ -1458,16 +1460,55 @@ describe(
         initialCookie,
       );
       assert.equal(application.status, 200, await application.clone().text());
-      const enabled = await send(
-        "/api/v1/auth/two-factor/enable",
-        { method: "totp" },
-        initialCookie,
-      );
-      assert.equal(enabled.status, 200, await enabled.clone().text());
-      const setup = (await enabled.json()) as {
+      let setup: {
         totpURI: string;
         backupCodes: string[];
       };
+      const browser = await chromium.launch({
+        executablePath:
+          process.env.CHROMIUM_PATH ??
+          (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
+      });
+      try {
+        const page = await browser.newPage();
+        // Exercise the production bundle and CSP, not only Vite's dev renderer.
+        await page.route("**/*", async (route) => {
+          const request = route.request();
+          if (new URL(request.url()).origin !== origin) return route.abort();
+          const response = await worker.fetch(request.url(), {
+            method: request.method(),
+            headers: { ...(await request.allHeaders()), cookie: initialCookie },
+            body: request.postData() ?? undefined,
+          });
+          await route.fulfill({
+            status: response.status,
+            headers: Object.fromEntries(response.headers),
+            body: Buffer.from(await response.arrayBuffer()),
+          });
+        });
+        await page.goto(`${origin}/volunteer/account`);
+        const enabled = page.waitForResponse((response) =>
+          response.url().endsWith("/two-factor/enable"),
+        );
+        await page
+          .getByRole("button", { name: "Set up an authenticator" })
+          .click();
+        setup = await (await enabled).json();
+        const qr = page.getByRole("img", {
+          name: "QR code for authenticator setup",
+        });
+        await expect(qr).toBeVisible();
+        const { data, info } = await sharp(await qr.screenshot())
+          .ensureAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        assert.equal(
+          jsQR(new Uint8ClampedArray(data), info.width, info.height)?.data,
+          setup.totpURI,
+        );
+      } finally {
+        await browser.close();
+      }
       const key = new URL(setup.totpURI).searchParams.get("secret")!;
       const confirmed = await send(
         "/api/v1/auth/two-factor/verify-totp",

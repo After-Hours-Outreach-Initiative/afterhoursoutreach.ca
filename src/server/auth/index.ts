@@ -16,9 +16,13 @@ import {
   cleanupAuthRecords,
   limitEmailRequests,
   limitEmailVerification,
+  takeRateLimit,
 } from "../db/rate-limits";
 import { hasApplied } from "../db/profiles";
-import { markSessionSecondFactorVerified } from "../db/sessions";
+import {
+  markSessionSecondFactorVerified,
+  revokeOtherAccountSessions,
+} from "../db/sessions";
 import { sendSignInEmail, type SignInEmail } from "./services";
 
 // A build-time gate keeps the development plugin out of deployed Workers.
@@ -78,6 +82,13 @@ const emailChangeRequestSchema = z.strictObject({ newEmail: emailSchema });
 const emailChangeSchema = emailChangeRequestSchema.extend({
   otp: z.string().regex(/^\d{6}$/),
 });
+// Changing sign-in protection needs a recent sign-in as well as a current code.
+export const authenticatorFreshAge = 600;
+const enableFactorSchema = z.strictObject({ method: z.literal("totp") });
+const disableFactorSchema = z.strictObject({
+  code: z.string().regex(/^\d{6}$/),
+  confirm: z.literal(true),
+});
 const signInResultSchema = z.looseObject({
   token: z.string(),
   user: z.looseObject({ id: z.string() }),
@@ -112,6 +123,20 @@ export function createAuth(
   const services: AuthServices = overrides ?? {
     sendEmail: (email) =>
       sendSignInEmail(bindings.RESEND_API_KEY, email, bindings.APP_ENV),
+  };
+  const limitFactorVerification = async (userId: string) => {
+    try {
+      // The plugin's per-account lockout only covers signed-out challenges.
+      await takeRateLimit(
+        bindings.DB,
+        bindings.BETTER_AUTH_SECRET,
+        `2fa-management:${userId}`,
+        5,
+        60_000,
+      );
+    } catch (error) {
+      authError(error);
+    }
   };
   // Request-scoped delivery feedback; never a shared outbox or public proof.
   const emailDeliveries = new WeakMap<
@@ -313,6 +338,78 @@ export function createAuth(
     logger: { disabled: true },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (
+          ctx.path === "/two-factor/enable" ||
+          ctx.path === "/two-factor/disable" ||
+          ctx.path === "/two-factor/verify-totp"
+        ) {
+          const removing = ctx.path === "/two-factor/disable";
+          const current = await getSessionFromCtx<
+            { twoFactorEnabled?: boolean },
+            { twoFactorVerified?: boolean }
+          >(ctx);
+          if (ctx.path === "/two-factor/verify-totp") {
+            // The regular verifier must not be a separate guessing oracle that
+            // bypasses the removal budget. Signed-out challenges retain the
+            // plugin's own lockout; initial enrollment has no active factor yet.
+            if (current?.user.twoFactorEnabled)
+              await limitFactorVerification(current.user.id);
+            return;
+          }
+          if (!current?.user.emailVerified)
+            throw new APIError("UNAUTHORIZED", {
+              message: "Sign in to manage your authenticator.",
+            });
+          if (
+            current.user.twoFactorEnabled &&
+            !current.session.twoFactorVerified
+          )
+            throw new APIError("FORBIDDEN", {
+              message: "Sign in with your authenticator before changing it.",
+            });
+          if (
+            Date.now() - current.session.createdAt.getTime() >=
+            authenticatorFreshAge * 1000
+          )
+            throw new APIError("FORBIDDEN", {
+              message:
+                "Sign in again to manage your authenticator (within ten minutes).",
+              code: "SESSION_NOT_FRESH",
+            });
+          if (!removing) {
+            if (!enableFactorSchema.safeParse(ctx.body).success)
+              throw new APIError("BAD_REQUEST", {
+                message: "Choose authenticator app setup.",
+              });
+            return;
+          }
+          if (!current.user.twoFactorEnabled)
+            throw new APIError("BAD_REQUEST", {
+              message: "Your authenticator is not enabled.",
+            });
+          await limitFactorVerification(current.user.id);
+          const parsed = disableFactorSchema.safeParse(ctx.body);
+          if (!parsed.success)
+            throw new APIError("BAD_REQUEST", {
+              message:
+                "Confirm removal and enter a current six-digit authenticator code.",
+            });
+          // Invoke the plugin's verifier directly: no alternate secret handling,
+          // backup-code fallback, or reusable client-side authorization flag.
+          await secondFactor.endpoints.verifyTOTP({
+            body: { code: parsed.data.code },
+            headers: ctx.headers,
+            context: ctx.context,
+          });
+          await revokeOtherAccountSessions(
+            bindings.DB,
+            current.user.id,
+            current.session.token,
+          );
+          // The built-in disable endpoint deletes the secret and backup codes
+          // and rotates the remaining session. Only expose it behind this guard.
+          return;
+        }
         const requestingChange = ctx.path === "/email-otp/request-email-change";
         const confirmingChange = ctx.path === "/email-otp/change-email";
         if (requestingChange || confirmingChange) {

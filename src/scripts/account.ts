@@ -545,18 +545,19 @@ form("[data-enable-factor]", async (element) => {
   try {
     // Generate locally: the setup URI contains the authenticator secret.
     const { default: QRCode } = await import("qrcode");
-    const canvas = qr.querySelector<HTMLCanvasElement>("canvas")!;
-    await QRCode.toCanvas(canvas, result.totpURI, {
+    // SVG does not depend on canvas, which some privacy settings disable.
+    const svg = await QRCode.toString(result.totpURI, {
+      type: "svg",
       width: 256,
       margin: 4,
       errorCorrectionLevel: "M",
     });
-    // Let responsive CSS preserve the square when the container is narrower.
-    canvas.style.removeProperty("width");
-    canvas.style.removeProperty("height");
+    const image = qr.querySelector<HTMLImageElement>("[data-factor-qr-image]")!;
+    image.src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    await image.decode();
     qr.hidden = false;
   } catch {
-    // Keep manual enrollment usable if the QR module or canvas is unavailable.
+    // Keep manual enrollment usable if the QR module or image is unavailable.
     qr.hidden = true;
     setup.querySelector<HTMLElement>("[data-factor-qr-error]")!.hidden = false;
   }
@@ -564,12 +565,9 @@ form("[data-enable-factor]", async (element) => {
   element.hidden = true;
 });
 
-form("[data-confirm-factor]", async (element, values) => {
-  await authClient.twoFactor.verifyTotp({
-    code: String(values.get("code")),
-  });
-  // Verification may rotate the current session. Refresh its metadata as well
-  // as the authenticator state, leaving unsaved profile answers untouched.
+async function refreshFactorSettings(element: HTMLFormElement) {
+  // Verification and removal rotate the current session. Refresh its metadata
+  // too, leaving unsaved profile answers untouched.
   const page = await loadActionPage();
   const settings = actionFragment(page, "[data-factor-settings]");
   const sessions = actionFragment(page, "[data-account-sessions]");
@@ -580,6 +578,29 @@ form("[data-confirm-factor]", async (element, values) => {
   document.querySelector("[data-account-sessions]")!.replaceWith(sessions);
   if (restoreFocus)
     settings.querySelector<HTMLElement>("h3")?.focus({ preventScroll: true });
+  return settings;
+}
+
+form("[data-confirm-factor]", async (element, values) => {
+  await authClient.twoFactor.verifyTotp({
+    code: String(values.get("code")),
+  });
+  await refreshFactorSettings(element);
+});
+
+form("[data-disable-factor]", async (element, values) => {
+  // The server requires the current TOTP and explicit confirmation in this same
+  // request; a previous successful verification is not removal authorization.
+  await post("/api/v1/auth/two-factor/disable", {
+    code: String(values.get("code")),
+    confirm: values.get("confirm") === "on",
+  });
+  const settings = await refreshFactorSettings(element);
+  message(
+    settings,
+    "Your authenticator was removed. Two-factor protection is off. Set up and verify a new authenticator to turn it back on.",
+    "success",
+  );
 });
 
 export {};

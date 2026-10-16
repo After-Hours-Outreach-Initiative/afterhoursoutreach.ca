@@ -19,6 +19,7 @@ const allowed = new Map([
   ["/get-session", "GET"],
   ["/sign-out", "POST"],
   ["/two-factor/enable", "POST"],
+  ["/two-factor/disable", "POST"],
   ["/two-factor/verify-totp", "POST"],
   ["/two-factor/verify-backup-code", "POST"],
   ...(import.meta.env.DEV
