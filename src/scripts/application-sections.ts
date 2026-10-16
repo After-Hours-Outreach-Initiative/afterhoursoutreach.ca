@@ -38,23 +38,6 @@ export function initApplicationSections(element: HTMLFormElement) {
     // dropdown never adds height, and the desktop sidebar must not affect jumps.
     barHeight = menu.getBoundingClientRect().height;
     if (!barHeight) menu.open = false;
-    if (!barHeight && !contents.hidden) {
-      // The fixed sidebar still aligns with the reserved second grid track.
-      // Read the track, never the nav's possibly stale width after a breakpoint.
-      const sidebarWidth = Number.parseFloat(
-        getComputedStyle(flow).gridTemplateColumns.split(" ")[1] ?? "",
-      );
-      if (sidebarWidth > 0) {
-        flow.style.setProperty(
-          "--application-sidebar-start",
-          `${flow.getBoundingClientRect().right - sidebarWidth}px`,
-        );
-        flow.style.setProperty(
-          "--application-sidebar-width",
-          `${sidebarWidth}px`,
-        );
-      }
-    }
     flow.style.setProperty("--application-sticky-offset", `${stickyHeight}px`);
     flow.style.setProperty("--application-bar-height", `${barHeight}px`);
     flow.style.setProperty(

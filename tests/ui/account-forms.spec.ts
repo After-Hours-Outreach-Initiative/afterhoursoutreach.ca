@@ -240,6 +240,46 @@ test("other referral help separates the character limit from its unit", async ({
   );
 });
 
+for (const width of [375, 1280]) {
+  test(`contents navigation starts in its final position before scripts load at ${width}px`, async ({
+    page,
+    baseURL,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await createLocalAccount(page.request, baseURL!, false);
+    let release!: () => void;
+    const scripts = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/*", async (route) => {
+      if (route.request().resourceType() === "script") await scripts;
+      await route.continue();
+    });
+    try {
+      await page.goto("/apply", { waitUntil: "commit" });
+      const contents = page.locator("[data-application-contents]");
+      await expect(contents).toBeVisible();
+      const initial = await contents.boundingBox();
+      const header = await page.locator(".site-header").boundingBox();
+      expect(initial!.y).toBe(
+        header!.y + header!.height + (width < 1024 ? 0 : 24),
+      );
+      release();
+      await page.waitForLoadState("load");
+      // This property confirms the application module has initialized.
+      await expect(page.locator("[data-application-flow]")).toHaveAttribute(
+        "style",
+        /--application-scroll-offset:/,
+      );
+      expect(await contents.boundingBox()).toEqual(initial);
+      await page.evaluate(() => scrollTo({ top: 500, behavior: "instant" }));
+      await expect
+        .poll(async () => (await contents.boundingBox())!.y)
+        .toBe(initial!.y);
+    } finally {
+      release();
+    }
+  });
+}
+
 test("contents navigation contrasts with the header and leaves room for the page heading", async ({
   page,
   baseURL,
