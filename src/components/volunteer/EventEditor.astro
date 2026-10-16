@@ -129,23 +129,14 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
             role="switch"
             name="publicVisibility"
             checked={Boolean(event?.open && !event.hidden)}
-            aria-describedby={`${dialogId}-visibility-help`}
           />
           <span class="switch-track" aria-hidden="true">
             <span class="switch-thumb"></span>
           </span>
           Public visibility
         </label>
-        <p class="volunteer-help" id={`${dialogId}-visibility-help`}>
-          When on, shown to approved volunteers and open for registration. When
-          off, only organizers and existing registrants can see it. Existing
-          spots are kept.
-        </p>
       </div>
     </div>
-    <p class="volunteer-help">
-      You can choose whether to email registered volunteers when saving changes.
-    </p>
     <p data-form-message role="status" hidden></p>
     <button class="btn btn-primary" type="submit" data-loading-label="Saving…"
       >Save event</button
@@ -177,10 +168,6 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
             message="Keep the reason to 1000 characters or fewer."
           />
         </div>
-        <p class="volunteer-help">
-          Cancels all spots. You can choose whether to email volunteers. Records
-          are retained, not permanently deleted.
-        </p>
         <p data-form-message role="status" hidden />
         <button
           class="btn btn-red"

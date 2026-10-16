@@ -1,6 +1,4 @@
 ---
-import { notificationRetryHours } from "@/server/db/notifications";
-
 interface Props {
   counts: { pending: number; expired: number };
 }
@@ -9,11 +7,7 @@ const { counts } = Astro.props;
 
 <section class="volunteer-panel" data-event-notifications>
   <h2>Event notifications</h2>
-  <p>
-    {counts.pending} notifications awaiting delivery. Delivery failures do not undo
-    saved changes. Retries are limited to {notificationRetryHours} hours to avoid
-    duplicate delivery after provider idempotency expires.
-  </p>
+  <p>{counts.pending} notifications awaiting delivery.</p>
   {
     Boolean(counts.expired) && (
       <p>
