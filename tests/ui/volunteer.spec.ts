@@ -326,7 +326,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
         () => document.documentElement.scrollWidth > innerWidth,
       ),
     ).toBe(false);
-    await page.getByRole("button", { name: "Edit profile" }).click();
+    await page.getByRole("button", { name: "Edit personal info" }).click();
     await expect(form.getByRole("heading", { level: 3 })).toHaveText([
       "Personal info",
       "Emergency contact",
@@ -357,7 +357,10 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(emergencyContact).toHaveCSS("padding", "0px");
     for (const heading of await form.getByRole("heading", { level: 3 }).all()) {
       await expect(heading).toHaveCSS("font-size", "22px");
-      await expect(heading).toHaveCSS("border-bottom-width", "1px");
+      await expect(heading.locator("..")).toHaveCSS(
+        "border-bottom-width",
+        "1px",
+      );
     }
     expect(
       await emergencyContact
@@ -375,6 +378,8 @@ test("account navigation and profile controls are usable on desktop and mobile",
             getComputedStyle(element).gridTemplateColumns.split(" ").length,
         ),
     ).toBe(width <= 640 ? 1 : 3);
+    await form.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByRole("button", { name: "Edit team interests" }).click();
     const medic = form.getByLabel("Medic", { exact: true });
     await medic.check();
     const certifications = form.locator("[data-medic-certifications]");
@@ -448,7 +453,11 @@ test("account navigation and profile controls are usable on desktop and mobile",
       ),
     ).toBe(false);
     await form.evaluate((element: HTMLFormElement) => element.reset());
-    const save = page.getByRole("button", { name: "Save profile" }).first();
+    await form.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByRole("button", { name: "Edit personal info" }).click();
+    const save = page
+      .getByRole("button", { name: "Save", exact: true })
+      .first();
     await expect(save).toBeDisabled();
     await name.fill("Unsaved layout draft");
     await expect(save).toBeEnabled();

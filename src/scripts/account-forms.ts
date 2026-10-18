@@ -98,6 +98,7 @@ export function initMedicCertifications(element: HTMLFormElement) {
     '[name="teams"][value="medic"]',
   );
   if (!section || !medic) return;
+  const medicalFields = section.parentElement!;
   const fields = [
     ...section.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
   ];
@@ -108,8 +109,13 @@ export function initMedicCertifications(element: HTMLFormElement) {
     "[data-certification-expiry]",
   );
   const expiryInput = expiry?.querySelector<HTMLInputElement>("input");
+  const teamTraining = element.querySelector<HTMLElement>(
+    "[data-profile-team-training]",
+  );
   const update = () => {
     section.hidden = !medic.checked;
+    medicalFields.hidden = !medic.checked;
+    if (teamTraining) teamTraining.hidden = !medic.checked;
     // Retain checked answers in FormData and drafts without hidden validation.
     for (const field of fields) field.required = medic.checked;
     if (expiry && expiryInput) {
@@ -262,23 +268,28 @@ export function initMotivationWordLimit(element: HTMLFormElement) {
 }
 
 export function initAccountFormChanges(element: HTMLFormElement) {
-  const buttons = element.querySelectorAll<HTMLButtonElement>(
-    'button[type="submit"]',
-  );
-  const editor = element.querySelector<HTMLFieldSetElement>(
-    "[data-profile-editor]",
+  const sections = [
+    ...element.querySelectorAll<HTMLElement>("[data-profile-section]"),
+  ].map((section) => ({
+    section,
+    fields: section.querySelector<HTMLFieldSetElement>(
+      "[data-profile-fields]",
+    )!,
+    summary: section.querySelector<HTMLElement>("[data-profile-answers]")!,
+    edit: section.querySelector<HTMLButtonElement>("[data-profile-edit]")!,
+    save: section.querySelector<HTMLButtonElement>('button[type="submit"]')!,
+    cancel: section.querySelector<HTMLButtonElement>("[data-profile-cancel]")!,
+  }));
+  const summaries = sections.map(({ summary }) => summary);
+  const medical = element.querySelector<HTMLElement>(
+    "[data-profile-medical-fields]",
   )!;
-  const actions = [
-    ...element.querySelectorAll<HTMLElement>("[data-profile-actions]"),
-  ];
-  const edit = element.querySelector<HTMLButtonElement>("[data-profile-edit]")!;
-  const cancels = element.querySelectorAll<HTMLButtonElement>(
-    "[data-profile-cancel]",
-  );
-  const fields = editor.querySelectorAll<HTMLElement>("[data-profile-fields]");
-  const summaries = editor.querySelectorAll<HTMLElement>(
-    "[data-profile-answers]",
-  );
+  const medicalHome = medical.parentElement!;
+  const teamTraining = element.querySelector<HTMLElement>(
+    "[data-profile-team-training]",
+  )!;
+  const feedback = element.querySelector<HTMLElement>("[data-form-message]")!;
+  let active: (typeof sections)[number] | undefined;
   const renderSavedAnswers = (values: FormData) => {
     const answers = {
       ...Object.fromEntries(
@@ -319,49 +330,109 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   // Profile answers are text and checkbox values; the server trims text on save.
   const snapshot = (values: FormData) =>
     JSON.stringify(
-      [...values].map(([name, value]) => [name, String(value).trim()]),
+      [...values]
+        .map(([name, value]) => [name, String(value).trim()])
+        .sort(([left], [right]) => left.localeCompare(right)),
     );
-  // Disabled fieldsets are omitted from FormData; read the initial saved answers
-  // before locking the shared controls again below.
-  editor.disabled = false;
-  const initial = new FormData(element);
-  let saved = snapshot(initial);
-  renderSavedAnswers(initial);
-  editor.disabled = true;
-  const changed = () => snapshot(new FormData(element)) !== saved;
-  const setEditing = (editing: boolean) => {
+  // Only the active fieldset participates in native validation/FormData. Retain
+  // the complete saved payload explicitly: the API is not a section/PATCH API.
+  for (const { fields } of sections) fields.disabled = false;
+  let saved = new FormData(element);
+  // Legacy non-Medic profiles may have multiple saved certifications that the
+  // single-choice editor cannot represent. Unrelated section saves retain them.
+  saved.delete("certifications");
+  for (const certification of JSON.parse(
+    element.dataset.profileCertifications ?? "[]",
+  ))
+    saved.append("certifications", certification);
+  for (const { fields } of sections) fields.disabled = true;
+  renderSavedAnswers(saved);
+  const values = () => {
+    const result = new FormData();
+    for (const [name, value] of saved) result.append(name, value);
+    if (active) {
+      // No radio is selected for an unrepresentable legacy multiselect answer.
+      // Keep it until a replacement is explicitly chosen, even in Team interests.
+      const retainCertifications =
+        saved.getAll("certifications").length > 1 &&
+        !medical.querySelector("input:checked");
+      // Delete unchecked choices too, not just entries present in FormData.
+      for (const control of active.fields.querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement
+      >("[name]"))
+        if (!retainCertifications || control.name !== "certifications")
+          result.delete(control.name);
+      for (const [name, value] of new FormData(element))
+        if (!retainCertifications || name !== "certifications")
+          result.append(name, value);
+    }
+    return result;
+  };
+  const changed = () =>
+    Boolean(active) && snapshot(values()) !== snapshot(saved);
+  const setEditing = (next?: (typeof sections)[number]) => {
     const restoreFocus =
-      editor.contains(document.activeElement) ||
-      actions.some((action) => action.contains(document.activeElement)) ||
+      active?.section.contains(document.activeElement) ||
       document.activeElement === document.body;
-    edit.hidden = editing;
-    editor.disabled = !editing;
-    for (const field of fields) field.hidden = !editing;
-    for (const summary of summaries) summary.hidden = editing;
-    for (const action of actions) action.hidden = !editing;
-    if (editing) {
+    const previous = active;
+    active = next;
+    // Medic selection and its required qualifications must save atomically.
+    // Reuse the same controls inside Team interests while it is being edited;
+    // Training and safety (and every unrelated section) remains saved text.
+    const destination =
+      next?.fields.dataset.profileFields === "team-interests"
+        ? teamTraining
+        : medicalHome;
+    if (destination === teamTraining) destination.appendChild(medical);
+    else destination.insertBefore(medical, destination.firstChild);
+    for (const section of sections) {
+      const editing = section === next;
+      section.edit.hidden = editing;
+      section.edit.setAttribute("aria-expanded", String(editing));
+      section.fields.disabled = !editing;
+      section.fields.hidden = !editing;
+      section.summary.hidden = editing;
+    }
+    if (next) {
       clearFormMessage(element);
-      editor
+      next.section.appendChild(feedback);
+      next.fields
         .querySelector<HTMLElement>(
           'input:not([type="hidden"]):enabled:not([readonly])',
         )
         ?.focus();
-    } else if (restoreFocus) edit.focus({ preventScroll: true });
+    }
+    update();
+    if (!next && restoreFocus)
+      queueMicrotask(() => previous?.edit.focus({ preventScroll: true }));
   };
-  edit.disabled = false;
-  edit.addEventListener("click", () => setEditing(true));
-  for (const cancel of cancels)
+  for (const section of sections) {
+    section.edit.addEventListener("click", () => {
+      if (!active && !element.dataset.submitting) setEditing(section);
+    });
+    const { cancel } = section;
     cancel.addEventListener("click", () => {
       if (element.dataset.submitting) return;
       element.reset();
       clearFormMessage(element);
-      setEditing(false);
+      setEditing();
     });
+  }
   const update = () => {
     const submitting = Boolean(element.dataset.submitting);
-    const disabled = editor.disabled || submitting || !changed();
-    for (const button of buttons) button.disabled = disabled;
-    for (const cancel of cancels) cancel.disabled = submitting;
+    const dirty = changed();
+    for (const section of sections) {
+      section.edit.disabled = Boolean(active) || submitting;
+      section.edit.title =
+        active && section !== active
+          ? "Save or cancel the open section before editing another."
+          : "";
+      // Leave only the open section's submit button in the form's implicit
+      // Enter-key submission order; earlier hidden buttons must not intercept it.
+      section.save.type = section === active ? "submit" : "button";
+      section.save.disabled = section !== active || submitting || !dirty;
+      section.cancel.disabled = submitting;
+    }
   };
   for (const event of ["input", "change"])
     element.addEventListener(event, update);
@@ -369,18 +440,25 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   update();
   return {
     update,
+    values,
+    submitButton: () => active?.save,
     markSaved(values: FormData) {
       // Edits made while the request is pending must remain unsaved.
-      saved = snapshot(values);
+      saved = values;
       renderSavedAnswers(values);
       // Cancel/reset must return to the latest save, not the initial page load.
-      for (const control of element.querySelectorAll<
+      for (const control of active!.fields.querySelectorAll<
         HTMLInputElement | HTMLTextAreaElement
       >("input[name], textarea[name]")) {
         if (
           control instanceof HTMLInputElement &&
           ["radio", "checkbox"].includes(control.type)
         ) {
+          if (
+            control.name === "certifications" &&
+            values.getAll(control.name).length > 1
+          )
+            continue;
           const checked = control.checked;
           control.defaultChecked = control.disabled
             ? checked
@@ -392,7 +470,7 @@ export function initAccountFormChanges(element: HTMLFormElement) {
           control.value = value;
         }
       }
-      if (!changed()) setEditing(false);
+      if (!changed()) setEditing();
     },
   };
 }
