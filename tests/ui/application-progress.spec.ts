@@ -32,6 +32,13 @@ for (const width of [390, 1280]) {
     await page.goto("/apply");
     const form = page.locator("form[data-application]");
     const count = page.locator("[data-application-progress-count]");
+    const tracker = page.getByRole("navigation", {
+      name: "Application progress",
+    });
+    const reviewButton = tracker.getByRole("button", {
+      name: "Review application",
+      exact: true,
+    });
     await expectComplete(page, "overview", true);
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
@@ -40,6 +47,30 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "about-volunteering", false);
     await expect(count).toHaveText(["2/5 complete", "2/5 complete"]);
     await expect(form.locator("[data-error]:visible")).toHaveCount(0);
+    await expect(reviewButton).toBeEnabled();
+    await expect(reviewButton).toBeInViewport();
+    expect(
+      await reviewButton.evaluate((button: HTMLButtonElement) =>
+        button.form?.hasAttribute("data-application"),
+      ),
+    ).toBe(true);
+    const overview = tracker.locator(
+      '.volunteer-contents-sidebar [href="#application-overview"]',
+    );
+    const checkmark = overview.locator("svg");
+    await expect(checkmark).toHaveCSS("color", "rgb(74, 222, 128)");
+    await expect(checkmark).toHaveCSS("visibility", "visible");
+    await expect(checkmark).toHaveCSS("border-width", "0px");
+    expect(
+      await overview.evaluate((link) =>
+        link.lastElementChild?.previousSibling?.textContent?.trim(),
+      ),
+    ).toBe("Overview");
+    await expect(
+      tracker.locator(
+        '.volunteer-contents-sidebar [href="#application-personal-info"] svg',
+      ),
+    ).toHaveCSS("visibility", "hidden");
 
     for (const [name, value] of Object.entries({
       firstName: "Test",
@@ -106,9 +137,6 @@ for (const width of [390, 1280]) {
       .fill("I want to help my community.");
     await expectComplete(page, "about-volunteering", true);
 
-    const tracker = page.getByRole("navigation", {
-      name: "Application progress",
-    });
     if (width < 1024) await tracker.locator("summary").click();
     await tracker
       .getByRole("link", { name: "Emergency contact", exact: true })
@@ -125,12 +153,29 @@ for (const width of [390, 1280]) {
         "Emergency contact",
       );
 
+    await expect(reviewButton).toBeInViewport();
+    await reviewButton.click();
+    await expect(form.locator("[data-application-review-step]")).toBeVisible();
+    await expect(
+      form.getByRole("heading", { name: "Review application", exact: true }),
+    ).toBeFocused();
+    await expect(tracker).toBeHidden();
+    await form.getByRole("button", { name: "Back to answers" }).click();
+    await expect(tracker).toBeVisible();
+    await expect(
+      form.locator("#application-personal-info > summary"),
+    ).toBeFocused();
+
     await form.evaluate((element: HTMLFormElement) => element.reset());
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
     await expectComplete(page, "training-and-safety", true);
     await expectComplete(page, "about-volunteering", false);
     await expect(count).toHaveText(["2/5 complete", "2/5 complete"]);
+    if (width >= 1024) {
+      await page.setViewportSize({ width, height: 400 });
+      await expect(reviewButton).toBeInViewport();
+    }
   });
 }
 
@@ -224,6 +269,16 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
   await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);
   await expect(page.locator(".site-header")).not.toBeInViewport();
   await expect(status).toBeInViewport();
+  await expect(status).toHaveCSS("font-size", "14px");
+  await expect(status).toHaveCSS("text-align", "right");
+  await expect(status).toHaveCSS("justify-content", "flex-end");
+  await expect(summary.locator("[data-application-progress-count]")).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(
+    tracker.getByRole("button", { name: "Review application", exact: true }),
+  ).toBeInViewport();
   expect((await status.boundingBox())!.y).toBeGreaterThanOrEqual(
     (await tracker.locator("summary").boundingBox())!.height,
   );
@@ -268,6 +323,9 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
     expect(current!.x + current!.width).toBeLessThanOrEqual(count!.x);
     await expect(
       summary.locator("[data-application-progress-count]"),
+    ).toBeInViewport();
+    await expect(
+      tracker.getByRole("button", { name: "Review application", exact: true }),
     ).toBeInViewport();
     await tracker.locator("summary").click();
     await expect

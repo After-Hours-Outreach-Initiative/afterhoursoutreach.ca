@@ -41,6 +41,7 @@ const sections = profileFormSections(application);
 
 {application && <ApplicationContents sections={sections} />}
 <form
+  id={application ? "volunteer-application" : undefined}
   data-account-profile
   data-application={application || undefined}
   data-profile-user-id={userId}

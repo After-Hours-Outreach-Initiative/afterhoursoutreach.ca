@@ -93,17 +93,28 @@ const totalSections = entries.filter(
       </details>
       {
         application && (
-          <p
-            class="volunteer-draft-save-status"
-            data-draft-save-indicator
-            data-save-state="initializing"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <CloudIcon class="volunteer-draft-save-icon" />
-            <span data-draft-save-message />
-          </p>
+          <div class="volunteer-contents-actions">
+            <button
+              type="submit"
+              form="volunteer-application"
+              data-application-review
+              class="btn btn-primary"
+              disabled
+            >
+              Review application
+            </button>
+            <p
+              class="volunteer-draft-save-status"
+              data-draft-save-indicator
+              data-save-state="initializing"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <CloudIcon class="volunteer-draft-save-icon" />
+              <span data-draft-save-message />
+            </p>
+          </div>
         )
       }
     </div>

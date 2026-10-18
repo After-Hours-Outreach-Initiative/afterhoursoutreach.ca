@@ -968,7 +968,7 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   const underage = younger.toISOString().slice(0, 10);
   for (const invalid of [underage, today.toISOString().slice(0, 10)]) {
     await birthDate.fill(invalid);
-    await form.getByRole("button", { name: "Review application" }).click();
+    await page.getByRole("button", { name: "Review application" }).click();
     await expect(birthDate).toBeFocused();
     await expect(form.locator("[data-error=birthDate]")).toBeVisible();
     await expect(form.locator("[data-error=birthDate]")).toHaveText(
@@ -1020,7 +1020,7 @@ test("the application requires JavaScript and retains birth-date constraints", a
     younger.setUTCDate(younger.getUTCDate() + 1);
     await birthDate.fill(younger.toISOString().slice(0, 10));
     await expect(
-      form.getByRole("button", { name: "Review application" }),
+      page.getByRole("button", { name: "Review application" }),
     ).toBeDisabled();
     expect(
       await birthDate.evaluate(
@@ -1144,7 +1144,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(details.locator(".volunteer-help")).toHaveCount(0);
   for (const blank of ["", " \t\n\u00a0 "]) {
     await otherText.fill(blank);
-    await form.getByRole("button", { name: "Review application" }).click();
+    await page.getByRole("button", { name: "Review application" }).click();
     await expect(otherText).toBeFocused();
     await expect(details.locator("[data-error=otherTraining]")).toBeVisible();
     expect(requests).toHaveLength(0);
@@ -1313,14 +1313,14 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     "Training and safety",
     "About volunteering",
   ]);
-  await form.getByRole("button", { name: "Review application" }).click();
+  await page.getByRole("button", { name: "Review application" }).click();
   await expect(firstAid).toBeFocused();
   await expect(
     certifications.locator("[data-error=certifications]"),
   ).toBeVisible();
   await firstAid.press("Space");
   await expect(firstAid).toBeChecked();
-  await form.getByRole("button", { name: "Review application" }).click();
+  await page.getByRole("button", { name: "Review application" }).click();
   await expect(expiry).toBeFocused();
   await expect(form.locator("[data-error=certificationExpiry]")).toBeVisible();
   expect(profileRequests).toHaveLength(0);
@@ -1363,7 +1363,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   );
   for (const blank of ["", " \t\n\u00a0 "]) {
     await experience.fill(blank);
-    await form.getByRole("button", { name: "Review application" }).click();
+    await page.getByRole("button", { name: "Review application" }).click();
     await expect(experience).toBeFocused();
     await expect(form.locator("[data-error=experience]")).toBeVisible();
     expect(profileRequests).toHaveLength(0);

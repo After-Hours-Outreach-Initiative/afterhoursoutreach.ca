@@ -20,19 +20,19 @@ const { entries, application, variant } = Astro.props;
           data-application-progress-link={application || undefined}
           data-complete={application ? "false" : undefined}
         >
-          {application && (
-            <span class="volunteer-contents-checkbox" aria-hidden="true">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="3"
-              >
-                <path d="m5 12 4 4L19 6" />
-              </svg>
-            </span>
-          )}
           {section.heading}
+          {application && (
+            <svg
+              class="volunteer-contents-checkmark"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              aria-hidden="true"
+            >
+              <path d="m5 12 4 4L19 6" />
+            </svg>
+          )}
         </a>
         {application && (
           <span
