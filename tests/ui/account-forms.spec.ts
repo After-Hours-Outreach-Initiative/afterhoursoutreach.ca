@@ -874,50 +874,75 @@ test("application shows all required errors and saves after they are corrected",
   ).toHaveValue("Updated volunteer");
 });
 
-test("mobile birth-date picker stays blank without a past calendar maximum", async ({
+test("mobile birth-date entry stays blank, labelled and within the form", async ({
   browser,
   baseURL,
 }) => {
-  const context = await browser.newContext({
-    ...devices["Pixel 7"],
-    baseURL,
-  });
-  try {
-    await createLocalAccount(context.request, baseURL!, false);
-    const page = await context.newPage();
-    await page.goto("/apply");
-    const form = page.locator("[data-account-profile]");
-    const birthDate = form.locator('[name="birthDate"]');
-    await expect(birthDate).toHaveAttribute("type", "date");
-    await expect(birthDate).toHaveAttribute("min", "1900-01-01");
-    await expect(birthDate).not.toHaveAttribute("max");
-    await birthDate.focus();
-    await expect(birthDate).toHaveValue("");
-    expect(
-      await birthDate.evaluate(
-        (input: HTMLInputElement) => input.validity.valueMissing,
-      ),
-    ).toBe(true);
-
-    // Native pickers can report a selection through change rather than input.
-    await birthDate.evaluate((input: HTMLInputElement) => {
-      input.value = "2999-01-01";
-      input.dispatchEvent(new Event("change", { bubbles: true }));
+  for (const device of ["Pixel 7", "iPhone 13"]) {
+    const context = await browser.newContext({
+      ...devices[device],
+      baseURL,
     });
-    await expect(birthDate).toHaveJSProperty(
-      "validationMessage",
-      applicationBirthDateError,
-    );
-    await form.evaluate((element: HTMLFormElement) => element.reset());
-    await expect(birthDate).toHaveValue("");
-    expect(
-      await birthDate.evaluate(
-        (input: HTMLInputElement) => input.validity.customError,
-      ),
-    ).toBe(false);
-    await expect(birthDate).not.toHaveAttribute("max");
-  } finally {
-    await context.close();
+    try {
+      await createLocalAccount(context.request, baseURL!, false);
+      const page = await context.newPage();
+      await page.goto("/apply");
+      const form = page.locator("[data-account-profile]");
+      const birthDate = form.getByRole("textbox", {
+        name: "Date of birth",
+        exact: true,
+      });
+      await expect(birthDate).toHaveAttribute("type", "text");
+      await expect(birthDate).toHaveAttribute("placeholder", "YYYY-MM-DD");
+      await expect(birthDate).toHaveAttribute("autocomplete", "off");
+      await expect(birthDate).toHaveAccessibleDescription(
+        /year-month-day.*1990-04-23.*at least 19/,
+      );
+      await expect(form.locator("[data-error=birthDate]")).toBeHidden();
+      await expect(birthDate).toHaveValue("");
+      await birthDate.focus();
+      await expect(birthDate).toHaveValue("");
+      expect(
+        await birthDate.evaluate(
+          (input: HTMLInputElement) => input.validity.valueMissing,
+        ),
+      ).toBe(true);
+      for (const width of [devices[device].viewport.width, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        expect(
+          await birthDate.evaluate((input) => {
+            const bounds = input.getBoundingClientRect();
+            const field = input
+              .closest(".volunteer-field")!
+              .getBoundingClientRect();
+            return (
+              bounds.left >= field.left &&
+              bounds.right <= field.right &&
+              bounds.right <= innerWidth
+            );
+          }),
+        ).toBe(true);
+      }
+
+      // Draft restoration can report a changed value through change, not input.
+      await birthDate.evaluate((input: HTMLInputElement) => {
+        input.value = "2999-01-01";
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await expect(birthDate).toHaveJSProperty(
+        "validationMessage",
+        applicationBirthDateError,
+      );
+      await form.evaluate((element: HTMLFormElement) => element.reset());
+      await expect(birthDate).toHaveValue("");
+      expect(
+        await birthDate.evaluate(
+          (input: HTMLInputElement) => input.validity.customError,
+        ),
+      ).toBe(false);
+    } finally {
+      await context.close();
+    }
   }
 });
 
@@ -930,7 +955,6 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   const form = page.locator("[data-account-profile]");
   const birthDate = form.locator('[name="birthDate"]');
   const cutoff = latestApplicationBirthDate();
-  await expect(birthDate).not.toHaveAttribute("max");
   const today = new Date();
   expect(cutoff.slice(0, 4)).toBe(String(today.getUTCFullYear() - 19));
   expect(cutoff.slice(5)).toBe(
@@ -966,7 +990,13 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   const younger = new Date(`${cutoff}T00:00:00Z`);
   younger.setUTCDate(younger.getUTCDate() + 1);
   const underage = younger.toISOString().slice(0, 10);
-  for (const invalid of [underage, today.toISOString().slice(0, 10)]) {
+  for (const invalid of [
+    underage,
+    today.toISOString().slice(0, 10),
+    "2005-02-29",
+    "1899-12-31",
+    "not-a-date",
+  ]) {
     await birthDate.fill(invalid);
     await page.getByRole("button", { name: "Review application" }).click();
     await expect(birthDate).toBeFocused();
@@ -998,7 +1028,7 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   await expect(submission.getByText(cutoff, { exact: true })).toBeVisible();
 });
 
-test("the application requires JavaScript and retains birth-date constraints", async ({
+test("the application requires JavaScript and renders blank DOB format guidance", async ({
   browser,
   baseURL,
 }) => {
@@ -1012,13 +1042,10 @@ test("the application requires JavaScript and retains birth-date constraints", a
     await page.goto("/apply");
     const form = page.locator("[data-account-profile]");
     const birthDate = form.locator('[name="birthDate"]');
-    const cutoff = (await birthDate.getAttribute("max"))!;
-    expect(cutoff).toBe(latestApplicationBirthDate());
-    await expect(birthDate).toHaveAttribute("min", "1900-01-01");
+    await expect(birthDate).toHaveAttribute("type", "text");
     await expect(birthDate).toHaveValue("");
-    const younger = new Date(`${cutoff}T00:00:00Z`);
-    younger.setUTCDate(younger.getUTCDate() + 1);
-    await birthDate.fill(younger.toISOString().slice(0, 10));
+    await expect(form.locator("#help-birthDate")).toContainText("YYYY-MM-DD");
+    await birthDate.fill("not-a-date");
     await expect(
       page.getByRole("button", { name: "Review application" }),
     ).toBeDisabled();
@@ -1028,7 +1055,7 @@ test("the application requires JavaScript and retains birth-date constraints", a
       ),
     ).toBe(false);
     await expect(page).toHaveURL(/\/apply$/);
-    await birthDate.fill(cutoff);
+    await birthDate.fill(latestApplicationBirthDate());
     expect(
       await birthDate.evaluate(
         (input: HTMLInputElement) => input.validity.valid,

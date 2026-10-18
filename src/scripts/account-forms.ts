@@ -1,5 +1,6 @@
 import {
   applicationBirthDateError,
+  isValidApplicationBirthDate,
   countWords,
   motivationMaxWords,
   motivationWordLimitError,
@@ -69,15 +70,16 @@ export function clearFormMessage(element: Element) {
 
 export function initBirthDate(element: HTMLFormElement) {
   const input = element.querySelector<HTMLInputElement>('[name="birthDate"]');
-  if (!input?.max) return;
-  const latest = Date.parse(input.max);
-  // Android opens an empty picker at min (1900) when max is before today.
-  // Keep the age limit in validation, not the calendar, without pre-filling a birthday.
-  // The server-rendered max remains the fallback when JavaScript is disabled.
-  input.removeAttribute("max");
+  if (!input) return;
+  // Plain text avoids native mobile picker defaults and intrinsic sizing. Keep
+  // the value untouched so drafts, resets and submissions retain YYYY-MM-DD.
   const update = () => {
     input.setCustomValidity(
-      input.valueAsNumber > latest ? applicationBirthDateError : "",
+      !input.readOnly &&
+        input.value &&
+        !isValidApplicationBirthDate(input.value)
+        ? applicationBirthDateError
+        : "",
     );
   };
   input.addEventListener("input", update);

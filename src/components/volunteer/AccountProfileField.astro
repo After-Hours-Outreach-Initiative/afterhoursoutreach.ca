@@ -1,6 +1,5 @@
 ---
 import {
-  latestApplicationBirthDate,
   applicationBirthDateError,
   type applicationFields,
   type ApplicationAnswers,
@@ -24,6 +23,7 @@ const {
   readOnly = false,
 } = Astro.props;
 const phone = field.name === "phone" || field.name === "emergencyPhone";
+const birthDate = field.name === "birthDate";
 const motivation = field.name === "motivation";
 const describedBy = `error-${field.name}${"help" in field && !readOnly ? ` help-${field.name}` : ""}`;
 const message =
@@ -82,20 +82,18 @@ const message =
         required={required && active && !readOnly}
         readonly={readOnly || !active}
         pattern={
-          phone
-            ? String.raw`(?=.*\S)[\d+\(\).\s\-xX]{7,}`
-            : required && field.name !== "birthDate"
-              ? String.raw`.*\S.*`
-              : undefined
+          birthDate
+            ? String.raw`\d{4}-\d{2}-\d{2}`
+            : phone
+              ? String.raw`(?=.*\S)[\d+\(\).\s\-xX]{7,}`
+              : required
+                ? String.raw`.*\S.*`
+                : undefined
         }
+        placeholder={birthDate && !readOnly ? "YYYY-MM-DD" : undefined}
+        spellcheck={birthDate ? false : undefined}
         minlength={phone ? "7" : undefined}
-        maxlength={phone ? "40" : "200"}
-        min={field.name === "birthDate" && !readOnly ? "1900-01-01" : undefined}
-        max={
-          field.name === "birthDate" && !readOnly
-            ? latestApplicationBirthDate()
-            : undefined
-        }
+        maxlength={birthDate ? "10" : phone ? "40" : "200"}
       />
     )
   }
