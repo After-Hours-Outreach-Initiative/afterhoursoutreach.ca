@@ -260,9 +260,16 @@ for (const path of ["/apply", "/volunteer/account"]) {
         await expect(contents).toBeVisible();
         const initial = await contents.boundingBox();
         const header = await page.locator(".site-header").boundingBox();
-        expect(initial!.y).toBe(
-          header!.y + header!.height + (width < 1024 ? 0 : 24),
-        );
+        if (path === "/apply" && width < 1024) {
+          const intro = await page
+            .locator(".volunteer-application-intro")
+            .boundingBox();
+          expect(initial!.y).toBe(intro!.y + intro!.height + 32);
+        } else {
+          expect(initial!.y).toBe(
+            header!.y + header!.height + (width < 1024 ? 0 : 24),
+          );
+        }
         release();
         await page.waitForLoadState("load");
         // Measurement enhances anchor offsets, never the navigation's position.
@@ -270,10 +277,27 @@ for (const path of ["/apply", "/volunteer/account"]) {
           page.locator("[data-application-flow], [data-account-contents-flow]"),
         ).toHaveAttribute("style", /--contents-scroll-offset:/);
         expect(await contents.boundingBox()).toEqual(initial);
-        await page.evaluate(() => scrollTo({ top: 500, behavior: "instant" }));
-        await expect
-          .poll(async () => (await contents.boundingBox())!.y)
-          .toBe(initial!.y);
+        if (path === "/apply" && width < 1024) {
+          await page.evaluate(
+            (top) => scrollTo({ top, behavior: "instant" }),
+            initial!.y + initial!.height + 16,
+          );
+          await expect(contents).toHaveAttribute("data-contents-sticky", "");
+          await expect
+            .poll(
+              async () =>
+                (await contents.locator("[data-contents-bar]").boundingBox())!
+                  .y,
+            )
+            .toBe(0);
+        } else {
+          await page.evaluate(() =>
+            scrollTo({ top: 500, behavior: "instant" }),
+          );
+          await expect
+            .poll(async () => (await contents.boundingBox())!.y)
+            .toBe(initial!.y);
+        }
       } finally {
         release();
       }
@@ -288,28 +312,43 @@ test("contents navigation contrasts with the header and leaves room for the page
   await page.setViewportSize({ width: 390, height: 844 });
   await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/apply");
-  const contents = page.getByRole("navigation", { name: "On this page" });
+  const contents = page.getByRole("navigation", {
+    name: "Application progress",
+  });
   const menu = contents.locator("[data-contents-menu]");
+  await expect(menu).toBeHidden();
+  await expect(
+    contents.locator(".volunteer-contents-inline-heading"),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    const nav = document
+      .querySelector("[data-application-contents]")!
+      .getBoundingClientRect();
+    scrollTo({ top: nav.bottom + scrollY + 16, behavior: "instant" });
+  });
+  await expect(contents).toHaveAttribute("data-contents-sticky", "");
   const bar = menu.locator("summary");
-  const toggle = bar.locator(".volunteer-contents-toggle");
+  const toggle = bar.locator(".volunteer-contents-section-toggle");
   await expect(page.locator(".site-header")).toHaveCSS(
     "background-color",
     "rgb(0, 0, 0)",
   );
   await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
-  await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await expect(toggle).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(toggle).toHaveCSS("border-width", "0px");
   const current = bar.locator("[data-contents-current]");
   await expect(current).toHaveCSS("color", "rgb(255, 255, 255)");
   await expect(current).toHaveCSS("font-size", "16px");
   await toggle.click();
   await expect(menu).toHaveAttribute("open", "");
   await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
-  await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await expect(toggle).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await page.keyboard.press("Escape");
   await expect(menu).not.toHaveAttribute("open");
 
   for (const width of [320, 390, 640, 768, 1023, 1024, 1280]) {
     await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
     await expect
       .poll(() =>
         page.locator("#application-overview").evaluate((heading) => {
@@ -318,7 +357,10 @@ test("contents navigation contrasts with the header and leaves room for the page
             .querySelector("[data-application-contents]")!
             .getBoundingClientRect();
           return innerWidth < 1024
-            ? title.top - nav.bottom
+            ? nav.top -
+                document
+                  .querySelector(".volunteer-application-intro")!
+                  .getBoundingClientRect().bottom
             : nav.left - title.right;
         }),
       )
@@ -545,7 +587,9 @@ test("application shows all required errors and saves after they are corrected",
     name: "Emergency contact",
     exact: true,
   });
-  const contents = page.getByRole("navigation", { name: "On this page" });
+  const contents = page.getByRole("navigation", {
+    name: "Application progress",
+  });
   await form.locator("#application-emergency-contact > summary").click();
   await contents
     .getByRole("link", { name: "Emergency contact", exact: true })

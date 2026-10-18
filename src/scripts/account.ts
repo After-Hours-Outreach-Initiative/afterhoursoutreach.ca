@@ -71,13 +71,13 @@ function form(
       if (draft) applicationDrafts.set(element, draft);
       else if (element.dataset.profileUserId)
         clearApplicationDraft(element.dataset.profileUserId);
-      initApplicationSections(element);
       initPhoneInputs(element);
       initBirthDate(element);
       initMedicCertifications(element);
       initRelevantTraining(element);
       initReferralSources(element);
       initMotivationWordLimit(element);
+      initApplicationSections(element);
       initApplicationReview(element);
       draft?.start();
       initialized.set(

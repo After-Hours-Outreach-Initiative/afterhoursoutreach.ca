@@ -1,65 +1,119 @@
 ---
+import CloudIcon from "@/components/icons/CloudIcon.astro";
+import PageContentsList from "./PageContentsList.astro";
+
 interface Props {
   entries: { id: string; heading: string; nested?: boolean }[];
   application?: boolean;
 }
 const { entries, application = false } = Astro.props;
+const heading = application ? "Application progress" : "On this page";
+const totalSections = entries.filter(
+  (entry) => entry.id !== "application-overview",
+).length;
 ---
 
 <nav
   class="volunteer-contents"
   data-page-contents
   data-application-contents={application || undefined}
-  aria-label="On this page"
+  aria-label={heading}
 >
-  <details class="volunteer-contents-menu" data-contents-menu>
-    <summary data-application-step-heading={application || undefined}>
-      <span class="volunteer-contents-toggle">
-        On this page
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          aria-hidden="true"
-        >
-          <path d="m9 5 7 7-7 7"></path>
-        </svg>
-      </span>
-      <span class="volunteer-contents-current" data-contents-current>
-        {entries[0]?.heading}
-      </span>
-    </summary>
-    <ol>
+  <div class="volunteer-contents-bar-slot">
+    <div class="volunteer-contents-bar" data-contents-bar>
       {
-        entries.map((section, index) => (
-          <li class:list={{ "volunteer-contents-nested": section.nested }}>
-            <a
-              href={`#${section.id}`}
-              aria-current={index === 0 ? "location" : undefined}
+        application && (
+          <div class="volunteer-contents-inline-heading">
+            <h2>{heading}</h2>
+            <span
+              class="volunteer-contents-completion"
+              data-application-progress-count
             >
-              {section.heading}
-            </a>
-          </li>
-        ))
+              0/{totalSections} complete
+            </span>
+          </div>
+        )
       }
-    </ol>
-  </details>
+      <details class="volunteer-contents-menu" data-contents-menu>
+        <summary data-application-step-heading={application || undefined}>
+          {
+            application ? (
+              <>
+                <span class="volunteer-contents-section-toggle">
+                  <span
+                    class="volunteer-contents-current"
+                    data-contents-current
+                  >
+                    {entries[0]?.heading}
+                  </span>
+                  <svg
+                    class="volunteer-contents-chevron"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </span>
+                <span
+                  class="volunteer-contents-completion"
+                  data-application-progress-count
+                >
+                  0/{totalSections} complete
+                </span>
+              </>
+            ) : (
+              <>
+                <span class="volunteer-contents-toggle">
+                  {heading}
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 5 7 7-7 7" />
+                  </svg>
+                </span>
+                <span class="volunteer-contents-current" data-contents-current>
+                  {entries[0]?.heading}
+                </span>
+              </>
+            )
+          }
+        </summary>
+        <PageContentsList
+          entries={entries}
+          application={application}
+          variant="menu"
+        />
+      </details>
+      {
+        application && (
+          <p
+            class="volunteer-draft-save-status"
+            data-draft-save-indicator
+            data-save-state="initializing"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <CloudIcon class="volunteer-draft-save-icon" />
+            <span data-draft-save-message />
+          </p>
+        )
+      }
+    </div>
+  </div>
   <div class="volunteer-contents-sidebar">
-    <h2>On this page</h2>
-    <ol>
-      {
-        entries.map((section, index) => (
-          <li class:list={{ "volunteer-contents-nested": section.nested }}>
-            <a
-              href={`#${section.id}`}
-              aria-current={index === 0 ? "location" : undefined}
-            >
-              {section.heading}
-            </a>
-          </li>
-        ))
-      }
-    </ol>
+    <h2>{heading}</h2>
+    <PageContentsList
+      entries={entries}
+      application={application}
+      variant="sidebar"
+    />
   </div>
 </nav>

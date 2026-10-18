@@ -34,7 +34,7 @@ body:has([data-application], [data-account-contents-flow]) {
   align-items: center;
   gap: 6px;
   min-height: 1.5em;
-  margin-top: 8px;
+  margin-top: 12px;
   color: #a1a1aa;
   font-size: inherit;
   line-height: 1.5;
@@ -259,6 +259,9 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-contents-menu {
   position: relative;
 }
+.volunteer-contents-inline-heading {
+  display: none;
+}
 .volunteer-contents summary {
   position: relative;
   z-index: 1;
@@ -306,6 +309,31 @@ body:has([data-application], [data-account-contents-flow]) {
   color: #fff;
   font-size: 16px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.volunteer-contents-section-toggle {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+}
+.volunteer-contents-section-toggle .volunteer-contents-current {
+  flex: 0 1 auto;
+}
+.volunteer-contents-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #a1a1aa;
+}
+.volunteer-contents-menu[open] .volunteer-contents-chevron {
+  transform: rotate(180deg);
+}
+.volunteer-contents-completion {
+  flex-shrink: 0;
+  color: #a1a1aa;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .volunteer-contents ol {
@@ -361,6 +389,33 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-contents a[aria-current="location"] {
   color: #c7d2fe;
 }
+.volunteer-contents-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-right: 10px;
+  border: 1px solid #71717a;
+  border-radius: 4px;
+}
+.volunteer-contents-checkbox svg {
+  width: 14px;
+  height: 14px;
+  visibility: hidden;
+}
+[data-application-progress-link][data-complete="true"]
+  .volunteer-contents-checkbox {
+  border-color: #a5b4fc;
+  background: #a5b4fc;
+  color: #09090b;
+}
+[data-application-progress-link][data-complete="true"]
+  .volunteer-contents-checkbox
+  svg {
+  visibility: visible;
+}
 .volunteer-contents a:focus-visible,
 .volunteer-contents summary:focus-visible,
 .volunteer-application-section > summary:focus-visible {
@@ -380,45 +435,121 @@ body:has([data-application], [data-account-contents-flow]) {
   display: none;
 }
 @media (width < 64rem) {
+  body:has([data-application-flow]) > .site-header {
+    position: relative;
+  }
   [data-application-flow] {
-    display: grid;
-    grid-template-rows: 0 auto auto auto;
+    --contents-bar-height: 87px;
+    --contents-scroll-offset: 87px;
   }
   [data-application-flow] > .volunteer-contents {
-    grid-column: 1;
-    grid-row: 1 / -1;
-    /* Start at the header, outside the wrap's padding. The
-       spanning grid area keeps the bar sticky throughout the application. */
-    margin: -32px calc(-1 * var(--contents-padding)) 0;
+    position: static;
+    margin: 0 calc(-1 * var(--contents-padding)) 32px;
   }
-  [data-application-flow] > .volunteer-application-intro {
-    grid-column: 1;
-    grid-row: 2;
+  [data-application-contents] .volunteer-contents-bar-slot {
+    /* Keep the document height unchanged when the header becomes an overlay. */
+    height: var(--contents-bar-height);
   }
-  [data-application-flow] > [data-application] {
-    grid-column: 1;
-    grid-row: 3;
-    /* Grid margins no longer collapse with the intro's 32px bottom margin. */
+  [data-application-contents] .volunteer-contents-bar {
+    position: relative;
+    padding-bottom: 8px;
+    border-bottom: var(--volunteer-border);
+    background: var(--color-panel-soft);
+  }
+  [data-application-contents] .volunteer-contents-inline-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 54px;
+    padding: 4px var(--contents-padding);
+    font-size: 14px;
+  }
+  .volunteer-contents-inline-heading h2 {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: normal;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  [data-application-contents] .volunteer-contents-menu {
+    display: none;
+    position: static;
+  }
+  [data-application-contents][data-contents-sticky] .volunteer-contents-bar {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 30;
+    box-shadow: 0 6px 20px #0005;
+    animation: volunteer-contents-enter 180ms ease-out;
+  }
+  [data-application-contents][data-contents-sticky]
+    .volunteer-contents-inline-heading {
+    display: none;
+  }
+  [data-application-contents][data-contents-sticky] .volunteer-contents-menu {
+    display: block;
+  }
+  [data-application-contents] .volunteer-contents-sidebar {
+    display: block;
+    padding: 4px var(--contents-padding) 8px;
+    border-bottom: var(--volunteer-border);
+    background: #0c0d10;
+  }
+  [data-application-contents] .volunteer-contents-sidebar h2 {
+    display: none;
+  }
+  [data-application-contents][data-contents-sticky]
+    .volunteer-contents-sidebar {
+    /* Already offscreen: hide the duplicate links without reclaiming space. */
+    visibility: hidden;
+  }
+  [data-application-contents] .volunteer-contents-menu > ol {
+    top: calc(100% + 1px);
+  }
+  [data-application-contents] summary {
+    border-bottom: 0;
+  }
+  [data-application-contents] .volunteer-draft-save-status {
     margin-top: 0;
+    padding-inline: var(--contents-padding);
   }
-  [data-application-flow] > [data-application-draft-actions] {
-    grid-column: 1;
-    grid-row: 4;
+  [data-application-contents] [data-draft-save-message] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .volunteer-contents a {
     min-height: 48px;
     padding-block: 10px;
     font-size: 16px;
   }
-  [data-application-flow]:has(> [data-application-contents]:not([hidden])) {
-    grid-template-rows: var(--contents-bar-height, 54px) auto auto auto;
+}
+@keyframes volunteer-contents-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
   }
-  [data-application-flow]:has(> [data-application-contents]:not([hidden]))
-    > .volunteer-application-intro {
-    margin-top: 0;
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-application-contents][data-contents-sticky] .volunteer-contents-bar {
+    animation: none;
   }
 }
 @media (min-width: 64rem) {
+  [data-application-contents] {
+    display: flex;
+    flex-direction: column;
+  }
+  [data-application-contents] > .volunteer-contents-bar-slot {
+    order: 1;
+  }
   [data-application-flow] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 13rem;
