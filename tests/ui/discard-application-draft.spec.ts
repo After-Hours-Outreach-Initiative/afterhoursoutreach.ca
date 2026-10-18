@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { createLocalAccount } from "../helpers/local-account";
 import {
   applicationDraftAnswersSchema,
+  applicationDraftDiscardPrefix,
   applicationDraftStoragePrefix,
 } from "../../src/data/application-draft";
 
@@ -14,7 +15,9 @@ const local = (page: Page, id: string) =>
 const account = async (page: Page) => (await page.request.get(endpoint)).json();
 async function confirmDiscard(page: Page) {
   page.once("dialog", async (dialog) => {
-    expect(dialog.message()).toContain("including unsynced answers");
+    expect(dialog.message()).toBe(
+      "Are you sure you want to permanently delete your application progress? This can’t be undone.",
+    );
     await dialog.accept();
   });
   await page.locator(button).click();
@@ -32,6 +35,8 @@ async function saved(page: Page, name: string) {
 }
 async function expectDeleted(page: Page, id: string) {
   await expect(page.locator(button)).toBeEnabled();
+  await expect(page.locator(button)).not.toHaveAttribute("aria-busy", "true");
+  await expect(page.locator(button).locator("svg")).toBeVisible();
   await expect(page.locator('[name="firstName"]')).toHaveValue("");
   await expect(page.locator('[name="firstName"]')).toBeEnabled();
   await expect(page.locator(status)).toBeHidden();
@@ -41,6 +46,32 @@ async function expectDeleted(page: Page, id: string) {
   const emptyAnswers = applicationDraftAnswersSchema.parse({});
   expect(backup.answers).toEqual(emptyAnswers);
   expect(backup.savedAnswers).toEqual(emptyAnswers);
+}
+
+async function expectDiscardLoading(page: Page) {
+  const discard = page.locator(button);
+  await expect(discard).toHaveText("Discarding…");
+  await expect(discard).toBeDisabled();
+  await expect(discard).toHaveAttribute("aria-busy", "true");
+  await expect(discard.locator("svg")).toBeHidden();
+  await expect(page.locator(status)).toBeHidden();
+  await expect(page.locator("[data-draft-new]")).toBeHidden();
+  expect(
+    await discard.evaluate((element) => {
+      const spinner = getComputedStyle(element, "::before");
+      return {
+        content: spinner.content,
+        width: spinner.width,
+        height: spinner.height,
+        animation: spinner.animationName,
+      };
+    }),
+  ).toEqual({
+    content: '\"\"',
+    width: "16px",
+    height: "16px",
+    animation: "volunteer-loading",
+  });
 }
 
 test.beforeEach(({ baseURL }) => {
@@ -64,6 +95,12 @@ for (const [layout, viewport] of [
 
     const discard = page.locator(button);
     await expect(discard).toBeEnabled();
+    await expect(discard).toHaveClass(/\bbtn-red\b/);
+    await expect(discard).toHaveAccessibleName("Discard application draft");
+    await expect(discard.locator("svg")).toBeVisible();
+    await expect(discard.locator("svg")).toHaveAttribute("aria-hidden", "true");
+    await expect(discard.locator("svg")).toHaveCSS("width", "20px");
+    await expect(discard.locator("svg")).toHaveCSS("height", "20px");
     expect(
       await discard.evaluate((element) => {
         const form = document.querySelector("form[data-application]")!;
@@ -108,7 +145,114 @@ for (const [layout, viewport] of [
     await page.locator('[name="firstName"]').fill("Fresh application");
     await saved(page, "Fresh application");
   });
+
+  test(`discard shows only a busy button while deletion is pending on ${layout}`, async ({
+    page,
+    baseURL,
+  }) => {
+    await page.setViewportSize(viewport);
+    const { id } = await createLocalAccount(page.request, baseURL!, false);
+    await page.goto("/apply");
+    await page.locator('[name="firstName"]').fill("Pending discard");
+    await saved(page, "Pending discard");
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(`**${endpoint}`, async (route) => {
+      if (route.request().method() === "DELETE") await held;
+      await route.continue();
+    });
+    try {
+      await confirmDiscard(page);
+      await expectDiscardLoading(page);
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      expect(
+        await page
+          .locator(button)
+          .evaluate(
+            (element) => getComputedStyle(element, "::before").animationName,
+          ),
+      ).toBe("none");
+      await Promise.all([page.waitForEvent("domcontentloaded"), release()]);
+      await expectDeleted(page, id);
+    } finally {
+      release();
+    }
+  });
+
+  test(`discard clears saved and unsynced answers without crypto.randomUUID on ${layout}`, async ({
+    page,
+    baseURL,
+  }) => {
+    await page.setViewportSize(viewport);
+    const { id } = await createLocalAccount(page.request, baseURL!, false);
+    // HTTP LAN addresses do not expose this secure-context API.
+    await page.addInitScript(() => {
+      Object.defineProperty(window.crypto, "randomUUID", {
+        value: undefined,
+        configurable: true,
+      });
+    });
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto("/apply");
+    await page.locator('[name="firstName"]').fill("Saved before discarding");
+    await saved(page, "Saved before discarding");
+    await page.locator('[name="medicalConditions"]').fill("Unsynced answer");
+
+    await confirmDiscard(page);
+
+    await expect(page.locator('[name="firstName"]')).toHaveValue("");
+    await expectDeleted(page, id);
+    await expect(page.locator('[name="medicalConditions"]')).toHaveValue("");
+    await page.locator('[name="firstName"]').fill("Fresh application");
+    await saved(page, "Fresh application");
+    await discardAndReload(page);
+    await expectDeleted(page, id);
+    expect(errors).toEqual([]);
+  });
 }
+
+test("retry uses the same busy button and hides the previous deletion error", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  await page.locator('[name="firstName"]').fill("Retry discard");
+  await saved(page, "Retry discard");
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let attempts = 0;
+  await page.route(`**${endpoint}`, async (route) => {
+    if (route.request().method() !== "DELETE") return route.continue();
+    if (++attempts <= 3) return route.fulfill({ status: 503 });
+    await held;
+    await route.continue();
+  });
+  try {
+    await confirmDiscard(page);
+    await expect(page.locator(status)).toContainText(
+      "Account draft deletion is not confirmed",
+    );
+    await expect(page.locator(button)).toHaveText(
+      "Retry discarding application draft",
+    );
+    await expect(page.locator(button)).toBeEnabled();
+    await expect(page.locator(button)).not.toHaveAttribute("aria-busy", "true");
+    await expect(page.locator(button).locator("svg")).toBeVisible();
+    await expect(page.locator("[data-draft-new]")).toBeVisible();
+    expect(attempts).toBe(3);
+
+    await page.locator(button).click();
+
+    await expectDiscardLoading(page);
+    await Promise.all([page.waitForEvent("domcontentloaded"), release()]);
+    await expectDeleted(page, id);
+    expect(attempts).toBe(4);
+  } finally {
+    release();
+  }
+});
 
 test("cancel keeps account and unsynced browser answers without sending DELETE", async ({
   page,
@@ -252,7 +396,7 @@ test("a successful save response arriving after deletion cannot restore cleared 
   await expect(page.locator('[name="firstName"]')).toHaveValue("");
 });
 
-test("offline deletion reports partial failure, survives reload without restore, and retries", async ({
+test("offline deletion resumes automatically when the connection returns", async ({
   page,
   baseURL,
 }) => {
@@ -280,13 +424,48 @@ test("offline deletion reports partial failure, survives reload without restore,
   expect((await account(page)).draft.answers.firstName).toBe(
     "Still on account",
   );
-  await page.reload();
-  await expect(page.locator('[name="firstName"]')).toHaveValue("");
-  await expect(page.locator('[name="firstName"]')).toBeDisabled();
-  expect(await local(page, id)).toBeNull();
   await page.unroute(`**${endpoint}`);
-  await discardAndReload(page, true);
+  await Promise.all([
+    page.waitForEvent("domcontentloaded"),
+    page.evaluate(() => window.dispatchEvent(new Event("online"))),
+  ]);
   await expectDeleted(page, id);
+});
+
+test("an interrupted discard resumes on reload without another click or recovery message", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  await page.locator('[name="firstName"]').fill("Interrupted discard");
+  await saved(page, "Interrupted discard");
+  await page.route(`**${endpoint}`, (route) =>
+    route.request().method() === "DELETE" ? route.abort() : route.continue(),
+  );
+  await confirmDiscard(page);
+  await expect(page.locator(status)).toContainText(
+    "Account draft deletion is not confirmed",
+  );
+  await page.unroute(`**${endpoint}`);
+
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(`**${endpoint}`, async (route) => {
+    if (route.request().method() === "DELETE") await held;
+    await route.continue();
+  });
+  try {
+    await page.reload();
+    await expectDiscardLoading(page);
+    await expect(page.locator('[name="firstName"]')).toHaveValue("");
+    await expect(page.locator('[name="firstName"]')).toBeDisabled();
+    expect(await local(page, id)).toBeNull();
+    await Promise.all([page.waitForEvent("domcontentloaded"), release()]);
+    await expectDeleted(page, id);
+  } finally {
+    release();
+  }
 });
 
 test("a stale account refresh response cannot restore a discarded draft", async ({
@@ -329,24 +508,24 @@ test("a failed discard retry cannot delete a newer draft and reload recovers", a
   await page.route(`**${endpoint}`, async (route) => {
     if (route.request().method() !== "DELETE") return route.continue();
     await route.fetch();
+    const { generation } = await account(page);
+    const newer = await page.request.put(endpoint, {
+      headers: { origin: baseURL! },
+      data: {
+        userId: id,
+        version: 1,
+        revision: null,
+        generation,
+        answers: { firstName: "Newer deliberate draft" },
+      },
+    });
+    expect(newer.ok()).toBe(true);
     await route.abort();
   });
   await confirmDiscard(page);
   await expect(page.locator(status)).toContainText(
-    "Account draft deletion is not confirmed",
+    "Reload to check your account",
   );
-  const { generation } = await account(page);
-  const newer = await page.request.put(endpoint, {
-    headers: { origin: baseURL! },
-    data: {
-      userId: id,
-      version: 1,
-      revision: null,
-      generation,
-      answers: { firstName: "Newer deliberate draft" },
-    },
-  });
-  expect(newer.ok()).toBe(true);
   await page.unroute(`**${endpoint}`);
   await page.locator(button).click();
   await expect(page.locator(status)).toContainText(
@@ -362,7 +541,7 @@ test("a failed discard retry cannot delete a newer draft and reload recovers", a
   await expect(page.locator('[name="firstName"]')).toBeEnabled();
 });
 
-test("a lost DELETE success response can be retried safely", async ({
+test("a lost DELETE success response is verified automatically without another click", async ({
   page,
   baseURL,
 }) => {
@@ -370,9 +549,67 @@ test("a lost DELETE success response can be retried safely", async ({
   await page.goto("/apply");
   await page.locator('[name="firstName"]').fill("Lost deletion response");
   await saved(page, "Lost deletion response");
+  let deletes = 0;
+  let reads = 0;
   await page.route(`**${endpoint}`, async (route) => {
+    if (route.request().method() === "GET") reads++;
     if (route.request().method() !== "DELETE") return route.continue();
+    deletes++;
     await route.fetch();
+    await route.abort();
+  });
+  await discardAndReload(page);
+  await expectDeleted(page, id);
+  expect(deletes).toBe(1);
+  expect(reads).toBe(1);
+});
+
+for (const failure of ["request lost", "verification unavailable"] as const) {
+  test(`discard retries the same request automatically when ${failure}`, async ({
+    page,
+    baseURL,
+  }) => {
+    const { id } = await createLocalAccount(page.request, baseURL!, false);
+    await page.goto("/apply");
+    // Even an empty server draft needs its generation changed to reject late saves.
+    const originalGeneration = (await account(page)).generation;
+    await page.locator('[name="firstName"]').fill("Retry automatically");
+    const requests: unknown[] = [];
+    let reads = 0;
+    await page.route(`**${endpoint}`, async (route) => {
+      if (route.request().method() === "GET") {
+        reads++;
+        return failure === "verification unavailable"
+          ? route.abort()
+          : route.continue();
+      }
+      if (route.request().method() !== "DELETE") return route.continue();
+      requests.push(route.request().postDataJSON());
+      if (requests.length === 1) {
+        if (failure === "verification unavailable") await route.fetch();
+        return route.abort();
+      }
+      await route.continue();
+    });
+    await discardAndReload(page);
+    await expectDeleted(page, id);
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toEqual(requests[1]);
+    expect(reads).toBe(1);
+    expect((await account(page)).generation).not.toBe(originalGeneration);
+  });
+}
+
+test("a lost deletion and verification response resumes automatically after reload", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  await page.locator('[name="firstName"]').fill("All responses lost");
+  await saved(page, "All responses lost");
+  await page.route(`**${endpoint}`, async (route) => {
+    if (route.request().method() === "DELETE") await route.fetch();
     await route.abort();
   });
   await confirmDiscard(page);
@@ -380,11 +617,57 @@ test("a lost DELETE success response can be retried safely", async ({
     "Account draft deletion is not confirmed",
   );
   expect((await account(page)).draft).toBeNull();
-  await page.reload();
   await page.unroute(`**${endpoint}`);
-  await discardAndReload(page, true);
+  await page.reload();
   await expectDeleted(page, id);
 });
+
+for (const changedState of ["account", "submission"] as const) {
+  test(`deletion verification stops if the ${changedState} changed`, async ({
+    page,
+    baseURL,
+  }) => {
+    const { id } = await createLocalAccount(page.request, baseURL!, false);
+    await page.goto("/apply");
+    let deletes = 0;
+    await page.route(`**${endpoint}`, async (route) => {
+      if (route.request().method() === "DELETE") {
+        deletes++;
+        await route.fetch();
+        return route.abort();
+      }
+      const response = await route.fetch();
+      const state = await response.json();
+      await route.fulfill({
+        response,
+        json: {
+          ...state,
+          ...(changedState === "account"
+            ? { userId: "another-account" }
+            : { submitted: true }),
+        },
+      });
+    });
+    await confirmDiscard(page);
+    await expect(page.locator(status)).toContainText(
+      changedState === "account"
+        ? "Your account changed"
+        : "A submitted application is never changed",
+    );
+    await expect(page.locator(button)).toBeEnabled();
+    await expect(page.locator('[name="firstName"]')).toBeDisabled();
+    const marker = await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key)!),
+      `${applicationDraftDiscardPrefix}${id}`,
+    );
+    expect(marker.completed).toBe(false);
+    expect(deletes).toBe(1);
+    // Returning to the page must not automatically repeat a blocked deletion.
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await page.waitForTimeout(700);
+    expect(deletes).toBe(1);
+  });
+}
 
 test("browser storage deletion failures are not reported as complete and can be retried", async ({
   page,

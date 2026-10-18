@@ -19,6 +19,96 @@ const emptyAnswers = () => applicationDraftAnswersSchema.parse({});
 const storageKey = (userId: string) =>
   `${applicationDraftStoragePrefix}${userId}`;
 
+class DiscardError extends Error {
+  constructor(
+    message: string,
+    readonly retryable = false,
+  ) {
+    super(message);
+  }
+}
+
+function checkDiscardResponse(response: Response) {
+  if (response.ok) return;
+  if (response.status === 401 || response.status === 403)
+    throw new DiscardError(
+      "Sign in to the same account, then retry discarding.",
+    );
+  if (response.status === 409 || response.status === 410)
+    throw new DiscardError(
+      "Reload to check your account before discarding again. A submitted application is never changed.",
+    );
+  throw new DiscardError(
+    "Retry discarding when your connection is available.",
+    response.status >= 500 || [408, 429].includes(response.status),
+  );
+}
+
+async function confirmAccountDiscard(
+  request: ReturnType<typeof applicationDraftDiscardSchema.parse>,
+) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+        signal: AbortSignal.timeout(15_000),
+      });
+      checkDiscardResponse(response);
+      const result = applicationDraftDiscardResponseSchema.parse(
+        await response.json(),
+      );
+      if (
+        result.userId !== request.userId ||
+        result.generation !== request.discardId
+      )
+        throw new DiscardError(
+          "Your account changed. Reload to check before continuing.",
+        );
+      return;
+    } catch (error) {
+      if (error instanceof DiscardError && !error.retryable) throw error;
+      // A lost response is not a failed deletion. Check the server without
+      // restoring answers or accepting an empty draft from an older generation.
+      try {
+        const response = await fetch(endpoint, {
+          credentials: "same-origin",
+          cache: "no-store",
+          signal: AbortSignal.timeout(15_000),
+        });
+        checkDiscardResponse(response);
+        const state = applicationDraftReadResponseSchema.parse(
+          await response.json(),
+        );
+        if (state.userId !== request.userId)
+          throw new DiscardError(
+            "Your account changed. Reload to check before continuing.",
+          );
+        if (state.submitted)
+          throw new DiscardError(
+            "Reload to check your account before discarding again. A submitted application is never changed.",
+          );
+        if (state.generation === request.discardId && !state.draft) return;
+        if (state.generation !== request.generation)
+          throw new DiscardError(
+            "Reload to check your account before discarding again. Your draft changed.",
+          );
+      } catch (verificationError) {
+        if (
+          verificationError instanceof DiscardError &&
+          !verificationError.retryable
+        )
+          throw verificationError;
+        // Verification can fail too; retry the same idempotent DELETE below.
+      }
+      if (attempt === 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+    }
+  }
+}
+
 export function clearApplicationDraft(userId: string) {
   try {
     localStorage.removeItem(storageKey(userId));
@@ -112,6 +202,9 @@ export function initApplicationDraft(element: HTMLFormElement) {
   const discardButton = discardActions.querySelector<HTMLButtonElement>(
     "[data-draft-discard]",
   )!;
+  const discardLabel = discardButton.querySelector<HTMLElement>(
+    "[data-draft-discard-label]",
+  )!;
   const discardStatus = discardActions.querySelector<HTMLElement>(
     "[data-draft-discard-status]",
   )!;
@@ -148,6 +241,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     ReturnType<typeof applicationDraftDiscardSchema.parse> | undefined;
   let deleting = false;
   let accountDiscarded = false;
+  let retryDiscardOnReconnect = false;
   let revision = initial?.revision ?? null;
   let savedAnswers = initial?.answers ?? emptyAnswers();
   let savedAt = initial?.updatedAt ?? null;
@@ -326,8 +420,8 @@ export function initApplicationDraft(element: HTMLFormElement) {
     ))
       fieldset.disabled = true;
     discardStatus.textContent = message;
-    discardStatus.hidden = false;
-    newDraft.hidden = false;
+    discardStatus.hidden = !message;
+    newDraft.hidden = !message;
     renderStatus();
   };
   const clearOldLocal = () => {
@@ -361,15 +455,22 @@ export function initApplicationDraft(element: HTMLFormElement) {
       if (paused || stopped) return;
       if (
         !confirm(
-          "Discard application draft? This deletes the draft saved with your account and this browser’s copy on this device, including unsynced answers. This cannot be undone. Your account and any submitted application are not deleted.",
+          "Are you sure you want to permanently delete your application progress? This can’t be undone.",
         )
       )
         return;
-      discardRequest = { userId, generation, discardId: crypto.randomUUID() };
+      discardRequest = {
+        userId,
+        generation,
+        discardId: discardActions.dataset.draftDiscardId!,
+      };
     }
     deleting = true;
+    retryDiscardOnReconnect = false;
     discardButton.disabled = true;
-    stopForDiscard("Discarding your draft. Saving is paused.");
+    discardLabel.textContent = "Discarding…";
+    discardButton.setAttribute("aria-busy", "true");
+    stopForDiscard("");
     let localCleared = false;
     try {
       // The answer-free marker also survives an offline reload and notifies tabs
@@ -386,38 +487,11 @@ export function initApplicationDraft(element: HTMLFormElement) {
     let accountFailure = "";
     if (!accountDiscarded) {
       try {
-        const response = await fetch(endpoint, {
-          method: "DELETE",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(discardRequest),
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (!response.ok) {
-          if (response.status === 401 || response.status === 403)
-            throw new Error(
-              "Sign in to the same account, then retry discarding.",
-            );
-          if (response.status === 409 || response.status === 410)
-            throw new Error(
-              "Reload to check your account before discarding again. A submitted application is never changed.",
-            );
-          throw new Error(
-            "Retry discarding when your connection is available.",
-          );
-        }
-        const result = applicationDraftDiscardResponseSchema.parse(
-          await response.json(),
-        );
-        if (
-          result.userId !== userId ||
-          result.generation !== discardRequest.discardId
-        )
-          throw new Error(
-            "Your account changed. Reload to check before continuing.",
-          );
+        await confirmAccountDiscard(discardRequest);
         accountDiscarded = true;
       } catch (error) {
+        retryDiscardOnReconnect =
+          !(error instanceof DiscardError) || error.retryable;
         accountFailure =
           error instanceof Error && error.name === "Error"
             ? error.message
@@ -441,7 +515,10 @@ export function initApplicationDraft(element: HTMLFormElement) {
       return;
     }
     discardStatus.textContent = `${localCleared ? "This browser’s draft answers were deleted." : "We could not confirm deletion of this browser’s copy. Clear this site’s browser data if retrying does not work."} ${accountDiscarded ? "Your account draft was deleted." : `Account draft deletion is not confirmed; it may still be saved. ${accountFailure}`} Saving remains paused on this page.`;
-    discardButton.textContent = "Retry discarding application draft";
+    discardStatus.hidden = false;
+    newDraft.hidden = false;
+    discardLabel.textContent = "Retry discarding application draft";
+    discardButton.removeAttribute("aria-busy");
     discardButton.hidden = false;
     discardButton.disabled = false;
     deleting = false;
@@ -593,12 +670,8 @@ export function initApplicationDraft(element: HTMLFormElement) {
       const { completed: _completed, ...request } = initialDiscard;
       discardRequest = request;
       accountDiscarded = initialDiscard.completed;
-      stopForDiscard(
-        "A previous draft discard needs checking. Old answers will not be restored. Retry discarding to confirm both copies are deleted.",
-        false,
-      );
+      stopForDiscard("", false);
       clearOldLocal();
-      discardButton.textContent = "Retry discarding application draft";
     }
     const stored = localStorage.getItem(storageKey(userId));
     if (stored && !stopped) {
@@ -654,13 +727,17 @@ export function initApplicationDraft(element: HTMLFormElement) {
       persist();
       renderStatus();
     });
-  window.addEventListener("online", () => void refresh());
-  window.addEventListener("focus", () => void refresh());
+  const resumePendingWork = () => {
+    if (discardRequest && retryDiscardOnReconnect) void discard();
+    else void refresh();
+  };
+  window.addEventListener("online", resumePendingWork);
+  window.addEventListener("focus", resumePendingWork);
   window.addEventListener("pageshow", (event) => {
-    if (event.persisted) void refresh();
+    if (event.persisted) resumePendingWork();
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void refresh();
+    if (document.visibilityState === "visible") resumePendingWork();
     else {
       persist();
       void save(true);
@@ -673,6 +750,10 @@ export function initApplicationDraft(element: HTMLFormElement) {
 
   return {
     start() {
+      if (discardRequest) {
+        void discard();
+        return;
+      }
       persist();
       renderStatus();
       schedule();
