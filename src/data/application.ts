@@ -204,6 +204,17 @@ export function latestApplicationBirthDate(today = new Date()): string {
     .slice(0, 10);
 }
 
+export function isValidApplicationBirthDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 10) === value &&
+    value >= "1900-01-01" &&
+    value <= latestApplicationBirthDate()
+  );
+}
+
 export const applicationFields = [
   {
     name: "firstName",
@@ -253,8 +264,8 @@ export const applicationFields = [
     section: "personal-info",
     label: "Date of birth",
     required: true,
-    type: "date",
-    help: "You must be at least 19 years old to apply.",
+    type: "text",
+    help: "Enter year-month-day (YYYY-MM-DD), for example 1990-04-23. You must be at least 19 years old to apply.",
   },
   {
     name: "medicalConditions",

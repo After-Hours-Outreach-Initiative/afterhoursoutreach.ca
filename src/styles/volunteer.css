@@ -659,6 +659,10 @@ body:has([data-application], [data-account-contents-flow]) {
   width: 100%;
   color-scheme: dark;
 }
+.volunteer-portal input[name="birthDate"] {
+  min-width: 0;
+  max-width: 100%;
+}
 .volunteer-portal input[type="checkbox"],
 .volunteer-portal input[type="radio"] {
   width: 18px;
