@@ -1318,16 +1318,18 @@ describe(
         await newPage.goto(
           `${origin}/volunteer/sign-in/complete#${new URLSearchParams(proof)}`,
         );
-        await newPage
-          .getByRole("button", { name: "Confirm sign-in" })
-          .waitFor();
+        await expect(newPage.getByLabel("Six-digit code")).toBeVisible();
         assert.equal(new URL(newPage.url()).hash, "");
         assert.ok(
           await DB.prepare("SELECT id FROM verification WHERE identifier=?")
             .bind(`sign-in-otp-${proof.email}`)
             .first(),
         );
-        await newPage.getByRole("button", { name: "Confirm sign-in" }).click();
+        // Legacy links have no browser binding and require manual code entry.
+        await newPage.getByLabel("Six-digit code").fill(proof.otp);
+        await newPage
+          .getByRole("button", { name: "Sign in with code" })
+          .click();
         await newPage
           .getByRole("heading", {
             name: "Volunteer application",

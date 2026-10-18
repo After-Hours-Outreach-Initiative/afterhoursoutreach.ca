@@ -11,10 +11,10 @@ export const prerender = false;
 >
   <section class="volunteer-panel volunteer-signin-panel">
     <form data-email-link class="volunteer-form" method="post">
-      <p>Continue signing in as <span data-sign-in-email></span>.</p>
+      <p>Sign-in link for <span data-sign-in-email></span>.</p>
       <p data-form-message role="status" aria-live="polite" hidden></p>
-      <button type="submit" class="btn btn-primary" disabled
-        >Confirm sign-in</button
+      <button type="submit" class="btn btn-primary" disabled hidden
+        >Try signing in again</button
       >
     </form>
     <EmailCodeForm />
@@ -33,8 +33,9 @@ export const prerender = false;
   </section>
   <noscript
     ><p class="mt-8">
-      Open the sign-in page and enter the code from your email in a browser with
-      JavaScript enabled.
+      Opening this page does not use your sign-in link. <a
+        href="/volunteer/sign-in">Open the sign-in page</a
+      > and enter the code from your email in a browser with JavaScript enabled.
     </p></noscript
   >
 </AccountLayout>

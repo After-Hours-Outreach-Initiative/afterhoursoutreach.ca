@@ -5,6 +5,7 @@ import {
   getSessionFromCtx,
 } from "better-auth/api";
 import { expireCookie } from "better-auth/cookies";
+import { constantTimeEqual } from "better-auth/crypto";
 import { emailOTP } from "better-auth/plugins/email-otp";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
@@ -78,6 +79,11 @@ const verifySchema = z.strictObject({
   email: emailSchema,
   otp: z.string().regex(/^\d{6}$/),
 });
+const emailLinkSchema = z.object({
+  email: emailSchema,
+  nonce: z.uuid(),
+  expiresAt: z.number(),
+});
 const emailChangeRequestSchema = z.strictObject({ newEmail: emailSchema });
 const emailChangeSchema = emailChangeRequestSchema.extend({
   otp: z.string().regex(/^\d{6}$/),
@@ -143,6 +149,7 @@ export function createAuth(
     object,
     { localEmail?: SignInEmail } | { error: string }
   >();
+  const emailLinks = new WeakMap<object, z.infer<typeof emailLinkSchema>>();
   const emailSignIn = emailOTP({
     expiresIn: 600,
     allowedAttempts: 3,
@@ -154,11 +161,17 @@ export function createAuth(
         changing ? "/volunteer/account" : "/volunteer/sign-in/complete",
         origin,
       );
+      const link = {
+        email,
+        nonce: crypto.randomUUID(),
+        expiresAt: Date.now() + 600_000,
+      };
       // Fragments keep the email and OTP out of HTTP request URLs/referrers.
       if (!changing)
         url.hash = new URLSearchParams({
           email,
           otp,
+          activation: link.nonce,
           returnTo: signInReturnTo(ctx?.query),
         }).toString();
       try {
@@ -169,6 +182,9 @@ export function createAuth(
           url: url.href,
           ...(changing && { purpose: "change-email" as const }),
         });
+        // Only the browser requesting a successfully delivered email gets this
+        // binding. A scanner fetching the link (even with JS) cannot acquire it.
+        if (!changing && ctx) emailLinks.set(ctx.context, link);
         if (development && localEmail && ctx)
           emailDeliveries.set(ctx.context, { localEmail });
       } catch (error) {
@@ -480,6 +496,32 @@ export function createAuth(
           throw new APIError("BAD_REQUEST", {
             message: "Enter a valid email address and sign-in code.",
           });
+        const activation = ctx.headers?.get("x-email-link-activation");
+        if (!sending && activation !== undefined && activation !== null) {
+          const cookie = ctx.context.createAuthCookie("email_link");
+          const value = await ctx.getSignedCookie(
+            cookie.name,
+            ctx.context.secret,
+          );
+          let link: z.infer<typeof emailLinkSchema> | undefined;
+          try {
+            link = emailLinkSchema.parse(JSON.parse(value || "null"));
+          } catch {
+            // Missing, forged or malformed browser bindings fail before the OTP
+            // verifier, without spending attempts or consuming the email code.
+          }
+          if (
+            !link ||
+            link.email !== parsed.data.email ||
+            link.expiresAt <= Date.now() ||
+            !constantTimeEqual(link.nonce, activation)
+          )
+            throw new APIError("FORBIDDEN", {
+              code: "EMAIL_LINK_BROWSER_REQUIRED",
+              message:
+                "Open this link in the browser where you requested it, or enter the code from your email below.",
+            });
+        }
         try {
           if (sending) {
             await limitEmailRequests(
@@ -511,6 +553,18 @@ export function createAuth(
           const delivery = emailDeliveries.get(ctx.context);
           if (delivery && "error" in delivery)
             return Response.json({ message: delivery.error }, { status: 503 });
+          const link = emailLinks.get(ctx.context);
+          if (link) {
+            const cookie = ctx.context.createAuthCookie("email_link", {
+              maxAge: 600,
+            });
+            await ctx.setSignedCookie(
+              cookie.name,
+              JSON.stringify(link),
+              ctx.context.secret,
+              cookie.attributes,
+            );
+          }
           if (development && delivery?.localEmail)
             return ctx.json({
               success: true,
@@ -522,6 +576,8 @@ export function createAuth(
         const current = ctx.context.newSession;
         const result = signInResultSchema.safeParse(ctx.context.returned);
         if (!current || !result.success) return;
+        if (ctx.headers?.has("x-email-link-activation"))
+          expireCookie(ctx, ctx.context.createAuthCookie("email_link"));
         const applicationSubmitted = await hasApplied(
           bindings.DB,
           current.user.id,
