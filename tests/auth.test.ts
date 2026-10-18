@@ -118,7 +118,7 @@ const answers = {
   certifications: [] as string[],
   certificationExpiry: "",
   experience: "None",
-  training: [] as string[],
+  training: ["none"],
   otherTraining: "",
   medicalConditions: "Sample private answer",
 };
@@ -1099,10 +1099,11 @@ test("one highest certification is required for Medic and training details only 
   }
 });
 
-test("relevant training allows multiple selections for every team and requires details only for Other", () => {
+test("relevant training requires an answer for every team, exclusive None, and details only for Other", () => {
   for (const teams of [["outreach"], ["medic"], ["non-patrol"]]) {
     for (const training of [
       [],
+      ["none"],
       ["naloxone-administration", "overdose-response"],
       ["other"],
     ]) {
@@ -1121,16 +1122,20 @@ test("relevant training allows multiple selections for every team and requires d
             training,
             otherTraining,
           }).success,
-          !training.includes("other") || Boolean(otherTraining?.trim()),
+          training.length > 0 &&
+            (!training.includes("other") || Boolean(otherTraining?.trim())),
         );
       }
     }
   }
   for (const training of [
+    undefined,
     null,
     "naloxone-trainer",
     ["unknown"],
     ["naloxone-trainer", "naloxone-trainer"],
+    ["none", "naloxone-trainer"],
+    ["none", "other"],
   ])
     assert.equal(
       profileSchema.safeParse({ ...answers, training }).success,
@@ -1141,7 +1146,10 @@ test("relevant training allows multiple selections for every team and requires d
       .success,
     false,
   );
-  const all = trainingOptions.map((option) => option.value);
+  assert.equal(trainingOptions.at(-1)?.value, "none");
+  const all = trainingOptions
+    .filter((option) => option.value !== "none")
+    .map((option) => option.value);
   assert.deepEqual(
     profileSchema.parse({
       ...answers,
@@ -1194,6 +1202,22 @@ test("relevant training and Other details round-trip independently of medical ce
     ...expected,
     training: ["naloxone-administration"],
   });
+  await assert.rejects(
+    saveProfile(bindings.DB, id, { ...expected, training: [] }),
+    RequestError,
+  );
+  // A previously optional, unanswered profile stays editable without guessing None.
+  await bindings.DB.prepare(
+    "UPDATE profile SET relevant_training='[]' WHERE user_id=?",
+  )
+    .bind(id)
+    .run();
+  const { training: _training, otherTraining: _other, ...legacyEdit } = answers;
+  await saveProfile(bindings.DB, id, {
+    ...legacyEdit,
+    preferredName: "Legacy edit",
+  });
+  assert.deepEqual((await loadProfile(bindings.DB, id))?.training, []);
 });
 
 test("certification expiry is required only for Medic", () => {

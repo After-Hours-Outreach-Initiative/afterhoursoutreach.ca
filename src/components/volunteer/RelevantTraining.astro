@@ -3,14 +3,17 @@ import {
   applicationFields,
   trainingOptions,
   trainingQuestion,
+  trainingRequiredError,
   type ApplicationAnswers,
 } from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
+import FieldError from "@/components/FieldError.astro";
 
 interface Props {
   values?: ApplicationAnswers | null;
+  required?: boolean;
 }
-const { values } = Astro.props;
+const { values, required = true } = Astro.props;
 const otherTrainingField = applicationFields.find(
   (field) => field.name === "otherTraining",
 )!;
@@ -19,11 +22,27 @@ const otherTrainingField = applicationFields.find(
 <fieldset
   class="volunteer-relevant-training volunteer-wide"
   data-relevant-training
+  data-training-required={required}
+  aria-describedby="help-training error-training"
 >
-  <legend>{trainingQuestion}</legend>
+  <legend>
+    {trainingQuestion}
+    {
+      required && (
+        <span class="volunteer-required" aria-hidden="true">
+          {" "}
+          *
+        </span>
+      )
+    }
+  </legend>
+  <p class="volunteer-help" id="help-training">
+    Select your relevant training and experience, or choose No relevant training
+    or experience on its own.
+  </p>
   <div class="volunteer-training-options">
     {
-      trainingOptions.map((option) => (
+      trainingOptions.map((option, index) => (
         <>
           <label class="volunteer-check">
             <input
@@ -31,6 +50,8 @@ const otherTrainingField = applicationFields.find(
               name="training"
               value={option.value}
               checked={values?.training.includes(option.value)}
+              required={required && index === 0 && !values?.training.length}
+              aria-describedby="help-training error-training"
             />
             <span>{option.label}</span>
           </label>
@@ -46,4 +67,5 @@ const otherTrainingField = applicationFields.find(
       ))
     }
   </div>
+  <FieldError field="training" message={trainingRequiredError} />
 </fieldset>

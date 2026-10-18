@@ -4,6 +4,7 @@ import {
   certificationOptions,
   heardAboutUsOptions,
   trainingOptions,
+  trainingExclusiveError,
   type ApplicationAnswers,
 } from "./application";
 
@@ -34,7 +35,10 @@ export const applicationDraftAnswersSchema = z.strictObject({
   certifications: choices(certificationOptions),
   certificationExpiry: text(),
   experience: text(2000),
-  training: choices(trainingOptions),
+  training: choices(trainingOptions).refine(
+    (values) => !values.includes("none") || values.length === 1,
+    trainingExclusiveError,
+  ),
   otherTraining: text(2000),
   medicalConditions: text(2000),
 });

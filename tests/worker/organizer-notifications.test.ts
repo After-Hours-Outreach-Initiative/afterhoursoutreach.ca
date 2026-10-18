@@ -22,6 +22,7 @@ const answers = {
   teams: ["outreach"],
   certification: "None",
   experience: "None",
+  training: ["none"],
   medicalConditions: "None",
 };
 

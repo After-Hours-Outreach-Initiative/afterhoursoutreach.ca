@@ -202,7 +202,10 @@ const sections = profileFormSections(application);
                     ),
                   )}
                 {section.key === "training-and-safety" && (
-                  <RelevantTraining values={values} />
+                  <RelevantTraining
+                    values={values}
+                    required={application || Boolean(values?.training.length)}
+                  />
                 )}
               </div>
             )}

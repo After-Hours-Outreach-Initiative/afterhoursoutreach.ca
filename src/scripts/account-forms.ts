@@ -3,6 +3,8 @@ import {
   countWords,
   motivationMaxWords,
   motivationWordLimitError,
+  trainingRequiredError,
+  trainingExclusiveError,
 } from "../data/application";
 
 const requestFailed = "The request failed. Please try again.";
@@ -131,15 +133,38 @@ export function initMedicCertifications(element: HTMLFormElement) {
 }
 
 export function initRelevantTraining(element: HTMLFormElement) {
-  const other = element.querySelector<HTMLInputElement>(
-    '[name="training"][value="other"]',
+  const section = element.querySelector<HTMLElement>(
+    "[data-relevant-training]",
+  );
+  const choices = [
+    ...(section?.querySelectorAll<HTMLInputElement>('[name="training"]') ?? []),
+  ];
+  const first = choices[0];
+  const other = choices.find((choice) => choice.value === "other");
+  const none = choices.find((choice) => choice.value === "none");
+  const feedback = section?.querySelector<HTMLElement>(
+    '[data-error="training"] span',
   );
   const details = element.querySelector<HTMLElement>(
     "[data-other-relevant-training]",
   );
   const input = details?.querySelector<HTMLTextAreaElement>("textarea");
-  if (!other || !details || !input) return;
+  if (!section || !first || !other || !none || !details || !input) return;
   const update = () => {
+    const selected = choices.filter((choice) => choice.checked);
+    const required =
+      section.dataset.trainingRequired !== "false" ||
+      // A legacy blank answer becomes required once an explicit answer is saved.
+      choices.some((choice) => choice.defaultChecked);
+    first.required = required && !selected.length;
+    const error =
+      none.checked && selected.length > 1
+        ? trainingExclusiveError
+        : first.required
+          ? trainingRequiredError
+          : "";
+    first.setCustomValidity(error);
+    if (feedback) feedback.textContent = error || trainingRequiredError;
     details.hidden = !other.checked;
     input.required = other.checked;
     input.readOnly = !other.checked;
@@ -149,8 +174,23 @@ export function initRelevantTraining(element: HTMLFormElement) {
         : "",
     );
   };
-  other.addEventListener("change", update);
-  input.addEventListener("input", update);
+  const updateSelection = (event: Event) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement &&
+      target.name === "training" &&
+      target.checked
+    ) {
+      if (target === none) {
+        for (const choice of choices)
+          if (choice !== none) choice.checked = false;
+      } else none.checked = false;
+    }
+    update();
+  };
+  // Resolve exclusivity before form-level listeners back up a checkbox input.
+  section.addEventListener("input", updateSelection);
+  section.addEventListener("change", updateSelection);
   element.addEventListener("reset", () => queueMicrotask(update));
   update();
 }

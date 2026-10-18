@@ -479,6 +479,7 @@ test("resuming requires a fresh review and consent; submission clears both draft
       await field.fill(value);
   }
   await form.locator('[name="heardAboutUsSources"][value="internet"]').check();
+  await form.locator('[name="training"][value="none"]').check();
   await page
     .getByRole("button", { name: "Review application", exact: true })
     .click();

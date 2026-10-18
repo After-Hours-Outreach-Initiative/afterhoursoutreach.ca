@@ -8,6 +8,8 @@ import {
   applicationBirthDateError,
   withOutreachTeam,
   trainingOptions,
+  trainingRequiredError,
+  trainingExclusiveError,
   applicationDisplayName,
   heardAboutUsOptions,
   heardAboutUsOtherMaxLength,
@@ -114,6 +116,10 @@ const profileAnswersSchema = z.strictObject({
     .array(z.enum(trainingOptions.map((option) => option.value)))
     .max(trainingOptions.length)
     .refine((values) => new Set(values).size === values.length)
+    .refine(
+      (values) => !values.includes("none") || values.length === 1,
+      trainingExclusiveError,
+    )
     .default([])
     .transform((values) =>
       trainingOptions
@@ -149,7 +155,14 @@ function validateTraining(
     | "otherTraining"
   >,
   context: z.RefinementCtx,
+  requireTraining = true,
 ) {
+  if (requireTraining && !answers.training.length)
+    context.addIssue({
+      code: "custom",
+      path: ["training"],
+      message: trainingRequiredError,
+    });
   if (answers.training.includes("other") && !answers.otherTraining)
     context.addIssue({
       code: "custom",
@@ -207,8 +220,7 @@ const profileEditSchema = profileAnswersSchema
     heardAboutUsSources: true,
     heardAboutUsOther: true,
     motivation: true,
-  })
-  .superRefine(validateTraining);
+  });
 
 export async function hasApplied(binding: Env["DB"], userId: string) {
   return Boolean(
@@ -316,9 +328,13 @@ export async function saveProfile(
           motivation: undefined,
         }
       : input;
-  const parsed = (old ? profileEditSchema : profileSchema).safeParse(
-    submittedInput,
-  );
+  const schema = old
+    ? profileEditSchema.superRefine((answers, context) =>
+        // Leave unanswered legacy profiles editable without inventing an answer.
+        validateTraining(answers, context, old.training.length > 0),
+      )
+    : profileSchema;
+  const parsed = schema.safeParse(submittedInput);
   if (!parsed.success)
     throw new RequestError(
       400,
@@ -338,7 +354,10 @@ export async function saveProfile(
                   (issue) => issue.path[0] === "motivation",
                 )
               ? `Explain why you want to volunteer (${motivationMaxWords} words or fewer).`
-              : "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers.",
+              : (parsed.error.issues.find(
+                  (issue) => issue.path[0] === "training",
+                )?.message ??
+                "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers."),
     );
   const { codeOfConductAccepted, ...submitted } = parsed.data;
   if (!old && codeOfConductAccepted !== true)

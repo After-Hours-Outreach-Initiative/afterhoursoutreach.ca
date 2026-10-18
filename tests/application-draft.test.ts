@@ -19,6 +19,11 @@ test("drafts accept unfinished answers without trimming, date checks, or consent
   assert.equal(answers.firstName, "  Still typing ");
   assert.equal(answers.emergencyName, "");
   assert.deepEqual(answers.certifications, []);
+  assert.deepEqual(answers.training, []);
+  assert.deepEqual(
+    applicationDraftAnswersSchema.parse({ training: ["none"] }).training,
+    ["none"],
+  );
   assert.equal("codeOfConductAccepted" in answers, false);
   assert.equal(draftProfileValues(answers).certification, "");
   assert.equal(sameDraftAnswers(answers, { ...answers }), true);
@@ -33,6 +38,7 @@ test("drafts reject consent, unexpected fields, invalid types and oversized answ
     { teams: ["organizer"] },
     { teams: ["medic", "medic"] },
     { certifications: ["unknown"] },
+    { training: ["none", "other"] },
     { firstName: "a".repeat(201) },
     { medicalConditions: "a".repeat(2001) },
     { motivation: "a".repeat(16_385) },
