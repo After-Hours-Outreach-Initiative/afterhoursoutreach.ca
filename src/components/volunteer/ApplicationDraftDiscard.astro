@@ -1,6 +1,18 @@
-<div class="volunteer-help" data-application-draft-actions>
-  <button type="button" data-draft-discard class="btn btn-quiet" disabled>
-    Discard application draft
+---
+import TrashIcon from "@/components/icons/TrashIcon.astro";
+
+// Browsers do not expose randomUUID on HTTP LAN addresses; generate it server-side.
+const discardId = crypto.randomUUID();
+---
+
+<div
+  class="volunteer-help"
+  data-application-draft-actions
+  data-draft-discard-id={discardId}
+>
+  <button type="button" data-draft-discard class="btn btn-red" disabled>
+    <TrashIcon class="volunteer-draft-discard-icon" />
+    <span data-draft-discard-label>Discard application draft</span>
   </button>
   <p data-draft-discard-status role="status" aria-live="polite" hidden></p>
   <a href="/apply" data-draft-new class="inline-block mt-2 underline" hidden>
