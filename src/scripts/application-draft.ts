@@ -81,6 +81,9 @@ export function initApplicationDraft(element: HTMLFormElement) {
   const saveIndicator = flow.querySelector<HTMLElement>(
     "[data-draft-save-indicator]",
   )!;
+  const saveMessageElement = saveIndicator.querySelector<HTMLElement>(
+    "[data-draft-save-message]",
+  )!;
   const saveTimeFormat = new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
@@ -202,7 +205,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     statusPanel.hidden = !message && !conflict;
 
     let saveState = "idle";
-    let saveMessage = "Ready to save";
+    let saveMessage = "";
     if (stopped || paused) {
       saveState = "paused";
       saveMessage = "Saving paused";
@@ -214,9 +217,6 @@ export function initApplicationDraft(element: HTMLFormElement) {
       saveMessage = unsaved
         ? "Couldn’t save to your account"
         : "Couldn’t check save status";
-    } else if (inFlight || unsaved) {
-      saveState = "saving";
-      saveMessage = "Saving…";
     } else if (revision && savedAt !== null) {
       saveState = "saved";
       const savedDate = new Date(savedAt);
@@ -225,16 +225,18 @@ export function initApplicationDraft(element: HTMLFormElement) {
         savedDate.toDateString() === now.toDateString()
           ? ""
           : ` on ${saveDateFormat.format(savedDate)}`;
-      saveMessage = `✓ Saved${date} at ${saveTimeFormat.format(savedDate)}`;
+      saveMessage = `Last saved${date} at ${saveTimeFormat.format(savedDate)}`;
       // Refresh at local midnight without a ticking counter.
       const midnight = new Date(now);
       midnight.setHours(24, 0, 0, 0);
       dateTimer = setTimeout(renderStatus, midnight.getTime() - now.getTime());
+    } else if (inFlight || unsaved) {
+      saveState = "pending";
+      saveMessage = "";
     }
     saveIndicator.dataset.saveState = saveState;
-    if (saveIndicator.textContent !== saveMessage)
-      saveIndicator.textContent = saveMessage;
-    saveIndicator.hidden = false;
+    if (saveMessageElement.textContent !== saveMessage)
+      saveMessageElement.textContent = saveMessage;
   };
   const restore = (answers: ApplicationDraftAnswers, notify = true) => {
     restoring = true;

@@ -35,9 +35,7 @@ async function expectDeleted(page: Page, id: string) {
   await expect(page.locator('[name="firstName"]')).toHaveValue("");
   await expect(page.locator('[name="firstName"]')).toBeEnabled();
   await expect(page.locator(status)).toBeHidden();
-  await expect(page.locator("[data-draft-save-indicator]")).toHaveText(
-    "Ready to save",
-  );
+  await expect(page.locator("[data-draft-save-indicator]")).toHaveText("");
   expect((await account(page)).draft).toBeNull();
   const backup = JSON.parse((await local(page, id))!);
   const emptyAnswers = applicationDraftAnswersSchema.parse({});

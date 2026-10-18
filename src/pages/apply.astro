@@ -2,6 +2,7 @@
 import { env } from "cloudflare:workers";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
+import CloudIcon from "@/components/icons/CloudIcon.astro";
 import {
   authBindingsForRequest,
   createAuth,
@@ -61,17 +62,19 @@ try {
           If approved, you will be eligible to sign up for an orientation.
         </li>
       </ol>
-      <p class="mt-6 text-sm text-zinc-400">
+      <p class="mt-6 text-base text-zinc-400">
         Your application progress is automatically saved to your account.
       </p>
       <p
         class="volunteer-draft-save-status"
         data-draft-save-indicator
+        data-save-state="initializing"
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        hidden
       >
+        <CloudIcon class="volunteer-draft-save-icon" />
+        <span data-draft-save-message></span>
       </p>
     </div>
     <AccountProfileForm
