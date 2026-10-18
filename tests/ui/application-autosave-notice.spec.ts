@@ -104,7 +104,7 @@ for (const [layout, viewport] of [
     });
   }
 
-  test(`autosave message precedes unanswered application fields on ${layout}`, async ({
+  test(`autosave status is in the progress tracker on ${layout}`, async ({
     page,
     baseURL,
   }) => {
@@ -118,26 +118,16 @@ for (const [layout, viewport] of [
     );
     await expect(notice).toBeVisible();
     await expect(notice).toBeInViewport();
-    const saveIndicator = page.locator("[data-draft-save-indicator]");
+    const tracker = page.getByRole("navigation", {
+      name: "Application progress",
+    });
+    const saveIndicator = tracker.locator("[data-draft-save-indicator]");
     await expect(saveIndicator).toHaveAttribute("data-save-state", "idle");
     await expect(saveIndicator).toHaveText("");
     await expect(saveIndicator).toBeVisible();
     await expect(saveIndicator).toHaveAttribute("role", "status");
     await expect(saveIndicator).toHaveAttribute("aria-live", "polite");
-    expect(
-      await saveIndicator.evaluate((element) => {
-        const notice = element.previousElementSibling!;
-        const form = document.querySelector("form[data-application]")!;
-        return (
-          notice.textContent?.trim() ===
-            "Your application progress is automatically saved to your account." &&
-          element.getBoundingClientRect().top >=
-            notice.getBoundingClientRect().bottom &&
-          element.getBoundingClientRect().bottom <=
-            form.getBoundingClientRect().top
-        );
-      }),
-    ).toBe(true);
+    await expect(page.locator("[data-draft-save-indicator]")).toHaveCount(1);
     await expect(
       page.getByRole("heading", {
         name: "Draft saving and privacy",

@@ -1,0 +1,49 @@
+---
+interface Props {
+  entries: { id: string; heading: string; nested?: boolean }[];
+  application: boolean;
+  variant: "menu" | "sidebar";
+}
+const { entries, application, variant } = Astro.props;
+---
+
+<ol>
+  {
+    entries.map((section, index) => (
+      <li class:list={{ "volunteer-contents-nested": section.nested }}>
+        <a
+          href={`#${section.id}`}
+          aria-current={index === 0 ? "location" : undefined}
+          aria-describedby={
+            application ? `contents-${variant}-${section.id}-status` : undefined
+          }
+          data-application-progress-link={application || undefined}
+          data-complete={application ? "false" : undefined}
+        >
+          {application && (
+            <span class="volunteer-contents-checkbox" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+              >
+                <path d="m5 12 4 4L19 6" />
+              </svg>
+            </span>
+          )}
+          {section.heading}
+        </a>
+        {application && (
+          <span
+            class="sr-only"
+            id={`contents-${variant}-${section.id}-status`}
+            data-application-completion-status
+          >
+            Incomplete
+          </span>
+        )}
+      </li>
+    ))
+  }
+</ol>
