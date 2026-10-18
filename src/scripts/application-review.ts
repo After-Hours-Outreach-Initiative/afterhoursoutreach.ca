@@ -37,7 +37,7 @@ export function initApplicationReview(element: HTMLFormElement) {
   const review = element.querySelector<HTMLFieldSetElement>(
     "[data-application-review-step]",
   );
-  const reviewButton = element.querySelector<HTMLButtonElement>(
+  const reviewButton = contents?.querySelector<HTMLButtonElement>(
     "[data-application-review]",
   );
   const submitButton = element.querySelector<HTMLButtonElement>(
