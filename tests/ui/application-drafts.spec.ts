@@ -28,9 +28,12 @@ async function expectSaveTime(page: Page) {
       hour: "numeric",
       minute: "2-digit",
     }).format(savedDate);
-    return `✓ Saved${date} at ${time}`;
+    return `Last saved${date} at ${time}`;
   }, draft.updatedAt as number);
   await expect(page.locator(saveIndicatorSelector)).toHaveText(savedMessage);
+  await expect(
+    page.locator(saveIndicatorSelector).locator("svg"),
+  ).toBeVisible();
 }
 
 async function expectDraftSaved(
@@ -88,19 +91,19 @@ for (const timezoneId of ["America/Vancouver", "Asia/Tokyo"]) {
       await page.clock.pauseAt(new Date(beforeMidnight));
       await page.goto("/apply");
       await expect(page.locator(saveIndicatorSelector)).toHaveText(
-        /^✓ Saved at /,
+        /^Last saved at /,
       );
       await expectSaveTime(page);
 
       await page.clock.runFor(2000);
 
       await expect(page.locator(saveIndicatorSelector)).toHaveText(
-        /^✓ Saved on /,
+        /^Last saved on /,
       );
       await expectSaveTime(page);
       await page.reload();
       await expect(page.locator(saveIndicatorSelector)).toHaveText(
-        /^✓ Saved on /,
+        /^Last saved on /,
       );
       await expectSaveTime(page);
     } finally {
@@ -178,6 +181,9 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   await expect(reopened.locator(saveIndicatorSelector)).toHaveText(
     "Couldn’t save to your account",
   );
+  await expect(
+    reopened.locator(saveIndicatorSelector).locator("svg"),
+  ).toBeHidden();
   await reopened.evaluate(() =>
     window.dispatchEvent(new Event("draft-test-online")),
   );
@@ -277,12 +283,18 @@ test("edits made during a pending save are backed up immediately and saved after
     page.getByText("Your answers save automatically", { exact: false }),
   ).toHaveCount(0);
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
-  await expect(page.locator(saveIndicatorSelector)).toHaveText("Ready to save");
+  await expect(page.locator(saveIndicatorSelector)).toHaveAttribute(
+    "data-save-state",
+    "idle",
+  );
+  await expect(page.locator(saveIndicatorSelector)).toHaveText("");
   await page.locator('[name="firstName"]').fill("First version");
-  await expect(page.locator(saveIndicatorSelector)).toHaveText("Saving…");
+  await expect(page.locator("[data-draft-save-message]")).toBeEmpty();
+  await expect(page.locator(saveIndicatorSelector).locator("svg")).toBeHidden();
   await expect.poll(() => requests).toBe(1);
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
-  await expect(page.locator(saveIndicatorSelector)).toHaveText("Saving…");
+  await expect(page.locator("[data-draft-save-message]")).toBeEmpty();
+  await expect(page.locator(saveIndicatorSelector).locator("svg")).toBeHidden();
   await page.locator('[name="firstName"]').fill("Latest version");
   expect(
     await page.evaluate(
@@ -292,12 +304,52 @@ test("edits made during a pending save are backed up immediately and saved after
   ).toBe("Latest version");
   release();
   await expect.poll(() => requests).toBe(2);
-  await expect(page.locator(saveIndicatorSelector)).toHaveText("Saving…");
+  await expectSaveTime(page);
   expect(
     (await (await page.request.get(endpoint)).json()).draft.answers.firstName,
   ).toBe("First version");
   releaseLatest();
   await expectDraftSaved(page, { firstName: "Latest version" });
+});
+
+test("last confirmed save status stays steady while editing", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  await page.locator('[name="firstName"]').fill("Confirmed answer");
+  await expectDraftSaved(page, { firstName: "Confirmed answer" });
+  const indicator = page.locator(saveIndicatorSelector);
+  const confirmedStatus = await indicator.innerText();
+
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => (release = resolve));
+  let requests = 0;
+  await page.route(`**${endpoint}`, async (route) => {
+    if (route.request().method() === "PUT") {
+      requests++;
+      await pending;
+    }
+    await route.continue();
+  });
+  try {
+    await page.locator('[name="firstName"]').fill("Pending answer");
+    await expect(indicator).toHaveText(confirmedStatus);
+    await expect.poll(() => requests).toBe(1);
+    await expect(indicator).toHaveText(confirmedStatus);
+    await expect(indicator).toHaveAttribute("data-save-state", "saved");
+    await expect(indicator.locator("svg")).toBeVisible();
+    await page.locator('[name="preferredName"]').fill("Another edit");
+    await expect(indicator).toHaveText(confirmedStatus);
+    release();
+    await expectDraftSaved(page, {
+      firstName: "Pending answer",
+      preferredName: "Another edit",
+    });
+  } finally {
+    release();
+  }
 });
 
 for (const keepLocal of [true, false]) {
@@ -332,6 +384,9 @@ for (const keepLocal of [true, false]) {
     await expect(page.locator(saveIndicatorSelector)).toHaveText(
       "Choose which answers to keep",
     );
+    await expect(
+      page.locator(saveIndicatorSelector).locator("svg"),
+    ).toBeHidden();
     await page.unroute(`**${endpoint}`);
     await page
       .getByRole("button", {
@@ -390,6 +445,7 @@ test("switching accounts never restores or autosaves another account's answers",
   await expect(page.locator(saveIndicatorSelector)).toHaveText(
     "Couldn’t save to your account",
   );
+  await expect(page.locator(saveIndicatorSelector).locator("svg")).toBeHidden();
   expect((await (await page.request.get(endpoint)).json()).draft).toBe(null);
   await page.goto("/apply");
   await expect(page.locator('[name="firstName"]')).toHaveValue("");

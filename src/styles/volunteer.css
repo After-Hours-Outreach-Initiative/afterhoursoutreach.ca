@@ -30,14 +30,28 @@ body:has([data-application], [data-account-contents-flow]) {
   margin: 28px 0 32px;
 }
 .volunteer-draft-save-status {
-  min-height: 21px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 1.5em;
   margin-top: 8px;
   color: #a1a1aa;
-  font-size: 14px;
+  font-size: inherit;
   line-height: 1.5;
 }
-.volunteer-draft-save-status[data-save-state="saved"] {
-  color: #86efac;
+.volunteer-draft-save-status[data-save-state="initializing"] {
+  /* Reserve the status row before client-side initialization. */
+  visibility: hidden;
+}
+.volunteer-draft-save-icon {
+  display: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.volunteer-draft-save-status[data-save-state="saved"]
+  .volunteer-draft-save-icon {
+  display: block;
 }
 .volunteer-draft-save-status:is(
   [data-save-state="error"],
