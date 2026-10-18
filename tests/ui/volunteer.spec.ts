@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { social } from "../../src/data/site";
 import {
   createLocalAccount,
   openLocalAccountSwitcher,
@@ -283,6 +284,25 @@ test("View as can choose a D1 account without an application without changing it
   );
   await expect(page.getByLabel("First name")).toHaveValue("");
   await expect(profile).toHaveAttribute("aria-pressed", "true");
+
+  await page.goto("/volunteer");
+  const portal = page.locator("[data-event-browser]");
+  await expect(
+    portal.getByRole("heading", { name: "Welcome to After Hours Outreach" }),
+  ).toBeVisible();
+  await expect(
+    portal.getByRole("link", {
+      name: "Please complete your Volunteer Application",
+    }),
+  ).toHaveAttribute("href", "/apply");
+  const discord = portal.getByRole("link", { name: "Join Discord" });
+  await expect(discord).toBeVisible();
+  await expect(discord).toHaveAttribute("href", social.discord);
+  await expect(
+    portal.locator(
+      "[data-application-pending], [data-live-event], [data-event-list], [data-event-save], [data-event-notifications]",
+    ),
+  ).toHaveCount(0);
 });
 
 test("account navigation and profile controls are usable on desktop and mobile", async ({

@@ -98,7 +98,59 @@ const filter = ["patrol", "orientation"].includes(
           </p>
 
           <SignInPanel returnTo="/volunteer" />
-
+        </div>
+      ) : !actor.applicationSubmitted ? (
+        <section class="volunteer-panel">
+          <h2>Welcome to After Hours Outreach</h2>
+          <p>
+            Thanks for your interest in volunteering. Complete your application
+            so an organizer can review it. Once approved, you can view upcoming
+            events and sign up for an orientation.
+          </p>
+          <a class="volunteer-application-warning" href="/apply">
+            <WarningIcon class="volunteer-warning-icon" />
+            <span class="volunteer-application-warning-text">
+              Please complete your Volunteer Application
+            </span>
+            <svg
+              class="volunteer-application-warning-arrow"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14m-6-6 6 6-6 6" />
+            </svg>
+          </a>
+        </section>
+      ) : !actor.active ? (
+        <p class="volunteer-notice" role="status">
+          Your volunteer account is inactive. Contact an organizer to restore
+          access.
+        </p>
+      ) : !actor.applicationApproved && actor.role !== "organizer" ? (
+        <section class="volunteer-panel" data-application-pending>
+          <h2>Application awaiting approval</h2>
+          <p>
+            An organizer will review your application before you can view events
+            or sign up for an orientation.
+          </p>
+          <p>
+            You can review your submitted application and update your profile
+            while you wait.
+          </p>
+          <a class="btn btn-outline mt-6" href="/volunteer/account">
+            Review application and profile
+          </a>
+        </section>
+      ) : null
+    }
+    {
+      !eventAccess && (
+        <>
           <p class="mt-12 max-w-3xl text-zinc-300">
             Join our Discord for more information and to become more involved.
           </p>
@@ -113,43 +165,8 @@ const filter = ["patrol", "orientation"].includes(
               Join Discord
             </a>
           </div>
-        </div>
-      ) : !actor.applicationSubmitted ? (
-        <a class="volunteer-application-warning" href="/apply">
-          <WarningIcon class="volunteer-warning-icon" />
-          <span class="volunteer-application-warning-text">
-            Please complete your Volunteer Application
-          </span>
-          <svg
-            class="volunteer-application-warning-arrow"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M5 12h14m-6-6 6 6-6 6" />
-          </svg>
-        </a>
-      ) : !actor.active ? (
-        <p class="volunteer-notice" role="status">
-          Your volunteer account is inactive. Contact an organizer to restore
-          access.
-        </p>
-      ) : !actor.applicationApproved && actor.role !== "organizer" ? (
-        <section class="volunteer-panel" data-application-pending>
-          <h2>Application awaiting approval</h2>
-          <p>
-            An organizer will review your application before you can view events
-            or sign up for an orientation.
-          </p>
-          <a class="btn btn-outline mt-6" href="/volunteer/account">
-            Your account
-          </a>
-        </section>
-      ) : null
+        </>
+      )
     }
     {
       actor?.role === "organizer" && !organizer && (

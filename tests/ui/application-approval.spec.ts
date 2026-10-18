@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { social } from "../../src/data/site";
 import {
   createLocalAccount,
   openLocalAccountSwitcher,
@@ -24,8 +25,27 @@ test("organizer approval unlocks events in place; revocation hides them again", 
       }),
     ).toBeVisible();
     await expect(
-      volunteer.locator("[data-live-event], [data-event-list]"),
+      volunteer.locator(
+        "[data-live-event], [data-event-list], [data-event-save], [data-event-notifications]",
+      ),
     ).toHaveCount(0);
+    const portal = volunteer.locator("[data-event-browser]");
+    await expect(
+      portal.getByText(
+        "You can review your submitted application and update your profile while you wait.",
+      ),
+    ).toBeVisible();
+    await expect(
+      portal.getByRole("link", { name: "Review application and profile" }),
+    ).toHaveAttribute("href", "/volunteer/account");
+    await expect(
+      portal.getByText(
+        "Join our Discord for more information and to become more involved.",
+      ),
+    ).toBeVisible();
+    const discord = portal.getByRole("link", { name: "Join Discord" });
+    await expect(discord).toBeVisible();
+    await expect(discord).toHaveAttribute("href", social.discord);
     expect(
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),
     ).toBe(403);
@@ -65,6 +85,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     await expect(volunteer.locator("[data-application-pending]")).toHaveCount(
       0,
     );
+    await expect(discord).toHaveCount(0);
     await volunteer
       .getByRole("button", { name: "Orientations", exact: true })
       .click();
@@ -102,6 +123,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     await expect(
       volunteer.locator("[data-live-event], [data-event-list]"),
     ).toHaveCount(0);
+    await expect(discord).toBeVisible();
     expect(
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),
     ).toBe(403);
