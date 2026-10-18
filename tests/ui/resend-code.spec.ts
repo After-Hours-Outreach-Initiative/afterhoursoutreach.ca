@@ -341,12 +341,11 @@ for (const errorCode of ["OTP_EXPIRED", "INVALID_OTP"]) {
     const hash = new URLSearchParams({
       email: "link@example.org",
       otp: "123456",
+      activation: crypto.randomUUID(),
       returnTo: "/volunteer/events?from=resend",
     });
     await page.goto(`/volunteer/sign-in/complete#${hash}`);
     await expect(page).toHaveURL(/\/volunteer\/sign-in\/complete$/);
-    expect(proofs).toEqual([]); // No mail-scanner auto-consumption.
-    await page.getByRole("button", { name: "Confirm sign-in" }).click();
     const code = page.locator("[data-email-code]");
     await expect(code).toBeVisible();
     await expect(code.locator('[name="email"]')).toHaveValue(
@@ -356,7 +355,7 @@ for (const errorCode of ["OTP_EXPIRED", "INVALID_OTP"]) {
       "Resend code",
     );
     await expect(
-      page.getByRole("button", { name: "Confirm sign-in" }),
+      page.getByRole("button", { name: "Try signing in again" }),
     ).toBeHidden();
     await expect(code.locator("[data-resend-code]")).toBeEnabled();
     await code.locator("[data-resend-code]").click();
@@ -452,7 +451,6 @@ test("a consumed local-D1 link resends successfully after the real 30-second coo
   });
   expect(consumed.status(), await consumed.text()).toBe(200);
   await page.goto(localEmail.url);
-  await page.getByRole("button", { name: "Confirm sign-in" }).click();
   const code = page.locator("[data-email-code]");
   await expect(code.locator("[data-form-message]")).toContainText(
     "already used",
@@ -489,7 +487,7 @@ test("a consumed local-D1 link resends successfully after the real 30-second coo
   await expect(page).toHaveURL(/\/apply$/);
 });
 
-test("a transient link failure keeps confirmation retryable and blocks resend during verification", async ({
+test("a transient automatic link failure stays retryable and blocks resend during verification", async ({
   page,
 }) => {
   let release!: () => void;
@@ -508,11 +506,11 @@ test("a transient link failure keeps confirmation retryable and blocks resend du
   const hash = new URLSearchParams({
     email: "retry@example.org",
     otp: "123456",
+    activation: crypto.randomUUID(),
     returnTo: "/volunteer/events",
   });
   await page.goto(`/volunteer/sign-in/complete#${hash}`);
-  const confirm = page.getByRole("button", { name: "Confirm sign-in" });
-  await confirm.click();
+  const confirm = page.getByRole("button", { name: "Try signing in again" });
   const code = page.locator("[data-email-code]");
   await expect(code.locator("[data-form-message]")).toHaveText(
     "We could not connect. Check your connection and try again.",
@@ -568,8 +566,8 @@ test("incomplete links recover with their email when available and sanitize the 
   ).toContainText("incomplete");
   await expect(code).toBeHidden();
   await expect(
-    page.getByRole("button", { name: "Confirm sign-in" }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: "Try signing in again" }),
+  ).toBeHidden();
   await expect(
     page.getByRole("link", { name: "Request a new email" }),
   ).toHaveAttribute(

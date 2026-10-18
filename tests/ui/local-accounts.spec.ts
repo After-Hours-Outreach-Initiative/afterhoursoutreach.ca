@@ -151,13 +151,27 @@ test("local D1 email links are one-use and sign-in pages have no third-party req
   const link = page.getByRole("link", { name: "Open local sign-in link" });
   const url = new URL((await link.getAttribute("href"))!);
   const proof = Object.fromEntries(new URLSearchParams(url.hash.slice(1)));
+  // A scanner can load every resource and execute JS, but has no requesting-
+  // browser cookie. Its activation must leave the real link usable.
+  const scanner = await page.context().browser()!.newContext();
+  try {
+    const scanned = await scanner.newPage();
+    const activation = scanned.waitForResponse((response) =>
+      response.url().includes("/api/v1/auth/sign-in/email-otp"),
+    );
+    await scanned.goto(url.href);
+    expect((await activation).status()).toBe(403);
+    await expect(scanned.locator("[data-email-code]")).toBeVisible();
+    await expect(scanned.getByLabel("Six-digit code")).toHaveValue("");
+    await expect(scanned.locator("[data-form-message]:visible")).toContainText(
+      "browser where you requested it",
+    );
+  } finally {
+    await scanner.close();
+  }
   await link.click();
-  await expect(
-    page.getByRole("button", { name: "Confirm sign-in" }),
-  ).toBeEnabled();
-  expect(new URL(page.url()).hash).toBe("");
-  await page.getByRole("button", { name: "Confirm sign-in" }).click();
   await expect(page).toHaveURL(/\/apply/);
+  expect(new URL(page.url()).hash).toBe("");
   const replay = await request.post("/api/v1/auth/sign-in/email-otp", {
     headers: { origin: url.origin },
     data: { email: proof.email, otp: proof.otp },

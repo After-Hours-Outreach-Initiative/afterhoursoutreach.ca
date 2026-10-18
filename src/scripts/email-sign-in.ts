@@ -76,7 +76,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
     };
 
     const run = async (form: HTMLFormElement, action: () => Promise<void>) => {
-      // Sending, confirming a link and verifying a code share one in-flight lock.
+      // Sending, activating a link and verifying a code share one in-flight lock.
       if (busy || form.closest("[hidden]")) return;
       busy = true;
       form.dataset.submitting = "true";
@@ -246,6 +246,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
       history.replaceState(null, "", location.pathname);
       email = (values.get("email") ?? "").trim().toLowerCase();
       proof = values.get("otp");
+      const activation = values.get("activation");
       returnTo = safeReturnTo(values.get("returnTo") ?? undefined);
       const address = link.querySelector<HTMLElement>("[data-sign-in-email]");
       if (address) address.textContent = email;
@@ -255,28 +256,44 @@ export function initEmailSignIn(finish: (result: object) => void) {
       if (fallback)
         fallback.href = `/volunteer/sign-in?${new URLSearchParams({ returnTo })}`;
       if (email && proof && /^\d{6}$/.test(proof)) {
-        link.addEventListener("submit", (event) => {
-          event.preventDefault();
-          if (linkButton?.disabled || linkButton?.hidden) return;
-          void run(link, async () => {
+        const activate = () =>
+          run(link, async () => {
+            message(link, "Signing you in…", "success");
             try {
-              // Explicit confirmation avoids consuming codes during mail-scanner visits.
+              // The server requires the signed requesting-browser cookie for
+              // automatic activation. Merely fetching this page or its scripts
+              // (including a scanner running JS) cannot consume the code.
               finish(
                 await authClient.signIn.emailOtp(
                   { email, otp: proof! },
-                  options(),
+                  {
+                    ...options(),
+                    headers: { "X-Email-Link-Activation": activation! },
+                  },
                 ),
               );
             } catch (error) {
-              // Connection/service failures may retry the original confirmation.
-              proofRejected = (error as { status?: number })?.status === 400;
+              const status = (error as { status?: number })?.status;
+              proofRejected = status === 400 || status === 403;
               if (proofRejected) proof = null;
               linkButton!.hidden = proofRejected;
+              clearFormMessage(link);
               showCode();
               message(code, emailCodeErrorMessage(error));
             }
           });
+        link.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (linkButton?.disabled || linkButton?.hidden) return;
+          void activate();
         });
+        if (activation) void activate();
+        else {
+          // Older links have no browser binding. Never auto-redeem their code.
+          proof = null;
+          showCode();
+          message(code, "Enter the six-digit code from your email to sign in.");
+        }
       } else {
         proof = null;
         message(link, "That sign-in link is incomplete. Request a new email.");

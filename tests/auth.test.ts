@@ -369,6 +369,78 @@ test("link and code redemption race produces exactly one successful result", asy
   );
 });
 
+test("automatic email links require an unexpired signed requesting-browser binding before touching the OTP", async () => {
+  const email = "browser-bound@example.org";
+  const sent = await request("/email-otp/send-verification-otp", {
+    email,
+    type: "sign-in",
+  });
+  assert.equal(sent.status, 200);
+  const cookie = cookies(sent);
+  assert.match(cookie, /aho\.email_link/);
+  const header = sent.headers.get("set-cookie")!;
+  assert.match(header, /HttpOnly/i);
+  assert.match(header, /Secure/i);
+  assert.match(header, /SameSite=Lax/i);
+  assert.match(header, /Max-Age=600/i);
+  assert.doesNotMatch(header, /Domain=/i);
+  const challenge = outbox.at(-1)!;
+  const activation = new URLSearchParams(
+    new URL(challenge.url).hash.slice(1),
+  ).get("activation")!;
+  assert.ok(activation);
+  assert.equal(new URL(challenge.url).search, "");
+  const activate = (binding = "", nonce = activation, address = email) =>
+    auth.handler(
+      new Request(`${origin}/api/v1/auth/sign-in/email-otp`, {
+        method: "POST",
+        headers: {
+          origin,
+          "content-type": "application/json",
+          "x-email-link-activation": nonce,
+          cookie: binding,
+        },
+        body: JSON.stringify({ email: address, otp: challenge.code }),
+      }),
+    );
+  const readChallenge = () =>
+    bindings.DB.prepare("SELECT * FROM verification WHERE identifier=?")
+      .bind(`sign-in-otp-${email}`)
+      .first();
+  const original = await readChallenge();
+  const budgets = await bindings.DB.prepare(
+    "SELECT * FROM auth_rate_limit",
+  ).all();
+  for (const response of [
+    await activate(), // A JS-enabled scanner has the entire link but no cookie.
+    await activate(cookie + "forged"),
+    await activate(cookie, crypto.randomUUID()),
+    await activate(cookie, activation, "another@example.org"),
+  ]) {
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get("set-cookie"), null);
+    assert.equal(
+      ((await response.json()) as { code: string }).code,
+      "EMAIL_LINK_BROWSER_REQUIRED",
+    );
+  }
+  // Enforce expiry on the server even if a client replays an expired cookie.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(Date.now() + 600_001);
+  assert.equal((await activate(cookie)).status, 403);
+  vi.useRealTimers();
+  assert.deepEqual(await readChallenge(), original);
+  assert.deepEqual(
+    await bindings.DB.prepare("SELECT * FROM auth_rate_limit").all(),
+    budgets,
+  );
+  const signedIn = await activate(cookie);
+  assert.equal(signedIn.status, 200, await signedIn.clone().text());
+  assert.equal(((await signedIn.json()) as { next: string }).next, "/apply");
+  assert.match(signedIn.headers.get("set-cookie")!, /email_link=.*Max-Age=0/);
+  assert.equal((await activate(cookie)).status, 400);
+});
+
 test("three wrong codes invalidate both code and link", async () => {
   const proof = await createSignInOTP(
     bindings.DB,
