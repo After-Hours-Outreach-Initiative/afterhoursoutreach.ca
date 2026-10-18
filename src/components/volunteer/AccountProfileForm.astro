@@ -5,6 +5,7 @@ import {
   type ApplicationAnswers,
 } from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
+import AccountProfileAnswers from "./AccountProfileAnswers.astro";
 import AccountProfileSection from "./AccountProfileSection.astro";
 import ApplicationContents from "./ApplicationContents.astro";
 import ApplicationSteps from "./ApplicationSteps.astro";
@@ -113,102 +114,112 @@ const sections = profileFormSections(application);
               section.key === "team-interests" ? "help-teams" : undefined
             }
           >
-            {section.key === "team-interests" ? (
-              <>
-                <input type="hidden" name="teams" value="outreach" />
-                <div class="volunteer-field">
-                  <span>
-                    Which teams interest you?{" "}
-                    <span class="volunteer-required" aria-hidden="true">
-                      *
-                    </span>
-                  </span>
-                  <span class="volunteer-help" id="help-teams">
-                    Outreach is included for everyone. Other teams are optional.
-                  </span>
-                </div>
-                <div class="volunteer-team-options">
-                  {teams.map((team) => (
-                    <label
-                      class="volunteer-team-option"
-                      data-included={team.value === "outreach" || undefined}
-                    >
-                      <input
-                        type="checkbox"
-                        name="teams"
-                        value={team.value}
-                        checked={
-                          team.value === "outreach" ||
-                          values?.teams.includes(team.value)
-                        }
-                        disabled={team.value === "outreach"}
-                        aria-labelledby={`team-${team.value}-label`}
-                        aria-describedby={`team-${team.value}-description help-teams`}
-                      />
-                      <span class="volunteer-team-content">
-                        <span
-                          class="volunteer-team-title"
-                          id={`team-${team.value}-label`}
-                        >
-                          {team.label}
-                        </span>
-                        <span
-                          class="volunteer-team-description"
-                          id={`team-${team.value}-description`}
-                        >
-                          {team.description}
-                          {"requirement" in team && (
-                            <span class="volunteer-team-requirement">
-                              {team.requirement}
-                            </span>
-                          )}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div class="volunteer-fields">
-                {section.key === "training-and-safety" && (
-                  <MedicalCertifications
-                    values={values}
-                    active={medicSelected}
-                  />
-                )}
-                {application && section.key === "personal-info" && (
-                  <label class="volunteer-field">
-                    Email
-                    <input type="email" value={email} readonly />
-                  </label>
-                )}
-                {section.fields
-                  .filter(
-                    (field) =>
-                      field.name !== "experience" &&
-                      field.name !== "otherTraining",
-                  )
-                  .map((field) =>
-                    field.name === "heardAboutUs" ? (
-                      <ReferralSources values={values} />
-                    ) : (
-                      <AccountProfileField
-                        field={field}
-                        values={values}
-                        active={
-                          field.name !== "certificationExpiry" || medicSelected
-                        }
-                      />
-                    ),
-                  )}
-                {section.key === "training-and-safety" && (
-                  <RelevantTraining
-                    values={values}
-                    required={application || Boolean(values?.training.length)}
-                  />
-                )}
-              </div>
+            {!application && (
+              <AccountProfileAnswers section={section} values={values} />
             )}
+            <div
+              data-profile-fields={!application || undefined}
+              hidden={!application}
+            >
+              {section.key === "team-interests" ? (
+                <>
+                  <input type="hidden" name="teams" value="outreach" />
+                  <div class="volunteer-field">
+                    <span>
+                      Which teams interest you?{" "}
+                      <span class="volunteer-required" aria-hidden="true">
+                        *
+                      </span>
+                    </span>
+                    <span class="volunteer-help" id="help-teams">
+                      Outreach is included for everyone. Other teams are
+                      optional.
+                    </span>
+                  </div>
+                  <div class="volunteer-team-options">
+                    {teams.map((team) => (
+                      <label
+                        class="volunteer-team-option"
+                        data-included={team.value === "outreach" || undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          name="teams"
+                          value={team.value}
+                          checked={
+                            team.value === "outreach" ||
+                            values?.teams.includes(team.value)
+                          }
+                          disabled={team.value === "outreach"}
+                          aria-labelledby={`team-${team.value}-label`}
+                          aria-describedby={`team-${team.value}-description help-teams`}
+                        />
+                        <span class="volunteer-team-content">
+                          <span
+                            class="volunteer-team-title"
+                            id={`team-${team.value}-label`}
+                          >
+                            {team.label}
+                          </span>
+                          <span
+                            class="volunteer-team-description"
+                            id={`team-${team.value}-description`}
+                          >
+                            {team.description}
+                            {"requirement" in team && (
+                              <span class="volunteer-team-requirement">
+                                {team.requirement}
+                              </span>
+                            )}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div class="volunteer-fields">
+                  {section.key === "training-and-safety" && (
+                    <MedicalCertifications
+                      values={values}
+                      active={medicSelected}
+                    />
+                  )}
+                  {application && section.key === "personal-info" && (
+                    <label class="volunteer-field">
+                      Email
+                      <input type="email" value={email} readonly />
+                    </label>
+                  )}
+                  {section.fields
+                    .filter(
+                      (field) =>
+                        field.name !== "experience" &&
+                        field.name !== "otherTraining",
+                    )
+                    .map((field) =>
+                      field.name === "heardAboutUs" ? (
+                        <ReferralSources values={values} />
+                      ) : (
+                        <AccountProfileField
+                          field={field}
+                          values={values}
+                          active={
+                            field.name !== "certificationExpiry" ||
+                            medicSelected
+                          }
+                        />
+                      ),
+                    )}
+                  {section.key === "training-and-safety" && (
+                    <RelevantTraining
+                      values={values}
+                      required={application || Boolean(values?.training.length)}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </AccountProfileSection>
         ))
       }

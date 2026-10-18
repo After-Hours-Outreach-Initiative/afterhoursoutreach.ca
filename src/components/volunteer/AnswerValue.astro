@@ -1,0 +1,22 @@
+---
+interface Props {
+  value: string | string[];
+}
+const { value } = Astro.props;
+---
+
+{
+  Array.isArray(value) ? (
+    value.length ? (
+      <ul>
+        {value.map((answer) => (
+          <li>{answer}</li>
+        ))}
+      </ul>
+    ) : (
+      "None selected"
+    )
+  ) : (
+    value || "Not provided"
+  )
+}

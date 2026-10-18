@@ -317,7 +317,10 @@ test("account navigation and profile controls are usable on desktop and mobile",
     ).toBeVisible();
     const form = page.locator("[data-account-profile]");
     await expect(form.locator("[data-profile-editor]")).toBeVisible();
-    await expect(form.locator('[name="preferredName"]')).toBeDisabled();
+    await expect(form.locator('[name="preferredName"]')).toBeHidden();
+    await expect(
+      form.locator('[data-profile-answer="preferredName"] dd'),
+    ).toHaveText(sampleAnswers.preferredName);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,

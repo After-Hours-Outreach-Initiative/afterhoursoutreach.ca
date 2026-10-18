@@ -6,7 +6,9 @@ import {
   motivationWordLimitError,
   trainingRequiredError,
   trainingExclusiveError,
+  profileFormSections,
 } from "../data/application";
+import { profileAnswerRows } from "../data/profile-answers";
 
 const requestFailed = "The request failed. Please try again.";
 
@@ -273,6 +275,47 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   const cancels = element.querySelectorAll<HTMLButtonElement>(
     "[data-profile-cancel]",
   );
+  const fields = editor.querySelectorAll<HTMLElement>("[data-profile-fields]");
+  const summaries = editor.querySelectorAll<HTMLElement>(
+    "[data-profile-answers]",
+  );
+  const renderSavedAnswers = (values: FormData) => {
+    const answers = {
+      ...Object.fromEntries(
+        [...values].map(([name, value]) => [name, String(value).trim()]),
+      ),
+      teams: values.getAll("teams").map(String),
+      certifications: values.getAll("certifications").map(String),
+      training: values.getAll("training").map(String),
+    };
+    for (const section of profileFormSections()) {
+      const summary = [...summaries].find(
+        (summary) => summary.dataset.profileAnswers === section.key,
+      );
+      if (!summary) continue;
+      for (const row of profileAnswerRows(section, answers)) {
+        const target = summary.querySelector<HTMLElement>(
+          `[data-profile-answer="${row.name}"]`,
+        );
+        const value = target?.querySelector("dd");
+        if (!target || !value) continue;
+        target.hidden = Boolean(row.hidden);
+        if (Array.isArray(row.value) && row.value.length) {
+          const list = document.createElement("ul");
+          for (const answer of row.value) {
+            const item = document.createElement("li");
+            item.textContent = answer;
+            list.appendChild(item);
+          }
+          value.replaceChildren(list);
+        } else {
+          value.textContent = Array.isArray(row.value)
+            ? "None selected"
+            : row.value || "Not provided";
+        }
+      }
+    }
+  };
   // Profile answers are text and checkbox values; the server trims text on save.
   const snapshot = (values: FormData) =>
     JSON.stringify(
@@ -281,7 +324,9 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   // Disabled fieldsets are omitted from FormData; read the initial saved answers
   // before locking the shared controls again below.
   editor.disabled = false;
-  let saved = snapshot(new FormData(element));
+  const initial = new FormData(element);
+  let saved = snapshot(initial);
+  renderSavedAnswers(initial);
   editor.disabled = true;
   const changed = () => snapshot(new FormData(element)) !== saved;
   const setEditing = (editing: boolean) => {
@@ -291,6 +336,8 @@ export function initAccountFormChanges(element: HTMLFormElement) {
       document.activeElement === document.body;
     edit.hidden = editing;
     editor.disabled = !editing;
+    for (const field of fields) field.hidden = !editing;
+    for (const summary of summaries) summary.hidden = editing;
     for (const action of actions) action.hidden = !editing;
     if (editing) {
       clearFormMessage(element);
@@ -325,6 +372,7 @@ export function initAccountFormChanges(element: HTMLFormElement) {
     markSaved(values: FormData) {
       // Edits made while the request is pending must remain unsaved.
       saved = snapshot(values);
+      renderSavedAnswers(values);
       // Cancel/reset must return to the latest save, not the initial page load.
       for (const control of element.querySelectorAll<
         HTMLInputElement | HTMLTextAreaElement

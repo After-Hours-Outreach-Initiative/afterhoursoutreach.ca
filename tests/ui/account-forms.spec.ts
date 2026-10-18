@@ -258,6 +258,12 @@ for (const path of ["/apply", "/volunteer/account"]) {
         await page.goto(path, { waitUntil: "commit" });
         const contents = page.locator("[data-page-contents]");
         await expect(contents).toBeVisible();
+        if (path === "/volunteer/account") {
+          await expect(
+            page.locator('[data-profile-answer="preferredName"] dd'),
+          ).toHaveText(sampleAnswers.preferredName);
+          await expect(page.locator('[name="preferredName"]')).toBeHidden();
+        }
         const initial = await contents.boundingBox();
         const header = await page.locator(".site-header").boundingBox();
         if (path === "/apply" && width < 1024) {
@@ -429,7 +435,10 @@ test("account contents navigate profile and settings sections on desktop and mob
           heading,
         );
     }
-    await expect(page.locator('[name="preferredName"]')).toBeDisabled();
+    await expect(page.locator('[name="preferredName"]')).toBeHidden();
+    await expect(
+      page.locator('[data-profile-answer="preferredName"] dd'),
+    ).toHaveText(sampleAnswers.preferredName);
     await expect(page.locator("[data-profile-actions]:visible")).toHaveCount(0);
   }
 });
@@ -1233,6 +1242,12 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(form.locator("[data-form-message]")).toHaveText(
     "Profile saved.",
   );
+  await expect(
+    form.locator('[data-profile-answer="training"] dd'),
+  ).toContainText("Naloxone administration training");
+  await expect(
+    form.locator('[data-profile-answer="otherTraining"]'),
+  ).toBeHidden();
   await page.reload();
   await page.getByRole("button", { name: "Edit profile" }).click();
   await expect(other).not.toBeChecked();
@@ -1449,6 +1464,15 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await submitLocalApplication(page);
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
+  for (const [name, value] of [
+    ["certifications", "Other"],
+    ["certificationExpiry", "2030-10-14"],
+    ["experience", "Naloxone training"],
+  ]) {
+    const answer = form.locator(`[data-profile-answer="${name}"] dd`);
+    await expect(answer).toBeVisible();
+    await expect(answer).toHaveText(value);
+  }
   await page.getByRole("button", { name: "Edit profile" }).click();
   await expect(medic).toBeChecked();
   await expect(certifications).toBeVisible();
@@ -1491,6 +1515,8 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(form.locator("[data-form-message]")).toHaveText(
     "Profile saved.",
   );
+  for (const name of ["certifications", "certificationExpiry", "experience"])
+    await expect(form.locator(`[data-profile-answer="${name}"]`)).toBeHidden();
   await page.reload();
   await page.getByRole("button", { name: "Edit profile" }).click();
   await expect(certifications).toBeHidden();
@@ -1567,26 +1593,28 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   const preferredName = form.locator('[name="preferredName"]');
   const name = form.locator('[name="emergencyName"]');
   const medicalConditions = form.locator('[name="medicalConditions"]');
-  const expectViewStyles = async () => {
-    for (const group of [
-      editor,
-      ...(await editor
-        .locator(".volunteer-fields, .volunteer-team-options")
-        .all()),
-    ]) {
-      await expect(group).toHaveCSS("opacity", "1");
-    }
-    for (const field of [preferredName, name, medicalConditions]) {
-      await expect(field).toBeDisabled();
-      await expect(field).toHaveCSS("opacity", "1");
-      await expect(field).toHaveCSS("color", "rgb(161, 161, 170)");
-      await expect(field).toHaveCSS("background-color", "rgb(23, 26, 32)");
-      await expect(field).toHaveCSS("cursor", "default");
-    }
-    for (const card of await editor.locator(".volunteer-team-option").all()) {
-      await expect(card).toHaveCSS("opacity", "1");
-      await expect(card).toHaveCSS("cursor", "default");
-    }
+  const answer = (name: string) =>
+    form.locator(`[data-profile-answer="${name}"] dd`);
+  const expectTextView = async (contact = sampleAnswers.emergencyName) => {
+    await expect(form.locator("[data-profile-answers]:visible")).toHaveCount(4);
+    await expect(
+      form.locator("input:visible, textarea:visible, select:visible"),
+    ).toHaveCount(0);
+    await expect(answer("emergencyName")).toBeVisible();
+    await expect(answer("emergencyName")).toHaveText(contact);
+    await expect(answer("teams").getByRole("listitem")).toHaveText([
+      "Outreach",
+    ]);
+    await expect(answer("training")).toHaveText(
+      "No relevant training or experience",
+    );
+    for (const conditional of [
+      "certifications",
+      "certificationExpiry",
+      "experience",
+      "otherTraining",
+    ])
+      await expect(answer(conditional)).toBeHidden();
   };
   await expect(editor).toBeVisible();
   await expect(editor).toHaveAccessibleName("Profile details");
@@ -1595,7 +1623,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(preferredName).toBeDisabled();
   await expect(name).toBeDisabled();
   await expect(form.getByLabel("Medic", { exact: true })).toBeDisabled();
-  await expectViewStyles();
+  await expectTextView();
   await expect(actions).toHaveCount(2);
   await expect(
     form.locator(
@@ -1649,6 +1677,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(visibleActions).toHaveCount(2);
   await expect(enabledSaves).toHaveCount(0);
   await expect(preferredName).toBeFocused();
+  await expect(form.locator("[data-profile-answers]:visible")).toHaveCount(0);
   await expect(name).toBeEditable();
   await expect(editor.locator(".volunteer-fields").first()).toHaveCSS(
     "opacity",
@@ -1666,7 +1695,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(editor).toBeVisible();
   await expect(name).toBeDisabled();
   await expect(name).toHaveValue(sampleAnswers.emergencyName);
-  await expectViewStyles();
+  await expectTextView();
   await expect(visibleActions).toHaveCount(0);
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await edit.click();
@@ -1715,6 +1744,8 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await name.fill(sampleAnswers.emergencyName);
   await expect(enabledSaves).toHaveCount(0);
   await name.fill("Updated volunteer");
+  const safetyAnswer = "First line\n<em>Text, not markup</em>";
+  await medicalConditions.fill(safetyAnswer);
   await expect(enabledSaves).toHaveCount(2);
   await save.click();
   await expect(form.locator("[data-form-message]")).toHaveAttribute(
@@ -1726,13 +1757,16 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(editor).toBeVisible();
   await expect(name).toHaveValue("Updated volunteer");
   await expect(name).toBeDisabled();
-  await expectViewStyles();
+  await expectTextView("Updated volunteer");
+  await expect(answer("medicalConditions")).toHaveText(safetyAnswer);
+  await expect(answer("medicalConditions").locator("em")).toHaveCount(0);
   await expect(visibleActions).toHaveCount(0);
   await expect(edit).toBeFocused();
   await edit.click();
   await name.fill(sampleAnswers.emergencyName);
   await expect(enabledSaves).toHaveCount(2);
   await cancels.first().click();
+  await expectTextView("Updated volunteer");
   await expect(visibleActions).toHaveCount(0);
   await expect(edit).toBeFocused();
   await edit.click();
@@ -1741,7 +1775,8 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await page.reload();
   await expect(name).toHaveValue("Updated volunteer");
   await expect(enabledSaves).toHaveCount(0);
-  await expectViewStyles();
+  await expectTextView("Updated volunteer");
+  await expect(answer("medicalConditions")).toHaveText(safetyAnswer);
 
   // Clearing the preferred name still falls back to the saved legal name.
   await edit.click();
@@ -1756,6 +1791,7 @@ test("profile editing is opt-in, saves changed answers, and cancels back to the 
   await expect(page.locator("[data-account-greeting]")).toHaveText(
     sampleAnswers.firstName,
   );
+  await expect(answer("preferredName")).toHaveText("Not provided");
 });
 
 test("Outreach stays selected while optional teams support cards, keyboard input and reset", async ({
