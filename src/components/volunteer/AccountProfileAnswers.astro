@@ -1,0 +1,33 @@
+---
+import {
+  type ApplicationAnswers,
+  profileFormSections,
+} from "@/data/application";
+import { profileAnswerRows } from "@/data/profile-answers";
+import AnswerValue from "./AnswerValue.astro";
+
+interface Props {
+  section: ReturnType<typeof profileFormSections>[number];
+  values?: ApplicationAnswers | null;
+}
+const { section, values } = Astro.props;
+---
+
+<div class="account-profile-summary" data-profile-answers={section.key}>
+  <dl>
+    {
+      profileAnswerRows(section, values).map((row) => (
+        <div
+          data-profile-answer={row.name}
+          class:list={{ "volunteer-wide": row.wide }}
+          hidden={row.hidden}
+        >
+          <dt>{row.label}</dt>
+          <dd>
+            <AnswerValue value={row.value} />
+          </dd>
+        </div>
+      ))
+    }
+  </dl>
+</div>

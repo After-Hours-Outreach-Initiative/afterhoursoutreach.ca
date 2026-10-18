@@ -8,6 +8,7 @@ import {
   trainingOptions,
   type SubmittedApplication,
 } from "@/data/application";
+import AnswerValue from "./AnswerValue.astro";
 
 interface Props {
   submission: SubmittedApplication | null;
@@ -151,19 +152,7 @@ const rows =
                     <div>
                       <dt>{row.label}</dt>
                       <dd>
-                        {Array.isArray(row.value) ? (
-                          row.value.length ? (
-                            <ul>
-                              {row.value.map((value) => (
-                                <li>{value}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            "None selected"
-                          )
-                        ) : (
-                          row.value || "Not provided"
-                        )}
+                        <AnswerValue value={row.value} />
                       </dd>
                     </div>
                   ))}
