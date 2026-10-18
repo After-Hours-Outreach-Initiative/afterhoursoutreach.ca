@@ -1250,6 +1250,8 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-field:has(:user-invalid) > [data-error],
 .volunteer-certifications:has(input[name="certifications"]:user-invalid)
   > [data-error],
+.volunteer-relevant-training:has(input[name="training"]:user-invalid)
+  > [data-error],
 .volunteer-referral-sources:has(input[name="heardAboutUsSources"]:user-invalid)
   > [data-error] {
   display: flex;

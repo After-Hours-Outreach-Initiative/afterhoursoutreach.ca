@@ -326,6 +326,7 @@ test("submission atomically removes drafts; failed submissions retain them and l
       emergencyRelationship: "Friend",
       heardAboutUsSources: ["internet"],
       motivation: "I want to help.",
+      training: ["none"],
     }),
   );
   await saveProfile(env.DB, actor.id, {

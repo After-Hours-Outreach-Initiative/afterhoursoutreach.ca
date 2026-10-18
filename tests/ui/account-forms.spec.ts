@@ -621,7 +621,7 @@ test("application shows all required errors and saves after they are corrected",
   await expect(training).toBeVisible();
   await expect(training.locator('[name="experience"]')).toBeHidden();
   await expect(training.locator("[data-medic-certifications]")).toBeHidden();
-  await expect(training.locator("[required]")).toHaveCount(0);
+  await expect(training.locator("[required]")).toHaveCount(1);
   await expect(
     form
       .getByRole("group", { name: "Team interests", exact: true })
@@ -692,10 +692,10 @@ test("application shows all required errors and saves after they are corrected",
       await input.evaluate((element) => element.matches(":user-invalid")),
     ).toBe(true);
     const id = await input.getAttribute("id");
-    const label =
-      (await input.getAttribute("name")) === "heardAboutUsSources"
-        ? form.locator("[data-referral-sources] > legend")
-        : form.locator(`label[for="${id}"]`);
+    const name = await input.getAttribute("name");
+    const label = ["heardAboutUsSources", "training"].includes(name ?? "")
+      ? input.locator("xpath=ancestor::fieldset[1]/legend")
+      : form.locator(`label[for="${id}"]`);
     await expect(label.locator(".volunteer-required")).toHaveText("*");
   }
   await expect(
@@ -723,8 +723,8 @@ test("application shows all required errors and saves after they are corrected",
   await expect(form.locator("[data-error=birthDate]")).toBeVisible();
   expect(requests).toEqual([]);
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field === "heardAboutUsSources") {
-      for (const source of sampleAnswers.heardAboutUsSources)
+    if (field === "heardAboutUsSources" || field === "training") {
+      for (const source of value as string[])
         await form.locator(`[name="${field}"][value="${source}"]`).check();
     } else if (
       ![
@@ -939,8 +939,8 @@ test("applications validate the birthday boundary and profiles keep the saved bi
       : today.toISOString().slice(5, 10),
   );
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field === "heardAboutUsSources") {
-      for (const source of sampleAnswers.heardAboutUsSources)
+    if (field === "heardAboutUsSources" || field === "training") {
+      for (const source of value as string[])
         await form.locator(`[name="${field}"][value="${source}"]`).check();
     } else if (
       ![
@@ -1061,6 +1061,10 @@ test("all teams can select multiple relevant training answers and add Other deta
     name: "Crisis intervention and de-escalation training (specify under Other)",
     exact: true,
   });
+  const none = training.getByRole("checkbox", {
+    name: "No relevant training or experience",
+    exact: true,
+  });
   const medic = form.getByLabel("Medic", { exact: true });
   const support = form.getByLabel("Non-patrol support", { exact: true });
   const requests: string[] = [];
@@ -1072,6 +1076,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(details).toBeHidden();
   await expect(otherText).not.toHaveAttribute("required");
   await expect(otherText).toHaveAttribute("readonly", "");
+  await expect(naloxone).toHaveAttribute("required", "");
   await expect(
     training.locator(".volunteer-training-options > label"),
   ).toHaveText(trainingOptions.map((option) => option.label));
@@ -1111,8 +1116,8 @@ test("all teams can select multiple relevant training answers and add Other deta
     ).toBe(false);
   }
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field === "heardAboutUsSources") {
-      for (const source of sampleAnswers.heardAboutUsSources)
+    if (field === "heardAboutUsSources" || field === "training") {
+      for (const source of value as string[])
         await form.locator(`[name="${field}"][value="${source}"]`).check();
     } else if (
       ![
@@ -1129,7 +1134,25 @@ test("all teams can select multiple relevant training answers and add Other deta
     )
       await form.locator(`[name="${field}"]`).fill(String(value));
   }
+  await none.uncheck();
+  await page.getByRole("button", { name: "Review application" }).click();
+  await expect(naloxone).toBeFocused();
+  await expect(training.locator("[data-error=training]")).toBeVisible();
+  expect(requests).toHaveLength(0);
+  await none.check();
+  await page.getByRole("button", { name: "Review application" }).click();
+  await expect(form.locator('[data-review-answer="training"]')).toHaveText(
+    "No relevant training or experience",
+  );
+  await form
+    .getByRole("button", { name: "Back to answers", exact: true })
+    .click();
   await naloxone.check();
+  await crisis.check();
+  await none.check();
+  await expect(training.locator(":checked")).toHaveCount(1);
+  await naloxone.check();
+  await expect(none).not.toBeChecked();
   await crisis.check();
   await other.check();
   await expect(training.locator(":checked")).toHaveCount(3);
@@ -1199,13 +1222,18 @@ test("all teams can select multiple relevant training answers and add Other deta
   await naloxone.uncheck();
   await crisis.uncheck();
   await save.click();
+  await expect(naloxone).toBeFocused();
+  expect(requests).toHaveLength(savedRequests);
+  await none.check();
+  await save.click();
   await expect(form.locator("[data-form-message]")).toHaveText(
     "Profile saved.",
   );
   await page.reload();
   await page.getByRole("button", { name: "Edit profile" }).click();
   await expect(training).toBeVisible();
-  await expect(training.locator(":checked")).toHaveCount(0);
+  await expect(training.locator(":checked")).toHaveCount(1);
+  await expect(none).toBeChecked();
   await expect(details).toBeHidden();
 });
 
@@ -1257,8 +1285,8 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).toBeHidden();
   await expect(expiry).not.toHaveAttribute("required");
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field === "heardAboutUsSources") {
-      for (const source of sampleAnswers.heardAboutUsSources)
+    if (field === "heardAboutUsSources" || field === "training") {
+      for (const source of value as string[])
         await form.locator(`[name="${field}"][value="${source}"]`).check();
     } else if (
       ![

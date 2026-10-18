@@ -27,6 +27,7 @@ const answers = {
   teams: ["outreach"],
   certification: "None",
   experience: "None",
+  training: ["none"],
   medicalConditions: "PRIVATE HEALTH ANSWER",
 };
 const cookies = (response: { headers: { getSetCookie(): string[] } }) =>

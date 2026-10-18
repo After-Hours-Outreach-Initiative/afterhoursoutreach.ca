@@ -42,7 +42,7 @@ const answers = {
   certifications: [] as string[],
   certificationExpiry: "",
   experience: "None",
-  training: [] as string[],
+  training: ["none"],
   otherTraining: "",
   medicalConditions: "Sample private answer",
 };
@@ -361,6 +361,9 @@ describe(
         codeOfConductAccepted: true,
       };
       for (const invalid of [
+        { training: undefined },
+        { training: [] },
+        { training: ["none", "naloxone-trainer"] },
         { training: ["unknown"] },
         { training: ["naloxone-trainer", "naloxone-trainer"] },
         { otherTraining: undefined },
@@ -1342,8 +1345,8 @@ describe(
           newPage.locator("[data-medic-certifications]"),
         ).toBeHidden();
         for (const [name, value] of Object.entries(answers)) {
-          if (name === "heardAboutUsSources") {
-            for (const source of answers.heardAboutUsSources)
+          if (name === "heardAboutUsSources" || name === "training") {
+            for (const source of value as string[])
               await newPage
                 .locator(`[name="${name}"][value="${source}"]`)
                 .check();

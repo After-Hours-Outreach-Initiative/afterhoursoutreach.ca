@@ -43,9 +43,9 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
     await expectComplete(page, "team-interests", true);
-    await expectComplete(page, "training-and-safety", true);
+    await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
-    await expect(count).toHaveText(["2/5 complete", "2/5 complete"]);
+    await expect(count).toHaveText(["1/5 complete", "1/5 complete"]);
     await expect(form.locator("[data-error]:visible")).toHaveCount(0);
     await expect(reviewButton).toBeEnabled();
     await expect(reviewButton).toBeInViewport();
@@ -71,6 +71,9 @@ for (const width of [390, 1280]) {
         '.volunteer-contents-sidebar [href="#application-personal-info"] svg',
       ),
     ).toHaveCSS("visibility", "hidden");
+
+    await form.locator('[name="training"][value="none"]').check();
+    await expectComplete(page, "training-and-safety", true);
 
     for (const [name, value] of Object.entries({
       firstName: "Test",
@@ -169,9 +172,9 @@ for (const width of [390, 1280]) {
     await form.evaluate((element: HTMLFormElement) => element.reset());
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
-    await expectComplete(page, "training-and-safety", true);
+    await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
-    await expect(count).toHaveText(["2/5 complete", "2/5 complete"]);
+    await expect(count).toHaveText(["1/5 complete", "1/5 complete"]);
     if (width >= 1024) {
       await page.setViewportSize({ width, height: 400 });
       await expect(reviewButton).toBeInViewport();
@@ -262,7 +265,7 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
   expect(await measure()).toEqual(initial);
   await expect(summary.locator(".volunteer-contents-toggle")).toHaveCount(0);
   await expect(summary.locator("[data-application-progress-count]")).toHaveText(
-    "2/5 complete",
+    "1/5 complete",
   );
   await page.locator('[name="firstName"]').fill("Saved progress");
   await expect(status).toHaveText(/^Last saved at /);

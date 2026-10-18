@@ -115,6 +115,10 @@ export const certificationOptions = [
 
 export const trainingQuestion =
   "Do you have any of the following relevant training or experience? Select all that apply.";
+export const trainingRequiredError =
+  "Select at least one option, including No relevant training or experience if none apply.";
+export const trainingExclusiveError =
+  "Select No relevant training or experience on its own, or choose your relevant training and experience.";
 
 export const trainingOptions = [
   {
@@ -160,6 +164,7 @@ export const trainingOptions = [
     label: "Nonprofit grant writing, fundraising, or donor relations",
   },
   { value: "other", label: "Other" },
+  { value: "none", label: "No relevant training or experience" },
 ] as const;
 
 // Keep existing saved answers and older form submissions compatible.
