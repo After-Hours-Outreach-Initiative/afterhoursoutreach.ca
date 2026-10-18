@@ -1146,9 +1146,13 @@ describe(
           ),
         ).toHaveCount(0);
         const saveProfile = page
-          .getByRole("button", { name: "Save profile", includeHidden: true })
+          .getByRole("button", {
+            name: "Save",
+            exact: true,
+            includeHidden: true,
+          })
           .first();
-        await page.getByRole("button", { name: "Edit profile" }).click();
+        await page.getByRole("button", { name: "Edit personal info" }).click();
         await expect(saveProfile).toBeDisabled();
         await expect(
           page

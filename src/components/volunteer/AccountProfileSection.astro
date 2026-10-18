@@ -38,8 +38,13 @@ const { id, heading, collapsible = false, describedBy } = Astro.props;
       </fieldset>
     </details>
   ) : (
-    <fieldset class="volunteer-profile-section" aria-describedby={describedBy}>
-      <legend>
+    <fieldset
+      class="volunteer-profile-section"
+      aria-describedby={describedBy}
+      data-profile-section
+    >
+      <legend class="sr-only">{heading}</legend>
+      <div class="volunteer-profile-section-heading">
         <h3
           id={id}
           class="volunteer-profile-heading"
@@ -48,7 +53,28 @@ const { id, heading, collapsible = false, describedBy } = Astro.props;
         >
           {heading}
         </h3>
-      </legend>
+        <button
+          type="button"
+          class="btn btn-outline"
+          data-profile-edit
+          aria-label={`Edit ${heading.toLowerCase()}`}
+          aria-controls={`${id}-fields`}
+          aria-expanded="false"
+          disabled
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="m16 3 5 5-12 12-6 1 1-6L16 3Z" />
+            <path d="m13 6 5 5" />
+          </svg>
+          Edit
+        </button>
+      </div>
       <slot />
     </fieldset>
   )

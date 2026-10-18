@@ -98,10 +98,12 @@ function form(
     event.preventDefault();
     if (element.dataset.submitting) return;
     const changes = initialize(element);
+    if (changes && !changes.submitButton()) return;
     const button =
       event.submitter instanceof HTMLButtonElement
         ? event.submitter
-        : element.querySelector<HTMLButtonElement>('button[type="submit"]');
+        : (changes?.submitButton() ??
+          element.querySelector<HTMLButtonElement>('button[type="submit"]'));
     if (
       button?.disabled ||
       button?.closest("[hidden]") ||
@@ -117,7 +119,7 @@ function form(
     if (emailCancel) emailCancel.disabled = true;
     const values = element.hasAttribute("data-application")
       ? applicationSubmissionValues(element)
-      : new FormData(element);
+      : (changes?.values() ?? new FormData(element));
     const label = button?.textContent;
     element.setAttribute("aria-busy", "true");
     if (button) {

@@ -242,6 +242,34 @@ body:has([data-application], [data-account-contents-flow]) {
   font-weight: normal;
   line-height: 1.4;
 }
+.volunteer-profile-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #3f3f46;
+}
+.volunteer-profile-section-heading .volunteer-profile-heading {
+  padding: 0;
+  border: 0;
+}
+.volunteer-profile-section-heading .btn {
+  flex-shrink: 0;
+  gap: 8px;
+}
+.volunteer-profile-section-heading svg {
+  width: 16px;
+  height: 16px;
+}
+[data-profile-fields] > [data-profile-actions],
+[data-profile-team-training]:has([data-profile-medical-fields]) {
+  margin-top: 24px;
+}
+[data-profile-team-training] > p {
+  margin-bottom: 16px;
+}
 .volunteer-contents {
   --contents-padding: 24px;
   position: sticky;
