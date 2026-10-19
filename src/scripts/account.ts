@@ -249,9 +249,10 @@ form("[data-account-profile]", async (element, values) => {
         name === "Account" ? "Account" : `Account for ${name}`,
       );
   }
-  message(element, result.message || "Profile saved.", "success");
-  if (element.hasAttribute("data-application"))
+  if (element.hasAttribute("data-application")) {
+    message(element, result.message || "Profile saved.", "success");
     location.assign(result.next ?? "/volunteer/account");
+  }
 });
 
 function closeEmailEditor(settings: HTMLElement) {
