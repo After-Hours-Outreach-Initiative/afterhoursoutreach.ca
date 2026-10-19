@@ -7,6 +7,7 @@ export function initPageContents(
     "[data-contents-menu]",
   );
   const toggle = menu?.querySelector<HTMLElement>("summary");
+  const dropdown = menu?.querySelector<HTMLElement>("[data-contents-dropdown]");
   const current = contents?.querySelector<HTMLElement>(
     "[data-contents-current]",
   );
@@ -98,10 +99,15 @@ export function initPageContents(
     if (active && active.links[0].getAttribute("aria-current") !== "location")
       activate(active);
     if (!barHeight) return;
-    const bounds = bar.getBoundingClientRect();
+    // Include the dropdown's gap below the bar. Its scroll area contains both
+    // section links and any action, so the action stays reachable on short screens.
+    const dropdownTop =
+      menu.open && dropdown
+        ? dropdown.getBoundingClientRect().top
+        : bar.getBoundingClientRect().bottom;
     flow.style.setProperty(
       "--contents-dropdown-space",
-      `${Math.max(0, window.innerHeight - bounds.bottom - 16)}px`,
+      `${Math.max(0, window.innerHeight - dropdownTop - 16)}px`,
     );
   };
   const schedule = () => {
