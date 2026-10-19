@@ -73,6 +73,13 @@ export function initPageContents(
       "--contents-scroll-offset",
       `${stickyHeight + barHeight}px`,
     );
+    if (application)
+      contents.toggleAttribute(
+        "data-contents-stuck",
+        barHeight > 0 &&
+          getComputedStyle(contents).position === "sticky" &&
+          Math.abs(contents.getBoundingClientRect().top - stickyHeight) < 1,
+      );
   };
   const activate = (active: (typeof sections)[number]) => {
     current.textContent =
