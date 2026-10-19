@@ -308,28 +308,6 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-contents summary::-webkit-details-marker {
   display: none;
 }
-.volunteer-contents-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  min-height: 40px;
-  padding: 6px 10px;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  background: var(--color-black);
-  color: #d4d4d8;
-  white-space: nowrap;
-}
-.volunteer-contents-toggle svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  color: #a1a1aa;
-}
-.volunteer-contents-menu[open] .volunteer-contents-toggle svg {
-  transform: rotate(90deg);
-}
 .volunteer-contents-current {
   flex: 1;
   min-width: 0;
@@ -384,23 +362,13 @@ body:has([data-application], [data-account-contents-flow]) {
   position: absolute;
   inset: 100% 0 auto;
   display: grid;
-  max-height: min(
-    24rem,
-    var(
-      --contents-dropdown-space,
-      calc(100dvh - var(--site-header-height) - 70px)
-    )
-  );
+  max-height: max(0px, calc(100dvh - 70px));
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
   padding: 4px var(--contents-padding);
   border-radius: 0 0 6px 6px;
   background: #0c0d10;
   box-shadow: 0 12px 30px #0008;
-}
-.volunteer-application-contents .volunteer-contents-dropdown {
-  max-height: max(0px, calc(100dvh - 70px));
-  overscroll-behavior: auto;
 }
 .volunteer-contents-dropdown > .btn {
   margin-block: 8px;
@@ -489,58 +457,62 @@ body:has([data-application], [data-account-contents-flow]) {
   [data-application-draft-actions] > .volunteer-actions {
     flex-direction: column;
   }
-  body:has([data-application-flow]) > .site-header {
+  body:has([data-application-flow], [data-account-contents-flow])
+    > .site-header {
     position: relative;
   }
-  [data-application-flow] {
+  [data-application-flow],
+  [data-account-contents-flow] {
     --contents-scroll-offset: 54px;
   }
   .volunteer-contents-actions {
     display: none;
   }
-  [data-application-flow] > .volunteer-contents {
+  .volunteer-contents {
     top: 0;
-    margin: 0;
     background: transparent;
   }
-  /* The visible step's summary owns the shared seam. */
+  [data-application-flow] > .volunteer-contents {
+    margin: 0;
+  }
+  /* The compact summary owns the first panel's shared seam. */
   [data-application-flow]:has(> .volunteer-application-contents:not([hidden]))
-    > [data-application] {
+    > [data-application],
+  [data-account-contents-body] > .volunteer-panel:first-child {
     margin-top: 0;
     border-top: 0;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
   }
-  .volunteer-application-contents .volunteer-contents-menu {
+  .volunteer-contents-menu {
     border-radius: 10px 10px 0 0;
   }
-  .volunteer-application-contents[data-contents-stuck]
-    .volunteer-contents-menu {
+  .volunteer-contents[data-contents-stuck] .volunteer-contents-menu {
     box-shadow: 0 4px 12px #0004;
   }
-  .volunteer-application-contents summary {
+  .volunteer-contents summary {
     gap: 8px;
     padding-inline: 12px;
     border: var(--volunteer-border);
     border-radius: 10px 10px 0 0;
   }
   @media (hover: hover) {
-    .volunteer-application-contents summary:hover {
+    .volunteer-contents summary:hover {
       border-color: #71717a;
     }
   }
-  .volunteer-application-contents summary:focus-visible {
+  .volunteer-contents summary:focus-visible {
     box-shadow: inset 0 0 0 1px #818cf8;
   }
-  .volunteer-application-contents summary:active {
+  .volunteer-contents summary:active {
     box-shadow: inset 0 0 0 100vmax #ffffff0d;
   }
-  .volunteer-application-contents[data-contents-stuck] .volunteer-contents-menu,
-  .volunteer-application-contents[data-contents-stuck] summary {
+  .volunteer-contents[data-contents-stuck] .volunteer-contents-menu,
+  .volunteer-contents[data-contents-stuck] summary {
     border-radius: 0;
     background: var(--color-panel-soft);
   }
-  .volunteer-application-contents .volunteer-contents-dropdown {
+  .volunteer-contents-dropdown {
     border: var(--volunteer-border);
     border-top: 0;
     border-radius: 0 0 8px 8px;
@@ -562,7 +534,7 @@ body:has([data-application], [data-account-contents-flow]) {
     padding-block: 10px;
     font-size: 16px;
   }
-  .volunteer-application-contents .volunteer-contents-dropdown a {
+  .volunteer-contents-dropdown a {
     font-size: 18px;
     font-weight: normal;
   }

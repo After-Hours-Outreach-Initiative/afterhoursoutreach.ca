@@ -33,93 +33,71 @@ const totalSections = entries.filter((entry) => entry.completable).length;
       <details class="volunteer-contents-menu" data-contents-menu>
         <summary
           data-application-step-heading={application || undefined}
-          aria-label={application ? heading : undefined}
+          aria-label={heading}
         >
+          <svg
+            class="volunteer-contents-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"></path>
+          </svg>
+          <span class="volunteer-contents-current" data-contents-current>
+            {application ? heading : entries[0]?.heading}
+          </span>
           {
-            application ? (
-              <>
+            application && !review && (
+              <span
+                class="volunteer-contents-progress"
+                data-application-progress
+                role="progressbar"
+                aria-label="Application progress"
+                aria-valuemin="0"
+                aria-valuemax={totalSections}
+                aria-valuenow="0"
+                aria-valuetext={`0 of ${totalSections} sections complete`}
+              >
                 <svg
-                  class="volunteer-contents-icon"
-                  viewBox="0 0 24 24"
+                  viewBox="0 0 28 28"
                   fill="none"
                   stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
+                  stroke-width="3"
                   aria-hidden="true"
                 >
-                  <path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1" />
+                  <circle
+                    class="volunteer-contents-progress-track"
+                    cx="14"
+                    cy="14"
+                    r="11"
+                  />
+                  <circle
+                    data-application-progress-value
+                    cx="14"
+                    cy="14"
+                    r="11"
+                    pathLength="100"
+                    stroke-dasharray="100"
+                    stroke-dashoffset="100"
+                    transform="rotate(-90 14 14)"
+                  />
                 </svg>
-                <span class="volunteer-contents-current" data-contents-current>
-                  {heading}
-                </span>
-                {!review && (
-                  <span
-                    class="volunteer-contents-progress"
-                    data-application-progress
-                    role="progressbar"
-                    aria-label="Application progress"
-                    aria-valuemin="0"
-                    aria-valuemax={totalSections}
-                    aria-valuenow="0"
-                    aria-valuetext={`0 of ${totalSections} sections complete`}
-                  >
-                    <svg
-                      viewBox="0 0 28 28"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="3"
-                      aria-hidden="true"
-                    >
-                      <circle
-                        class="volunteer-contents-progress-track"
-                        cx="14"
-                        cy="14"
-                        r="11"
-                      />
-                      <circle
-                        data-application-progress-value
-                        cx="14"
-                        cy="14"
-                        r="11"
-                        pathLength="100"
-                        stroke-dasharray="100"
-                        stroke-dashoffset="100"
-                        transform="rotate(-90 14 14)"
-                      />
-                    </svg>
-                  </span>
-                )}
-                <svg
-                  class="volunteer-contents-chevron"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  aria-hidden="true"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </>
-            ) : (
-              <>
-                <span class="volunteer-contents-toggle">
-                  {heading}
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                  >
-                    <path d="m9 5 7 7-7 7" />
-                  </svg>
-                </span>
-                <span class="volunteer-contents-current" data-contents-current>
-                  {entries[0]?.heading}
-                </span>
-              </>
+              </span>
             )
           }
+          <svg
+            class="volunteer-contents-chevron"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
         </summary>
         <div class="volunteer-contents-dropdown" data-contents-dropdown>
           <PageContentsList
