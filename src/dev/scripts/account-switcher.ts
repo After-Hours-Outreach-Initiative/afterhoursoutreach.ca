@@ -199,15 +199,45 @@ export async function initAccountSwitcher() {
         `${user.email}${user.role === "organizer" ? " · Organizer" : ""}`,
       );
       const row = document.createElement("div");
-      row.className = "grid min-w-0 gap-1";
+      row.className =
+        "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2";
       row.dataset.localAccount = user.id;
       const remove = document.createElement("button");
       remove.type = "button";
-      remove.className = "btn btn-quiet";
-      remove.textContent = "Delete";
+      remove.className = "btn btn-quiet account-profile-delete";
       remove.setAttribute("aria-label", `Delete ${label} (${user.email})`);
+      remove.title = `Delete ${label} (${user.email})`;
       remove.dataset.deleteUser = user.id;
       remove.dataset.deleteName = `${label} (${user.email})`;
+      // Match TrashIcon.astro using DOM nodes, not HTML containing account data.
+      const icon = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "svg",
+      );
+      for (const [name, value] of Object.entries({
+        class: "size-5",
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        "stroke-width": "2",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "aria-hidden": "true",
+        focusable: "false",
+      }))
+        icon.setAttribute(name, value);
+      for (const d of [
+        "M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2",
+        "m5 6 1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7m4-7v7",
+      ]) {
+        const path = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "path",
+        );
+        path.setAttribute("d", d);
+        icon.appendChild(path);
+      }
+      remove.appendChild(icon);
       row.appendChild(button);
       row.appendChild(remove);
       profiles.appendChild(row);
