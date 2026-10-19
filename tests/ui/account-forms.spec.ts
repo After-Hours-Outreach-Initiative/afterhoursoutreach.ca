@@ -47,6 +47,28 @@ async function expectEmergencyContactRows(section: Locator) {
   }
 }
 
+async function expectTeamCardRows(form: Locator) {
+  const grid = form.locator(".volunteer-team-options");
+  const bounds = await grid.boundingBox();
+  const boxes = await grid
+    .locator(".volunteer-team-option")
+    .evaluateAll((cards) =>
+      cards.map((card) => {
+        const { x, y, width, height } = card.getBoundingClientRect();
+        return { x, y, width, height };
+      }),
+    );
+  expect(boxes).toHaveLength(3);
+  for (const [index, box] of boxes.entries()) {
+    expect(box.x).toBeCloseTo(bounds!.x, 1);
+    expect(box.width).toBeCloseTo(bounds!.width, 1);
+    if (index)
+      expect(box.y).toBeGreaterThan(
+        boxes[index - 1].y + boxes[index - 1].height,
+      );
+  }
+}
+
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
     !baseURL?.startsWith("http://localhost:"),
@@ -655,6 +677,7 @@ test("application shows all required errors and saves after they are corrected",
     await expectEmergencyContactRows(
       form.getByRole("group", { name: "Emergency contact", exact: true }),
     );
+    await expectTeamCardRows(form);
   }
   await expect(form.getByRole("heading", { level: 3 })).toHaveText([
     "Personal info",
@@ -2060,6 +2083,10 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   const training = form.locator("[data-medic-certifications]");
   await expect(training).toBeHidden();
   await expect(cards).toHaveCount(3);
+  for (const width of [320, 375, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectTeamCardRows(form);
+  }
   await expect(outreach).toHaveAccessibleDescription(
     /Hand out supplies and connect with the DTES community/,
   );
