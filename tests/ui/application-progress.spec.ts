@@ -100,10 +100,14 @@ async function expectActionsPosition(page: Page) {
   ).toHaveCount(2);
 }
 
-async function expectDropdown(dropdown: Locator) {
+async function expectDropdown(dropdown: Locator, scrolls = false) {
   await expect(dropdown).toHaveCSS("position", "absolute");
-  await expect(dropdown).toHaveCSS("max-height", "none");
-  await expect(dropdown).toHaveCSS("overflow-y", "visible");
+  await expect(dropdown).toHaveCSS(
+    "max-height",
+    `${Math.max(0, dropdown.page().viewportSize()!.height - 70)}px`,
+  );
+  await expect(dropdown).toHaveCSS("overflow-y", "auto");
+  await expect(dropdown).toHaveCSS("overscroll-behavior", "auto");
   expect(
     await dropdown.evaluate((element) => {
       const summary = element.parentElement!.querySelector("summary")!;
@@ -113,11 +117,11 @@ async function expectDropdown(dropdown: Locator) {
       );
     }),
   ).toBe(true);
-  expect(
-    await dropdown.evaluate(
-      (element) => element.scrollHeight - element.clientHeight,
-    ),
-  ).toBe(0);
+  const overflow = await dropdown.evaluate(
+    (element) => element.scrollHeight - element.clientHeight,
+  );
+  if (scrolls) expect(overflow).toBeGreaterThan(0);
+  else expect(overflow).toBe(0);
   expect(
     await dropdown.evaluate((element) =>
       element
@@ -126,6 +130,7 @@ async function expectDropdown(dropdown: Locator) {
     ),
   ).toBe("");
   await expect(dropdown.getByRole("link")).toHaveCount(7);
+  if (scrolls) return;
   const bounds = (await dropdown.boundingBox())!;
   for (const control of await dropdown
     .locator("a, button, [role=status]")
@@ -481,7 +486,7 @@ test("restored drafts initialize completion without showing validation errors", 
   await expect(page.locator("[data-error]:visible")).toHaveCount(0);
 });
 
-test("one compact mobile tracker keeps its reading edge and lets its natural dropdown extend below the viewport", async ({
+test("one compact mobile tracker keeps its reading edge and scrolls its viewport-capped dropdown", async ({
   page,
   baseURL,
 }) => {
@@ -606,6 +611,12 @@ test("one compact mobile tracker keeps its reading edge and lets its natural dro
       element.previousElementSibling?.hasAttribute("data-application-review"),
     ),
   ).toBe(true);
+  await dropdown.hover();
+  await page.mouse.wheel(0, 80);
+  await expect
+    .poll(() => page.evaluate(() => scrollY))
+    .toBeGreaterThan(beforeOpen);
+  expect(await dropdown.evaluate((element) => element.scrollTop)).toBe(0);
   await tracker
     .getByRole("link", { name: "Emergency contact", exact: true })
     .click();
@@ -686,16 +697,15 @@ test("one compact mobile tracker keeps its reading edge and lets its natural dro
     await expect(tracker).toHaveAttribute("data-contents-stuck", "");
     await expect(menu).not.toHaveCSS("box-shadow", "none");
     await expect(dropdown).toHaveCSS("border-radius", "0px 0px 8px 8px");
-    await expectDropdown(dropdown);
-    expect((await dropdown.boundingBox())!.height).toBeGreaterThan(
-      viewport.height,
-    );
+    await expectDropdown(dropdown, true);
+    expect((await dropdown.boundingBox())!.height).toBe(viewport.height - 70);
+    await expect(dropdown).toBeInViewport({ ratio: 1 });
     expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
     await page.setViewportSize({ ...viewport, height: viewport.height + 20 });
-    await expectDropdown(dropdown);
+    await expectDropdown(dropdown, true);
     expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
     await page.setViewportSize(viewport);
-    await expectDropdown(dropdown);
+    await expectDropdown(dropdown, true);
     expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
     await expect(page.locator("[data-application-flow]")).toHaveAttribute(
       "style",
@@ -713,7 +723,7 @@ test("one compact mobile tracker keeps its reading edge and lets its natural dro
     for (const key of ["Space", "Enter"]) {
       await summary.press(key);
       await expect(menu).toHaveAttribute("open", "");
-      await expectDropdown(dropdown);
+      await expectDropdown(dropdown, true);
       expect(await page.evaluate(() => scrollY)).toBe(toggleScroll);
       await summary.press(key);
       await expect(menu).not.toHaveAttribute("open");
@@ -725,8 +735,31 @@ test("one compact mobile tracker keeps its reading edge and lets its natural dro
       .focus();
     await page.keyboard.press("Tab");
     await expect(reviewButton).toBeFocused();
-    // Native focus can move the document without making an overflowing sticky
-    // menu's last controls visible. Only focus order is guaranteed here.
+    await expect(reviewButton).toBeInViewport({ ratio: 1 });
+    expect(
+      await dropdown.evaluate((element) => element.scrollTop),
+    ).toBeGreaterThan(0);
+    await dropdown.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await dropdown.hover();
+    await page.mouse.wheel(0, 40);
+    await expect
+      .poll(() => dropdown.evaluate((element) => element.scrollTop))
+      .toBe(40);
+    expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
+    await dropdown.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await expect(status).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
+    await dropdown.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await page.mouse.wheel(0, -80);
+    await expect
+      .poll(() => page.evaluate(() => scrollY))
+      .toBeLessThan(menuScroll);
     expect(await dropdown.evaluate((element) => element.scrollTop)).toBe(0);
     await page.keyboard.press("Escape");
     await expect(menu).not.toHaveAttribute("open");
