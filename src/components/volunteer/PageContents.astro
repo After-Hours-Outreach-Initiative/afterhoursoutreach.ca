@@ -48,10 +48,39 @@ const totalSections = entries.filter((entry) => entry.completable).length;
                   hidden
                 />
                 <span
-                  class="volunteer-contents-completion"
-                  data-application-progress-count
+                  class="volunteer-contents-progress"
+                  data-application-progress
+                  role="progressbar"
+                  aria-label="Application progress"
+                  aria-valuemin="0"
+                  aria-valuemax={totalSections}
+                  aria-valuenow="0"
+                  aria-valuetext={`0 of ${totalSections} sections complete`}
                 >
-                  0/{totalSections} complete
+                  <svg
+                    viewBox="0 0 28 28"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      class="volunteer-contents-progress-track"
+                      cx="14"
+                      cy="14"
+                      r="11"
+                    />
+                    <circle
+                      data-application-progress-value
+                      cx="14"
+                      cy="14"
+                      r="11"
+                      pathLength="100"
+                      stroke-dasharray="100"
+                      stroke-dashoffset="100"
+                      transform="rotate(-90 14 14)"
+                    />
+                  </svg>
                 </span>
               </>
             ) : (
