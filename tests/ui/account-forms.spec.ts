@@ -591,6 +591,45 @@ test("application shows all required errors and saves after they are corrected",
   await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/apply");
   const form = page.locator("[data-account-profile]");
+  const names = form.locator(".volunteer-name-fields input");
+  expect(
+    await names.evaluateAll((inputs) =>
+      inputs.map((input) => input.getAttribute("name")),
+    ),
+  ).toEqual(["firstName", "middleNames", "lastName"]);
+  await expect(names.nth(1)).toHaveAccessibleName("Middle name(s) (optional)");
+  await expect(names.nth(1)).not.toHaveAttribute("required");
+  for (const width of [320, 375, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const boxes = await names.evaluateAll((inputs) =>
+      inputs.map((input) => {
+        const { x, y, width, height } = input.getBoundingClientRect();
+        return { x, y, width, height };
+      }),
+    );
+    for (let index = 1; index < boxes.length; index++) {
+      expect(boxes[index].width).toBeCloseTo(boxes[0].width, 1);
+      if (width >= 1024) {
+        expect(boxes[index].y).toBeCloseTo(boxes[0].y, 1);
+        expect(boxes[index].x).toBeGreaterThan(
+          boxes[index - 1].x + boxes[index - 1].width,
+        );
+      } else {
+        expect(boxes[index].x).toBe(boxes[0].x);
+        expect(boxes[index].y).toBeGreaterThan(
+          boxes[index - 1].y + boxes[index - 1].height,
+        );
+      }
+    }
+    expect(
+      await form.locator(".volunteer-name-fields").evaluate((group) => ({
+        columns: getComputedStyle(
+          group.parentElement!,
+        ).gridTemplateColumns.split(" ").length,
+        overflows: document.documentElement.scrollWidth > innerWidth,
+      })),
+    ).toEqual({ columns: width >= 1024 ? 2 : 1, overflows: false });
+  }
   await expect(form.getByRole("heading", { level: 3 })).toHaveText([
     "Personal info",
     "Emergency contact",
@@ -864,7 +903,9 @@ test("application shows all required errors and saves after they are corrected",
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
-  await expect(form.locator('[name="firstName"]')).toHaveCount(0);
+  await expect(
+    form.locator('[name="firstName"], [name="middleNames"], [name="lastName"]'),
+  ).toHaveCount(0);
   await expect(
     page.getByRole("textbox", { name: /^Preferred name/ }),
   ).toHaveValue(sampleAnswers.preferredName);
