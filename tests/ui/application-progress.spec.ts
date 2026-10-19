@@ -73,7 +73,7 @@ async function expectProgress(page: Page, completed: number) {
 }
 
 async function expectActionsPosition(page: Page) {
-  const actions = page.getByRole("group", { name: "Review and discard" });
+  const actions = page.getByRole("group", { name: "Review or discard" });
   await expect(actions).toBeInViewport({ ratio: 1 });
   await expect
     .poll(async () => {
@@ -139,6 +139,18 @@ for (const width of [390, 1280]) {
     const draftActions = page.locator("[data-application-draft-actions]");
     const discard = draftActions.locator("[data-draft-discard]");
     await expectActionsPosition(page);
+    expect(
+      await tracker
+        .locator("ol")
+        .evaluateAll((lists) =>
+          lists.map((list) =>
+            Array.from(
+              list.children,
+              (item) => getComputedStyle(item).paddingInlineStart,
+            ),
+          ),
+        ),
+    ).toEqual(Array(2).fill(["0px", ...Array(5).fill("16px"), "0px"]));
     for (const id of ["overview", "review-and-discard"]) {
       const links = tracker.locator(`[href="#application-${id}"]`);
       await expect(links).toHaveCount(2);
@@ -233,11 +245,11 @@ for (const width of [390, 1280]) {
 
     if (width < 1024) await menu.locator("summary").click();
     await tracker
-      .getByRole("link", { name: "Review and discard", exact: true })
+      .getByRole("link", { name: "Review or discard", exact: true })
       .click();
     await expectActionsPosition(page);
     await expect(
-      page.getByRole("group", { name: "Review and discard" }),
+      page.getByRole("group", { name: "Review or discard" }),
     ).toBeFocused();
     await expect(form.locator("[data-application-review-step]")).toBeHidden();
     await expect(form.locator("[data-error]:visible")).toHaveCount(0);
@@ -410,7 +422,7 @@ for (const width of [390, 1280]) {
       await page.setViewportSize({ width, height: 400 });
       await expect(reviewButton).toBeInViewport();
       await tracker
-        .getByRole("link", { name: "Review and discard", exact: true })
+        .getByRole("link", { name: "Review or discard", exact: true })
         .click();
       await expectActionsPosition(page);
     }
@@ -600,7 +612,7 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     await page.setViewportSize(viewport);
     await summary.click();
     await menu
-      .getByRole("link", { name: "Review and discard", exact: true })
+      .getByRole("link", { name: "Review or discard", exact: true })
       .click();
     await expectActionsPosition(page);
     const bottomReview = localApplicationReviewButton(page, "bottom");
@@ -661,7 +673,7 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     await expect(summary).toBeInViewport({ ratio: 0.99 });
     const menuScroll = await page.evaluate(() => scrollY);
     await menu
-      .getByRole("link", { name: "Review and discard", exact: true })
+      .getByRole("link", { name: "Review or discard", exact: true })
       .focus();
     await page.keyboard.press("Tab");
     await expect(reviewButton).toBeFocused();

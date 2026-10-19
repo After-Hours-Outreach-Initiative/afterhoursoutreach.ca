@@ -15,7 +15,12 @@ const { entries, application, variant } = Astro.props;
 <ol>
   {
     entries.map((section, index) => (
-      <li class:list={{ "volunteer-contents-nested": section.nested }}>
+      <li
+        class:list={{
+          "volunteer-contents-nested":
+            section.nested || (application && section.completable),
+        }}
+      >
         <a
           href={`#${section.id}`}
           aria-current={index === 0 ? "location" : undefined}
