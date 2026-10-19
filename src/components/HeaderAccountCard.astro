@@ -1,28 +1,47 @@
 ---
+import AccountIcon from "@/components/icons/AccountIcon.astro";
+
 interface Props {
   signedIn: boolean;
   name?: string;
   email?: string;
   accountPage: boolean;
   class?: string;
+  showIcon?: boolean;
 }
 
-const { signedIn, name, email, accountPage, class: className } = Astro.props;
+const {
+  signedIn,
+  name,
+  email,
+  accountPage,
+  class: className,
+  showIcon = false,
+} = Astro.props;
 ---
 
 <div class:list={["header-account-card", className]}>
   <div class="header-account-identity">
-    <strong
-      class="header-account-name"
-      data-account-menu-name={signedIn ? "" : undefined}
-      >{name?.trim() || "Your account"}</strong
-    >
-    <p
-      class="header-account-email"
-      data-account-email={signedIn ? "" : undefined}
-    >
-      {email}
-    </p>
+    {
+      showIcon && (
+        <span class="header-account-icon">
+          <AccountIcon class="size-5 shrink-0" />
+        </span>
+      )
+    }
+    <div class="header-account-details">
+      <strong
+        class="header-account-name"
+        data-account-menu-name={signedIn ? "" : undefined}
+        >{name?.trim() || "Your account"}</strong
+      >
+      <p
+        class="header-account-email"
+        data-account-email={signedIn ? "" : undefined}
+      >
+        {email}
+      </p>
+    </div>
   </div>
   <a href="/volunteer/account" aria-current={accountPage ? "page" : undefined}
     >Account</a
