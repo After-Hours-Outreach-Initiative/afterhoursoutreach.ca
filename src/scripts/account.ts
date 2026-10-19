@@ -14,7 +14,7 @@ import {
 import { initApplicationSections } from "./application-sections";
 import { initPageContents } from "./page-contents";
 import { initPhoneInputs } from "./phone-input";
-import { initBirthDate } from "./birth-date";
+import { initDateInputs } from "./date-input";
 import {
   clearApplicationDraft,
   initApplicationDraft,
@@ -72,7 +72,7 @@ function form(
       else if (element.dataset.profileUserId)
         clearApplicationDraft(element.dataset.profileUserId);
       initPhoneInputs(element);
-      initBirthDate(element);
+      initDateInputs(element);
       initMedicCertifications(element);
       initRelevantTraining(element);
       initReferralSources(element);

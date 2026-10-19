@@ -7,6 +7,11 @@ import {
   profileFormSections,
 } from "../data/application";
 import { profileAnswerRows } from "../data/profile-answers";
+import {
+  readDateInputs,
+  saveDateInputDefaults,
+  setDateInputActive,
+} from "./date-input";
 
 const requestFailed = "The request failed. Please try again.";
 
@@ -83,10 +88,9 @@ export function initMedicCertifications(element: HTMLFormElement) {
   const other = section.querySelector<HTMLInputElement>('[value="other"]');
   const training = element.querySelector<HTMLElement>("[data-other-training]");
   const experience = training?.querySelector<HTMLTextAreaElement>("textarea");
-  const expiry = element.querySelector<HTMLElement>(
+  const expiry = element.querySelector<HTMLFieldSetElement>(
     "[data-certification-expiry]",
   );
-  const expiryInput = expiry?.querySelector<HTMLInputElement>("input");
   const teamTraining = element.querySelector<HTMLElement>(
     "[data-profile-team-training]",
   );
@@ -96,11 +100,7 @@ export function initMedicCertifications(element: HTMLFormElement) {
     if (teamTraining) teamTraining.hidden = !medic.checked;
     // Retain checked answers in FormData and drafts without hidden validation.
     for (const field of fields) field.required = medic.checked;
-    if (expiry && expiryInput) {
-      expiry.hidden = !medic.checked;
-      expiryInput.required = medic.checked;
-      expiryInput.readOnly = !medic.checked;
-    }
+    if (expiry) setDateInputActive(expiry, medic.checked);
     if (training && experience) {
       const active = medic.checked && Boolean(other?.checked);
       training.hidden = !active;
@@ -268,6 +268,10 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   )!;
   const feedback = element.querySelector<HTMLElement>("[data-form-message]")!;
   let active: (typeof sections)[number] | undefined;
+  // Unnamed partial edits can leave the canonical value unchanged. Snapshot the
+  // exact parts per request so a late save cannot mark newer edits as saved.
+  let savedDates = readDateInputs(element);
+  const submittedDates = new WeakMap<FormData, Record<string, string>>();
   const renderSavedAnswers = (values: FormData) => {
     const answers = {
       ...Object.fromEntries(
@@ -326,6 +330,7 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   for (const { fields } of sections) fields.disabled = true;
   renderSavedAnswers(saved);
   const values = () => {
+    const dates = readDateInputs(element);
     const result = new FormData();
     for (const [name, value] of saved) result.append(name, value);
     if (active) {
@@ -344,10 +349,15 @@ export function initAccountFormChanges(element: HTMLFormElement) {
         if (!retainCertifications || name !== "certifications")
           result.append(name, value);
     }
+    submittedDates.set(result, dates);
     return result;
   };
   const changed = () =>
-    Boolean(active) && snapshot(values()) !== snapshot(saved);
+    Boolean(active) &&
+    (snapshot(values()) !== snapshot(saved) ||
+      Object.entries(readDateInputs(active!.fields)).some(
+        ([name, value]) => value !== savedDates[name],
+      ));
   const setEditing = (next?: (typeof sections)[number]) => {
     const restoreFocus =
       active?.section.contains(document.activeElement) ||
@@ -423,6 +433,8 @@ export function initAccountFormChanges(element: HTMLFormElement) {
     markSaved(values: FormData) {
       // Edits made while the request is pending must remain unsaved.
       saved = values;
+      savedDates = submittedDates.get(values) ?? savedDates;
+      saveDateInputDefaults(active!.fields, savedDates);
       renderSavedAnswers(values);
       // Cancel/reset must return to the latest save, not the initial page load.
       for (const control of active!.fields.querySelectorAll<

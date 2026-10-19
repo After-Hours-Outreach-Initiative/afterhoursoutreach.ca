@@ -137,6 +137,12 @@ for (const [layout, viewport] of [
     await page.goto("/apply#application-personal-info");
     await page.locator('[name="firstName"]').fill("Old application");
     await page.locator('[data-birth-date-part="day"]').fill("23");
+    await page.locator('[name="teams"][value="medic"]').check();
+    await page
+      .locator(
+        '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+      )
+      .fill("203");
     await page.locator('[name="medicalConditions"]').fill("Private old answer");
     await saved(page, "Old application");
     await page.locator('[name="phone"]').fill("Unsynced answer");
@@ -152,6 +158,11 @@ for (const [layout, viewport] of [
       await expect(
         page.locator(`[data-birth-date-part="${part}"]`),
       ).toHaveValue("");
+    await expect(
+      page.locator(
+        '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+      ),
+    ).toHaveValue("");
     await expect(page.locator('[name="medicalConditions"]')).toHaveValue("");
     await expect(page.locator('[name="phone"]')).toHaveValue("");
     await expect(page.locator("[data-draft-new]")).toBeHidden();

@@ -13,7 +13,7 @@ import {
   type ApplicationDraft,
   type ApplicationDraftAnswers,
 } from "../data/application-draft";
-import { restoreBirthDate, syncBirthDate } from "./birth-date";
+import { restoreDateInputs, readDateInputs } from "./date-input";
 
 const endpoint = "/api/v1/account/application-draft";
 const emptyAnswers = () => applicationDraftAnswersSchema.parse({});
@@ -142,7 +142,7 @@ export function clearSyncedApplicationDrafts() {
 }
 
 export function readDraftAnswers(element: HTMLFormElement) {
-  const birthDate = syncBirthDate(element);
+  const dates = readDateInputs(element);
   const answers = emptyAnswers();
   for (const name of Object.keys(answers) as (keyof typeof answers)[]) {
     const controls = [
@@ -163,7 +163,7 @@ export function readDraftAnswers(element: HTMLFormElement) {
       });
     } else Object.assign(answers, { [name]: controls[0]?.value ?? "" });
   }
-  if (birthDate !== undefined) answers.birthDate = birthDate;
+  Object.assign(answers, dates);
   return answers;
 }
 
@@ -354,7 +354,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     }
     // Repopulate the unnamed date parts before synthetic input/change listeners
     // can read them, including silent startup reconciliation.
-    restoreBirthDate(element, answers.birthDate);
+    restoreDateInputs(element, answers);
     const consent = element.querySelector<HTMLInputElement>(
       '[name="codeOfConductAccepted"]',
     );

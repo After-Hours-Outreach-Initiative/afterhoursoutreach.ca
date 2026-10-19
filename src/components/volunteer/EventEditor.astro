@@ -2,6 +2,7 @@
 import type { EventRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
+import DateInput from "./DateInput.astro";
 interface Props {
   event?: EventRow;
 }
@@ -56,23 +57,15 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
           </label>
         )
       }
-      <div class="volunteer-field">
-        <label for={`${dialogId}-startsAt`}>Start date and time</label>
-        <input
-          id={`${dialogId}-startsAt`}
-          type="datetime-local"
-          name="startsAt"
-          aria-describedby={`error-${dialogId}-startsAt ${dialogId}-time-help`}
-          required
-          value={event ? vancouverInput(event.startsAt) : ""}
-        /><span class="volunteer-help" id={`${dialogId}-time-help`}
-          >Vancouver time, regardless of your device’s time zone.</span
-        >
-        <FieldError
-          field={`${dialogId}-startsAt`}
-          message="Choose a valid start date and time."
-        />
-      </div>
+      <DateInput
+        name="startsAt"
+        id={`${dialogId}-startsAt`}
+        errorField={`${dialogId}-startsAt`}
+        label="Start date"
+        value={event ? vancouverInput(event.startsAt) : ""}
+        help="Vancouver time, regardless of your device’s time zone."
+        withTime
+      />
       <div class="volunteer-field">
         <label for={`${dialogId}-spots`}>Volunteer spots</label>
         <input
@@ -149,8 +142,16 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
       </fieldset>
     </div>
     <p data-form-message role="status" hidden></p>
-    <button class="btn btn-primary" type="submit" data-loading-label="Saving…"
-      >Save event</button
+    <noscript
+      ><p>
+        Enable JavaScript to edit event dates and save this event.
+      </p></noscript
+    >
+    <button
+      class="btn btn-primary"
+      type="submit"
+      data-loading-label="Saving…"
+      disabled>Save event</button
     >
   </form>
   {

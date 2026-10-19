@@ -1,13 +1,22 @@
 import { vancouverInstant } from "../data/event-time";
 import { actionFragment, loadActionPage } from "./action-page";
 import { chooseNotification } from "./notification-choice";
+import { initDateInputs, readDateInputs } from "./date-input";
 
+function initEventDates(root: Document | HTMLElement) {
+  initDateInputs(root);
+  for (const button of root.querySelectorAll<HTMLButtonElement>(
+    '[data-event-save]:not([data-submitting]) button[type="submit"]',
+  ))
+    button.disabled = false;
+}
 // Compare against the server HTML, not transient loading/filter/expanded state.
 const renderedCards = new WeakMap<HTMLElement, string>();
 let deferredEventRefresh = false;
 let refreshDeferredEvents = () => {};
 for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
   renderedCards.set(card, card.outerHTML);
+initEventDates(document);
 
 function applyEventFilter(root: HTMLElement, type: string) {
   const selected = ["patrol", "orientation"].includes(type) ? type : "all";
@@ -75,6 +84,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       root,
       new URL(location.href).searchParams.get("type") ?? "all",
     );
+    initEventDates(root);
     return;
   }
   if (root.dataset.eventAccess !== "true") {
@@ -168,6 +178,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     new URL(location.href).searchParams.get("type") ?? "all",
   );
   root.dataset.eventVersion = refreshed.dataset.eventVersion;
+  initEventDates(root);
   if (element?.matches("[data-event-save]") && !eventId) element.reset();
   if (restoreFocus && (element || !focused?.isConnected)) {
     const card = eventId
@@ -368,6 +379,11 @@ function form(
       element.closest<HTMLElement>("[data-volunteer-controls], dialog") ??
       element;
     if (scope.dataset.submitting) return;
+    if (element.matches("[data-event-save]")) {
+      initEventDates(element);
+      readDateInputs(element);
+      if (!element.reportValidity()) return;
+    }
     const button = element.querySelector<HTMLButtonElement>(
       'button[type="submit"]',
     );
@@ -549,7 +565,10 @@ document.addEventListener("click", (event) => {
     button.closest<HTMLDialogElement>("dialog")?.close();
   else if (button) {
     const dialog = document.getElementById(button.dataset.showDialog ?? "");
-    if (dialog instanceof HTMLDialogElement) dialog.showModal();
+    if (dialog instanceof HTMLDialogElement) {
+      initEventDates(dialog);
+      dialog.showModal();
+    }
   }
 });
 

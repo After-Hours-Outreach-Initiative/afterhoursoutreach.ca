@@ -4,19 +4,18 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
+import { fillDateInput } from "./date-input";
 
 export async function fillApplicationField(
   scope: Page | Locator,
   name: string,
   value: string,
 ) {
-  if (name !== "birthDate") {
+  if (!["birthDate", "certificationExpiry"].includes(name)) {
     await scope.locator(`[name="${name}"]`).fill(value);
     return;
   }
-  const [year, month, day] = value.split("-");
-  for (const [part, answer] of Object.entries({ day, month, year }))
-    await scope.locator(`[data-birth-date-part="${part}"]`).fill(answer ?? "");
+  await fillDateInput(scope, name, value);
 }
 
 export async function openLocalAccountSwitcher(page: Page) {

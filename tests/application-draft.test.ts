@@ -42,12 +42,23 @@ test("drafts accept unfinished answers without trimming, date checks, or consent
     const parts = birthDateParts(value);
     const restored = applicationDraftAnswersSchema.parse({
       birthDate: birthDateDraftValue(parts),
+      certificationExpiry: birthDateDraftValue(parts),
     });
     assert.deepEqual(birthDateParts(restored.birthDate), parts);
+    assert.deepEqual(birthDateParts(restored.certificationExpiry), parts);
   }
   assert.equal(
     canonicalBirthDate({ day: "3", month: "4", year: "1990" }),
     "1990-04-03",
+  );
+  assert.equal(
+    canonicalBirthDate({ day: "29", month: "2", year: "2028" }),
+    "2028-02-29",
+  );
+  assert.equal(canonicalBirthDate({ day: "29", month: "2", year: "2027" }), "");
+  assert.equal(
+    canonicalBirthDate({ day: "14", month: "10", year: "1899" }),
+    "1899-10-14",
   );
 });
 

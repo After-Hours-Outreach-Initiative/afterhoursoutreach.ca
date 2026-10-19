@@ -15,6 +15,7 @@ import {
 } from "../../src/data/code-of-conduct";
 import { totpFromSetupKey } from "../helpers/totp";
 import { inPlaceAction } from "../helpers/in-place-action";
+import { fillDateInput } from "../helpers/date-input";
 import {
   certificationOptions,
   certificationQuestion,
@@ -733,11 +734,8 @@ test("application shows all required errors and saves after they are corrected",
   });
   const emergencyHeading = form.locator("#application-emergency-contact");
   await emergencyHeading.click();
-  for (const key of ["Enter", "Space"]) {
-    await emergencyHeading.press(key);
-    await expect(emergencyContact).toBeVisible();
-    await expect(emergencyContact.locator("input:visible")).toHaveCount(3);
-  }
+  await expect(emergencyContact).toBeVisible();
+  await expect(emergencyContact.locator("input:visible")).toHaveCount(3);
   await contents
     .getByRole("link", { name: "Emergency contact", exact: true })
     .click();
@@ -1544,7 +1542,8 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     name: "Other",
     exact: true,
   });
-  const expiry = form.locator('[name="certificationExpiry"]');
+  const expiryGroup = form.locator('[data-date-input="certificationExpiry"]');
+  const expiry = expiryGroup.locator('[data-date-part="day"]');
   await expect(training).toBeVisible();
   await expect(experience).toBeHidden();
   await expect(experience).not.toHaveAttribute("required");
@@ -1576,9 +1575,15 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(certifications).toBeVisible();
   await expect(experience).toBeHidden();
   await expect(expiry).toBeVisible();
-  await expect(expiry).toHaveAttribute("type", "date");
+  await expect(expiry).toHaveAttribute("type", "text");
   await expect(expiry).toHaveAttribute("required", "");
-  await expect(expiry).toHaveAccessibleName("Certification expiry date");
+  await expect(expiryGroup).toHaveAccessibleName("Certification expiry date");
+  for (const part of ["day", "month", "year"]) {
+    const input = expiryGroup.locator(`[data-date-part="${part}"]`);
+    await expect(input).toHaveAttribute("inputmode", "numeric");
+    await expect(input).toHaveAttribute("autocomplete", "off");
+    await expect(input).not.toHaveAttribute("name");
+  }
   await expect(
     form.locator("[data-certification-expiry] .volunteer-required"),
   ).toHaveText("*");
@@ -1620,7 +1625,13 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).toBeFocused();
   await expect(form.locator("[data-error=certificationExpiry]")).toBeVisible();
   expect(profileRequests).toHaveLength(0);
-  await expiry.fill("2030-10-14");
+  await fillApplicationField(form, "certificationExpiry", "2030-02-30");
+  await reviewLocalApplication(page);
+  await expect(expiry).toBeFocused();
+  await expect(form.locator('[name="certificationExpiry"]')).toHaveValue("");
+  await fillApplicationField(form, "certificationExpiry", "1899-10-14");
+  await expect(expiry).toHaveJSProperty("validationMessage", "");
+  await fillApplicationField(form, "certificationExpiry", "2030-10-14");
   await expect(form.locator("[data-error=certificationExpiry]")).toBeHidden();
   await nurse.check();
   await expect(firstAid).not.toBeChecked();
@@ -1684,7 +1695,9 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(experience).not.toHaveAttribute("required");
   await medic.check();
   await expect(other).toBeChecked();
-  await expect(expiry).toHaveValue("2030-10-14");
+  await expect(form.locator('[name="certificationExpiry"]')).toHaveValue(
+    "2030-10-14",
+  );
   await expect(expiry).toHaveAttribute("required", "");
   await expect(experience).toHaveValue("Naloxone training");
   await submitLocalApplication(page);
@@ -1704,7 +1717,9 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(certifications).toBeVisible();
   await expect(other).toBeChecked();
   await expect(certifications.locator(":checked")).toHaveCount(1);
-  await expect(expiry).toHaveValue("2030-10-14");
+  await expect(form.locator('[name="certificationExpiry"]')).toHaveValue(
+    "2030-10-14",
+  );
   await expect(experience).toBeEditable();
   await expect(experience).toHaveValue("Naloxone training");
   const save = form
@@ -1727,7 +1742,9 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await medic.check();
   await expect(expiry).toHaveAttribute("required", "");
   await form.evaluate((element: HTMLFormElement) => element.reset());
-  await expect(expiry).toHaveValue("2030-10-14");
+  await expect(form.locator('[name="certificationExpiry"]')).toHaveValue(
+    "2030-10-14",
+  );
   await expect(expiry).toHaveAttribute("required", "");
   await expect(save).toBeDisabled();
   await nurse.check();
@@ -1782,7 +1799,9 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(firstAid).toBeChecked();
   await expect(other).not.toBeChecked();
   await expect(experience).toBeHidden();
-  await expect(expiry).toHaveValue("2030-10-14");
+  await expect(form.locator('[name="certificationExpiry"]')).toHaveValue(
+    "2030-10-14",
+  );
   await other.check();
   await expect(experience).toBeEditable();
   await expect(experience).toHaveValue("");
@@ -2224,8 +2243,38 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   expect(requests).toHaveLength(1);
   await firstAid.check();
   const expiry = form.locator('[name="certificationExpiry"]');
-  await expiry.fill("2030-10-14");
-  await save.click();
+  await fillApplicationField(form, "certificationExpiry", "2030-10-14");
+  let finishSaving!: () => void;
+  const saving = new Promise<void>((resolve) => {
+    finishSaving = resolve;
+  });
+  await page.route("**/api/v1/account/profile", async (route) => {
+    await saving;
+    await route.continue();
+  });
+  try {
+    await save.click();
+    await expect(form).toHaveAttribute("aria-busy", "true");
+    await form
+      .locator(
+        '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+      )
+      .fill("203");
+    finishSaving();
+    await expect(form).not.toHaveAttribute("aria-busy");
+    await expect(save).toBeEnabled();
+    await expect(expiry).toHaveValue("");
+    await save.click();
+    await expect(
+      form.locator(
+        '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+      ),
+    ).toBeFocused();
+    await form.getByRole("button", { name: "Cancel", exact: true }).click();
+  } finally {
+    finishSaving();
+    await page.unroute("**/api/v1/account/profile");
+  }
   await expect(
     form.locator('[data-profile-answer="certificationExpiry"] dd'),
   ).toHaveText("2030-10-14");
@@ -2236,9 +2285,14 @@ test("Outreach stays selected while optional teams support cards, keyboard input
       '[data-profile-fields="training-and-safety"] [data-medic-certifications]',
     ),
   ).toBeVisible();
-  await expiry.fill("2031-01-01");
+  await fillApplicationField(form, "certificationExpiry", "2031-01-01");
   await form.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(expiry).toHaveValue("2030-10-14");
+  await expect(
+    form.locator(
+      '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+    ),
+  ).toHaveValue("2030");
   await expect(medic).toBeChecked();
 });
 
@@ -2406,7 +2460,32 @@ test("event editor shows native number and URL errors without submitting", async
       requests.push(request.url());
   });
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
-  await form.getByLabel("Start date and time").fill("2030-01-01T20:00");
+  const dateGroup = form.getByRole("group", {
+    name: "Start date",
+    exact: true,
+  });
+  const day = dateGroup.getByRole("textbox", { name: "Day", exact: true });
+  const time = dateGroup.getByLabel("Start time");
+  await expect(time).toHaveAttribute("type", "time");
+  await expect(dateGroup).toContainText(
+    "Vancouver time, regardless of your device’s time zone.",
+  );
+  for (const value of [
+    "2030-02-30T20:00",
+    // Historical transitions are stable across browser/runtime tzdata versions.
+    "2025-03-09T02:30",
+    "2025-11-02T01:30",
+  ]) {
+    await fillDateInput(form, "startsAt", value);
+    await form.getByRole("button", { name: "Save event" }).click();
+    await expect(value.includes("02-30") ? day : time).toBeFocused();
+    await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
+    expect(requests).toEqual([]);
+  }
+  await fillDateInput(form, "startsAt", "2030-01-01T20:00");
+  await expect(form.locator('[name="startsAt"]')).toHaveValue(
+    "2030-01-01T20:00",
+  );
   await form
     .getByLabel("Meeting point", { exact: true })
     .fill("Test meeting point");

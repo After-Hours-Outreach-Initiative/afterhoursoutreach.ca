@@ -5,14 +5,14 @@ import {
   trainingOptions,
 } from "../data/application";
 import { clearFormMessage } from "./account-forms";
-import { syncBirthDate } from "./birth-date";
+import { readDateInputs } from "./date-input";
 
 // Review and submission share this payload. Omit inactive answers from the
 // outgoing copy without changing the draft controls used for back/edit navigation.
 export function applicationSubmissionValues(
   element: HTMLFormElement,
 ): FormData {
-  syncBirthDate(element);
+  readDateInputs(element);
   const values = new FormData(element);
   if (!values.getAll("teams").includes("medic")) {
     values.delete("certifications");
