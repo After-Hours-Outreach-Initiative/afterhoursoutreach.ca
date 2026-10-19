@@ -6,7 +6,7 @@ import {
   isValidApplicationBirthDate,
   normalizeCertifications,
   applicationBirthDateError,
-  withOutreachTeam,
+  outreachRequiredError,
   trainingOptions,
   trainingRequiredError,
   trainingExclusiveError,
@@ -83,8 +83,7 @@ const profileAnswersSchema = z.strictObject({
     .array(z.enum(["outreach", "medic", "non-patrol"]))
     .max(3)
     .refine((values) => new Set(values).size === values.length)
-    .default([])
-    .transform(withOutreachTeam),
+    .default([]),
   certification: z.string().trim().max(200).default(""),
   certifications: z
     .array(
@@ -181,8 +180,14 @@ function validateTraining(
     });
 }
 
-export const profileSchema = profileAnswersSchema.superRefine(
-  (answers, context) => {
+const requiredTeams = profileAnswersSchema.shape.teams.refine(
+  (teams) => teams.includes("outreach"),
+  outreachRequiredError,
+);
+
+export const profileSchema = profileAnswersSchema
+  .extend({ teams: requiredTeams })
+  .superRefine((answers, context) => {
     validateTraining(answers, context);
     if (
       answers.heardAboutUsSources.includes("other") &&
@@ -194,8 +199,7 @@ export const profileSchema = profileAnswersSchema.superRefine(
         path: ["heardAboutUsOther"],
         message: `Briefly describe how you found out about us (${heardAboutUsOtherMaxLength} characters or fewer).`,
       });
-  },
-);
+  });
 
 // Older clients may still send these answers; profile edits never replace them.
 const profileEditSchema = profileAnswersSchema
@@ -244,7 +248,7 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
       ? (row.heard_about_us_other ?? "")
       : "",
     motivation: row.motivation,
-    teams: withOutreachTeam(row.teams),
+    teams: row.teams,
     certification: row.medical_certification,
     certifications: normalizeCertifications(row.medical_certifications),
     certificationExpiry: row.medical_certification_expiry ?? "",
@@ -305,6 +309,7 @@ export async function saveProfile(
           birthDate: old.birthDate,
           preferredName: old.preferredName,
           pronouns: old.pronouns,
+          teams: old.teams,
           certification: old.certification,
           certifications: old.certifications,
           experience: old.experience,
@@ -320,10 +325,18 @@ export async function saveProfile(
         }
       : input;
   const schema = old
-    ? profileEditSchema.superRefine((answers, context) =>
-        // Leave unanswered legacy profiles editable without inventing an answer.
-        validateTraining(answers, context, old.training.length > 0),
-      )
+    ? profileEditSchema
+        .extend({
+          // Keep Outreach on submitted profiles, but don't impose a new answer on
+          // legacy profiles that never selected it or invent it during an edit.
+          teams: old.teams.includes("outreach")
+            ? requiredTeams
+            : profileAnswersSchema.shape.teams,
+        })
+        .superRefine((answers, context) =>
+          // Leave unanswered legacy profiles editable without inventing an answer.
+          validateTraining(answers, context, old.training.length > 0),
+        )
     : profileSchema;
   const parsed = schema.safeParse(submittedInput);
   if (!parsed.success)
@@ -345,8 +358,8 @@ export async function saveProfile(
                   (issue) => issue.path[0] === "motivation",
                 )
               ? `Explain why you want to volunteer (${motivationMaxWords} words or fewer).`
-              : (parsed.error.issues.find(
-                  (issue) => issue.path[0] === "training",
+              : (parsed.error.issues.find((issue) =>
+                  ["teams", "training"].includes(String(issue.path[0])),
                 )?.message ??
                 "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers."),
     );

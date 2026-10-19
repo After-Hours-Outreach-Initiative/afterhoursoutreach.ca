@@ -7,7 +7,6 @@ import {
 } from "./access";
 import {
   normalizeCertifications,
-  withOutreachTeam,
   type ApplicationAnswers,
 } from "../../data/application";
 import { RequestError } from "../http";
@@ -136,7 +135,7 @@ export async function viewVolunteerProfile(
     ...row,
     heardAboutUsSources: sources,
     heardAboutUsOther: sources.includes("other") ? row.heardAboutUsOther : "",
-    teams: withOutreachTeam(JSON.parse(row.teams) as string[]),
+    teams: JSON.parse(row.teams) as string[],
     certifications: normalizeCertifications(
       JSON.parse(row.certifications) as string[],
     ),

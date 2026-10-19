@@ -776,8 +776,9 @@ test("application shows all required errors and saves after they are corrected",
     name: "Outreach",
     exact: true,
   });
-  await expect(outreach).toBeChecked();
-  await expect(outreach).toBeDisabled();
+  await expect(outreach).not.toBeChecked();
+  await expect(outreach).toBeEnabled();
+  await expect(outreach).toHaveAttribute("required", "");
   for (const field of [
     "emergencyName",
     "emergencyPhone",
@@ -868,7 +869,11 @@ test("application shows all required errors and saves after they are corrected",
   await expect(form.locator("[data-error=birthDate]")).toBeVisible();
   expect(requests).toEqual([]);
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field === "heardAboutUsSources" || field === "training") {
+    if (
+      field === "heardAboutUsSources" ||
+      field === "training" ||
+      field === "teams"
+    ) {
       for (const source of value as string[])
         await form.locator(`[name="${field}"][value="${source}"]`).check();
     } else if (
@@ -886,6 +891,12 @@ test("application shows all required errors and saves after they are corrected",
     )
       await fillApplicationField(form, field, String(value));
   }
+  await outreach.uncheck();
+  await reviewLocalApplication(page);
+  await expect(outreach).toBeFocused();
+  await expect(form.locator("[data-application-review-step]")).toBeHidden();
+  await expect(form.locator('[data-error="teams"]')).toBeVisible();
+  await outreach.check();
   await page.setViewportSize({ width: 375, height: 812 });
   expect(
     await page.evaluate(
@@ -1158,7 +1169,11 @@ test("applications validate the birthday boundary and profiles keep the saved bi
       : today.toISOString().slice(5, 10),
   );
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field === "heardAboutUsSources" || field === "training") {
+    if (
+      field === "heardAboutUsSources" ||
+      field === "training" ||
+      field === "teams"
+    ) {
       for (const source of value as string[])
         await form.locator(`[name="${field}"][value="${source}"]`).check();
     } else if (
@@ -1176,7 +1191,9 @@ test("applications validate the birthday boundary and profiles keep the saved bi
     )
       await fillApplicationField(form, field, String(value));
   }
-  await expect(form.getByLabel("Outreach", { exact: true })).toBeChecked();
+  await expect(
+    form.getByRole("checkbox", { name: "Outreach", exact: true }),
+  ).toBeChecked();
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/account/profile")
@@ -1393,7 +1410,11 @@ test("all teams can select multiple relevant training answers and add Other deta
     ).toBe(false);
   }
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field === "heardAboutUsSources" || field === "training") {
+    if (
+      field === "heardAboutUsSources" ||
+      field === "training" ||
+      field === "teams"
+    ) {
       for (const source of value as string[])
         await form.locator(`[name="${field}"][value="${source}"]`).check();
     } else if (
@@ -1575,7 +1596,11 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).toBeHidden();
   await expect(expiry).not.toHaveAttribute("required");
   for (const [field, value] of Object.entries(sampleAnswers)) {
-    if (field === "heardAboutUsSources" || field === "training") {
+    if (
+      field === "heardAboutUsSources" ||
+      field === "training" ||
+      field === "teams"
+    ) {
       for (const source of value as string[])
         await form.locator(`[name="${field}"][value="${source}"]`).check();
     } else if (
@@ -1593,7 +1618,9 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     )
       await fillApplicationField(form, field, String(value));
   }
-  await expect(form.getByLabel("Outreach", { exact: true })).toBeChecked();
+  await expect(
+    form.getByRole("checkbox", { name: "Outreach", exact: true }),
+  ).toBeChecked();
   await medic.check();
   await expect(certifications).toBeVisible();
   await expect(experience).toBeHidden();

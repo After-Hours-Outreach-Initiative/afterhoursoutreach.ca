@@ -52,9 +52,8 @@ export function applicationDisplayName(
   );
 }
 
-export function withOutreachTeam(teams: string[]): string[] {
-  return ["outreach", ...teams.filter((team) => team !== "outreach")];
-}
+export const outreachRequiredError =
+  "Select Outreach to complete your application.";
 
 export const applicationTeamOptions = [
   {

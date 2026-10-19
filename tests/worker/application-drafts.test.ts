@@ -99,7 +99,10 @@ test("draft API enforces authentication, origin, ownership, revisions, and priva
     assert.equal(saved.headers.get("cache-control"), "no-store");
     assert.equal((await send("PUT", body, cookie)).status, 409);
     const resumed = await send("GET", undefined, cookie);
-    const original = (await saved.json()) as { draft: { revision: string } };
+    const original = (await saved.json()) as {
+      draft: { revision: string; answers: { teams: string[] } };
+    };
+    assert.deepEqual(original.draft.answers.teams, []);
     assert.deepEqual(
       ((await resumed.json()) as { draft: unknown }).draft,
       original.draft,
@@ -115,6 +118,12 @@ test("draft API enforces authentication, origin, ownership, revisions, and priva
     const firstName = html.match(/<input[^>]*name="firstName"[^>]*>/)?.[0];
     assert.ok(firstName);
     assert.match(firstName, /\brequired\b/);
+    const outreach = html.match(
+      /<input[^>]*name="teams"[^>]*value="outreach"[^>]*>/,
+    )?.[0];
+    assert.ok(outreach);
+    assert.match(outreach, /\brequired\b/);
+    assert.doesNotMatch(outreach, /\b(?:checked|disabled)\b/);
     assert.equal(
       await DB.prepare("SELECT 1 FROM profile WHERE user_id=?")
         .bind(userId)

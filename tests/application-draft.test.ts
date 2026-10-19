@@ -14,6 +14,12 @@ import {
 } from "../src/data/application-birth-date";
 
 test("drafts accept unfinished answers without trimming, date checks, or consent", () => {
+  assert.deepEqual(applicationDraftAnswersSchema.parse({}).teams, []);
+  for (const teams of [[], ["medic"], ["outreach", "non-patrol"]]) {
+    const draft = applicationDraftAnswersSchema.parse({ teams });
+    assert.deepEqual(draft.teams, teams);
+    assert.deepEqual(draftProfileValues(draft).teams, teams);
+  }
   const answers = applicationDraftAnswersSchema.parse({
     firstName: "  Still typing ",
     phone: "bad phone",

@@ -170,6 +170,9 @@ test("browser drafts preserve incomplete answers through reload and closing the 
     )
     .toBe("  Unfinished name ");
   await page.reload();
+  await expect(
+    form.locator('[name="teams"][value="outreach"]'),
+  ).not.toBeChecked();
   await expect(form.locator('[name="firstName"]')).toHaveValue(
     "  Unfinished name ",
   );
@@ -222,6 +225,7 @@ test("browser drafts preserve incomplete answers through reload and closing the 
     "19",
   );
   await expectDraftSaved(reopened, {
+    teams: ["medic"],
     firstName: "  Unfinished name ",
     birthDate: '["23","","19"]',
     certificationExpiry: '["","2","203"]',
@@ -271,6 +275,12 @@ test("account drafts resume in a separate browser with no local storage and rema
       "Different device",
     );
     await expectSaveTime(resumed);
+    await expect(
+      resumed.locator('[name="teams"][value="outreach"]'),
+    ).not.toBeChecked();
+    await expect(
+      resumed.locator('[name="teams"][value="medic"]'),
+    ).toBeChecked();
     await expect(resumed.locator('[name="firstName"]')).toHaveAttribute(
       "required",
       "",
@@ -565,6 +575,7 @@ test("resuming requires a fresh review and consent; submission clears both draft
   }
   await form.locator('[name="heardAboutUsSources"][value="internet"]').check();
   await form.locator('[name="training"][value="none"]').check();
+  await form.locator('[name="teams"][value="outreach"]').check();
   await reviewLocalApplication(page);
   await form.locator('[name="codeOfConductAccepted"]').check();
   const stored = await page.evaluate(
@@ -574,6 +585,7 @@ test("resuming requires a fresh review and consent; submission clears both draft
   expect(stored).not.toContain("codeOfConductAccepted");
   await page.reload();
   await expect(localApplicationReviewButton(page)).toBeVisible();
+  await expect(form.locator('[name="teams"][value="outreach"]')).toBeChecked();
   await expect(
     form.locator('[name="codeOfConductAccepted"]'),
   ).not.toBeChecked();

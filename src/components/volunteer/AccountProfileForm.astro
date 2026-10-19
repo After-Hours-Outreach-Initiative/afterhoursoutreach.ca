@@ -2,6 +2,7 @@
 import {
   profileFormSections,
   applicationTeamOptions as teams,
+  outreachRequiredError,
   type ApplicationAnswers,
 } from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
@@ -14,6 +15,7 @@ import RelevantTraining from "./RelevantTraining.astro";
 import ReferralSources from "./ReferralSources.astro";
 import ApplicationDraftStatus from "./ApplicationDraftStatus.astro";
 import ApplicationDraftDiscard from "./ApplicationDraftDiscard.astro";
+import FieldError from "@/components/FieldError.astro";
 import {
   draftProfileValues,
   type ApplicationDraft,
@@ -104,7 +106,9 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
               <legend class="sr-only">{section.heading} answers</legend>
               {section.key === "team-interests" ? (
                 <>
-                  <input type="hidden" name="teams" value="outreach" />
+                  {!application && values?.teams.includes("outreach") && (
+                    <input type="hidden" name="teams" value="outreach" />
+                  )}
                   <div class="volunteer-field">
                     <span>
                       Which teams interest you?{" "}
@@ -113,27 +117,29 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                       </span>
                     </span>
                     <span class="volunteer-help" id="help-teams">
-                      Outreach is included for everyone. Other teams are
-                      optional.
+                      Outreach is required to apply. Other teams are optional.
                     </span>
                   </div>
                   <div class="volunteer-team-options">
                     {teams.map((team) => (
                       <label
+                        for={`profile-team-${team.value}`}
                         class="volunteer-team-option"
-                        data-included={team.value === "outreach" || undefined}
+                        data-included={
+                          (!application && team.value === "outreach") ||
+                          undefined
+                        }
                       >
                         <input
                           type="checkbox"
+                          id={`profile-team-${team.value}`}
                           name="teams"
                           value={team.value}
-                          checked={
-                            team.value === "outreach" ||
-                            values?.teams.includes(team.value)
-                          }
-                          disabled={team.value === "outreach"}
+                          checked={values?.teams.includes(team.value) ?? false}
+                          required={application && team.value === "outreach"}
+                          disabled={!application && team.value === "outreach"}
                           aria-labelledby={`team-${team.value}-label`}
-                          aria-describedby={`team-${team.value}-description help-teams`}
+                          aria-describedby={`team-${team.value}-description help-teams${application && team.value === "outreach" ? " error-teams" : ""}`}
                         />
                         <span class="volunteer-team-content">
                           <span
@@ -141,6 +147,15 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                             id={`team-${team.value}-label`}
                           >
                             {team.label}
+                            {application && team.value === "outreach" && (
+                              <span
+                                class="volunteer-required"
+                                aria-hidden="true"
+                              >
+                                {" "}
+                                *
+                              </span>
+                            )}
                           </span>
                           <span
                             class="volunteer-team-description"
@@ -156,6 +171,12 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                         </span>
                       </label>
                     ))}
+                    {application && (
+                      <FieldError
+                        field="teams"
+                        message={outreachRequiredError}
+                      />
+                    )}
                   </div>
                   {!application && (
                     <div data-profile-team-training hidden={!medicSelected}>

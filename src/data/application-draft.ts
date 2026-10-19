@@ -31,7 +31,7 @@ export const applicationDraftAnswersSchema = z.strictObject({
   heardAboutUsSources: choices(heardAboutUsOptions),
   heardAboutUsOther: text(),
   motivation: text(16_384),
-  teams: choices(applicationTeamOptions).default(["outreach"]),
+  teams: choices(applicationTeamOptions),
   certifications: choices(certificationOptions),
   certificationExpiry: text(),
   experience: text(2000),
