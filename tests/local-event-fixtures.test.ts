@@ -4,11 +4,16 @@ import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "vitest";
 import {
+  localAccountFixtures,
+  localAccountUserId,
+} from "../scripts/local-account-fixtures";
+import {
   fixtureEventId,
   fixtureUserId,
   localEventFixtures,
 } from "../scripts/local-event-fixtures";
 import { vancouverInput } from "../src/data/event-time";
+import { profileSchema } from "../src/server/db/profiles";
 import { assertCompleteSampleProfiles } from "./helpers/sample-profile-fixtures";
 
 function database() {
@@ -22,11 +27,17 @@ function database() {
   return db;
 }
 
-test("the local seed refuses remote, preview, and production arguments before any writes", () => {
-  for (const argument of ["--remote", "--preview", "--production"]) {
+test("the local seed refuses nonlocal targets and unknown arguments before any writes", () => {
+  for (const args of [
+    ["--remote"],
+    ["--preview"],
+    ["--production"],
+    ["--unknown"],
+    ["--accounts", "--remote"],
+  ]) {
     const result = spawnSync(
       process.execPath,
-      ["--import", "tsx", "scripts/seed-local-events.ts", argument],
+      ["--import", "tsx", "scripts/seed-local-events.ts", ...args],
       { encoding: "utf8" },
     );
     assert.equal(result.status, 1);
@@ -35,6 +46,73 @@ test("the local seed refuses remote, preview, and production arguments before an
       result.stdout,
       /Executing|test events and sample accounts are ready/,
     );
+  }
+});
+
+test("manual local personas have exactly the requested application/access states", () => {
+  const db = database();
+  try {
+    const now = Date.now();
+    db.exec(localAccountFixtures(now).join(";\n"));
+    assert.deepEqual(
+      db
+        .prepare(
+          `SELECT u.name, u.email_verified, u.role, p.user_id IS NOT NULL AS submitted,
+          v.active, v.registration_approved, v.patrol_approved, u.two_factor_enabled
+          FROM user u LEFT JOIN profile p ON p.user_id = u.id
+          LEFT JOIN volunteer_status v ON v.user_id = u.id ORDER BY u.name`,
+        )
+        .all()
+        .map((row) => Object.values(row)),
+      [
+        ["Accepted", 1, "volunteer", 1, 1, 1, 0, 0],
+        ["Applied", 1, "volunteer", 1, 1, 0, 0, 0],
+        ["Inactive", 1, "volunteer", 1, 0, 0, 0, 0],
+        ["Not applied", 1, "volunteer", 0, null, null, null, 0],
+        ["Organizer", 1, "organizer", 1, 1, 1, 0, 0],
+      ],
+    );
+    const profiles = db
+      .prepare(
+        "SELECT p.submitted_application, u.email FROM profile p JOIN user u ON u.id = p.user_id",
+      )
+      .all();
+    assert.equal(profiles.length, 4);
+    for (const row of profiles) {
+      const snapshot = JSON.parse(String(row.submitted_application));
+      assert.deepEqual(profileSchema.parse(snapshot.answers), snapshot.answers);
+      assert.equal(snapshot.email, row.email);
+      assert.equal(snapshot.submittedAt, new Date(now).toISOString());
+    }
+    assert.equal(
+      db.prepare("SELECT count(*) AS n FROM application_draft").get()!.n,
+      0,
+    );
+    assert.equal(
+      db
+        .prepare(
+          "SELECT count(*) AS n FROM event WHERE open = 1 AND hidden = 0 AND starts_at > ?",
+        )
+        .get(now)!.n,
+      2,
+    );
+    // Reseeding must not undo manual changes to a scenario.
+    db.prepare(
+      "UPDATE volunteer_status SET registration_approved = 1 WHERE user_id = ?",
+    ).run(localAccountUserId("applied"));
+    const tables = ["user", "profile", "volunteer_status", "event"];
+    const before = tables.map((table) =>
+      db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+    );
+    db.exec(localAccountFixtures(now + 1000).join(";\n"));
+    assert.deepEqual(
+      tables.map((table) =>
+        db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+      ),
+      before,
+    );
+  } finally {
+    db.close();
   }
 });
 

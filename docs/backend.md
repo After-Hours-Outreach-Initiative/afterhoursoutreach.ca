@@ -53,7 +53,17 @@ session for users with an enrolled authenticator, without changing their role,
 email verification, active status, profile, or patrol approval. Create new
 accounts through the regular sign-in form.
 
-Run `pnpm db:seed:local` with the dev server running to restore local test data:
+For manual testing, run `pnpm db:seed:local:accounts` with the dev server running
+and local migrations applied. On a fresh local database, View as contains
+**Visitor** (signed out), **Not applied** (no application or draft), **Applied**
+(awaiting approval), **Accepted** (application approved, not patrol approved),
+**Inactive** (inactive, unapproved application), and **Organizer** (active organizer).
+The four submitted profiles use realistic fictional answers. The command also
+adds an open orientation and patrol and enrolls Organizer's authenticator through
+the real local auth backend. It only inserts missing fixtures: it does not reset
+the database, remove other users, or overwrite subsequent edits to these personas.
+
+Run `pnpm db:seed:local` to restore the broader automated-test fixtures:
 an orientation, an open patrol, a full patrol, a hidden/closed orientation, and
 a past orientation with attendance. Sample users are stored in D1 too; choose
 **Robin Vance** in View as for event and volunteer-management tools. Robin’s
