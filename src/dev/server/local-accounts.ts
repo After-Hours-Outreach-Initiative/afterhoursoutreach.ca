@@ -8,6 +8,8 @@ import {
   signup,
   user,
 } from "../../server/db/schema";
+import { RequestError } from "../../server/http";
+import { isManualAccountPreset } from "../accounts";
 
 // Creation metadata only; this provider cannot be used to sign in.
 const disposableAccountProvider = "local-development-application";
@@ -38,6 +40,9 @@ export async function createDisposableAccount(binding: Env["DB"]) {
 }
 
 export async function deleteLocalAccount(binding: Env["DB"], userId: string) {
+  // Immutable IDs can be checked before the batch: no demotion or child cleanup.
+  if (isManualAccountPreset(userId))
+    throw new RequestError(403, "Manual preset accounts cannot be deleted.");
   const db = createDatabase(binding);
   // Demote in the same transaction so the existing last-organizer trigger applies.
   // Cascades remove auth sessions, drafts, profile, status, and linked accounts.

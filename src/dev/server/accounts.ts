@@ -13,7 +13,7 @@ import { asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "../../server/db";
 import { profile, user } from "../../server/db/schema";
-import { safeReturnTo } from "../../server/http";
+import { RequestError, safeReturnTo } from "../../server/http";
 import type { AuthBindings } from "../../server/auth";
 import { newApplicationPersona } from "../accounts";
 import { createDisposableAccount, deleteLocalAccount } from "./local-accounts";
@@ -147,6 +147,8 @@ export function developmentAccounts(bindings: AuthBindings) {
           try {
             deleted = await deleteLocalAccount(bindings.DB, ctx.body.userId);
           } catch (error) {
+            if (error instanceof RequestError && error.status === 403)
+              throw new APIError("FORBIDDEN", { message: error.message });
             const reason =
               error instanceof Error
                 ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import { env } from "cloudflare:workers";
 import { localEventFixtures } from "../scripts/local-event-fixtures";
+import { localAccountFixtures } from "../scripts/local-account-fixtures";
 import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
 import { changeSignup, listEvents } from "../src/server/db/events";
@@ -404,7 +405,7 @@ test("deleting an account cascades to its private application draft", async () =
   assert.equal(await loadApplicationDraft(env.DB, actor.id), null);
 });
 
-test("new local applications preserve old fixtures; deletion allows ordinary accounts but protects organizers and references", async () => {
+test("new local applications preserve old fixtures; deletion protects only manual presets, last organizers and references", async () => {
   const original = await draftActor("local-account-user-not-applied");
   const answers = {
     ...draftProfileValues(
@@ -430,6 +431,7 @@ test("new local applications preserve old fixtures; deletion allows ordinary acc
   await createDisposableAccount(env.DB);
   assert.equal(await loadProfile(env.DB, fresh), null);
   assert.equal(await loadApplicationDraft(env.DB, fresh), null);
+  assert.equal(await deleteLocalAccount(env.DB, fresh), true);
   assert.deepEqual(
     await loadSubmittedApplication(env.DB, original.id),
     snapshot,
@@ -492,6 +494,27 @@ test("new local applications preserve old fixtures; deletion allows ordinary acc
     true,
   );
   assert.equal(await loadProfile(env.DB, "local-fixture-user-casey"), null);
+  await env.DB.batch(localAccountFixtures().map((sql) => env.DB.prepare(sql)));
+  // Renaming a preset cannot remove protection; ordinary names/roles above do not add it.
+  await env.DB.prepare(
+    "UPDATE user SET name='Renamed preset' WHERE id LIKE 'local-account-user-%'",
+  ).run();
+  const snapshotTables = () =>
+    Promise.all(
+      ["user", "profile", "volunteer_status", "session", "audit_log"].map(
+        async (table) =>
+          (await env.DB.prepare(`SELECT * FROM ${table} ORDER BY 1`).all())
+            .results,
+      ),
+    );
+  const beforePresets = await snapshotTables();
+  for (const key of ["applied", "accepted", "inactive", "organizer"]) {
+    await assert.rejects(
+      deleteLocalAccount(env.DB, `local-account-user-${key}`),
+      statusError(403),
+    );
+    assert.deepEqual(await snapshotTables(), beforePresets);
+  }
 });
 
 async function seedMedic(

@@ -3,7 +3,11 @@ import { InferServerPlugin } from "better-auth/client/plugins";
 import type { AccountAuth } from "../../server/auth";
 import { authClient } from "../../scripts/auth-client";
 import { accountErrorMessage } from "../../scripts/account-forms";
-import { newApplicationPersona } from "../accounts";
+import {
+  isManualAccountPreset,
+  manualAccountPresetIds,
+  newApplicationPersona,
+} from "../accounts";
 
 // This module is loaded only in development; server imports are type-only.
 const developmentAuthClient = createAuthClient({
@@ -154,12 +158,9 @@ export async function initAccountSwitcher() {
       after = result.next;
       currentUserId = result.currentUserId;
     } while (after);
-    const personaOrder = new Map([
-      ["local-account-user-applied", 0],
-      ["local-account-user-accepted", 1],
-      ["local-account-user-inactive", 2],
-      ["local-account-user-organizer", 3],
-    ]);
+    const personaOrder = new Map(
+      manualAccountPresetIds.map((id, index) => [id, index]),
+    );
     users.sort(
       (a, b) =>
         (personaOrder.get(a.id) ?? personaOrder.size) -
@@ -198,6 +199,10 @@ export async function initAccountSwitcher() {
         label,
         `${user.email}${user.role === "organizer" ? " · Organizer" : ""}`,
       );
+      if (isManualAccountPreset(user.id)) {
+        profiles.appendChild(button);
+        continue;
+      }
       const row = document.createElement("div");
       row.className =
         "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2";
