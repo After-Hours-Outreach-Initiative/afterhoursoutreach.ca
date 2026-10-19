@@ -400,7 +400,10 @@ for (const width of [390, 1280]) {
     }
     await expect(form.locator("[data-application-review-step]")).toBeVisible();
     await expect(
-      form.getByRole("heading", { name: "Review application", exact: true }),
+      form.getByRole("heading", {
+        name: "Review your application",
+        exact: true,
+      }),
     ).toBeFocused();
     await expect(tracker).toBeHidden();
     const reviewTracker = page.getByRole("navigation", { name: "Sections" });
