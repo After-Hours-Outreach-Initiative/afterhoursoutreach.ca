@@ -280,7 +280,6 @@ export const applicationFields = [
     section: "emergency-contact",
     label: "Emergency contact name",
     required: true,
-    help: "Someone we can contact if you need help during an event.",
   },
   {
     name: "emergencyPhone",
@@ -354,7 +353,11 @@ export function profileFormSections(application = false) {
       );
   return [
     { key: "personal-info", heading: "Personal info" },
-    { key: "emergency-contact", heading: "Emergency contact" },
+    {
+      key: "emergency-contact",
+      heading: "Emergency contact",
+      description: "Someone we can contact if you need help during an event.",
+    },
     { key: "team-interests", heading: "Team interests" },
     { key: "training-and-safety", heading: "Training and safety" },
     { key: "about-volunteering", heading: "About volunteering" },

@@ -24,6 +24,9 @@ import {
   trainingQuestion,
 } from "../../src/data/application";
 
+const emergencyContactDescription =
+  "Someone we can contact if you need help during an event.";
+
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
     !baseURL?.startsWith("http://localhost:"),
@@ -650,6 +653,21 @@ test("application shows all required errors and saves after they are corrected",
     name: "Emergency contact",
     exact: true,
   });
+  await expect(emergencyContact.locator(":scope > legend + p")).toHaveText(
+    emergencyContactDescription,
+  );
+  await expect(emergencyContact.locator(":scope > p + fieldset")).toHaveCount(
+    1,
+  );
+  await expect(emergencyContact).toHaveAccessibleDescription(
+    emergencyContactDescription,
+  );
+  await expect(
+    form.getByText(emergencyContactDescription, { exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    emergencyContact.locator('[name="emergencyName"]'),
+  ).toHaveAttribute("aria-describedby", "error-emergencyName");
   const contents = page.getByRole("navigation", {
     name: "Sections",
   });
@@ -1750,10 +1768,26 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   );
   const preferredName = form.locator('[name="preferredName"]');
   const name = form.locator('[name="emergencyName"]');
+  const emergencyContact = form.getByRole("group", {
+    name: "Emergency contact",
+    exact: true,
+  });
+  const emergencyDescription = emergencyContact.locator(
+    ".volunteer-profile-section-heading + p",
+  );
+  await expect(emergencyDescription).toHaveText(emergencyContactDescription);
+  await expect(emergencyContact).toHaveAccessibleDescription(
+    emergencyContactDescription,
+  );
+  await expect(
+    form.getByText(emergencyContactDescription, { exact: true }),
+  ).toHaveCount(1);
+  await expect(name).toHaveAttribute("aria-describedby", "error-emergencyName");
   const medicalConditions = form.locator('[name="medicalConditions"]');
   const answer = (name: string) =>
     form.locator(`[data-profile-answer="${name}"] dd`);
   const expectTextView = async (contact = sampleAnswers.emergencyName) => {
+    await expect(emergencyDescription).toBeVisible();
     await expect(form.locator("[data-profile-answers]:visible")).toHaveCount(4);
     await expect(
       form.locator("input:visible, textarea:visible, select:visible"),
@@ -1840,6 +1874,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await expect(preferredName).toBeHidden();
   await expect(preferredName).toBeDisabled();
   await expect(name).toBeEditable();
+  await expect(emergencyDescription).toBeVisible();
   await expect(editor.locator(".volunteer-fields").first()).toHaveCSS(
     "opacity",
     "1",
