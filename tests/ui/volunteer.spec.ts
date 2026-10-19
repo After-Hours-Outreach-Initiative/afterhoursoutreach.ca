@@ -513,7 +513,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
   ).toBeNull();
 });
 
-test("local account selection rejects cross-origin writes and unknown users", async ({
+test("local account selection rejects cross-origin writes, unknown users and deleting manual presets", async ({
   page,
   baseURL,
 }) => {
@@ -537,6 +537,19 @@ test("local account selection rejects cross-origin writes and unknown users", as
     data: { userId: "not-a-user" },
   });
   expect(unknown.status()).toBe(404);
+  const presetIds = ["applied", "accepted", "inactive", "organizer"].map(
+    (key) => `local-account-user-${key}`,
+  );
+  for (const userId of presetIds) {
+    const deletion = await request.post("/api/v1/auth/dev/delete-user", {
+      headers: { origin: baseURL! },
+      data: { userId, confirm: true },
+    });
+    expect(deletion.status()).toBe(403);
+    expect(await deletion.text()).toContain(
+      "Manual preset accounts cannot be deleted.",
+    );
+  }
   for (const origin of ["https://evil.example", null]) {
     const deletion = await request.post("/api/v1/auth/dev/delete-user", {
       headers: origin ? { origin } : undefined,
@@ -565,8 +578,40 @@ test("local account selection rejects cross-origin writes and unknown users", as
   expect(
     (await (await request.get("/api/v1/auth/get-session")).json()).user.id,
   ).toBe(user.id);
+  // Manual presets are opt-in fixtures; runtime tests cover their persisted records.
+  await page.route("**/api/v1/auth/dev/users", async (route) => {
+    const response = await route.fetch();
+    const listing = await response.json();
+    await route.fulfill({
+      json: {
+        ...listing,
+        users: [
+          ...listing.users,
+          ...presetIds.map((id) => ({
+            id,
+            name: "Renamed preset",
+            email: `${id}@example.invalid`,
+            role: "volunteer",
+          })),
+          {
+            id: "local-account-user-not-applied",
+            name: "Not applied",
+            email: "not-applied.local@example.org",
+            role: "volunteer",
+          },
+        ],
+      },
+    });
+  });
   await page.reload();
   const profiles = await openLocalAccountSwitcher(page);
+  for (const id of presetIds) {
+    await expect(profiles.locator(`[data-switch-user="${id}"]`)).toBeEnabled();
+    await expect(profiles.locator(`[data-delete-user="${id}"]`)).toHaveCount(0);
+  }
+  await expect(
+    profiles.locator('[data-delete-user="local-account-user-not-applied"]'),
+  ).toBeVisible();
   await expect(
     profiles.locator('[data-delete-user="local-fixture-user-robin"]'),
   ).toBeVisible();

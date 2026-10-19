@@ -58,11 +58,15 @@ into a fresh disposable local D1 account with an empty application and no draft 
 selected answers. Submitting uses the normal application flow, keeps this browser
 signed into that account, and lists it under the entered name in View as. Unfinished
 accounts/drafts remain listed too, so repeated selections never leave invisible
-accounts. Every saved local account has a **Delete** button with confirmation,
-including regular sign-in accounts, named fixtures, and the original Not applied
-account. Visitor and the virtual Not applied choice have no Delete button;
-deleting the current account signs out, while deleting another leaves the current
-session alone. Deletion removes its application, draft, sessions, and related volunteer
+accounts. The four manual presets **Applied**, **Accepted**, **Inactive**, and
+**Organizer** have no trash button, and the server rejects their deletion without
+changing any records. Protection uses only their exact preset IDs, even if renamed.
+Other saved local accounts retain the compact trash button on the right with
+confirmation, including regular sign-in accounts, other named fixtures, and the
+original Not applied account. Visitor and the virtual Not applied choice have no
+trash button; deleting the current account signs out, while deleting another
+leaves the current session alone. Deletion removes its application, draft,
+sessions, and related volunteer
 records in one transaction. Existing database protections block deletion of the
 last active organizer and accounts referenced by organizer-owned records; an error
 is shown and no records are changed when deletion is blocked.
