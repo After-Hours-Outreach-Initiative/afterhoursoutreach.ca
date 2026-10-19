@@ -22,12 +22,15 @@ export function initApplicationSections(element: HTMLFormElement) {
     for (const link of links) {
       const section = document.getElementById(link.hash.slice(1));
       if (!section) continue;
-      const fields = section.querySelectorAll<
-        HTMLInputElement | HTMLTextAreaElement
-      >("input, textarea");
-      // Reading validity never fires `invalid` or opens/focuses a section.
+      const fields = section
+        .closest(".volunteer-application-section")
+        ?.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+          "input, textarea",
+        );
+      if (!fields) continue;
+      // Reading validity never fires `invalid` or focuses a section.
       // Conditional controls opt out through the form's existing validators;
-      // collapsed sections still count. Sections with no requirements are done.
+      // sections with no requirements are done.
       const complete = [...fields].every(
         (field) =>
           !field.willValidate ||
