@@ -371,7 +371,10 @@ test("contents navigation contrasts with the header and leaves room for the page
   });
   const menu = contents.locator("[data-contents-menu]");
   await expect(menu).toBeVisible();
-  await expect(menu.locator("[data-contents-current]")).toHaveText("Sections");
+  await expect(menu.locator(".volunteer-contents-section-toggle")).toHaveText(
+    "Sections",
+  );
+  await expect(menu.locator("[data-contents-current]")).toBeHidden();
   await expect(contents.locator(".volunteer-contents-sidebar")).toBeHidden();
   await page.evaluate(() => {
     const nav = document
@@ -387,15 +390,15 @@ test("contents navigation contrasts with the header and leaves room for the page
     "rgb(0, 0, 0)",
   );
   await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
-  await expect(toggle).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  await expect(toggle).toHaveCSS("border-width", "0px");
+  await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await expect(toggle).toHaveCSS("border-width", "1px");
   const current = bar.locator("[data-contents-current]");
   await expect(current).toHaveCSS("color", "rgb(255, 255, 255)");
   await expect(current).toHaveCSS("font-size", "16px");
   await toggle.click();
   await expect(menu).toHaveAttribute("open", "");
   await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
-  await expect(toggle).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
   await page.keyboard.press("Escape");
   await expect(menu).not.toHaveAttribute("open");
 
@@ -1254,9 +1257,10 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     await expect(contents).toHaveCSS("position", "relative");
     await expect(contents.locator(".volunteer-contents-sidebar")).toBeHidden();
     await expect(menu).toBeVisible();
-    await expect(menu.locator("[data-contents-current]")).toHaveText(
+    await expect(menu.locator(".volunteer-contents-section-toggle")).toHaveText(
       "Sections",
     );
+    await expect(menu.locator("[data-contents-current]")).toBeHidden();
     await menu.locator("summary").press("Enter");
     await expect(menu).toHaveAttribute("open", "");
     await menu

@@ -429,7 +429,11 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
   await expect(compact).not.toHaveCSS("position", "fixed");
   await expect(menu).toBeVisible();
   await expect(menu).not.toHaveAttribute("open");
-  await expect(current).toHaveText("Sections");
+  await expect(
+    summary.locator(".volunteer-contents-section-toggle"),
+  ).toHaveText("Sections");
+  await expect(current).toBeHidden();
+  await expect(current).toHaveText("");
   await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
   await expect(tracker.getByRole("link")).toHaveCount(0);
   const measure = () =>
@@ -463,7 +467,7 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     await expect
       .poll(async () => (await tracker.boundingBox())!.y)
       .toBe(Math.max(0, nav.y - Math.round(top)));
-    await expect(current).toHaveText("Sections");
+    await expect(current).toBeHidden();
     await expect(menu).toBeVisible();
     expect(await measure()).toEqual(initial);
   }
@@ -584,7 +588,7 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(viewport.width);
     const current = await summary
-      .locator(".volunteer-contents-section-toggle")
+      .locator("[data-contents-current]")
       .boundingBox();
     const count = await summary
       .locator("[data-application-progress-count]")
@@ -637,7 +641,7 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
-  await expect(current).toHaveText("Sections");
+  await expect(current).toBeHidden();
   await expect(menu).toBeVisible();
   await expect(menu).not.toHaveAttribute("open");
   await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
@@ -664,9 +668,15 @@ test("the mobile dropdown works from its normal position and Overview restores S
   const menu = tracker.locator("[data-contents-menu]");
   const summary = menu.locator("summary");
   const dropdown = menu.locator("[data-contents-dropdown]");
-  await expect(summary.locator("[data-contents-current]")).toHaveText(
-    "Sections",
-  );
+  const label = summary.locator(".volunteer-contents-section-toggle");
+  const current = summary.locator("[data-contents-current]");
+  const chevron = label.locator("svg");
+  const count = summary.locator("[data-application-progress-count]");
+  await expect(label).toHaveText("Sections");
+  await expect(current).toBeHidden();
+  await expect(summary.locator("button, a, [tabindex]")).toHaveCount(0);
+  await expect(chevron).toHaveCSS("width", "22px");
+  await expect(label).toHaveCSS("border-width", "1px");
   for (const viewport of [
     { width: 320, height: 812 },
     { width: 375, height: 812 },
@@ -679,6 +689,10 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(summary).toHaveCSS("border-width", "1px");
     await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
     await expect(menu).toHaveCSS("border-radius", "10px 10px 0px 0px");
+    await expect(current).toBeHidden();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(viewport.width);
     const initial = (await summary.boundingBox())!;
     const panel = page.locator("form[data-application]");
     await expect(panel).toHaveCSS("border-top-width", "0px");
@@ -698,6 +712,42 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(summary).toHaveCSS("border-radius", "0px");
     await expect(menu).toHaveCSS("border-radius", "0px");
     expect(await summary.boundingBox()).toEqual({ ...initial, y: 0 });
+    await page.evaluate(() => {
+      const section = document
+        .querySelector("#application-personal-info")!
+        .getBoundingClientRect();
+      scrollTo({ top: scrollY + section.top - 70, behavior: "instant" });
+    });
+    await expect(current).toHaveText("Personal info");
+    await expect(current).toBeVisible();
+    await expect(label).toHaveText("Sections");
+    const labelBounds = (await label.boundingBox())!;
+    const currentBounds = (await current.boundingBox())!;
+    const countBounds = (await count.boundingBox())!;
+    expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(
+      currentBounds.x,
+    );
+    expect(currentBounds.x + currentBounds.width).toBeLessThanOrEqual(
+      countBounds.x,
+    );
+    expect(countBounds.x + countBounds.width).toBeLessThanOrEqual(
+      viewport.width,
+    );
+    // The label, current section, count, and row padding all toggle the native summary.
+    for (const target of [label, current, count]) {
+      await target.click();
+      await expect(menu).toHaveAttribute("open", "");
+      await expect(chevron).toHaveCSS(
+        "transform",
+        "matrix(-1, 0, 0, -1, 0, 0)",
+      );
+      await page.keyboard.press("Escape");
+    }
+    await summary.click({ position: { x: 3, y: 27 } });
+    await expect(menu).toHaveAttribute("open", "");
+    await page.keyboard.press("Escape");
+    await expect(summary).toBeFocused();
+    await expect(summary).not.toHaveCSS("box-shadow", "none");
     await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
     await expect(tracker).not.toHaveAttribute("data-contents-stuck");
     await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
@@ -750,9 +800,9 @@ test("the mobile dropdown works from its normal position and Overview restores S
   await expect(menu).toHaveCSS("border-radius", "10px 10px 0px 0px");
   await expect(menu).not.toHaveAttribute("open");
   await expect(menu).toBeVisible();
-  await expect(summary.locator("[data-contents-current]")).toHaveText(
-    "Sections",
-  );
+  await expect(label).toHaveText("Sections");
+  await expect(current).toBeHidden();
+  await expect(current).toHaveText("");
   await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
   await summary.press("Space");
   await expect(menu).toHaveAttribute("open", "");
