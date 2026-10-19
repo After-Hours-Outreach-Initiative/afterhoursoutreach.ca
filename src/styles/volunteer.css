@@ -429,16 +429,23 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-contents a[aria-current="location"] {
   color: #c7d2fe;
 }
-.volunteer-contents-checkmark {
+.volunteer-contents-completion-icon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
   margin-left: 10px;
-  color: #4ade80;
+  color: #a1a1aa;
+}
+.volunteer-contents-completion-icon path {
   visibility: hidden;
 }
 [data-application-progress-link][data-complete="true"]
-  .volunteer-contents-checkmark {
+  .volunteer-contents-completion-icon {
+  color: #4ade80;
+}
+[data-application-progress-link][data-complete="true"]
+  .volunteer-contents-completion-icon
+  path {
   visibility: visible;
 }
 .volunteer-contents a:focus-visible,
