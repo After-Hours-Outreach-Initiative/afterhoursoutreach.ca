@@ -239,9 +239,12 @@ test("account drafts resume in a separate browser with no local storage and rema
   await fillApplicationField(page, "birthDate", "2020-01-01");
   await page.locator('[data-birth-date-part="month"]').fill("");
   await page.locator('[name="teams"][value="medic"]').check();
-  await page
-    .locator('[data-date-input="certificationExpiry"] [data-date-part="year"]')
-    .fill("203");
+  const expiryYear = page.locator(
+    '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+  );
+  await expiryYear.fill("203");
+  // Commit blur feedback before a pointer click can move its training target.
+  await expiryYear.press("Tab");
   await page.locator('[name="training"][value="other"]').check();
   await page
     .locator('[name="otherTraining"]')
