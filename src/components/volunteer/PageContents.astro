@@ -29,19 +29,7 @@ const totalSections = entries.filter((entry) => entry.completable).length;
           {
             application ? (
               <>
-                <span class="volunteer-contents-section-toggle">
-                  {heading}
-                  <svg
-                    class="volunteer-contents-chevron"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                  >
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </span>
+                <span class="volunteer-contents-section-toggle">{heading}</span>
                 <span
                   class="volunteer-contents-current"
                   data-contents-current
@@ -82,6 +70,16 @@ const totalSections = entries.filter((entry) => entry.completable).length;
                     />
                   </svg>
                 </span>
+                <svg
+                  class="volunteer-contents-chevron"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </>
             ) : (
               <>

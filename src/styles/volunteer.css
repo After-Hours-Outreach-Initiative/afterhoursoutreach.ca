@@ -344,21 +344,13 @@ body:has([data-application], [data-account-contents-flow]) {
   white-space: nowrap;
 }
 .volunteer-contents-section-toggle {
-  display: inline-flex;
-  align-items: center;
   flex-shrink: 0;
-  gap: 6px;
-  min-height: 40px;
-  padding: 6px 10px;
-  border: 1px solid #52525b;
-  border-radius: 6px;
-  background: var(--color-black);
   color: #f4f4f5;
   white-space: nowrap;
 }
 .volunteer-contents-chevron {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   color: #d4d4d8;
 }
@@ -536,22 +528,16 @@ body:has([data-application], [data-account-contents-flow]) {
     border: var(--volunteer-border);
     border-radius: 10px 10px 0 0;
   }
+  @media (hover: hover) {
+    [data-application-contents] summary:hover {
+      border-color: #71717a;
+    }
+  }
   [data-application-contents] summary:focus-visible {
     box-shadow: inset 0 0 0 1px #818cf8;
   }
-  [data-application-contents]
-    summary:focus-visible
-    .volunteer-contents-section-toggle {
-    border-color: #818cf8;
-  }
   [data-application-contents] summary:active {
-    box-shadow: inset 0 0 0 100vmax #ffffff08;
-  }
-  [data-application-contents]
-    summary:active
-    .volunteer-contents-section-toggle {
-    border-color: #a1a1aa;
-    background: var(--color-panel-soft);
+    box-shadow: inset 0 0 0 100vmax #ffffff0d;
   }
   [data-application-contents][data-contents-stuck] .volunteer-contents-menu,
   [data-application-contents][data-contents-stuck] summary {

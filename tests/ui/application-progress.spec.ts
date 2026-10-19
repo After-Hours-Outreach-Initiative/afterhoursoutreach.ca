@@ -626,6 +626,12 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
       .locator("[data-application-progress]")
       .boundingBox();
     expect(current!.x + current!.width).toBeLessThanOrEqual(progress!.x);
+    if (viewport.width === 320)
+      expect(
+        await summary
+          .locator("[data-contents-current]")
+          .evaluate((element) => element.scrollWidth > element.clientWidth),
+      ).toBe(true);
     await expect(
       summary.locator("[data-application-progress]"),
     ).toBeInViewport();
@@ -702,13 +708,20 @@ test("the mobile dropdown works from its normal position and Overview restores S
   const dropdown = menu.locator("[data-contents-dropdown]");
   const label = summary.locator(".volunteer-contents-section-toggle");
   const current = summary.locator("[data-contents-current]");
-  const chevron = label.locator("svg");
+  const chevron = summary.locator(".volunteer-contents-chevron");
   const progress = summary.locator("[data-application-progress]");
   await expect(label).toHaveText("Sections");
   await expect(current).toBeHidden();
-  await expect(summary.locator("button, a, [tabindex]")).toHaveCount(0);
-  await expect(chevron).toHaveCSS("width", "22px");
-  await expect(label).toHaveCSS("border-width", "1px");
+  await expect(
+    summary.locator('button, a, [tabindex], [role="button"]'),
+  ).toHaveCount(0);
+  await expect(chevron).toHaveCSS("width", "24px");
+  await expect(label).toHaveCSS("border-width", "0px");
+  await expect(label).toHaveCSS("padding", "0px");
+  await expect(label).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(summary.locator(":scope > :last-child")).toHaveClass(
+    "volunteer-contents-chevron",
+  );
   for (const viewport of [
     { width: 320, height: 812 },
     { width: 375, height: 812 },
@@ -756,6 +769,8 @@ test("the mobile dropdown works from its normal position and Overview restores S
     const labelBounds = (await label.boundingBox())!;
     const currentBounds = (await current.boundingBox())!;
     const progressBounds = (await progress.boundingBox())!;
+    const chevronBounds = (await chevron.boundingBox())!;
+    const summaryBounds = (await summary.boundingBox())!;
     expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(
       currentBounds.x,
     );
@@ -763,10 +778,15 @@ test("the mobile dropdown works from its normal position and Overview restores S
       progressBounds.x,
     );
     expect(progressBounds.x + progressBounds.width).toBeLessThanOrEqual(
-      viewport.width,
+      chevronBounds.x,
     );
-    // The label, current section, ring, and row padding all toggle the native summary.
-    for (const target of [label, current, progress]) {
+    expect(chevronBounds.x + chevronBounds.width).toBe(
+      summaryBounds.x + summaryBounds.width - 13,
+    );
+    await expect(current).toHaveCSS("text-overflow", "ellipsis");
+    expect(summaryBounds.height).toBe(54);
+    // Every part of the row toggles the native summary.
+    for (const target of [label, current, progress, chevron]) {
       await target.click();
       await expect(menu).toHaveAttribute("open", "");
       await expect(chevron).toHaveCSS(
