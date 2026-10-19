@@ -529,8 +529,8 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
   await expect(status).toBeHidden();
   await expect(tracker.getByRole("status")).toHaveCount(0);
   await expect(status).toHaveCSS("font-size", "14px");
-  await expect(status).toHaveCSS("text-align", "right");
-  await expect(status).toHaveCSS("justify-content", "flex-end");
+  await expect(status).toHaveCSS("text-align", "left");
+  await expect(status).toHaveCSS("justify-content", "flex-start");
   await expect(reviewButton).toBeHidden();
   const height = (await compact.boundingBox())!.height;
   expect(height).toBe(54);
