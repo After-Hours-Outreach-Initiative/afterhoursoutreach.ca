@@ -374,6 +374,22 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       "min-width",
       "0px",
     );
+    const arrow = identity.locator(".header-account-arrow");
+    await expect(arrow).toBeVisible();
+    await expect(arrow).toHaveAttribute("aria-hidden", "true");
+    await expect(arrow).toHaveAttribute("focusable", "false");
+    const identityBox = await identity.boundingBox();
+    const arrowBox = await arrow.boundingBox();
+    expect(arrowBox).toMatchObject({
+      x: identityBox!.x + identityBox!.width - 28,
+      y: identityBox!.y + 16,
+      width: 16,
+      height: 16,
+    });
+    const detailsBox = await identity
+      .locator(".header-account-details")
+      .boundingBox();
+    expect(detailsBox!.x + detailsBox!.width).toBeLessThan(arrowBox!.x);
     const divider = card.getByRole("separator");
     await expect(divider).toBeVisible();
     await expect(divider).toHaveCSS("border-top-color", "rgb(39, 39, 42)");
