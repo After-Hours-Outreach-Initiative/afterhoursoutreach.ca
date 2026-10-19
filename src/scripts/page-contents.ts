@@ -82,10 +82,11 @@ export function initPageContents(
       );
   };
   const activate = (active: (typeof sections)[number]) => {
-    current.textContent =
-      application && active.hash === `#${topId}`
-        ? "Sections"
-        : (active.links[0].textContent?.trim() ?? "");
+    const overview = application && active.hash === `#${topId}`;
+    current.hidden = overview;
+    current.textContent = overview
+      ? ""
+      : (active.links[0].textContent?.trim() ?? "");
     for (const section of sections)
       for (const link of section.links) {
         if (section === active) link.setAttribute("aria-current", "location");

@@ -30,12 +30,7 @@ const totalSections = entries.filter((entry) => entry.completable).length;
             application ? (
               <>
                 <span class="volunteer-contents-section-toggle">
-                  <span
-                    class="volunteer-contents-current"
-                    data-contents-current
-                  >
-                    {heading}
-                  </span>
+                  {heading}
                   <svg
                     class="volunteer-contents-chevron"
                     viewBox="0 0 24 24"
@@ -47,6 +42,11 @@ const totalSections = entries.filter((entry) => entry.completable).length;
                     <path d="m6 9 6 6 6-6" />
                   </svg>
                 </span>
+                <span
+                  class="volunteer-contents-current"
+                  data-contents-current
+                  hidden
+                />
                 <span
                   class="volunteer-contents-completion"
                   data-application-progress-count
