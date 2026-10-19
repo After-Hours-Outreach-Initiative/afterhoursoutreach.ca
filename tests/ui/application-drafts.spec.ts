@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   createLocalAccount,
+  fillApplicationField,
   localApplicationReviewButton,
   reviewLocalApplication,
   sampleAnswers,
@@ -143,6 +144,8 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   const form = page.locator(formSelector);
   await form.locator('[name="firstName"]').fill("  Unfinished name ");
   await form.locator('[name="phone"]').fill("123");
+  await form.locator('[data-birth-date-part="day"]').fill("23");
+  await form.locator('[data-birth-date-part="year"]').fill("19");
   await form.locator('[name="medicalConditions"]').fill("Sample medical draft");
   await form.locator('[name="teams"][value="medic"]').check();
   await form.locator('[name="certifications"][value="other"]').check();
@@ -161,6 +164,9 @@ test("browser drafts preserve incomplete answers through reload and closing the 
     "  Unfinished name ",
   );
   await expect(form.locator('[name="phone"]')).toHaveValue("123");
+  await expect(form.locator('[data-birth-date-part="day"]')).toHaveValue("23");
+  await expect(form.locator('[data-birth-date-part="month"]')).toHaveValue("");
+  await expect(form.locator('[data-birth-date-part="year"]')).toHaveValue("19");
   await expect(form.locator('[name="medicalConditions"]')).toHaveValue(
     "Sample medical draft",
   );
@@ -189,7 +195,16 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   await reopened.evaluate(() =>
     window.dispatchEvent(new Event("draft-test-online")),
   );
-  await expectDraftSaved(reopened, { firstName: "  Unfinished name " });
+  await expect(reopened.locator('[data-birth-date-part="day"]')).toHaveValue(
+    "23",
+  );
+  await expect(reopened.locator('[data-birth-date-part="year"]')).toHaveValue(
+    "19",
+  );
+  await expectDraftSaved(reopened, {
+    firstName: "  Unfinished name ",
+    birthDate: '["23","","19"]',
+  });
 });
 
 test("account drafts resume in a separate browser with no local storage and remain unsubmitted", async ({
@@ -201,14 +216,15 @@ test("account drafts resume in a separate browser with no local storage and rema
   await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/apply");
   await page.locator('[name="firstName"]').fill("Different device");
-  await page.locator('[name="birthDate"]').fill("2020-01-01");
+  await fillApplicationField(page, "birthDate", "2020-01-01");
+  await page.locator('[data-birth-date-part="month"]').fill("");
   await page.locator('[name="training"][value="other"]').check();
   await page
     .locator('[name="otherTraining"]')
     .fill("Still finishing training answer");
   await expectDraftSaved(page, {
     firstName: "Different device",
-    birthDate: "2020-01-01",
+    birthDate: '["01","","2020"]',
     training: ["other"],
     otherTraining: "Still finishing training answer",
   });
@@ -234,9 +250,16 @@ test("account drafts resume in a separate browser with no local storage and rema
       "required",
       "",
     );
-    await expect(resumed.locator('[name="birthDate"]')).toHaveValue(
-      "2020-01-01",
+    await expect(resumed.locator('[data-birth-date-part="day"]')).toHaveValue(
+      "01",
     );
+    await expect(resumed.locator('[data-birth-date-part="month"]')).toHaveValue(
+      "",
+    );
+    await expect(resumed.locator('[data-birth-date-part="year"]')).toHaveValue(
+      "2020",
+    );
+    await expect(resumed.locator('[name="birthDate"]')).toHaveValue("");
     await expect(resumed.locator('[name="otherTraining"]')).toBeVisible();
     await expect(resumed.locator('[name="otherTraining"]')).toHaveValue(
       "Still finishing training answer",
@@ -367,6 +390,7 @@ for (const keepLocal of [true, false]) {
       route.request().method() === "PUT" ? route.abort() : route.continue(),
     );
     await page.locator('[name="firstName"]').fill("Local changes");
+    await page.locator('[data-birth-date-part="day"]').fill("23");
     const { draft } = await (await page.request.get(endpoint)).json();
     const remote = await page.request.put(endpoint, {
       headers: { origin: baseURL! },
@@ -374,7 +398,11 @@ for (const keepLocal of [true, false]) {
         userId: id,
         version: 1,
         revision: draft.revision,
-        answers: { ...draft.answers, firstName: "Other device" },
+        answers: {
+          ...draft.answers,
+          firstName: "Other device",
+          birthDate: '["","4","19"]',
+        },
       },
     });
     expect(remote.ok(), await remote.text()).toBe(true);
@@ -402,7 +430,17 @@ for (const keepLocal of [true, false]) {
     );
     await expectDraftSaved(page, {
       firstName: keepLocal ? "Local changes" : "Other device",
+      birthDate: keepLocal ? '["23","",""]' : '["","4","19"]',
     });
+    await expect(page.locator('[data-birth-date-part="day"]')).toHaveValue(
+      keepLocal ? "23" : "",
+    );
+    await expect(page.locator('[data-birth-date-part="month"]')).toHaveValue(
+      keepLocal ? "" : "4",
+    );
+    await expect(page.locator('[data-birth-date-part="year"]')).toHaveValue(
+      keepLocal ? "" : "19",
+    );
   });
 }
 
@@ -472,6 +510,10 @@ test("resuming requires a fresh review and consent; submission clears both draft
   const form = page.locator(formSelector);
   for (const [name, value] of Object.entries(sampleAnswers)) {
     if (typeof value !== "string") continue;
+    if (name === "birthDate") {
+      await fillApplicationField(form, name, value);
+      continue;
+    }
     const field = form.locator(`[name="${name}"]`);
     if (
       (await field.count()) &&

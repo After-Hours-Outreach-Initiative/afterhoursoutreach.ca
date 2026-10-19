@@ -8,7 +8,10 @@ import sharp from "sharp";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
-import { reviewLocalApplication } from "../helpers/local-account";
+import {
+  fillApplicationField,
+  reviewLocalApplication,
+} from "../helpers/local-account";
 import {
   latestApplicationBirthDate,
   applicationBirthDateError,
@@ -1373,7 +1376,7 @@ describe(
             ].includes(name)
           )
             continue;
-          await newPage.locator(`[name="${name}"]`).fill(String(value));
+          await fillApplicationField(newPage, name, String(value));
         }
         await expect(
           newPage.getByRole("checkbox", { name: "Outreach", exact: true }),

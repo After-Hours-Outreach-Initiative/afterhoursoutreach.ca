@@ -7,6 +7,11 @@ import {
   localApplicationDraftSchema,
   sameDraftAnswers,
 } from "../src/data/application-draft";
+import {
+  birthDateDraftValue,
+  birthDateParts,
+  canonicalBirthDate,
+} from "../src/data/application-birth-date";
 
 test("drafts accept unfinished answers without trimming, date checks, or consent", () => {
   const answers = applicationDraftAnswersSchema.parse({
@@ -28,6 +33,22 @@ test("drafts accept unfinished answers without trimming, date checks, or consent
   assert.equal(draftProfileValues(answers).certification, "");
   assert.equal(sameDraftAnswers(answers, { ...answers }), true);
   assert.equal(sameDraftAnswers(answers, { ...answers, phone: "" }), false);
+  for (const value of [
+    "",
+    "1995-04-12",
+    '["23","","19"]',
+    '["010","4","1990"]',
+  ]) {
+    const parts = birthDateParts(value);
+    const restored = applicationDraftAnswersSchema.parse({
+      birthDate: birthDateDraftValue(parts),
+    });
+    assert.deepEqual(birthDateParts(restored.birthDate), parts);
+  }
+  assert.equal(
+    canonicalBirthDate({ day: "3", month: "4", year: "1990" }),
+    "1990-04-03",
+  );
 });
 
 test("drafts reject consent, unexpected fields, invalid types and oversized answers", () => {

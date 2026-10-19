@@ -1,6 +1,7 @@
 import { devices, expect, test } from "@playwright/test";
 import {
   createLocalAccount,
+  fillApplicationField,
   localApplicationReviewButton,
   openLocalAccountSwitcher,
   reviewLocalApplication,
@@ -703,16 +704,18 @@ test("application shows all required errors and saves after they are corrected",
   );
   const count = await required.count();
   expect(count).toBeGreaterThan(1);
-  await expect(form.locator("[data-error]:visible")).toHaveCount(count);
+  // The three DOB inputs share one group error.
+  await expect(form.locator("[data-error]:visible")).toHaveCount(count - 2);
   for (const input of await required.all()) {
     expect(
       await input.evaluate((element) => element.matches(":user-invalid")),
     ).toBe(true);
     const id = await input.getAttribute("id");
     const name = await input.getAttribute("name");
-    const label = ["heardAboutUsSources", "training"].includes(name ?? "")
-      ? input.locator("xpath=ancestor::fieldset[1]/legend")
-      : form.locator(`label[for="${id}"]`);
+    const label =
+      !name || ["heardAboutUsSources", "training"].includes(name)
+        ? input.locator("xpath=ancestor::fieldset[1]/legend")
+        : form.locator(`label[for="${id}"]`);
     await expect(label.locator(".volunteer-required")).toHaveText("*");
   }
   await expect(
@@ -733,7 +736,7 @@ test("application shows all required errors and saves after they are corrected",
     "valid phone number",
   );
   await expect(form.locator("[data-error=phone]")).toBeVisible();
-  await page.getByLabel(/^Date of birth/).fill("2999-01-01");
+  await fillApplicationField(form, "birthDate", "2999-01-01");
   await expect(form.locator("[data-error=birthDate]")).toContainText(
     "at least 19 years old",
   );
@@ -756,7 +759,7 @@ test("application shows all required errors and saves after they are corrected",
         "otherTraining",
       ].includes(field)
     )
-      await form.locator(`[name="${field}"]`).fill(String(value));
+      await fillApplicationField(form, field, String(value));
   }
   await page.setViewportSize({ width: 375, height: 812 });
   expect(
@@ -906,58 +909,88 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
       const page = await context.newPage();
       await page.goto("/apply");
       const form = page.locator("[data-account-profile]");
-      const birthDate = form.getByRole("textbox", {
+      const birthDate = form.getByRole("group", {
         name: "Date of birth",
         exact: true,
       });
-      await expect(birthDate).toHaveAttribute("type", "text");
-      await expect(birthDate).toHaveAttribute("placeholder", "YYYY-MM-DD");
-      await expect(birthDate).toHaveAttribute("autocomplete", "off");
-      await expect(birthDate).toHaveAccessibleDescription(
-        /year-month-day.*1990-04-23.*at least 19/,
-      );
+      for (const part of ["day", "month", "year"]) {
+        const input = birthDate.locator(`[data-birth-date-part="${part}"]`);
+        await expect(input).toHaveAccessibleName(
+          part[0].toUpperCase() + part.slice(1),
+        );
+        await expect(input).toHaveAttribute("type", "text");
+        await expect(input).toHaveAttribute("inputmode", "numeric");
+        await expect(input).toHaveAttribute("autocomplete", `bday-${part}`);
+        await expect(input).not.toHaveAttribute("name");
+        await expect(input).toHaveAccessibleDescription(
+          /23 4 1990.*at least 19/,
+        );
+        await expect(input).toHaveValue("");
+        await input.focus();
+        await expect(input).toHaveValue("");
+      }
       await expect(form.locator("[data-error=birthDate]")).toBeHidden();
-      await expect(birthDate).toHaveValue("");
-      await birthDate.focus();
-      await expect(birthDate).toHaveValue("");
-      expect(
-        await birthDate.evaluate(
-          (input: HTMLInputElement) => input.validity.valueMissing,
-        ),
-      ).toBe(true);
+      const day = birthDate.getByRole("textbox", { name: "Day", exact: true });
+      const month = birthDate.getByRole("textbox", {
+        name: "Month",
+        exact: true,
+      });
+      const year = birthDate.getByRole("textbox", {
+        name: "Year",
+        exact: true,
+      });
+      await day.pressSequentially("010");
+      await expect(day).toBeFocused();
+      await expect(day).toHaveValue("010");
+      await day.press("Home");
+      await day.press("Delete");
+      await expect(day).toHaveValue("10");
+      await day.press("Tab");
+      await expect(month).toBeFocused();
+      await month.press("Shift+Tab");
+      await expect(day).toBeFocused();
       for (const width of [devices[device].viewport.width, 320]) {
         await page.setViewportSize({ width, height: 844 });
         expect(
-          await birthDate.evaluate((input) => {
-            const bounds = input.getBoundingClientRect();
-            const field = input
-              .closest(".volunteer-field")!
-              .getBoundingClientRect();
+          await birthDate.evaluate((group) => {
+            const field = group.getBoundingClientRect();
             return (
-              bounds.left >= field.left &&
-              bounds.right <= field.right &&
-              bounds.right <= innerWidth
+              [...group.querySelectorAll('input[type="text"]')].every(
+                (input) => {
+                  const bounds = input.getBoundingClientRect();
+                  return (
+                    bounds.left >= field.left &&
+                    bounds.right <= field.right &&
+                    bounds.right <= innerWidth
+                  );
+                },
+              ) && document.documentElement.scrollWidth <= innerWidth
             );
           }),
         ).toBe(true);
       }
 
       // Draft restoration can report a changed value through change, not input.
-      await birthDate.evaluate((input: HTMLInputElement) => {
-        input.value = "2999-01-01";
+      await fillApplicationField(form, "birthDate", "1990-01-01");
+      await year.evaluate((input: HTMLInputElement) => {
+        input.value = "2999";
         input.dispatchEvent(new Event("change", { bubbles: true }));
       });
-      await expect(birthDate).toHaveJSProperty(
+      await expect(year).toHaveJSProperty(
         "validationMessage",
         applicationBirthDateError,
       );
       await form.evaluate((element: HTMLFormElement) => element.reset());
-      await expect(birthDate).toHaveValue("");
+      await expect(day).toHaveValue("");
+      await expect(month).toHaveValue("");
+      await expect(year).toHaveValue("");
+      await expect(form.locator('[name="birthDate"]')).toHaveValue("");
+      await expect(form.locator("[data-error=birthDate]")).toBeHidden();
       expect(
-        await birthDate.evaluate(
-          (input: HTMLInputElement) => input.validity.customError,
+        await year.evaluate(
+          (input: HTMLInputElement) => input.validity.valueMissing,
         ),
-      ).toBe(false);
+      ).toBe(true);
     } finally {
       await context.close();
     }
@@ -997,7 +1030,7 @@ test("applications validate the birthday boundary and profiles keep the saved bi
         "otherTraining",
       ].includes(field)
     )
-      await form.locator(`[name="${field}"]`).fill(String(value));
+      await fillApplicationField(form, field, String(value));
   }
   await expect(form.getByLabel("Outreach", { exact: true })).toBeChecked();
   const requests: string[] = [];
@@ -1008,26 +1041,41 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   const younger = new Date(`${cutoff}T00:00:00Z`);
   younger.setUTCDate(younger.getUTCDate() + 1);
   const underage = younger.toISOString().slice(0, 10);
-  for (const invalid of [
-    underage,
-    today.toISOString().slice(0, 10),
-    "2005-02-29",
-    "1899-12-31",
-    "not-a-date",
+  for (const [invalid, part, message] of [
+    [underage, "year", applicationBirthDateError],
+    [today.toISOString().slice(0, 10), "year", applicationBirthDateError],
+    [
+      "2005-02-29",
+      "day",
+      "Enter a real date of birth. Check the day and month.",
+    ],
+    ["1899-12-31", "year", "Enter a four-digit year of 1900 or later."],
+    ["1990-13-01", "month", "Enter a month from 1 to 12."],
+    ["1990-01-no", "day", "Enter a day from 1 to 31."],
   ]) {
-    await birthDate.fill(invalid);
+    await fillApplicationField(form, "birthDate", invalid);
     await reviewLocalApplication(page);
-    await expect(birthDate).toBeFocused();
+    await expect(
+      form.locator(`[data-birth-date-part="${part}"]`),
+    ).toBeFocused();
     await expect(form.locator("[data-error=birthDate]")).toBeVisible();
-    await expect(form.locator("[data-error=birthDate]")).toHaveText(
-      applicationBirthDateError,
-    );
+    await expect(form.locator("[data-error=birthDate]")).toHaveText(message);
     expect(requests).toEqual([]);
     await expect(page).toHaveURL(/\/apply$/);
   }
-  await birthDate.fill(cutoff);
+  await fillApplicationField(form, "birthDate", cutoff);
   await expect(form.locator("[data-error=birthDate]")).toBeHidden();
-  await submitLocalApplication(page);
+  await reviewLocalApplication(page);
+  await expect(form.locator('[data-review-answer="birthDate"]')).toHaveText(
+    new Intl.DateTimeFormat("en-CA", {
+      dateStyle: "long",
+      timeZone: "UTC",
+    }).format(new Date(`${cutoff}T00:00:00Z`)),
+  );
+  await form.locator('[name="codeOfConductAccepted"]').check();
+  await page
+    .getByRole("button", { name: "Submit application", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
@@ -1059,11 +1107,11 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     const page = await context.newPage();
     await page.goto("/apply");
     const form = page.locator("[data-account-profile]");
-    const birthDate = form.locator('[name="birthDate"]');
+    const birthDate = form.locator('[data-birth-date-part="year"]');
     await expect(birthDate).toHaveAttribute("type", "text");
     await expect(birthDate).toHaveValue("");
-    await expect(form.locator("#help-birthDate")).toContainText("YYYY-MM-DD");
-    await birthDate.fill("not-a-date");
+    await expect(form.locator("#help-birthDate")).toContainText("23 4 1990");
+    await birthDate.fill("not-a-year");
     await expect(localApplicationReviewButton(page)).toBeDisabled();
     expect(
       await birthDate.evaluate(
@@ -1071,7 +1119,7 @@ test("the application requires JavaScript and renders blank DOB format guidance"
       ),
     ).toBe(false);
     await expect(page).toHaveURL(/\/apply$/);
-    await birthDate.fill(latestApplicationBirthDate());
+    await fillApplicationField(form, "birthDate", latestApplicationBirthDate());
     expect(
       await birthDate.evaluate(
         (input: HTMLInputElement) => input.validity.valid,
@@ -1185,7 +1233,7 @@ test("all teams can select multiple relevant training answers and add Other deta
         "otherTraining",
       ].includes(field)
     )
-      await form.locator(`[name="${field}"]`).fill(String(value));
+      await fillApplicationField(form, field, String(value));
   }
   await none.uncheck();
   await reviewLocalApplication(page);
@@ -1361,7 +1409,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
         "otherTraining",
       ].includes(field)
     )
-      await form.locator(`[name="${field}"]`).fill(String(value));
+      await fillApplicationField(form, field, String(value));
   }
   await expect(form.getByLabel("Outreach", { exact: true })).toBeChecked();
   await medic.check();

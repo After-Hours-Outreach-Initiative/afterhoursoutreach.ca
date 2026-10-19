@@ -1,4 +1,23 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
+
+export async function fillApplicationField(
+  scope: Page | Locator,
+  name: string,
+  value: string,
+) {
+  if (name !== "birthDate") {
+    await scope.locator(`[name="${name}"]`).fill(value);
+    return;
+  }
+  const [year, month, day] = value.split("-");
+  for (const [part, answer] of Object.entries({ day, month, year }))
+    await scope.locator(`[data-birth-date-part="${part}"]`).fill(answer ?? "");
+}
 
 export async function openLocalAccountSwitcher(page: Page) {
   await page
