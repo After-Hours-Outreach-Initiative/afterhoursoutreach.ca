@@ -29,6 +29,10 @@ import {
   queueMedicCertificationNotifications,
 } from "../src/server/db/medic-certifications";
 import { processMedicCertificationNotifications } from "../src/server/medic-certifications";
+import {
+  createDisposableAccount,
+  deleteDisposableAccount,
+} from "../src/dev/server/disposable-accounts";
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -397,6 +401,80 @@ test("deleting an account cascades to its private application draft", async () =
   await saveApplicationDraft(env.DB, actor, draftInput(actor));
   await env.DB.prepare("DELETE FROM user WHERE id=?").bind(actor.id).run();
   assert.equal(await loadApplicationDraft(env.DB, actor.id), null);
+});
+
+test("disposable local accounts preserve old fixtures and deletion requires provenance, a volunteer role, and safe references", async () => {
+  const original = await draftActor("local-account-user-not-applied");
+  const answers = {
+    ...draftProfileValues(
+      applicationDraftAnswersSchema.parse({
+        firstName: "Preserved",
+        lastName: "Application",
+        phone: "604-555-0100",
+        birthDate: "1995-01-01",
+        emergencyName: "Contact",
+        emergencyPhone: "604-555-0101",
+        emergencyRelationship: "Friend",
+        heardAboutUsSources: ["internet"],
+        motivation: "I want to help.",
+        teams: ["outreach"],
+        training: ["none"],
+      }),
+    ),
+    codeOfConductAccepted: true,
+  };
+  await saveProfile(env.DB, original.id, answers);
+  const snapshot = await loadSubmittedApplication(env.DB, original.id);
+  const id = await createDisposableAccount(env.DB);
+  await createDisposableAccount(env.DB);
+  assert.deepEqual(
+    await loadSubmittedApplication(env.DB, original.id),
+    snapshot,
+  );
+  assert.equal(await deleteDisposableAccount(env.DB, original.id), false);
+  const lookalike = await draftActor(
+    `local-application-${crypto.randomUUID()}`,
+  );
+  assert.equal(await deleteDisposableAccount(env.DB, lookalike.id), false);
+
+  await saveProfile(env.DB, id, answers);
+  const organizer = await draftActor("protected-organizer");
+  await saveProfile(env.DB, organizer.id, answers);
+  await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+    .bind(organizer.id)
+    .run();
+  // Names/emails are editable, not a deletion authorization mechanism.
+  await env.DB.prepare(
+    "UPDATE user SET role='organizer', name='Changed', email='changed@example.org' WHERE id=?",
+  )
+    .bind(id)
+    .run();
+  assert.equal(await deleteDisposableAccount(env.DB, id), false);
+  assert.ok(await loadProfile(env.DB, id));
+  await env.DB.prepare("UPDATE user SET role='volunteer' WHERE id=?")
+    .bind(id)
+    .run();
+  await env.DB.prepare(
+    `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
+    VALUES ('protected-event', 'orientation', 0, 'Meeting point', 1, ?, 0, 0)`,
+  )
+    .bind(id)
+    .run();
+  const audit = () =>
+    env.DB.prepare("SELECT count(*) AS n FROM audit_log WHERE subject_id=?")
+      .bind(id)
+      .first();
+  const before = await audit();
+  await assert.rejects(deleteDisposableAccount(env.DB, id));
+  assert.deepEqual(await audit(), before); // No partial child deletion on FK failure.
+  assert.ok(await loadProfile(env.DB, id));
+  await env.DB.prepare("DELETE FROM event WHERE id='protected-event'").run();
+  assert.equal(await deleteDisposableAccount(env.DB, id), true);
+  assert.equal(await loadProfile(env.DB, id), null);
+  assert.deepEqual(
+    await loadSubmittedApplication(env.DB, original.id),
+    snapshot,
+  );
 });
 
 async function seedMedic(

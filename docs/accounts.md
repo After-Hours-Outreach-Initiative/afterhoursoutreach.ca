@@ -239,10 +239,20 @@ runtime import from outside `src/dev/` behind the guard. Type-only imports are
 safe because TypeScript removes them.
 
 The development controls are available only in the local dev server. Built
-Worker tests check that `GET /api/v1/auth/dev/users` and
-`POST /api/v1/auth/dev/switch-user` return `404` in production and preview builds;
+Worker tests check that `GET /api/v1/auth/dev/users`,
+`POST /api/v1/auth/dev/switch-user`, and `POST /api/v1/auth/dev/delete-user`
+return `404` in production and preview builds;
 local browser tests exercise account switching and simulated email delivery.
 Dev-tool assets must not be placed in `public/`, which is copied into builds.
+
+The Not applied choice creates a new disposable D1 identity on each selection;
+submission, account naming, and private drafts still use the normal backend.
+All created identities remain visible and deletable, even if abandoned before
+submission. The original Not applied fixture is never cleared or repurposed.
+Deletion requires same-origin POST, explicit confirmation, server-owned provenance
+in the auth `account` table, and a volunteer role. It cannot delete canonical
+fixtures, organizers, or ordinary accounts; deleting a current disposable account
+also clears its browser session. See [backend.md](backend.md#local-testing).
 
 ## TODO
 

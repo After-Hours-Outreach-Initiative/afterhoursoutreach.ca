@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { createLocalAccount, sampleAnswers } from "../helpers/local-account";
+import {
+  createLocalAccount,
+  fillApplicationField,
+  openLocalAccountSwitcher,
+  sampleAnswers,
+  submitLocalApplication,
+} from "../helpers/local-account";
 
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
@@ -16,6 +22,141 @@ test.beforeEach(async ({ page, baseURL }) => {
   await expect(
     page.getByRole("button", { name: "Continue with Email" }),
   ).toBeVisible();
+});
+
+test("Not applied always starts blank; submitted local accounts persist and can be deleted", async ({
+  page,
+  baseURL,
+}) => {
+  const current = async () =>
+    (await (await page.request.get("/api/v1/auth/get-session")).json()).user;
+  const draft = async () =>
+    await (await page.request.get("/api/v1/account/application-draft")).json();
+  const disposableUsers = async () => {
+    const { users }: { users: { id: string }[] } = await (
+      await page.request.get("/api/v1/auth/dev/users")
+    ).json();
+    // Other browser tests may create ordinary accounts in the shared test D1.
+    return users.filter(({ id }) => id.startsWith("local-application-"));
+  };
+  const choose = async (id: string) => {
+    const profiles = await openLocalAccountSwitcher(page);
+    await Promise.all([
+      page.waitForEvent("domcontentloaded"),
+      profiles.locator(`[data-switch-user="${id}"]`).click(),
+    ]);
+  };
+  const expectBlank = async () => {
+    await expect(page).toHaveURL(/\/apply$/);
+    await expect(page.locator('[name="firstName"]')).toHaveValue("");
+    await expect(
+      page.locator("form[data-application] input:checked"),
+    ).toHaveCount(0);
+    expect(await draft()).toMatchObject({ submitted: false, draft: null });
+  };
+
+  await choose("new-application");
+  await expectBlank();
+  const first = await current();
+  await page.locator('[name="firstName"]').fill("Unfinished draft");
+  await page.locator('[name="teams"][value="outreach"]').check();
+  await page.locator('[name="teams"][value="medic"]').check();
+  await expect
+    .poll(async () => (await draft()).draft?.answers.teams)
+    .toEqual(["outreach", "medic"]);
+
+  // Invalid submission neither creates a completed account nor consumes the persona.
+  const before = await disposableUsers();
+  const invalid = await page.request.post("/api/v1/account/profile", {
+    headers: { origin: baseURL! },
+    data: { ...sampleAnswers, teams: [], codeOfConductAccepted: true },
+  });
+  expect(invalid.status()).toBe(400);
+  expect(await draft()).toMatchObject({
+    submitted: false,
+    draft: { answers: { firstName: "Unfinished draft" } },
+  });
+  expect(await disposableUsers()).toEqual(before);
+
+  await choose("new-application");
+  await expectBlank();
+  const second = await current();
+  expect(second.id).not.toBe(first.id);
+  // The abandoned draft remains explicitly selectable/deletable, never invisible.
+  await choose(first.id);
+  await expect(page.locator('[name="firstName"]')).toHaveValue(
+    "Unfinished draft",
+  );
+  await expect(page.locator('[name="teams"][value="medic"]')).toBeChecked();
+  await choose(second.id);
+  await expectBlank();
+  for (const key of [
+    "firstName",
+    "lastName",
+    "preferredName",
+    "phone",
+    "birthDate",
+    "emergencyName",
+    "emergencyPhone",
+    "emergencyRelationship",
+    "motivation",
+  ] as const)
+    await fillApplicationField(page, key, sampleAnswers[key]);
+  for (const [name, value] of [
+    ["teams", "outreach"],
+    ["training", "none"],
+    ["heardAboutUsSources", "friend-word-of-mouth"],
+  ])
+    await page.locator(`[name="${name}"][value="${value}"]`).check();
+  await submitLocalApplication(page);
+  await expect(page).toHaveURL(/\/volunteer\/account$/);
+  expect(await current()).toMatchObject({
+    id: second.id,
+    name: sampleAnswers.preferredName,
+  });
+  await page.reload();
+  expect(await draft()).toMatchObject({ submitted: true, draft: null });
+  const profiles = await openLocalAccountSwitcher(page);
+  await expect(
+    profiles.locator(`[data-switch-user="${second.id}"]`),
+  ).toContainText(sampleAnswers.preferredName);
+  await expect(
+    profiles.locator(`[data-switch-user="${second.id}"]`),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .getByRole("button", { name: "Close development controls" })
+    .click();
+
+  await choose("new-application");
+  await expectBlank();
+  const third = await current();
+  const choices = await openLocalAccountSwitcher(page);
+  const remove = choices.locator(`[data-delete-user="${second.id}"]`);
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await remove.click();
+  await expect(remove).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await remove.click();
+  await expect(remove).toHaveCount(0);
+  expect((await current()).id).toBe(third.id);
+  // Deleting the current account revokes its session and returns to Visitor.
+  page.once("dialog", (dialog) => dialog.accept());
+  await choices.locator(`[data-delete-user="${third.id}"]`).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  expect(
+    await (await page.request.get("/api/v1/auth/get-session")).json(),
+  ).toBeNull();
+  const remaining = await openLocalAccountSwitcher(page);
+  for (const id of [second.id, third.id])
+    await expect(remaining.locator(`[data-switch-user="${id}"]`)).toHaveCount(
+      0,
+    );
+  await expect(
+    remaining.locator(`[data-delete-user="${first.id}"]`),
+  ).toBeVisible();
+  await expect(
+    remaining.locator('[data-switch-user="new-application"]'),
+  ).toBeEnabled();
 });
 
 test("unfinished application shows a clickable yellow warning card without clipping", async ({

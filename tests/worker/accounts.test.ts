@@ -1015,6 +1015,16 @@ describe(
             404,
           );
         }
+        assert.equal(
+          (
+            await send(
+              "/api/v1/auth/dev/delete-user",
+              { userId: before.user.id, confirm: true },
+              sessionCookie,
+            )
+          ).status,
+          404,
+        );
       }
       const after = (await (
         await send("/api/v1/auth/get-session", undefined, cookie)
@@ -1717,6 +1727,18 @@ test("a built Worker cannot enable account switching with local runtime vars", a
       },
     );
     assert.equal(switching.status, 404);
+    const deletion = await worker.fetch(
+      "http://localhost:4321/api/v1/auth/dev/delete-user",
+      {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:4321",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ userId: "new-application", confirm: true }),
+      },
+    );
+    assert.equal(deletion.status, 404);
   } finally {
     await server.close();
   }

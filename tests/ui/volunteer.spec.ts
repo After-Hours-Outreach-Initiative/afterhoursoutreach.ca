@@ -537,6 +537,29 @@ test("local account selection rejects cross-origin writes and unknown users", as
     data: { userId: "not-a-user" },
   });
   expect(unknown.status()).toBe(404);
+  for (const origin of ["https://evil.example", null]) {
+    const deletion = await request.post("/api/v1/auth/dev/delete-user", {
+      headers: origin ? { origin } : undefined,
+      data: { userId: user.id, confirm: true },
+    });
+    expect(deletion.status()).toBe(403);
+  }
+  for (const userId of [
+    user.id,
+    "local-fixture-user-robin",
+    "local-account-user-not-applied",
+  ]) {
+    const deletion = await request.post("/api/v1/auth/dev/delete-user", {
+      headers: { origin: baseURL! },
+      data: { userId, confirm: true },
+    });
+    expect(deletion.status()).toBe(403);
+  }
+  const unconfirmed = await request.post("/api/v1/auth/dev/delete-user", {
+    headers: { origin: baseURL! },
+    data: { userId: user.id },
+  });
+  expect(unconfirmed.status()).toBe(400);
   expect(
     (await (await request.get("/api/v1/auth/get-session")).json()).user.id,
   ).toBe(user.id);

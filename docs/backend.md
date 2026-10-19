@@ -47,21 +47,35 @@ See [testing.md](testing.md).
 
 On localhost or the dev server's LAN address, the shared account layout includes
 a **View as** button for every user in local D1, including accounts that have
-not finished their application. Choosing a user replaces only this browser's
+not finished their application. Choosing a saved user replaces only this browser's
 session; choosing Visitor signs out. Switching simulates a verified two-factor
 session for users with an enrolled authenticator, without changing their role,
 email verification, active status, profile, or patrol approval. Create new
 accounts through the regular sign-in form.
 
+**Not applied** is a reusable virtual choice: every selection creates and signs
+into a fresh disposable local D1 account with an empty application and no draft or
+selected answers. Submitting uses the normal application flow, keeps this browser
+signed into that account, and lists it under the entered name in View as. Unfinished
+accounts/drafts remain listed too, so repeated selections never leave invisible
+accounts. Each disposable volunteer account has a **Delete** button with confirmation;
+deleting the current account signs out, while deleting another leaves the current
+session alone. Deletion removes its application, draft, sessions, and related volunteer
+records. Fixtures, organizers, and regular sign-in accounts cannot be deleted here.
+Accounts referenced by organizer-owned records cannot be deleted either.
+
 For manual testing, run `pnpm db:seed:local:accounts` with the dev server running
 and local migrations applied. On a fresh local database, View as contains
-**Visitor** (signed out), **Not applied** (no application or draft), **Applied**
+**Visitor** (signed out), **Not applied** (always a fresh application), **Applied**
 (awaiting approval), **Accepted** (application approved, not patrol approved),
 **Inactive** (inactive, unapproved application), and **Organizer** (active organizer).
 The four submitted profiles use realistic fictional answers. The command also
 adds an open orientation and patrol and enrolls Organizer's authenticator through
 the real local auth backend. It only inserts missing fixtures: it does not reset
 the database, remove other users, or overwrite subsequent edits to these personas.
+The original Not applied fixture is preserved separately as **Original Not applied
+account** (or its submitted name if already completed); its application/draft is
+never reset when choosing the reusable Not applied option.
 
 Run `pnpm db:seed:local` to restore the broader automated-test fixtures:
 an orientation, an open patrol, a full patrol, a hidden/closed orientation, and

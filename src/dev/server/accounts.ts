@@ -9,12 +9,19 @@ import {
   expireCookie,
   setSessionCookie,
 } from "better-auth/cookies";
-import { asc, eq, gt } from "drizzle-orm";
+import { and, asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "../../server/db";
-import { profile, user } from "../../server/db/schema";
+import { account, profile, user } from "../../server/db/schema";
 import { safeReturnTo } from "../../server/http";
 import type { AuthBindings } from "../../server/auth";
+import { newApplicationPersona } from "../accounts";
+import {
+  createDisposableAccount,
+  deleteDisposableAccount,
+  disposableAccountId,
+  disposableAccountProvider,
+} from "./disposable-accounts";
 
 export function developmentAccounts(bindings: AuthBindings) {
   const requireLocal = (request: Request | undefined) => {
@@ -48,14 +55,29 @@ export function developmentAccounts(bindings: AuthBindings) {
               name: user.name,
               email: user.email,
               role: user.role,
+              disposableId: account.id,
             })
             .from(user)
+            .leftJoin(
+              account,
+              and(
+                eq(account.user_id, user.id),
+                eq(account.account_id, user.id),
+                eq(account.provider_id, disposableAccountProvider),
+              ),
+            )
             .where(ctx.query.after ? gt(user.id, ctx.query.after) : undefined)
             .orderBy(asc(user.id))
             .limit(101);
           const current = await getSessionFromCtx(ctx);
           return ctx.json({
-            users: rows.slice(0, 100),
+            users: rows.slice(0, 100).map(({ disposableId, ...person }) => ({
+              ...person,
+              canDelete:
+                disposableId !== null &&
+                person.role === "volunteer" &&
+                disposableAccountId.test(person.id),
+            })),
             next: rows.length > 100 ? rows[99].id : null,
             currentUserId: current?.user.id ?? null,
           });
@@ -75,10 +97,16 @@ export function developmentAccounts(bindings: AuthBindings) {
         },
         async (ctx) => {
           requireLocal(ctx.request);
-          const person = ctx.body.userId
-            ? await ctx.context.internalAdapter.findUserById(ctx.body.userId)
+          // Each selection gets its own empty, visible, deletable D1 identity.
+          // Never clear/reuse the old Not applied fixture: it may be submitted.
+          const userId =
+            ctx.body.userId === newApplicationPersona
+              ? await createDisposableAccount(bindings.DB)
+              : ctx.body.userId;
+          const person = userId
+            ? await ctx.context.internalAdapter.findUserById(userId)
             : null;
-          if (ctx.body.userId && !person)
+          if (userId && !person)
             throw new APIError("NOT_FOUND", { message: "User not found." });
           const token = await ctx.getSignedCookie(
             ctx.context.authCookies.sessionToken.name,
@@ -91,8 +119,8 @@ export function developmentAccounts(bindings: AuthBindings) {
           if (!person) return ctx.json({ next: "/volunteer" });
           const twoFactorVerified =
             "twoFactorEnabled" in person && person.twoFactorEnabled === true;
-          // Only the session changes. Never promote users, approve patrols, or
-          // change their email verification or authenticator enrollment in D1.
+          // For saved users only the session changes. Never promote users, approve
+          // patrols, or change email verification or authenticator enrollment in D1.
           const session = await ctx.context.internalAdapter.createSession(
             person.id,
             false,
@@ -120,6 +148,45 @@ export function developmentAccounts(bindings: AuthBindings) {
           )
             next = "/volunteer";
           return ctx.json({ next });
+        },
+      ),
+      developmentDeleteUser: createAuthEndpoint(
+        "/dev/delete-user",
+        {
+          method: "POST",
+          requireHeaders: true,
+          body: z.strictObject({
+            userId: z.string().min(1).max(200),
+            confirm: z.literal(true),
+          }),
+        },
+        async (ctx) => {
+          requireLocal(ctx.request);
+          const current = await getSessionFromCtx(ctx);
+          let deleted: boolean;
+          try {
+            deleted = await deleteDisposableAccount(
+              bindings.DB,
+              ctx.body.userId,
+            );
+          } catch {
+            throw new APIError("CONFLICT", {
+              message:
+                "Could not delete this local account. It may be referenced by organizer records.",
+            });
+          }
+          if (!deleted)
+            throw new APIError("FORBIDDEN", {
+              message:
+                "Only disposable local volunteer accounts can be deleted.",
+            });
+          const deletedCurrent = current?.user.id === ctx.body.userId;
+          if (deletedCurrent) {
+            deleteSessionCookie(ctx);
+            expireCookie(ctx, ctx.context.createAuthCookie("two_factor"));
+            expireCookie(ctx, ctx.context.createAuthCookie("sign_in_return"));
+          }
+          return ctx.json({ next: deletedCurrent ? "/volunteer" : null });
         },
       ),
     },
