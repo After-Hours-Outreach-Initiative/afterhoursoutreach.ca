@@ -397,7 +397,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
           (element) =>
             getComputedStyle(element).gridTemplateColumns.split(" ").length,
         ),
-    ).toBe(width <= 640 ? 1 : 3);
+    ).toBe(1);
     await form.getByRole("button", { name: "Cancel", exact: true }).click();
     await page.getByRole("button", { name: "Edit team interests" }).click();
     const medic = form.getByLabel("Medic", { exact: true });

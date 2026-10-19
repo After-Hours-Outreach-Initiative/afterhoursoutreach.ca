@@ -597,9 +597,6 @@ body:has([data-application], [data-account-contents-flow]) {
     overscroll-behavior: contain;
     padding: 4px 0;
   }
-  [data-application-flow] .volunteer-team-options {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-  }
 }
 [data-application-questions],
 .volunteer-application-section,
@@ -781,7 +778,7 @@ body:has([data-application], [data-account-contents-flow]) {
 }
 .volunteer-team-options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   margin-top: 16px;
   gap: 12px;
 }
@@ -1364,9 +1361,6 @@ body:has([data-application], [data-account-contents-flow]) {
     padding: 20px;
   }
   .volunteer-fields {
-    grid-template-columns: 1fr;
-  }
-  .volunteer-team-options {
     grid-template-columns: 1fr;
   }
   .volunteer-event-top .volunteer-actions {
