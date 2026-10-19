@@ -273,7 +273,7 @@ export const applicationFields = [
     label: "Medical conditions/allergies/anything else we should know",
     required: false,
     multiline: true,
-    help: "Optional. Used to help organizers support your safety during events.",
+    help: "Used to help organizers support your safety during events.",
   },
   {
     name: "emergencyName",
