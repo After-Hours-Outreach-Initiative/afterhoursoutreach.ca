@@ -25,16 +25,27 @@ const totalSections = entries.filter((entry) => entry.completable).length;
   <div class="volunteer-contents-bar-slot">
     <div class="volunteer-contents-bar" data-contents-bar>
       <details class="volunteer-contents-menu" data-contents-menu>
-        <summary data-application-step-heading={application || undefined}>
+        <summary
+          data-application-step-heading={application || undefined}
+          aria-label={application ? heading : undefined}
+        >
           {
             application ? (
               <>
-                <span class="volunteer-contents-section-toggle">{heading}</span>
-                <span
-                  class="volunteer-contents-current"
-                  data-contents-current
-                  hidden
-                />
+                <svg
+                  class="volunteer-contents-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1" />
+                </svg>
+                <span class="volunteer-contents-current" data-contents-current>
+                  {heading}
+                </span>
                 <span
                   class="volunteer-contents-progress"
                   data-application-progress

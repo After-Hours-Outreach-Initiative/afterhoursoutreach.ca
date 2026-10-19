@@ -343,11 +343,7 @@ body:has([data-application], [data-account-contents-flow]) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.volunteer-contents-section-toggle {
-  flex-shrink: 0;
-  color: #f4f4f5;
-  white-space: nowrap;
-}
+.volunteer-contents-icon,
 .volunteer-contents-chevron {
   width: 24px;
   height: 24px;
