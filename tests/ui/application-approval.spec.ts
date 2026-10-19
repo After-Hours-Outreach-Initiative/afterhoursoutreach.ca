@@ -54,7 +54,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
       volunteer
         .getByRole("status")
         .filter({ hasText: "awaiting organizer approval" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await volunteer.goto(`${baseURL}/volunteer`);
 
     await page.goto("/volunteer");
