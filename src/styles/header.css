@@ -225,6 +225,7 @@
   gap: 12px;
 }
 .header-mobile-account .header-account-icon {
+  align-self: flex-start;
   width: 44px;
   height: 44px;
 }

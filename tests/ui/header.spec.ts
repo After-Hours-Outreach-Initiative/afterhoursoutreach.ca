@@ -321,6 +321,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
         .boundingBox();
       const iconBox = await icon.boundingBox();
       expect(emailBox!.x).toBe(nameBox!.x);
+      expect(iconBox!.y).toBe(nameBox!.y);
       expect(iconBox!.x + iconBox!.width).toBeLessThan(nameBox!.x);
       expect(iconBox!.x + iconBox!.width).toBeLessThan(emailBox!.x);
       expect(accountBox!.x).toBe(width < 640 ? 16 : 24);
