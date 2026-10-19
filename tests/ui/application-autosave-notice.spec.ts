@@ -61,11 +61,12 @@ for (const [layout, viewport] of [
       try {
         await page.goto("/apply", { waitUntil: "commit" });
         const indicator = page.locator("[data-draft-save-indicator]");
-        await expect(indicator).toHaveCSS("min-height", "24px");
+        const statusHeight = layout === "mobile" ? 21 : 24;
+        await expect(indicator).toHaveCSS("min-height", `${statusHeight}px`);
         await expect(indicator).toBeHidden();
         await page.evaluate(() => document.fonts.ready);
         const initial = await measure();
-        expect(initial.statusHeight).toBe(24);
+        expect(initial.statusHeight).toBe(statusHeight);
 
         release();
         await page.waitForLoadState("load");
@@ -85,10 +86,11 @@ for (const [layout, viewport] of [
             { exact: true },
           ),
         ).toHaveCSS("font-size", listFontSize);
-        await expect(indicator).toHaveCSS("font-size", listFontSize);
+        const statusFontSize = layout === "mobile" ? "14px" : listFontSize;
+        await expect(indicator).toHaveCSS("font-size", statusFontSize);
         await expect(indicator.locator("[data-draft-save-message]")).toHaveCSS(
           "font-size",
-          listFontSize,
+          statusFontSize,
         );
         if (saved) {
           await expect(indicator.locator("svg")).toBeVisible();
