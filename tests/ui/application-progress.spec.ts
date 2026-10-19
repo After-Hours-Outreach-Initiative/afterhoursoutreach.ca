@@ -470,6 +470,10 @@ test("one compact mobile tracker sticks continuously and names sections only at 
   await expect(reviewButton).toBeVisible();
   await expect(status).toBeVisible();
   await expect(tracker.getByRole("status")).toHaveCount(1);
+  await expect(dropdown.getByRole("link").first()).toHaveCSS(
+    "font-size",
+    "18px",
+  );
   const dropdownBounds = (await dropdown.boundingBox())!;
   const linksBounds = (await dropdown.locator("ol").boundingBox())!;
   expect(dropdownBounds.y).toBeGreaterThanOrEqual(height);

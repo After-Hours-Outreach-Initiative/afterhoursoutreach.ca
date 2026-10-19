@@ -509,6 +509,10 @@ body:has([data-application], [data-account-contents-flow]) {
     padding-block: 10px;
     font-size: 16px;
   }
+  [data-application-contents] .volunteer-contents-dropdown a {
+    font-size: 18px;
+    font-weight: normal;
+  }
 }
 @media (min-width: 64rem) {
   .volunteer-name-fields {
