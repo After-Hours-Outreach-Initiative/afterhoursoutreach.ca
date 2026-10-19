@@ -215,15 +215,6 @@ body:has([data-application], [data-account-contents-flow]) {
   gap: 24px;
   min-width: 0;
 }
-.volunteer-application-review .volunteer-section-heading {
-  flex-wrap: nowrap;
-  padding-bottom: 16px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid #3f3f46;
-}
-.volunteer-application-review .volunteer-section-heading .btn {
-  flex-shrink: 0;
-}
 .volunteer-application-review dt {
   margin-bottom: 6px;
   color: #a1a1aa;
