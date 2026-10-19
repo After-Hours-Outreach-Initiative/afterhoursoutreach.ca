@@ -14,8 +14,8 @@ export function initApplicationSections(element: HTMLFormElement) {
       "[data-application-progress-link]",
     ),
   ];
-  const counts = flow.querySelectorAll<HTMLElement>(
-    "[data-application-progress-count]",
+  const progress = flow.querySelectorAll<HTMLElement>(
+    "[data-application-progress]",
   );
   const update = () => {
     const sections = new Map<string, boolean>();
@@ -45,9 +45,21 @@ export function initApplicationSections(element: HTMLFormElement) {
         status.textContent = message;
     }
     const completed = [...sections.values()].filter(Boolean).length;
-    const message = `${completed}/${sections.size} complete`;
-    for (const count of counts)
-      if (count.textContent?.trim() !== message) count.textContent = message;
+    for (const indicator of progress) {
+      indicator.setAttribute("aria-valuemax", String(sections.size));
+      indicator.setAttribute("aria-valuenow", String(completed));
+      indicator.setAttribute(
+        "aria-valuetext",
+        `${completed} of ${sections.size} sections complete`,
+      );
+      indicator.dataset.complete = String(completed === sections.size);
+      indicator
+        .querySelector("[data-application-progress-value]")
+        ?.setAttribute(
+          "stroke-dashoffset",
+          String(sections.size ? 100 - (completed / sections.size) * 100 : 100),
+        );
+    }
   };
   element.addEventListener("input", update);
   element.addEventListener("change", update);

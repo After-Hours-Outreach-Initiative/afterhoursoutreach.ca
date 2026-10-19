@@ -40,6 +40,38 @@ async function expectComplete(page: Page, section: string, complete: boolean) {
   }
 }
 
+async function expectProgress(page: Page, completed: number) {
+  const progress = page.locator("[data-application-progress]");
+  await expect(progress).toHaveAttribute("role", "progressbar");
+  await expect(progress).toHaveAttribute("aria-label", "Application progress");
+  await expect(progress).toHaveAttribute("aria-valuemin", "0");
+  await expect(progress).toHaveAttribute("aria-valuemax", "5");
+  await expect(progress).toHaveAttribute("aria-valuenow", String(completed));
+  await expect(progress).toHaveAttribute(
+    "aria-valuetext",
+    `${completed} of 5 sections complete`,
+  );
+  await expect(progress).toHaveAttribute(
+    "data-complete",
+    String(completed === 5),
+  );
+  await expect(progress).toHaveText("");
+  await expect(progress).toHaveCSS("width", "28px");
+  await expect(progress).toHaveCSS("height", "28px");
+  await expect(progress.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  const value = progress.locator("[data-application-progress-value]");
+  await expect(value).toHaveAttribute("pathLength", "100");
+  await expect(value).toHaveAttribute("stroke-dasharray", "100");
+  await expect(value).toHaveAttribute(
+    "stroke-dashoffset",
+    String(100 - completed * 20),
+  );
+  await expect(value).toHaveCSS(
+    "stroke",
+    completed === 5 ? "rgb(74, 222, 128)" : "rgb(129, 140, 248)",
+  );
+}
+
 async function expectActionsPosition(page: Page) {
   const actions = page.getByRole("group", { name: "Review and discard" });
   await expect(actions).toBeInViewport({ ratio: 1 });
@@ -98,7 +130,6 @@ for (const width of [390, 1280]) {
     await createLocalAccount(page.request, baseURL!, false);
     await page.goto("/apply#application-review-and-discard");
     const form = page.locator("form[data-application]");
-    const count = page.locator("[data-application-progress-count]");
     const tracker = page.getByRole("navigation", {
       name: "Sections",
     });
@@ -135,7 +166,12 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "team-interests", true);
     await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
-    await expect(count).toHaveText("1/5 complete");
+    await expectProgress(page, 1);
+    if (width < 1024)
+      await expect(
+        page.getByRole("progressbar", { name: "Application progress" }),
+      ).toBeVisible();
+    else await expect(page.locator("[data-application-progress]")).toBeHidden();
     await expect(form.locator("[data-error]:visible")).toHaveCount(0);
     await expect(page.locator("[data-application-review]")).toHaveCount(3);
     await expect(form.locator("[data-application-review]")).toHaveCount(0);
@@ -247,10 +283,10 @@ for (const width of [390, 1280]) {
     }))
       await fillApplicationField(form, name, value);
     await expectComplete(page, "personal-info", true);
-    await expect(count).toHaveText("3/5 complete");
+    await expectProgress(page, 3);
     await fillApplicationField(form, "birthDate", "2999-01-01");
     await expectComplete(page, "personal-info", false);
-    await expect(count).toHaveText("2/5 complete");
+    await expectProgress(page, 2);
     await fillApplicationField(form, "birthDate", "1990-01-01");
     await form.locator('[name="firstName"]').fill("   ");
     await expectComplete(page, "personal-info", false);
@@ -264,13 +300,13 @@ for (const width of [390, 1280]) {
     }))
       await form.locator(`[name="${name}"]`).fill(value);
     await expectComplete(page, "emergency-contact", true);
-    await expect(count).toHaveText("4/5 complete");
+    await expectProgress(page, 4);
     await form.locator("#application-emergency-contact > summary").click();
     await expectComplete(page, "emergency-contact", true);
 
     await form.locator('[name="teams"][value="medic"]').check();
     await expectComplete(page, "training-and-safety", false);
-    await expect(count).toHaveText("3/5 complete");
+    await expectProgress(page, 3);
     await form.locator('[name="certifications"][value="other"]').check();
     await form.locator('[name="certificationExpiry"]').fill("2030-01-01");
     await expectComplete(page, "training-and-safety", false);
@@ -293,16 +329,17 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "about-volunteering", false);
     await form.locator('[name="heardAboutUsOther"]').fill("A community event");
     await expectComplete(page, "about-volunteering", true);
-    await expect(count).toHaveText("5/5 complete");
+    await expectProgress(page, 5);
     await form
       .locator('[name="motivation"]')
       .fill("word ".repeat(motivationMaxWords + 1));
     await expectComplete(page, "about-volunteering", false);
-    await expect(count).toHaveText("4/5 complete");
+    await expectProgress(page, 4);
     await form
       .locator('[name="motivation"]')
       .fill("I want to help my community.");
     await expectComplete(page, "about-volunteering", true);
+    await expectProgress(page, 5);
 
     if (width < 1024) await tracker.locator("summary").click();
     await tracker
@@ -365,7 +402,7 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "emergency-contact", false);
     await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
-    await expect(count).toHaveText("1/5 complete");
+    await expectProgress(page, 1);
     if (width >= 1024) {
       await page.setViewportSize({ width, height: 400 });
       await expect(reviewButton).toBeInViewport();
@@ -401,6 +438,7 @@ test("restored drafts initialize completion without showing validation errors", 
   await page.goto("/apply");
   await expectComplete(page, "emergency-contact", true);
   await expectComplete(page, "training-and-safety", false);
+  await expectProgress(page, 2);
   await expect(page.locator("[data-error]:visible")).toHaveCount(0);
 });
 
@@ -478,9 +516,7 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     expect(await measure()).toEqual(initial);
   }
   await expect(summary.locator(".volunteer-contents-toggle")).toHaveCount(0);
-  await expect(summary.locator("[data-application-progress-count]")).toHaveText(
-    "1/5 complete",
-  );
+  await expectProgress(page, 1);
   await page.locator('[name="firstName"]').fill("Saved progress");
   await expect(status).toHaveText(/^Last saved at /);
   await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);
@@ -490,10 +526,6 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
   await expect(status).toHaveCSS("font-size", "14px");
   await expect(status).toHaveCSS("text-align", "right");
   await expect(status).toHaveCSS("justify-content", "flex-end");
-  await expect(summary.locator("[data-application-progress-count]")).toHaveCSS(
-    "font-size",
-    "14px",
-  );
   await expect(reviewButton).toBeHidden();
   const height = (await compact.boundingBox())!.height;
   expect(height).toBe(54);
@@ -590,12 +622,12 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     const current = await summary
       .locator("[data-contents-current]")
       .boundingBox();
-    const count = await summary
-      .locator("[data-application-progress-count]")
+    const progress = await summary
+      .locator("[data-application-progress]")
       .boundingBox();
-    expect(current!.x + current!.width).toBeLessThanOrEqual(count!.x);
+    expect(current!.x + current!.width).toBeLessThanOrEqual(progress!.x);
     await expect(
-      summary.locator("[data-application-progress-count]"),
+      summary.locator("[data-application-progress]"),
     ).toBeInViewport();
     await expect(reviewButton).toBeHidden();
     await tracker.locator("summary").click();
@@ -671,7 +703,7 @@ test("the mobile dropdown works from its normal position and Overview restores S
   const label = summary.locator(".volunteer-contents-section-toggle");
   const current = summary.locator("[data-contents-current]");
   const chevron = label.locator("svg");
-  const count = summary.locator("[data-application-progress-count]");
+  const progress = summary.locator("[data-application-progress]");
   await expect(label).toHaveText("Sections");
   await expect(current).toBeHidden();
   await expect(summary.locator("button, a, [tabindex]")).toHaveCount(0);
@@ -723,18 +755,18 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(label).toHaveText("Sections");
     const labelBounds = (await label.boundingBox())!;
     const currentBounds = (await current.boundingBox())!;
-    const countBounds = (await count.boundingBox())!;
+    const progressBounds = (await progress.boundingBox())!;
     expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(
       currentBounds.x,
     );
     expect(currentBounds.x + currentBounds.width).toBeLessThanOrEqual(
-      countBounds.x,
+      progressBounds.x,
     );
-    expect(countBounds.x + countBounds.width).toBeLessThanOrEqual(
+    expect(progressBounds.x + progressBounds.width).toBeLessThanOrEqual(
       viewport.width,
     );
-    // The label, current section, count, and row padding all toggle the native summary.
-    for (const target of [label, current, count]) {
+    // The label, current section, ring, and row padding all toggle the native summary.
+    for (const target of [label, current, progress]) {
       await target.click();
       await expect(menu).toHaveAttribute("open", "");
       await expect(chevron).toHaveCSS(
