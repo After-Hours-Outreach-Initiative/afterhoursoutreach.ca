@@ -200,6 +200,7 @@
   font-size: 18px;
 }
 .header-mobile-panel [data-header-discord] {
+  width: 100%;
   margin-top: 16px;
   font-size: 18px;
 }

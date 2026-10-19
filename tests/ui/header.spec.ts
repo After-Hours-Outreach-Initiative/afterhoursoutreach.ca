@@ -181,9 +181,10 @@ for (const width of [1280, 1024, 768, 375, 320]) {
         exact: true,
       });
       await expect(discord).toHaveClass("btn btn-primary");
+      await expect(discord).toHaveCSS("justify-content", "center");
       const discordBox = await discord.boundingBox();
       expect(discordBox!.x).toBe(gutter);
-      expect(discordBox!.width).toBeLessThan(width - gutter * 2);
+      expect(discordBox!.width).toBe(width - gutter * 2);
     }
 
     // Public pages resolve the same session as the volunteer portal.
