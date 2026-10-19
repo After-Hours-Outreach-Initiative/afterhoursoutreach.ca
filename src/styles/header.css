@@ -148,6 +148,18 @@
   cursor: wait;
   opacity: 0.6;
 }
+.header-mobile-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: #0009;
+}
+@media (width < 64rem) {
+  .site-header:has(.mobile-nav[open]) + .header-mobile-backdrop {
+    display: block;
+  }
+}
 .header-mobile-panel {
   max-height: calc(100dvh - 5.5rem);
   padding-top: 8px;

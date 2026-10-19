@@ -379,6 +379,71 @@ for (const width of [1280, 1024, 768, 375, 320]) {
   });
 }
 
+test("mobile navigation dims the page only while open", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/");
+  const menu = page.locator(".mobile-nav");
+  const toggle = menu.locator("summary");
+  const backdrop = page.locator(".header-mobile-backdrop");
+  await expect(backdrop).toBeHidden();
+
+  await toggle.focus();
+  await toggle.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(backdrop).toBeVisible();
+  await expect(backdrop).toHaveAttribute("aria-hidden", "true");
+  await expect(backdrop).toHaveCSS("background-color", "rgba(0, 0, 0, 0.6)");
+  expect(await backdrop.boundingBox()).toEqual({
+    x: 0,
+    y: 0,
+    width: 375,
+    height: 812,
+  });
+  expect(
+    await backdrop.evaluate(
+      (element) => document.elementFromPoint(180, 800) === element,
+    ),
+  ).toBe(true);
+
+  // The backdrop is outside the menu, so the existing outside-click handler
+  // dismisses it without activating the page beneath it.
+  await page.mouse.click(180, 800);
+  await expect(backdrop).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page).toHaveURL(/\/$/);
+
+  await toggle.click();
+  await expect(backdrop).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(backdrop).toBeHidden();
+  await expect(toggle).toBeFocused();
+  await expect(toggle).toHaveAccessibleName("Open navigation");
+
+  await toggle.click();
+  await expect(backdrop).toBeVisible();
+  await toggle.click();
+  await expect(backdrop).toBeHidden();
+
+  await toggle.click();
+  // Navigation remains above the backdrop and usable.
+  await menu.getByRole("link", { name: "About", exact: true }).click();
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(backdrop).toBeHidden();
+
+  await page.setViewportSize({ width: 768, height: 812 });
+  await toggle.click();
+  await expect(backdrop).toBeVisible();
+  await page.setViewportSize({ width: 1024, height: 812 });
+  await expect(backdrop).toBeHidden();
+  await expect(menu).not.toHaveAttribute("open");
+  await expect(
+    page.getByRole("navigation", { name: "Primary navigation", exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(backdrop).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+});
+
 test("mobile account controls stay reachable in a short viewport", async ({
   page,
   baseURL,
