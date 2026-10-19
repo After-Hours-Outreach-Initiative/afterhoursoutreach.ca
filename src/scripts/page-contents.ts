@@ -83,9 +83,8 @@ export function initPageContents(
   };
   const activate = (active: (typeof sections)[number]) => {
     const overview = application && active.hash === `#${topId}`;
-    current.hidden = overview;
     current.textContent = overview
-      ? ""
+      ? "Sections"
       : (active.links[0].textContent?.trim() ?? "");
     for (const section of sections)
       for (const link of section.links) {

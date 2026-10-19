@@ -473,11 +473,9 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
   await expect(compact).not.toHaveCSS("position", "fixed");
   await expect(menu).toBeVisible();
   await expect(menu).not.toHaveAttribute("open");
-  await expect(
-    summary.locator(".volunteer-contents-section-toggle"),
-  ).toHaveText("Sections");
-  await expect(current).toBeHidden();
-  await expect(current).toHaveText("");
+  await expect(summary.locator(".volunteer-contents-icon")).toBeVisible();
+  await expect(current).toBeVisible();
+  await expect(current).toHaveText("Sections");
   await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
   await expect(tracker.getByRole("link")).toHaveCount(0);
   const measure = () =>
@@ -511,7 +509,8 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     await expect
       .poll(async () => (await tracker.boundingBox())!.y)
       .toBe(Math.max(0, nav.y - Math.round(top)));
-    await expect(current).toBeHidden();
+    await expect(current).toBeVisible();
+    await expect(current).toHaveText("Sections");
     await expect(menu).toBeVisible();
     expect(await measure()).toEqual(initial);
   }
@@ -630,12 +629,13 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
       .locator("[data-application-progress]")
       .boundingBox();
     expect(current!.x + current!.width).toBeLessThanOrEqual(progress!.x);
+    // The list icon leaves room for the full action label even at 320px.
     if (viewport.width === 320)
       expect(
         await summary
           .locator("[data-contents-current]")
           .evaluate((element) => element.scrollWidth > element.clientWidth),
-      ).toBe(true);
+      ).toBe(false);
     await expect(
       summary.locator("[data-application-progress]"),
     ).toBeInViewport();
@@ -683,7 +683,8 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
-  await expect(current).toBeHidden();
+  await expect(current).toBeVisible();
+  await expect(current).toHaveText("Sections");
   await expect(menu).toBeVisible();
   await expect(menu).not.toHaveAttribute("open");
   await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
@@ -710,19 +711,31 @@ test("the mobile dropdown works from its normal position and Overview restores S
   const menu = tracker.locator("[data-contents-menu]");
   const summary = menu.locator("summary");
   const dropdown = menu.locator("[data-contents-dropdown]");
-  const label = summary.locator(".volunteer-contents-section-toggle");
+  const icon = summary.locator(".volunteer-contents-icon");
   const current = summary.locator("[data-contents-current]");
   const chevron = summary.locator(".volunteer-contents-chevron");
   const progress = summary.locator("[data-application-progress]");
-  await expect(label).toHaveText("Sections");
-  await expect(current).toBeHidden();
+  await expect(summary).toHaveAccessibleName("Sections");
+  await expect(summary).toHaveText("Sections");
+  await expect(icon).toBeVisible();
+  await expect(icon).toHaveText("");
+  await expect(icon).toHaveAttribute("aria-hidden", "true");
+  await expect(icon).toHaveAttribute("viewBox", "0 0 24 24");
+  await expect(icon).toHaveAttribute("stroke-width", "2");
+  await expect(icon).toHaveCSS("width", "24px");
+  await expect(icon).toHaveCSS("height", "24px");
+  await expect(current).toBeVisible();
+  await expect(current).toHaveText("Sections");
   await expect(
     summary.locator('button, a, [tabindex], [role="button"]'),
   ).toHaveCount(0);
   await expect(chevron).toHaveCSS("width", "24px");
-  await expect(label).toHaveCSS("border-width", "0px");
-  await expect(label).toHaveCSS("padding", "0px");
-  await expect(label).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(icon).toHaveCSS("border-width", "0px");
+  await expect(icon).toHaveCSS("padding", "0px");
+  await expect(icon).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(summary.locator(":scope > :first-child")).toHaveClass(
+    "volunteer-contents-icon",
+  );
   await expect(summary.locator(":scope > :last-child")).toHaveClass(
     "volunteer-contents-chevron",
   );
@@ -738,7 +751,8 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(summary).toHaveCSS("border-width", "1px");
     await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
     await expect(menu).toHaveCSS("border-radius", "10px 10px 0px 0px");
-    await expect(current).toBeHidden();
+    await expect(current).toBeVisible();
+    await expect(current).toHaveText("Sections");
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(viewport.width);
@@ -769,13 +783,17 @@ test("the mobile dropdown works from its normal position and Overview restores S
     });
     await expect(current).toHaveText("Personal info");
     await expect(current).toBeVisible();
-    await expect(label).toHaveText("Sections");
-    const labelBounds = (await label.boundingBox())!;
+    await expect(summary).toHaveAccessibleName("Sections");
+    await expect(summary).toHaveText("Personal info");
+    await expect(icon).toBeVisible();
+    const iconBounds = (await icon.boundingBox())!;
     const currentBounds = (await current.boundingBox())!;
     const progressBounds = (await progress.boundingBox())!;
     const chevronBounds = (await chevron.boundingBox())!;
     const summaryBounds = (await summary.boundingBox())!;
-    expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(
+    expect(iconBounds.width).toBe(24);
+    expect(iconBounds.height).toBe(24);
+    expect(iconBounds.x + iconBounds.width).toBeLessThanOrEqual(
       currentBounds.x,
     );
     expect(currentBounds.x + currentBounds.width).toBeLessThanOrEqual(
@@ -790,7 +808,7 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(current).toHaveCSS("text-overflow", "ellipsis");
     expect(summaryBounds.height).toBe(54);
     // Every part of the row toggles the native summary.
-    for (const target of [label, current, progress, chevron]) {
+    for (const target of [icon, current, progress, chevron]) {
       await target.click();
       await expect(menu).toHaveAttribute("open", "");
       await expect(chevron).toHaveCSS(
@@ -854,9 +872,9 @@ test("the mobile dropdown works from its normal position and Overview restores S
   await expect(menu).toHaveCSS("border-radius", "10px 10px 0px 0px");
   await expect(menu).not.toHaveAttribute("open");
   await expect(menu).toBeVisible();
-  await expect(label).toHaveText("Sections");
-  await expect(current).toBeHidden();
-  await expect(current).toHaveText("");
+  await expect(icon).toBeVisible();
+  await expect(current).toBeVisible();
+  await expect(current).toHaveText("Sections");
   await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
   await summary.press("Space");
   await expect(menu).toHaveAttribute("open", "");
