@@ -15,7 +15,6 @@ export function initPageContents(
   const bar =
     contents.querySelector<HTMLElement>("[data-contents-bar]") ?? menu;
   const application = contents.hasAttribute("data-application-contents");
-  const mobile = window.matchMedia("(width < 64rem)");
   const links = [...contents.querySelectorAll<HTMLAnchorElement>("a")];
   // Both responsive lists share each section, so targets are measured and
   // observed once while all of their links stay in sync.
@@ -41,24 +40,12 @@ export function initPageContents(
       headerPosition === "sticky" || headerPosition === "fixed"
         ? Math.max(0, header?.getBoundingClientRect().bottom ?? 0)
         : 0;
-    // The inline checklist never collapses. Its original height remains in the
-    // document while only the compact header moves into a fixed overlay.
-    const stuck =
-      application &&
-      mobile.matches &&
-      !content.hidden &&
-      !contents.hidden &&
-      flow.getBoundingClientRect().bottom > 0 &&
-      contents.getBoundingClientRect().bottom <= 0;
-    contents.toggleAttribute("data-contents-sticky", stuck);
-    // Reserve the future overlay's height for anchor jumps from the inline list.
-    // The dropdown is absolute, so opening it cannot change this measurement.
-    barHeight = (
-      application ? mobile.matches : menu.getBoundingClientRect().height
-    )
+    // The actual mobile tracker stays in flow with CSS sticky. Its dropdown is
+    // absolute, so opening it cannot change the reading edge or anchor offset.
+    barHeight = menu.getBoundingClientRect().height
       ? bar.getBoundingClientRect().height
       : 0;
-    if (!barHeight || (application && !stuck)) menu.open = false;
+    if (!barHeight) menu.open = false;
     flow.style.setProperty("--contents-sticky-offset", `${stickyHeight}px`);
     flow.style.setProperty("--contents-bar-height", `${barHeight}px`);
     flow.style.setProperty(
@@ -67,7 +54,10 @@ export function initPageContents(
     );
   };
   const activate = (active: (typeof sections)[number]) => {
-    current.textContent = active.links[0].textContent?.trim() ?? "";
+    current.textContent =
+      application && active.hash === `#${topId}`
+        ? "Sections"
+        : (active.links[0].textContent?.trim() ?? "");
     for (const section of sections)
       for (const link of section.links) {
         if (section === active) link.setAttribute("aria-current", "location");
@@ -84,11 +74,7 @@ export function initPageContents(
     }
     // Use the reading edge, not intersection ratios: a tall section remains
     // current throughout its fields, and collapsed summaries still participate.
-    const overlayHeight =
-      !application || contents.hasAttribute("data-contents-sticky")
-        ? barHeight
-        : 0;
-    const readingEdge = stickyHeight + overlayHeight + 16;
+    const readingEdge = stickyHeight + barHeight + 16;
     let active = sections[0];
     for (const section of sections) {
       const target = section.target;

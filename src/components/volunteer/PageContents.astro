@@ -21,19 +21,6 @@ const totalSections = entries.filter(
 >
   <div class="volunteer-contents-bar-slot">
     <div class="volunteer-contents-bar" data-contents-bar>
-      {
-        application && (
-          <div class="volunteer-contents-inline-heading">
-            <h2>{heading}</h2>
-            <span
-              class="volunteer-contents-completion"
-              data-application-progress-count
-            >
-              0/{totalSections} complete
-            </span>
-          </div>
-        )
-      }
       <details class="volunteer-contents-menu" data-contents-menu>
         <summary data-application-step-heading={application || undefined}>
           {
@@ -44,7 +31,7 @@ const totalSections = entries.filter(
                     class="volunteer-contents-current"
                     data-contents-current
                   >
-                    {entries[0]?.heading}
+                    {heading}
                   </span>
                   <svg
                     class="volunteer-contents-chevron"

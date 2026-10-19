@@ -291,7 +291,7 @@ for (const path of ["/apply", "/volunteer/account"]) {
             (top) => scrollTo({ top, behavior: "instant" }),
             initial!.y + initial!.height + 16,
           );
-          await expect(contents).toHaveAttribute("data-contents-sticky", "");
+          await expect(contents).toHaveCSS("position", "sticky");
           await expect
             .poll(
               async () =>
@@ -325,17 +325,16 @@ test("contents navigation contrasts with the header and leaves room for the page
     name: "Sections",
   });
   const menu = contents.locator("[data-contents-menu]");
-  await expect(menu).toBeHidden();
-  await expect(
-    contents.locator(".volunteer-contents-inline-heading"),
-  ).toBeVisible();
+  await expect(menu).toBeVisible();
+  await expect(menu.locator("[data-contents-current]")).toHaveText("Sections");
+  await expect(contents.locator(".volunteer-contents-sidebar")).toBeHidden();
   await page.evaluate(() => {
     const nav = document
       .querySelector("[data-application-contents]")!
       .getBoundingClientRect();
     scrollTo({ top: nav.bottom + scrollY + 16, behavior: "instant" });
   });
-  await expect(contents).toHaveAttribute("data-contents-sticky", "");
+  await expect.poll(async () => (await contents.boundingBox())!.y).toBe(0);
   const bar = menu.locator("summary");
   const toggle = bar.locator(".volunteer-contents-section-toggle");
   await expect(page.locator(".site-header")).toHaveCSS(
@@ -1147,6 +1146,28 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     await expect(
       page.getByRole("button", { name: "Review application" }),
     ).toHaveCount(1);
+    const contents = page.getByRole("navigation", { name: "Sections" });
+    const menu = contents.locator("[data-contents-menu]");
+    await expect(contents).toHaveCSS("position", "sticky");
+    await expect(contents.locator(".volunteer-contents-sidebar")).toBeHidden();
+    await expect(menu).toBeVisible();
+    await expect(menu.locator("[data-contents-current]")).toHaveText(
+      "Sections",
+    );
+    await menu.locator("summary").press("Enter");
+    await expect(menu).toHaveAttribute("open", "");
+    await menu
+      .getByRole("link", { name: "Emergency contact", exact: true })
+      .click();
+    await menu.locator("summary").press("Enter");
+    await expect(menu).not.toHaveAttribute("open");
+    await expect.poll(async () => (await contents.boundingBox())!.y).toBe(0);
+    const barHeight = (await contents.boundingBox())!.height;
+    expect(
+      Math.round(
+        (await page.locator("#application-emergency-contact").boundingBox())!.y,
+      ),
+    ).toBeGreaterThanOrEqual(barHeight + 16);
   } finally {
     await context.close();
   }

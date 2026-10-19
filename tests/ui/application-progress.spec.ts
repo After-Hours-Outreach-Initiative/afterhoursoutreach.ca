@@ -50,7 +50,7 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "team-interests", true);
     await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
-    await expect(count).toHaveText(["1/5 complete", "1/5 complete"]);
+    await expect(count).toHaveText("1/5 complete");
     await expect(form.locator("[data-error]:visible")).toHaveCount(0);
     await expect(page.locator("[data-application-review]")).toHaveCount(3);
     await expect(form.locator("[data-application-review]")).toHaveCount(0);
@@ -93,7 +93,7 @@ for (const width of [390, 1280]) {
         ),
       ).toBe(true);
     const overview = tracker.locator(
-      '.volunteer-contents-sidebar [href="#application-overview"]',
+      `${width < 1024 ? "[data-contents-menu]" : ".volunteer-contents-sidebar"} [href="#application-overview"]`,
     );
     const checkmark = overview.locator("svg");
     await expect(checkmark).toHaveCSS("color", "rgb(74, 222, 128)");
@@ -111,8 +111,8 @@ for (const width of [390, 1280]) {
     ).toHaveCSS("visibility", "hidden");
 
     if (width < 1024) {
-      await tracker
-        .locator(".volunteer-contents-sidebar")
+      await menu.locator("summary").click();
+      await menu
         .getByRole("link", { name: "Emergency contact", exact: true })
         .click();
       await menu.locator("summary").click();
@@ -138,10 +138,10 @@ for (const width of [390, 1280]) {
     }))
       await fillApplicationField(form, name, value);
     await expectComplete(page, "personal-info", true);
-    await expect(count).toHaveText(["3/5 complete", "3/5 complete"]);
+    await expect(count).toHaveText("3/5 complete");
     await fillApplicationField(form, "birthDate", "2999-01-01");
     await expectComplete(page, "personal-info", false);
-    await expect(count).toHaveText(["2/5 complete", "2/5 complete"]);
+    await expect(count).toHaveText("2/5 complete");
     await fillApplicationField(form, "birthDate", "1990-01-01");
     await form.locator('[name="firstName"]').fill("   ");
     await expectComplete(page, "personal-info", false);
@@ -155,13 +155,13 @@ for (const width of [390, 1280]) {
     }))
       await form.locator(`[name="${name}"]`).fill(value);
     await expectComplete(page, "emergency-contact", true);
-    await expect(count).toHaveText(["4/5 complete", "4/5 complete"]);
+    await expect(count).toHaveText("4/5 complete");
     await form.locator("#application-emergency-contact > summary").click();
     await expectComplete(page, "emergency-contact", true);
 
     await form.locator('[name="teams"][value="medic"]').check();
     await expectComplete(page, "training-and-safety", false);
-    await expect(count).toHaveText(["3/5 complete", "3/5 complete"]);
+    await expect(count).toHaveText("3/5 complete");
     await form.locator('[name="certifications"][value="other"]').check();
     await form.locator('[name="certificationExpiry"]').fill("2030-01-01");
     await expectComplete(page, "training-and-safety", false);
@@ -184,12 +184,12 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "about-volunteering", false);
     await form.locator('[name="heardAboutUsOther"]').fill("A community event");
     await expectComplete(page, "about-volunteering", true);
-    await expect(count).toHaveText(["5/5 complete", "5/5 complete"]);
+    await expect(count).toHaveText("5/5 complete");
     await form
       .locator('[name="motivation"]')
       .fill("word ".repeat(motivationMaxWords + 1));
     await expectComplete(page, "about-volunteering", false);
-    await expect(count).toHaveText(["4/5 complete", "4/5 complete"]);
+    await expect(count).toHaveText("4/5 complete");
     await form
       .locator('[name="motivation"]')
       .fill("I want to help my community.");
@@ -252,7 +252,7 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "emergency-contact", false);
     await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
-    await expect(count).toHaveText(["1/5 complete", "1/5 complete"]);
+    await expect(count).toHaveText("1/5 complete");
     if (width >= 1024) {
       await page.setViewportSize({ width, height: 400 });
       await expect(reviewButton).toBeInViewport();
@@ -287,7 +287,7 @@ test("restored drafts initialize completion without showing validation errors", 
   await expect(page.locator("[data-error]:visible")).toHaveCount(0);
 });
 
-test("mobile checklist scrolls away before the compact bar appears without a layout jump", async ({
+test("one compact mobile tracker sticks continuously and names sections only at the reading edge", async ({
   page,
   baseURL,
 }) => {
@@ -307,13 +307,14 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
   const dropdown = menu.locator("[data-contents-dropdown]");
   const reviewButton = dropdown.locator("[data-application-review]");
   const summary = tracker.locator("summary");
-  const inline = tracker.locator(".volunteer-contents-inline-heading");
-  await expect(tracker).not.toHaveAttribute("data-contents-sticky");
-  await expect(inline).toBeVisible();
-  await expect(menu).toBeHidden();
-  await expect(
-    tracker.locator(".volunteer-contents-sidebar > ol > li"),
-  ).toHaveCount(6);
+  const current = summary.locator("[data-contents-current]");
+  await expect(tracker).toHaveCSS("position", "sticky");
+  await expect(compact).not.toHaveCSS("position", "fixed");
+  await expect(menu).toBeVisible();
+  await expect(menu).not.toHaveAttribute("open");
+  await expect(current).toHaveText("Sections");
+  await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
+  await expect(tracker.getByRole("link")).toHaveCount(0);
   const measure = () =>
     page.evaluate(() => {
       const nav = document
@@ -330,19 +331,23 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
     .locator(".volunteer-application-intro")
     .boundingBox())!;
   expect(nav.y).toBe(description.y + description.height + 32);
-  await page.evaluate(
-    (top) => scrollTo({ top, behavior: "instant" }),
-    nav.y + nav.height - 1,
-  );
-  await expect(tracker).not.toHaveAttribute("data-contents-sticky");
-  await expect(menu).toBeHidden();
-  await page.evaluate(
-    (top) => scrollTo({ top, behavior: "instant" }),
-    nav.y + nav.height + 16,
-  );
-  await expect(tracker).toHaveAttribute("data-contents-sticky", "");
-  await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);
-  expect(await measure()).toEqual(initial);
+  const firstSection = page.locator("#application-personal-info");
+  const firstTop = (await firstSection.boundingBox())!.y;
+  for (const top of [64, nav.y - 1, nav.y + 1, firstTop - nav.height - 18]) {
+    await page.evaluate((top) => scrollTo({ top, behavior: "instant" }), top);
+    await expect
+      .poll(async () => (await tracker.boundingBox())!.y)
+      .toBe(Math.max(0, nav.y - Math.round(top)));
+    await expect(current).toHaveText("Sections");
+    await expect(menu).toBeVisible();
+    expect(await measure()).toEqual(initial);
+  }
+  for (const top of [firstTop - nav.height - 15, firstTop + 150]) {
+    await page.evaluate((top) => scrollTo({ top, behavior: "instant" }), top);
+    await expect(current).toHaveText("Personal info");
+    await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);
+    expect(await measure()).toEqual(initial);
+  }
   await expect(summary.locator(".volunteer-contents-toggle")).toHaveCount(0);
   await expect(summary.locator("[data-application-progress-count]")).toHaveText(
     "1/5 complete",
@@ -454,13 +459,14 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
-  await expect(tracker).not.toHaveAttribute("data-contents-sticky");
-  await expect(inline).toBeVisible();
-  await expect(menu).toBeHidden();
+  await expect(current).toHaveText("Sections");
+  await expect(menu).toBeVisible();
+  await expect(menu).not.toHaveAttribute("open");
+  await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
   expect(await measure()).toEqual(initial);
 });
 
-test("inline mobile links clear the future bar and Overview restores the expanded checklist", async ({
+test("the mobile dropdown works from its normal position and Overview restores Sections", async ({
   page,
   baseURL,
 }) => {
@@ -471,12 +477,17 @@ test("inline mobile links clear the future bar and Overview restores the expande
   const tracker = page.locator("[data-application-contents]");
   const compact = tracker.locator("[data-contents-bar]");
   const menu = tracker.locator("[data-contents-menu]");
-  await tracker
-    .locator(".volunteer-contents-sidebar")
+  const summary = menu.locator("summary");
+  await expect(summary.locator("[data-contents-current]")).toHaveText(
+    "Sections",
+  );
+  await summary.press("Enter");
+  await expect(menu).toHaveAttribute("open", "");
+  await menu
     .getByRole("link", { name: "Emergency contact", exact: true })
     .click();
-  await expect(tracker).toHaveAttribute("data-contents-sticky", "");
-  await expect(compact).toHaveCSS("animation-name", "none");
+  await expect(menu).not.toHaveAttribute("open");
+  await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);
   await expect(
     page.locator("#application-emergency-contact > summary"),
   ).toBeFocused();
@@ -488,12 +499,19 @@ test("inline mobile links clear the future bar and Overview restores the expande
       ),
     )
     .toBeGreaterThanOrEqual(bar.height + 16);
-  await menu.locator("summary").press("Enter");
+  await summary.press("Enter");
   await expect(menu).toHaveAttribute("open", "");
   await menu.getByRole("link", { name: "Overview", exact: true }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
-  await expect(tracker).not.toHaveAttribute("data-contents-sticky");
   await expect(menu).not.toHaveAttribute("open");
-  await expect(menu).toBeHidden();
-  await expect(tracker.locator(".volunteer-contents-sidebar")).toBeVisible();
+  await expect(menu).toBeVisible();
+  await expect(summary.locator("[data-contents-current]")).toHaveText(
+    "Sections",
+  );
+  await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
+  await summary.press("Space");
+  await expect(menu).toHaveAttribute("open", "");
+  await page.keyboard.press("Escape");
+  await expect(menu).not.toHaveAttribute("open");
+  await expect(summary).toBeFocused();
 });
