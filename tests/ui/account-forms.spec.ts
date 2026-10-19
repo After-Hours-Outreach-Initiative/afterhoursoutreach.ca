@@ -697,7 +697,12 @@ test("application shows all required errors and saves after they are corrected",
     const heading = section.getByRole("heading", { level: 3 });
     await expect(heading).toHaveAttribute("tabindex", "-1");
     await expect(heading).toHaveAttribute("data-application-section");
-    await expect(heading).toHaveCSS("border-bottom-width", "1px");
+    await expect(heading).toHaveCSS("font-weight", "700");
+    await expect(heading).toHaveCSS(
+      "border-bottom",
+      "1px solid rgb(63, 63, 70)",
+    );
+    await expect(heading).toHaveCSS("padding-bottom", "16px");
     await expect(section.locator(":scope > fieldset")).toBeVisible();
   }
   await expect(form.locator('input[type="email"]')).toHaveCount(0);
@@ -886,6 +891,22 @@ test("application shows all required errors and saves after they are corrected",
     ),
   ).toBe(false);
   await reviewLocalApplication(page);
+  const reviewHeadings = form.locator(
+    ".volunteer-application-review .volunteer-section-heading",
+  );
+  await expect(reviewHeadings).toHaveCount(5);
+  for (const row of await reviewHeadings.all()) {
+    await expect(row.getByRole("heading", { level: 3 })).toHaveCSS(
+      "font-weight",
+      "700",
+    );
+    await expect(row).toHaveCSS("border-bottom", "1px solid rgb(63, 63, 70)");
+    await expect(row).toHaveCSS("padding-bottom", "16px");
+    await expect(row).toHaveCSS("margin-bottom", "24px");
+    const bounds = (await row.boundingBox())!;
+    const edit = (await row.getByRole("button").boundingBox())!;
+    expect(edit.x + edit.width).toBeCloseTo(bounds.x + bounds.width, 1);
+  }
   await expect(form.locator('[data-review-answer="email"]')).toHaveCount(0);
   const conduct = form.getByRole("region", {
     name: "Code of Conduct",
