@@ -887,6 +887,8 @@ body:has([data-application], [data-account-contents-flow]) {
   align-items: center;
   gap: 20px;
   padding: 24px 0;
+}
+.volunteer-setting:not(:last-child) {
   border-bottom: 1px solid #27272a;
 }
 .volunteer-setting > div {
