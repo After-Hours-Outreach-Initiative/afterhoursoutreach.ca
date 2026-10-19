@@ -13,6 +13,7 @@ import {
   type ApplicationDraft,
   type ApplicationDraftAnswers,
 } from "../data/application-draft";
+import { restoreBirthDate, syncBirthDate } from "./birth-date";
 
 const endpoint = "/api/v1/account/application-draft";
 const emptyAnswers = () => applicationDraftAnswersSchema.parse({});
@@ -141,6 +142,7 @@ export function clearSyncedApplicationDrafts() {
 }
 
 export function readDraftAnswers(element: HTMLFormElement) {
+  const birthDate = syncBirthDate(element);
   const answers = emptyAnswers();
   for (const name of Object.keys(answers) as (keyof typeof answers)[]) {
     const controls = [
@@ -161,6 +163,7 @@ export function readDraftAnswers(element: HTMLFormElement) {
       });
     } else Object.assign(answers, { [name]: controls[0]?.value ?? "" });
   }
+  if (birthDate !== undefined) answers.birthDate = birthDate;
   return answers;
 }
 
@@ -347,6 +350,9 @@ export function initApplicationDraft(element: HTMLFormElement) {
         else if (typeof value === "string") control.value = value;
       }
     }
+    // Repopulate the unnamed date parts before synthetic input/change listeners
+    // can read them, including silent startup reconciliation.
+    restoreBirthDate(element, answers.birthDate);
     const consent = element.querySelector<HTMLInputElement>(
       '[name="codeOfConductAccepted"]',
     );
@@ -409,7 +415,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     // Native form reset must not recover the server-rendered draft either.
     for (const control of element.querySelectorAll<
       HTMLInputElement | HTMLTextAreaElement
-    >("input[name], textarea[name]")) {
+    >("input, textarea")) {
       control.defaultValue = control.value;
       if (control instanceof HTMLInputElement)
         control.defaultChecked = control.checked;

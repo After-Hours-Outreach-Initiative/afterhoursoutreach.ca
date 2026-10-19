@@ -1,0 +1,55 @@
+---
+import FieldError from "@/components/FieldError.astro";
+import {
+  birthDateParts,
+  canonicalBirthDate,
+} from "@/data/application-birth-date";
+
+interface Props {
+  value: string;
+  help: string;
+  required: boolean;
+}
+const { value, help, required } = Astro.props;
+const parts = birthDateParts(value);
+---
+
+<fieldset class="volunteer-field volunteer-birth-date" data-birth-date>
+  <legend>
+    Date of birth{
+      required && (
+        <span class="volunteer-required" aria-hidden="true">
+          {" "}
+          *
+        </span>
+      )
+    }
+  </legend>
+  <span class="volunteer-help" id="help-birthDate">{help}</span>
+  <div class="volunteer-birth-date-parts">
+    {
+      (["day", "month", "year"] as const).map((part) => (
+        <div class="volunteer-field">
+          <label for={`profile-birthDate-${part}`}>
+            {part[0].toUpperCase() + part.slice(1)}
+          </label>
+          <input
+            id={`profile-birthDate-${part}`}
+            data-birth-date-part={part}
+            type="text"
+            inputmode="numeric"
+            autocomplete={`bday-${part}`}
+            aria-describedby="help-birthDate error-birthDate"
+            value={parts[part]}
+            required={required}
+            pattern={part === "year" ? String.raw`\d{4}` : String.raw`\d{1,2}`}
+            maxlength="10"
+            spellcheck={false}
+          />
+        </div>
+      ))
+    }
+  </div>
+  <input type="hidden" name="birthDate" value={canonicalBirthDate(parts)} />
+  <FieldError field="birthDate" message="Enter your date of birth." />
+</fieldset>

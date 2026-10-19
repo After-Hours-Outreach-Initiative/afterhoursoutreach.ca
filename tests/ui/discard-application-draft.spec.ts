@@ -135,6 +135,7 @@ for (const [layout, viewport] of [
     const { id } = await createLocalAccount(page.request, baseURL!, false);
     await page.goto("/apply#application-personal-info");
     await page.locator('[name="firstName"]').fill("Old application");
+    await page.locator('[data-birth-date-part="day"]').fill("23");
     await page.locator('[name="medicalConditions"]').fill("Private old answer");
     await saved(page, "Old application");
     await page.locator('[name="phone"]').fill("Unsynced answer");
@@ -143,6 +144,13 @@ for (const [layout, viewport] of [
 
     await expect(page).toHaveURL("/apply");
     await expectDeleted(page, id);
+    await page
+      .locator("[data-account-profile]")
+      .evaluate((form: HTMLFormElement) => form.reset());
+    for (const part of ["day", "month", "year"])
+      await expect(
+        page.locator(`[data-birth-date-part="${part}"]`),
+      ).toHaveValue("");
     await expect(page.locator('[name="medicalConditions"]')).toHaveValue("");
     await expect(page.locator('[name="phone"]')).toHaveValue("");
     await expect(page.locator("[data-draft-new]")).toBeHidden();

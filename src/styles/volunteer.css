@@ -701,9 +701,23 @@ body:has([data-application], [data-account-contents-flow]) {
   width: 100%;
   color-scheme: dark;
 }
-.volunteer-portal input[name="birthDate"] {
+.volunteer-birth-date {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.volunteer-birth-date legend {
+  margin-bottom: 8px;
+  font-weight: normal;
+}
+.volunteer-birth-date-parts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 12px;
+  max-width: 320px;
+}
+.volunteer-birth-date-parts input {
   min-width: 0;
-  max-width: 100%;
 }
 .volunteer-portal input[type="checkbox"],
 .volunteer-portal input[type="radio"] {

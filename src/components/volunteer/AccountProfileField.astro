@@ -5,6 +5,7 @@ import {
   type ApplicationAnswers,
 } from "@/data/application";
 import FieldError from "@/components/FieldError.astro";
+import ApplicationBirthDate from "./ApplicationBirthDate.astro";
 
 interface Props {
   field: (typeof applicationFields)[number];
@@ -38,71 +39,80 @@ const message =
           : `Keep this answer to ${"multiline" in field ? 2000 : 200} characters or fewer.`;
 ---
 
-<div
-  class:list={["volunteer-field", { "volunteer-wide": "multiline" in field }]}
-  data-other-training={field.name === "experience" || undefined}
-  data-other-relevant-training={field.name === "otherTraining" || undefined}
-  data-certification-expiry={field.name === "certificationExpiry" || undefined}
-  hidden={!active}
->
-  <label for={`profile-${field.name}`} class:list={{ "sr-only": hideLabel }}>
-    {field.label}
-    {
-      !readOnly &&
-        (required ? (
-          <span class="volunteer-required" aria-hidden="true">
-            {" "}
-            *
-          </span>
-        ) : (
-          <span class="volunteer-help"> (optional)</span>
-        ))
-    }
-  </label>
-  {
-    "multiline" in field ? (
-      <textarea
-        id={`profile-${field.name}`}
-        name={field.name}
-        aria-describedby={describedBy}
-        required={required && active && !readOnly}
-        readonly={readOnly || !active}
-        rows="3"
-        maxlength={motivation ? undefined : 2000}
-        set:text={values?.[field.name] ?? ""}
-      />
-    ) : (
-      <input
-        id={`profile-${field.name}`}
-        name={field.name}
-        aria-describedby={describedBy}
-        type={"type" in field ? field.type : "text"}
-        autocomplete={"autocomplete" in field ? field.autocomplete : "off"}
-        value={values?.[field.name] ?? ""}
-        required={required && active && !readOnly}
-        readonly={readOnly || !active}
-        pattern={
-          birthDate
-            ? String.raw`\d{4}-\d{2}-\d{2}`
-            : phone
+{
+  birthDate && !readOnly ? (
+    <ApplicationBirthDate
+      value={values?.birthDate ?? ""}
+      help={"help" in field ? field.help : ""}
+      required={required && active}
+    />
+  ) : (
+    <div
+      class:list={[
+        "volunteer-field",
+        { "volunteer-wide": "multiline" in field },
+      ]}
+      data-other-training={field.name === "experience" || undefined}
+      data-other-relevant-training={field.name === "otherTraining" || undefined}
+      data-certification-expiry={
+        field.name === "certificationExpiry" || undefined
+      }
+      hidden={!active}
+    >
+      <label
+        for={`profile-${field.name}`}
+        class:list={{ "sr-only": hideLabel }}
+      >
+        {field.label}
+        {!readOnly &&
+          (required ? (
+            <span class="volunteer-required" aria-hidden="true">
+              {" "}
+              *
+            </span>
+          ) : (
+            <span class="volunteer-help"> (optional)</span>
+          ))}
+      </label>
+      {"multiline" in field ? (
+        <textarea
+          id={`profile-${field.name}`}
+          name={field.name}
+          aria-describedby={describedBy}
+          required={required && active && !readOnly}
+          readonly={readOnly || !active}
+          rows="3"
+          maxlength={motivation ? undefined : 2000}
+          set:text={values?.[field.name] ?? ""}
+        />
+      ) : (
+        <input
+          id={`profile-${field.name}`}
+          name={field.name}
+          aria-describedby={describedBy}
+          type={"type" in field ? field.type : "text"}
+          autocomplete={"autocomplete" in field ? field.autocomplete : "off"}
+          value={values?.[field.name] ?? ""}
+          required={required && active && !readOnly}
+          readonly={readOnly || !active}
+          pattern={
+            phone
               ? String.raw`(?=.*\S)[\d+\(\).\s\-xX]{7,}`
               : required
                 ? String.raw`.*\S.*`
                 : undefined
-        }
-        placeholder={birthDate && !readOnly ? "YYYY-MM-DD" : undefined}
-        spellcheck={birthDate ? false : undefined}
-        minlength={phone ? "7" : undefined}
-        maxlength={birthDate ? "10" : phone ? "40" : "200"}
-      />
-    )
-  }
-  {
-    "help" in field && !readOnly && (
-      <span class="volunteer-help" id={`help-${field.name}`}>
-        {field.help}
-      </span>
-    )
-  }
-  <FieldError field={field.name} message={message} />
-</div>
+          }
+          spellcheck={birthDate ? false : undefined}
+          minlength={phone ? "7" : undefined}
+          maxlength={phone ? "40" : "200"}
+        />
+      )}
+      {"help" in field && !readOnly && (
+        <span class="volunteer-help" id={`help-${field.name}`}>
+          {field.help}
+        </span>
+      )}
+      <FieldError field={field.name} message={message} />
+    </div>
+  )
+}

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { motivationMaxWords } from "../../src/data/application";
 import {
   createLocalAccount,
+  fillApplicationField,
   localApplicationReviewButton,
 } from "../helpers/local-account";
 
@@ -135,13 +136,13 @@ for (const width of [390, 1280]) {
       phone: "6045550100",
       birthDate: "1990-01-01",
     }))
-      await form.locator(`[name="${name}"]`).fill(value);
+      await fillApplicationField(form, name, value);
     await expectComplete(page, "personal-info", true);
     await expect(count).toHaveText(["3/5 complete", "3/5 complete"]);
-    await form.locator('[name="birthDate"]').fill("2999-01-01");
+    await fillApplicationField(form, "birthDate", "2999-01-01");
     await expectComplete(page, "personal-info", false);
     await expect(count).toHaveText(["2/5 complete", "2/5 complete"]);
-    await form.locator('[name="birthDate"]').fill("1990-01-01");
+    await fillApplicationField(form, "birthDate", "1990-01-01");
     await form.locator('[name="firstName"]').fill("   ");
     await expectComplete(page, "personal-info", false);
     await form.locator('[name="firstName"]').fill("Test");
@@ -381,9 +382,11 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
     page.locator("#application-emergency-contact > summary"),
   ).toBeFocused();
   await expect
-    .poll(
-      async () =>
+    .poll(async () =>
+      // scrollIntoView rounds scroll positions while layout can be fractional.
+      Math.round(
         (await page.locator("#application-emergency-contact").boundingBox())!.y,
+      ),
     )
     .toBeGreaterThanOrEqual(height + 16);
   await expect(page.locator("#application-emergency-contact")).toBeInViewport();
@@ -479,9 +482,10 @@ test("inline mobile links clear the future bar and Overview restores the expande
   ).toBeFocused();
   const bar = (await compact.boundingBox())!;
   await expect
-    .poll(
-      async () =>
+    .poll(async () =>
+      Math.round(
         (await page.locator("#application-emergency-contact").boundingBox())!.y,
+      ),
     )
     .toBeGreaterThanOrEqual(bar.height + 16);
   await menu.locator("summary").press("Enter");

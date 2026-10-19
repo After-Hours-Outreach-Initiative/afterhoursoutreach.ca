@@ -1,6 +1,4 @@
 import {
-  applicationBirthDateError,
-  isValidApplicationBirthDate,
   countWords,
   motivationMaxWords,
   motivationWordLimitError,
@@ -68,26 +66,6 @@ export function clearFormMessage(element: Element) {
   target.hidden = true;
   target.textContent = "";
   delete target.dataset.messageKind;
-}
-
-export function initBirthDate(element: HTMLFormElement) {
-  const input = element.querySelector<HTMLInputElement>('[name="birthDate"]');
-  if (!input) return;
-  // Plain text avoids native mobile picker defaults and intrinsic sizing. Keep
-  // the value untouched so drafts, resets and submissions retain YYYY-MM-DD.
-  const update = () => {
-    input.setCustomValidity(
-      !input.readOnly &&
-        input.value &&
-        !isValidApplicationBirthDate(input.value)
-        ? applicationBirthDateError
-        : "",
-    );
-  };
-  input.addEventListener("input", update);
-  input.addEventListener("change", update);
-  element.addEventListener("reset", () => queueMicrotask(update));
-  update();
 }
 
 export function initMedicCertifications(element: HTMLFormElement) {

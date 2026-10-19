@@ -14,6 +14,7 @@ import {
 import { initApplicationSections } from "./application-sections";
 import { initPageContents } from "./page-contents";
 import { initPhoneInputs } from "./phone-input";
+import { initBirthDate } from "./birth-date";
 import {
   clearApplicationDraft,
   initApplicationDraft,
@@ -23,7 +24,6 @@ import {
   accountErrorMessage,
   clearFormMessage,
   initAccountFormChanges,
-  initBirthDate,
   initMedicCertifications,
   initMotivationWordLimit,
   initReferralSources,
