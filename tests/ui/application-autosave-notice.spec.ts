@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   createLocalAccount,
   localApplicationReviewButton,
+  localApplicationSaveIndicator,
 } from "../helpers/local-account";
 
 test.beforeEach(({ baseURL }) => {
@@ -16,7 +17,7 @@ for (const [layout, viewport] of [
   ["mobile", { width: 390, height: 844 }],
 ] as const) {
   for (const saved of [false, true]) {
-    test(`save status reserves its space before scripts load for a ${saved ? "saved" : "new"} draft on ${layout}`, async ({
+    test(`save status does not shift the form when scripts load for a ${saved ? "saved" : "new"} draft on ${layout}`, async ({
       page,
       baseURL,
     }) => {
@@ -46,27 +47,30 @@ for (const [layout, viewport] of [
       });
       const measure = () =>
         page.evaluate(() => {
-          const status = document
-            .querySelector("[data-draft-save-indicator]")!
+          const bar = document
+            .querySelector("[data-contents-bar]")!
             .getBoundingClientRect();
           const form = document
             .querySelector("form[data-application]")!
             .getBoundingClientRect();
           return {
-            statusTop: status.top + scrollY,
-            statusHeight: status.height,
+            barHeight: bar.height,
             formTop: form.top + scrollY,
           };
         });
       try {
         await page.goto("/apply", { waitUntil: "commit" });
-        const indicator = page.locator("[data-draft-save-indicator]");
+        const indicator = localApplicationSaveIndicator(page);
         const statusHeight = layout === "mobile" ? 21 : 24;
         await expect(indicator).toHaveCSS("min-height", `${statusHeight}px`);
         await expect(indicator).toBeHidden();
         await page.evaluate(() => document.fonts.ready);
         const initial = await measure();
-        expect(initial.statusHeight).toBe(statusHeight);
+        if (layout === "mobile") {
+          expect(initial.barHeight).toBe(54);
+          await page.locator("[data-contents-menu] > summary").click();
+        }
+        expect((await indicator.boundingBox())!.height).toBe(statusHeight);
 
         release();
         await page.waitForLoadState("load");
@@ -126,13 +130,24 @@ for (const [layout, viewport] of [
     const tracker = page.getByRole("navigation", {
       name: "Sections",
     });
-    const saveIndicator = tracker.locator("[data-draft-save-indicator]");
+    const saveIndicator = localApplicationSaveIndicator(page);
+    if (layout === "mobile") {
+      await expect(saveIndicator).toBeHidden();
+      await expect(tracker.getByRole("status")).toHaveCount(0);
+      await tracker.locator("summary").click();
+    }
     await expect(saveIndicator).toHaveAttribute("data-save-state", "idle");
     await expect(saveIndicator).toHaveText("");
     await expect(saveIndicator).toBeVisible();
     await expect(saveIndicator).toHaveAttribute("role", "status");
     await expect(saveIndicator).toHaveAttribute("aria-live", "polite");
-    await expect(page.locator("[data-draft-save-indicator]")).toHaveCount(1);
+    await expect(page.locator("[data-draft-save-indicator]")).toHaveCount(2);
+    await expect(tracker.getByRole("status")).toHaveCount(1);
+    expect(
+      await saveIndicator.evaluate((element) =>
+        element.previousElementSibling?.hasAttribute("data-application-review"),
+      ),
+    ).toBe(true);
     await expect(
       page.getByRole("heading", {
         name: "Draft saving and privacy",
@@ -186,7 +201,20 @@ test("autosave message is present before answers without JavaScript", async ({
       { exact: true },
     );
     await expect(notice).toBeVisible();
-    await expect(page.locator("[data-draft-save-indicator]")).toBeHidden();
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 844 });
+      if (width < 1024) {
+        await expect(page.locator("[data-contents-bar]")).toHaveCSS(
+          "height",
+          "54px",
+        );
+        await page.locator("[data-contents-menu] > summary").click();
+      }
+      for (const indicator of await page
+        .locator("[data-draft-save-indicator]")
+        .all())
+        await expect(indicator).toBeHidden();
+    }
     await expect(page.locator('[name="firstName"]')).toHaveValue("");
     await expect(localApplicationReviewButton(page, "bottom")).toBeDisabled();
   } finally {

@@ -67,6 +67,18 @@ export const sampleAnswers = {
   medicalConditions: "Sample private answer",
 };
 
+function localApplicationProgressScope(page: Page) {
+  return (page.viewportSize()?.width ?? 1280) < 1024
+    ? "[data-contents-menu]"
+    : ".volunteer-contents-actions";
+}
+
+export function localApplicationSaveIndicator(page: Page) {
+  return page.locator(
+    `${localApplicationProgressScope(page)} [data-draft-save-indicator]`,
+  );
+}
+
 export function localApplicationReviewButton(
   page: Page,
   placement: "progress" | "bottom" = "progress",
@@ -74,9 +86,7 @@ export function localApplicationReviewButton(
   const scope =
     placement === "bottom"
       ? "[data-application-draft-actions]"
-      : (page.viewportSize()?.width ?? 1280) < 1024
-        ? "[data-contents-menu]"
-        : ".volunteer-contents-actions";
+      : localApplicationProgressScope(page);
   return page.locator(`${scope} [data-application-review]`);
 }
 
