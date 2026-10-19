@@ -8,6 +8,18 @@ export function initApplicationSections(element: HTMLFormElement) {
   );
   if (!flow || !content) return;
   initPageContents(flow, { content, topId: "application-overview" });
+  const review = element.querySelector<HTMLElement>(
+    "[data-application-review-step]",
+  );
+  const reviewContents = flow.querySelector<HTMLElement>(
+    "[data-application-review-contents]",
+  );
+  if (review && reviewContents)
+    initPageContents(flow, {
+      content: review,
+      contents: reviewContents,
+      topId: "application-overview",
+    });
 
   const links = [
     ...flow.querySelectorAll<HTMLAnchorElement>(

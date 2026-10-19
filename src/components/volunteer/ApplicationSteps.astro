@@ -86,7 +86,9 @@ const reviewSections = sections.map((section) => {
           {reviewSections.map((section) => (
             <section aria-labelledby={`review-${section.key}`}>
               <div class="volunteer-section-heading">
-                <h3 id={`review-${section.key}`}>{section.heading}</h3>
+                <h3 id={`review-${section.key}`} tabindex="-1">
+                  {section.heading}
+                </h3>
                 <button
                   type="button"
                   class="btn btn-quiet"

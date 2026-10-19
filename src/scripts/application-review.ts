@@ -34,6 +34,9 @@ export function initApplicationReview(element: HTMLFormElement) {
   const contents = flow?.querySelector<HTMLElement>(
     "[data-application-contents]",
   );
+  const reviewContents = flow?.querySelector<HTMLElement>(
+    "[data-application-review-contents]",
+  );
   const draftActions = flow?.querySelector<HTMLElement>(
     "[data-application-draft-actions]",
   );
@@ -79,6 +82,7 @@ export function initApplicationReview(element: HTMLFormElement) {
     step = next;
     questions.hidden = next !== "questions";
     if (contents) contents.hidden = next !== "questions";
+    if (reviewContents) reviewContents.hidden = next !== "review";
     if (draftActions) draftActions.hidden = next !== "questions";
     review.hidden = next !== "review";
     // The hidden acknowledgement must not block first-step native validation.

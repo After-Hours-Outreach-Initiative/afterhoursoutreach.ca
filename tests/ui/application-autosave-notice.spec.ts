@@ -72,7 +72,7 @@ for (const [layout, viewport] of [
         const initial = await measure();
         if (layout === "mobile") {
           expect(initial.barHeight).toBe(54);
-          await page.locator("[data-contents-menu] > summary").click();
+          await page.locator("[data-application-contents] summary").click();
         }
         expect((await indicator.boundingBox())!.height).toBe(statusHeight);
 
@@ -240,13 +240,14 @@ test("autosave message is present before answers without JavaScript", async ({
     ]) {
       await page.setViewportSize(viewport);
       if (viewport.width < 1024) {
-        const menu = page.locator("[data-contents-menu]");
+        const menu = page.locator(
+          "[data-application-contents] [data-contents-menu]",
+        );
         const dropdown = menu.locator("[data-contents-dropdown]");
         if ((await menu.getAttribute("open")) === null) {
-          await expect(page.locator("[data-contents-bar]")).toHaveCSS(
-            "height",
-            "54px",
-          );
+          await expect(
+            page.locator("[data-application-contents] [data-contents-bar]"),
+          ).toHaveCSS("height", "54px");
           await menu.locator("summary").click();
         }
         await expect(page.locator("[data-application-contents]")).toHaveCSS(

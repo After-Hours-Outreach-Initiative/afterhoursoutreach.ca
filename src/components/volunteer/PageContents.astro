@@ -10,16 +10,22 @@ interface Props {
     completable?: boolean;
   }[];
   application?: boolean;
+  review?: boolean;
 }
-const { entries, application = false } = Astro.props;
+const { entries, application = false, review = false } = Astro.props;
 const heading = application ? "Sections" : "On this page";
 const totalSections = entries.filter((entry) => entry.completable).length;
 ---
 
 <nav
-  class="volunteer-contents"
+  class:list={[
+    "volunteer-contents",
+    { "volunteer-application-contents": application },
+  ]}
   data-page-contents
-  data-application-contents={application || undefined}
+  data-application-contents={(application && !review) || undefined}
+  data-application-review-contents={review || undefined}
+  hidden={review}
   aria-label={heading}
 >
   <div class="volunteer-contents-bar-slot">
@@ -46,41 +52,43 @@ const totalSections = entries.filter((entry) => entry.completable).length;
                 <span class="volunteer-contents-current" data-contents-current>
                   {heading}
                 </span>
-                <span
-                  class="volunteer-contents-progress"
-                  data-application-progress
-                  role="progressbar"
-                  aria-label="Application progress"
-                  aria-valuemin="0"
-                  aria-valuemax={totalSections}
-                  aria-valuenow="0"
-                  aria-valuetext={`0 of ${totalSections} sections complete`}
-                >
-                  <svg
-                    viewBox="0 0 28 28"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="3"
-                    aria-hidden="true"
+                {!review && (
+                  <span
+                    class="volunteer-contents-progress"
+                    data-application-progress
+                    role="progressbar"
+                    aria-label="Application progress"
+                    aria-valuemin="0"
+                    aria-valuemax={totalSections}
+                    aria-valuenow="0"
+                    aria-valuetext={`0 of ${totalSections} sections complete`}
                   >
-                    <circle
-                      class="volunteer-contents-progress-track"
-                      cx="14"
-                      cy="14"
-                      r="11"
-                    />
-                    <circle
-                      data-application-progress-value
-                      cx="14"
-                      cy="14"
-                      r="11"
-                      pathLength="100"
-                      stroke-dasharray="100"
-                      stroke-dashoffset="100"
-                      transform="rotate(-90 14 14)"
-                    />
-                  </svg>
-                </span>
+                    <svg
+                      viewBox="0 0 28 28"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="3"
+                      aria-hidden="true"
+                    >
+                      <circle
+                        class="volunteer-contents-progress-track"
+                        cx="14"
+                        cy="14"
+                        r="11"
+                      />
+                      <circle
+                        data-application-progress-value
+                        cx="14"
+                        cy="14"
+                        r="11"
+                        pathLength="100"
+                        stroke-dasharray="100"
+                        stroke-dashoffset="100"
+                        transform="rotate(-90 14 14)"
+                      />
+                    </svg>
+                  </span>
+                )}
                 <svg
                   class="volunteer-contents-chevron"
                   viewBox="0 0 24 24"
@@ -120,7 +128,7 @@ const totalSections = entries.filter((entry) => entry.completable).length;
             variant="menu"
           />
           {
-            application && (
+            application && !review && (
               <>
                 <button
                   type="submit"
@@ -138,7 +146,7 @@ const totalSections = entries.filter((entry) => entry.completable).length;
         </div>
       </details>
       {
-        application && (
+        application && !review && (
           <div class="volunteer-contents-actions">
             <button
               type="submit"

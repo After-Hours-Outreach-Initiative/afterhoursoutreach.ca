@@ -407,7 +407,7 @@ body:has([data-application], [data-account-contents-flow]) {
   background: #0c0d10;
   box-shadow: 0 12px 30px #0008;
 }
-[data-application-contents] .volunteer-contents-dropdown {
+.volunteer-application-contents .volunteer-contents-dropdown {
   max-height: max(0px, calc(100dvh - 70px));
   overscroll-behavior: auto;
 }
@@ -512,55 +512,55 @@ body:has([data-application], [data-account-contents-flow]) {
     margin: 0;
     background: transparent;
   }
-  /* The summary owns the shared seam; review keeps its standalone panel. */
-  [data-application-flow]
-    > [data-application-contents]:not([hidden])
-    + [data-application] {
+  /* The visible step's summary owns the shared seam. */
+  [data-application-flow]:has(> .volunteer-application-contents:not([hidden]))
+    > [data-application] {
     margin-top: 0;
     border-top: 0;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
   }
-  [data-application-contents] .volunteer-contents-menu {
+  .volunteer-application-contents .volunteer-contents-menu {
     border-radius: 10px 10px 0 0;
   }
-  [data-application-contents][data-contents-stuck] .volunteer-contents-menu {
+  .volunteer-application-contents[data-contents-stuck]
+    .volunteer-contents-menu {
     box-shadow: 0 4px 12px #0004;
   }
-  [data-application-contents] summary {
+  .volunteer-application-contents summary {
     gap: 8px;
     padding-inline: 12px;
     border: var(--volunteer-border);
     border-radius: 10px 10px 0 0;
   }
   @media (hover: hover) {
-    [data-application-contents] summary:hover {
+    .volunteer-application-contents summary:hover {
       border-color: #71717a;
     }
   }
-  [data-application-contents] summary:focus-visible {
+  .volunteer-application-contents summary:focus-visible {
     box-shadow: inset 0 0 0 1px #818cf8;
   }
-  [data-application-contents] summary:active {
+  .volunteer-application-contents summary:active {
     box-shadow: inset 0 0 0 100vmax #ffffff0d;
   }
-  [data-application-contents][data-contents-stuck] .volunteer-contents-menu,
-  [data-application-contents][data-contents-stuck] summary {
+  .volunteer-application-contents[data-contents-stuck] .volunteer-contents-menu,
+  .volunteer-application-contents[data-contents-stuck] summary {
     border-radius: 0;
     background: var(--color-panel-soft);
   }
-  [data-application-contents] .volunteer-contents-dropdown {
+  .volunteer-application-contents .volunteer-contents-dropdown {
     border: var(--volunteer-border);
     border-top: 0;
     border-radius: 0 0 8px 8px;
     box-shadow: none;
   }
-  [data-application-contents] .volunteer-draft-save-status {
+  .volunteer-application-contents .volunteer-draft-save-status {
     justify-content: flex-start;
     font-size: 14px;
     text-align: left;
   }
-  [data-application-contents] [data-draft-save-message] {
+  .volunteer-application-contents [data-draft-save-message] {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -571,7 +571,7 @@ body:has([data-application], [data-account-contents-flow]) {
     padding-block: 10px;
     font-size: 16px;
   }
-  [data-application-contents] .volunteer-contents-dropdown a {
+  .volunteer-application-contents .volunteer-contents-dropdown a {
     font-size: 18px;
     font-weight: normal;
   }
@@ -580,19 +580,19 @@ body:has([data-application], [data-account-contents-flow]) {
   .volunteer-name-fields {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  [data-application-contents] {
+  .volunteer-application-contents {
     display: flex;
     flex-direction: column;
     max-height: calc(
       100dvh - var(--contents-sticky-offset, var(--site-header-height)) - 48px
     );
   }
-  [data-application-contents] > .volunteer-contents-bar-slot {
+  .volunteer-application-contents > .volunteer-contents-bar-slot {
     order: 1;
     flex-shrink: 0;
     padding-top: 16px;
   }
-  [data-application-contents] > .volunteer-contents-sidebar {
+  .volunteer-application-contents > .volunteer-contents-sidebar {
     min-height: 0;
   }
   [data-application-flow] {
@@ -601,7 +601,9 @@ body:has([data-application], [data-account-contents-flow]) {
     grid-template-rows: auto auto auto;
     column-gap: 32px;
   }
-  [data-application-flow]:has(> [data-application-contents][hidden]) {
+  [data-application-flow]:not(
+    :has(> .volunteer-application-contents:not([hidden]))
+  ) {
     grid-template-columns: minmax(0, 1fr);
     column-gap: 0;
   }
@@ -642,6 +644,7 @@ body:has([data-application], [data-account-contents-flow]) {
 }
 [data-application-questions],
 .volunteer-application-section,
+[data-application-review-step] h3,
 [data-application] [data-application-step-heading],
 [data-application] .volunteer-application-section > .volunteer-profile-heading,
 [data-application] #code-of-conduct-heading,
