@@ -3,6 +3,7 @@ import {
   createLocalAccount,
   fillApplicationField,
   localApplicationReviewButton,
+  localApplicationSaveIndicator,
   reviewLocalApplication,
   sampleAnswers,
   submitLocalApplication,
@@ -14,7 +15,6 @@ import {
 
 const endpoint = "/api/v1/account/application-draft";
 const statusSelector = "[data-draft-status]";
-const saveIndicatorSelector = "[data-draft-save-indicator]";
 const formSelector = "[data-account-profile]";
 
 async function expectSaveTime(page: Page) {
@@ -33,9 +33,12 @@ async function expectSaveTime(page: Page) {
     }).format(savedDate);
     return `Last saved${date} at ${time}`;
   }, draft.updatedAt as number);
-  await expect(page.locator(saveIndicatorSelector)).toHaveText(savedMessage);
+  await expect(page.locator("[data-draft-save-indicator]")).toHaveText([
+    savedMessage,
+    savedMessage,
+  ]);
   await expect(
-    page.locator(saveIndicatorSelector).locator("svg"),
+    localApplicationSaveIndicator(page).locator("svg"),
   ).toBeVisible();
 }
 
@@ -93,19 +96,19 @@ for (const timezoneId of ["America/Vancouver", "Asia/Tokyo"]) {
       await page.clock.install({ time: new Date(beforeMidnight - 60_000) });
       await page.clock.pauseAt(new Date(beforeMidnight));
       await page.goto("/apply");
-      await expect(page.locator(saveIndicatorSelector)).toHaveText(
+      await expect(localApplicationSaveIndicator(page)).toHaveText(
         /^Last saved at /,
       );
       await expectSaveTime(page);
 
       await page.clock.runFor(2000);
 
-      await expect(page.locator(saveIndicatorSelector)).toHaveText(
+      await expect(localApplicationSaveIndicator(page)).toHaveText(
         /^Last saved on /,
       );
       await expectSaveTime(page);
       await page.reload();
-      await expect(page.locator(saveIndicatorSelector)).toHaveText(
+      await expect(localApplicationSaveIndicator(page)).toHaveText(
         /^Last saved on /,
       );
       await expectSaveTime(page);
@@ -186,11 +189,11 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   await expect(reopened.locator(statusSelector)).toContainText(
     "We could not connect",
   );
-  await expect(reopened.locator(saveIndicatorSelector)).toHaveText(
+  await expect(localApplicationSaveIndicator(reopened)).toHaveText(
     "Couldn’t save to your account",
   );
   await expect(
-    reopened.locator(saveIndicatorSelector).locator("svg"),
+    localApplicationSaveIndicator(reopened).locator("svg"),
   ).toBeHidden();
   await reopened.evaluate(() =>
     window.dispatchEvent(new Event("draft-test-online")),
@@ -308,18 +311,22 @@ test("edits made during a pending save are backed up immediately and saved after
     page.getByText("Your answers save automatically", { exact: false }),
   ).toHaveCount(0);
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
-  await expect(page.locator(saveIndicatorSelector)).toHaveAttribute(
+  await expect(localApplicationSaveIndicator(page)).toHaveAttribute(
     "data-save-state",
     "idle",
   );
-  await expect(page.locator(saveIndicatorSelector)).toHaveText("");
+  await expect(localApplicationSaveIndicator(page)).toHaveText("");
   await page.locator('[name="firstName"]').fill("First version");
-  await expect(page.locator("[data-draft-save-message]")).toBeEmpty();
-  await expect(page.locator(saveIndicatorSelector).locator("svg")).toBeHidden();
+  await expect(
+    localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
+  ).toBeEmpty();
+  await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
   await expect.poll(() => requests).toBe(1);
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
-  await expect(page.locator("[data-draft-save-message]")).toBeEmpty();
-  await expect(page.locator(saveIndicatorSelector).locator("svg")).toBeHidden();
+  await expect(
+    localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
+  ).toBeEmpty();
+  await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
   await page.locator('[name="firstName"]').fill("Latest version");
   expect(
     await page.evaluate(
@@ -345,7 +352,7 @@ test("last confirmed save status stays steady while editing", async ({
   await page.goto("/apply");
   await page.locator('[name="firstName"]').fill("Confirmed answer");
   await expectDraftSaved(page, { firstName: "Confirmed answer" });
-  const indicator = page.locator(saveIndicatorSelector);
+  const indicator = localApplicationSaveIndicator(page);
   const confirmedStatus = await indicator.innerText();
 
   let release!: () => void;
@@ -411,11 +418,11 @@ for (const keepLocal of [true, false]) {
       "Local changes",
     );
     await expect(page.locator("[data-draft-conflict]")).toBeVisible();
-    await expect(page.locator(saveIndicatorSelector)).toHaveText(
+    await expect(localApplicationSaveIndicator(page)).toHaveText(
       "Choose which answers to keep",
     );
     await expect(
-      page.locator(saveIndicatorSelector).locator("svg"),
+      localApplicationSaveIndicator(page).locator("svg"),
     ).toBeHidden();
     await page.unroute(`**${endpoint}`);
     await page
@@ -482,10 +489,10 @@ test("switching accounts never restores or autosaves another account's answers",
   await expect(page.locator(statusSelector)).toContainText(
     "Sign in again or reload",
   );
-  await expect(page.locator(saveIndicatorSelector)).toHaveText(
+  await expect(localApplicationSaveIndicator(page)).toHaveText(
     "Couldn’t save to your account",
   );
-  await expect(page.locator(saveIndicatorSelector).locator("svg")).toBeHidden();
+  await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
   expect((await (await page.request.get(endpoint)).json()).draft).toBe(null);
   await page.goto("/apply");
   await expect(page.locator('[name="firstName"]')).toHaveValue("");

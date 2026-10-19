@@ -1,5 +1,5 @@
 ---
-import CloudIcon from "@/components/icons/CloudIcon.astro";
+import DraftSaveStatus from "./DraftSaveStatus.astro";
 import PageContentsList from "./PageContentsList.astro";
 
 interface Props {
@@ -80,15 +80,18 @@ const totalSections = entries.filter(
           />
           {
             application && (
-              <button
-                type="submit"
-                form="volunteer-application"
-                data-application-review
-                class="btn btn-primary"
-                disabled
-              >
-                Review application
-              </button>
+              <>
+                <button
+                  type="submit"
+                  form="volunteer-application"
+                  data-application-review
+                  class="btn btn-primary"
+                  disabled
+                >
+                  Review application
+                </button>
+                <DraftSaveStatus />
+              </>
             )
           }
         </div>
@@ -105,17 +108,7 @@ const totalSections = entries.filter(
             >
               Review application
             </button>
-            <p
-              class="volunteer-draft-save-status"
-              data-draft-save-indicator
-              data-save-state="initializing"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              <CloudIcon class="volunteer-draft-save-icon" />
-              <span data-draft-save-message />
-            </p>
+            <DraftSaveStatus />
           </div>
         )
       }

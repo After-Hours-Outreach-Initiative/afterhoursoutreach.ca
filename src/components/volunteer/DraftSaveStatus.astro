@@ -1,0 +1,15 @@
+---
+import CloudIcon from "@/components/icons/CloudIcon.astro";
+---
+
+<p
+  class="volunteer-draft-save-status"
+  data-draft-save-indicator
+  data-save-state="initializing"
+  role="status"
+  aria-live="polite"
+  aria-atomic="true"
+>
+  <CloudIcon class="volunteer-draft-save-icon" />
+  <span data-draft-save-message></span>
+</p>

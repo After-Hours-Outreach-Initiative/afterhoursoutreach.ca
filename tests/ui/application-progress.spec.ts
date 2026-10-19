@@ -4,6 +4,7 @@ import {
   createLocalAccount,
   fillApplicationField,
   localApplicationReviewButton,
+  localApplicationSaveIndicator,
 } from "../helpers/local-account";
 
 test.beforeEach(({ baseURL }) => {
@@ -301,7 +302,7 @@ test("one compact mobile tracker sticks continuously and names sections only at 
   const tracker = page.getByRole("navigation", {
     name: "Sections",
   });
-  const status = tracker.locator("[data-draft-save-indicator]");
+  const status = localApplicationSaveIndicator(page);
   const compact = tracker.locator("[data-contents-bar]");
   const menu = tracker.locator("[data-contents-menu]");
   const dropdown = menu.locator("[data-contents-dropdown]");
@@ -356,7 +357,8 @@ test("one compact mobile tracker sticks continuously and names sections only at 
   await expect(status).toHaveText(/^Last saved at /);
   await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);
   await expect(page.locator(".site-header")).not.toBeInViewport();
-  await expect(status).toBeInViewport();
+  await expect(status).toBeHidden();
+  await expect(tracker.getByRole("status")).toHaveCount(0);
   await expect(status).toHaveCSS("font-size", "14px");
   await expect(status).toHaveCSS("text-align", "right");
   await expect(status).toHaveCSS("justify-content", "flex-end");
@@ -365,24 +367,38 @@ test("one compact mobile tracker sticks continuously and names sections only at 
     "14px",
   );
   await expect(reviewButton).toBeHidden();
-  expect((await status.boundingBox())!.y).toBeGreaterThanOrEqual(
-    (await tracker.locator("summary").boundingBox())!.height,
-  );
   const height = (await compact.boundingBox())!.height;
-  expect(height).toBe(84);
+  expect(height).toBe(54);
+  expect((await summary.boundingBox())!.height).toBe(height);
+  await expect(page.locator("[data-application-flow]")).toHaveAttribute(
+    "style",
+    /--contents-bar-height: 54px; --contents-scroll-offset: 54px;/,
+  );
   await tracker.locator("summary").click();
   expect((await compact.boundingBox())!.height).toBe(height);
   await expect(reviewButton).toBeVisible();
+  await expect(status).toBeVisible();
+  await expect(tracker.getByRole("status")).toHaveCount(1);
   const dropdownBounds = (await dropdown.boundingBox())!;
   const linksBounds = (await dropdown.locator("ol").boundingBox())!;
   expect(dropdownBounds.y).toBeGreaterThanOrEqual(height);
   expect((await reviewButton.boundingBox())!.y).toBeGreaterThanOrEqual(
     linksBounds.y + linksBounds.height,
   );
+  const reviewBounds = (await reviewButton.boundingBox())!;
+  expect((await status.boundingBox())!.y).toBeGreaterThanOrEqual(
+    reviewBounds.y + reviewBounds.height,
+  );
+  expect(
+    await status.evaluate((element) =>
+      element.previousElementSibling?.hasAttribute("data-application-review"),
+    ),
+  ).toBe(true);
   await tracker
     .getByRole("link", { name: "Emergency contact", exact: true })
     .click();
   await expect(reviewButton).toBeHidden();
+  await expect(status).toBeHidden();
   await expect(
     page.locator("#application-emergency-contact > summary"),
   ).toBeFocused();
@@ -454,8 +470,11 @@ test("one compact mobile tracker sticks continuously and names sections only at 
     const action = (await reviewButton.boundingBox())!;
     expect(action.y).toBeGreaterThanOrEqual(height);
     expect(action.y + action.height).toBeLessThanOrEqual(viewport.height - 16);
+    await status.scrollIntoViewIfNeeded();
+    await expect(status).toBeInViewport({ ratio: 1 });
     await page.keyboard.press("Escape");
     await expect(reviewButton).toBeHidden();
+    await expect(status).toBeHidden();
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
@@ -464,6 +483,13 @@ test("one compact mobile tracker sticks continuously and names sections only at 
   await expect(menu).not.toHaveAttribute("open");
   await expect(tracker.locator(".volunteer-contents-sidebar")).toBeHidden();
   expect(await measure()).toEqual(initial);
+  const savedMessage = await status.textContent();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(status).toBeHidden();
+  const desktopStatus = localApplicationSaveIndicator(page);
+  await expect(desktopStatus).toBeVisible();
+  await expect(desktopStatus).toHaveText(savedMessage!.trim());
+  await expect(tracker.getByRole("status")).toHaveCount(1);
 });
 
 test("the mobile dropdown works from its normal position and Overview restores Sections", async ({

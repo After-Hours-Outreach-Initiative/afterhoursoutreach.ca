@@ -171,12 +171,12 @@ export function initApplicationDraft(element: HTMLFormElement) {
   const userId = element.dataset.profileUserId;
   if (!userId || !element.hasAttribute("data-application")) return;
   const flow = element.closest("[data-application-flow]")!;
-  const saveIndicator = flow.querySelector<HTMLElement>(
-    "[data-draft-save-indicator]",
-  )!;
-  const saveMessageElement = saveIndicator.querySelector<HTMLElement>(
-    "[data-draft-save-message]",
-  )!;
+  const saveIndicators = [
+    ...flow.querySelectorAll<HTMLElement>("[data-draft-save-indicator]"),
+  ].map((indicator) => ({
+    indicator,
+    message: indicator.querySelector<HTMLElement>("[data-draft-save-message]")!,
+  }));
   const saveTimeFormat = new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
@@ -331,9 +331,11 @@ export function initApplicationDraft(element: HTMLFormElement) {
       saveState = "pending";
       saveMessage = "";
     }
-    saveIndicator.dataset.saveState = saveState;
-    if (saveMessageElement.textContent !== saveMessage)
-      saveMessageElement.textContent = saveMessage;
+    for (const { indicator, message } of saveIndicators) {
+      indicator.dataset.saveState = saveState;
+      if (message.textContent !== saveMessage)
+        message.textContent = saveMessage;
+    }
   };
   const restore = (answers: ApplicationDraftAnswers, notify = true) => {
     restoring = true;
