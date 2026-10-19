@@ -363,7 +363,7 @@ body:has([data-application], [data-account-contents-flow]) {
   height: 28px;
   flex-shrink: 0;
   margin-left: auto;
-  color: #818cf8;
+  color: #facc15;
 }
 .volunteer-contents-progress svg {
   width: 100%;

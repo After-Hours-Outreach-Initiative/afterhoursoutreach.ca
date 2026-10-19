@@ -68,7 +68,7 @@ async function expectProgress(page: Page, completed: number) {
   );
   await expect(value).toHaveCSS(
     "stroke",
-    completed === 5 ? "rgb(74, 222, 128)" : "rgb(129, 140, 248)",
+    completed === 5 ? "rgb(74, 222, 128)" : "rgb(250, 204, 21)",
   );
 }
 
