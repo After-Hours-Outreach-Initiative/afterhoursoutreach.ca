@@ -1222,9 +1222,14 @@ describe(
         }
         await saveProfile.click();
         try {
-          await page
-            .getByText("Profile saved.", { exact: true })
-            .waitFor({ timeout: 5000 });
+          const saved = page.locator(
+            '[data-account-profile] [data-profile-answer="preferredName"] dd',
+          );
+          await expect(saved).toBeVisible();
+          await expect(saved).toHaveText(changedName);
+          await expect(
+            page.locator("[data-account-profile] [data-form-message]"),
+          ).toBeHidden();
         } catch (error) {
           console.error(
             JSON.stringify({

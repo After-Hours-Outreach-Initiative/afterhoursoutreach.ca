@@ -553,9 +553,13 @@ test("formatted phones survive draft reloads and profile saves and resets", asyn
   await expect(save).toBeDisabled();
   await phone.fill("7785550199");
   await save.click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
+  await expect(
+    form.locator('[data-profile-answers="personal-info"]'),
+  ).toBeVisible();
+  await expect(form.locator('[data-profile-answer="phone"] dd')).toHaveText(
+    "778-555-0199",
   );
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await page.getByRole("button", { name: "Edit emergency contact" }).click();
   await emergency.fill("+1 (604) 555-0199 x123");
   const emergencySave = form.locator(
@@ -563,9 +567,13 @@ test("formatted phones survive draft reloads and profile saves and resets", asyn
   );
   await expect(emergencySave).toBeEnabled();
   await emergencySave.click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
-  );
+  await expect(
+    form.locator('[data-profile-answers="emergency-contact"]'),
+  ).toBeVisible();
+  await expect(
+    form.locator('[data-profile-answer="emergencyPhone"] dd'),
+  ).toHaveText("+1-604-555-0199 x123");
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(save).toBeDisabled();
   await page.reload();
   await page.getByRole("button", { name: "Edit personal info" }).click();
@@ -876,13 +884,15 @@ test("application shows all required errors and saves after they are corrected",
       .getByRole("button", { name: "Save", exact: true, includeHidden: true })
       .first(),
   ).toBeDisabled();
-  // Editing reuses validation and identifies successful saves semantically.
+  // Editing reuses validation and returns to saved text without a success message.
   await page
     .getByRole("textbox", { name: /^Preferred name/ })
     .fill("Updated volunteer");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  const saved = page.locator("[data-account-profile] [data-form-message]");
-  await expect(saved).toHaveAttribute("data-message-kind", "success");
+  const saved = form.locator('[data-profile-answer="preferredName"] dd');
+  await expect(saved).toBeVisible();
+  await expect(saved).toHaveText("Updated volunteer");
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(
     page
       .getByRole("button", { name: "Save", exact: true, includeHidden: true })
@@ -1307,9 +1317,10 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(save).toBeDisabled();
   await other.uncheck();
   await save.click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
-  );
+  await expect(
+    form.locator('[data-profile-answers="training-and-safety"]'),
+  ).toBeVisible();
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(
     form.locator('[data-profile-answer="training"] dd'),
   ).toContainText("Naloxone administration training");
@@ -1336,9 +1347,13 @@ test("all teams can select multiple relevant training answers and add Other deta
   expect(requests).toHaveLength(savedRequests);
   await none.check();
   await save.click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
+  await expect(
+    form.locator('[data-profile-answers="training-and-safety"]'),
+  ).toBeVisible();
+  await expect(form.locator('[data-profile-answer="training"] dd')).toHaveText(
+    "No relevant training or experience",
   );
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await page.reload();
   await page.getByRole("button", { name: "Edit training and safety" }).click();
   await expect(training).toBeVisible();
@@ -1581,9 +1596,10 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   // Deselecting Medic retains saved selections, even while the question is hidden.
   await medic.uncheck();
   await save.click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
-  );
+  await expect(
+    form.locator('[data-profile-answers="team-interests"]'),
+  ).toBeVisible();
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   for (const name of ["certifications", "certificationExpiry", "experience"])
     await expect(form.locator(`[data-profile-answer="${name}"]`)).toBeHidden();
   await page.reload();
@@ -1611,9 +1627,13 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     ),
   ).toBe(false);
   await save.click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
-  );
+  await expect(
+    form.locator('[data-profile-answers="team-interests"]'),
+  ).toBeVisible();
+  await expect(
+    form.locator('[data-profile-answer="certifications"] dd'),
+  ).toHaveText("Advanced First Aid (formerly OFA Level 3)");
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await page.reload();
   await page.getByRole("button", { name: "Edit team interests" }).click();
   await expect(firstAid).toBeChecked();
@@ -1820,10 +1840,8 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await name.fill("Updated volunteer");
   await expect(enabledSaves).toHaveCount(1);
   await name.press("Enter");
-  await expect(form.locator("[data-form-message]")).toHaveAttribute(
-    "data-message-kind",
-    "success",
-  );
+  await expect(contactFields).toBeHidden();
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(enabledSaves).toHaveCount(0);
   expect(requests).toHaveLength(1);
   expect(requests[0]).toMatchObject({
@@ -1870,9 +1888,10 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await medicalConditions.fill(safetyAnswer);
   await form.locator('[name="preferredName"]').fill("");
   await form.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
-  );
+  await expect(
+    form.locator('[data-profile-answers="personal-info"]'),
+  ).toBeVisible();
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(page.locator("[data-account-menu-name]").first()).toHaveText(
     `${sampleAnswers.firstName} ${sampleAnswers.middleNames} ${sampleAnswers.lastName}`,
   );
@@ -1891,9 +1910,14 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   ).toBeDisabled();
   await form.getByLabel("Non-patrol support", { exact: true }).check();
   await form.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
-  );
+  await expect(
+    form.locator('[data-profile-answers="team-interests"]'),
+  ).toBeVisible();
+  await expect(answer("teams").getByRole("listitem")).toHaveText([
+    "Outreach",
+    "Non-patrol support",
+  ]);
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   expect(requests[2].certifications).toEqual(certifications);
 });
 
@@ -2000,9 +2024,10 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   expect(requests).toEqual([]);
   await support.check();
   await save.click();
-  await expect(form.locator("[data-form-message]")).toHaveText(
-    "Profile saved.",
-  );
+  await expect(
+    form.locator('[data-profile-answers="team-interests"]'),
+  ).toBeVisible();
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   await page.reload();
   await expect(outreach).toBeChecked();
   await expect(outreach).toBeDisabled();
@@ -2266,6 +2291,11 @@ test("failed profile saves keep unsaved changes retryable", async ({
   await expect(form.locator("[data-form-message]")).toHaveText(
     "Your profile is temporarily unavailable.",
   );
+  await expect(form.locator("[data-form-message]")).toBeVisible();
+  await expect(form.locator("[data-form-message]")).toHaveAttribute(
+    "role",
+    "alert",
+  );
   for (const save of await saves.all()) await expect(save).toBeEnabled();
   await expect(
     form.locator("[data-profile-cancel]:enabled:visible"),
@@ -2276,10 +2306,10 @@ test("failed profile saves keep unsaved changes retryable", async ({
   await name.fill("Retry this profile");
   await page.unroute("**/api/v1/account/profile");
   await saves.last().click();
-  await expect(form.locator("[data-form-message]")).toHaveAttribute(
-    "data-message-kind",
-    "success",
-  );
+  const saved = form.locator('[data-profile-answer="preferredName"] dd');
+  await expect(saved).toBeVisible();
+  await expect(saved).toHaveText("Retry this profile");
+  await expect(form.locator("[data-form-message]")).toBeHidden();
   for (const save of await saves.all()) await expect(save).toBeDisabled();
 });
 
@@ -2322,10 +2352,12 @@ test("edits made during a profile save remain unsaved", async ({
     for (const save of await saves.all()) await expect(save).toBeDisabled();
     finishSaving();
     await expect(form).not.toHaveAttribute("aria-busy");
-    await expect(form.locator("[data-form-message]")).toHaveAttribute(
-      "data-message-kind",
-      "success",
-    );
+    await expect(
+      form.locator('[data-profile-answer="preferredName"] dd'),
+    ).toHaveText("First saved name");
+    await expect(name).toBeVisible();
+    await expect(name).toHaveValue("Second unsaved name");
+    await expect(form.locator("[data-form-message]")).toBeHidden();
     for (const button of await form
       .locator("[data-profile-actions]:visible button")
       .all())
