@@ -7,7 +7,7 @@ interface Props {
   application?: boolean;
 }
 const { entries, application = false } = Astro.props;
-const heading = application ? "Application progress" : "On this page";
+const heading = application ? "Sections" : "On this page";
 const totalSections = entries.filter(
   (entry) => entry.id !== "application-overview",
 ).length;
