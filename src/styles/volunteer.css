@@ -457,12 +457,10 @@ body:has([data-application], [data-account-contents-flow]) {
   [data-application-draft-actions] > .volunteer-actions {
     flex-direction: column;
   }
-  body:has([data-application-flow], [data-account-contents-flow])
-    > .site-header {
+  body:has([data-application-flow]) > .site-header {
     position: relative;
   }
-  [data-application-flow],
-  [data-account-contents-flow] {
+  [data-application-flow] {
     --contents-scroll-offset: 54px;
   }
   .volunteer-contents-actions {
