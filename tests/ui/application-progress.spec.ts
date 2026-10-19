@@ -100,15 +100,35 @@ async function expectActionsPosition(page: Page) {
   ).toHaveCount(2);
 }
 
-async function expectFullDropdown(dropdown: Locator) {
-  await expect(dropdown).toHaveCSS("max-height", "none");
-  await expect(dropdown).toHaveCSS("overflow-y", "visible");
-  expect(
-    await dropdown.evaluate(
-      (element) => element.scrollHeight - element.clientHeight,
-    ),
-  ).toBe(0);
+async function expectDropdown(dropdown: Locator, overflow = false) {
+  await expect(dropdown).toHaveCSS("position", "absolute");
+  await expect(dropdown).toHaveCSS("overflow-y", "auto");
+  await expect(dropdown).toHaveCSS("overscroll-behavior-y", "contain");
+  await expect
+    .poll(() =>
+      dropdown.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const summary = element.parentElement!.querySelector("summary")!;
+        const available = Math.max(0, innerHeight - bounds.top - 16);
+        return (
+          bounds.top === summary.getBoundingClientRect().bottom &&
+          Math.abs(
+            parseFloat(getComputedStyle(element).maxHeight) - available,
+          ) < 1 &&
+          bounds.height <= available + 1
+        );
+      }),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      dropdown.evaluate(
+        (element) => element.scrollHeight > element.clientHeight,
+      ),
+    )
+    .toBe(overflow);
   await expect(dropdown.getByRole("link")).toHaveCount(7);
+  if (overflow) return;
   const bounds = (await dropdown.boundingBox())!;
   for (const control of await dropdown
     .locator("a, button, [role=status]")
@@ -460,7 +480,7 @@ test("restored drafts initialize completion without showing validation errors", 
   await expect(page.locator("[data-error]:visible")).toHaveCount(0);
 });
 
-test("one compact mobile tracker keeps its reading edge and lets tall menus scroll with the page", async ({
+test("one compact mobile tracker keeps its reading edge and scrolls only menus that cannot fit", async ({
   page,
   baseURL,
 }) => {
@@ -551,9 +571,11 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     "style",
     /--contents-bar-height: 54px; --contents-scroll-offset: 54px;/,
   );
+  const beforeOpen = await page.evaluate(() => scrollY);
   await tracker.locator("summary").click();
   expect((await compact.boundingBox())!.height).toBe(height);
-  await expectFullDropdown(dropdown);
+  await expectDropdown(dropdown);
+  expect(await page.evaluate(() => scrollY)).toBe(beforeOpen);
   await expect(tracker).toHaveCSS("position", "sticky");
   await expect(summary).toHaveCSS("border-radius", "0px");
   await expect(menu).toHaveCSS("border-radius", "0px");
@@ -652,26 +674,25 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
       summary.locator("[data-application-progress]"),
     ).toBeInViewport();
     await expect(reviewButton).toBeHidden();
+    const menuScroll = await page.evaluate(() => scrollY);
     await tracker.locator("summary").click();
-    await expect(tracker).toHaveCSS("position", "relative");
-    await expect(tracker).not.toHaveAttribute("data-contents-stuck");
-    await expect(menu).toHaveCSS("box-shadow", "none");
-    await expect(dropdown).toHaveCSS("position", "static");
-    await expect(dropdown).toHaveCSS("border-radius", "0px");
-    await expectFullDropdown(dropdown);
-    const expanded = (await dropdown.boundingBox())!;
-    const form = (await page.locator("form[data-application]").boundingBox())!;
-    expect(form.y).toBe(expanded.y + expanded.height);
-    expect((await dropdown.boundingBox())!.height).toBeGreaterThan(
-      viewport.height,
-    );
+    await expect(tracker).toHaveCSS("position", "sticky");
+    await expect(tracker).toHaveAttribute("data-contents-stuck", "");
+    await expect(menu).not.toHaveCSS("box-shadow", "none");
+    await expect(dropdown).toHaveCSS("border-radius", "0px 0px 8px 8px");
+    await expectDropdown(dropdown, true);
+    expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
+    await page.setViewportSize({ ...viewport, height: viewport.height + 20 });
+    await expectDropdown(dropdown, true);
+    expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
+    await page.setViewportSize(viewport);
+    await expectDropdown(dropdown, true);
+    expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
     await expect(page.locator("[data-application-flow]")).toHaveAttribute(
       "style",
       /--contents-bar-height: 54px; --contents-scroll-offset: 54px;/,
     );
-    // Native scrolling rounds fractional layout positions by less than a pixel.
-    await expect(summary).toBeInViewport({ ratio: 0.99 });
-    const menuScroll = await page.evaluate(() => scrollY);
+    await expect(summary).toBeInViewport({ ratio: 1 });
     await menu
       .getByRole("link", { name: "Review or discard", exact: true })
       .focus();
@@ -681,17 +702,33 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     const action = (await reviewButton.boundingBox())!;
     expect(action.y).toBeGreaterThanOrEqual(0);
     expect(action.y + action.height).toBeLessThanOrEqual(viewport.height);
-    expect(await page.evaluate(() => scrollY)).toBeGreaterThan(menuScroll);
-    await expect(summary).not.toBeInViewport();
+    expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
+    await expect(summary).toBeInViewport({ ratio: 1 });
     await status.scrollIntoViewIfNeeded();
     await expect(status).toBeInViewport({ ratio: 1 });
-    await expectFullDropdown(dropdown);
+    await expectDropdown(dropdown, true);
+    expect(
+      await dropdown.evaluate((element) => element.scrollTop),
+    ).toBeGreaterThan(0);
+    await dropdown.hover();
+    await page.mouse.wheel(0, 1000);
+    expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
     await page.keyboard.press("Escape");
     await expect(reviewButton).toBeHidden();
     await expect(status).toBeHidden();
     await expect(summary).toBeFocused();
     await expect(tracker).toHaveCSS("position", "sticky");
     await expect(summary).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
+    for (const key of ["Space", "Enter"]) {
+      await summary.press(key);
+      await expect(menu).toHaveAttribute("open", "");
+      await expectDropdown(dropdown, true);
+      expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
+      await summary.press(key);
+      await expect(menu).not.toHaveAttribute("open");
+      expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
+    }
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
@@ -838,9 +875,11 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(tracker).not.toHaveAttribute("data-contents-stuck");
     await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
     await expect(menu).toHaveCSS("border-radius", "10px 10px 0px 0px");
+    const beforeOpen = await page.evaluate(() => scrollY);
     await summary.press("Enter");
     await expect(menu).toHaveAttribute("open", "");
-    await expectFullDropdown(dropdown);
+    await expectDropdown(dropdown, true);
+    expect(await page.evaluate(() => scrollY)).toBe(beforeOpen);
     await expect(tracker).toHaveCSS("position", "sticky");
     await expect(dropdown).toHaveCSS("position", "absolute");
     await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
@@ -853,11 +892,17 @@ test("the mobile dropdown works from its normal position and Overview restores S
     expect(expanded.y).toBe(bar.y + bar.height);
     await expect(summary).toBeInViewport({ ratio: 1 });
     await expect(dropdown).toBeInViewport({ ratio: 1 });
-    await expect(dropdown.locator("[role=status]")).toBeInViewport({
-      ratio: 1,
-    });
+    expect(await summary.boundingBox()).toEqual(initial);
     await page.keyboard.press("Escape");
     await expect(menu).not.toHaveAttribute("open");
+    expect(await page.evaluate(() => scrollY)).toBe(beforeOpen);
+    await summary.press("Space");
+    await expect(menu).toHaveAttribute("open", "");
+    await expectDropdown(dropdown, true);
+    expect(await page.evaluate(() => scrollY)).toBe(beforeOpen);
+    await summary.press("Space");
+    await expect(menu).not.toHaveAttribute("open");
+    expect(await page.evaluate(() => scrollY)).toBe(beforeOpen);
   }
   await summary.press("Enter");
   await menu

@@ -15,7 +15,6 @@ export function initPageContents(
   const bar =
     contents.querySelector<HTMLElement>("[data-contents-bar]") ?? menu;
   const application = contents.hasAttribute("data-application-contents");
-  if (application) contents.setAttribute("data-contents-enhanced", "");
   const links = [...contents.querySelectorAll<HTMLAnchorElement>("a")];
   // Both responsive lists share each section, so targets are measured and
   // observed once while all of their links stay in sync.
@@ -46,27 +45,11 @@ export function initPageContents(
       headerPosition === "sticky" || headerPosition === "fixed"
         ? Math.max(0, header?.getBoundingClientRect().bottom ?? 0)
         : 0;
-    // Only the compact bar contributes to the reading edge, even when a tall
-    // application menu temporarily joins the page flow on a short screen.
+    // Only the compact bar contributes to the reading edge, not its dropdown.
     barHeight = menu.getBoundingClientRect().height
       ? (application ? toggle : bar).getBoundingClientRect().height
       : 0;
     if (!barHeight) menu.open = false;
-    if (application && dropdown) {
-      const wasPageFlow = contents.hasAttribute("data-contents-page-flow");
-      const pageFlow =
-        menu.open &&
-        barHeight +
-          dropdown.getBoundingClientRect().height +
-          stickyHeight +
-          16 >
-          window.innerHeight;
-      contents.toggleAttribute("data-contents-page-flow", pageFlow);
-      // Releasing a previously sticky menu can return it far above the current
-      // scroll position. Start at its summary so every link remains reachable.
-      if (pageFlow && !wasPageFlow)
-        toggle.scrollIntoView({ block: "start", behavior: "instant" });
-    }
     flow.style.setProperty("--contents-sticky-offset", `${stickyHeight}px`);
     flow.style.setProperty("--contents-bar-height", `${barHeight}px`);
     flow.style.setProperty(
@@ -80,6 +63,18 @@ export function initPageContents(
           getComputedStyle(contents).position === "sticky" &&
           Math.abs(contents.getBoundingClientRect().top - stickyHeight) < 1,
       );
+    if (barHeight) {
+      // Always open below the bar in its current position. Limit only the menu,
+      // never move the document to make room before the bar becomes sticky.
+      const dropdownTop =
+        menu.open && dropdown
+          ? dropdown.getBoundingClientRect().top
+          : bar.getBoundingClientRect().bottom;
+      flow.style.setProperty(
+        "--contents-dropdown-space",
+        `${Math.max(0, window.innerHeight - dropdownTop - 16)}px`,
+      );
+    }
   };
   const activate = (active: (typeof sections)[number]) => {
     const overview = application && active.hash === `#${topId}`;
@@ -130,34 +125,12 @@ export function initPageContents(
       active = actions;
     if (active && active.links[0].getAttribute("aria-current") !== "location")
       activate(active);
-    if (!barHeight || application) return;
-    // Account navigation keeps its existing bounded dropdown scroll area.
-    const dropdownTop =
-      menu.open && dropdown
-        ? dropdown.getBoundingClientRect().top
-        : bar.getBoundingClientRect().bottom;
-    flow.style.setProperty(
-      "--contents-dropdown-space",
-      `${Math.max(0, window.innerHeight - dropdownTop - 16)}px`,
-    );
   };
   const schedule = () => {
     if (!frame) frame = requestAnimationFrame(update);
   };
   const refresh = () => {
     measure();
-    if (
-      application &&
-      menu.open &&
-      dropdown &&
-      !contents.hasAttribute("data-contents-page-flow")
-    ) {
-      // A menu that fits can still open below the fold before the bar sticks.
-      // Move the page just enough to show it all, including the save status.
-      const overflow =
-        dropdown.getBoundingClientRect().bottom + 16 - window.innerHeight;
-      if (overflow > 0) window.scrollBy({ top: overflow, behavior: "instant" });
-    }
     schedule();
   };
   const reveal = (target: HTMLElement) => {

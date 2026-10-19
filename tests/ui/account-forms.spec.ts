@@ -1289,7 +1289,7 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     ).toHaveCount(1);
     const contents = page.getByRole("navigation", { name: "Sections" });
     const menu = contents.locator("[data-contents-menu]");
-    await expect(contents).toHaveCSS("position", "relative");
+    await expect(contents).toHaveCSS("position", "sticky");
     await expect(contents.locator(".volunteer-contents-sidebar")).toBeHidden();
     await expect(menu).toBeVisible();
     await expect(menu.locator(".volunteer-contents-icon")).toBeVisible();
