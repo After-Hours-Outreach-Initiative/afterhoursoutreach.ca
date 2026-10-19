@@ -35,7 +35,12 @@ const submittedTime = (value: string) =>
     timeZoneName: "short",
   });
 const answers = submission?.answers;
-const rows =
+const rows: {
+  section: string;
+  label: string;
+  value: string | string[];
+  wide?: boolean;
+}[] =
   submission && answers
     ? [
         {
@@ -66,6 +71,7 @@ const rows =
             section: field.section,
             label: field.label,
             value: answers[field.name],
+            wide: "multiline" in field,
           })),
         {
           section: "team-interests",
@@ -83,6 +89,7 @@ const rows =
                 section: "training-and-safety",
                 label: "Additional certification answer",
                 value: answers.certification,
+                wide: true,
               },
             ]
           : []),
@@ -102,6 +109,7 @@ const rows =
                 section: "about-volunteering",
                 label: "Other referral details",
                 value: answers.heardAboutUsOther,
+                wide: true,
               },
             ]
           : []),
@@ -140,7 +148,7 @@ const rows =
               aria-labelledby={`submitted-${section.key}`}
             >
               <h3
-                class="volunteer-profile-heading"
+                class="volunteer-profile-heading mb-6"
                 id={`submitted-${section.key}`}
               >
                 {section.heading}
@@ -149,7 +157,11 @@ const rows =
                 {rows
                   .filter((row) => row.section === section.key)
                   .map((row) => (
-                    <div>
+                    <div
+                      class:list={{
+                        "volunteer-wide": row.wide || Array.isArray(row.value),
+                      }}
+                    >
                       <dt>{row.label}</dt>
                       <dd>
                         <AnswerValue value={row.value} />
