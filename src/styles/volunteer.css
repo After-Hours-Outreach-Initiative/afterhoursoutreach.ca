@@ -568,9 +568,9 @@ body:has([data-application], [data-account-contents-flow]) {
     border-radius: 0;
   }
   [data-application-contents] .volunteer-draft-save-status {
-    justify-content: flex-end;
+    justify-content: flex-start;
     font-size: 14px;
-    text-align: right;
+    text-align: left;
   }
   [data-application-contents] [data-draft-save-message] {
     min-width: 0;
