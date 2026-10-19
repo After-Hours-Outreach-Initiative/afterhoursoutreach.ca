@@ -63,9 +63,8 @@ export function initPageContents(
           getComputedStyle(contents).position === "sticky" &&
           Math.abs(contents.getBoundingClientRect().top - stickyHeight) < 1,
       );
-    if (barHeight) {
-      // Always open below the bar in its current position. Limit only the menu,
-      // never move the document to make room before the bar becomes sticky.
+    if (!application && barHeight) {
+      // Account navigation keeps its existing bounded dropdown scroll area.
       const dropdownTop =
         menu.open && dropdown
           ? dropdown.getBoundingClientRect().top
@@ -235,7 +234,6 @@ export function initPageContents(
     contents,
     bar,
     menu,
-    application ? dropdown : null,
     flow,
     content,
     ...sections.map(({ target }) => target),

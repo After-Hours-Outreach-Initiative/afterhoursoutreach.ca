@@ -407,6 +407,11 @@ body:has([data-application], [data-account-contents-flow]) {
   background: #0c0d10;
   box-shadow: 0 12px 30px #0008;
 }
+[data-application-contents] .volunteer-contents-dropdown {
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
 .volunteer-contents-dropdown > .btn {
   margin-block: 8px;
 }
@@ -546,9 +551,6 @@ body:has([data-application], [data-account-contents-flow]) {
     background: var(--color-panel-soft);
   }
   [data-application-contents] .volunteer-contents-dropdown {
-    /* Use its natural height when it fits, with a viewport fallback for the
-       native disclosure before scripts load or when JavaScript is disabled. */
-    max-height: var(--contents-dropdown-space, max(0px, calc(100dvh - 70px)));
     border: var(--volunteer-border);
     border-top: 0;
     border-radius: 0 0 8px 8px;
