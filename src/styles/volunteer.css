@@ -408,8 +408,7 @@ body:has([data-application], [data-account-contents-flow]) {
   box-shadow: 0 12px 30px #0008;
 }
 [data-application-contents] .volunteer-contents-dropdown {
-  max-height: none;
-  overflow: visible;
+  max-height: max(0px, calc(100dvh - 70px));
   overscroll-behavior: auto;
 }
 .volunteer-contents-dropdown > .btn {

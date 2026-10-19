@@ -254,10 +254,20 @@ test("autosave message is present before answers without JavaScript", async ({
           "sticky",
         );
         await expect(dropdown).toHaveCSS("position", "absolute");
-        await expect(dropdown).toHaveCSS("max-height", "none");
-        await expect(dropdown).toHaveCSS("overflow-y", "visible");
+        await expect(dropdown).toHaveCSS(
+          "max-height",
+          `${viewport.height - 70}px`,
+        );
+        await expect(dropdown).toHaveCSS("overflow-y", "auto");
         await expect(dropdown.getByRole("link")).toHaveCount(7);
         await menu.locator("summary").scrollIntoViewIfNeeded();
+        if (viewport.height === 240)
+          await menu.evaluate((element) =>
+            scrollTo({
+              top: scrollY + element.getBoundingClientRect().top,
+              behavior: "instant",
+            }),
+          );
         await menu
           .locator("summary")
           .evaluate((element: HTMLElement) =>
@@ -273,11 +283,21 @@ test("autosave message is present before answers without JavaScript", async ({
         const lastLink = dropdown.getByRole("link").last();
         await lastLink.focus();
         await expect(lastLink).toBeFocused();
-        expect(await dropdown.evaluate((element) => element.scrollTop)).toBe(0);
-        if (viewport.height === 240)
-          expect((await dropdown.boundingBox())!.height).toBeGreaterThan(
-            viewport.height,
+        if (viewport.height === 240) {
+          expect((await dropdown.boundingBox())!.height).toBe(
+            viewport.height - 70,
           );
+          expect(
+            await dropdown.evaluate((element) => element.scrollTop),
+          ).toBeGreaterThan(0);
+          await expect(lastLink).toBeInViewport({ ratio: 1 });
+          expect(await page.evaluate(() => scrollY)).toBe(beforeToggle);
+        } else
+          expect(
+            await dropdown.evaluate(
+              (element) => element.scrollHeight - element.clientHeight,
+            ),
+          ).toBe(0);
       }
       for (const indicator of await page
         .locator("[data-draft-save-indicator]")
