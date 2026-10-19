@@ -545,27 +545,14 @@ body:has([data-application], [data-account-contents-flow]) {
     border-radius: 0;
     background: var(--color-panel-soft);
   }
-  /* A tall application menu belongs to the page, not a nested scroll area.
-     Without scripts, keep the whole navigation in normal flow as well. */
-  [data-application-contents]:not([data-contents-enhanced]),
-  [data-application-contents][data-contents-page-flow] {
-    position: relative;
-  }
   [data-application-contents] .volunteer-contents-dropdown {
-    max-height: none;
-    overflow: visible;
-    overscroll-behavior: auto;
+    /* Use its natural height when it fits, with a viewport fallback for the
+       native disclosure before scripts load or when JavaScript is disabled. */
+    max-height: var(--contents-dropdown-space, max(0px, calc(100dvh - 70px)));
     border: var(--volunteer-border);
     border-top: 0;
     border-radius: 0 0 8px 8px;
     box-shadow: none;
-  }
-  [data-application-contents]:not([data-contents-enhanced])
-    .volunteer-contents-dropdown,
-  [data-application-contents][data-contents-page-flow]
-    .volunteer-contents-dropdown {
-    position: static;
-    border-radius: 0;
   }
   [data-application-contents] .volunteer-draft-save-status {
     justify-content: flex-start;

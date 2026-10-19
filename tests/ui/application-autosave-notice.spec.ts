@@ -250,22 +250,30 @@ test("autosave message is present before answers without JavaScript", async ({
         }
         await expect(page.locator("[data-application-contents]")).toHaveCSS(
           "position",
-          "relative",
+          "sticky",
         );
-        await expect(dropdown).toHaveCSS("max-height", "none");
-        await expect(dropdown).toHaveCSS("overflow-y", "visible");
+        await expect(dropdown).toHaveCSS("position", "absolute");
+        await expect(dropdown).toHaveCSS(
+          "max-height",
+          `${viewport.height - 70}px`,
+        );
+        await expect(dropdown).toHaveCSS("overflow-y", "auto");
+        await expect(dropdown).toHaveCSS("overscroll-behavior-y", "contain");
         await expect(dropdown.getByRole("link")).toHaveCount(7);
         await menu.locator("summary").scrollIntoViewIfNeeded();
+        // The CSS viewport fallback bounds the native disclosure while sticky,
+        // even with no script available to measure its initial position.
+        await page.evaluate(() => scrollBy({ top: 100, behavior: "instant" }));
         const menuScroll = await page.evaluate(() => scrollY);
         const lastLink = dropdown.getByRole("link").last();
         await lastLink.scrollIntoViewIfNeeded();
         // Native scrolling rounds fractional layout positions by less than a pixel.
         await expect(lastLink).toBeInViewport({ ratio: 0.99 });
+        expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
         if (viewport.height === 240)
-          expect(await page.evaluate(() => scrollY)).toBeGreaterThan(
-            menuScroll,
-          );
-        expect(await dropdown.evaluate((element) => element.scrollTop)).toBe(0);
+          expect(
+            await dropdown.evaluate((element) => element.scrollTop),
+          ).toBeGreaterThan(0);
       }
       for (const indicator of await page
         .locator("[data-draft-save-indicator]")
