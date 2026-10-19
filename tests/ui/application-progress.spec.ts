@@ -461,6 +461,16 @@ for (const width of [390, 1280]) {
       "Test",
     );
     await expect(draftActions).toBeHidden();
+    const reviewEdits = form.locator(
+      ".volunteer-application-review [data-application-edit]",
+    );
+    await expect(reviewEdits).toHaveCount(5);
+    for (const edit of await reviewEdits.all()) {
+      await expect(edit).toHaveClass("btn btn-outline");
+      await expect(edit.locator("svg")).toHaveAttribute("aria-hidden", "true");
+      await expect(edit.locator("svg")).toHaveCSS("width", "16px");
+      await expect(edit.locator("svg")).toHaveCSS("height", "16px");
+    }
     await form.getByRole("button", { name: "Edit emergency contact" }).click();
     await expect(form.locator("#application-emergency-contact")).toBeFocused();
     await expect(form.locator('[name="emergencyName"]')).toHaveValue("Contact");

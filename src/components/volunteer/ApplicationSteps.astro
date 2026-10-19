@@ -85,16 +85,26 @@ const reviewSections = sections.map((section) => {
         <div class="volunteer-application-review">
           {reviewSections.map((section) => (
             <section aria-labelledby={`review-${section.key}`}>
-              <div class="volunteer-section-heading">
+              <div class="volunteer-profile-section-heading">
                 <h3 id={`review-${section.key}`} tabindex="-1">
                   {section.heading}
                 </h3>
                 <button
                   type="button"
-                  class="btn btn-quiet"
+                  class="btn btn-outline"
                   data-application-edit={`application-${section.key}`}
                   aria-label={`Edit ${section.heading.toLowerCase()}`}
                 >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="m16 3 5 5-12 12-6 1 1-6L16 3Z" />
+                    <path d="m13 6 5 5" />
+                  </svg>
                   Edit
                 </button>
               </div>
