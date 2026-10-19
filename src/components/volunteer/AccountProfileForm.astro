@@ -36,6 +36,7 @@ const values =
   profileValues ?? (draft ? draftProfileValues(draft.answers) : null);
 const medicSelected = values?.teams.includes("medic") ?? false;
 const sections = profileFormSections(application);
+const nameFieldNames = ["firstName", "middleNames", "lastName"];
 ---
 
 {application && <ApplicationContents sections={sections} />}
@@ -166,6 +167,15 @@ const sections = profileFormSections(application);
                 </>
               ) : (
                 <div class="volunteer-fields">
+                  {application && section.key === "personal-info" && (
+                    <div class="volunteer-name-fields volunteer-wide">
+                      {section.fields
+                        .filter((field) => nameFieldNames.includes(field.name))
+                        .map((field) => (
+                          <AccountProfileField field={field} values={values} />
+                        ))}
+                    </div>
+                  )}
                   {section.key === "training-and-safety" && (
                     <div
                       class="volunteer-fields volunteer-wide"
@@ -188,6 +198,7 @@ const sections = profileFormSections(application);
                   {section.fields
                     .filter(
                       (field) =>
+                        !nameFieldNames.includes(field.name) &&
                         field.name !== "experience" &&
                         field.name !== "certificationExpiry" &&
                         field.name !== "otherTraining",
