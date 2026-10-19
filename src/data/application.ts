@@ -265,7 +265,7 @@ export const applicationFields = [
     label: "Date of birth",
     required: true,
     type: "text",
-    help: "For example, 23 4 1990. You must be at least 19 years old to apply.",
+    help: "You must be at least 19 years old to apply.",
   },
   {
     name: "medicalConditions",

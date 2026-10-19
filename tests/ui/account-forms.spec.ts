@@ -923,7 +923,7 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
         await expect(input).toHaveAttribute("autocomplete", `bday-${part}`);
         await expect(input).not.toHaveAttribute("name");
         await expect(input).toHaveAccessibleDescription(
-          /23 4 1990.*at least 19/,
+          /at least 19 years old/,
         );
         await expect(input).toHaveValue("");
         await input.focus();
@@ -1110,7 +1110,9 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     const birthDate = form.locator('[data-birth-date-part="year"]');
     await expect(birthDate).toHaveAttribute("type", "text");
     await expect(birthDate).toHaveValue("");
-    await expect(form.locator("#help-birthDate")).toContainText("23 4 1990");
+    await expect(form.locator("#help-birthDate")).toHaveText(
+      "You must be at least 19 years old to apply.",
+    );
     await birthDate.fill("not-a-year");
     await expect(localApplicationReviewButton(page)).toBeDisabled();
     expect(
