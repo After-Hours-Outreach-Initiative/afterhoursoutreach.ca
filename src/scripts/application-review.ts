@@ -32,6 +32,9 @@ export function initApplicationReview(element: HTMLFormElement) {
   const contents = flow?.querySelector<HTMLElement>(
     "[data-application-contents]",
   );
+  const draftActions = flow?.querySelector<HTMLElement>(
+    "[data-application-draft-actions]",
+  );
   const questions = element.querySelector<HTMLElement>(
     "[data-application-questions]",
   );
@@ -74,6 +77,7 @@ export function initApplicationReview(element: HTMLFormElement) {
     step = next;
     questions.hidden = next !== "questions";
     if (contents) contents.hidden = next !== "questions";
+    if (draftActions) draftActions.hidden = next !== "questions";
     review.hidden = next !== "review";
     // The hidden acknowledgement must not block first-step native validation.
     // Questions stay enabled on review so FormData still contains every answer.

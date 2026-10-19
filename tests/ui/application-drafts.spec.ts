@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   createLocalAccount,
+  localApplicationReviewButton,
+  reviewLocalApplication,
   sampleAnswers,
   submitLocalApplication,
 } from "../helpers/local-account";
@@ -480,9 +482,7 @@ test("resuming requires a fresh review and consent; submission clears both draft
   }
   await form.locator('[name="heardAboutUsSources"][value="internet"]').check();
   await form.locator('[name="training"][value="none"]').check();
-  await page
-    .getByRole("button", { name: "Review application", exact: true })
-    .click();
+  await reviewLocalApplication(page);
   await form.locator('[name="codeOfConductAccepted"]').check();
   const stored = await page.evaluate(
     (key) => localStorage.getItem(key),
@@ -490,9 +490,7 @@ test("resuming requires a fresh review and consent; submission clears both draft
   );
   expect(stored).not.toContain("codeOfConductAccepted");
   await page.reload();
-  await expect(
-    page.getByRole("button", { name: "Review application", exact: true }),
-  ).toBeVisible();
+  await expect(localApplicationReviewButton(page)).toBeVisible();
   await expect(
     form.locator('[name="codeOfConductAccepted"]'),
   ).not.toBeChecked();

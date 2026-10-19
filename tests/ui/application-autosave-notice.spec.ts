@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { createLocalAccount } from "../helpers/local-account";
+import {
+  createLocalAccount,
+  localApplicationReviewButton,
+} from "../helpers/local-account";
 
 test.beforeEach(({ baseURL }) => {
   test.skip(
@@ -183,9 +186,7 @@ test("autosave message is present before answers without JavaScript", async ({
     await expect(notice).toBeVisible();
     await expect(page.locator("[data-draft-save-indicator]")).toBeHidden();
     await expect(page.locator('[name="firstName"]')).toHaveValue("");
-    await expect(
-      page.getByRole("button", { name: "Review application", exact: true }),
-    ).toBeDisabled();
+    await expect(localApplicationReviewButton(page, "bottom")).toBeDisabled();
   } finally {
     await context.close();
   }

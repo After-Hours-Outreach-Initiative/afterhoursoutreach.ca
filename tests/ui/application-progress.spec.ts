@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { motivationMaxWords } from "../../src/data/application";
-import { createLocalAccount } from "../helpers/local-account";
+import {
+  createLocalAccount,
+  localApplicationReviewButton,
+} from "../helpers/local-account";
 
 test.beforeEach(({ baseURL }) => {
   test.skip(
@@ -36,11 +39,10 @@ for (const width of [390, 1280]) {
       name: "Application progress",
     });
     const menu = tracker.locator("[data-contents-menu]");
-    const reviewButton = tracker.locator(
-      width < 1024
-        ? "[data-contents-menu] [data-application-review]"
-        : ".volunteer-contents-actions [data-application-review]",
-    );
+    const reviewButton = localApplicationReviewButton(page);
+    const bottomReview = localApplicationReviewButton(page, "bottom");
+    const draftActions = page.locator("[data-application-draft-actions]");
+    const discard = draftActions.locator("[data-draft-discard]");
     await expectComplete(page, "overview", true);
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
@@ -49,22 +51,35 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "about-volunteering", false);
     await expect(count).toHaveText(["1/5 complete", "1/5 complete"]);
     await expect(form.locator("[data-error]:visible")).toHaveCount(0);
-    await expect(page.locator("[data-application-review]")).toHaveCount(2);
+    await expect(page.locator("[data-application-review]")).toHaveCount(3);
     await expect(form.locator("[data-application-review]")).toHaveCount(0);
     await expect(reviewButton).toBeEnabled();
+    await expect(bottomReview).toBeVisible();
+    await expect(bottomReview).toBeEnabled();
+    await expect(bottomReview).toHaveAccessibleName("Review application");
+    await expect(
+      bottomReview.locator("..").locator("[data-draft-discard]"),
+    ).toHaveCount(1);
+    const bottomBounds = (await bottomReview.boundingBox())!;
+    const discardBounds = (await discard.boundingBox())!;
+    expect(bottomBounds.x).toBeGreaterThanOrEqual(0);
+    expect(discardBounds.x + discardBounds.width).toBeLessThanOrEqual(width);
+    expect(bottomBounds.y).toBe(discardBounds.y);
+    expect(bottomBounds.x + bottomBounds.width).toBeLessThan(discardBounds.x);
     if (width < 1024) {
       await expect(reviewButton).toBeHidden();
       await expect(
         page.getByRole("button", { name: "Review application", exact: true }),
-      ).toHaveCount(0);
+      ).toHaveCount(1);
     } else {
       await expect(reviewButton).toBeInViewport();
     }
-    expect(
-      await reviewButton.evaluate((button: HTMLButtonElement) =>
-        button.form?.hasAttribute("data-application"),
-      ),
-    ).toBe(true);
+    for (const button of [reviewButton, bottomReview])
+      expect(
+        await button.evaluate((button: HTMLButtonElement) =>
+          button.form?.hasAttribute("data-application"),
+        ),
+      ).toBe(true);
     const overview = tracker.locator(
       '.volunteer-contents-sidebar [href="#application-overview"]',
     );
@@ -97,6 +112,9 @@ for (const width of [390, 1280]) {
       await expect(reviewButton).toBeHidden();
     }
 
+    await bottomReview.click();
+    await expect(form.locator('[name="firstName"]')).toBeFocused();
+    await expect(form.locator("[data-application-review-step]")).toBeHidden();
     await form.locator('[name="training"][value="none"]').check();
     await expectComplete(page, "training-and-safety", true);
 
@@ -194,6 +212,7 @@ for (const width of [390, 1280]) {
       form.getByRole("heading", { name: "Review application", exact: true }),
     ).toBeFocused();
     await expect(tracker).toBeHidden();
+    await expect(draftActions).toBeHidden();
     await form.getByRole("button", { name: "Back to answers" }).click();
     await expect(tracker).toBeVisible();
     await expect(
@@ -203,6 +222,18 @@ for (const width of [390, 1280]) {
       await expect(menu).not.toHaveAttribute("open");
       await expect(reviewButton).toBeHidden();
     }
+
+    await expect(bottomReview).toBeVisible();
+    await bottomReview.click();
+    await expect(form.locator("[data-application-review-step]")).toBeVisible();
+    await expect(form.locator('[data-review-answer="firstName"]')).toHaveText(
+      "Test",
+    );
+    await expect(draftActions).toBeHidden();
+    await page.goBack();
+    await expect(bottomReview).toBeVisible();
+    await expect(discard).toBeVisible();
+    await expect(tracker).toBeVisible();
 
     await form.evaluate((element: HTMLFormElement) => element.reset());
     await expectComplete(page, "personal-info", false);
@@ -357,6 +388,23 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
     { width: 768, height: 400 },
   ]) {
     await page.setViewportSize(viewport);
+    const bottomReview = localApplicationReviewButton(page, "bottom");
+    await expect(bottomReview).toBeVisible();
+    const bottomBounds = (await bottomReview.boundingBox())!;
+    const discardBounds = (await page
+      .locator("[data-draft-discard]")
+      .boundingBox())!;
+    expect(bottomBounds.y).toBe(discardBounds.y);
+    expect(bottomBounds.x + bottomBounds.width).toBeLessThan(discardBounds.x);
+    for (const bounds of [bottomBounds, discardBounds]) {
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+      expect(bounds.width).toBeGreaterThanOrEqual(44);
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(viewport.width);
     const current = await summary
       .locator(".volunteer-contents-section-toggle")
       .boundingBox();

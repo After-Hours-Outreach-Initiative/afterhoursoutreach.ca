@@ -10,10 +10,21 @@ const discardId = crypto.randomUUID();
   data-application-draft-actions
   data-draft-discard-id={discardId}
 >
-  <button type="button" data-draft-discard class="btn btn-red" disabled>
-    <TrashIcon class="volunteer-draft-discard-icon" />
-    <span data-draft-discard-label>Discard application draft</span>
-  </button>
+  <div class="volunteer-actions">
+    <button
+      type="submit"
+      form="volunteer-application"
+      data-application-review
+      class="btn btn-primary"
+      disabled
+    >
+      Review application
+    </button>
+    <button type="button" data-draft-discard class="btn btn-red" disabled>
+      <TrashIcon class="volunteer-draft-discard-icon" />
+      <span data-draft-discard-label>Discard application draft</span>
+    </button>
+  </div>
   <p data-draft-discard-status role="status" aria-live="polite" hidden></p>
   <a href="/apply" data-draft-new class="inline-block mt-2 underline" hidden>
     Reload to start or check your draft

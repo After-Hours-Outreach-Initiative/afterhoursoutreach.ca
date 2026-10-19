@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
+import { reviewLocalApplication } from "../helpers/local-account";
 import {
   latestApplicationBirthDate,
   applicationBirthDateError,
@@ -1380,9 +1381,7 @@ describe(
         await expect(
           newPage.getByRole("checkbox", { name: "Outreach", exact: true }),
         ).toBeDisabled();
-        await newPage
-          .getByRole("button", { name: "Review application" })
-          .click();
+        await reviewLocalApplication(newPage);
         const conduct = newPage.getByRole("region", {
           name: "Code of Conduct",
           exact: true,

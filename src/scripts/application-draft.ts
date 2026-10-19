@@ -419,6 +419,10 @@ export function initApplicationDraft(element: HTMLFormElement) {
       "fieldset",
     ))
       fieldset.disabled = true;
+    for (const button of flow.querySelectorAll<HTMLButtonElement>(
+      "[data-application-review]",
+    ))
+      button.disabled = true;
     discardStatus.textContent = message;
     discardStatus.hidden = !message;
     newDraft.hidden = !message;

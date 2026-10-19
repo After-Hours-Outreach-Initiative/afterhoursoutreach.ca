@@ -1,6 +1,7 @@
 import { devices, expect, test } from "@playwright/test";
 import {
   createLocalAccount,
+  localApplicationReviewButton,
   openLocalAccountSwitcher,
   reviewLocalApplication,
   sampleAnswers,
@@ -694,11 +695,9 @@ test("application shows all required errors and saves after they are corrected",
     if (new URL(request.url()).pathname === "/api/v1/account/profile")
       requests.push(request.url());
   });
-  await expect(
-    page.getByRole("button", { name: "Review application" }),
-  ).toBeEnabled();
+  await expect(localApplicationReviewButton(page)).toBeEnabled();
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
-  await page.getByRole("button", { name: "Review application" }).click();
+  await reviewLocalApplication(page);
   const required = form.locator(
     "input[required]:enabled, textarea[required]:enabled",
   );
@@ -1017,7 +1016,7 @@ test("applications validate the birthday boundary and profiles keep the saved bi
     "not-a-date",
   ]) {
     await birthDate.fill(invalid);
-    await page.getByRole("button", { name: "Review application" }).click();
+    await reviewLocalApplication(page);
     await expect(birthDate).toBeFocused();
     await expect(form.locator("[data-error=birthDate]")).toBeVisible();
     await expect(form.locator("[data-error=birthDate]")).toHaveText(
@@ -1065,9 +1064,7 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     await expect(birthDate).toHaveValue("");
     await expect(form.locator("#help-birthDate")).toContainText("YYYY-MM-DD");
     await birthDate.fill("not-a-date");
-    await expect(
-      page.getByRole("button", { name: "Review application" }),
-    ).toBeDisabled();
+    await expect(localApplicationReviewButton(page)).toBeDisabled();
     expect(
       await birthDate.evaluate(
         (input: HTMLInputElement) => input.validity.valid,
@@ -1082,12 +1079,14 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     ).toBe(true);
     await page.setViewportSize({ width: 390, height: 844 });
     const reviewButtons = page.locator("[data-application-review]");
-    await expect(reviewButtons).toHaveCount(2);
+    await expect(reviewButtons).toHaveCount(3);
     for (const button of await reviewButtons.all())
       await expect(button).toBeDisabled();
+    await expect(localApplicationReviewButton(page)).toBeHidden();
+    await expect(localApplicationReviewButton(page, "bottom")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Review application" }),
-    ).toHaveCount(0);
+    ).toHaveCount(1);
   } finally {
     await context.close();
   }
@@ -1402,14 +1401,14 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     "Training and safety",
     "About volunteering",
   ]);
-  await page.getByRole("button", { name: "Review application" }).click();
+  await reviewLocalApplication(page);
   await expect(firstAid).toBeFocused();
   await expect(
     certifications.locator("[data-error=certifications]"),
   ).toBeVisible();
   await firstAid.press("Space");
   await expect(firstAid).toBeChecked();
-  await page.getByRole("button", { name: "Review application" }).click();
+  await reviewLocalApplication(page);
   await expect(expiry).toBeFocused();
   await expect(form.locator("[data-error=certificationExpiry]")).toBeVisible();
   expect(profileRequests).toHaveLength(0);
@@ -1452,7 +1451,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   );
   for (const blank of ["", " \t\n\u00a0 "]) {
     await experience.fill(blank);
-    await page.getByRole("button", { name: "Review application" }).click();
+    await reviewLocalApplication(page);
     await expect(experience).toBeFocused();
     await expect(form.locator("[data-error=experience]")).toBeVisible();
     expect(profileRequests).toHaveLength(0);
