@@ -588,7 +588,7 @@ test("application shows all required errors and saves after they are corrected",
   page,
   baseURL,
 }) => {
-  const { email } = await createLocalAccount(page.request, baseURL!, false);
+  await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/apply");
   const form = page.locator("[data-account-profile]");
   await expect(form.getByRole("heading", { level: 3 })).toHaveText([
@@ -598,10 +598,7 @@ test("application shows all required errors and saves after they are corrected",
     "Training and safety",
     "About volunteering",
   ]);
-  const emailInput = form.locator("input").first();
-  await expect(emailInput).toHaveAttribute("type", "email");
-  await expect(emailInput).toHaveValue(email);
-  await expect(emailInput).not.toBeEditable();
+  await expect(form.locator('input[type="email"]')).toHaveCount(0);
   await expect(
     form
       .getByRole("group", { name: "Personal info", exact: true })
@@ -775,6 +772,7 @@ test("application shows all required errors and saves after they are corrected",
     ),
   ).toBe(false);
   await reviewLocalApplication(page);
+  await expect(form.locator('[data-review-answer="email"]')).toHaveCount(0);
   const conduct = form.getByRole("region", {
     name: "Code of Conduct",
     exact: true,

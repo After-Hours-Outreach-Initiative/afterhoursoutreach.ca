@@ -138,7 +138,6 @@ export function initApplicationReview(element: HTMLFormElement) {
       "[data-review-answer]",
     )) {
       const name = answer.dataset.reviewAnswer!;
-      if (name === "email") continue;
       if (choices[name]) {
         const selected = choices[name].filter((option) =>
           values.getAll(name).includes(option.value),

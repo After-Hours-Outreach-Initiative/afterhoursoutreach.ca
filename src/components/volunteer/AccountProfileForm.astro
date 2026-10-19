@@ -19,7 +19,6 @@ import {
   type ApplicationDraft,
 } from "@/data/application-draft";
 interface Props {
-  email: string;
   userId?: string;
   values?: ApplicationAnswers | null;
   application?: boolean;
@@ -27,7 +26,6 @@ interface Props {
   draftGeneration?: string | null;
 }
 const {
-  email,
   userId,
   values: profileValues,
   application = false,
@@ -76,11 +74,7 @@ const sections = profileFormSections(application);
     <legend class="sr-only">
       {application ? "Application answers" : "Profile details"}
     </legend>
-    <ApplicationSteps
-      application={application}
-      email={email}
-      sections={sections}
-    >
+    <ApplicationSteps application={application} sections={sections}>
       {
         sections.map((section) => (
           <AccountProfileSection
@@ -190,12 +184,6 @@ const sections = profileFormSections(application);
                         active={medicSelected}
                       />
                     </div>
-                  )}
-                  {application && section.key === "personal-info" && (
-                    <label class="volunteer-field">
-                      Email
-                      <input type="email" value={email} readonly />
-                    </label>
                   )}
                   {section.fields
                     .filter(

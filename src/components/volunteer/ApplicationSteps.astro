@@ -8,14 +8,13 @@ import CodeOfConduct from "./CodeOfConduct.astro";
 
 interface Props {
   application: boolean;
-  email: string;
   sections: {
     key: string;
     heading: string;
     fields: (typeof applicationFields)[number][];
   }[];
 }
-const { application, email, sections } = Astro.props;
+const { application, sections } = Astro.props;
 interface ReviewRow {
   name: string;
   label: string;
@@ -28,8 +27,6 @@ const reviewSections = sections.map((section) => {
       name: field.name === "heardAboutUs" ? "heardAboutUsSources" : field.name,
       label: field.label + (field.required ? "" : " (optional)"),
     }));
-  if (section.key === "personal-info")
-    rows.unshift({ name: "email", label: "Email" });
   if (section.key === "team-interests")
     rows = [{ name: "teams", label: "Which teams interest you?" }];
   if (section.key === "training-and-safety")
@@ -106,9 +103,7 @@ const reviewSections = sections.map((section) => {
                     hidden={Boolean(row.condition)}
                   >
                     <dt>{row.label}</dt>
-                    <dd data-review-answer={row.name}>
-                      {row.name === "email" ? email : "Not provided"}
-                    </dd>
+                    <dd data-review-answer={row.name}>Not provided</dd>
                   </div>
                 ))}
               </dl>

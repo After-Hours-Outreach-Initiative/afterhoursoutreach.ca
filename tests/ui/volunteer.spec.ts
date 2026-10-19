@@ -279,7 +279,7 @@ test("View as can choose a D1 account without an application without changing it
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.getByRole("textbox", { name: /^Email/ })).toHaveValue(
+  await expect(page.locator("[data-account-email]").first()).toHaveText(
     user.email,
   );
   await expect(page.getByLabel("First name")).toHaveValue("");
