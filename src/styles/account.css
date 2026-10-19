@@ -113,6 +113,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+.account-sessions li:not(:last-child) {
   padding-bottom: 20px;
   border-bottom: 1px solid #3f3f46;
 }

@@ -2651,6 +2651,77 @@ test("edits made during a profile save remain unsaved", async ({
   }
 });
 
+test("session dividers stay between rows after removal and settings refresh", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  const account = await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const sessions = page.locator("[data-account-sessions]");
+  const rows = sessions.locator("[data-session-row]");
+  const expectDividers = async (count: number) => {
+    await expect(rows).toHaveCount(count);
+    await expect(sessions).toHaveCSS("border-bottom-width", "0px");
+    for (let index = 0; index < count; index++)
+      await expect(rows.nth(index)).toHaveCSS(
+        "border-bottom-width",
+        index < count - 1 ? "1px" : "0px",
+      );
+    await expect(page.locator("[data-factor-settings]")).toHaveCSS(
+      "border-bottom-width",
+      "1px",
+    );
+  };
+  await expectDividers(1);
+
+  // Separate devices keep their sessions when the local browser clears cookies.
+  const otherDevice = await browser.newContext({ baseURL });
+  try {
+    for (let index = 0; index < 2; index++) {
+      await otherDevice.clearCookies();
+      const response = await otherDevice.request.post(
+        "/api/v1/auth/dev/switch-user",
+        {
+          headers: { origin: baseURL! },
+          data: { userId: account.id },
+        },
+      );
+      expect(response.status(), await response.text()).toBe(200);
+    }
+  } finally {
+    await otherDevice.close();
+  }
+  await page.reload();
+  for (const width of [1280, 375]) {
+    await page.setViewportSize({ width, height: 812 });
+    await expectDividers(3);
+  }
+  for (const remaining of [2, 1]) {
+    const form = sessions.locator("[data-end-session]").last();
+    await inPlaceAction(page, {
+      endpoint: "/api/v1/account/session",
+      form,
+      trigger: () => form.getByRole("button", { name: "End session" }).click(),
+      updated: () => expectDividers(remaining),
+      loadingLabel: "Ending session…",
+    });
+  }
+  await expect(
+    sessions.getByRole("heading", { name: "Sessions" }),
+  ).toBeFocused();
+
+  // Authenticator verification replaces the server-rendered Sessions fragment.
+  await page.getByRole("button", { name: "Set up an authenticator" }).click();
+  const setup = page.locator("[data-confirm-factor]");
+  await expect(setup).toBeVisible();
+  const key = (await page.locator("[data-factor-key]").textContent())!;
+  await setup.locator('input[name="code"]').fill(totpFromSetupKey(key));
+  await page.getByRole("button", { name: "Verify and enable" }).click();
+  await expect(setup).toHaveCount(0);
+  await expectDividers(1);
+});
+
 test("authenticator setup and sign-in show native inline code errors", async ({
   page,
   baseURL,
