@@ -28,22 +28,23 @@ export function applicationSubmissionValues(
 
 export function initApplicationReview(element: HTMLFormElement) {
   if (!element.hasAttribute("data-application")) return;
-  const contents = element
-    .closest("[data-application-flow]")
-    ?.querySelector<HTMLElement>("[data-application-contents]");
+  const flow = element.closest("[data-application-flow]");
+  const contents = flow?.querySelector<HTMLElement>(
+    "[data-application-contents]",
+  );
   const questions = element.querySelector<HTMLElement>(
     "[data-application-questions]",
   );
   const review = element.querySelector<HTMLFieldSetElement>(
     "[data-application-review-step]",
   );
-  const reviewButton = contents?.querySelector<HTMLButtonElement>(
+  const reviewButtons = flow?.querySelectorAll<HTMLButtonElement>(
     "[data-application-review]",
   );
   const submitButton = element.querySelector<HTMLButtonElement>(
     "[data-application-submit]",
   );
-  if (!questions || !review || !reviewButton || !submitButton) return;
+  if (!questions || !review || !reviewButtons?.length || !submitButton) return;
 
   const originalTitle = document.title;
   let step: "questions" | "review" = "questions";
@@ -54,7 +55,7 @@ export function initApplicationReview(element: HTMLFormElement) {
   });
   // Resumed drafts always return to the answers and require a fresh review.
   history.replaceState(state("questions"), "");
-  reviewButton.disabled = false;
+  for (const button of reviewButtons) button.disabled = false;
 
   const focus = (target: HTMLElement | null) => {
     // History traversal restores scroll after popstate. Focus/scroll afterwards,
