@@ -322,10 +322,10 @@ for (const path of ["/apply", "/volunteer/account"]) {
             .locator(".volunteer-application-intro")
             .boundingBox();
           expect(initial!.y).toBe(intro!.y + intro!.height + 32);
+        } else if (width < 1024) {
+          expect(initial!.y).toBe(header!.y + header!.height + 32);
         } else {
-          expect(initial!.y).toBe(
-            header!.y + header!.height + (width < 1024 ? 0 : 24),
-          );
+          expect(initial!.y).toBe(header!.y + header!.height + 24);
         }
         release();
         await page.waitForLoadState("load");
@@ -334,7 +334,7 @@ for (const path of ["/apply", "/volunteer/account"]) {
           page.locator("[data-application-flow], [data-account-contents-flow]"),
         ).toHaveAttribute("style", /--contents-scroll-offset:/);
         expect(await contents.boundingBox()).toEqual(initial);
-        if (path === "/apply" && width < 1024) {
+        if (width < 1024) {
           await page.evaluate(
             (top) => scrollTo({ top, behavior: "instant" }),
             initial!.y + initial!.height + 16,
@@ -437,11 +437,91 @@ test("account contents navigate profile and settings sections on desktop and mob
   baseURL,
 }) => {
   await createLocalAccount(page.request, baseURL!);
-  for (const width of [1280, 375]) {
-    await page.setViewportSize({ width, height: 812 });
+  for (const width of [1280, 320, 375, 768]) {
+    // On desktop, leave enough trailing page for Sessions to reach the reading
+    // edge; a taller viewport clamps that native jump at the document bottom.
+    await page.setViewportSize({ width, height: width < 1024 ? 812 : 768 });
     await page.goto("/volunteer/account");
     const contents = page.getByRole("navigation", { name: "On this page" });
     const menu = contents.locator("[data-contents-menu]");
+    const summary = menu.locator("summary");
+    const current = summary.locator("[data-contents-current]");
+    await expect(
+      contents.locator(
+        "[data-application-progress], [data-application-progress-link], .volunteer-contents-completion-icon, [data-application-review], .volunteer-draft-save-status",
+      ),
+    ).toHaveCount(0);
+    await expect(contents).not.toHaveAttribute("data-application-contents");
+    if (width < 1024) {
+      await expect(
+        contents.locator(".volunteer-contents-sidebar"),
+      ).toBeHidden();
+      await expect(summary).toHaveAccessibleName("On this page");
+      await expect(current).toHaveText("Your profile");
+      await expect(summary.locator(":scope > :first-child")).toHaveClass(
+        "volunteer-contents-icon",
+      );
+      await expect(summary.locator(":scope > :last-child")).toHaveClass(
+        "volunteer-contents-chevron",
+      );
+      await expect(summary.locator(".volunteer-contents-toggle")).toHaveCount(
+        0,
+      );
+      await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
+      await expect(summary).toHaveCSS("background-color", "rgb(23, 26, 32)");
+      await expect(page.locator(".site-header")).toHaveCSS(
+        "position",
+        "relative",
+      );
+      await expect(contents).not.toHaveAttribute("data-contents-stuck");
+      const initial = (await summary.boundingBox())!;
+      const panel = (await page
+        .locator(".volunteer-panel")
+        .first()
+        .boundingBox())!;
+      expect(initial).toEqual({
+        x: width <= 640 ? 16 : 24,
+        y: panel.y - 54,
+        width: panel.width,
+        height: 54,
+      });
+      const dropdown = menu.locator("[data-contents-dropdown]");
+      for (const target of [
+        summary.locator(".volunteer-contents-icon"),
+        current,
+        summary.locator(".volunteer-contents-chevron"),
+      ]) {
+        await target.click();
+        await expect(menu).toHaveAttribute("open", "");
+        await expect(dropdown).toHaveCSS("position", "absolute");
+        await expect(dropdown).toHaveCSS("max-height", "742px");
+        await expect(dropdown).toHaveCSS("overscroll-behavior", "auto");
+        await expect(dropdown).toHaveCSS("border-radius", "0px 0px 8px 8px");
+        const expanded = (await dropdown.boundingBox())!;
+        expect(expanded.x).toBe(initial.x);
+        expect(expanded.width).toBe(initial.width);
+        expect(expanded.y).toBe(initial.y + initial.height);
+        expect(await summary.boundingBox()).toEqual(initial);
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth),
+        ).toBe(width);
+        await page.keyboard.press("Escape");
+        await expect(menu).not.toHaveAttribute("open");
+        await expect(summary).toBeFocused();
+      }
+      await summary.press("Space");
+      await page.locator(".site-header").click({ position: { x: 2, y: 2 } });
+      await expect(menu).not.toHaveAttribute("open");
+      await summary.press("Enter");
+      await page.locator("#account-profile-heading").focus();
+      await expect(menu).not.toHaveAttribute("open");
+    } else {
+      await expect(menu).toBeHidden();
+      await expect(
+        contents.locator(".volunteer-contents-sidebar"),
+      ).toBeVisible();
+      await expect(contents).toHaveCSS("top", "112px");
+    }
     await expect(
       contents.getByRole("link", {
         name: "Volunteer Application",
@@ -473,7 +553,7 @@ test("account contents navigate profile and settings sections on desktop and mob
       ["submitted-application-heading", "Volunteer Application"],
       ["account-sessions-heading", "Sessions"],
     ]) {
-      if (width < 1024) await menu.locator("summary").click();
+      if (width < 1024) await summary.click();
       const link = contents.getByRole("link", { name: heading, exact: true });
       await expect(link).toHaveAttribute("href", `#${id}`);
       await link.focus();
@@ -483,10 +563,37 @@ test("account contents navigate profile and settings sections on desktop and mob
       await expect(
         contents.locator(`a[href="#${id}"][aria-current="location"]`),
       ).toHaveCount(2);
-      if (width < 1024)
-        await expect(contents.locator("[data-contents-current]")).toHaveText(
-          heading,
-        );
+      if (width < 1024) {
+        await expect(current).toHaveText(heading);
+        await expect(summary).toHaveAccessibleName("On this page");
+        await expect(menu).not.toHaveAttribute("open");
+        await expect(contents).toHaveAttribute("data-contents-stuck", "");
+        await expect(summary).toHaveCSS("border-radius", "0px");
+        await expect(menu).not.toHaveCSS("box-shadow", "none");
+        await expect.poll(async () => (await summary.boundingBox())!.y).toBe(0);
+        expect(
+          Math.round((await page.locator(`#${id}`).boundingBox())!.y),
+        ).toBeGreaterThanOrEqual(70);
+      }
+    }
+    if (width < 1024) {
+      // Scrolling, not only choosing links, updates the current section.
+      await page.locator("#account-factor-heading").evaluate((heading) => {
+        scrollTo({
+          top: scrollY + heading.getBoundingClientRect().top - 70,
+          behavior: "instant",
+        });
+      });
+      await expect(current).toHaveText("Two-factor authentication");
+      await expect(current).toHaveCSS("text-overflow", "ellipsis");
+      await expect(summary).toHaveCSS("height", "54px");
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width);
+      await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+      await expect(current).toHaveText("Your profile");
+      await expect(contents).not.toHaveAttribute("data-contents-stuck");
+      await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
     }
     await expect(page.locator('[name="preferredName"]')).toBeHidden();
     await expect(

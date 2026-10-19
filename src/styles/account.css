@@ -56,7 +56,7 @@
 [data-account-contents-flow] > .volunteer-contents {
   grid-column: 1;
   grid-row: 1 / -1;
-  margin: -32px calc(-1 * var(--contents-padding)) 0;
+  margin: 0;
 }
 [data-account-contents-body] {
   grid-column: 1;

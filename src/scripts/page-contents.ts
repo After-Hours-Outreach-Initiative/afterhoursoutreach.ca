@@ -14,7 +14,6 @@ export function initPageContents(
     "[data-contents-menu]",
   );
   const toggle = menu?.querySelector<HTMLElement>("summary");
-  const dropdown = menu?.querySelector<HTMLElement>("[data-contents-dropdown]");
   const current = contents?.querySelector<HTMLElement>(
     "[data-contents-current]",
   );
@@ -61,7 +60,7 @@ export function initPageContents(
         : 0;
     // Only the compact bar contributes to the reading edge, not its dropdown.
     barHeight = menu.getBoundingClientRect().height
-      ? (application ? toggle : bar).getBoundingClientRect().height
+      ? toggle.getBoundingClientRect().height
       : 0;
     if (!barHeight) menu.open = false;
     flow.style.setProperty("--contents-sticky-offset", `${stickyHeight}px`);
@@ -70,24 +69,12 @@ export function initPageContents(
       "--contents-scroll-offset",
       `${stickyHeight + barHeight}px`,
     );
-    if (application)
-      contents.toggleAttribute(
-        "data-contents-stuck",
-        barHeight > 0 &&
-          getComputedStyle(contents).position === "sticky" &&
-          Math.abs(contents.getBoundingClientRect().top - stickyHeight) < 1,
-      );
-    if (!application && barHeight) {
-      // Account navigation keeps its existing bounded dropdown scroll area.
-      const dropdownTop =
-        menu.open && dropdown
-          ? dropdown.getBoundingClientRect().top
-          : bar.getBoundingClientRect().bottom;
-      flow.style.setProperty(
-        "--contents-dropdown-space",
-        `${Math.max(0, window.innerHeight - dropdownTop - 16)}px`,
-      );
-    }
+    contents.toggleAttribute(
+      "data-contents-stuck",
+      barHeight > 0 &&
+        getComputedStyle(contents).position === "sticky" &&
+        Math.abs(contents.getBoundingClientRect().top - stickyHeight) < 1,
+    );
   };
   const activate = (active: (typeof sections)[number]) => {
     const overview = application && active.hash === `#${topId}`;
