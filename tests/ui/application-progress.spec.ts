@@ -64,8 +64,19 @@ for (const width of [390, 1280]) {
     const discardBounds = (await discard.boundingBox())!;
     expect(bottomBounds.x).toBeGreaterThanOrEqual(0);
     expect(discardBounds.x + discardBounds.width).toBeLessThanOrEqual(width);
-    expect(bottomBounds.y).toBe(discardBounds.y);
-    expect(bottomBounds.x + bottomBounds.width).toBeLessThan(discardBounds.x);
+    if (width < 1024) {
+      const actionsBounds = (await bottomReview.locator("..").boundingBox())!;
+      expect(bottomBounds.y + bottomBounds.height).toBeLessThan(
+        discardBounds.y,
+      );
+      for (const bounds of [bottomBounds, discardBounds]) {
+        expect(bounds.x).toBe(actionsBounds.x);
+        expect(bounds.width).toBe(actionsBounds.width);
+      }
+    } else {
+      expect(bottomBounds.y).toBe(discardBounds.y);
+      expect(bottomBounds.x + bottomBounds.width).toBeLessThan(discardBounds.x);
+    }
     if (width < 1024) {
       await expect(reviewButton).toBeHidden();
       await expect(
@@ -394,9 +405,11 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
     const discardBounds = (await page
       .locator("[data-draft-discard]")
       .boundingBox())!;
-    expect(bottomBounds.y).toBe(discardBounds.y);
-    expect(bottomBounds.x + bottomBounds.width).toBeLessThan(discardBounds.x);
+    const actionsBounds = (await bottomReview.locator("..").boundingBox())!;
+    expect(bottomBounds.y + bottomBounds.height).toBeLessThan(discardBounds.y);
     for (const bounds of [bottomBounds, discardBounds]) {
+      expect(bounds.x).toBe(actionsBounds.x);
+      expect(bounds.width).toBe(actionsBounds.width);
       expect(bounds.x).toBeGreaterThanOrEqual(0);
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
       expect(bounds.width).toBeGreaterThanOrEqual(44);
