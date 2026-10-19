@@ -359,6 +359,15 @@ test("account navigation and profile controls are usable on desktop and mobile",
     const name = page.getByLabel("Preferred name", { exact: false });
     await expect(name).toHaveValue(sampleAnswers.preferredName);
     await expect(name).toBeEditable();
+    for (const heading of await form.getByRole("heading", { level: 3 }).all()) {
+      await expect(heading).toHaveCSS("font-size", "22px");
+      await expect(heading.locator("..")).toHaveCSS(
+        "border-bottom-width",
+        "1px",
+      );
+    }
+    await form.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByRole("button", { name: "Edit emergency contact" }).click();
     const emergencyContact = page.getByRole("group", {
       name: "Emergency contact",
       exact: true,
@@ -375,31 +384,24 @@ test("account navigation and profile controls are usable on desktop and mobile",
       ).toHaveValue(sampleAnswers[field]);
     await expect(emergencyContact).toHaveCSS("border-top-width", "0px");
     await expect(emergencyContact).toHaveCSS("padding", "0px");
-    for (const heading of await form.getByRole("heading", { level: 3 }).all()) {
-      await expect(heading).toHaveCSS("font-size", "22px");
-      await expect(heading.locator("..")).toHaveCSS(
-        "border-bottom-width",
-        "1px",
-      );
-    }
+    const emergencyGrid = emergencyContact.locator(".volunteer-fields");
+    await expect(emergencyGrid).toBeVisible();
     expect(
-      await emergencyContact
-        .locator(".volunteer-fields")
-        .evaluate(
-          (element) =>
-            getComputedStyle(element).gridTemplateColumns.split(" ").length,
-        ),
-    ).toBe(width <= 640 ? 1 : 2);
-    expect(
-      await form
-        .locator(".volunteer-team-options")
-        .evaluate(
-          (element) =>
-            getComputedStyle(element).gridTemplateColumns.split(" ").length,
-        ),
+      await emergencyGrid.evaluate(
+        (element) =>
+          getComputedStyle(element).gridTemplateColumns.split(" ").length,
+      ),
     ).toBe(1);
     await form.getByRole("button", { name: "Cancel", exact: true }).click();
     await page.getByRole("button", { name: "Edit team interests" }).click();
+    const teamGrid = form.locator(".volunteer-team-options");
+    await expect(teamGrid).toBeVisible();
+    expect(
+      await teamGrid.evaluate(
+        (element) =>
+          getComputedStyle(element).gridTemplateColumns.split(" ").length,
+      ),
+    ).toBe(1);
     const medic = form.getByLabel("Medic", { exact: true });
     await medic.check();
     const certifications = form.locator("[data-medic-certifications]");
