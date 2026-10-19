@@ -368,11 +368,21 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     });
     await expect(identity).toHaveAttribute("href", "/volunteer/account");
     await expect(identity).not.toHaveAttribute("aria-current");
+    await expect(identity).toHaveCSS("border-bottom-width", "0px");
     await expect(identity).toHaveCSS("overflow-wrap", "anywhere");
     await expect(identity.locator(".header-account-details")).toHaveCSS(
       "min-width",
       "0px",
     );
+    const divider = card.getByRole("separator");
+    await expect(divider).toBeVisible();
+    await expect(divider).toHaveCSS("border-top-color", "rgb(39, 39, 42)");
+    const cardBox = await card.boundingBox();
+    expect(await divider.boundingBox()).toMatchObject({
+      x: cardBox!.x + 1,
+      width: cardBox!.width - 2,
+      height: 1,
+    });
     await identity.hover();
     await expect(identity).toHaveCSS("background-color", "rgb(23, 26, 32)");
     const accountLink = card.getByRole("link", {
