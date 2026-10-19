@@ -238,6 +238,9 @@ body:has([data-application], [data-account-contents-flow]) {
   padding: 0;
   border: 0;
 }
+.volunteer-profile-section > .volunteer-help {
+  margin-bottom: 24px;
+}
 .volunteer-profile-section > legend:not(.sr-only) {
   width: 100%;
   margin-bottom: 24px;
