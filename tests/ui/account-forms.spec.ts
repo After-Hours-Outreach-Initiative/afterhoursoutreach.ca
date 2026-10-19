@@ -1,4 +1,10 @@
-import { devices, expect, test, type Locator } from "@playwright/test";
+import {
+  devices,
+  expect,
+  test,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import {
   createLocalAccount,
   fillApplicationField,
@@ -27,6 +33,44 @@ import {
 
 const emergencyContactDescription =
   "Someone we can contact if you need help during an event.";
+
+async function expectOtherDetailAlignment(
+  page: Page,
+  section: Locator,
+  details: Locator,
+) {
+  const viewport = page.viewportSize();
+  try {
+    for (const width of [1280, 375, 320]) {
+      await page.setViewportSize({ width, height: 812 });
+      await expect(details).toBeVisible();
+      const text = await section
+        .locator('.volunteer-check:has([value="other"]) > span')
+        .boundingBox();
+      const bounds = await section.boundingBox();
+      const boxes = await details
+        .locator(":scope > :visible:not(.sr-only)")
+        .evaluateAll((elements) =>
+          elements.map((element) => {
+            const { x, right } = element.getBoundingClientRect();
+            return { x, right };
+          }),
+        );
+      expect(boxes.length).toBeGreaterThan(0);
+      for (const box of boxes) {
+        expect(box.x).toBeCloseTo(text!.x, 1);
+        expect(box.right).toBeCloseTo(bounds!.x + bounds!.width, 1);
+      }
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > innerWidth,
+        ),
+      ).toBe(false);
+    }
+  } finally {
+    if (viewport) await page.setViewportSize(viewport);
+  }
+}
 
 async function expectEmergencyContactRows(section: Locator) {
   const grid = section.locator(".volunteer-fields");
@@ -275,7 +319,7 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
   await expect(page.locator("[data-email-code]")).toBeHidden();
 });
 
-test("other referral help separates the character limit from its unit", async ({
+test("Other referral details align with the option text and show readable help", async ({
   page,
   baseURL,
 }) => {
@@ -286,6 +330,11 @@ test("other referral help separates the character limit from its unit", async ({
   await expect(form.locator("#help-heardAboutUsOther")).toBeVisible();
   await expect(form.locator("#help-heardAboutUsOther")).toHaveText(
     "Briefly describe how you found out about us (200 characters or fewer).",
+  );
+  await expectOtherDetailAlignment(
+    page,
+    form.locator("[data-referral-sources]"),
+    form.locator("[data-other-referral]"),
   );
 });
 
@@ -1584,6 +1633,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     await expect(details.locator("[data-error=otherTraining]")).toBeVisible();
     expect(requests).toHaveLength(0);
   }
+  await expectOtherDetailAlignment(page, training, details);
   await otherText.fill("Crisis intervention course");
   await medic.check();
   await expect(training).toBeVisible();
@@ -1637,6 +1687,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await save.click();
   await expect(otherText).toBeFocused();
   await expect(details.locator("[data-error=otherTraining]")).toBeVisible();
+  await expectOtherDetailAlignment(page, training, details);
   expect(requests).toHaveLength(savedRequests);
   await other.uncheck();
   await naloxone.uncheck();
@@ -1839,6 +1890,11 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     await expect(form.locator("[data-error=experience]")).toBeVisible();
     expect(profileRequests).toHaveLength(0);
   }
+  await expectOtherDetailAlignment(
+    page,
+    certifications,
+    certifications.locator("[data-other-training]"),
+  );
   await expect(
     certifications.locator("[data-error=certifications]"),
   ).toBeHidden();
@@ -1943,6 +1999,11 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     await expect(form.locator("[data-error=experience]")).toBeVisible();
     expect(profileRequests).toHaveLength(savedRequests);
   }
+  await expectOtherDetailAlignment(
+    page,
+    certifications,
+    certifications.locator("[data-other-training]"),
+  );
   await firstAid.check();
   await expect(experience).toBeHidden();
   expect(

@@ -1,5 +1,7 @@
 .volunteer-portal {
   --volunteer-border: 1px solid #3f3f46;
+  --volunteer-check-size: 18px;
+  --volunteer-check-gap: 10px;
   background: var(--color-black);
   color: #f4f4f5;
 }
@@ -655,8 +657,8 @@ body:has([data-application], [data-account-contents-flow]) {
 }
 .volunteer-portal input[type="checkbox"],
 .volunteer-portal input[type="radio"] {
-  width: 18px;
-  height: 18px;
+  width: var(--volunteer-check-size);
+  height: var(--volunteer-check-size);
   accent-color: #4169e1;
   flex-shrink: 0;
 }
@@ -850,6 +852,14 @@ body:has([data-application], [data-account-contents-flow]) {
   min-height: 44px;
   cursor: pointer;
 }
+/* Keep the entire follow-up field in the option's text column. */
+.volunteer-certification-options > [data-other-training],
+.volunteer-training-options > [data-other-relevant-training],
+.volunteer-referral-sources > [data-other-referral] {
+  margin-inline-start: calc(
+    var(--volunteer-check-size) + var(--volunteer-check-gap)
+  );
+}
 .volunteer-setting {
   display: flex;
   flex-wrap: wrap;
@@ -902,11 +912,11 @@ body:has([data-application], [data-account-contents-flow]) {
 }
 .volunteer-check {
   display: flex;
-  gap: 10px;
+  gap: var(--volunteer-check-gap);
   align-items: flex-start;
 }
 .volunteer-check > input {
-  margin-top: calc(0.5lh - 9px);
+  margin-top: calc(0.5lh - var(--volunteer-check-size) / 2);
 }
 .volunteer-code-of-conduct ul {
   display: grid;
