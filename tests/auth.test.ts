@@ -1122,7 +1122,11 @@ test("profile validation rejects privilege fields, invalid dates, unknown/duplic
 
 test("one highest certification is required for Medic and training details only for Other", () => {
   assert.equal(profileSchema.safeParse(answers).success, true);
-  for (const teams of [["outreach"], ["medic"], ["non-patrol"]]) {
+  for (const teams of [
+    ["outreach"],
+    ["outreach", "medic"],
+    ["outreach", "non-patrol"],
+  ]) {
     for (const certifications of [[], ["advanced-first-aid"], ["other"]]) {
       for (const experience of [undefined, "", " ", " \t\n\u00a0 "]) {
         assert.equal(
@@ -1151,7 +1155,7 @@ test("one highest certification is required for Medic and training details only 
     assert.equal(
       profileSchema.safeParse({
         ...answers,
-        teams: ["medic"],
+        teams: ["outreach", "medic"],
         certifications,
         certificationExpiry: "2030-10-14",
       }).success,
@@ -1162,7 +1166,7 @@ test("one highest certification is required for Medic and training details only 
     assert.equal(
       profileSchema.safeParse({
         ...answers,
-        teams: ["medic"],
+        teams: ["outreach", "medic"],
         certifications: [option.value],
         certificationExpiry: "2030-10-14",
       }).success,
@@ -1172,7 +1176,11 @@ test("one highest certification is required for Medic and training details only 
 });
 
 test("relevant training requires an answer for every team, exclusive None, and details only for Other", () => {
-  for (const teams of [["outreach"], ["medic"], ["non-patrol"]]) {
+  for (const teams of [
+    ["outreach"],
+    ["outreach", "medic"],
+    ["outreach", "non-patrol"],
+  ]) {
     for (const training of [
       [],
       ["none"],
@@ -1290,10 +1298,31 @@ test("relevant training and Other details round-trip independently of medical ce
     preferredName: "Legacy edit",
   });
   assert.deepEqual((await loadProfile(bindings.DB, id))?.training, []);
+  // Loading and unrelated edits must not manufacture Outreach for legacy profiles.
+  await bindings.DB.prepare(
+    "UPDATE profile SET teams='[\"non-patrol\"]' WHERE user_id=?",
+  )
+    .bind(id)
+    .run();
+  assert.deepEqual((await loadProfile(bindings.DB, id))?.teams, ["non-patrol"]);
+  const { teams: _teams, ...withoutTeams } = legacyEdit;
+  await saveProfile(bindings.DB, id, {
+    ...withoutTeams,
+    preferredName: "Legacy team edit",
+  });
+  assert.deepEqual((await loadProfile(bindings.DB, id))?.teams, ["non-patrol"]);
+  assert.deepEqual(
+    (await viewVolunteerProfile(bindings.DB, actor, id))?.teams,
+    ["non-patrol"],
+  );
 });
 
 test("certification expiry is required only for Medic", () => {
-  for (const teams of [["outreach"], ["medic"], ["outreach", "non-patrol"]]) {
+  for (const teams of [
+    ["outreach"],
+    ["outreach", "medic"],
+    ["outreach", "non-patrol"],
+  ]) {
     for (const certificationExpiry of [
       undefined,
       "",
@@ -1337,7 +1366,7 @@ test("highest certification and expiry round-trip, preserve legacy answers and a
   const certificationExpiry = "2030-10-14";
   await saveProfile(bindings.DB, id, {
     ...editable,
-    teams: ["medic"],
+    teams: ["outreach", "medic"],
     certifications,
     certificationExpiry,
   });
@@ -1354,7 +1383,10 @@ test("highest certification and expiry round-trip, preserve legacy answers and a
     certificationExpiry: ___,
     ...olderClient
   } = editable;
-  await saveProfile(bindings.DB, id, { ...olderClient, teams: ["medic"] });
+  await saveProfile(bindings.DB, id, {
+    ...olderClient,
+    teams: ["outreach", "medic"],
+  });
   assert.deepEqual(await loadProfile(bindings.DB, id), expected);
   await bindings.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
     .bind(id)
@@ -1397,12 +1429,16 @@ test("highest certification and expiry round-trip, preserve legacy answers and a
     "nurse",
   ]);
   await assert.rejects(
-    () => saveProfile(bindings.DB, id, { ...olderClient, teams: ["medic"] }),
+    () =>
+      saveProfile(bindings.DB, id, {
+        ...olderClient,
+        teams: ["outreach", "medic"],
+      }),
     RequestError,
   );
   await saveProfile(bindings.DB, id, {
     ...olderClient,
-    teams: ["medic"],
+    teams: ["outreach", "medic"],
     certifications: ["nurse"],
   });
   assert.deepEqual((await loadProfile(bindings.DB, id))?.certifications, [

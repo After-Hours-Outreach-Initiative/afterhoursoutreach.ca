@@ -15,6 +15,7 @@ import {
 import {
   latestApplicationBirthDate,
   applicationBirthDateError,
+  outreachRequiredError,
   type SubmittedApplication,
 } from "../../src/data/application";
 import {
@@ -257,7 +258,7 @@ describe(
       );
     });
 
-    test("Outreach is always saved even when no team or only other teams are submitted", async () => {
+    test("applications require explicit Outreach and leave optional teams optional without rewriting legacy edits", async () => {
       const outreachCookie = await signIn(
         "worker-default-outreach@example.org",
       );
@@ -270,23 +271,44 @@ describe(
         )
           .bind(account.user.id)
           .first<{ teams: string }>();
-        return JSON.parse(row!.teams);
+        return row ? JSON.parse(row.teams) : null;
       };
+      for (const teams of [
+        undefined,
+        [],
+        ["medic"],
+        ["non-patrol"],
+        ["medic", "non-patrol"],
+      ]) {
+        const rejected = await send(
+          "/api/v1/account/profile",
+          {
+            ...answers,
+            teams,
+            certifications: ["advanced-first-aid"],
+            certificationExpiry: "2030-10-14",
+            codeOfConductAccepted: true,
+          },
+          outreachCookie,
+        );
+        assert.equal(rejected.status, 400);
+        assert.deepEqual(await rejected.json(), {
+          message: outreachRequiredError,
+        });
+        assert.equal(await savedTeams(), null);
+      }
       const application = await send(
         "/api/v1/account/profile",
-        { ...answers, teams: undefined, codeOfConductAccepted: true },
+        { ...answers, codeOfConductAccepted: true },
         outreachCookie,
       );
       assert.equal(application.status, 200, await application.clone().text());
       assert.deepEqual(await savedTeams(), ["outreach"]);
-      for (const [teams, expected] of [
-        [[], ["outreach"]],
-        [["medic"], ["outreach", "medic"]],
-        [["non-patrol"], ["outreach", "non-patrol"]],
-        [
-          ["medic", "non-patrol"],
-          ["outreach", "medic", "non-patrol"],
-        ],
+      for (const teams of [
+        ["outreach"],
+        ["outreach", "medic"],
+        ["outreach", "non-patrol"],
+        ["outreach", "medic", "non-patrol"],
       ]) {
         const edited = await send(
           "/api/v1/account/profile",
@@ -301,8 +323,25 @@ describe(
           outreachCookie,
         );
         assert.equal(edited.status, 200, await edited.clone().text());
-        assert.deepEqual(await savedTeams(), expected);
+        assert.deepEqual(await savedTeams(), teams);
       }
+      const removed = await send(
+        "/api/v1/account/profile",
+        { ...answers, teams: [] },
+        outreachCookie,
+      );
+      assert.equal(removed.status, 400);
+      assert.deepEqual(await savedTeams(), ["outreach", "medic", "non-patrol"]);
+      await DB.prepare("UPDATE profile SET teams='[]' WHERE user_id=?")
+        .bind(account.user.id)
+        .run();
+      const legacy = await send(
+        "/api/v1/account/profile",
+        { ...answers, teams: [], preferredName: "Legacy edit" },
+        outreachCookie,
+      );
+      assert.equal(legacy.status, 200, await legacy.clone().text());
+      assert.deepEqual(await savedTeams(), []);
     });
 
     test("Medic application and edits require a certification expiry date", async () => {
@@ -316,7 +355,7 @@ describe(
           .first();
       const medicAnswers = {
         ...answers,
-        teams: ["medic"],
+        teams: ["outreach", "medic"],
         certifications: ["advanced-first-aid"],
         codeOfConductAccepted: true,
       };
@@ -409,7 +448,7 @@ describe(
         "/api/v1/account/profile",
         {
           ...trainingAnswers,
-          teams: ["non-patrol"],
+          teams: ["outreach", "non-patrol"],
           training: ["overdose-response", "lived-experience"],
           otherTraining: "",
         },
@@ -438,7 +477,7 @@ describe(
         "/api/v1/account/profile",
         {
           ...withoutCertifications,
-          teams: ["medic"],
+          teams: ["outreach", "medic"],
           codeOfConductAccepted: true,
         },
         trainingCookie,
@@ -453,7 +492,7 @@ describe(
         "/api/v1/account/profile",
         {
           ...withoutCertifications,
-          teams: ["medic"],
+          teams: ["outreach", "medic"],
           certifications: ["other"],
           certificationExpiry: "2030-10-14",
           codeOfConductAccepted: true,
@@ -524,7 +563,7 @@ describe(
       );
       const nonMedicEdit = await send(
         "/api/v1/account/profile",
-        { ...edits, teams: ["non-patrol"], certifications: [] },
+        { ...edits, teams: ["outreach", "non-patrol"], certifications: [] },
         trainingCookie,
       );
       assert.equal(nonMedicEdit.status, 200, await nonMedicEdit.clone().text());
@@ -548,7 +587,7 @@ describe(
         "/api/v1/account/profile",
         {
           ...edits,
-          teams: ["medic"],
+          teams: ["outreach", "medic"],
           certifications: ["advanced-first-aid"],
           certificationExpiry: "2030-10-14",
         },
@@ -1360,7 +1399,11 @@ describe(
           newPage.locator("[data-medic-certifications]"),
         ).toBeHidden();
         for (const [name, value] of Object.entries(answers)) {
-          if (name === "heardAboutUsSources" || name === "training") {
+          if (
+            name === "heardAboutUsSources" ||
+            name === "training" ||
+            name === "teams"
+          ) {
             for (const source of value as string[])
               await newPage
                 .locator(`[name="${name}"][value="${source}"]`)
@@ -1388,7 +1431,7 @@ describe(
         ).toBeChecked();
         await expect(
           newPage.getByRole("checkbox", { name: "Outreach", exact: true }),
-        ).toBeDisabled();
+        ).toBeEnabled();
         await reviewLocalApplication(newPage);
         const conduct = newPage.getByRole("region", {
           name: "Code of Conduct",

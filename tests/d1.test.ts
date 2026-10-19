@@ -326,9 +326,19 @@ test("submission atomically removes drafts; failed submissions retain them and l
       emergencyRelationship: "Friend",
       heardAboutUsSources: ["internet"],
       motivation: "I want to help.",
+      teams: ["outreach"],
       training: ["none"],
     }),
   );
+  await assert.rejects(
+    saveProfile(env.DB, actor.id, {
+      ...answers,
+      teams: [],
+      codeOfConductAccepted: true,
+    }),
+    statusError(400),
+  );
+  assert.deepEqual(await loadApplicationDraft(env.DB, actor.id), saved);
   await saveProfile(env.DB, actor.id, {
     ...answers,
     codeOfConductAccepted: true,
@@ -357,7 +367,7 @@ test("submission atomically removes drafts; failed submissions retain them and l
     phone: "604-555-0199",
     emergencyName: "Changed contact",
     medicalConditions: "Changed safety answer",
-    teams: ["non-patrol"],
+    teams: ["outreach", "non-patrol"],
     training: ["naloxone-administration"],
   });
   assert.equal((await loadProfile(env.DB, actor.id))?.phone, "604-555-0199");

@@ -195,10 +195,10 @@ for (const width of [390, 1280]) {
     await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
-    await expectComplete(page, "team-interests", true);
+    await expectComplete(page, "team-interests", false);
     await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
-    await expectProgress(page, 1);
+    await expectProgress(page, 0);
     if (width < 1024)
       await expect(
         page.getByRole("progressbar", { name: "Application progress" }),
@@ -249,7 +249,7 @@ for (const width of [390, 1280]) {
       `${width < 1024 ? "[data-contents-menu]" : ".volunteer-contents-sidebar"} [href="#application-team-interests"]`,
     );
     const checkmark = teamInterests.locator("svg");
-    await expect(checkmark).toHaveCSS("color", "rgb(74, 222, 128)");
+    await expect(checkmark).toHaveCSS("color", "rgb(161, 161, 170)");
     await expect(checkmark).toHaveCSS("visibility", "visible");
     await expect(checkmark).toHaveCSS("border-width", "0px");
     expect(
@@ -304,6 +304,24 @@ for (const width of [390, 1280]) {
     await bottomReview.click();
     await expect(form.locator('[name="firstName"]')).toBeFocused();
     await expect(form.locator("[data-application-review-step]")).toBeHidden();
+    const outreach = form.getByRole("checkbox", {
+      name: "Outreach",
+      exact: true,
+    });
+    const support = form.getByRole("checkbox", {
+      name: "Non-patrol support",
+      exact: true,
+    });
+    await expect(outreach).not.toBeChecked();
+    await expect(outreach).toBeEnabled();
+    await expect(outreach).toHaveAttribute("required", "");
+    await expect(form.locator('[name="teams"][required]')).toHaveCount(1);
+    await support.check();
+    await expectComplete(page, "team-interests", false);
+    await outreach.check();
+    await expectComplete(page, "team-interests", true);
+    await support.uncheck();
+    await expectComplete(page, "team-interests", true);
     await form.locator('[name="training"][value="none"]').check();
     await expectComplete(page, "training-and-safety", true);
 
@@ -487,9 +505,10 @@ for (const width of [390, 1280]) {
     await form.evaluate((element: HTMLFormElement) => element.reset());
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
+    await expectComplete(page, "team-interests", false);
     await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
-    await expectProgress(page, 1);
+    await expectProgress(page, 0);
     await expect(
       form.locator(".volunteer-application-section > fieldset:visible"),
     ).toHaveCount(5);
@@ -526,6 +545,8 @@ test("restored drafts initialize completion without showing validation errors", 
   });
   expect(response.ok(), await response.text()).toBe(true);
   await page.goto("/apply");
+  await expect(page.locator('[name="teams"][value="outreach"]')).toBeChecked();
+  await expectComplete(page, "team-interests", true);
   await expectComplete(page, "emergency-contact", true);
   await expectComplete(page, "training-and-safety", false);
   await expectProgress(page, 2);
@@ -609,7 +630,7 @@ test("one compact mobile tracker keeps its reading edge and scrolls its viewport
     expect(await measure()).toEqual(initial);
   }
   await expect(summary.locator(".volunteer-contents-toggle")).toHaveCount(0);
-  await expectProgress(page, 1);
+  await expectProgress(page, 0);
   await page.locator('[name="firstName"]').fill("Saved progress");
   await expect(status).toHaveText(/^Last saved at /);
   await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);

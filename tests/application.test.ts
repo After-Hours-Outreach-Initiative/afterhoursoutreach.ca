@@ -2,10 +2,34 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   latestApplicationBirthDate,
   normalizeCertifications,
+  outreachRequiredError,
 } from "../src/data/application";
 import { profileSchema } from "../src/server/db/profiles";
 
 const birthDateSchema = profileSchema.shape.birthDate;
+
+test("applications require an explicit Outreach selection and leave other teams optional", () => {
+  const schema = profileSchema.shape.teams;
+  for (const teams of [
+    undefined,
+    [],
+    ["medic"],
+    ["non-patrol"],
+    ["medic", "non-patrol"],
+  ]) {
+    const parsed = schema.safeParse(teams);
+    expect(parsed.success).toBe(false);
+    if (!parsed.success)
+      expect(parsed.error.issues[0].message).toBe(outreachRequiredError);
+  }
+  for (const teams of [
+    ["outreach"],
+    ["outreach", "medic"],
+    ["outreach", "non-patrol"],
+    ["outreach", "medic", "non-patrol"],
+  ])
+    expect(schema.parse(teams)).toEqual(teams);
+});
 
 afterEach(() => vi.useRealTimers());
 
