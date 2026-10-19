@@ -27,6 +27,34 @@ async function expectComplete(page: Page, section: string, complete: boolean) {
   }
 }
 
+async function expectActionsPosition(page: Page) {
+  const actions = page.getByRole("group", { name: "Review and discard" });
+  await expect(actions).toBeInViewport({ ratio: 1 });
+  await expect
+    .poll(async () => {
+      const bounds = (await actions.boundingBox())!;
+      const height = page.viewportSize()!.height;
+      const center = Math.min(height * 0.75, height - 16 - bounds.height / 2);
+      return Math.abs(bounds.y + bounds.height / 2 - center);
+    })
+    .toBeLessThanOrEqual(1);
+  const bounds = (await actions.boundingBox())!;
+  const tracker = page.locator("[data-application-contents]");
+  const menu = tracker.locator("[data-contents-menu]");
+  const top = (await menu.isVisible())
+    ? (await tracker.boundingBox())!.y + (await tracker.boundingBox())!.height
+    : (await page.locator(".site-header").boundingBox())!.height;
+  expect(bounds.y).toBeGreaterThanOrEqual(top + 16);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(
+    page.viewportSize()!.height - 16,
+  );
+  await expect(
+    tracker.locator(
+      '[href="#application-review-and-discard"][aria-current="location"]',
+    ),
+  ).toHaveCount(2);
+}
+
 for (const width of [390, 1280]) {
   test(`progress follows valid required answers and conditional fields at ${width}px`, async ({
     page,
@@ -34,7 +62,7 @@ for (const width of [390, 1280]) {
   }) => {
     await page.setViewportSize({ width, height: 900 });
     await createLocalAccount(page.request, baseURL!, false);
-    await page.goto("/apply");
+    await page.goto("/apply#application-review-and-discard");
     const form = page.locator("form[data-application]");
     const count = page.locator("[data-application-progress-count]");
     const tracker = page.getByRole("navigation", {
@@ -45,7 +73,29 @@ for (const width of [390, 1280]) {
     const bottomReview = localApplicationReviewButton(page, "bottom");
     const draftActions = page.locator("[data-application-draft-actions]");
     const discard = draftActions.locator("[data-draft-discard]");
-    await expectComplete(page, "overview", true);
+    await expectActionsPosition(page);
+    for (const id of ["overview", "review-and-discard"]) {
+      const links = tracker.locator(`[href="#application-${id}"]`);
+      await expect(links).toHaveCount(2);
+      for (const link of await links.all()) {
+        await expect(link).not.toHaveAttribute("data-complete");
+        await expect(link).not.toHaveAttribute(
+          "data-application-progress-link",
+        );
+        await expect(link).not.toHaveAttribute("aria-describedby");
+        await expect(link).toHaveAccessibleDescription("");
+        await expect(link.locator("svg")).toHaveCount(0);
+        await expect(
+          link.locator("..").locator("[data-application-completion-status]"),
+        ).toHaveCount(0);
+      }
+    }
+    await expect(
+      tracker.locator("[data-application-progress-link]"),
+    ).toHaveCount(10);
+    if (width < 1024) await menu.locator("summary").click();
+    await tracker.getByRole("link", { name: "Overview", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
     await expectComplete(page, "team-interests", true);
@@ -93,23 +143,47 @@ for (const width of [390, 1280]) {
           button.form?.hasAttribute("data-application"),
         ),
       ).toBe(true);
-    const overview = tracker.locator(
-      `${width < 1024 ? "[data-contents-menu]" : ".volunteer-contents-sidebar"} [href="#application-overview"]`,
+    const teamInterests = tracker.locator(
+      `${width < 1024 ? "[data-contents-menu]" : ".volunteer-contents-sidebar"} [href="#application-team-interests"]`,
     );
-    const checkmark = overview.locator("svg");
+    const checkmark = teamInterests.locator("svg");
     await expect(checkmark).toHaveCSS("color", "rgb(74, 222, 128)");
     await expect(checkmark).toHaveCSS("visibility", "visible");
     await expect(checkmark).toHaveCSS("border-width", "0px");
     expect(
-      await overview.evaluate((link) =>
+      await teamInterests.evaluate((link) =>
         link.lastElementChild?.previousSibling?.textContent?.trim(),
       ),
-    ).toBe("Overview");
+    ).toBe("Team interests");
     await expect(
       tracker.locator(
         '.volunteer-contents-sidebar [href="#application-personal-info"] svg',
       ),
     ).toHaveCSS("visibility", "hidden");
+
+    if (width < 1024) await menu.locator("summary").click();
+    await tracker
+      .getByRole("link", { name: "Review and discard", exact: true })
+      .click();
+    await expectActionsPosition(page);
+    await expect(
+      page.getByRole("group", { name: "Review and discard" }),
+    ).toBeFocused();
+    await expect(form.locator("[data-application-review-step]")).toBeHidden();
+    await expect(form.locator("[data-error]:visible")).toHaveCount(0);
+    expect(await page.evaluate(() => history.state.applicationStep)).toBe(
+      "questions",
+    );
+    await page.goBack();
+    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    await page.goForward();
+    await expectActionsPosition(page);
+    await page.evaluate(() => scrollBy({ top: -120, behavior: "instant" }));
+    await expect(
+      tracker.locator(
+        '[href="#application-review-and-discard"][aria-current="location"]',
+      ),
+    ).toHaveCount(0);
 
     if (width < 1024) {
       await menu.locator("summary").click();
@@ -257,6 +331,10 @@ for (const width of [390, 1280]) {
     if (width >= 1024) {
       await page.setViewportSize({ width, height: 400 });
       await expect(reviewButton).toBeInViewport();
+      await tracker
+        .getByRole("link", { name: "Review and discard", exact: true })
+        .click();
+      await expectActionsPosition(page);
     }
   });
 }
@@ -419,10 +497,15 @@ test("one compact mobile tracker sticks continuously and names sections only at 
   );
 
   for (const viewport of [
-    { width: 320, height: 360 },
+    { width: 320, height: 240 },
     { width: 768, height: 400 },
   ]) {
     await page.setViewportSize(viewport);
+    await summary.click();
+    await menu
+      .getByRole("link", { name: "Review and discard", exact: true })
+      .click();
+    await expectActionsPosition(page);
     const bottomReview = localApplicationReviewButton(page, "bottom");
     await expect(bottomReview).toBeVisible();
     const bottomBounds = (await bottomReview.boundingBox())!;
@@ -462,7 +545,7 @@ test("one compact mobile tracker sticks continuously and names sections only at 
       .toBeLessThanOrEqual(viewport.height - 16);
     expect((await compact.boundingBox())!.height).toBe(height);
     await menu
-      .getByRole("link", { name: "About volunteering", exact: true })
+      .getByRole("link", { name: "Review and discard", exact: true })
       .focus();
     await page.keyboard.press("Tab");
     await expect(reviewButton).toBeFocused();

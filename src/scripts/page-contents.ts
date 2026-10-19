@@ -28,6 +28,11 @@ export function initPageContents(
     },
     links: links.filter((link) => link.hash === hash),
   }));
+  const actions = application
+    ? sections.find(({ target }) =>
+        target?.hasAttribute("data-contents-actions"),
+      )
+    : undefined;
   const header = document.querySelector<HTMLElement>("body > header");
   let stickyHeight = 0;
   let barHeight = 0;
@@ -64,6 +69,13 @@ export function initPageContents(
         else link.removeAttribute("aria-current");
       }
   };
+  // Keep the buttons together near 3/4 of the viewport, above its bottom gap
+  // and below sticky navigation when a short screen requires a higher position.
+  const actionsReadingEdge = (height: number) =>
+    Math.max(
+      stickyHeight + barHeight + 16 + height / 2,
+      Math.min(window.innerHeight * 0.75, window.innerHeight - 16 - height / 2),
+    );
   const update = () => {
     frame = 0;
     // Sticky headers can move without resizing as the preview banner scrolls.
@@ -77,11 +89,22 @@ export function initPageContents(
     const readingEdge = stickyHeight + barHeight + 16;
     let active = sections[0];
     for (const section of sections) {
+      if (section === actions) continue;
       const target = section.target;
       if (!target || !target.getClientRects().length) continue;
       if (target.getBoundingClientRect().top > readingEdge + 1) break;
       active = section;
     }
+    // The final action entry uses its own reading edge, not the headings' top
+    // edge, so a jump there stays current and scrolling back naturally leaves it.
+    const actionBounds = actions?.target?.getBoundingClientRect();
+    if (
+      actions &&
+      actionBounds?.height &&
+      actionBounds.top + actionBounds.height / 2 <=
+        actionsReadingEdge(actionBounds.height) + 1
+    )
+      active = actions;
     if (active && active.links[0].getAttribute("aria-current") !== "location")
       activate(active);
     if (!barHeight) return;
@@ -126,7 +149,29 @@ export function initPageContents(
         : target;
     focusTarget?.focus({ preventScroll: true });
     if (hash === `#${topId}`) window.scrollTo({ top: 0, behavior: "instant" });
-    else target.scrollIntoView({ block: "start", behavior: "instant" });
+    else if (section === actions) {
+      // Cancel an earlier validation/review smooth scroll and let its last
+      // queued frame settle before positioning the buttons.
+      window.scrollTo({ top: window.scrollY, behavior: "instant" });
+      requestAnimationFrame(() => {
+        if (
+          content.hidden ||
+          contents.hidden ||
+          document.activeElement !== target
+        )
+          return;
+        const bounds = target.getBoundingClientRect();
+        window.scrollTo({
+          top:
+            window.scrollY +
+            bounds.top +
+            bounds.height / 2 -
+            actionsReadingEdge(bounds.height),
+          behavior: "instant",
+        });
+        schedule();
+      });
+    } else target.scrollIntoView({ block: "start", behavior: "instant" });
     schedule();
   };
   for (const { links } of sections) {
@@ -202,9 +247,13 @@ export function initPageContents(
   window.addEventListener("resize", refresh);
   window.addEventListener("pageshow", (event) => {
     refresh();
-    // Override the browser's initial fragment jump to the intro heading, while
+    // Override initial native jumps for the intro and action alignment, while
     // leaving bfcache scroll restoration alone on subsequent page visits.
-    if (!event.persisted && location.hash === `#${topId}`) visit(location.hash);
+    if (
+      !event.persisted &&
+      (location.hash === `#${topId}` || location.hash === actions?.hash)
+    )
+      requestAnimationFrame(() => visit(location.hash));
   });
   window.addEventListener("hashchange", () => {
     // History traversal restores scroll after dispatching its events. Apply the

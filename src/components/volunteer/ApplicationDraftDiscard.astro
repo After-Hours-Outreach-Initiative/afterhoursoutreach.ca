@@ -10,7 +10,14 @@ const discardId = crypto.randomUUID();
   data-application-draft-actions
   data-draft-discard-id={discardId}
 >
-  <div class="volunteer-actions">
+  <div
+    class="volunteer-actions"
+    id="application-review-and-discard"
+    data-contents-actions
+    role="group"
+    aria-label="Review and discard"
+    tabindex="-1"
+  >
     <button
       type="submit"
       form="volunteer-application"

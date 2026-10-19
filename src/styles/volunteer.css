@@ -443,6 +443,7 @@ body:has([data-application], [data-account-contents-flow]) {
 }
 .volunteer-contents a:focus-visible,
 .volunteer-contents summary:focus-visible,
+.volunteer-actions[data-contents-actions]:focus-visible,
 .volunteer-application-section > summary:focus-visible {
   outline: 3px solid #4169e1;
   outline-offset: 4px;
