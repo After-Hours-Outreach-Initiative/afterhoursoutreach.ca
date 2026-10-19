@@ -92,26 +92,17 @@ export function initApplicationReview(element: HTMLFormElement) {
     if (!moveFocus) return;
     const section = editTarget ? document.getElementById(editTarget) : null;
     editTarget = undefined;
-    if (
-      next === "questions" &&
-      section instanceof HTMLDetailsElement &&
-      questions.contains(section)
-    ) {
-      section.open = true;
-      focus(section.querySelector<HTMLElement>("summary"));
-    } else {
-      focus(
-        next === "questions"
-          ? (questions.querySelector<HTMLElement>(
-              "[data-application-section] > summary",
+    focus(
+      next === "questions"
+        ? section && questions.contains(section)
+          ? section
+          : (questions.querySelector<HTMLElement>(
+              "[data-application-section]",
             ) ??
-              contents?.querySelector<HTMLElement>("summary") ??
-              null)
-          : review.querySelector<HTMLElement>(
-              "[data-application-step-heading]",
-            ),
-      );
-    }
+            contents?.querySelector<HTMLElement>("summary") ??
+            null)
+        : review.querySelector<HTMLElement>("[data-application-step-heading]"),
+    );
   };
   const render = () => {
     const values = applicationSubmissionValues(element);
@@ -173,7 +164,7 @@ export function initApplicationReview(element: HTMLFormElement) {
       event.preventDefault();
       event.stopPropagation();
       if (element.dataset.submitting) return;
-      // Native constraint validation has already opened/focused invalid sections.
+      // Native constraint validation has already focused any invalid fields.
       render();
       history.pushState(state("review"), "");
       display("review");

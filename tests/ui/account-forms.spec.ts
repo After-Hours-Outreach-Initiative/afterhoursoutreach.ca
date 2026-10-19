@@ -690,6 +690,16 @@ test("application shows all required errors and saves after they are corrected",
     "Training and safety",
     "About volunteering",
   ]);
+  const sections = form.locator("[data-application-questions] > section");
+  await expect(sections).toHaveCount(5);
+  await expect(sections.locator("details, summary, h3 svg")).toHaveCount(0);
+  for (const section of await sections.all()) {
+    const heading = section.getByRole("heading", { level: 3 });
+    await expect(heading).toHaveAttribute("tabindex", "-1");
+    await expect(heading).toHaveAttribute("data-application-section");
+    await expect(heading).toHaveCSS("border-bottom-width", "1px");
+    await expect(section.locator(":scope > fieldset")).toBeVisible();
+  }
   await expect(form.locator('input[type="email"]')).toHaveCount(0);
   await expect(
     form
@@ -721,17 +731,17 @@ test("application shows all required errors and saves after they are corrected",
   const contents = page.getByRole("navigation", {
     name: "Sections",
   });
-  await form.locator("#application-emergency-contact > summary").click();
+  const emergencyHeading = form.locator("#application-emergency-contact");
+  await emergencyHeading.click();
+  for (const key of ["Enter", "Space"]) {
+    await emergencyHeading.press(key);
+    await expect(emergencyContact).toBeVisible();
+    await expect(emergencyContact.locator("input:visible")).toHaveCount(3);
+  }
   await contents
     .getByRole("link", { name: "Emergency contact", exact: true })
     .click();
-  await expect(form.locator("#application-emergency-contact")).toHaveAttribute(
-    "open",
-    "",
-  );
-  await expect(
-    form.locator("#application-emergency-contact > summary"),
-  ).toBeFocused();
+  await expect(emergencyHeading).toBeFocused();
   await expect(
     contents.locator(
       'a[href="#application-emergency-contact"][aria-current="location"]',
@@ -889,9 +899,7 @@ test("application shows all required errors and saves after they are corrected",
     .getByRole("button", { name: "Back to answers", exact: true })
     .click();
   await expect(contents).toBeVisible();
-  await expect(
-    form.locator("#application-personal-info > summary"),
-  ).toBeFocused();
+  await expect(form.locator("#application-personal-info")).toBeFocused();
   await reviewLocalApplication(page);
   await expect(contents).toBeHidden();
   await expect(conduct.getByRole("listitem")).toHaveText(
@@ -1223,6 +1231,14 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     const page = await context.newPage();
     await page.goto("/apply");
     const form = page.locator("[data-account-profile]");
+    await expect(
+      form.locator(
+        "[data-application-questions] details, [data-application-questions] summary",
+      ),
+    ).toHaveCount(0);
+    await expect(
+      form.locator(".volunteer-application-section > fieldset:visible"),
+    ).toHaveCount(5);
     const birthDate = form.locator('[data-birth-date-part="year"]');
     await expect(birthDate).toHaveAttribute("type", "text");
     await expect(birthDate).toHaveValue("");

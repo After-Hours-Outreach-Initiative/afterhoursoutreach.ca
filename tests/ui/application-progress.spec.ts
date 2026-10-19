@@ -301,7 +301,8 @@ for (const width of [390, 1280]) {
       await form.locator(`[name="${name}"]`).fill(value);
     await expectComplete(page, "emergency-contact", true);
     await expectProgress(page, 4);
-    await form.locator("#application-emergency-contact > summary").click();
+    await form.locator("#application-emergency-contact").click();
+    await expect(form.locator('[name="emergencyName"]')).toBeVisible();
     await expectComplete(page, "emergency-contact", true);
 
     await form.locator('[name="teams"][value="medic"]').check();
@@ -345,12 +346,8 @@ for (const width of [390, 1280]) {
     await tracker
       .getByRole("link", { name: "Emergency contact", exact: true })
       .click();
-    await expect(
-      form.locator("#application-emergency-contact"),
-    ).toHaveAttribute("open", "");
-    await expect(
-      form.locator("#application-emergency-contact > summary"),
-    ).toBeFocused();
+    await expect(form.locator("#application-emergency-contact")).toBeFocused();
+    await expect(form.locator('[name="emergencyName"]')).toBeVisible();
     await expect(tracker.locator('[aria-current="location"]')).toHaveCount(2);
     if (width < 1024)
       await expect(tracker.locator("[data-contents-current]")).toHaveText(
@@ -375,9 +372,7 @@ for (const width of [390, 1280]) {
     await expect(draftActions).toBeHidden();
     await form.getByRole("button", { name: "Back to answers" }).click();
     await expect(tracker).toBeVisible();
-    await expect(
-      form.locator("#application-personal-info > summary"),
-    ).toBeFocused();
+    await expect(form.locator("#application-personal-info")).toBeFocused();
     if (width < 1024) {
       await expect(menu).not.toHaveAttribute("open");
       await expect(reviewButton).toBeHidden();
@@ -392,6 +387,11 @@ for (const width of [390, 1280]) {
       "Test",
     );
     await expect(draftActions).toBeHidden();
+    await form.getByRole("button", { name: "Edit emergency contact" }).click();
+    await expect(form.locator("#application-emergency-contact")).toBeFocused();
+    await expect(form.locator('[name="emergencyName"]')).toHaveValue("Contact");
+    await page.goForward();
+    await expect(form.locator("[data-application-review-step]")).toBeVisible();
     await page.goBack();
     await expect(bottomReview).toBeVisible();
     await expect(discard).toBeVisible();
@@ -403,6 +403,9 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "training-and-safety", false);
     await expectComplete(page, "about-volunteering", false);
     await expectProgress(page, 1);
+    await expect(
+      form.locator(".volunteer-application-section > fieldset:visible"),
+    ).toHaveCount(5);
     if (width >= 1024) {
       await page.setViewportSize({ width, height: 400 });
       await expect(reviewButton).toBeInViewport();
@@ -439,6 +442,9 @@ test("restored drafts initialize completion without showing validation errors", 
   await expectComplete(page, "emergency-contact", true);
   await expectComplete(page, "training-and-safety", false);
   await expectProgress(page, 2);
+  await expect(
+    page.locator(".volunteer-application-section > fieldset:visible"),
+  ).toHaveCount(5);
   await expect(page.locator("[data-error]:visible")).toHaveCount(0);
 });
 
@@ -570,9 +576,7 @@ test("one compact mobile tracker keeps its reading edge and lets tall menus scro
     .click();
   await expect(reviewButton).toBeHidden();
   await expect(status).toBeHidden();
-  await expect(
-    page.locator("#application-emergency-contact > summary"),
-  ).toBeFocused();
+  await expect(page.locator("#application-emergency-contact")).toBeFocused();
   await expect
     .poll(async () =>
       // scrollIntoView rounds scroll positions while layout can be fractional.
@@ -831,9 +835,7 @@ test("the mobile dropdown works from its normal position and Overview restores S
     .click();
   await expect(menu).not.toHaveAttribute("open");
   await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);
-  await expect(
-    page.locator("#application-emergency-contact > summary"),
-  ).toBeFocused();
+  await expect(page.locator("#application-emergency-contact")).toBeFocused();
   const bar = (await compact.boundingBox())!;
   await expect
     .poll(async () =>

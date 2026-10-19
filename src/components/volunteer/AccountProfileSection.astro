@@ -3,14 +3,14 @@ interface Props {
   id: string;
   heading: string;
   description?: string;
-  collapsible?: boolean;
+  application?: boolean;
   describedBy?: string;
 }
 const {
   id,
   heading,
   description,
-  collapsible = false,
+  application = false,
   describedBy,
 } = Astro.props;
 const descriptionId = description ? `help-${id}` : undefined;
@@ -19,26 +19,16 @@ const sectionDescribedBy =
 ---
 
 {
-  collapsible ? (
-    <details
-      id={id}
-      class="volunteer-application-section"
-      data-application-section
-      aria-label={`${heading} section`}
-      open
-    >
-      <summary>
-        <h3 class="volunteer-profile-heading">{heading}</h3>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          aria-hidden="true"
-        >
-          <path d="m9 5 7 7-7 7" />
-        </svg>
-      </summary>
+  application ? (
+    <section class="volunteer-application-section" aria-labelledby={id}>
+      <h3
+        id={id}
+        class="volunteer-profile-heading"
+        data-application-section
+        tabindex="-1"
+      >
+        {heading}
+      </h3>
       <fieldset
         class="volunteer-profile-section"
         aria-describedby={sectionDescribedBy}
@@ -51,7 +41,7 @@ const sectionDescribedBy =
         )}
         <slot />
       </fieldset>
-    </details>
+    </section>
   ) : (
     <fieldset
       class="volunteer-profile-section"

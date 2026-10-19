@@ -464,7 +464,7 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-contents a:focus-visible,
 .volunteer-contents summary:focus-visible,
 .volunteer-actions[data-contents-actions]:focus-visible,
-.volunteer-application-section > summary:focus-visible {
+.volunteer-application-section > .volunteer-profile-heading:focus-visible {
   outline: 3px solid #4169e1;
   outline-offset: 4px;
 }
@@ -654,7 +654,7 @@ body:has([data-application], [data-account-contents-flow]) {
 [data-application-questions],
 .volunteer-application-section,
 [data-application] [data-application-step-heading],
-[data-application] .volunteer-application-section > summary,
+[data-application] .volunteer-application-section > .volunteer-profile-heading,
 [data-application] #code-of-conduct-heading,
 [data-application] :is(input, select, textarea) {
   scroll-margin-top: calc(
@@ -664,33 +664,8 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-application-section {
   min-width: 0;
 }
-.volunteer-application-section > summary {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.volunteer-application-section > .volunteer-profile-heading {
   min-height: 44px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #3f3f46;
-  cursor: pointer;
-  list-style: none;
-}
-.volunteer-application-section > summary::-webkit-details-marker {
-  display: none;
-}
-.volunteer-application-section > summary .volunteer-profile-heading {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-}
-.volunteer-application-section > summary svg {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  color: #a1a1aa;
-}
-.volunteer-application-section[open] > summary svg {
-  transform: rotate(90deg);
 }
 .volunteer-application-section > .volunteer-profile-section {
   margin-top: 24px;

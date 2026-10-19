@@ -82,7 +82,7 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
             id={`${application ? "application" : "account-profile"}-${section.key}`}
             heading={section.heading}
             description={section.description}
-            collapsible={application}
+            application={application}
             describedBy={
               section.key === "team-interests" ? "help-teams" : undefined
             }
