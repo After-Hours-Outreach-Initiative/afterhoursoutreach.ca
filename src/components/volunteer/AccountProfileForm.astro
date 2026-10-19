@@ -167,7 +167,15 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                   )}
                 </>
               ) : (
-                <div class="volunteer-fields">
+                <div
+                  class:list={[
+                    "volunteer-fields",
+                    {
+                      "volunteer-emergency-contact-fields":
+                        section.key === "emergency-contact",
+                    },
+                  ]}
+                >
                   {application && section.key === "personal-info" && (
                     <div class="volunteer-name-fields volunteer-wide">
                       {section.fields
