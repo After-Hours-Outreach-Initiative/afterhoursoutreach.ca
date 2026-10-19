@@ -42,7 +42,6 @@ let userId = "";
 let currentId = "";
 let twoFactorEnabled = false;
 let organizer = false;
-let applicationApproved = false;
 let active = false;
 let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
 let sessionsNeedSignIn = false;
@@ -82,7 +81,6 @@ try {
   const status = await createDatabase(env.DB).query.volunteerStatus.findFirst({
     where: eq(volunteerStatus.user_id, current.user.id),
   });
-  applicationApproved = status?.registration_approved ?? false;
   active = status?.active ?? false;
   try {
     const listed = await auth.api.listSessions({
@@ -150,18 +148,12 @@ const contents = [
     <PageContents entries={contents} />
     <div data-account-contents-body>
       {
-        !active ? (
+        !active && (
           <p class="volunteer-notice" role="status">
             Your volunteer account is inactive. Contact an organizer to restore
             access.
           </p>
-        ) : !applicationApproved && !organizer ? (
-          <p class="volunteer-notice" role="status">
-            Your application is awaiting organizer approval. You can update your
-            profile while you wait. Events and orientation sign-ups will be
-            available once approved.
-          </p>
-        ) : null
+        )
       }
       <section class="volunteer-panel">
         <h2 id="account-profile-heading" data-contents-section tabindex="-1">
