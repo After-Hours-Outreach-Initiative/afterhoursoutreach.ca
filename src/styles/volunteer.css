@@ -513,7 +513,7 @@ body:has([data-application], [data-account-contents-flow]) {
   .volunteer-contents-dropdown {
     border: var(--volunteer-border);
     border-top: 0;
-    border-radius: 0 0 8px 8px;
+    border-radius: 0;
     box-shadow: none;
   }
   .volunteer-application-contents .volunteer-draft-save-status {

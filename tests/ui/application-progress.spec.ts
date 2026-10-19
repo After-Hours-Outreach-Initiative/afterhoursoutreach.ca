@@ -766,7 +766,7 @@ test("one compact mobile tracker keeps its reading edge and scrolls its viewport
     await expect(tracker).toHaveCSS("position", "sticky");
     await expect(tracker).toHaveAttribute("data-contents-stuck", "");
     await expect(menu).not.toHaveCSS("box-shadow", "none");
-    await expect(dropdown).toHaveCSS("border-radius", "0px 0px 8px 8px");
+    await expect(dropdown).toHaveCSS("border-radius", "0px");
     await expectDropdown(dropdown, true);
     expect((await dropdown.boundingBox())!.height).toBe(viewport.height - 70);
     await expect(dropdown).toBeInViewport({ ratio: 1 });
@@ -988,7 +988,7 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(tracker).toHaveCSS("position", "sticky");
     await expect(dropdown).toHaveCSS("position", "absolute");
     await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
-    await expect(dropdown).toHaveCSS("border-radius", "0px 0px 8px 8px");
+    await expect(dropdown).toHaveCSS("border-radius", "0px");
     await expect(dropdown).toHaveCSS("border-top-width", "0px");
     const expanded = (await dropdown.boundingBox())!;
     const bar = (await summary.boundingBox())!;
