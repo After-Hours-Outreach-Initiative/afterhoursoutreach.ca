@@ -81,6 +81,7 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
           <AccountProfileSection
             id={`${application ? "application" : "account-profile"}-${section.key}`}
             heading={section.heading}
+            description={section.description}
             collapsible={application}
             describedBy={
               section.key === "team-interests" ? "help-teams" : undefined

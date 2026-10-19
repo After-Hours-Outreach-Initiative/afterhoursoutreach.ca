@@ -2,10 +2,20 @@
 interface Props {
   id: string;
   heading: string;
+  description?: string;
   collapsible?: boolean;
   describedBy?: string;
 }
-const { id, heading, collapsible = false, describedBy } = Astro.props;
+const {
+  id,
+  heading,
+  description,
+  collapsible = false,
+  describedBy,
+} = Astro.props;
+const descriptionId = description ? `help-${id}` : undefined;
+const sectionDescribedBy =
+  [descriptionId, describedBy].filter(Boolean).join(" ") || undefined;
 ---
 
 {
@@ -31,16 +41,21 @@ const { id, heading, collapsible = false, describedBy } = Astro.props;
       </summary>
       <fieldset
         class="volunteer-profile-section"
-        aria-describedby={describedBy}
+        aria-describedby={sectionDescribedBy}
       >
         <legend class="sr-only">{heading}</legend>
+        {description && (
+          <p class="volunteer-help" id={descriptionId}>
+            {description}
+          </p>
+        )}
         <slot />
       </fieldset>
     </details>
   ) : (
     <fieldset
       class="volunteer-profile-section"
-      aria-describedby={describedBy}
+      aria-describedby={sectionDescribedBy}
       data-profile-section
     >
       <legend class="sr-only">{heading}</legend>
@@ -75,6 +90,11 @@ const { id, heading, collapsible = false, describedBy } = Astro.props;
           Edit
         </button>
       </div>
+      {description && (
+        <p class="volunteer-help" id={descriptionId}>
+          {description}
+        </p>
+      )}
       <slot />
     </fieldset>
   )
