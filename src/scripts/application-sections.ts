@@ -34,8 +34,8 @@ export function initApplicationSections(element: HTMLFormElement) {
           (field.validity.valid &&
             (!field.required || Boolean(field.value.trim()))),
       );
-      // Count each form section once, excluding Overview and responsive copies.
-      if (content.contains(section)) sections.set(section.id, complete);
+      // Only completable entries carry progress links; deduplicate responsive copies.
+      sections.set(section.id, complete);
       link.dataset.complete = String(complete);
       const status = link.parentElement?.querySelector<HTMLElement>(
         "[data-application-completion-status]",

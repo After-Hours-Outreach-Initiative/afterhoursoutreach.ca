@@ -3,14 +3,17 @@ import DraftSaveStatus from "./DraftSaveStatus.astro";
 import PageContentsList from "./PageContentsList.astro";
 
 interface Props {
-  entries: { id: string; heading: string; nested?: boolean }[];
+  entries: {
+    id: string;
+    heading: string;
+    nested?: boolean;
+    completable?: boolean;
+  }[];
   application?: boolean;
 }
 const { entries, application = false } = Astro.props;
 const heading = application ? "Sections" : "On this page";
-const totalSections = entries.filter(
-  (entry) => entry.id !== "application-overview",
-).length;
+const totalSections = entries.filter((entry) => entry.completable).length;
 ---
 
 <nav

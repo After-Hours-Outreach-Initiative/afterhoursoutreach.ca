@@ -1,6 +1,11 @@
 ---
 interface Props {
-  entries: { id: string; heading: string; nested?: boolean }[];
+  entries: {
+    id: string;
+    heading: string;
+    nested?: boolean;
+    completable?: boolean;
+  }[];
   application: boolean;
   variant: "menu" | "sidebar";
 }
@@ -15,13 +20,19 @@ const { entries, application, variant } = Astro.props;
           href={`#${section.id}`}
           aria-current={index === 0 ? "location" : undefined}
           aria-describedby={
-            application ? `contents-${variant}-${section.id}-status` : undefined
+            application && section.completable
+              ? `contents-${variant}-${section.id}-status`
+              : undefined
           }
-          data-application-progress-link={application || undefined}
-          data-complete={application ? "false" : undefined}
+          data-application-progress-link={
+            (application && section.completable) || undefined
+          }
+          data-complete={
+            application && section.completable ? "false" : undefined
+          }
         >
           {section.heading}
-          {application && (
+          {application && section.completable && (
             <svg
               class="volunteer-contents-checkmark"
               viewBox="0 0 24 24"
@@ -34,7 +45,7 @@ const { entries, application, variant } = Astro.props;
             </svg>
           )}
         </a>
-        {application && (
+        {application && section.completable && (
           <span
             class="sr-only"
             id={`contents-${variant}-${section.id}-status`}

@@ -4,9 +4,18 @@ interface Props {
   sections: { key: string; heading: string }[];
 }
 const { sections } = Astro.props;
-const entries = [{ key: "overview", heading: "Overview" }, ...sections].map(
-  (section) => ({ ...section, id: `application-${section.key}` }),
-);
+const entries = [
+  { id: "application-overview", heading: "Overview" },
+  ...sections.map((section) => ({
+    ...section,
+    id: `application-${section.key}`,
+    completable: true,
+  })),
+  {
+    id: "application-review-and-discard",
+    heading: "Review and discard",
+  },
+];
 ---
 
 <PageContents entries={entries} application />
