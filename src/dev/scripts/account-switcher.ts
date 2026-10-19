@@ -114,7 +114,19 @@ export async function initAccountSwitcher() {
       after = result.next;
       currentUserId = result.currentUserId;
     } while (after);
-    users.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
+    const personaOrder = new Map([
+      ["local-account-user-not-applied", 0],
+      ["local-account-user-applied", 1],
+      ["local-account-user-accepted", 2],
+      ["local-account-user-inactive", 3],
+      ["local-account-user-organizer", 4],
+    ]);
+    users.sort(
+      (a, b) =>
+        (personaOrder.get(a.id) ?? personaOrder.size) -
+          (personaOrder.get(b.id) ?? personaOrder.size) ||
+        (a.name || a.email).localeCompare(b.name || b.email),
+    );
     for (const user of users) {
       const button = document.createElement("button");
       button.type = "button";
