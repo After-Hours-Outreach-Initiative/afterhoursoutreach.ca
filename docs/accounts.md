@@ -248,11 +248,14 @@ Dev-tool assets must not be placed in `public/`, which is copied into builds.
 The Not applied choice creates a new disposable D1 identity on each selection;
 submission, account naming, and private drafts still use the normal backend.
 All created identities remain visible and deletable, even if abandoned before
-submission. The original Not applied fixture is never cleared or repurposed.
-Deletion requires same-origin POST, explicit confirmation, server-owned provenance
-in the auth `account` table, and a volunteer role. It cannot delete canonical
-fixtures, organizers, or ordinary accounts; deleting a current disposable account
-also clears its browser session. See [backend.md](backend.md#local-testing).
+submission. Choosing Not applied never clears or repurposes the original fixture.
+Every saved local account has a Delete button, including ordinary sign-in accounts
+and fixtures. Visitor and the virtual Not applied choice are not saved accounts
+and have no Delete button. Deletion requires same-origin POST and explicit
+confirmation; deleting the current account also clears its browser session.
+The database still prevents deleting the last active organizer or accounts
+referenced by organizer-owned records, without partial cleanup.
+See [backend.md](backend.md#local-testing).
 
 ## TODO
 

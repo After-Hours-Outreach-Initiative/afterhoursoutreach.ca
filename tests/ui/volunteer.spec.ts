@@ -515,9 +515,9 @@ test("account navigation and profile controls are usable on desktop and mobile",
 
 test("local account selection rejects cross-origin writes and unknown users", async ({
   page,
-  request,
   baseURL,
 }) => {
+  const request = page.request;
   const user = await createLocalAccount(request, baseURL!);
   const response = await request.post("/api/v1/auth/dev/switch-user", {
     headers: { origin: "https://evil.example" },
@@ -544,17 +544,19 @@ test("local account selection rejects cross-origin writes and unknown users", as
     });
     expect(deletion.status()).toBe(403);
   }
-  for (const userId of [
-    user.id,
-    "local-fixture-user-robin",
-    "local-account-user-not-applied",
-  ]) {
+  for (const userId of ["not-a-user", "new-application"]) {
     const deletion = await request.post("/api/v1/auth/dev/delete-user", {
       headers: { origin: baseURL! },
       data: { userId, confirm: true },
     });
-    expect(deletion.status()).toBe(403);
+    expect(deletion.status()).toBe(404);
   }
+  const referenced = await request.post("/api/v1/auth/dev/delete-user", {
+    headers: { origin: baseURL! },
+    data: { userId: "local-fixture-user-robin", confirm: true },
+  });
+  expect(referenced.status()).toBe(409);
+  expect(await referenced.text()).toContain("referenced by organizer records");
   const unconfirmed = await request.post("/api/v1/auth/dev/delete-user", {
     headers: { origin: baseURL! },
     data: { userId: user.id },
@@ -564,7 +566,23 @@ test("local account selection rejects cross-origin writes and unknown users", as
     (await (await request.get("/api/v1/auth/get-session")).json()).user.id,
   ).toBe(user.id);
   await page.reload();
-  await openLocalAccountSwitcher(page);
+  const profiles = await openLocalAccountSwitcher(page);
+  await expect(
+    profiles.locator('[data-delete-user="local-fixture-user-robin"]'),
+  ).toBeVisible();
+  await expect(
+    profiles.locator(
+      '[data-delete-user="new-application"], [data-delete-user=""]',
+    ),
+  ).toHaveCount(0);
+  const remove = profiles.locator(`[data-delete-user="${user.id}"]`);
+  await expect(remove).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await remove.click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  expect(
+    await (await request.get("/api/v1/auth/get-session")).json(),
+  ).toBeNull();
 });
 
 test("View as simulates a verified factor without changing the user's real role or enrollment", async ({

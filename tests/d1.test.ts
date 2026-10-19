@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { env } from "cloudflare:workers";
+import { localEventFixtures } from "../scripts/local-event-fixtures";
 import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
 import { changeSignup, listEvents } from "../src/server/db/events";
@@ -31,8 +32,8 @@ import {
 import { processMedicCertificationNotifications } from "../src/server/medic-certifications";
 import {
   createDisposableAccount,
-  deleteDisposableAccount,
-} from "../src/dev/server/disposable-accounts";
+  deleteLocalAccount,
+} from "../src/dev/server/local-accounts";
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -403,7 +404,7 @@ test("deleting an account cascades to its private application draft", async () =
   assert.equal(await loadApplicationDraft(env.DB, actor.id), null);
 });
 
-test("disposable local accounts preserve old fixtures and deletion requires provenance, a volunteer role, and safe references", async () => {
+test("new local applications preserve old fixtures; deletion allows ordinary accounts but protects organizers and references", async () => {
   const original = await draftActor("local-account-user-not-applied");
   const answers = {
     ...draftProfileValues(
@@ -425,33 +426,33 @@ test("disposable local accounts preserve old fixtures and deletion requires prov
   };
   await saveProfile(env.DB, original.id, answers);
   const snapshot = await loadSubmittedApplication(env.DB, original.id);
-  const id = await createDisposableAccount(env.DB);
+  const fresh = await createDisposableAccount(env.DB);
   await createDisposableAccount(env.DB);
+  assert.equal(await loadProfile(env.DB, fresh), null);
+  assert.equal(await loadApplicationDraft(env.DB, fresh), null);
   assert.deepEqual(
     await loadSubmittedApplication(env.DB, original.id),
     snapshot,
   );
-  assert.equal(await deleteDisposableAccount(env.DB, original.id), false);
-  const lookalike = await draftActor(
-    `local-application-${crypto.randomUUID()}`,
-  );
-  assert.equal(await deleteDisposableAccount(env.DB, lookalike.id), false);
-
+  // Ordinary sign-in accounts have neither the application prefix nor a marker.
+  const { id } = await draftActor("ordinary-local-account");
   await saveProfile(env.DB, id, answers);
   const organizer = await draftActor("protected-organizer");
   await saveProfile(env.DB, organizer.id, answers);
   await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
     .bind(organizer.id)
     .run();
-  // Names/emails are editable, not a deletion authorization mechanism.
+  await assert.rejects(
+    deleteLocalAccount(env.DB, organizer.id),
+    (error: unknown) =>
+      error instanceof Error &&
+      /last_organizer/.test(`${error.message} ${error.cause}`),
+  );
+  assert.ok(await loadProfile(env.DB, organizer.id));
+  // An unreferenced organizer can be deleted while another active one remains.
   await env.DB.prepare(
-    "UPDATE user SET role='organizer', name='Changed', email='changed@example.org' WHERE id=?",
+    "UPDATE user SET role='organizer', name='1 1', email='changed@example.org' WHERE id=?",
   )
-    .bind(id)
-    .run();
-  assert.equal(await deleteDisposableAccount(env.DB, id), false);
-  assert.ok(await loadProfile(env.DB, id));
-  await env.DB.prepare("UPDATE user SET role='volunteer' WHERE id=?")
     .bind(id)
     .run();
   await env.DB.prepare(
@@ -465,16 +466,32 @@ test("disposable local accounts preserve old fixtures and deletion requires prov
       .bind(id)
       .first();
   const before = await audit();
-  await assert.rejects(deleteDisposableAccount(env.DB, id));
+  await assert.rejects(deleteLocalAccount(env.DB, id));
   assert.deepEqual(await audit(), before); // No partial child deletion on FK failure.
   assert.ok(await loadProfile(env.DB, id));
+  assert.equal(
+    await env.DB.prepare("SELECT role FROM user WHERE id=?")
+      .bind(id)
+      .first("role"),
+    "organizer",
+  );
   await env.DB.prepare("DELETE FROM event WHERE id='protected-event'").run();
-  assert.equal(await deleteDisposableAccount(env.DB, id), true);
+  assert.equal(await deleteLocalAccount(env.DB, id), true);
   assert.equal(await loadProfile(env.DB, id), null);
   assert.deepEqual(
     await loadSubmittedApplication(env.DB, original.id),
     snapshot,
   );
+  // The saved old Not applied fixture is deletable too, unlike the virtual choice.
+  assert.equal(await deleteLocalAccount(env.DB, original.id), true);
+  assert.equal(await loadSubmittedApplication(env.DB, original.id), null);
+  assert.equal(await deleteLocalAccount(env.DB, original.id), false);
+  await env.DB.batch(localEventFixtures().map((sql) => env.DB.prepare(sql)));
+  assert.equal(
+    await deleteLocalAccount(env.DB, "local-fixture-user-casey"),
+    true,
+  );
+  assert.equal(await loadProfile(env.DB, "local-fixture-user-casey"), null);
 });
 
 async function seedMedic(
