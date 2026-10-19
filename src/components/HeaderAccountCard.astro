@@ -21,7 +21,11 @@ const {
 ---
 
 <div class:list={["header-account-card", className]}>
-  <div class="header-account-identity">
+  <a
+    class="header-account-identity"
+    href="/volunteer/account"
+    aria-current={accountPage ? "page" : undefined}
+  >
     {
       showIcon && (
         <span class="header-account-icon">
@@ -42,7 +46,7 @@ const {
         {email}
       </p>
     </div>
-  </div>
+  </a>
   <a href="/volunteer/account" aria-current={accountPage ? "page" : undefined}
     >Account</a
   >

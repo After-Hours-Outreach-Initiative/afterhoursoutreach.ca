@@ -354,6 +354,19 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       "font-size",
       "14px",
     );
+    const identity = card.getByRole("link", {
+      name: "Robin Vance robin.local@example.org",
+      exact: true,
+    });
+    await expect(identity).toHaveAttribute("href", "/volunteer/account");
+    await expect(identity).not.toHaveAttribute("aria-current");
+    await expect(identity).toHaveCSS("overflow-wrap", "anywhere");
+    await expect(identity.locator(".header-account-details")).toHaveCSS(
+      "min-width",
+      "0px",
+    );
+    await identity.hover();
+    await expect(identity).toHaveCSS("background-color", "rgb(23, 26, 32)");
     const accountLink = card.getByRole("link", {
       name: "Account",
       exact: true,
@@ -376,6 +389,21 @@ for (const width of [1280, 1024, 768, 375, 320]) {
         () => document.documentElement.scrollWidth > innerWidth,
       ),
     ).toBe(false);
+    await focused.click();
+    await identity.focus();
+    await page.keyboard.press("Tab");
+    await expect(accountLink).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(identity).toBeFocused();
+    await expect(identity).toHaveCSS("outline-style", "solid");
+    await expect(identity).toHaveCSS("outline-width", "3px");
+    if (mobile) await identity.locator("[data-account-email]").click();
+    else await identity.press("Enter");
+    await expect(page).toHaveURL(/\/volunteer\/account$/);
+    await page.waitForLoadState("load");
+    await expect(focused).toHaveAttribute("aria-expanded", "false");
+    await focused.click();
+    await expect(identity).toHaveAttribute("aria-current", "page");
   });
 }
 
