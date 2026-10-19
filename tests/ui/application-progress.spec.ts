@@ -24,6 +24,19 @@ async function expectComplete(page: Page, section: string, complete: boolean) {
     await expect(link).toHaveAccessibleDescription(
       complete ? "Complete" : "Incomplete",
     );
+    const icon = link.locator("svg");
+    await expect(icon).toHaveAttribute("viewBox", "0 0 24 24");
+    await expect(icon).toHaveAttribute("aria-hidden", "true");
+    await expect(icon).toHaveAttribute("stroke-width", "2");
+    await expect(icon.locator("circle")).toHaveAttribute("r", "10");
+    await expect(icon).toHaveCSS(
+      "color",
+      complete ? "rgb(74, 222, 128)" : "rgb(161, 161, 170)",
+    );
+    await expect(icon.locator("path")).toHaveCSS(
+      "visibility",
+      complete ? "visible" : "hidden",
+    );
   }
 }
 
@@ -159,7 +172,7 @@ for (const width of [390, 1280]) {
       tracker.locator(
         '.volunteer-contents-sidebar [href="#application-personal-info"] svg',
       ),
-    ).toHaveCSS("visibility", "hidden");
+    ).toHaveCSS("visibility", "visible");
 
     if (width < 1024) await menu.locator("summary").click();
     await tracker
