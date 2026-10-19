@@ -151,6 +151,12 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   await form.locator('[data-birth-date-part="year"]').fill("19");
   await form.locator('[name="medicalConditions"]').fill("Sample medical draft");
   await form.locator('[name="teams"][value="medic"]').check();
+  await form
+    .locator('[data-date-input="certificationExpiry"] [data-date-part="month"]')
+    .fill("2");
+  await form
+    .locator('[data-date-input="certificationExpiry"] [data-date-part="year"]')
+    .fill("203");
   await form.locator('[name="certifications"][value="other"]').check();
   await form.locator('[name="experience"]').fill("Unfinished other experience");
   await form.locator('[name="teams"][value="medic"]').uncheck();
@@ -174,6 +180,16 @@ test("browser drafts preserve incomplete answers through reload and closing the 
     "Sample medical draft",
   );
   await form.locator('[name="teams"][value="medic"]').check();
+  await expect(
+    form.locator(
+      '[data-date-input="certificationExpiry"] [data-date-part="month"]',
+    ),
+  ).toHaveValue("2");
+  await expect(
+    form.locator(
+      '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+    ),
+  ).toHaveValue("203");
   await expect(
     form.locator('[name="certifications"][value="other"]'),
   ).toBeChecked();
@@ -207,6 +223,7 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   await expectDraftSaved(reopened, {
     firstName: "  Unfinished name ",
     birthDate: '["23","","19"]',
+    certificationExpiry: '["","2","203"]',
   });
 });
 
@@ -221,6 +238,10 @@ test("account drafts resume in a separate browser with no local storage and rema
   await page.locator('[name="firstName"]').fill("Different device");
   await fillApplicationField(page, "birthDate", "2020-01-01");
   await page.locator('[data-birth-date-part="month"]').fill("");
+  await page.locator('[name="teams"][value="medic"]').check();
+  await page
+    .locator('[data-date-input="certificationExpiry"] [data-date-part="year"]')
+    .fill("203");
   await page.locator('[name="training"][value="other"]').check();
   await page
     .locator('[name="otherTraining"]')
@@ -228,6 +249,7 @@ test("account drafts resume in a separate browser with no local storage and rema
   await expectDraftSaved(page, {
     firstName: "Different device",
     birthDate: '["01","","2020"]',
+    certificationExpiry: '["","","203"]',
     training: ["other"],
     otherTraining: "Still finishing training answer",
   });
@@ -263,6 +285,14 @@ test("account drafts resume in a separate browser with no local storage and rema
       "2020",
     );
     await expect(resumed.locator('[name="birthDate"]')).toHaveValue("");
+    await expect(
+      resumed.locator(
+        '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+      ),
+    ).toHaveValue("203");
+    await expect(resumed.locator('[name="certificationExpiry"]')).toHaveValue(
+      "",
+    );
     await expect(resumed.locator('[name="otherTraining"]')).toBeVisible();
     await expect(resumed.locator('[name="otherTraining"]')).toHaveValue(
       "Still finishing training answer",

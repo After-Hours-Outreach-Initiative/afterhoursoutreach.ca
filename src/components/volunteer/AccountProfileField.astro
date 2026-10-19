@@ -6,6 +6,7 @@ import {
 } from "@/data/application";
 import FieldError from "@/components/FieldError.astro";
 import ApplicationBirthDate from "./ApplicationBirthDate.astro";
+import DateInput from "./DateInput.astro";
 
 interface Props {
   field: (typeof applicationFields)[number];
@@ -45,6 +46,15 @@ const message =
       value={values?.birthDate ?? ""}
       help={"help" in field ? field.help : ""}
       required={required && active}
+    />
+  ) : field.name === "certificationExpiry" && !readOnly ? (
+    <DateInput
+      name={field.name}
+      id={`profile-${field.name}`}
+      label={field.label}
+      value={values?.[field.name] ?? ""}
+      {required}
+      {active}
     />
   ) : (
     <div

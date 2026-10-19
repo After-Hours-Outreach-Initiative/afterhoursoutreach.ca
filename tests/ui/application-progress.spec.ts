@@ -309,7 +309,7 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "training-and-safety", false);
     await expectProgress(page, 3);
     await form.locator('[name="certifications"][value="other"]').check();
-    await form.locator('[name="certificationExpiry"]').fill("2030-01-01");
+    await fillApplicationField(form, "certificationExpiry", "2030-01-01");
     await expectComplete(page, "training-and-safety", false);
     await form.locator('[name="experience"]').fill("Other medical training");
     await expectComplete(page, "training-and-safety", true);

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { chromium, expect, type Locator } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
+import { fillDateInput } from "../helpers/date-input";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
 import { hashAuthValue } from "../../src/server/db/rate-limits";
@@ -1056,6 +1057,7 @@ describe(
         try {
           const page = await browser.newPage({
             viewport: { width: 375, height: 812 },
+            timezoneId: "Asia/Tokyo",
           });
           const errors: string[] = [];
           page.on("pageerror", (error) => errors.push(error.message));
@@ -1351,9 +1353,7 @@ describe(
           await expect(hidden).toBeChecked();
           await page.keyboard.press("ArrowLeft");
           await expect(visible).toBeChecked();
-          await dialog
-            .getByLabel("Start date and time")
-            .fill("2031-04-12T20:30");
+          await fillDateInput(dialog, "startsAt", "2031-04-12T20:30");
           await dialog
             .getByLabel("Meeting point", { exact: true })
             .fill("Browser-created meeting point");
@@ -1371,6 +1371,14 @@ describe(
             loadingLabel: "Saving…",
           });
           await expect(dialog).toBeHidden();
+          assert.equal(
+            (
+              await DB.prepare("SELECT starts_at FROM event WHERE id=?")
+                .bind(await createdCard.getAttribute("data-live-event"))
+                .first()
+            )?.starts_at,
+            Date.parse("2031-04-13T03:30:00Z"),
+          );
           // Refreshed editor versions support another save without navigation.
           for (const spots of [9, 8]) {
             await createdCard
@@ -1380,6 +1388,10 @@ describe(
               name: "Edit event",
               exact: true,
             });
+            await expect(editor.locator('[data-date-part="day"]')).toHaveValue(
+              "12",
+            );
+            await expect(editor.getByLabel("Start time")).toHaveValue("20:30");
             await expect(
               editor.getByRole("combobox", { name: "Event type", exact: true }),
             ).toHaveCount(0);
@@ -1451,9 +1463,7 @@ describe(
           ).toHaveValue("");
           await expect(hidden).toBeChecked();
           await visibilityChoices.getByText("Visible", { exact: true }).click();
-          await dialog
-            .getByLabel("Start date and time")
-            .fill("2031-04-13T20:30");
+          await fillDateInput(dialog, "startsAt", "2031-04-13T20:30");
           await dialog
             .getByLabel("Meeting point", { exact: true })
             .fill("Browser move destination");

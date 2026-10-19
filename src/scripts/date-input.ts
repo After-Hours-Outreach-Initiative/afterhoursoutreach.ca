@@ -1,0 +1,190 @@
+import {
+  applicationBirthDateError,
+  isValidApplicationBirthDate,
+} from "../data/application";
+import {
+  canonicalDate,
+  dateDraftValue,
+  dateParts,
+  type DateParts,
+} from "../data/date-input";
+import { vancouverInstant } from "../data/event-time";
+
+const parts = ["day", "month", "year"] as const;
+const initialized = new WeakMap<HTMLFieldSetElement, () => void>();
+
+function controls(group: HTMLFieldSetElement) {
+  return {
+    canonical: group.querySelector<HTMLInputElement>(
+      'input[type="hidden"][name]',
+    )!,
+    day: group.querySelector<HTMLInputElement>('[data-date-part="day"]')!,
+    month: group.querySelector<HTMLInputElement>('[data-date-part="month"]')!,
+    year: group.querySelector<HTMLInputElement>('[data-date-part="year"]')!,
+    time: group.querySelector<HTMLInputElement>("[data-date-time-input]"),
+  };
+}
+
+function sync(group: HTMLFieldSetElement) {
+  const fields = controls(group);
+  const value = {
+    day: fields.day.value,
+    month: fields.month.value,
+    year: fields.year.value,
+  };
+  const date = canonicalDate(value);
+  const time = fields.time?.value;
+  fields.canonical.value =
+    date && (!fields.time || /^\d{2}:\d{2}$/.test(time!))
+      ? `${date}${fields.time ? `T${time}` : ""}`
+      : "";
+  return dateDraftValue(value);
+}
+
+function groups(root: Document | HTMLElement) {
+  return root.querySelectorAll<HTMLFieldSetElement>("[data-date-input]");
+}
+
+// Draft strings preserve correction buffers; only canonical values enter FormData.
+export function readDateInputs(root: Document | HTMLElement) {
+  return Object.fromEntries(
+    [...groups(root)].map((group) => [group.dataset.dateInput!, sync(group)]),
+  );
+}
+
+export function restoreDateInputs(
+  root: Document | HTMLElement,
+  values: Record<string, unknown>,
+) {
+  for (const group of groups(root)) {
+    const value = values[group.dataset.dateInput!];
+    if (typeof value !== "string") continue;
+    const fields = controls(group);
+    const restored = dateParts(value);
+    for (const part of parts) fields[part].value = restored[part];
+    sync(group);
+    initialized.get(group)?.();
+  }
+}
+
+export function saveDateInputDefaults(
+  root: Document | HTMLElement,
+  values: Record<string, string>,
+) {
+  for (const group of groups(root)) {
+    const fields = controls(group);
+    const saved = dateParts(values[group.dataset.dateInput!] ?? "");
+    for (const part of parts) {
+      const input = fields[part];
+      const current = input.value;
+      input.defaultValue = saved[part];
+      input.value = current;
+    }
+  }
+}
+
+export function setDateInputActive(
+  group: HTMLFieldSetElement,
+  active: boolean,
+) {
+  group.hidden = !active;
+  for (const input of group.querySelectorAll<HTMLInputElement>(
+    "[data-date-part]",
+  )) {
+    input.required = active;
+    input.readOnly = !active;
+  }
+  initialized.get(group)?.();
+}
+
+export function initDateInputs(root: Document | HTMLElement) {
+  for (const group of groups(root)) {
+    if (initialized.has(group)) continue;
+    const fields = controls(group);
+    const feedback = group.querySelector<HTMLElement>("[data-error] span")!;
+    const fallback = feedback.textContent!;
+    const birthDate = group.hasAttribute("data-birth-date");
+    const update = () => {
+      sync(group);
+      const { day, month, year, time } = fields;
+      for (const input of [day, month, year, time])
+        input?.setCustomValidity("");
+      if (day.readOnly) return;
+      if (
+        !day.required &&
+        !day.value &&
+        !month.value &&
+        !year.value &&
+        !time?.value
+      )
+        return;
+      let error: [keyof DateParts | "time", string] | undefined;
+      if (!day.value)
+        error = [
+          "day",
+          birthDate ? "Enter your day of birth." : "Enter the day.",
+        ];
+      else if (
+        !/^\d{1,2}$/.test(day.value) ||
+        +day.value < 1 ||
+        +day.value > 31
+      )
+        error = ["day", "Enter a day from 1 to 31."];
+      else if (!month.value)
+        error = [
+          "month",
+          birthDate ? "Enter your month of birth." : "Enter the month.",
+        ];
+      else if (
+        !/^\d{1,2}$/.test(month.value) ||
+        +month.value < 1 ||
+        +month.value > 12
+      )
+        error = ["month", "Enter a month from 1 to 12."];
+      else if (!year.value)
+        error = [
+          "year",
+          birthDate ? "Enter your year of birth." : "Enter the year.",
+        ];
+      else if (!/^\d{4}$/.test(year.value) || (birthDate && +year.value < 1900))
+        error = [
+          "year",
+          birthDate
+            ? "Enter a four-digit year of 1900 or later."
+            : "Enter a four-digit year.",
+        ];
+      else if (
+        !canonicalDate({ day: day.value, month: month.value, year: year.value })
+      )
+        error = [
+          "day",
+          birthDate
+            ? "Enter a real date of birth. Check the day and month."
+            : "Enter a real date. Check the day and month.",
+        ];
+      else if (
+        birthDate &&
+        !isValidApplicationBirthDate(fields.canonical.value)
+      )
+        error = ["year", applicationBirthDateError];
+      else if (time) {
+        if (!time.value) error = ["time", "Enter a start time."];
+        else {
+          try {
+            vancouverInstant(fields.canonical.value);
+          } catch (failure) {
+            error = ["time", (failure as Error).message];
+          }
+        }
+      }
+      if (error) fields[error[0]]!.setCustomValidity(error[1]);
+      feedback.textContent = error?.[1] ?? fallback;
+    };
+    initialized.set(group, update);
+    // Target listeners run before form-level autosave and dirty tracking.
+    group.addEventListener("input", update);
+    group.addEventListener("change", update);
+    group.form?.addEventListener("reset", () => queueMicrotask(update));
+    update();
+  }
+}

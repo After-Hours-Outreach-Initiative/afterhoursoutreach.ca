@@ -1,0 +1,112 @@
+---
+import FieldError from "@/components/FieldError.astro";
+import { dateParts, canonicalDate } from "@/data/date-input";
+
+interface Props {
+  name: string;
+  id: string;
+  label: string;
+  value: string;
+  help?: string;
+  required?: boolean;
+  active?: boolean;
+  birthDate?: boolean;
+  withTime?: boolean;
+  errorField?: string;
+}
+const {
+  name,
+  id,
+  label,
+  value,
+  help,
+  required = true,
+  active = true,
+  birthDate = false,
+  withTime = false,
+  errorField = name,
+} = Astro.props;
+const parts = dateParts(withTime ? value.split("T")[0] : value);
+const date = canonicalDate(parts);
+const time = withTime ? (value.split("T")[1] ?? "") : "";
+const message = birthDate
+  ? "Enter your date of birth."
+  : `Enter a valid ${label.toLowerCase()}${withTime ? " and time" : ""}.`;
+const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
+---
+
+<fieldset
+  class="volunteer-field volunteer-date-input"
+  data-date-input={name}
+  data-birth-date={birthDate || undefined}
+  data-date-time={withTime || undefined}
+  data-certification-expiry={name === "certificationExpiry" || undefined}
+  hidden={!active}
+>
+  <legend>
+    {label}{
+      required && (
+        <span class="volunteer-required" aria-hidden="true">
+          {" "}
+          *
+        </span>
+      )
+    }
+  </legend>
+  {
+    help && (
+      <span class="volunteer-help" id={`help-${id}`}>
+        {help}
+      </span>
+    )
+  }
+  <div class="volunteer-date-parts">
+    {
+      (["day", "month", "year"] as const).map((part) => (
+        <div class="volunteer-field">
+          <label for={`${id}-${part}`}>
+            {part[0].toUpperCase() + part.slice(1)}
+          </label>
+          <input
+            id={`${id}-${part}`}
+            data-date-part={part}
+            data-birth-date-part={birthDate ? part : undefined}
+            type="text"
+            inputmode="numeric"
+            autocomplete={birthDate ? `bday-${part}` : "off"}
+            aria-describedby={describedBy}
+            value={parts[part]}
+            required={required && active}
+            readonly={!active}
+            pattern={part === "year" ? String.raw`\d{4}` : String.raw`\d{1,2}`}
+            maxlength="10"
+            spellcheck={false}
+          />
+        </div>
+      ))
+    }
+  </div>
+  {
+    withTime && (
+      <div class="volunteer-field">
+        <label for={`${id}-time`}>Start time</label>
+        <input
+          id={`${id}-time`}
+          data-date-time-input
+          type="time"
+          value={time}
+          required={required && active}
+          aria-describedby={describedBy}
+        />
+      </div>
+    )
+  }
+  <input
+    type="hidden"
+    name={name}
+    value={date && (!withTime || time)
+      ? `${date}${withTime ? `T${time}` : ""}`
+      : ""}
+  />
+  <FieldError field={errorField} message={message} />
+</fieldset>
