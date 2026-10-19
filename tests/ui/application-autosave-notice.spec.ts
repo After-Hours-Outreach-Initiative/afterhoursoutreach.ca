@@ -61,9 +61,13 @@ for (const [layout, viewport] of [
       try {
         await page.goto("/apply", { waitUntil: "commit" });
         const indicator = localApplicationSaveIndicator(page);
+        const bottomIndicator = page.locator(
+          "[data-application-draft-actions] [data-draft-save-indicator]",
+        );
         const statusHeight = layout === "mobile" ? 21 : 24;
         await expect(indicator).toHaveCSS("min-height", `${statusHeight}px`);
         await expect(indicator).toBeHidden();
+        await expect(bottomIndicator).toBeHidden();
         await page.evaluate(() => document.fonts.ready);
         const initial = await measure();
         if (layout === "mobile") {
@@ -80,6 +84,14 @@ for (const [layout, viewport] of [
         );
         await expect(indicator).toHaveText(saved ? /^Last saved at / : "");
         await expect(indicator).toBeVisible();
+        await expect(bottomIndicator).toHaveAttribute(
+          "data-save-state",
+          saved ? "saved" : "idle",
+        );
+        await expect(bottomIndicator).toHaveText(await indicator.innerText());
+        await expect(bottomIndicator).toBeVisible();
+        await expect(bottomIndicator).toHaveCSS("font-size", "14px");
+        await expect(bottomIndicator).toHaveCSS("font-weight", "400");
         const listFontSize = await page
           .locator(".volunteer-application-intro li")
           .first()
@@ -141,8 +153,27 @@ for (const [layout, viewport] of [
     await expect(saveIndicator).toBeVisible();
     await expect(saveIndicator).toHaveAttribute("role", "status");
     await expect(saveIndicator).toHaveAttribute("aria-live", "polite");
-    await expect(page.locator("[data-draft-save-indicator]")).toHaveCount(2);
+    await expect(page.locator("[data-draft-save-indicator]")).toHaveCount(3);
     await expect(tracker.getByRole("status")).toHaveCount(1);
+    expect(
+      await page
+        .locator("[data-application-draft-actions] [data-draft-save-indicator]")
+        .evaluate((element) => {
+          const group = element.previousElementSibling!;
+          const bounds = element.getBoundingClientRect();
+          const groupBounds = group.getBoundingClientRect();
+          return (
+            group.id === "application-review-and-discard" &&
+            group.getAttribute("role") === "group" &&
+            group.querySelectorAll("button").length === 2 &&
+            element.nextElementSibling?.hasAttribute(
+              "data-draft-discard-status",
+            ) &&
+            bounds.left === groupBounds.left &&
+            bounds.top === groupBounds.bottom + 12
+          );
+        }),
+    ).toBe(true);
     expect(
       await saveIndicator.evaluate((element) =>
         element.previousElementSibling?.hasAttribute("data-application-review"),

@@ -36,6 +36,7 @@ async function expectSaveTime(page: Page) {
   await expect(page.locator("[data-draft-save-indicator]")).toHaveText([
     savedMessage,
     savedMessage,
+    savedMessage,
   ]);
   await expect(
     localApplicationSaveIndicator(page).locator("svg"),
@@ -205,8 +206,8 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   await expect(reopened.locator(statusSelector)).toContainText(
     "We could not connect",
   );
-  await expect(localApplicationSaveIndicator(reopened)).toHaveText(
-    "Couldn’t save to your account",
+  await expect(reopened.locator("[data-draft-save-indicator]")).toHaveText(
+    Array(3).fill("Couldn’t save to your account"),
   );
   await expect(
     localApplicationSaveIndicator(reopened).locator("svg"),
