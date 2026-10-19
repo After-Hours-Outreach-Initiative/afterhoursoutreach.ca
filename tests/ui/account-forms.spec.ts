@@ -390,15 +390,16 @@ test("contents navigation contrasts with the header and leaves room for the page
     "rgb(0, 0, 0)",
   );
   await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
-  await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
-  await expect(toggle).toHaveCSS("border-width", "1px");
+  await expect(toggle).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(toggle).toHaveCSS("border-width", "0px");
+  await expect(bar).toHaveCSS("border-width", "1px");
   const current = bar.locator("[data-contents-current]");
   await expect(current).toHaveCSS("color", "rgb(255, 255, 255)");
   await expect(current).toHaveCSS("font-size", "16px");
   await toggle.click();
   await expect(menu).toHaveAttribute("open", "");
   await expect(bar).toHaveCSS("background-color", "rgb(23, 26, 32)");
-  await expect(toggle).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await expect(toggle).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await page.keyboard.press("Escape");
   await expect(menu).not.toHaveAttribute("open");
 
