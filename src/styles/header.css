@@ -125,11 +125,14 @@
 }
 .header-account-card .header-account-identity {
   padding: 12px;
-  border-bottom: 1px solid #27272a;
-  margin-bottom: 4px;
   color: white;
   font-weight: 400;
   overflow-wrap: anywhere;
+}
+.header-account-divider {
+  margin: 0 -4px 4px;
+  border: 0;
+  border-top: 1px solid #27272a;
 }
 .header-account-details {
   min-width: 0;
