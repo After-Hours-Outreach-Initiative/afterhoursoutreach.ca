@@ -58,11 +58,14 @@ into a fresh disposable local D1 account with an empty application and no draft 
 selected answers. Submitting uses the normal application flow, keeps this browser
 signed into that account, and lists it under the entered name in View as. Unfinished
 accounts/drafts remain listed too, so repeated selections never leave invisible
-accounts. Each disposable volunteer account has a **Delete** button with confirmation;
+accounts. Every saved local account has a **Delete** button with confirmation,
+including regular sign-in accounts, named fixtures, and the original Not applied
+account. Visitor and the virtual Not applied choice have no Delete button;
 deleting the current account signs out, while deleting another leaves the current
 session alone. Deletion removes its application, draft, sessions, and related volunteer
-records. Fixtures, organizers, and regular sign-in accounts cannot be deleted here.
-Accounts referenced by organizer-owned records cannot be deleted either.
+records in one transaction. Existing database protections block deletion of the
+last active organizer and accounts referenced by organizer-owned records; an error
+is shown and no records are changed when deletion is blocked.
 
 For manual testing, run `pnpm db:seed:local:accounts` with the dev server running
 and local migrations applied. On a fresh local database, View as contains

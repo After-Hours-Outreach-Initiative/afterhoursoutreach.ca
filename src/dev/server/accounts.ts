@@ -9,19 +9,14 @@ import {
   expireCookie,
   setSessionCookie,
 } from "better-auth/cookies";
-import { and, asc, eq, gt } from "drizzle-orm";
+import { asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "../../server/db";
-import { account, profile, user } from "../../server/db/schema";
+import { profile, user } from "../../server/db/schema";
 import { safeReturnTo } from "../../server/http";
 import type { AuthBindings } from "../../server/auth";
 import { newApplicationPersona } from "../accounts";
-import {
-  createDisposableAccount,
-  deleteDisposableAccount,
-  disposableAccountId,
-  disposableAccountProvider,
-} from "./disposable-accounts";
+import { createDisposableAccount, deleteLocalAccount } from "./local-accounts";
 
 export function developmentAccounts(bindings: AuthBindings) {
   const requireLocal = (request: Request | undefined) => {
@@ -55,29 +50,14 @@ export function developmentAccounts(bindings: AuthBindings) {
               name: user.name,
               email: user.email,
               role: user.role,
-              disposableId: account.id,
             })
             .from(user)
-            .leftJoin(
-              account,
-              and(
-                eq(account.user_id, user.id),
-                eq(account.account_id, user.id),
-                eq(account.provider_id, disposableAccountProvider),
-              ),
-            )
             .where(ctx.query.after ? gt(user.id, ctx.query.after) : undefined)
             .orderBy(asc(user.id))
             .limit(101);
           const current = await getSessionFromCtx(ctx);
           return ctx.json({
-            users: rows.slice(0, 100).map(({ disposableId, ...person }) => ({
-              ...person,
-              canDelete:
-                disposableId !== null &&
-                person.role === "volunteer" &&
-                disposableAccountId.test(person.id),
-            })),
+            users: rows.slice(0, 100),
             next: rows.length > 100 ? rows[99].id : null,
             currentUserId: current?.user.id ?? null,
           });
@@ -165,20 +145,21 @@ export function developmentAccounts(bindings: AuthBindings) {
           const current = await getSessionFromCtx(ctx);
           let deleted: boolean;
           try {
-            deleted = await deleteDisposableAccount(
-              bindings.DB,
-              ctx.body.userId,
-            );
-          } catch {
+            deleted = await deleteLocalAccount(bindings.DB, ctx.body.userId);
+          } catch (error) {
+            const reason =
+              error instanceof Error
+                ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
+                : "";
             throw new APIError("CONFLICT", {
-              message:
-                "Could not delete this local account. It may be referenced by organizer records.",
+              message: reason.includes("last_organizer")
+                ? "Keep at least one active organizer. This local account was not deleted."
+                : "Could not delete this local account. It may be referenced by organizer records.",
             });
           }
           if (!deleted)
-            throw new APIError("FORBIDDEN", {
-              message:
-                "Only disposable local volunteer accounts can be deleted.",
+            throw new APIError("NOT_FOUND", {
+              message: "Local account not found.",
             });
           const deletedCurrent = current?.user.id === ctx.body.userId;
           if (deletedCurrent) {

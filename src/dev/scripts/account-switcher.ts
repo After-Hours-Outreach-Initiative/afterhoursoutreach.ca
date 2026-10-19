@@ -101,7 +101,7 @@ export async function initAccountSwitcher() {
     if (button.dataset.deleteUser) {
       if (
         !window.confirm(
-          `Delete ${button.dataset.deleteName}? This permanently removes this local test account, its application, and its draft.`,
+          `Delete ${button.dataset.deleteName}? This permanently removes this local account, its application, and its draft.`,
         )
       )
         return;
@@ -116,12 +116,12 @@ export async function initAccountSwitcher() {
           location.assign(result.next);
           return;
         }
-        button.closest("[data-disposable-account]")?.remove();
+        button.closest("[data-local-account]")?.remove();
         setBusy(false);
         profiles
           .querySelector<HTMLButtonElement>("[data-switch-user]")
           ?.focus();
-        message.textContent = "Local test account deleted.";
+        message.textContent = "Local account deleted.";
         message.hidden = false;
       } catch (error) {
         setBusy(false);
@@ -198,23 +198,19 @@ export async function initAccountSwitcher() {
         label,
         `${user.email}${user.role === "organizer" ? " · Organizer" : ""}`,
       );
-      if (user.canDelete) {
-        const row = document.createElement("div");
-        row.className = "grid min-w-0 gap-1";
-        row.dataset.disposableAccount = user.id;
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.className = "btn btn-quiet";
-        remove.textContent = "Delete";
-        remove.setAttribute("aria-label", `Delete ${label} (${user.email})`);
-        remove.dataset.deleteUser = user.id;
-        remove.dataset.deleteName = `${label} (${user.email})`;
-        row.appendChild(button);
-        row.appendChild(remove);
-        profiles.appendChild(row);
-      } else {
-        profiles.appendChild(button);
-      }
+      const row = document.createElement("div");
+      row.className = "grid min-w-0 gap-1";
+      row.dataset.localAccount = user.id;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn btn-quiet";
+      remove.textContent = "Delete";
+      remove.setAttribute("aria-label", `Delete ${label} (${user.email})`);
+      remove.dataset.deleteUser = user.id;
+      remove.dataset.deleteName = `${label} (${user.email})`;
+      row.appendChild(button);
+      row.appendChild(remove);
+      profiles.appendChild(row);
     }
     profiles
       .querySelectorAll<HTMLButtonElement>("[data-switch-user]")
