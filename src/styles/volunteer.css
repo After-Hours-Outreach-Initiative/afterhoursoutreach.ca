@@ -497,7 +497,21 @@ body:has([data-application], [data-account-contents-flow]) {
   }
   [data-application-flow] > .volunteer-contents {
     top: 0;
-    margin: 0 calc(-1 * var(--contents-padding)) 32px;
+    margin: 0 0 32px;
+    background: transparent;
+  }
+  [data-application-contents] .volunteer-contents-menu {
+    border-radius: 8px;
+  }
+  [data-application-contents][data-contents-stuck] .volunteer-contents-menu {
+    box-shadow: 0 4px 12px #0004;
+  }
+  [data-application-contents] summary {
+    border: var(--volunteer-border);
+    border-radius: 8px;
+  }
+  [data-application-contents] .volunteer-contents-menu[open] > summary {
+    border-radius: 8px 8px 0 0;
   }
   /* A tall application menu belongs to the page, not a nested scroll area.
      Without scripts, keep the whole navigation in normal flow as well. */
@@ -509,6 +523,10 @@ body:has([data-application], [data-account-contents-flow]) {
     max-height: none;
     overflow: visible;
     overscroll-behavior: auto;
+    border: var(--volunteer-border);
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+    box-shadow: none;
   }
   [data-application-contents]:not([data-contents-enhanced])
     .volunteer-contents-dropdown,
