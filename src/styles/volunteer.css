@@ -497,21 +497,32 @@ body:has([data-application], [data-account-contents-flow]) {
   }
   [data-application-flow] > .volunteer-contents {
     top: 0;
-    margin: 0 0 32px;
+    margin: 0;
     background: transparent;
   }
+  /* The summary owns the shared seam; review keeps its standalone panel. */
+  [data-application-flow]
+    > [data-application-contents]:not([hidden])
+    + [data-application] {
+    margin-top: 0;
+    border-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
   [data-application-contents] .volunteer-contents-menu {
-    border-radius: 8px;
+    border-radius: 10px 10px 0 0;
   }
   [data-application-contents][data-contents-stuck] .volunteer-contents-menu {
     box-shadow: 0 4px 12px #0004;
   }
   [data-application-contents] summary {
     border: var(--volunteer-border);
-    border-radius: 8px;
+    border-radius: 10px 10px 0 0;
   }
-  [data-application-contents] .volunteer-contents-menu[open] > summary {
-    border-radius: 8px 8px 0 0;
+  [data-application-contents][data-contents-stuck] .volunteer-contents-menu,
+  [data-application-contents][data-contents-stuck] summary {
+    border-radius: 0;
+    background: var(--color-panel-soft);
   }
   /* A tall application menu belongs to the page, not a nested scroll area.
      Without scripts, keep the whole navigation in normal flow as well. */
@@ -533,6 +544,7 @@ body:has([data-application], [data-account-contents-flow]) {
   [data-application-contents][data-contents-page-flow]
     .volunteer-contents-dropdown {
     position: static;
+    border-radius: 0;
   }
   [data-application-contents] .volunteer-draft-save-status {
     justify-content: flex-end;
