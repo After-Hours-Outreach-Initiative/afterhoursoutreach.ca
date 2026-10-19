@@ -15,6 +15,7 @@ export function initPageContents(
   const bar =
     contents.querySelector<HTMLElement>("[data-contents-bar]") ?? menu;
   const application = contents.hasAttribute("data-application-contents");
+  if (application) contents.setAttribute("data-contents-enhanced", "");
   const links = [...contents.querySelectorAll<HTMLAnchorElement>("a")];
   // Both responsive lists share each section, so targets are measured and
   // observed once while all of their links stay in sync.
@@ -45,12 +46,27 @@ export function initPageContents(
       headerPosition === "sticky" || headerPosition === "fixed"
         ? Math.max(0, header?.getBoundingClientRect().bottom ?? 0)
         : 0;
-    // The actual mobile tracker stays in flow with CSS sticky. Its dropdown is
-    // absolute, so opening it cannot change the reading edge or anchor offset.
+    // Only the compact bar contributes to the reading edge, even when a tall
+    // application menu temporarily joins the page flow on a short screen.
     barHeight = menu.getBoundingClientRect().height
-      ? bar.getBoundingClientRect().height
+      ? (application ? toggle : bar).getBoundingClientRect().height
       : 0;
     if (!barHeight) menu.open = false;
+    if (application && dropdown) {
+      const wasPageFlow = contents.hasAttribute("data-contents-page-flow");
+      const pageFlow =
+        menu.open &&
+        barHeight +
+          dropdown.getBoundingClientRect().height +
+          stickyHeight +
+          16 >
+          window.innerHeight;
+      contents.toggleAttribute("data-contents-page-flow", pageFlow);
+      // Releasing a previously sticky menu can return it far above the current
+      // scroll position. Start at its summary so every link remains reachable.
+      if (pageFlow && !wasPageFlow)
+        toggle.scrollIntoView({ block: "start", behavior: "instant" });
+    }
     flow.style.setProperty("--contents-sticky-offset", `${stickyHeight}px`);
     flow.style.setProperty("--contents-bar-height", `${barHeight}px`);
     flow.style.setProperty(
@@ -107,9 +123,8 @@ export function initPageContents(
       active = actions;
     if (active && active.links[0].getAttribute("aria-current") !== "location")
       activate(active);
-    if (!barHeight) return;
-    // Include the dropdown's gap below the bar. Its scroll area contains both
-    // section links and any action, so the action stays reachable on short screens.
+    if (!barHeight || application) return;
+    // Account navigation keeps its existing bounded dropdown scroll area.
     const dropdownTop =
       menu.open && dropdown
         ? dropdown.getBoundingClientRect().top
@@ -124,6 +139,18 @@ export function initPageContents(
   };
   const refresh = () => {
     measure();
+    if (
+      application &&
+      menu.open &&
+      dropdown &&
+      !contents.hasAttribute("data-contents-page-flow")
+    ) {
+      // A menu that fits can still open below the fold before the bar sticks.
+      // Move the page just enough to show it all, including the save status.
+      const overflow =
+        dropdown.getBoundingClientRect().bottom + 16 - window.innerHeight;
+      if (overflow > 0) window.scrollBy({ top: overflow, behavior: "instant" });
+    }
     schedule();
   };
   const reveal = (target: HTMLElement) => {
@@ -228,6 +255,7 @@ export function initPageContents(
     contents,
     bar,
     menu,
+    application ? dropdown : null,
     flow,
     content,
     ...sections.map(({ target }) => target),

@@ -1187,7 +1187,7 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     ).toHaveCount(1);
     const contents = page.getByRole("navigation", { name: "Sections" });
     const menu = contents.locator("[data-contents-menu]");
-    await expect(contents).toHaveCSS("position", "sticky");
+    await expect(contents).toHaveCSS("position", "relative");
     await expect(contents.locator(".volunteer-contents-sidebar")).toBeHidden();
     await expect(menu).toBeVisible();
     await expect(menu.locator("[data-contents-current]")).toHaveText(
@@ -1198,15 +1198,13 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     await menu
       .getByRole("link", { name: "Emergency contact", exact: true })
       .click();
+    await expect(page).toHaveURL(/#application-emergency-contact$/);
+    await expect(
+      page.locator("#application-emergency-contact"),
+    ).toBeInViewport();
     await menu.locator("summary").press("Enter");
     await expect(menu).not.toHaveAttribute("open");
-    await expect.poll(async () => (await contents.boundingBox())!.y).toBe(0);
-    const barHeight = (await contents.boundingBox())!.height;
-    expect(
-      Math.round(
-        (await page.locator("#application-emergency-contact").boundingBox())!.y,
-      ),
-    ).toBeGreaterThanOrEqual(barHeight + 16);
+    await expect(menu.locator("summary")).toBeInViewport({ ratio: 1 });
   } finally {
     await context.close();
   }
