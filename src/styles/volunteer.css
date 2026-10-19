@@ -493,6 +493,23 @@ body:has([data-application], [data-account-contents-flow]) {
     top: 0;
     margin: 0 calc(-1 * var(--contents-padding)) 32px;
   }
+  /* A tall application menu belongs to the page, not a nested scroll area.
+     Without scripts, keep the whole navigation in normal flow as well. */
+  [data-application-contents]:not([data-contents-enhanced]),
+  [data-application-contents][data-contents-page-flow] {
+    position: relative;
+  }
+  [data-application-contents] .volunteer-contents-dropdown {
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+  [data-application-contents]:not([data-contents-enhanced])
+    .volunteer-contents-dropdown,
+  [data-application-contents][data-contents-page-flow]
+    .volunteer-contents-dropdown {
+    position: static;
+  }
   [data-application-contents] .volunteer-draft-save-status {
     justify-content: flex-end;
     font-size: 14px;
