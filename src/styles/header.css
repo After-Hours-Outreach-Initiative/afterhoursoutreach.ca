@@ -151,15 +151,20 @@
 .header-mobile-panel {
   max-height: calc(100dvh - 5.5rem);
   padding-top: 8px;
+  padding-bottom: 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+.header-mobile-links {
+  border-top: 1px solid #27272a;
 }
 .header-mobile-link {
   display: flex;
   align-items: center;
   min-height: 48px;
   width: 100%;
-  padding: 12px 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid #27272a;
   color: #d4d4d8;
   font-size: 20px;
   line-height: 1.5;
@@ -171,17 +176,36 @@
   background: #171a20;
 }
 .header-mobile-children {
-  margin: 0 20px 0 28px;
+  margin-left: 20px;
 }
 .header-mobile-children .header-mobile-link {
-  padding-left: 20px;
+  padding-left: 12px;
   font-size: 18px;
 }
 .header-mobile-panel [data-header-discord] {
+  margin-top: 16px;
   font-size: 18px;
 }
 .header-mobile-account {
-  margin: 16px;
+  margin: 16px 0;
+}
+.header-mobile-account .header-account-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-mobile-account .header-account-icon {
+  width: 44px;
+  height: 44px;
+}
+.header-mobile-account .header-account-details {
+  min-width: 0;
+}
+.header-mobile-account .header-account-card a,
+.header-mobile-account .header-account-card button {
+  min-height: 56px;
+  padding: 12px 16px;
+  font-size: 18px;
 }
 @media (max-width: 639px) {
   .header-mobile-panel {

@@ -164,12 +164,26 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(header.locator("[data-volunteer-menu]")).toBeHidden();
     await expect(header.locator("[data-volunteer-children]")).toBeHidden();
     if (mobile) {
-      await expect(navigation).toHaveCSS("border-top-width", "0px");
-      await expect(navigation).toHaveCSS("border-bottom-width", "0px");
+      await expect(navigation).toHaveCSS("background-color", "rgb(0, 0, 0)");
+      const gutter = width < 640 ? 16 : 24;
+      await expect(navigation).toHaveCSS("padding-left", `${gutter}px`);
+      await expect(navigation).toHaveCSS("padding-right", `${gutter}px`);
+      await expect(navigation.locator(".header-mobile-links")).toHaveCSS(
+        "border-top-width",
+        "1px",
+      );
       for (const item of await navigation
-        .locator(".header-mobile-links > li")
+        .locator(".header-mobile-links > li > a")
         .all())
-        await expect(item).toHaveCSS("border-bottom-width", "0px");
+        await expect(item).toHaveCSS("border-bottom-width", "1px");
+      const discord = navigation.getByRole("link", {
+        name: "Join Discord",
+        exact: true,
+      });
+      await expect(discord).toHaveClass("btn btn-primary");
+      const discordBox = await discord.boundingBox();
+      expect(discordBox!.x).toBe(gutter);
+      expect(discordBox!.width).toBeLessThan(width - gutter * 2);
     }
 
     // Public pages resolve the same session as the volunteer portal.
@@ -222,6 +236,8 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await expect(
         children.getByRole("link", { name: "Events", exact: true }),
       ).toHaveCSS("font-size", "18px");
+      for (const child of await children.getByRole("link").all())
+        await expect(child).toHaveCSS("border-bottom-width", "1px");
       const parentBox = await parent.boundingBox();
       const childBox = await children
         .getByRole("link", { name: "Events", exact: true })
@@ -282,7 +298,8 @@ for (const width of [1280, 1024, 768, 375, 320]) {
         exact: true,
       });
       await expect(sitePages.locator("[data-mobile-account]")).toHaveCount(0);
-      await expect(account.locator(".header-account-icon")).toHaveCount(0);
+      const icon = account.locator(".header-account-icon");
+      await expect(icon).toBeVisible();
       const sitePagesBox = await sitePages.boundingBox();
       const accountBox = await account.boundingBox();
       expect(accountBox!.y).toBeGreaterThanOrEqual(
@@ -294,7 +311,12 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       const emailBox = await account
         .locator("[data-account-email]")
         .boundingBox();
+      const iconBox = await icon.boundingBox();
       expect(emailBox!.x).toBe(nameBox!.x);
+      expect(iconBox!.x + iconBox!.width).toBeLessThan(nameBox!.x);
+      expect(iconBox!.x + iconBox!.width).toBeLessThan(emailBox!.x);
+      expect(accountBox!.x).toBe(width < 640 ? 16 : 24);
+      expect(accountBox!.width).toBe(width - accountBox!.x * 2);
     } else {
       const accountToggle = account.locator("summary");
       await accountToggle.click();
@@ -337,10 +359,12 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       exact: true,
     });
     await expect(accountLink).toBeVisible();
-    await expect(accountLink).toHaveCSS("font-size", "16px");
-    await expect(
-      card.getByRole("button", { name: "Sign out", exact: true }),
-    ).toBeVisible();
+    const signOut = card.getByRole("button", { name: "Sign out", exact: true });
+    await expect(signOut).toBeVisible();
+    for (const action of [accountLink, signOut]) {
+      await expect(action).toHaveCSS("font-size", mobile ? "18px" : "16px");
+      await expect(action).toHaveCSS("min-height", mobile ? "56px" : "44px");
+    }
     for (const discord of await header.locator("[data-header-discord]").all())
       await expect(discord).toBeHidden();
     await page.keyboard.press("Escape");
@@ -372,7 +396,7 @@ test("mobile account controls stay reachable in a short viewport", async ({
   });
   await signOut.scrollIntoViewIfNeeded();
   await expect(signOut).toBeInViewport();
-  await expect(signOut).toHaveCSS("min-height", "44px");
+  await expect(signOut).toHaveCSS("min-height", "56px");
   const panel = header.getByRole("navigation", {
     name: "Mobile navigation",
     exact: true,

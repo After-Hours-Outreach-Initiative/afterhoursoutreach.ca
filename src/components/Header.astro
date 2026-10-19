@@ -191,7 +191,7 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
         ></span>
       </summary>
       <nav
-        class="header-mobile-panel absolute inset-x-0 top-full w-full bg-ink"
+        class="header-mobile-panel absolute inset-x-0 top-full w-full bg-black px-6 max-sm:px-4"
         aria-label="Mobile navigation"
       >
         <ul class="header-mobile-links" aria-label="Site pages">
@@ -237,10 +237,10 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
           data-mobile-account
           hidden={!signedIn}
         >
-          <HeaderAccountCard {signedIn} {name} {email} {accountPage} />
+          <HeaderAccountCard {signedIn} {name} {email} {accountPage} showIcon />
         </section>
         <a
-          class="flex items-center gap-2.5 bg-blue px-5 py-4 text-base font-bold"
+          class="btn btn-primary"
           data-header-discord
           hidden={signedIn}
           href={social.discord}
