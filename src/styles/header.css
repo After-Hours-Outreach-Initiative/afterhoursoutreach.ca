@@ -117,10 +117,9 @@
 }
 .header-dropdown a:hover,
 .header-dropdown button:hover,
-.header-dropdown a[aria-current],
+.header-dropdown:not(.header-account-card) a[aria-current],
 .header-account-card a:hover,
-.header-account-card button:hover,
-.header-account-card a[aria-current] {
+.header-account-card button:hover {
   color: white;
   background: #171a20;
 }

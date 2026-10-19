@@ -214,6 +214,9 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(
       navigation.getByRole("link", { name: "Events", exact: true }),
     ).toBeHidden();
+    await expect(
+      navigation.getByRole("link", { name: "About", exact: true }),
+    ).toHaveCSS("color", "rgb(255, 255, 255)");
 
     await viewAs(page, baseURL!, true);
     await page.goto("/about");
@@ -284,6 +287,10 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveAttribute("aria-current", "page");
+    await page.mouse.move(0, 0);
+    await expect(
+      navigation.getByRole("link", { name: "Volunteers", exact: true }),
+    ).toHaveCSS("background-color", "rgb(23, 26, 32)");
 
     await expect(
       account.locator(
@@ -404,7 +411,21 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await page.waitForLoadState("load");
     await expect(focused).toHaveAttribute("aria-expanded", "false");
     await focused.click();
-    await expect(identity).toHaveAttribute("aria-current", "page");
+    for (const link of [identity, accountLink]) {
+      await expect(link).toHaveAttribute("aria-current", "page");
+      await page.mouse.move(0, 0);
+      await expect(link).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await link.hover();
+      await expect(link).toHaveCSS("background-color", "rgb(23, 26, 32)");
+      await page.mouse.move(0, 0);
+      await link.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+      await expect(link).toBeFocused();
+      await expect(link).toHaveCSS("outline-style", "solid");
+      await expect(link).toHaveCSS("outline-width", "3px");
+    }
+    await expect(accountLink).toHaveCSS("color", "rgb(212, 212, 216)");
   });
 }
 
