@@ -48,10 +48,25 @@ export const sampleAnswers = {
   medicalConditions: "Sample private answer",
 };
 
-export async function submitLocalApplication(page: Page) {
+export async function reviewLocalApplication(page: Page) {
+  if ((page.viewportSize()?.width ?? 1280) < 1024) {
+    const tracker = page.locator("[data-application-contents]");
+    // The compact progress menu appears only after the inline checklist scrolls away.
+    await page
+      .locator("#application-emergency-contact > summary")
+      .scrollIntoViewIfNeeded();
+    await expect(tracker).toHaveAttribute("data-contents-sticky", "");
+    const menu = tracker.locator("[data-contents-menu]");
+    if (!(await menu.evaluate((element: HTMLDetailsElement) => element.open)))
+      await menu.locator("summary").click();
+  }
   await page
     .getByRole("button", { name: "Review application", exact: true })
     .click();
+}
+
+export async function submitLocalApplication(page: Page) {
+  await reviewLocalApplication(page);
   await page.locator('[name="codeOfConductAccepted"]').check();
   await page
     .getByRole("button", { name: "Submit application", exact: true })

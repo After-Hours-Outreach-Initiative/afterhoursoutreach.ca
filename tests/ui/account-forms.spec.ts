@@ -2,6 +2,7 @@ import { devices, expect, test } from "@playwright/test";
 import {
   createLocalAccount,
   openLocalAccountSwitcher,
+  reviewLocalApplication,
   sampleAnswers,
   submitLocalApplication,
 } from "../helpers/local-account";
@@ -764,7 +765,7 @@ test("application shows all required errors and saves after they are corrected",
       () => document.documentElement.scrollWidth > innerWidth,
     ),
   ).toBe(false);
-  await page.getByRole("button", { name: "Review application" }).click();
+  await reviewLocalApplication(page);
   const conduct = form.getByRole("region", {
     name: "Code of Conduct",
     exact: true,
@@ -774,9 +775,10 @@ test("application shows all required errors and saves after they are corrected",
     .getByRole("button", { name: "Back to answers", exact: true })
     .click();
   await expect(contents).toBeVisible();
-  await page
-    .getByRole("button", { name: "Review application", exact: true })
-    .click();
+  await expect(
+    form.locator("#application-personal-info > summary"),
+  ).toBeFocused();
+  await reviewLocalApplication(page);
   await expect(contents).toBeHidden();
   await expect(conduct.getByRole("listitem")).toHaveText(
     codeOfConductRules.slice(0, 2),
@@ -1078,6 +1080,14 @@ test("the application requires JavaScript and renders blank DOB format guidance"
         (input: HTMLInputElement) => input.validity.valid,
       ),
     ).toBe(true);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const reviewButtons = page.locator("[data-application-review]");
+    await expect(reviewButtons).toHaveCount(2);
+    for (const button of await reviewButtons.all())
+      await expect(button).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Review application" }),
+    ).toHaveCount(0);
   } finally {
     await context.close();
   }
@@ -1179,12 +1189,12 @@ test("all teams can select multiple relevant training answers and add Other deta
       await form.locator(`[name="${field}"]`).fill(String(value));
   }
   await none.uncheck();
-  await page.getByRole("button", { name: "Review application" }).click();
+  await reviewLocalApplication(page);
   await expect(naloxone).toBeFocused();
   await expect(training.locator("[data-error=training]")).toBeVisible();
   expect(requests).toHaveLength(0);
   await none.check();
-  await page.getByRole("button", { name: "Review application" }).click();
+  await reviewLocalApplication(page);
   await expect(form.locator('[data-review-answer="training"]')).toHaveText(
     "No relevant training or experience",
   );
@@ -1211,7 +1221,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(details.locator(".volunteer-help")).toHaveCount(0);
   for (const blank of ["", " \t\n\u00a0 "]) {
     await otherText.fill(blank);
-    await page.getByRole("button", { name: "Review application" }).click();
+    await reviewLocalApplication(page);
     await expect(otherText).toBeFocused();
     await expect(details.locator("[data-error=otherTraining]")).toBeVisible();
     expect(requests).toHaveLength(0);

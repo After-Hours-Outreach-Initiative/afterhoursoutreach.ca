@@ -373,7 +373,7 @@ body:has([data-application], [data-account-contents-flow]) {
   padding: 0;
   list-style: none;
 }
-.volunteer-contents-menu > ol {
+.volunteer-contents-dropdown {
   position: absolute;
   inset: 100% 0 auto;
   display: grid;
@@ -390,6 +390,9 @@ body:has([data-application], [data-account-contents-flow]) {
   border-radius: 0 0 6px 6px;
   background: #0c0d10;
   box-shadow: 0 12px 30px #0008;
+}
+.volunteer-contents-dropdown > .btn {
+  margin-block: 8px;
 }
 .volunteer-contents-sidebar {
   display: none;
@@ -525,7 +528,7 @@ body:has([data-application], [data-account-contents-flow]) {
     /* Already offscreen: hide the duplicate links without reclaiming space. */
     visibility: hidden;
   }
-  [data-application-contents] .volunteer-contents-menu > ol {
+  [data-application-contents] .volunteer-contents-dropdown {
     top: calc(100% + 1px);
   }
   [data-application-contents] summary {
@@ -567,9 +570,6 @@ body:has([data-application], [data-account-contents-flow]) {
   }
 }
 @media (min-width: 64rem) {
-  .volunteer-application-review-bottom {
-    display: none;
-  }
   [data-application-contents] {
     display: flex;
     flex-direction: column;

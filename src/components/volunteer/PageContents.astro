@@ -85,11 +85,26 @@ const totalSections = entries.filter(
             )
           }
         </summary>
-        <PageContentsList
-          entries={entries}
-          application={application}
-          variant="menu"
-        />
+        <div class="volunteer-contents-dropdown" data-contents-dropdown>
+          <PageContentsList
+            entries={entries}
+            application={application}
+            variant="menu"
+          />
+          {
+            application && (
+              <button
+                type="submit"
+                form="volunteer-application"
+                data-application-review
+                class="btn btn-primary"
+                disabled
+              >
+                Review application
+              </button>
+            )
+          }
+        </div>
       </details>
       {
         application && (

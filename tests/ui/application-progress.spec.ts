@@ -35,10 +35,12 @@ for (const width of [390, 1280]) {
     const tracker = page.getByRole("navigation", {
       name: "Application progress",
     });
-    const reviewButton = page.getByRole("button", {
-      name: "Review application",
-      exact: true,
-    });
+    const menu = tracker.locator("[data-contents-menu]");
+    const reviewButton = tracker.locator(
+      width < 1024
+        ? "[data-contents-menu] [data-application-review]"
+        : ".volunteer-contents-actions [data-application-review]",
+    );
     await expectComplete(page, "overview", true);
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
@@ -47,22 +49,16 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "about-volunteering", false);
     await expect(count).toHaveText(["1/5 complete", "1/5 complete"]);
     await expect(form.locator("[data-error]:visible")).toHaveCount(0);
-    await expect(reviewButton).toHaveCount(1);
+    await expect(page.locator("[data-application-review]")).toHaveCount(2);
+    await expect(form.locator("[data-application-review]")).toHaveCount(0);
     await expect(reviewButton).toBeEnabled();
     if (width < 1024) {
-      await expect(tracker.locator("[data-application-review]")).toBeHidden();
+      await expect(reviewButton).toBeHidden();
       await expect(
-        form.locator("[data-application-questions] > :last-child"),
-      ).toHaveAttribute("data-application-review", "");
-      await expect(reviewButton).not.toBeInViewport();
+        page.getByRole("button", { name: "Review application", exact: true }),
+      ).toHaveCount(0);
     } else {
-      await expect(form.locator("[data-application-review]")).toBeHidden();
-      await expect(
-        tracker.getByRole("button", {
-          name: "Review application",
-          exact: true,
-        }),
-      ).toBeInViewport();
+      await expect(reviewButton).toBeInViewport();
     }
     expect(
       await reviewButton.evaluate((button: HTMLButtonElement) =>
@@ -86,6 +82,20 @@ for (const width of [390, 1280]) {
         '.volunteer-contents-sidebar [href="#application-personal-info"] svg',
       ),
     ).toHaveCSS("visibility", "hidden");
+
+    if (width < 1024) {
+      await tracker
+        .locator(".volunteer-contents-sidebar")
+        .getByRole("link", { name: "Emergency contact", exact: true })
+        .click();
+      await menu.locator("summary").click();
+      await expect(reviewButton).toBeVisible();
+      await reviewButton.click();
+      await expect(form.locator('[name="firstName"]')).toBeFocused();
+      await expect(form.locator("[data-application-review-step]")).toBeHidden();
+      await expect(menu).not.toHaveAttribute("open");
+      await expect(reviewButton).toBeHidden();
+    }
 
     await form.locator('[name="training"][value="none"]').check();
     await expectComplete(page, "training-and-safety", true);
@@ -171,7 +181,13 @@ for (const width of [390, 1280]) {
         "Emergency contact",
       );
 
-    if (width >= 1024) await expect(reviewButton).toBeInViewport();
+    if (width < 1024) {
+      await expect(reviewButton).toBeHidden();
+      await page.setViewportSize({ width, height: 360 });
+      await menu.locator("summary").click();
+      await reviewButton.scrollIntoViewIfNeeded();
+    }
+    await expect(reviewButton).toBeInViewport({ ratio: 1 });
     await reviewButton.click();
     await expect(form.locator("[data-application-review-step]")).toBeVisible();
     await expect(
@@ -183,6 +199,10 @@ for (const width of [390, 1280]) {
     await expect(
       form.locator("#application-personal-info > summary"),
     ).toBeFocused();
+    if (width < 1024) {
+      await expect(menu).not.toHaveAttribute("open");
+      await expect(reviewButton).toBeHidden();
+    }
 
     await form.evaluate((element: HTMLFormElement) => element.reset());
     await expectComplete(page, "personal-info", false);
@@ -241,6 +261,8 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
   const status = tracker.locator("[data-draft-save-indicator]");
   const compact = tracker.locator("[data-contents-bar]");
   const menu = tracker.locator("[data-contents-menu]");
+  const dropdown = menu.locator("[data-contents-dropdown]");
+  const reviewButton = dropdown.locator("[data-application-review]");
   const summary = tracker.locator("summary");
   const inline = tracker.locator(".volunteer-contents-inline-heading");
   await expect(tracker).not.toHaveAttribute("data-contents-sticky");
@@ -294,7 +316,7 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
     "font-size",
     "14px",
   );
-  await expect(tracker.locator("[data-application-review]")).toBeHidden();
+  await expect(reviewButton).toBeHidden();
   expect((await status.boundingBox())!.y).toBeGreaterThanOrEqual(
     (await tracker.locator("summary").boundingBox())!.height,
   );
@@ -302,13 +324,17 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
   expect(height).toBe(84);
   await tracker.locator("summary").click();
   expect((await compact.boundingBox())!.height).toBe(height);
-  const dropdown = await tracker
-    .locator("[data-contents-menu] > ol")
-    .boundingBox();
-  expect(dropdown!.y).toBeGreaterThanOrEqual(height);
+  await expect(reviewButton).toBeVisible();
+  const dropdownBounds = (await dropdown.boundingBox())!;
+  const linksBounds = (await dropdown.locator("ol").boundingBox())!;
+  expect(dropdownBounds.y).toBeGreaterThanOrEqual(height);
+  expect((await reviewButton.boundingBox())!.y).toBeGreaterThanOrEqual(
+    linksBounds.y + linksBounds.height,
+  );
   await tracker
     .getByRole("link", { name: "Emergency contact", exact: true })
     .click();
+  await expect(reviewButton).toBeHidden();
   await expect(
     page.locator("#application-emergency-contact > summary"),
   ).toBeFocused();
@@ -341,17 +367,26 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
     await expect(
       summary.locator("[data-application-progress-count]"),
     ).toBeInViewport();
-    await expect(tracker.locator("[data-application-review]")).toBeHidden();
+    await expect(reviewButton).toBeHidden();
     await tracker.locator("summary").click();
     await expect
       .poll(async () => {
-        const list = await tracker
-          .locator("[data-contents-menu] > ol")
-          .boundingBox();
-        return list!.y + list!.height;
+        const bounds = (await dropdown.boundingBox())!;
+        return bounds.y + bounds.height;
       })
       .toBeLessThanOrEqual(viewport.height - 16);
+    expect((await compact.boundingBox())!.height).toBe(height);
+    await menu
+      .getByRole("link", { name: "About volunteering", exact: true })
+      .focus();
+    await page.keyboard.press("Tab");
+    await expect(reviewButton).toBeFocused();
+    await expect(reviewButton).toBeInViewport({ ratio: 1 });
+    const action = (await reviewButton.boundingBox())!;
+    expect(action.y).toBeGreaterThanOrEqual(height);
+    expect(action.y + action.height).toBeLessThanOrEqual(viewport.height - 16);
     await page.keyboard.press("Escape");
+    await expect(reviewButton).toBeHidden();
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
