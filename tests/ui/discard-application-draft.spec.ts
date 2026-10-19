@@ -442,7 +442,14 @@ test("offline deletion resumes automatically when the connection returns", async
   await expect(page.locator(status)).toContainText(
     "This browser’s draft answers were deleted",
   );
-  await expect(localApplicationSaveIndicator(page)).toHaveText("Saving paused");
+  await expect(page.locator("[data-draft-save-indicator]")).toHaveText(
+    Array(3).fill("Saving paused"),
+  );
+  await expect(
+    page.locator(
+      "[data-application-draft-actions] [data-draft-save-indicator]",
+    ),
+  ).toHaveAttribute("data-save-state", "paused");
   expect(await local(page, id)).toBeNull();
   expect((await account(page)).draft.answers.firstName).toBe(
     "Still on account",
