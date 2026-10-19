@@ -26,11 +26,18 @@
   background: #16214a;
   color: white;
 }
-.account-profile-button:focus-visible {
+.account-profile-delete {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+.account-profile-button:focus-visible,
+.account-profile-delete:focus-visible {
   outline: 2px solid #a5b4fc;
   outline-offset: 2px;
 }
-.account-profile-button:disabled {
+.account-profile-button:disabled,
+.account-profile-delete:disabled {
   opacity: 0.6;
   cursor: wait;
 }
