@@ -305,7 +305,9 @@ for (const path of ["/apply", "/volunteer/account"]) {
       });
       try {
         await page.goto(path, { waitUntil: "commit" });
-        const contents = page.locator("[data-page-contents]");
+        const contents = page.getByRole("navigation", {
+          name: path === "/apply" ? "Sections" : "On this page",
+        });
         await expect(contents).toBeVisible();
         if (path === "/volunteer/account") {
           await expect(

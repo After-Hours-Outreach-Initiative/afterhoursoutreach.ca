@@ -1,8 +1,15 @@
 export function initPageContents(
   flow: HTMLElement,
-  { content = flow, topId }: { content?: HTMLElement; topId?: string } = {},
+  {
+    content = flow,
+    contents = flow.querySelector<HTMLElement>("[data-page-contents]"),
+    topId,
+  }: {
+    content?: HTMLElement;
+    contents?: HTMLElement | null;
+    topId?: string;
+  } = {},
 ) {
-  const contents = flow.querySelector<HTMLElement>("[data-page-contents]");
   const menu = contents?.querySelector<HTMLDetailsElement>(
     "[data-contents-menu]",
   );
@@ -14,7 +21,9 @@ export function initPageContents(
   if (!contents || !menu || !toggle || !current) return;
   const bar =
     contents.querySelector<HTMLElement>("[data-contents-bar]") ?? menu;
-  const application = contents.hasAttribute("data-application-contents");
+  const review = contents.hasAttribute("data-application-review-contents");
+  const application =
+    contents.hasAttribute("data-application-contents") || review;
   const links = [...contents.querySelectorAll<HTMLAnchorElement>("a")];
   // Both responsive lists share each section, so targets are measured and
   // observed once while all of their links stay in sync.
@@ -39,6 +48,11 @@ export function initPageContents(
   let frame = 0;
 
   const measure = () => {
+    // Only the visible step's navigation may set the shared scroll offsets.
+    if (contents.hidden) {
+      menu.open = false;
+      return;
+    }
     // A preview banner can initially shift the sticky header down.
     const headerPosition = header && getComputedStyle(header).position;
     stickyHeight =
@@ -193,9 +207,9 @@ export function initPageContents(
         )
           return;
         event.preventDefault();
-        // Preserve the review step's history state without a native anchor jump
-        // racing the reveal/focus and measured scroll offset.
-        if (location.hash !== link.hash)
+        // Review jumps stay within the step, preserving Back/Edit navigation.
+        // Other jumps retain history without racing measured scroll offsets.
+        if (!review && location.hash !== link.hash)
           history.pushState(history.state, "", link.hash);
         visit(link.hash);
       });

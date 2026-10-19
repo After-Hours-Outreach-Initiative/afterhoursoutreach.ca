@@ -152,9 +152,7 @@ for (const width of [390, 1280]) {
     await createLocalAccount(page.request, baseURL!, false);
     await page.goto("/apply#application-review-and-discard");
     const form = page.locator("form[data-application]");
-    const tracker = page.getByRole("navigation", {
-      name: "Sections",
-    });
+    const tracker = page.locator("[data-application-contents]");
     const menu = tracker.locator("[data-contents-menu]");
     const reviewButton = localApplicationReviewButton(page);
     const bottomReview = localApplicationReviewButton(page, "bottom");
@@ -405,11 +403,49 @@ for (const width of [390, 1280]) {
       form.getByRole("heading", { name: "Review application", exact: true }),
     ).toBeFocused();
     await expect(tracker).toBeHidden();
-    await expect(form).toHaveCSS("border-top-width", "1px");
-    await expect(form).toHaveCSS("border-radius", "10px");
+    const reviewTracker = page.getByRole("navigation", { name: "Sections" });
+    await expect(reviewTracker).toHaveAttribute(
+      "data-application-review-contents",
+    );
+    await expect(reviewTracker).toBeVisible();
+    await expect(
+      reviewTracker.locator(
+        "[data-application-progress], [data-application-review], [data-draft-save-indicator]",
+      ),
+    ).toHaveCount(0);
+    await expect(form).toHaveCSS(
+      "border-top-width",
+      width < 1024 ? "0px" : "1px",
+    );
+    await expect(form).toHaveCSS(
+      "border-radius",
+      width < 1024 ? "0px 0px 10px 10px" : "10px",
+    );
     await expect(draftActions).toBeHidden();
+    if (width < 1024) await reviewTracker.locator("summary").click();
+    await expect(reviewTracker.getByRole("link")).toHaveText([
+      "Overview",
+      "Personal info",
+      "Emergency contact",
+      "Team interests",
+      "Training and safety",
+      "About volunteering",
+      "Code of Conduct",
+    ]);
+    await reviewTracker
+      .getByRole("link", { name: "Emergency contact", exact: true })
+      .click();
+    await expect(form.locator("#review-emergency-contact")).toBeFocused();
+    await expect(form.locator("#review-emergency-contact")).toBeInViewport();
+    await expect(
+      reviewTracker.locator('[aria-current="location"]'),
+    ).toHaveCount(2);
+    await expect(form.locator("[data-application-review-step]")).toBeVisible();
     await form.getByRole("button", { name: "Back to answers" }).click();
     await expect(tracker).toBeVisible();
+    await expect(
+      page.locator("[data-application-review-contents]"),
+    ).toBeHidden();
     await expect(form.locator("#application-personal-info")).toBeFocused();
     if (width < 1024) {
       await expect(menu).not.toHaveAttribute("open");

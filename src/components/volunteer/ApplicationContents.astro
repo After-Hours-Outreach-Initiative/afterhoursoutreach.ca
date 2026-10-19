@@ -19,3 +19,16 @@ const entries = [
 ---
 
 <PageContents entries={entries} application />
+<PageContents
+  entries={[
+    { id: "application-overview", heading: "Overview" },
+    ...sections.map((section) => ({
+      id: `review-${section.key}`,
+      heading: section.heading,
+      nested: true,
+    })),
+    { id: "code-of-conduct-heading", heading: "Code of Conduct" },
+  ]}
+  application
+  review
+/>
