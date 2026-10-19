@@ -1,4 +1,4 @@
-import { devices, expect, test } from "@playwright/test";
+import { devices, expect, test, type Locator } from "@playwright/test";
 import {
   createLocalAccount,
   fillApplicationField,
@@ -26,6 +26,26 @@ import {
 
 const emergencyContactDescription =
   "Someone we can contact if you need help during an event.";
+
+async function expectEmergencyContactRows(section: Locator) {
+  const grid = section.locator(".volunteer-fields");
+  const bounds = await grid.boundingBox();
+  const boxes = await grid.locator("input").evaluateAll((inputs) =>
+    inputs.map((input) => {
+      const { x, y, width, height } = input.getBoundingClientRect();
+      return { x, y, width, height };
+    }),
+  );
+  expect(boxes).toHaveLength(3);
+  for (const [index, box] of boxes.entries()) {
+    expect(box.x).toBeCloseTo(bounds!.x, 1);
+    expect(box.width).toBeCloseTo(bounds!.width, 1);
+    if (index)
+      expect(box.y).toBeGreaterThan(
+        boxes[index - 1].y + boxes[index - 1].height,
+      );
+  }
+}
 
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
@@ -632,6 +652,9 @@ test("application shows all required errors and saves after they are corrected",
         overflows: document.documentElement.scrollWidth > innerWidth,
       })),
     ).toEqual({ columns: width >= 1024 ? 2 : 1, overflows: false });
+    await expectEmergencyContactRows(
+      form.getByRole("group", { name: "Emergency contact", exact: true }),
+    );
   }
   await expect(form.getByRole("heading", { level: 3 })).toHaveText([
     "Personal info",
@@ -1875,6 +1898,10 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await expect(preferredName).toBeDisabled();
   await expect(name).toBeEditable();
   await expect(emergencyDescription).toBeVisible();
+  for (const width of [1280, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectEmergencyContactRows(emergencyContact);
+  }
   await expect(editor.locator(".volunteer-fields").first()).toHaveCSS(
     "opacity",
     "1",

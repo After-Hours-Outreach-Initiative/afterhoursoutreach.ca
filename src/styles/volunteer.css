@@ -164,6 +164,9 @@ body:has([data-application], [data-account-contents-flow]) {
   grid-template-columns: 1fr 1fr;
   gap: 24px;
 }
+.volunteer-fields.volunteer-emergency-contact-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
 .volunteer-name-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
