@@ -346,7 +346,7 @@ for (const path of ["/apply", "/volunteer/account"]) {
                 (await contents.locator("[data-contents-bar]").boundingBox())!
                   .y,
             )
-            .toBe(0);
+            .toBe(path === "/apply" ? 0 : header!.height);
         } else {
           await page.evaluate(() =>
             scrollTo({ top: 500, behavior: "instant" }),
@@ -446,6 +446,8 @@ test("account contents navigate profile and settings sections on desktop and mob
     const menu = contents.locator("[data-contents-menu]");
     const summary = menu.locator("summary");
     const current = summary.locator("[data-contents-current]");
+    const header = page.locator(".site-header");
+    const headerHeight = (await header.boundingBox())!.height;
     await expect(
       contents.locator(
         "[data-application-progress], [data-application-progress-link], .volunteer-contents-completion-icon, [data-application-review], .volunteer-draft-save-status",
@@ -469,10 +471,7 @@ test("account contents navigate profile and settings sections on desktop and mob
       );
       await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
       await expect(summary).toHaveCSS("background-color", "rgb(23, 26, 32)");
-      await expect(page.locator(".site-header")).toHaveCSS(
-        "position",
-        "relative",
-      );
+      await expect(header).toHaveCSS("position", "sticky");
       await expect(contents).not.toHaveAttribute("data-contents-stuck");
       const initial = (await summary.boundingBox())!;
       const panel = (await page
@@ -494,7 +493,10 @@ test("account contents navigate profile and settings sections on desktop and mob
         await target.click();
         await expect(menu).toHaveAttribute("open", "");
         await expect(dropdown).toHaveCSS("position", "absolute");
-        await expect(dropdown).toHaveCSS("max-height", "742px");
+        await expect(dropdown).toHaveCSS(
+          "max-height",
+          `${812 - headerHeight - 70}px`,
+        );
         await expect(dropdown).toHaveCSS("overscroll-behavior", "auto");
         await expect(dropdown).toHaveCSS("border-radius", "0px 0px 8px 8px");
         const expanded = (await dropdown.boundingBox())!;
@@ -570,20 +572,25 @@ test("account contents navigate profile and settings sections on desktop and mob
         await expect(contents).toHaveAttribute("data-contents-stuck", "");
         await expect(summary).toHaveCSS("border-radius", "0px");
         await expect(menu).not.toHaveCSS("box-shadow", "none");
-        await expect.poll(async () => (await summary.boundingBox())!.y).toBe(0);
+        await expect
+          .poll(async () => (await summary.boundingBox())!.y)
+          .toBe(headerHeight);
+        expect((await header.boundingBox())!.y).toBe(0);
         expect(
           Math.round((await page.locator(`#${id}`).boundingBox())!.y),
-        ).toBeGreaterThanOrEqual(70);
+        ).toBeGreaterThanOrEqual(headerHeight + 70);
       }
     }
     if (width < 1024) {
       // Scrolling, not only choosing links, updates the current section.
-      await page.locator("#account-factor-heading").evaluate((heading) => {
-        scrollTo({
-          top: scrollY + heading.getBoundingClientRect().top - 70,
-          behavior: "instant",
-        });
-      });
+      await page
+        .locator("#account-factor-heading")
+        .evaluate((heading, offset) => {
+          scrollTo({
+            top: scrollY + heading.getBoundingClientRect().top - offset,
+            behavior: "instant",
+          });
+        }, headerHeight + 70);
       await expect(current).toHaveText("Two-factor authentication");
       await expect(current).toHaveCSS("text-overflow", "ellipsis");
       await expect(summary).toHaveCSS("height", "54px");
