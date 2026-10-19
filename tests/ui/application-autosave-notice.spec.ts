@@ -122,7 +122,7 @@ for (const [layout, viewport] of [
     await expect(notice).toBeVisible();
     await expect(notice).toBeInViewport();
     const tracker = page.getByRole("navigation", {
-      name: "Application progress",
+      name: "Sections",
     });
     const saveIndicator = tracker.locator("[data-draft-save-indicator]");
     await expect(saveIndicator).toHaveAttribute("data-save-state", "idle");

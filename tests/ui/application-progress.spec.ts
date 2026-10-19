@@ -37,7 +37,7 @@ for (const width of [390, 1280]) {
     const form = page.locator("form[data-application]");
     const count = page.locator("[data-application-progress-count]");
     const tracker = page.getByRole("navigation", {
-      name: "Application progress",
+      name: "Sections",
     });
     const menu = tracker.locator("[data-contents-menu]");
     const reviewButton = localApplicationReviewButton(page);
@@ -299,7 +299,7 @@ test("mobile checklist scrolls away before the compact bar appears without a lay
     "sticky",
   );
   const tracker = page.getByRole("navigation", {
-    name: "Application progress",
+    name: "Sections",
   });
   const status = tracker.locator("[data-draft-save-indicator]");
   const compact = tracker.locator("[data-contents-bar]");

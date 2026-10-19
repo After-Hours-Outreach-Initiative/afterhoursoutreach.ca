@@ -322,7 +322,7 @@ test("contents navigation contrasts with the header and leaves room for the page
   await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/apply");
   const contents = page.getByRole("navigation", {
-    name: "Application progress",
+    name: "Sections",
   });
   const menu = contents.locator("[data-contents-menu]");
   await expect(menu).toBeHidden();
@@ -616,7 +616,7 @@ test("application shows all required errors and saves after they are corrected",
     exact: true,
   });
   const contents = page.getByRole("navigation", {
-    name: "Application progress",
+    name: "Sections",
   });
   await form.locator("#application-emergency-contact > summary").click();
   await contents
