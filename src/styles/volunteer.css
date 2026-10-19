@@ -446,6 +446,15 @@ body:has([data-application], [data-account-contents-flow]) {
 [data-application-flow] > [data-application-draft-actions] {
   min-width: 0;
 }
+[data-application-draft-actions] > .volunteer-actions {
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+[data-application-draft-actions] .btn {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .volunteer-draft-discard-icon {
   width: 20px;
   height: 20px;
@@ -1354,6 +1363,9 @@ body:has([data-application], [data-account-contents-flow]) {
   cursor: wait;
 }
 @media (max-width: 640px) {
+  [data-application-draft-actions] .btn {
+    padding: 8px 12px;
+  }
   .volunteer-wrap {
     padding: 32px 16px 64px;
   }

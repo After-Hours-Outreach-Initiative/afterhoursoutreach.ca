@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createLocalAccount } from "../helpers/local-account";
+import {
+  createLocalAccount,
+  localApplicationReviewButton,
+} from "../helpers/local-account";
 import {
   applicationDraftAnswersSchema,
   applicationDraftDiscardPrefix,
@@ -35,6 +38,7 @@ async function saved(page: Page, name: string) {
 }
 async function expectDeleted(page: Page, id: string) {
   await expect(page.locator(button)).toBeEnabled();
+  await expect(localApplicationReviewButton(page, "bottom")).toBeEnabled();
   await expect(page.locator(button)).not.toHaveAttribute("aria-busy", "true");
   await expect(page.locator(button).locator("svg")).toBeVisible();
   await expect(page.locator('[name="firstName"]')).toHaveValue("");
@@ -52,6 +56,7 @@ async function expectDiscardLoading(page: Page) {
   const discard = page.locator(button);
   await expect(discard).toHaveText("Discarding…");
   await expect(discard).toBeDisabled();
+  await expect(localApplicationReviewButton(page, "bottom")).toBeDisabled();
   await expect(discard).toHaveAttribute("aria-busy", "true");
   await expect(discard.locator("svg")).toBeHidden();
   await expect(page.locator(status)).toBeHidden();

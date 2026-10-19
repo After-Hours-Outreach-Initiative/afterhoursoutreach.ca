@@ -48,6 +48,19 @@ export const sampleAnswers = {
   medicalConditions: "Sample private answer",
 };
 
+export function localApplicationReviewButton(
+  page: Page,
+  placement: "progress" | "bottom" = "progress",
+) {
+  const scope =
+    placement === "bottom"
+      ? "[data-application-draft-actions]"
+      : (page.viewportSize()?.width ?? 1280) < 1024
+        ? "[data-contents-menu]"
+        : ".volunteer-contents-actions";
+  return page.locator(`${scope} [data-application-review]`);
+}
+
 export async function reviewLocalApplication(page: Page) {
   if ((page.viewportSize()?.width ?? 1280) < 1024) {
     const tracker = page.locator("[data-application-contents]");
@@ -60,9 +73,7 @@ export async function reviewLocalApplication(page: Page) {
     if (!(await menu.evaluate((element: HTMLDetailsElement) => element.open)))
       await menu.locator("summary").click();
   }
-  await page
-    .getByRole("button", { name: "Review application", exact: true })
-    .click();
+  await localApplicationReviewButton(page).click();
 }
 
 export async function submitLocalApplication(page: Page) {
