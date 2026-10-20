@@ -51,7 +51,7 @@
    spanning grid area lets it stay sticky for the entire account page. */
 [data-account-contents-flow] {
   display: grid;
-  grid-template-rows: var(--contents-bar-height, 54px) auto;
+  grid-template-rows: var(--contents-bar-height, 78px) auto;
 }
 [data-account-contents-flow] > .volunteer-contents {
   grid-column: 1;
@@ -67,7 +67,7 @@
 [data-account-contents-flow] [data-contents-section],
 [data-account-contents-flow] :is(input, select, textarea) {
   scroll-margin-top: calc(
-    var(--contents-scroll-offset, calc(var(--site-header-height) + 54px)) + 16px
+    var(--contents-scroll-offset, calc(var(--site-header-height) + 78px)) + 16px
   );
 }
 @media (width < 64rem) {
@@ -75,7 +75,7 @@
     max-height: max(
       0px,
       calc(
-        100dvh - var(--contents-sticky-offset, var(--site-header-height)) - 70px
+        100dvh - var(--contents-sticky-offset, var(--site-header-height)) - 78px
       )
     );
   }

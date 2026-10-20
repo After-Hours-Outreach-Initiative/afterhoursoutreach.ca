@@ -58,9 +58,9 @@ export function initPageContents(
       headerPosition === "sticky" || headerPosition === "fixed"
         ? Math.max(0, header?.getBoundingClientRect().bottom ?? 0)
         : 0;
-    // Only the compact bar contributes to the reading edge, not its dropdown.
+    // Include the compact band's padding in the reading edge, not its dropdown.
     barHeight = menu.getBoundingClientRect().height
-      ? toggle.getBoundingClientRect().height
+      ? bar.getBoundingClientRect().height
       : 0;
     if (!barHeight) menu.open = false;
     flow.style.setProperty("--contents-sticky-offset", `${stickyHeight}px`);

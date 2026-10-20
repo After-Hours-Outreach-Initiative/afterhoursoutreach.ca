@@ -360,11 +360,14 @@ body:has([data-application], [data-account-contents-flow]) {
   padding: 0;
   list-style: none;
 }
-.volunteer-contents-dropdown {
+.volunteer-contents-dropdown-band {
   position: absolute;
   inset: 100% 0 auto;
+}
+.volunteer-contents-dropdown {
+  position: relative;
   display: grid;
-  max-height: max(0px, calc(100dvh - 70px));
+  max-height: max(0px, calc(100dvh - 78px));
   overflow-y: auto;
   overscroll-behavior: auto;
   padding: 4px var(--contents-padding);
@@ -463,14 +466,26 @@ body:has([data-application], [data-account-contents-flow]) {
     position: relative;
   }
   [data-application-flow] {
-    --contents-scroll-offset: 54px;
+    --contents-scroll-offset: 78px;
   }
   .volunteer-contents-actions {
     display: none;
   }
   .volunteer-contents {
     top: 0;
-    background: transparent;
+  }
+  /* The square, opaque band masks scrolling content in the rounded cutouts
+     and page gutters without changing the bar's width or the desktop sidebar. */
+  .volunteer-contents::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0 calc(-1 * var(--contents-padding));
+    background: var(--color-black);
+    pointer-events: none;
+  }
+  .volunteer-contents-bar {
+    padding-block: 8px 16px;
   }
   [data-application-flow] > .volunteer-contents {
     margin: 0;
@@ -479,7 +494,8 @@ body:has([data-application], [data-account-contents-flow]) {
   [data-application-flow]:has(> .volunteer-application-contents:not([hidden]))
     > [data-application],
   [data-account-contents-body] > .volunteer-panel:first-child {
-    margin-top: 16px;
+    /* The band's bottom padding preserves the detached 16px panel gap. */
+    margin-top: 0;
   }
   .volunteer-contents-menu {
     border-radius: 10px;
@@ -503,6 +519,11 @@ body:has([data-application], [data-account-contents-flow]) {
   }
   .volunteer-contents summary:active {
     box-shadow: inset 0 0 0 100vmax #ffffff0d;
+  }
+  .volunteer-contents-dropdown-band {
+    inset-inline: calc(-1 * var(--contents-padding));
+    padding: 0 var(--contents-padding) 16px;
+    background: var(--color-black);
   }
   .volunteer-contents-dropdown {
     border: var(--volunteer-border);
@@ -604,7 +625,7 @@ body:has([data-application], [data-account-contents-flow]) {
 [data-application] #code-of-conduct-heading,
 [data-application] :is(input, select, textarea) {
   scroll-margin-top: calc(
-    var(--contents-scroll-offset, calc(var(--site-header-height) + 54px)) + 16px
+    var(--contents-scroll-offset, calc(var(--site-header-height) + 78px)) + 16px
   );
 }
 .volunteer-application-section {
