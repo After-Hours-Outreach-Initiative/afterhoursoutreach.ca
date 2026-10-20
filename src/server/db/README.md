@@ -5,22 +5,23 @@ operations. Edit files here, not generated SQL in `drizzle/`.
 
 ## Where rules live
 
-| Source                    | Responsibility                                                                                                                                        |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema.ts`               | Tables, defaults, relationships, checks, and unique indexes.                                                                                          |
-| `triggers.sql`            | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation event types, visibility, and organizer protection/bootstrap. |
-| `events.ts`               | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                        |
-| `volunteers.ts`           | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                |
-| `profiles.ts`             | Application validation and transactional profile updates.                                                                                             |
-| `application-drafts.ts`   | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                        |
-| `access.ts`               | Verified account context and authorization, rechecked inside writes.                                                                                  |
-| `policy.ts`               | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                 |
-| `sessions.ts`             | Ownership-scoped session lookup and second-factor verification markers.                                                                               |
-| `notifications.ts`        | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                               |
-| `medic-certifications.ts` | Certification reminder eligibility, renewal-cycle ledger, atomic claims, and bounded retry state.                                                     |
-| `rate-limits.ts`          | Persistent request/email counters and cleanup.                                                                                                        |
-| `errors.ts`               | Safe translation of database invariant errors into application errors.                                                                                |
-| `index.ts`, `sql.ts`      | Request-scoped Drizzle connection and shared SQL clock.                                                                                               |
+| Source                        | Responsibility                                                                                                                                        |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema.ts`                   | Tables, defaults, relationships, checks, and unique indexes.                                                                                          |
+| `triggers.sql`                | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation event types, visibility, and organizer protection/bootstrap. |
+| `events.ts`                   | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                        |
+| `volunteers.ts`               | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                |
+| `profiles.ts`                 | Application validation and transactional profile updates.                                                                                             |
+| `application-drafts.ts`       | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                        |
+| `access.ts`                   | Verified account context and authorization, rechecked inside writes.                                                                                  |
+| `policy.ts`                   | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                 |
+| `sessions.ts`                 | Ownership-scoped session lookup and second-factor verification markers.                                                                               |
+| `notifications.ts`            | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                               |
+| `medic-certifications.ts`     | Certification reminder eligibility, renewal-cycle ledger, atomic claims, and bounded retry state.                                                     |
+| `submission-notifications.ts` | Fixed-recipient first-submission ledger, transactional intent creation, production claims and shared budget reservations; Preview suppression.        |
+| `rate-limits.ts`              | Persistent request/email counters and cleanup.                                                                                                        |
+| `errors.ts`                   | Safe translation of database invariant errors into application errors.                                                                                |
+| `index.ts`, `sql.ts`          | Request-scoped Drizzle connection and shared SQL clock.                                                                                               |
 
 HTTP request parsing and responses remain in `src/pages/api/v1/`. Better Auth's
 integration remains in `src/server/auth/`. Email transport and delivery orchestration
@@ -125,8 +126,17 @@ effective templates, not by re-keying occurrences. All series mutations recheck
 the live organizer session and version inside a D1 batch. Notification creation
 requires explicit consent and uses only affected booked occurrences. Retrying
 recognizes both `event_audit` and `patrol_series_audit` operation IDs and does not
-repeat a mutation. `patrol_series_template` and `patrol_series.stopped_from` require
-ordered migration generation by the integration owner before deployment.
+repeat a mutation. `0014_patrol_submission_integration.sql` adds the recurrence
+tables, `patrol_series.stopped_from`, occurrence columns, and submission ledger.
+Apply it before running this build; historical standalone records are retained.
+
+First-submission intents are appended using `saveProfile`'s guarded transaction
+hook. Immediate `waitUntil` delivery and the existing hourly cron drain only that
+outbox. Production uses the shared 80-email UTC-day budget; local simulation uses
+none. Preview intents have no payload and cannot be promoted into production mail.
+Retries freeze each recipient/request/key and stop after 23 hours from the first
+attempt. Unattempted records survive outages; unresolved expired records remain
+for human follow-up, without an automatic replacement send.
 
 ## Generated migrations
 
