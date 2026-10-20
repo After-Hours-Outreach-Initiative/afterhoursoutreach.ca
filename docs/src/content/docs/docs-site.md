@@ -81,9 +81,15 @@ split different levels of detail into separate diagrams.
 flowchart TD
     accTitle: Browser request
     accDescr: The browser sends an HTTPS request to the application Worker.
-    browser["Browser"] -->|HTTPS| worker["Worker"]
+    browser["Browser"]
+    worker@{ icon: "logos:cloudflare-icon", label: "Worker", pos: "b", h: 48 }
+    browser -->|HTTPS| worker
 ```
 ````
+
+The locally bundled icon packs provide `simple-icons:github` and
+`logos:cloudflare-icon`. Label repository nodes with the repository name, and
+include "Worker" in labels for Worker entry points and deployment targets.
 
 Keep authoring instructions on this page, the high-level system map on
 [Overview](/), and detailed system diagrams on their architecture pages.

@@ -5,7 +5,8 @@
   font-family: inherit;
 }
 
-.sl-markdown-content pre.mermaid svg {
+/* Mermaid also creates nested SVGs for icons; only size the diagram itself. */
+.sl-markdown-content pre.mermaid > svg {
   flex: 0 0 auto;
   min-width: 36rem;
 }

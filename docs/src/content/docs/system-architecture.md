@@ -20,15 +20,15 @@ commands are two ways to deploy the application.
 ```mermaid
 flowchart TB
     accTitle: Git-triggered deployment paths
-    accDescr: The Cloudflare GitHub app builds the main branch for production and the current feature branch for its preview. Both targets belong to the afterhoursoutreach-ca Worker. The complete automatic branch allowlist has not been verified.
-    repo["GitHub repository"]
+    accDescr: The Cloudflare GitHub app builds the afterhoursoutreach.ca repository's main branch for production and the current feature branch for its preview. Both targets belong to the afterhoursoutreach-ca Worker. The complete automatic branch allowlist has not been verified.
+    repo@{ icon: "simple-icons:github", label: "afterhoursoutreach.ca", pos: "b", h: 48 }
     subgraph builds["Cloudflare Workers Builds"]
         productionBuild["Production build"]
         previewBuild["Preview build"]
     end
     subgraph worker["afterhoursoutreach-ca"]
-        production["Production"]
-        preview["Current branch preview"]
+        production@{ icon: "logos:cloudflare-icon", label: "Production Worker", pos: "b", h: 48 }
+        preview@{ icon: "logos:cloudflare-icon", label: "Preview Worker", pos: "b", h: 48 }
     end
     repo -->|main| productionBuild
     repo -->|current feature branch| previewBuild
@@ -77,8 +77,8 @@ flowchart TB
     productionBuild["Build application"]
     previewBuild["Build preview application"]
     migrate["Apply guarded preview migrations"]
-    production["Production Worker target"]
-    preview["Branch Preview target"]
+    production@{ icon: "logos:cloudflare-icon", label: "Production Worker", pos: "b", h: 48 }
+    preview@{ icon: "logos:cloudflare-icon", label: "Preview Worker", pos: "b", h: 48 }
 
     checkout -->|pnpm deploy| productionBuild
     productionBuild -->|wrangler deploy| production
@@ -122,14 +122,16 @@ libraries and modules in the same application, not extra deployed services.
 ```mermaid
 flowchart TB
     accTitle: Application request handling
-    accDescr: Browser requests enter Astro pages and API endpoints inside the Worker. Better Auth handles authentication, domain workflows handle accounts and events, and both use the database layer and email delivery modules. D1 and Resend are external services.
+    accDescr: Browser requests enter the Worker fetch handler, then Astro pages and API endpoints. Better Auth handles authentication, domain workflows handle accounts and events, and both use the database layer and email delivery modules. D1 and Resend are external services.
     browser["Browser"]
     subgraph worker["Application Worker"]
+        entry@{ icon: "logos:cloudflare-icon", label: "Worker fetch handler", pos: "b", h: 48 }
         routes["Astro pages and API endpoints"]
         auth["Better Auth"]
         workflows["Account and event workflows"]
         database["Drizzle and database modules"]
         delivery["Email delivery modules"]
+        entry --> routes
         routes --> auth
         routes --> workflows
         auth --> database
@@ -139,7 +141,7 @@ flowchart TB
     end
     d1[("Environment's D1 database")]
     resend["Resend API"]
-    browser -->|HTTPS| routes
+    browser -->|HTTPS| entry
     database -->|SQL and transactions| d1
     delivery -->|HTTPS| resend
 ```
@@ -175,7 +177,7 @@ flowchart TB
     accDescr: Cloudflare Cron Triggers invoke the same Worker's scheduled handler. Medic reminder processing checks eligibility and persistent delivery state in production D1, then sends bounded email batches through Resend. Production D1 remains pending; preview and local environments skip this processing.
     cron["Cloudflare Cron Triggers"]
     subgraph worker["Same application Worker"]
-        scheduled["Scheduled handler"]
+        scheduled@{ icon: "logos:cloudflare-icon", label: "Worker scheduled handler", pos: "b", h: 48 }
         reminders["Medic reminder processing"]
         scheduled --> reminders
     end
