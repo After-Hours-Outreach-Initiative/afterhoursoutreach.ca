@@ -512,3 +512,62 @@ export const medicCertificationNotification = sqliteTable(
     ),
   ],
 );
+
+// One immutable request per first submission and fixed organizer mailbox. No
+// recipient account is required; only name/time/review metadata is copied.
+export const applicationSubmissionNotification = sqliteTable(
+  "application_submission_notification",
+  {
+    id: text().primaryKey(),
+    operation_id: text().notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    recipient: text().notNull(),
+    mode: text({ enum: ["production", "local", "preview"] }).notNull(),
+    // Frozen at submission; previews retain only a suppressed ledger entry.
+    payload: text(),
+    status: text({
+      enum: ["pending", "sending", "sent", "local", "suppressed", "expired"],
+    })
+      .notNull()
+      .default("pending"),
+    outcome: text({ enum: ["failed", "unconfirmed"] }),
+    first_attempt_at: timestamp(),
+    next_attempt_at: timestamp().notNull(),
+    attempts: integer().notNull().default(0),
+    budget_window: timestamp(),
+    lease_token: text(),
+    lease_until: timestamp(),
+    created_at: timestamp().notNull(),
+    sent_at: timestamp(),
+  },
+  (table) => [
+    uniqueIndex("application_submission_recipient").on(
+      table.user_id,
+      table.recipient,
+    ),
+    index("application_submission_pending").on(
+      table.mode,
+      table.status,
+      table.next_attempt_at,
+    ),
+    index("application_submission_operation").on(table.operation_id),
+    check(
+      "application_submission_recipient_fixed",
+      sql`${table.recipient} IN ('ivan.zheng@afterhoursoutreach.ca','info@afterhoursoutreach.ca','molina.dewilde@afterhoursoutreach.ca')`,
+    ),
+    check(
+      "application_submission_mode",
+      sql`${table.mode} IN ('production','local','preview')`,
+    ),
+    check(
+      "application_submission_status",
+      sql`${table.status} IN ('pending','sending','sent','local','suppressed','expired')`,
+    ),
+    check(
+      "application_submission_preview_suppressed",
+      sql`${table.mode} != 'preview' OR (${table.status} = 'suppressed' AND ${table.payload} IS NULL)`,
+    ),
+  ],
+);

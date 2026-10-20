@@ -1,5 +1,9 @@
 import { handle } from "@astrojs/cloudflare/handler";
 import {
+  runSubmissionNotificationJob,
+  submissionDeliveryCron,
+} from "./server/submission-notifications";
+import {
   medicDeliveryCron,
   medicDiscoveryCron,
   processMedicCertificationNotifications,
@@ -8,6 +12,9 @@ import {
 export default {
   fetch: handle,
   async scheduled(controller, bindings) {
+    // Independent catch-safe job: one notification family must not starve another.
+    if (controller.cron === submissionDeliveryCron)
+      await runSubmissionNotificationJob(bindings);
     if (![medicDiscoveryCron, medicDeliveryCron].includes(controller.cron))
       return;
     try {

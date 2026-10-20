@@ -252,3 +252,15 @@ WHEN NEW.submitted_application IS NOT OLD.submitted_application
 BEGIN
   SELECT RAISE(ABORT, 'submitted_application_immutable');
 END;
+--> statement-breakpoint
+
+-- Never rebuild a request or promote a preview/local intent into real mail.
+CREATE TRIGGER application_submission_notification_immutable
+BEFORE UPDATE OF id, operation_id, user_id, recipient, mode, payload, created_at ON application_submission_notification
+WHEN NEW.id IS NOT OLD.id OR NEW.operation_id IS NOT OLD.operation_id
+  OR NEW.user_id IS NOT OLD.user_id OR NEW.recipient IS NOT OLD.recipient
+  OR NEW.mode IS NOT OLD.mode OR NEW.payload IS NOT OLD.payload
+  OR NEW.created_at IS NOT OLD.created_at
+BEGIN
+  SELECT RAISE(ABORT, 'application_submission_notification_immutable');
+END;
