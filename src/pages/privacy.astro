@@ -11,48 +11,299 @@ const account = await loadAccountNavigation(
 ---
 
 <Layout
-  title="Privacy | After Hours Outreach Initiative"
-  description="Privacy information for volunteer accounts and events."
+  title="Privacy policy | After Hours Outreach Society"
+  description="How After Hours Outreach Society handles information on its public website and volunteer portal, with outstanding policy approvals identified."
   noindex
   privatePage
   account={account}
 >
   <section class="bg-black px-6 py-20">
     <div class="mx-auto max-w-3xl">
-      <h1 class="text-blue">Privacy</h1>
-      <h2 class="mt-12">Your information</h2>
+      <h1 class="text-blue">Privacy policy</h1>
       <p class="mt-6">
-        {
-          import.meta.env.DEV
-            ? "Your email identifies your local account. Sign-in emails are shown in a development dialog instead of sent. Profile answers and account drafts are stored in local D1. Sessions use an HttpOnly cookie. The development View as buttons can switch to any user in the local database without an email or authenticator challenge."
-            : "Your email identifies your account and receives sign-in emails through Resend. Profile answers and account drafts are saved in Cloudflare D1 in the US. Date of birth is used for age and eligibility; emergency contacts and optional medical information help support volunteer safety. Profile edits are logged by field name, without copying your answers. Sessions use a necessary HttpOnly cookie."
-        }
-        The Code of Conduct version and the time you acknowledge it are saved with
-        your profile to record your application confirmation.
+        After Hours Outreach Society ("we", "us") operates this website and its
+        volunteer portal. This policy describes information handled through
+        those services. It is not a complete policy for offline outreach
+        records, donations, social media, or other activities outside the
+        portal.
       </p>
       <p class="mt-6">
-        Unsubmitted application answers, including personal and medical answers,
-        are also backed up in this browser’s local storage and automatically
-        saved to your account so you can resume on another device. Drafts are
-        not shown to organizers. Successful submission removes the draft copies;
-        signing out removes browser copies that have reached your account.
-        Unsynced browser backups remain on this device to prevent data loss.
-        Avoid shared devices, or clear this site’s browser data after use.
+        <strong>Draft for approval.</strong> The effective date and the designation
+        and public title of the person responsible for privacy are pending human approval.
+        The retention criteria below are proposals, not an approved schedule. Use
+        sample application answers until the policy and supporting practices are finalized;
+        this draft does not mean the portal is ready to collect real volunteer information.
       </p>
-      <h2 class="mt-12">Organizer access and events</h2>
+
+      <h2 class="mt-12">Information we collect and why</h2>
+      <ul class="mt-6 list-disc space-y-4 pl-6">
+        <li>
+          <strong>Accounts and contact details.</strong> Your email address identifies
+          your account, verifies sign-in and email changes, and receives service messages.
+          Account records include your name, role, verification status, and creation
+          and update times. Application names, optional pronouns, and phone numbers
+          support identification, communication, and volunteer coordination. Your
+          full date of birth is stored to check the application requirement that volunteers
+          be at least 19.
+        </li>
+        <li>
+          <strong>Emergency and safety information.</strong> An emergency contact’s
+          name, phone number, and relationship to you help organizers contact someone
+          if you need help. Optional medical, allergy, or other safety information
+          helps organizers support you during events. Share only what is relevant
+          to that purpose. Please tell your emergency contact about this use and obtain
+          their agreement before providing their details.
+        </li>
+        <li>
+          <strong>Application and qualifications.</strong> Team interests, motivation,
+          training, experience, and any required medic certification and expiry date
+          support application review, role suitability, and event safety. Referral
+          answers help us understand how applicants find us. Training choices include
+          potentially sensitive lived experience in the DTES, with substance use,
+          or in recovery; you do not have to select that choice or describe that personal
+          history. Organizers can see these answers after submission.
+        </li>
+        <li>
+          <strong>Submission records.</strong> New applications keep an original copy
+          of the submitted answers and account email, the submission time, and the
+          Code of Conduct version and acknowledgement time. Later profile edits do
+          not replace that original copy. These records document the application and
+          acknowledgement; accepting the Code of Conduct is not consent to unrelated
+          uses of personal information.
+        </li>
+        <li>
+          <strong>Events and access.</strong> We record event signups, cancellations
+          and moves, orientation completion, application and patrol approvals, account
+          activity status, and role changes. Records of the person making a change
+          and its time support coordination, eligibility, and accountability. Notification
+          records can include recipients, subjects, message text, delivery attempts,
+          and status.
+        </li>
+        <li>
+          <strong>Technical and authentication records.</strong> Hosting receives
+          request information such as IP addresses and browser headers to serve the
+          site. Authentication records include session identifiers, IP addresses,
+          browser/device information, verification records, and hashed abuse-limiting
+          counters. If you set up an authenticator, we store its setup secret, backup-code
+          records, verification status, and failed-attempt information. These support
+          sign-in and abuse prevention. Operational logs and traces support troubleshooting.
+        </li>
+      </ul>
       <p class="mt-6">
-        Active organizers with completed applications can manage volunteers and
-        view full profiles. Two-factor authentication is optional; accounts that
-        enable it must use it when signing in. Full profile views and edits are
-        logged; audit entries do not copy sensitive answers. Event rosters
-        contain volunteer names, not medical or emergency-contact answers. Event
-        registrations, attendance, access decisions, cancellations, and
-        notification records are saved in D1. {
-          import.meta.env.DEV
-            ? "Notification delivery is simulated locally."
-            : "Event and access changes send notifications through Resend."
-        }
-        Do not include sensitive personal information in an organizer’s emailed reason.
+        The application requires first and last names, phone number, birth date,
+        emergency contact details, Outreach team selection, a
+        training/experience selection (which can be "No relevant training or
+        experience"), motivation, referral selection, and Code of Conduct
+        acknowledgement. Medic applicants must provide certification and expiry
+        details. Selecting "Other" can require an explanation. Middle names,
+        preferred name, pronouns, medical information, and additional team
+        interests are optional. Without the required answers, the form cannot be
+        submitted; organizer approval is needed before most volunteers can
+        access events.
+      </p>
+
+      <h2 class="mt-12">Drafts, cookies, and this browser</h2>
+      <p class="mt-6">
+        Collection starts before you submit an application. As you enter
+        answers, the form backs them up in this browser’s local storage and
+        automatically saves a draft to your signed-in account so you can resume
+        on another device. This includes any medical, emergency-contact, or
+        lived-experience answers you enter. Drafts are not available in
+        organizer views, but are stored on our service as well as your device.
+        Submission makes your profile available for organizer review.
+      </p>
+      <p class="mt-6">
+        Successful submission removes the account draft and clears the browser
+        draft on that device. "Discard application draft" requests removal of
+        your unsubmitted account draft and this browser’s draft answers; check
+        any failure or retry message. It does not delete your account or a
+        submitted application. Other devices may still hold local copies until
+        they reconnect and check the draft’s status. Discard markers without
+        answers remain to prevent old tabs from restoring discarded drafts.
+      </p>
+      <p class="mt-6">
+        Signing out clears browser draft copies whose answers have reached your
+        account, but leaves unsynced backups on the device to avoid data loss.
+        Signing out does not delete your account draft. Avoid shared devices;
+        clear this site’s browser data on each device if you need to remove
+        local copies. Clearing browser data alone does not delete server
+        records.
+      </p>
+      <p class="mt-6">
+        Necessary authentication cookies keep you signed in and support email
+        links and two-factor sign-in. Session cookies are HttpOnly (not readable
+        by page scripts) and use the Secure setting on HTTPS. Sessions are
+        configured for 30 days and renew with use. Blocking these cookies
+        prevents portal sign-in. Browser draft storage is separate from cookies
+        and can remain after a session ends.
+      </p>
+
+      <h2 class="mt-12">Who can access volunteer information</h2>
+      <p class="mt-6">
+        You can view your own account and, where captured, your original
+        submitted application. Authorized active organizers with completed
+        applications can review full current profiles, including emergency
+        contacts, optional medical information, and training or lived-experience
+        answers, to review applications and manage volunteering. Access is not
+        limited to an organizer assigned to your event. Full-profile views and
+        profile edits are audited; edit logs record changed field names, not
+        copies of the answers.
+      </p>
+      <p class="mt-6">
+        Event rosters are organizer-only. They show volunteer display names
+        (preferred names when provided) and orientation-completion status, not
+        medical or emergency-contact answers. Other volunteers see available
+        event details and signup counts, not other volunteers’ roster names or
+        full profiles. Two-factor authentication is optional for both volunteers
+        and organizers; once enabled, it is required at sign-in.
+      </p>
+      <p class="mt-6">
+        People administering our hosting, database, and email systems may have
+        technical access beyond the portal’s organizer screens. Service
+        providers process information as described below. Any disclosure for an
+        emergency or legal requirement must have an applicable legal basis and
+        be limited to the information needed; this is not permission for
+        unrestricted sharing.
+      </p>
+
+      <h2 class="mt-12">Hosting, email, and external services</h2>
+      <p class="mt-6">
+        The hosted service is configured to run on Cloudflare Workers and use
+        Cloudflare D1 for account, authentication, profile, application-draft,
+        event, audit, and notification records. Cloudflare also provides the
+        hosting infrastructure for requests, logs, and traces. We have not
+        confirmed a country-only storage or processing commitment. Provider
+        processing locations, agreements, support access, backup arrangements,
+        and retention require confirmation before this draft is approved; do not
+        assume information stays in British Columbia or Canada.
+      </p>
+      <p class="mt-6">
+        Hosted sign-in and email-change messages use Resend, which receives the
+        recipient address and message content, including the verification code
+        and, for sign-in, a sign-in link. Event, role, and access-change emails
+        also use Resend when an organizer chooses to send them. Their content
+        can include event details, access status, and an organizer-entered
+        reason. Production medic-certification reminders include the expiry date
+        listed in the profile. Notification content and delivery records are
+        also stored in D1. Do not put sensitive answers in emailed reasons.
+      </p>
+      <p class="mt-6">
+        <strong>Planned first-submission notification — rollout pending.</strong
+        >
+        A minimal email is planned for the fixed organizer recipients Ivan, info@afterhoursoutreach.ca,
+        and Molina when an application is first submitted. It is to contain only the
+        applicant’s name, submission time, and an organizer-only review link, not
+        application answers. The review link requires authorized organizer sign-in.
+        Delivery through Resend, the exact recipient inboxes, and any delivery records
+        must be confirmed against the notification implementation before this is described
+        as an active practice. Draft saves and later profile edits are not the planned
+        trigger.
+      </p>
+      <p class="mt-6">
+        Some public pages connect to Shopify’s image CDN, including donation
+        product images; those requests disclose connection information such as
+        your IP address to that provider. Donation and social links lead to
+        separate services such as GoFundMe and Discord, whose own practices
+        apply when you visit them. The portal does not currently link a Discord
+        identity to your account. This policy does not describe those services’
+        records or all information the Society may receive outside this portal.
+      </p>
+      <p class="mt-6">
+        Local development uses a local database and simulated emails, not real
+        email delivery. Development account-switching tools can bypass normal
+        sign-in challenges for local accounts. Use sample answers only in
+        development and preview testing.
+      </p>
+
+      <h2 class="mt-12">Safeguards and limitations</h2>
+      <p class="mt-6">
+        The portal uses authenticated, role-checked access, organizer
+        profile-view auditing, profile-edit logs, and restrictions on caching
+        and third-party resources on account pages. These measures reduce risk
+        but do not guarantee security. Keep sign-in links, codes, and
+        authenticator backup codes private, and contact us if you suspect
+        unauthorized access. Operational access rules and privacy-response
+        practices still need approval alongside this policy.
+      </p>
+
+      <h2 class="mt-12">Retention — proposed criteria for approval</h2>
+      <p class="mt-6">
+        No general automatic retention or account-deletion schedule is
+        implemented. Expiring a sign-in code or session does not establish when
+        every related record is erased. The following criteria are proposed for
+        human approval, not current deletion promises:
+      </p>
+      <ul class="mt-6 list-disc space-y-4 pl-6">
+        <li>
+          Keep identifiable information only while needed for its stated
+          purpose, an active volunteer relationship, or a documented legal or
+          operational requirement. Review abandoned drafts and inactive accounts
+          separately from submitted applications and active profiles.
+        </li>
+        <li>
+          Preserve information actually used for a decision directly affecting a
+          person for at least one year after its use, as required by BC’s
+          Personal Information Protection Act, and review any need for longer
+          retention. An original application snapshot or a field-name audit log
+          does not by itself capture every later decision’s supporting records.
+        </li>
+        <li>
+          Set and approve separate limits for sensitive answers, emergency
+          contacts, event and orientation records, authentication records, audit
+          logs, email content and delivery records, and provider-held copies.
+          Delete or anonymize information when its justified retention ends,
+          subject to applicable legal requirements.
+        </li>
+        <li>
+          Confirm deletion methods, responsibility, and backup expiry before
+          promising a deletion deadline. Copies in other browsers, provider
+          systems, email inboxes, or backups may require separate handling;
+          clearing one copy does not establish that all copies are gone.
+        </li>
+      </ul>
+
+      <h2 class="mt-12">Requests, corrections, and complaints</h2>
+      <p class="mt-6">
+        Contact After Hours Outreach Society at <a
+          href="mailto:info@afterhoursoutreach.ca"
+          class="underline underline-offset-4">info@afterhoursoutreach.ca</a
+        > with privacy questions or a written request for access, correction, deletion,
+        or withdrawal of consent where consent applies. You can also ask how your
+        information has been used or disclosed, or raise a privacy complaint. Identify
+        the request and the account email involved; do not send sign-in codes, authenticator
+        secrets, or unnecessary medical details. Identity may need to be verified
+        before information is released or changed.
+      </p>
+      <p class="mt-6">
+        You can edit ongoing profile details in <a
+          href="/volunteer/account"
+          class="underline underline-offset-4">Your account</a
+        > and change your email through verification. Legal names, birth date, and
+        the original submission cannot be changed through the profile editor; contact
+        us about corrections. There is no self-service account deletion. A deletion
+        or consent-withdrawal request is not a promise of immediate erasure: required
+        decision records or other legally justified records may need to be kept, and
+        removing necessary information may affect participation.
+      </p>
+      <p class="mt-6">
+        The responsible privacy role and internal request, deletion, and
+        complaint-handling procedures are still pending approval. The contact
+        address above is the request channel, not a claim that those procedures
+        have already been established. You may also contact the <a
+          href="https://www.oipc.bc.ca/for-the-public/"
+          class="underline underline-offset-4"
+          >Office of the Information and Privacy Commissioner for British
+          Columbia</a
+        > about access or privacy concerns, including a complaint you cannot resolve
+        with us.
+      </p>
+
+      <h2 class="mt-12">Policy updates</h2>
+      <p class="mt-6">
+        The approved policy and its effective date will be published here after
+        review. The process for communicating material changes and obtaining any
+        required new consent also needs approval. Do not treat a later website
+        edit as permission for an unrelated use of your information.
       </p>
     </div>
   </section>
