@@ -1,6 +1,17 @@
-# Test benchmark report
+---
+title: Test benchmark report
+description: Historical test benchmark measurements and failures from October 7, 2026.
+---
+
+<span id="test-benchmark-report"></span>
 
 Measured 2026-10-07T20:07:59.494Z on `feat/patrol-scheduling-mockup` at `a82ebc4884166e11e0399a5a6b40ed6416548144`.
+
+:::caution[Historical report]
+Commands and tooling reflect the report date, not current usage. See
+[Testing](/testing/) for current commands; the legacy `--local-url` option is now
+rejected.
+:::
 
 **Failed or incomplete runs: do not treat this as a passing performance baseline.**
 
@@ -259,4 +270,4 @@ Failure timings include assertion timeouts and may stop before completing the wo
 
 ## Raw data
 
-Structured measurements: `docs/benchmarks/test-baseline.json`. Raw runner JSON and command logs: `test-results/benchmarks/2026-10-07T20-07-59-494Z` (ignored by Git). The structured snapshot stores each measured run and every test name/duration; keep it with this report for future comparisons.
+Structured measurements: [`docs/benchmarks/test-baseline.json`](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/docs/benchmarks/test-baseline.json). Raw runner JSON and command logs: `test-results/benchmarks/2026-10-07T20-07-59-494Z` (ignored by Git). The structured snapshot stores each measured run and every test name/duration; keep it with this report for future comparisons.

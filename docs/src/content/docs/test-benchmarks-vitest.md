@@ -1,6 +1,17 @@
-# Vitest migration benchmark
+---
+title: Vitest migration benchmark
+description: Historical Vitest migration measurements and comparisons from October 7, 2026.
+---
+
+<span id="vitest-migration-benchmark"></span>
 
 Measured 2026-10-07T23:05:32.588Z on `chore/test-benchmark-baseline` at `45a0471cce095bf806edcc374527134592184de3`.
+
+:::caution[Historical report]
+Commands and tooling reflect the report date, not current usage. See
+[Testing](/testing/) for current commands; the legacy `--local-url` option is now
+rejected.
+:::
 
 **Valid baseline: all measured runs and warm-ups passed.**
 
@@ -381,4 +392,4 @@ Leaf cases: 115 → 116. Parent/container counts: 3 → 0. A runner changing its
 
 ## Raw data
 
-Structured measurements: `docs/benchmarks/test-vitest.json`. Raw runner JSON and command logs: `test-results/benchmarks/2026-10-07T23-05-32-588Z` (ignored by Git). The structured snapshot stores each measured run and every test name/duration; keep it with this report for future comparisons.
+Structured measurements: [`docs/benchmarks/test-vitest.json`](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/docs/benchmarks/test-vitest.json). Raw runner JSON and command logs: `test-results/benchmarks/2026-10-07T23-05-32-588Z` (ignored by Git). The structured snapshot stores each measured run and every test name/duration; keep it with this report for future comparisons.
