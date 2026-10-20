@@ -12,6 +12,7 @@ import {
 import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
 import { nowMsSql, profileDisplayNameSql, profileFullNameSql } from "./sql";
+import type { VolunteerApprovalFilter } from "../../data/volunteer-list";
 
 export interface VolunteerRow {
   id: string;
@@ -31,25 +32,37 @@ export async function listVolunteers(
   actor: Actor,
   search = "",
   offset = 0,
+  approval: VolunteerApprovalFilter = "all",
 ) {
   requireOrganizer(actor);
-  const rows = await db
-    .prepare(
-      `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+  // A profile is created only on submission; private drafts never enter either
+  // query. Count all unapproved applications, not just this search or page.
+  const [rows, awaiting] = (await db.batch([
+    db
+      .prepare(
+        `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       FROM user u
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
       WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
+        AND (? = 'all' OR v.registration_approved = 0)
       ORDER BY v.registration_approved, name, u.id
       LIMIT ? OFFSET ?`,
-    )
-    .bind(search.slice(0, 100), volunteerPageSize + 1, offset)
-    .all<VolunteerRow>();
+      )
+      .bind(search.slice(0, 100), approval, volunteerPageSize + 1, offset),
+    db.prepare(
+      `SELECT count(*) AS count FROM user u
+      JOIN profile p ON p.user_id = u.id
+      JOIN volunteer_status v ON v.user_id = u.id
+      WHERE v.registration_approved = 0`,
+    ),
+  ])) as [D1Result<VolunteerRow>, D1Result<{ count: number }>];
   return {
     rows: rows.results.slice(0, volunteerPageSize),
     hasMore: rows.results.length > volunteerPageSize,
+    awaitingApprovalCount: Number(awaiting.results[0]?.count ?? 0),
   };
 }
 

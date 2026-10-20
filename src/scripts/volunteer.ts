@@ -3,6 +3,11 @@ import { actionFragment, loadActionPage } from "./action-page";
 import { chooseNotification } from "./notification-choice";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
+  cancelVolunteerSearch,
+  initVolunteerBrowser,
+  syncVolunteerBrowser,
+} from "./volunteer-browser";
+import {
   showActionEmailFeedback,
   simulateActionEmail,
   type EmailActionResult,
@@ -213,6 +218,7 @@ async function refreshEvents(element: HTMLFormElement) {
 }
 
 async function refreshVolunteer(element: HTMLFormElement) {
+  cancelVolunteerSearch();
   const userId = element.querySelector<HTMLInputElement>(
     'input[name="userId"]',
   )!.value;
@@ -245,13 +251,7 @@ async function refreshVolunteer(element: HTMLFormElement) {
         ?.focus({ preventScroll: true });
   }
   if (host && location.href === hostUrl) {
-    const results = document.querySelector<HTMLElement>(
-      "[data-volunteer-results]",
-    );
-    if (results)
-      results.replaceChildren(
-        ...actionFragment(host, "[data-volunteer-results]").childNodes,
-      );
+    syncVolunteerBrowser(host);
     syncEvents(host);
   }
 }
@@ -693,78 +693,7 @@ if (profileDialog && profileContent) {
   });
 }
 
-document
-  .querySelectorAll<HTMLElement>("[data-volunteer-browser]")
-  .forEach((root) => {
-    const search = root.querySelector<HTMLInputElement>(
-      "[data-volunteer-search]",
-    );
-    const form = root.querySelector<HTMLFormElement>(
-      "[data-volunteer-search-form]",
-    );
-    const results = root.querySelector<HTMLElement>("[data-volunteer-results]");
-    const error = root.querySelector<HTMLElement>(
-      "[data-volunteer-search-error]",
-    );
-    if (!search || !form || !results || !error) return;
-    let timer: number;
-    let pending: AbortController | undefined;
-    const loadResults = async () => {
-      pending?.abort();
-      const controller = new AbortController();
-      pending = controller;
-      const url = new URL(location.href);
-      if (search.value) url.searchParams.set("q", search.value);
-      else url.searchParams.delete("q");
-      url.searchParams.delete("offset");
-      results.setAttribute("aria-busy", "true");
-      error.hidden = true;
-      try {
-        const response = await fetch(url, {
-          credentials: "same-origin",
-          signal: controller.signal,
-        });
-        if (!response.ok || response.redirected)
-          throw new Error(
-            "Could not search volunteers. Check your organizer session.",
-          );
-        const page = new DOMParser().parseFromString(
-          await response.text(),
-          "text/html",
-        );
-        const updated = page.querySelector("[data-volunteer-results]");
-        if (!updated) throw new Error("Volunteer search is unavailable.");
-        if (!controller.signal.aborted) {
-          results.replaceChildren(
-            ...Array.from(updated.childNodes, (node) =>
-              document.importNode(node, true),
-            ),
-          );
-          history.replaceState(null, "", url);
-        }
-      } catch (reason) {
-        if (!controller.signal.aborted) {
-          error.textContent =
-            reason instanceof Error
-              ? reason.message
-              : "Volunteer search is unavailable.";
-          error.hidden = false;
-        }
-      } finally {
-        if (!controller.signal.aborted) results.removeAttribute("aria-busy");
-      }
-    };
-    search.addEventListener("input", () => {
-      clearTimeout(timer);
-      pending?.abort();
-      timer = window.setTimeout(() => void loadResults(), 180);
-    });
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      clearTimeout(timer);
-      void loadResults();
-    });
-  });
+initVolunteerBrowser();
 
 document.addEventListener("click", (event) => {
   const dialog = event.target;
