@@ -1,4 +1,7 @@
-# Backend
+---
+title: Backend
+description: Server architecture, local testing, database workflows, organizer access, and email delivery.
+---
 
 The server side behind accounts, applications, and event signups.
 
@@ -9,7 +12,7 @@ The server side behind accounts, applications, and event signups.
 - Cloudflare D1 for the database.
 - Drizzle for the schema and migrations.
 - Better Auth with the official Email OTP plugin for sign in and sessions. See
-  [accounts.md](accounts.md).
+  [accounts.md](/accounts/).
 - Resend for sign in and notification emails.
 
 All HTTP API endpoints use `/api/v1/`, including authentication and health checks.
@@ -19,7 +22,7 @@ The unversioned routes are no longer served. This keeps event requests outside t
 ## Database and business rules
 
 Database queries and persisted business workflows are grouped in
-[`src/server/db/`](../src/server/db/README.md). Constraints are declared in
+[`src/server/db/`](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/src/server/db/README.md). Constraints are declared in
 `schema.ts`, atomic invariants in `triggers.sql`, and workflows in the event,
 volunteer, profile, access, session, outbox, and rate-limit modules there.
 HTTP handling, authentication integration, and email transport stay outside.
@@ -43,7 +46,7 @@ appear in a dialog, not an inbox. Local D1 rate limits still apply.
 
 Automated browser tests use `pnpm test:ui`, which starts its own server and
 disposable D1 database; it never adds test accounts to this persistent dev database.
-See [testing.md](testing.md).
+See [testing.md](/testing/).
 
 On localhost or the dev server's LAN address, the shared account layout includes
 a **View as** button for every user in local D1, including accounts that have
@@ -191,7 +194,7 @@ Everything runs on the Workers free plan:
 The paid plan ($5/month) raises all of these if we ever hit them.
 
 D1 has no Canadian region, so the data is stored in the US. The privacy page
-has to say so. See [privacy.md](privacy.md).
+has to say so. See [privacy.md](/privacy/).
 
 ## Email
 
@@ -201,7 +204,7 @@ recommends
 Emails include "Questions? Ask us on Discord" and a link to the Discord server.
 
 The Resend free plan allows 3,000 emails a month and 100 a day. The sign in
-rate limit in [accounts.md](accounts.md) also protects this quota.
+rate limit in [accounts.md](/accounts/) also protects this quota.
 
 ## TODO
 

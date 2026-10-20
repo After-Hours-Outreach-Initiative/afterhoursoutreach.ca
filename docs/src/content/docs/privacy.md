@@ -1,10 +1,14 @@
-# Privacy
+---
+title: Privacy
+description: Implementation review, proposed privacy practices, and pre-launch work, not an approved privacy policy.
+---
 
 Implementation notes, proposed policies, and pre-launch privacy work for the
 website. Reviewed against the current implementation on October 15, 2026.
 
 This is not an approved privacy policy or a legal compliance certification.
-The public page at [`/privacy`](../src/pages/privacy.astro) is still a draft and
+The [public `/privacy` page](https://afterhoursoutreach.ca/privacy)
+([source file](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/src/pages/privacy.astro)) is still a draft and
 asks people to use sample profile answers until the policy is finalized. Do not
 treat the site as ready to collect real volunteer data until the policy and
 supporting procedures have been reviewed and implemented.

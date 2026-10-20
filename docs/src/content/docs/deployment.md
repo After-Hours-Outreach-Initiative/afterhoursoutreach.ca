@@ -1,4 +1,7 @@
-# Deployment
+---
+title: Deployment
+description: Branch preview and production deployment procedures, safeguards, and medic certification reminders.
+---
 
 - Domain: [afterhoursoutreach.ca](https://afterhoursoutreach.ca)
 - DNS registrar: Porkbun
@@ -62,7 +65,7 @@ Use `wrangler preview base-config secret put NAME` for new previews, or
 Account secrets are configured in Previews Base. Email requests remain rate limited.
 `pnpm test:accounts` uses local data only.
 `pnpm test:preview` checks preview account behavior and rejection of development
-endpoints using a local Worker and test database. See [testing.md](testing.md)
+endpoints using a local Worker and test database. See [testing.md](/testing/)
 for the Vitest projects and browser-test commands.
 
 Production: `pnpm deploy`. The developer controls when to deploy; there is no
