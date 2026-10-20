@@ -1,0 +1,19 @@
+{
+  "name": "@afterhoursoutreach/docs",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "astro dev --background",
+    "stop": "astro dev stop",
+    "status": "astro dev status",
+    "logs": "astro dev logs",
+    "check": "astro check"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/starlight": "0.42.6",
+    "astro": "7.2.10",
+    "typescript": "^5.9.3"
+  }
+}
