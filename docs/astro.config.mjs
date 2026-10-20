@@ -16,6 +16,42 @@ export default defineConfig({
       title: "After Hours Outreach docs",
       // Pagefind needs a build; this reader only uses the development server.
       pagefind: false,
+      sidebar: [
+        { label: "Overview", slug: "" },
+        {
+          label: "Application workflows",
+          items: [
+            { label: "Accounts", slug: "accounts" },
+            { label: "Events", slug: "events" },
+          ],
+        },
+        {
+          label: "Architecture and operations",
+          items: [
+            { label: "Backend", slug: "backend" },
+            { label: "Deployment", slug: "deployment" },
+          ],
+        },
+        { label: "Privacy review", slug: "privacy" },
+        {
+          label: "Testing",
+          items: [
+            { label: "Testing guide", slug: "testing" },
+            {
+              label: "Historical benchmarks",
+              collapsed: true,
+              items: [
+                { label: "Original baseline", slug: "test-benchmarks" },
+                {
+                  label: "Simplified suite",
+                  slug: "test-benchmarks-simplified",
+                },
+                { label: "Vitest migration", slug: "test-benchmarks-vitest" },
+              ],
+            },
+          ],
+        },
+      ],
     }),
   ],
 });
