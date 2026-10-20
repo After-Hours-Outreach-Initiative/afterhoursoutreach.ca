@@ -1116,7 +1116,7 @@ describe(
           const profileGate = new Promise<void>((resolve) => {
             releaseProfile = resolve;
           });
-          const profilePattern = `**/volunteer/volunteers/${alice.id}`;
+          const profilePattern = `**/volunteer/volunteers/${alice.id}*`;
           await page.route(profilePattern, async (route) => {
             await profileGate;
             await route.fallback();

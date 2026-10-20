@@ -7,24 +7,21 @@ import { accountContext, requireOrganizer } from "@/server/db/access";
 import { listVolunteers, volunteerPageSize } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
+import { volunteerListState, volunteerListUrl } from "@/data/volunteer-list";
 import "@/styles/volunteer.css";
 export const prerender = false;
 let team: Awaited<ReturnType<typeof listVolunteers>> = {
   rows: [],
   hasMore: false,
+  awaitingApprovalCount: 0,
 };
 let lock = "";
 let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
-const search = (Astro.url.searchParams.get("q") ?? "").slice(0, 100);
-const offset = Math.min(
-  10000,
-  Math.max(
-    0,
-    Number.parseInt(Astro.url.searchParams.get("offset") ?? "0", 10) || 0,
-  ),
-);
+const state = volunteerListState(Astro.url.searchParams);
+const { search, offset, approval } = state;
+const listUrl = volunteerListUrl(state);
 try {
   const { actor, headers, email, greetingName } = await accountContext(
     env,
@@ -32,7 +29,9 @@ try {
   );
   forwardCookies(headers, Astro.response.headers);
   if (!actor)
-    return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/volunteers");
+    return Astro.redirect(
+      `/volunteer/sign-in?returnTo=${encodeURIComponent(listUrl)}`,
+    );
   if (actor.role !== "organizer")
     return new Response("Organizer access is required.", { status: 403 });
   accountName = actor.name;
@@ -44,7 +43,8 @@ try {
     if (error instanceof RequestError) lock = error.message;
     else throw error;
   }
-  if (!lock) team = await listVolunteers(env.DB, actor, search, offset);
+  if (!lock)
+    team = await listVolunteers(env.DB, actor, search, offset, approval);
 } catch {
   return new Response("Volunteer management is temporarily unavailable.", {
     status: 503,
@@ -76,11 +76,54 @@ try {
           <div class="volunteer-section-heading">
             <h2 id="volunteers-heading">Volunteers</h2>
           </div>
+          <nav
+            class="volunteer-actions mb-6"
+            aria-label="Application approval"
+            data-volunteer-filters
+          >
+            <a
+              class:list={[
+                "btn",
+                approval === "all" ? "btn-primary" : "btn-quiet",
+              ]}
+              href={volunteerListUrl({ ...state, approval: "all", offset: 0 })}
+              aria-current={approval === "all" ? "page" : undefined}
+            >
+              All applicants
+            </a>
+            <a
+              class:list={[
+                "btn",
+                approval === "awaiting" ? "btn-primary" : "btn-quiet",
+              ]}
+              href={volunteerListUrl({
+                ...state,
+                approval: "awaiting",
+                offset: 0,
+              })}
+              aria-current={approval === "awaiting" ? "page" : undefined}
+            >
+              <span>
+                Awaiting approval (
+                <span data-awaiting-approval-count>
+                  {team.awaitingApprovalCount}
+                </span>
+                )
+              </span>
+            </a>
+          </nav>
+          <p class="volunteer-help mb-6">
+            The awaiting approval count includes all submitted applications not
+            yet approved, regardless of your search or page.
+          </p>
           <form
             class="volunteer-search"
             method="get"
             data-volunteer-search-form
           >
+            {approval === "awaiting" && (
+              <input type="hidden" name="approval" value="awaiting" />
+            )}
             <label class="volunteer-search-field">
               <span class="sr-only">Find a volunteer</span>
               <SearchIcon class="volunteer-search-icon" />
@@ -113,11 +156,11 @@ try {
                         · {person.orientations} orientations completed
                       </p>
                       <p>
-                        {person.role === "organizer"
-                          ? "Event access through organizer role"
-                          : person.applicationApproved
-                            ? "Application approved"
-                            : "Application awaiting approval"}
+                        {person.applicationApproved
+                          ? "Application approved"
+                          : "Application awaiting approval"}
+                        {person.role === "organizer" &&
+                          " · Event access through organizer role"}
                       </p>
                       <p>
                         <span
@@ -134,10 +177,12 @@ try {
                     </div>
                     <a
                       class="btn btn-quiet"
-                      href={`/volunteer/volunteers/${encodeURIComponent(person.id)}`}
+                      href={`/volunteer/volunteers/${encodeURIComponent(person.id)}?returnTo=${encodeURIComponent(listUrl)}`}
                       data-volunteer-profile-link
                     >
-                      View profile and approval
+                      {person.applicationApproved
+                        ? "View profile and approval"
+                        : "Review application and approval"}
                     </a>
                   </div>
                 </li>
@@ -145,14 +190,23 @@ try {
             </ul>
             {!team.rows.length && (
               <p class="volunteer-notice">
-                No volunteer applicants match your search.
+                {approval === "awaiting"
+                  ? offset > 0
+                    ? "No applications awaiting approval on this page. Return to the previous page."
+                    : search
+                      ? "No applications awaiting approval match your search."
+                      : "No applications are awaiting approval."
+                  : "No volunteer applicants match your search."}
               </p>
             )}
             <div class="volunteer-actions">
               {offset > 0 && (
                 <a
                   class="btn btn-quiet"
-                  href={`?q=${encodeURIComponent(search)}&offset=${Math.max(0, offset - volunteerPageSize)}`}
+                  href={volunteerListUrl({
+                    ...state,
+                    offset: Math.max(0, offset - volunteerPageSize),
+                  })}
                 >
                   Previous volunteers
                 </a>
@@ -160,7 +214,10 @@ try {
               {team.hasMore && (
                 <a
                   class="btn btn-quiet"
-                  href={`?q=${encodeURIComponent(search)}&offset=${offset + volunteerPageSize}`}
+                  href={volunteerListUrl({
+                    ...state,
+                    offset: offset + volunteerPageSize,
+                  })}
                 >
                   Next volunteers
                 </a>

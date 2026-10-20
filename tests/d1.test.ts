@@ -26,6 +26,12 @@ import {
 } from "../src/data/application-draft";
 import { RequestError } from "../src/server/http";
 import {
+  listVolunteers,
+  setVolunteerStatus,
+  viewVolunteerProfile,
+  volunteerPageSize,
+} from "../src/server/db/volunteers";
+import {
   medicNotificationDates,
   pendingMedicNotifications,
   queueMedicCertificationNotifications,
@@ -142,6 +148,169 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 });
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
+
+test("application queue counts all submitted unapproved applications independently of search, pages and profile views", async () => {
+  const actor: Actor = {
+    ...(await draftActor("queue-organizer")),
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+    applicationApproved: true,
+  };
+  await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+    .bind(actor.id)
+    .run();
+  const ids = [
+    actor.id,
+    "approved",
+    ...Array.from(
+      { length: volunteerPageSize + 3 },
+      (_, index) => `pending-${String(index).padStart(2, "0")}`,
+    ),
+  ];
+  for (const id of ids) {
+    if (id !== actor.id) await draftActor(id);
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO profile (
+        user_id, preferred_name, phone, birth_date, emergency_contact_name,
+        emergency_contact_phone, emergency_contact_relationship, heard_about_us,
+        motivation, teams, medical_certification, training_experience, registered_at, updated_at
+      ) VALUES (?, ?, '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', '[]', 'None', 'None', 0, 0)`,
+      ).bind(id, id),
+      env.DB.prepare(
+        "INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0)",
+      ).bind(
+        id,
+        id === "pending-00" ? 0 : 1,
+        id.startsWith("pending-") ? 0 : 1,
+        id === "pending-01" ? 1 : 0,
+        id === "pending-01" ? actor.id : null,
+        id === "pending-01" ? 0 : null,
+      ),
+    ]);
+  }
+  const draft = await draftActor("draft-only");
+  await saveApplicationDraft(env.DB, draft, draftInput(draft));
+  await draftActor("account-only");
+  // Even an anomalous account-only status cannot count without submission.
+  await env.DB.prepare(
+    "INSERT INTO volunteer_status (user_id, updated_at) VALUES ('account-only', 0)",
+  ).run();
+  const count = volunteerPageSize + 3;
+  const first = await listVolunteers(env.DB, actor, "", 0, "awaiting");
+  assert.equal(first.awaitingApprovalCount, count);
+  assert.equal(first.rows.length, volunteerPageSize);
+  assert.equal(first.hasMore, true);
+  assert.equal(first.rows[0].active, 0); // Inactive is not an approval state.
+  assert.equal(first.rows[1].patrolApproved, 1); // Neither is patrol approval.
+  const second = await listVolunteers(
+    env.DB,
+    actor,
+    "",
+    volunteerPageSize,
+    "awaiting",
+  );
+  assert.equal(second.awaitingApprovalCount, count);
+  assert.equal(second.rows.length, 3);
+  assert.equal(second.hasMore, false);
+  assert.equal(
+    new Set([...first.rows, ...second.rows].map((row) => row.id)).size,
+    count,
+  );
+  for (const search of ["pending-02", "no match", "approved"])
+    assert.equal(
+      (await listVolunteers(env.DB, actor, search, 0, "awaiting"))
+        .awaitingApprovalCount,
+      count,
+    );
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "approved", 0, "awaiting")).rows,
+    [],
+  );
+  assert.equal(
+    (await listVolunteers(env.DB, actor, "approved")).rows[0].id,
+    "approved",
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
+    0,
+  );
+  await viewVolunteerProfile(env.DB, actor, "pending-02");
+  assert.equal(
+    (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting")).rows
+      .length,
+    1,
+  );
+  assert.equal(
+    (await listVolunteers(env.DB, actor)).awaitingApprovalCount,
+    count,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT action FROM audit_log").first("action"),
+    "profile_viewed",
+  );
+  await setVolunteerStatus(env.DB, actor, {
+    userId: "pending-02",
+    version: 0,
+    active: true,
+    applicationApproved: true,
+    patrolApproved: false,
+  });
+  const after = await listVolunteers(
+    env.DB,
+    actor,
+    "pending-02",
+    0,
+    "awaiting",
+  );
+  assert.deepEqual(after.rows, []);
+  assert.equal(after.awaitingApprovalCount, count - 1);
+  assert.equal(
+    (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
+      .applicationApproved,
+    1,
+  );
+  const version = (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
+    .updatedAt;
+  await setVolunteerStatus(env.DB, actor, {
+    userId: "pending-02",
+    version,
+    active: true,
+    applicationApproved: false,
+    patrolApproved: false,
+  });
+  assert.equal(
+    (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting"))
+      .awaitingApprovalCount,
+    count,
+  );
+  for (const denied of [
+    { ...actor, role: "volunteer" as const },
+    { ...actor, active: false },
+    { ...actor, applicationSubmitted: false },
+    { ...actor, twoFactorEnabled: true, twoFactorVerified: false },
+  ])
+    await assert.rejects(
+      listVolunteers(env.DB, denied, "", 0, "awaiting"),
+      statusError(403),
+    );
+  // Organizer event access is a role exception, not application approval.
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
+  const organizerQueue = await listVolunteers(
+    env.DB,
+    { ...actor, applicationApproved: false },
+    "queue-organizer",
+    0,
+    "awaiting",
+  );
+  assert.equal(organizerQueue.awaitingApprovalCount, count + 1);
+  assert.equal(organizerQueue.rows[0].id, actor.id);
+});
 
 test("first completed orientation uses the earliest attended event, not when attendance was recorded", async () => {
   const actor = await draftActor();

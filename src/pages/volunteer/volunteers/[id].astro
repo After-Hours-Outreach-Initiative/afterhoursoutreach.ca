@@ -8,6 +8,7 @@ import {
 } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
+import { volunteerListReturnUrl } from "@/data/volunteer-list";
 import {
   certificationOptions,
   profileFields,
@@ -25,6 +26,9 @@ let person: VolunteerRow | null = null;
 let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
+const returnUrl = volunteerListReturnUrl(
+  Astro.url.searchParams.get("returnTo"),
+);
 try {
   const { actor, headers, email, greetingName } = await accountContext(
     env,
@@ -33,7 +37,7 @@ try {
   forwardCookies(headers, Astro.response.headers);
   if (!actor)
     return Astro.redirect(
-      `/volunteer/sign-in?returnTo=${encodeURIComponent(Astro.url.pathname)}`,
+      `/volunteer/sign-in?returnTo=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`,
     );
   requireOrganizer(actor);
   accountName = actor.name;
@@ -65,6 +69,13 @@ if (!values || !person)
   <section class="volunteer-panel">
     <div data-volunteer-profile>
       <h2>{applicationDisplayName(values)}</h2>
+      <p>
+        {
+          person.applicationApproved
+            ? "Application approved"
+            : "Application awaiting approval"
+        }
+      </p>
       <VolunteerControls person={person} />
       <dl class="volunteer-profile-details">
         <div>
@@ -126,7 +137,7 @@ if (!values || !person)
       </dl>
     </div>
   </section>
-  <a class="btn btn-outline" href="/volunteer/volunteers">Back to volunteers</a>
+  <a class="btn btn-outline" href={returnUrl}>Back to volunteers</a>
 </AccountLayout>
 <script>
   import "@/scripts/volunteer";
