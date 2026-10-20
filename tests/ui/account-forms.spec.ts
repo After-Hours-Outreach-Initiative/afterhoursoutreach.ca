@@ -34,6 +34,25 @@ import {
 const emergencyContactDescription =
   "Someone we can contact if you need help during an event.";
 
+async function expectChoiceErrorRail(options: Locator, invalid: boolean) {
+  await expect
+    .poll(() =>
+      options.evaluate((element) => {
+        const rail = getComputedStyle(element, "::before");
+        return [rail.borderLeft, rail.top, rail.bottom, rail.left];
+      }),
+    )
+    .toEqual([
+      `3px solid ${invalid ? "rgb(248, 113, 113)" : "rgba(0, 0, 0, 0)"}`,
+      "0px",
+      "0px",
+      "-12px",
+    ]);
+  if (invalid)
+    for (const input of await options.locator(":scope > label > input").all())
+      await expect(input).not.toHaveCSS("outline-color", "rgb(248, 113, 113)");
+}
+
 async function expectOtherDetailAlignment(
   page: Page,
   section: Locator,
@@ -335,6 +354,16 @@ test("Other referral details align with the option text and show readable help",
     page,
     form.locator("[data-referral-sources]"),
     form.locator("[data-other-referral]"),
+  );
+  await reviewLocalApplication(page);
+  await expect(form.locator("[data-error=heardAboutUsOther]")).toBeVisible();
+  await expectChoiceErrorRail(
+    form.locator(".volunteer-referral-options"),
+    false,
+  );
+  await expect(form.locator('[name="heardAboutUsOther"]')).toHaveCSS(
+    "border-top-color",
+    "rgb(248, 113, 113)",
   );
 });
 
@@ -898,9 +927,7 @@ test("application shows all required errors and saves after they are corrected",
   await expect(
     emergencyContact.locator('[name="emergencyName"]'),
   ).toHaveAttribute("aria-describedby", "error-emergencyName");
-  const contents = page.getByRole("navigation", {
-    name: "Sections",
-  });
+  const contents = page.locator("[data-application-contents]");
   const emergencyHeading = form.locator("#application-emergency-contact");
   await emergencyHeading.click();
   await expect(emergencyContact).toBeVisible();
@@ -987,7 +1014,21 @@ test("application shows all required errors and saves after they are corrected",
   });
   await expect(localApplicationReviewButton(page)).toBeEnabled();
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
+  const choiceLists = await form.locator(".volunteer-choice-options").all();
+  for (const options of choiceLists)
+    await expectChoiceErrorRail(options, false);
+  const choicePositions = () =>
+    form.locator(".volunteer-choice-options").evaluateAll((groups) =>
+      groups.map((group) => {
+        const { x, width } = group.getBoundingClientRect();
+        return { x, width };
+      }),
+    );
+  const initialChoicePositions = await choicePositions();
   await reviewLocalApplication(page);
+  for (const options of choiceLists)
+    await expectChoiceErrorRail(options, await options.isVisible());
+  expect(await choicePositions()).toEqual(initialChoicePositions);
   const required = form.locator(
     "input[required]:enabled, textarea[required]:enabled",
   );
@@ -1054,12 +1095,16 @@ test("application shows all required errors and saves after they are corrected",
     )
       await fillApplicationField(form, field, String(value));
   }
+  for (const options of choiceLists)
+    await expectChoiceErrorRail(options, false);
   await outreach.uncheck();
   await reviewLocalApplication(page);
   await expect(outreach).toBeFocused();
   await expect(form.locator("[data-application-review-step]")).toBeHidden();
   await expect(form.locator('[data-error="teams"]')).toBeVisible();
+  await expectChoiceErrorRail(form.locator(".volunteer-team-options"), true);
   await outreach.check();
+  await expectChoiceErrorRail(form.locator(".volunteer-team-options"), false);
   await page.setViewportSize({ width: 375, height: 812 });
   expect(
     await page.evaluate(
@@ -1068,7 +1113,7 @@ test("application shows all required errors and saves after they are corrected",
   ).toBe(false);
   await reviewLocalApplication(page);
   const reviewHeadings = form.locator(
-    ".volunteer-application-review .volunteer-section-heading",
+    ".volunteer-application-review .volunteer-profile-section-heading",
   );
   await expect(reviewHeadings).toHaveCount(5);
   for (const row of await reviewHeadings.all()) {
@@ -1631,6 +1676,10 @@ test("all teams can select multiple relevant training answers and add Other deta
     await reviewLocalApplication(page);
     await expect(otherText).toBeFocused();
     await expect(details.locator("[data-error=otherTraining]")).toBeVisible();
+    await expectChoiceErrorRail(
+      training.locator(".volunteer-training-options"),
+      false,
+    );
     expect(requests).toHaveLength(0);
   }
   await expectOtherDetailAlignment(page, training, details);
@@ -1788,6 +1837,10 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   ).toBeChecked();
   await medic.check();
   await expect(certifications).toBeVisible();
+  const certificationChoices = certifications.locator(
+    ".volunteer-choice-options",
+  );
+  await expectChoiceErrorRail(certificationChoices, false);
   await expect(experience).toBeHidden();
   await expect(expiry).toBeVisible();
   await expect(expiry).toHaveAttribute("type", "text");
@@ -1834,8 +1887,15 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(
     certifications.locator("[data-error=certifications]"),
   ).toBeVisible();
+  await expectChoiceErrorRail(certificationChoices, true);
+  await medic.uncheck();
+  await expect(certifications).toBeHidden();
+  await expectChoiceErrorRail(certificationChoices, false);
+  await medic.check();
+  await reviewLocalApplication(page);
   await firstAid.press("Space");
   await expect(firstAid).toBeChecked();
+  await expectChoiceErrorRail(certificationChoices, false);
   await reviewLocalApplication(page);
   await expect(expiry).toBeFocused();
   await expect(form.locator("[data-error=certificationExpiry]")).toBeVisible();
@@ -1888,6 +1948,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     await reviewLocalApplication(page);
     await expect(experience).toBeFocused();
     await expect(form.locator("[data-error=experience]")).toBeVisible();
+    await expectChoiceErrorRail(certificationChoices, false);
     expect(profileRequests).toHaveLength(0);
   }
   await expectOtherDetailAlignment(

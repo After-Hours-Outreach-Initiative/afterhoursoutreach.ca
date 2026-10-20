@@ -765,6 +765,21 @@ body:has([data-application], [data-account-contents-flow]) {
   margin-top: 16px;
   gap: 12px;
 }
+.volunteer-choice-options {
+  position: relative;
+}
+.volunteer-choice-options::before {
+  /* Draw in the existing gutter without shifting choices or Other details. */
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -12px;
+  border-inline-start: 3px solid transparent;
+  pointer-events: none;
+}
+.volunteer-choice-options:has(> label > input:enabled:user-invalid)::before {
+  border-inline-start-color: #f87171;
+}
 .volunteer-team-option {
   display: flex;
   align-items: flex-start;
@@ -1251,7 +1266,7 @@ body:has([data-application], [data-account-contents-flow]) {
   line-height: 1.6;
 }
 .volunteer-field:has(:user-invalid) > [data-error],
-.volunteer-team-options:has(input[name="teams"]:user-invalid) > [data-error],
+.volunteer-team-options:has(input[name="teams"]:user-invalid) + [data-error],
 .volunteer-certifications:has(input[name="certifications"]:user-invalid)
   > [data-error],
 .volunteer-relevant-training:has(input[name="training"]:user-invalid)
@@ -1260,20 +1275,28 @@ body:has([data-application], [data-account-contents-flow]) {
   > [data-error] {
   display: flex;
 }
-.volunteer-portal input:user-invalid,
+.volunteer-portal
+  input:user-invalid:not(.volunteer-choice-options > label > input),
 .volunteer-portal textarea:user-invalid,
 .volunteer-portal select:user-invalid {
   border-color: #f87171;
 }
-.volunteer-portal :user-invalid:focus-visible {
+.volunteer-portal
+  :user-invalid:focus-visible:not(.volunteer-choice-options > label > input) {
   outline-color: #f87171;
 }
-.volunteer-portal input:is([type="checkbox"], [type="radio"]):user-invalid {
+.volunteer-portal
+  input:is([type="checkbox"], [type="radio"]):user-invalid:not(
+    .volunteer-choice-options > label > input
+  ) {
   outline: 2px solid #f87171;
   outline-offset: 2px;
 }
 .volunteer-form fieldset > [data-error] {
   margin-top: 8px;
+}
+.volunteer-form .volunteer-team-options + [data-error] {
+  margin-top: 12px;
 }
 .volunteer-portal form .btn:disabled,
 .volunteer-portal [data-application-review]:disabled {
