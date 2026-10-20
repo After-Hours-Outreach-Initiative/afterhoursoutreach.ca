@@ -405,7 +405,10 @@ for (const path of ["/apply", "/volunteer/account"]) {
         const initialPanel = await panel.boundingBox();
         if (width < 1024) {
           expect(initialPanel!.y).toBe(initial!.y + initial!.height);
-          await expect(contents).toHaveCSS("background-color", "rgb(0, 0, 0)");
+          await expect(contents).toHaveCSS(
+            "background-color",
+            "rgba(0, 0, 0, 0)",
+          );
           await expect(contents.locator("[data-contents-bar]")).toHaveCSS(
             "padding",
             "8px 0px 16px",
@@ -413,9 +416,18 @@ for (const path of ["/apply", "/volunteer/account"]) {
           expect(
             await contents.evaluate((nav) => {
               const backing = getComputedStyle(nav, "::before");
-              return [backing.backgroundColor, backing.left, backing.right];
+              return [
+                backing.backgroundColor,
+                backing.left,
+                backing.right,
+                backing.top,
+                backing.height,
+              ];
             }),
-          ).toEqual(["rgb(0, 0, 0)", "-16px", "-16px"]);
+          ).toEqual(["rgb(0, 0, 0)", "-16px", "-16px", "0px", "18px"]);
+          await expect(
+            contents.locator(".volunteer-contents-dropdown-band"),
+          ).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
           await expect(panel).toHaveCSS("border-radius", "10px");
           await expect(panel).toHaveCSS("border-top-width", "1px");
         }

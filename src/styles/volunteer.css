@@ -473,14 +473,16 @@ body:has([data-application], [data-account-contents-flow]) {
   }
   .volunteer-contents {
     top: 0;
+    background: transparent;
   }
-  /* The square, opaque band masks scrolling content in the rounded cutouts
-     and page gutters without changing the bar's width or the desktop sidebar. */
+  /* Mask the 8px top padding and 10px upper corner cutouts only, leaving the
+     lower corners and detached panel gap uncovered. */
   .volunteer-contents::before {
     content: "";
     position: absolute;
     z-index: -1;
-    inset: 0 calc(-1 * var(--contents-padding));
+    inset: 0 calc(-1 * var(--contents-padding)) auto;
+    height: 18px;
     background: var(--color-black);
     pointer-events: none;
   }
@@ -523,7 +525,6 @@ body:has([data-application], [data-account-contents-flow]) {
   .volunteer-contents-dropdown-band {
     inset-inline: calc(-1 * var(--contents-padding));
     padding: 0 var(--contents-padding) 16px;
-    background: var(--color-black);
   }
   .volunteer-contents-dropdown {
     border: var(--volunteer-border);
