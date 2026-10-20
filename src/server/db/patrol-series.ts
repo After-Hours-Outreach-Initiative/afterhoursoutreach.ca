@@ -41,6 +41,7 @@ export interface PatrolSeriesRow {
   localTime: string;
   intervalWeeks: number;
   endDate: string | null;
+  stoppedFrom: string | null;
   timeZone: "America/Vancouver";
   meetingPoint: string;
   meetingPointUrl: string | null;
@@ -53,10 +54,74 @@ export interface PatrolSeriesRow {
   updatedAt: number;
 }
 const seriesColumns = `id, first_date AS firstDate, local_time AS localTime,
-  interval_weeks AS intervalWeeks, end_date AS endDate, time_zone AS timeZone,
+  interval_weeks AS intervalWeeks, end_date AS endDate, stopped_from AS stoppedFrom, time_zone AS timeZone,
   meeting_point AS meetingPoint, meeting_point_url AS meetingPointUrl,
   spots, open, hidden, generation_until AS generationUntil,
   created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt`;
+
+export const patrolTemplateSchema = z
+  .strictObject(patrolSeriesSchema.shape)
+  .pick({
+    localTime: true,
+    meetingPoint: true,
+    meetingPointUrl: true,
+    spots: true,
+    open: true,
+    hidden: true,
+  })
+  .extend({ dayOffset: z.number().int().min(-366).max(366).default(0) });
+export type PatrolTemplateInput = z.infer<typeof patrolTemplateSchema>;
+export interface PatrolTemplate extends Omit<
+  PatrolTemplateInput,
+  "open" | "hidden" | "meetingPointUrl"
+> {
+  effectiveDate: string;
+  open: number;
+  hidden: number;
+  meetingPointUrl: string | null;
+}
+export async function listPatrolTemplates(
+  db: Env["DB"],
+  actor: Actor,
+  seriesId: string,
+) {
+  requireOrganizer(actor);
+  return readTemplates(db, seriesId);
+}
+async function readTemplates(db: Env["DB"], seriesId: string) {
+  return (
+    await db
+      .prepare(
+        `SELECT effective_date AS effectiveDate, local_time AS localTime,
+    day_offset AS dayOffset, meeting_point AS meetingPoint, meeting_point_url AS meetingPointUrl,
+    spots, open, hidden FROM patrol_series_template WHERE series_id = ? ORDER BY effective_date`,
+      )
+      .bind(seriesId)
+      .all<PatrolTemplate>()
+  ).results;
+}
+export function patrolTemplateFor(
+  series: PatrolSeriesRow,
+  templates: PatrolTemplate[],
+  date: string,
+): PatrolTemplate {
+  return (
+    templates.filter((template) => template.effectiveDate <= date).at(-1) ?? {
+      ...series,
+      effectiveDate: series.firstDate,
+      dayOffset: 0,
+    }
+  );
+}
+function templateStart(
+  date: string,
+  template: Pick<PatrolTemplate, "localTime" | "dayOffset">,
+) {
+  return vancouverOccurrenceInstant(
+    addCalendarDays(date, template.dayOffset),
+    template.localTime,
+  );
+}
 
 export async function findPatrolSeries(
   db: Env["DB"],
@@ -105,13 +170,17 @@ export function planPatrolOccurrences(
   series: Pick<
     PatrolSeriesRow,
     "firstDate" | "localTime" | "intervalWeeks" | "endDate"
-  >,
+  > & { stoppedFrom?: string | null },
   existing: OccurrenceSnapshot[],
   now: number,
+  templates: PatrolTemplate[] = [],
 ) {
   const today = vancouverInput(now).slice(0, 10);
+  const offsets = [0, ...templates.map((template) => template.dayOffset)];
+  const maxOffset = Math.max(...offsets);
+  const minOffset = Math.min(...offsets);
   const days =
-    (Date.parse(`${today}T00:00:00Z`) -
+    (Date.parse(`${addCalendarDays(today, -maxOffset)}T00:00:00Z`) -
       Date.parse(`${series.firstDate}T00:00:00Z`)) /
     86_400_000;
   const step = series.intervalWeeks * 7;
@@ -127,21 +196,57 @@ export function planPatrolOccurrences(
     .map((event) => event.startsAt)
     .sort((a, b) => a - b);
   const planned: PlannedOccurrence[] = [];
-  while (date <= "9999-12-31" && (!series.endDate || date <= series.endDate)) {
-    const startsAt = vancouverOccurrenceInstant(date, series.localTime);
+  let frontier = endOfCalendar;
+  while (
+    date <= "9999-12-31" &&
+    (!series.endDate || date <= series.endDate) &&
+    (!series.stoppedFrom || date < series.stoppedFrom)
+  ) {
+    const template = templates
+      .filter((template) => template.effectiveDate <= date)
+      .at(-1);
+    const startsAt = templateStart(
+      date,
+      template ?? { localTime: series.localTime, dayOffset: 0 },
+    );
     if (startsAt > now && !byDate.has(date)) {
       // Continue over already-materialized dates, even beyond the third slot,
       // to establish a truthful coverage frontier for direct signup writes.
-      if (future.length >= 3 && startsAt > future[2])
-        return { occurrences: planned, generationUntil: startsAt };
       planned.push({ date, startsAt });
       future.push(startsAt);
       future.sort((a, b) => a - b);
     }
+    // Later templates can shift dates backwards. Scan until even their earliest
+    // possible local start is beyond the third slot before choosing the window.
+    if (
+      future.length >= 3 &&
+      vancouverOccurrenceInstant(addCalendarDays(date, minOffset), "00:00") >
+        future[2]
+    ) {
+      const missing = planned.filter((event) => event.startsAt > future[2]);
+      if (missing.length) {
+        // Unseen later templates might shift their starts earlier than these
+        // missing rows. Never overstate coverage while generation is delayed.
+        frontier = Math.min(
+          vancouverOccurrenceInstant(addCalendarDays(date, minOffset), "00:00"),
+          ...missing.map((event) => event.startsAt),
+        );
+        break;
+      }
+    }
     if (date > addCalendarDays("9999-12-31", -step)) break;
     date = addCalendarDays(date, step);
   }
-  return { occurrences: planned, generationUntil: endOfCalendar };
+  const third = future[2] ?? Infinity;
+  return {
+    occurrences: planned.filter((event) => event.startsAt <= third),
+    generationUntil: Math.min(
+      frontier,
+      ...planned
+        .filter((event) => event.startsAt > third)
+        .map((event) => event.startsAt),
+    ),
+  };
 }
 
 function insertOccurrences(
@@ -149,7 +254,12 @@ function insertOccurrences(
   series: PatrolSeriesRow,
   occurrences: PlannedOccurrence[],
   now: number,
+  templates: PatrolTemplate[] = [],
 ) {
+  const rows = occurrences.map((event) => ({
+    ...event,
+    ...patrolTemplateFor(series, templates, event.date),
+  }));
   return db
     .prepare(
       `INSERT INTO event (
@@ -157,12 +267,13 @@ function insertOccurrences(
       spots, open, hidden, created_by, created_at, updated_at)
     SELECT 'patrol:' || ps.id || ':' || json_extract(j.value, '$.date'), 'patrol', ps.id,
       json_extract(j.value, '$.date'), json_extract(j.value, '$.startsAt'),
-      ps.meeting_point, ps.meeting_point_url, ps.spots, ps.open, ps.hidden, ps.created_by, ?, ?
+       json_extract(j.value, '$.meetingPoint'), json_extract(j.value, '$.meetingPointUrl'),
+       json_extract(j.value, '$.spots'), json_extract(j.value, '$.open'), json_extract(j.value, '$.hidden'), ps.created_by, ?, ?
     FROM patrol_series ps, json_each(?) j
     WHERE ps.id = ? AND ps.updated_at = ?
     ON CONFLICT(series_id, occurrence_date) DO NOTHING`,
     )
-    .bind(now, now, JSON.stringify(occurrences), series.id, series.updatedAt);
+    .bind(now, now, JSON.stringify(rows), series.id, series.updatedAt);
 }
 
 /**
@@ -184,6 +295,7 @@ export async function ensurePatrolOccurrences(
       .all<PatrolSeriesRow>()
   ).results;
   for (const series of seriesRows) {
+    const templates = await readTemplates(db, series.id);
     const existing = (
       await db
         .prepare(
@@ -193,14 +305,14 @@ export async function ensurePatrolOccurrences(
         .bind(series.id)
         .all<OccurrenceSnapshot>()
     ).results;
-    const plan = planPatrolOccurrences(series, existing, now);
+    const plan = planPatrolOccurrences(series, existing, now, templates);
     if (
       !plan.occurrences.length &&
       plan.generationUntil <= series.generationUntil
     )
       continue;
     const results = await db.batch([
-      insertOccurrences(db, series, plan.occurrences, now),
+      insertOccurrences(db, series, plan.occurrences, now, templates),
       db
         .prepare(
           `UPDATE patrol_series SET generation_until = max(generation_until, ?)
@@ -388,22 +500,31 @@ export async function materializePatrolOccurrence(
   occurrenceDate: string,
 ) {
   const series = await findPatrolSeries(db, actor, seriesId);
-  if (!z.iso.date().safeParse(occurrenceDate).success)
-    throw new RequestError(400, "Choose a scheduled occurrence date.");
-  const days =
-    (Date.parse(`${occurrenceDate}T00:00:00Z`) -
-      Date.parse(`${series.firstDate}T00:00:00Z`)) /
-    86_400_000;
-  if (
-    days < 0 ||
-    days % (7 * series.intervalWeeks) !== 0 ||
-    (series.endDate && occurrenceDate > series.endDate)
-  )
-    throw new RequestError(
-      400,
-      "Choose a scheduled occurrence date within this series.",
-    );
-  const startsAt = vancouverOccurrenceInstant(occurrenceDate, series.localTime);
+  // Existing snapshots remain addressable after stopping/shortening, including
+  // cancellations and past history. This path never recreates an occurrence.
+  const existing = await db
+    .prepare(`SELECT id FROM event WHERE series_id = ? AND occurrence_date = ?`)
+    .bind(seriesId, occurrenceDate)
+    .first<{ id: string }>();
+  if (existing) {
+    const result = await db
+      .prepare(
+        `UPDATE patrol_series SET generation_until = generation_until
+      WHERE id = ? AND updated_at = ? AND ${writePermission(true)}`,
+      )
+      .bind(seriesId, series.updatedAt, ...permissionValues(actor))
+      .run();
+    if (!result.meta.changes)
+      throw new RequestError(
+        409,
+        "This series or your organizer authorization changed. Reload the page.",
+      );
+    return existing;
+  }
+  requireScheduledDate(series, occurrenceDate);
+  const templates = await readTemplates(db, seriesId);
+  const template = patrolTemplateFor(series, templates, occurrenceDate);
+  const startsAt = templateStart(occurrenceDate, template);
   if (startsAt <= Date.now())
     throw new RequestError(409, "Past occurrences cannot be created.");
   // Recheck the live organizer session in the same transaction as generation.
@@ -418,7 +539,7 @@ export async function materializePatrolOccurrence(
       .prepare(
         `INSERT INTO event (id, type, series_id, occurrence_date, starts_at,
       meeting_point, meeting_point_url, spots, open, hidden, created_by, created_at, updated_at)
-      SELECT ?, 'patrol', id, ?, ?, meeting_point, meeting_point_url, spots, open, hidden, created_by, ?, ?
+       SELECT ?, 'patrol', id, ?, ?, ?, ?, ?, ?, ?, created_by, ?, ?
       FROM patrol_series WHERE id = ? AND changes() = 1
       ON CONFLICT(series_id, occurrence_date) DO NOTHING`,
       )
@@ -426,6 +547,11 @@ export async function materializePatrolOccurrence(
         patrolOccurrenceId(seriesId, occurrenceDate),
         occurrenceDate,
         startsAt,
+        template.meetingPoint,
+        template.meetingPointUrl,
+        template.spots,
+        template.open,
+        template.hidden,
         Date.now(),
         Date.now(),
         seriesId,
@@ -438,6 +564,268 @@ export async function materializePatrolOccurrence(
     );
   await ensurePatrolOccurrences(db, seriesId);
   return { id: patrolOccurrenceId(seriesId, occurrenceDate) };
+}
+
+function requireScheduledDate(
+  series: PatrolSeriesRow,
+  date: string,
+  allowStopped = false,
+) {
+  if (!z.iso.date().safeParse(date).success)
+    throw new RequestError(400, "Choose a scheduled occurrence date.");
+  const days =
+    (Date.parse(`${date}T00:00:00Z`) -
+      Date.parse(`${series.firstDate}T00:00:00Z`)) /
+    86_400_000;
+  if (
+    days < 0 ||
+    days % (7 * series.intervalWeeks) !== 0 ||
+    (series.endDate && date > series.endDate) ||
+    (!allowStopped && series.stoppedFrom && date >= series.stoppedFrom)
+  )
+    throw new RequestError(
+      400,
+      "Choose a scheduled occurrence date within this series.",
+    );
+}
+
+/** Replace the template from a nominal date, including generated snapshots.
+ * Individual edits (event_audit.updated) and cancellation tombstones always win.
+ * Signups are never recreated, moved or dropped; capacity failures roll back ALL.
+ */
+export async function updatePatrolSeriesFrom(
+  db: Env["DB"],
+  actor: Actor,
+  id: string,
+  date: string,
+  input: unknown,
+  version: number,
+  notify = false,
+) {
+  requireOrganizer(actor);
+  const parsed = patrolTemplateSchema.safeParse(input);
+  if (!parsed.success)
+    throw new RequestError(
+      400,
+      "Check the recurring time, date offset, capacity, meeting point and HTTPS map link.",
+    );
+  const data = parsed.data;
+  const series = await findPatrolSeries(db, actor, id);
+  requireScheduledDate(series, date);
+  if (templateStart(date, data) <= Date.now())
+    throw new RequestError(400, "Choose a future recurring date and time.");
+  const now = Date.now();
+  const operation = crypto.randomUUID();
+  const rows = (
+    await db
+      .prepare(
+        `SELECT id, occurrence_date AS date FROM event
+    WHERE series_id = ? AND occurrence_date >= ? AND cancelled_at IS NULL AND starts_at > ${nowMsSql}`,
+      )
+      .bind(id, date)
+      .all<{ id: string; date: string }>()
+  ).results;
+  const updates = rows.map((row) => ({
+    ...row,
+    startsAt: templateStart(row.date, data),
+  }));
+  const values = [
+    data.localTime,
+    data.dayOffset,
+    data.meetingPoint,
+    data.meetingPointUrl || null,
+    data.spots,
+    Number(data.open),
+    Number(data.hidden),
+  ];
+  try {
+    const results = await db.batch([
+      db
+        .prepare(
+          `UPDATE patrol_series SET generation_until = 0, updated_at = ?
+        WHERE id = ? AND updated_at = ? AND ${writePermission(true)}
+          AND NOT EXISTS(SELECT 1 FROM event e WHERE e.series_id = patrol_series.id AND e.occurrence_date >= ?
+            AND e.cancelled_at IS NULL AND e.starts_at > ${nowMsSql}
+            AND e.id NOT IN (SELECT json_extract(j.value,'$.id') FROM json_each(?) j))`,
+        )
+        .bind(
+          Math.max(now, series.updatedAt + 1),
+          id,
+          version,
+          ...permissionValues(actor),
+          date,
+          JSON.stringify(updates),
+        ),
+      db
+        .prepare(
+          `INSERT INTO patrol_series_audit (id,series_id,actor_id,action,changed_fields,created_at)
+        SELECT ?,?,?,'updated_future',?,? WHERE changes() = 1`,
+        )
+        .bind(
+          operation,
+          id,
+          actor.id,
+          JSON.stringify(["effectiveDate", ...Object.keys(data)]),
+          now,
+        ),
+      db
+        .prepare(
+          `DELETE FROM patrol_series_template WHERE series_id = ? AND effective_date >= ?
+        AND EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
+        )
+        .bind(id, date, operation),
+      db
+        .prepare(
+          `INSERT INTO patrol_series_template (id,series_id,effective_date,local_time,day_offset,
+        meeting_point,meeting_point_url,spots,open,hidden)
+        SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
+        )
+        .bind(operation, id, date, ...values, operation),
+      db
+        .prepare(
+          `INSERT INTO event_audit (id,event_id,actor_id,action,changed_fields,created_at)
+        SELECT ? || ':' || e.id,e.id,?,'series_updated',?,? FROM event e JOIN json_each(?) j ON e.id = json_extract(j.value,'$.id')
+        WHERE e.cancelled_at IS NULL AND e.starts_at > ${nowMsSql}
+          AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'updated')
+          AND (e.starts_at != json_extract(j.value,'$.startsAt') OR e.meeting_point != ? OR e.meeting_point_url IS NOT ? OR e.spots != ? OR e.open != ? OR e.hidden != ?)
+          AND EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
+        )
+        .bind(
+          operation,
+          actor.id,
+          JSON.stringify(Object.keys(data)),
+          now,
+          JSON.stringify(updates),
+          ...values.slice(2),
+          operation,
+        ),
+      db
+        .prepare(
+          `UPDATE event SET starts_at = (SELECT json_extract(j.value,'$.startsAt') FROM json_each(?) j WHERE json_extract(j.value,'$.id') = event.id),
+        meeting_point = ?, meeting_point_url = ?, spots = ?, open = ?, hidden = ?, updated_at = max(updated_at + 1, ?)
+        WHERE EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || event.id)`,
+        )
+        .bind(JSON.stringify(updates), ...values.slice(2), now, operation),
+      seriesNotifications(
+        db,
+        operation,
+        now,
+        notify,
+        "Your After Hours Outreach patrol changed",
+        "An organizer changed this and future patrols. Your existing registration is still reserved. Check the volunteer page for your updated patrol date, time and meeting point.",
+      ),
+    ]);
+    if (!results[0].meta.changes)
+      throw new RequestError(
+        409,
+        "This patrol series or your organizer authorization changed. Reload before editing it.",
+      );
+    await ensurePatrolOccurrences(db, id);
+    return {
+      operation,
+      message:
+        "This and future patrols saved. Individual exceptions and existing registrations were kept.",
+    };
+  } catch (error) {
+    return databaseWriteError(error);
+  }
+}
+
+function seriesNotifications(
+  db: Env["DB"],
+  operation: string,
+  now: number,
+  notify: boolean,
+  subject: string,
+  body: string,
+) {
+  return db
+    .prepare(
+      `INSERT INTO event_notification (id,operation_id,user_id,subject,body,created_at,delivery_to)
+    SELECT lower(hex(randomblob(16))),?,s.user_id,?,?,?,u.email FROM signup s
+    JOIN user u ON u.id = s.user_id AND u.email_verified = 1 WHERE s.status = 'confirmed' AND ? = 1
+      AND EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || s.event_id)`,
+    )
+    .bind(operation, subject, body, now, Number(notify), operation);
+}
+
+/** Stop is exclusive and permanent, even when a later end-date edit extends a series. */
+export async function stopPatrolSeries(
+  db: Env["DB"],
+  actor: Actor,
+  id: string,
+  date: string,
+  version: number,
+  reason = "",
+  notify = false,
+) {
+  requireOrganizer(actor);
+  if (reason.length > 1000)
+    throw new RequestError(400, "Keep the reason to 1000 characters or fewer.");
+  const series = await findPatrolSeries(db, actor, id);
+  requireScheduledDate(series, date, true);
+  const now = Date.now();
+  const operation = crypto.randomUUID();
+  const results = await db.batch([
+    db
+      .prepare(
+        `UPDATE patrol_series SET stopped_from = CASE WHEN stopped_from IS NULL OR stopped_from > ? THEN ? ELSE stopped_from END,
+      generation_until = 0, updated_at = ? WHERE id = ? AND updated_at = ? AND ${writePermission(true)}`,
+      )
+      .bind(
+        date,
+        date,
+        Math.max(now, series.updatedAt + 1),
+        id,
+        version,
+        ...permissionValues(actor),
+      ),
+    db
+      .prepare(
+        `INSERT INTO patrol_series_audit (id,series_id,actor_id,action,changed_fields,created_at)
+      SELECT ?,?,?,'stopped','["stoppedFrom"]',? WHERE changes() = 1`,
+      )
+      .bind(operation, id, actor.id, now),
+    db
+      .prepare(
+        `INSERT INTO event_audit (id,event_id,actor_id,action,changed_fields,created_at)
+      SELECT ? || ':' || id,id,?,'cancelled','["cancelledAt","stoppedFrom"]',? FROM event
+      WHERE series_id = ? AND occurrence_date >= ? AND cancelled_at IS NULL AND starts_at > ${nowMsSql}
+        AND EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
+      )
+      .bind(operation, actor.id, now, id, date, operation),
+    seriesNotifications(
+      db,
+      operation,
+      now,
+      notify,
+      "Your After Hours Outreach patrol was cancelled",
+      `An organizer stopped this patrol series. Your registration was cancelled.${reason ? `\nReason: ${reason}` : ""}`,
+    ),
+    db
+      .prepare(
+        `UPDATE event SET cancelled_at = ?, open = 0, hidden = 1, updated_at = max(updated_at + 1, ?)
+      WHERE EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || event.id)`,
+      )
+      .bind(now, now, operation),
+    db
+      .prepare(
+        `UPDATE signup SET status = 'cancelled', updated_at = ? WHERE status = 'confirmed'
+      AND EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || signup.event_id)`,
+      )
+      .bind(now, operation),
+  ]);
+  if (!results[0].meta.changes)
+    throw new RequestError(
+      409,
+      "This patrol series or your organizer authorization changed. Reload the page.",
+    );
+  await ensurePatrolOccurrences(db, id);
+  return {
+    operation,
+    message:
+      "Recurrence stopped. Future occurrences and their registrations were cancelled; history was kept.",
+  };
 }
 
 /** SQL alias is supplied only by backend code, never request input. */

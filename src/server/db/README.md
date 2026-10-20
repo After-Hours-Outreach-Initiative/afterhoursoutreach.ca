@@ -88,6 +88,46 @@ keep those spots but cannot add another until none count or the cap is lifted.
 No over-cap cleanup runs on event edits or status changes; existing access-revocation
 and event-cancellation workflows are unchanged.
 
+## Recurring patrol controls
+
+`patrol-series.ts` owns recurrence; its public operations are re-exported by
+`events.ts`. A nominal `(series_id, occurrence_date)` and its deterministic event
+ID never change, even when the actual start date/time changes. Volunteers can
+register only for the earliest three future, non-cancelled occurrences per series;
+hidden, closed, and full occurrences consume slots. Reads and version polling
+await generation, and SQL signup guards fail closed beyond its coverage frontier.
+
+- `savePatrolSeries(db, actor, input, id?, version?, notify?)` creates a series or
+  updates its base defaults/end date. Existing snapshots are not rewritten.
+  End dates are inclusive; shortening atomically cancels affected future snapshots
+  and bookings, including individual exceptions. Extending never restores them.
+- `updatePatrolSeriesFrom(db, actor, seriesId, nominalDate, template, version,
+notify?)` provides actual **this-and-future** editing, including already-generated
+  occurrences. The template contains `localTime`, `dayOffset` (−366…366 relative to
+  each nominal date), meeting point/link, capacity, open and hidden. The effective
+  template applies during generation too. An earlier edit replaces later templates,
+  but preserves earlier templates, individual `saveEvent` exceptions, cancellation
+  tombstones, past occurrences, event IDs, and every booking row. Capacity failures
+  roll back the entire operation. Any `event_audit` action `updated` marks a permanent
+  individual exception; series updates use `series_updated`, not `updated`.
+- `stopPatrolSeries(db, actor, seriesId, nominalDate, version, reason?, notify?)`
+  permanently stops generation from that date (exclusive boundary). It cancels
+  existing future occurrences and bookings at/after it, including exceptions, but
+  keeps past history. End-date extension cannot restart a stopped series.
+- `materializePatrolOccurrence` lets organizers select any scheduled date beyond
+  the volunteer window. Existing past/cancelled snapshots remain addressable even
+  after shortening/stopping. It never restores a cancellation. Organizer listings
+  accept an optional selected occurrence ID so the 100-row limit cannot hide it.
+
+The first date and interval remain the immutable nominal cadence. Change cadence
+by stopping the old series and creating another; change actual day/time using
+effective templates, not by re-keying occurrences. All series mutations recheck
+the live organizer session and version inside a D1 batch. Notification creation
+requires explicit consent and uses only affected booked occurrences. Retrying
+recognizes both `event_audit` and `patrol_series_audit` operation IDs and does not
+repeat a mutation. `patrol_series_template` and `patrol_series.stopped_from` require
+ordered migration generation by the integration owner before deployment.
+
 ## Generated migrations
 
 ```sh

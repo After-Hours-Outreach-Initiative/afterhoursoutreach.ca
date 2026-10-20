@@ -21,8 +21,14 @@ import {
   patrolOccurrenceId,
   saveEvent,
   savePatrolSeries,
+  updatePatrolSeriesFrom,
+  stopPatrolSeries,
+  listPatrolTemplates,
 } from "../src/server/db/events";
-import { planPatrolOccurrences } from "../src/server/db/patrol-series";
+import {
+  planPatrolOccurrences,
+  type PatrolTemplate,
+} from "../src/server/db/patrol-series";
 import { RequestError } from "../src/server/http";
 import { sourceSchemaStatements } from "./helpers/source-schema";
 
@@ -215,6 +221,67 @@ test("spring/fall recurrence DST policy is deterministic, including gaps and fol
     "2026-03-15T02:30",
   );
   assert.throws(() => vancouverOccurrenceInstant("2026-02-30", "02:30"));
+});
+
+test("effective day shifts plan the true earliest starts across template boundaries and keep a conservative signup frontier", () => {
+  const firstDate = "2026-10-20";
+  const series = {
+    firstDate,
+    localTime: "20:30",
+    intervalWeeks: 1,
+    endDate: "2027-12-31",
+  };
+  const now = vancouverOccurrenceInstant("2026-10-21", "12:00");
+  for (const [one, two] of [
+    [35, -28],
+    [-28, 35],
+    [366, -366],
+    [-366, 366],
+    [0, 0],
+  ]) {
+    const templates: PatrolTemplate[] = [one, two].map((dayOffset, index) => ({
+      effectiveDate: addCalendarDays(firstDate, index === 0 ? 14 : 42),
+      localTime: "21:15",
+      dayOffset,
+      meetingPoint: "Point",
+      meetingPointUrl: null,
+      spots: 8,
+      open: 1,
+      hidden: 0,
+    }));
+    const candidates = Array.from({ length: 63 }, (_, index) => {
+      const date = addCalendarDays(firstDate, index * 7);
+      const template = templates
+        .filter((item) => item.effectiveDate <= date)
+        .at(-1);
+      return {
+        date,
+        startsAt: vancouverOccurrenceInstant(
+          addCalendarDays(date, template?.dayOffset ?? 0),
+          template?.localTime ?? series.localTime,
+        ),
+      };
+    }).filter((event) => event.date <= series.endDate && event.startsAt > now);
+    candidates.sort((a, b) => a.startsAt - b.startsAt);
+    const plan = planPatrolOccurrences(series, [], now, templates);
+    const third = candidates[2].startsAt;
+    assert.deepEqual(
+      plan.occurrences.map((event) => event.date).sort(),
+      candidates
+        .filter((event) => event.startsAt <= third)
+        .map((event) => event.date)
+        .sort(),
+    );
+    const missing = candidates.filter(
+      (event) =>
+        !plan.occurrences.some((planned) => planned.date === event.date),
+    );
+    assert.ok(plan.generationUntil > third);
+    assert.ok(
+      plan.generationUntil <=
+        Math.min(...missing.map((event) => event.startsAt)),
+    );
+  }
 });
 
 test("concurrent D1 generation is idempotent and creates independent occurrence IDs, rosters, capacity and audits", async () => {
@@ -674,4 +741,384 @@ test("validation and authorization reject invalid recurrence input or stale orga
   await assert.rejects(savePatrolSeries(db, organizer, input()), status(403));
   assert.equal(await count("patrol_series"), 0);
   assert.equal(await count("event"), 0);
+});
+
+const templateInput = () => ({
+  localTime: "21:15",
+  dayOffset: 1,
+  meetingPoint: "Updated meeting point",
+  meetingPointUrl: "https://example.org/map",
+  spots: 3,
+  open: true,
+  hidden: false,
+});
+
+test("this-and-future updates booked materialized occurrences with stable IDs, preserving earlier dates, individual exceptions and tombstones", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  const events = await all(series.id);
+  await changeSignup(db, alice, events[1].id, "join");
+  await changeSignup(db, bob, events[2].id, "join");
+  const bookings = (await db.prepare("SELECT * FROM signup ORDER BY id").all())
+    .results;
+  await saveEvent(
+    db,
+    organizer,
+    {
+      type: "patrol",
+      startsAt: new Date(events[2].startsAt).toISOString(),
+      meetingPoint: "Individual exception",
+      meetingPointUrl: "",
+      spots: 2,
+      open: true,
+      hidden: false,
+    },
+    events[2].id,
+    events[2].updatedAt,
+  );
+  const exceptional = await findEvent(db, events[2].id);
+  const distantDate = addCalendarDays(data.firstDate, 70);
+  const distant = await materializePatrolOccurrence(
+    db,
+    organizer,
+    series.id,
+    distantDate,
+  );
+  await cancelEvent(
+    db,
+    organizer,
+    distant.id,
+    (await findEvent(db, distant.id)).updatedAt,
+    "Skip date",
+  );
+  const old = await findPatrolSeries(db, organizer, series.id);
+  const change = await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    events[1].occurrenceDate!,
+    templateInput(),
+    old.updatedAt,
+    true,
+  );
+  const changed = await findEvent(db, events[1].id);
+  assert.equal(
+    changed.startsAt,
+    vancouverOccurrenceInstant(
+      addCalendarDays(events[1].occurrenceDate!, 1),
+      "21:15",
+    ),
+  );
+  assert.equal(changed.meetingPoint, "Updated meeting point");
+  assert.equal(changed.occurrenceDate, events[1].occurrenceDate);
+  assert.equal(
+    (await findEvent(db, events[0].id)).startsAt,
+    events[0].startsAt,
+  );
+  assert.equal(
+    (await findEvent(db, events[2].id)).meetingPoint,
+    exceptional.meetingPoint,
+  );
+  assert.deepEqual(
+    (await db.prepare("SELECT * FROM signup ORDER BY id").all()).results,
+    bookings,
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT count(*) n FROM event_notification WHERE operation_id=?")
+      .bind(change.operation)
+      .first("n"),
+    1,
+  );
+  await ensurePatrolOccurrences(db);
+  assert.ok((await findEvent(db, distant.id)).cancelledAt);
+  const fourth = await materializePatrolOccurrence(
+    db,
+    organizer,
+    series.id,
+    addCalendarDays(data.firstDate, 42),
+  );
+  assert.equal(
+    (await findEvent(db, fourth.id)).meetingPoint,
+    "Updated meeting point",
+  );
+  assert.equal(
+    vancouverInput((await findEvent(db, fourth.id)).startsAt),
+    `${addCalendarDays(data.firstDate, 43)}T21:15`,
+  );
+  await assert.rejects(
+    updatePatrolSeriesFrom(
+      db,
+      organizer,
+      series.id,
+      data.firstDate,
+      templateInput(),
+      old.updatedAt,
+    ),
+    status(409),
+  );
+});
+
+test("effective-date templates preserve earlier boundaries; an earlier this-and-future change replaces later defaults but not exceptions", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  let current = await findPatrolSeries(db, organizer, series.id);
+  const day = (offset: number) => addCalendarDays(data.firstDate, offset);
+  await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    day(56),
+    templateInput(),
+    current.updatedAt,
+  );
+  const later = await materializePatrolOccurrence(
+    db,
+    organizer,
+    series.id,
+    day(70),
+  );
+  assert.equal(
+    (await findEvent(db, later.id)).meetingPoint,
+    "Updated meeting point",
+  );
+  const earlier = await materializePatrolOccurrence(
+    db,
+    organizer,
+    series.id,
+    day(42),
+  );
+  assert.equal(
+    (await findEvent(db, earlier.id)).meetingPoint,
+    data.meetingPoint,
+  );
+  current = await findPatrolSeries(db, organizer, series.id);
+  await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    day(28),
+    { ...templateInput(), dayOffset: -1, meetingPoint: "Replacement" },
+    current.updatedAt,
+  );
+  assert.equal((await findEvent(db, later.id)).meetingPoint, "Replacement");
+  assert.equal((await listPatrolTemplates(db, organizer, series.id)).length, 1);
+  const newDate = await materializePatrolOccurrence(
+    db,
+    organizer,
+    series.id,
+    day(84),
+  );
+  assert.equal(
+    vancouverInput((await findEvent(db, newDate.id)).startsAt),
+    `${day(83)}T21:15`,
+  );
+});
+
+test("bulk capacity violations roll back template, event/audit changes, notifications, versions and all bookings", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  const events = await all(series.id);
+  await changeSignup(db, alice, events[1].id, "join");
+  await changeSignup(db, bob, events[1].id, "join");
+  const old = await findPatrolSeries(db, organizer, series.id);
+  const audits = await count("event_audit");
+  await assert.rejects(
+    updatePatrolSeriesFrom(
+      db,
+      organizer,
+      series.id,
+      data.firstDate,
+      { ...templateInput(), spots: 1 },
+      old.updatedAt,
+      true,
+    ),
+    status(409),
+  );
+  assert.deepEqual(await findPatrolSeries(db, organizer, series.id), old);
+  assert.deepEqual(
+    await all(series.id),
+    events.map((event, index) => ({
+      ...event,
+      confirmed: index === 1 ? 2 : 0,
+    })),
+  );
+  assert.equal(await count("patrol_series_template"), 0);
+  assert.equal(await count("event_audit"), audits);
+  assert.equal(await count("event_notification"), 0);
+});
+
+test("an occurrence generated between the bulk read and write cannot retain stale defaults unnoticed", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  const old = await findPatrolSeries(db, organizer, series.id);
+  const extraDate = addCalendarDays(data.firstDate, 70);
+  let inject = true;
+  const racing = new Proxy(db, {
+    get(target, key) {
+      if (key === "batch")
+        return async (statements: D1PreparedStatement[]) => {
+          if (inject) {
+            inject = false;
+            await materializePatrolOccurrence(
+              db,
+              organizer,
+              series.id,
+              extraDate,
+            );
+          }
+          return target.batch(statements);
+        };
+      const value = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  await assert.rejects(
+    updatePatrolSeriesFrom(
+      racing,
+      organizer,
+      series.id,
+      data.firstDate,
+      templateInput(),
+      old.updatedAt,
+      true,
+    ),
+    status(409),
+  );
+  assert.equal(await count("patrol_series_template"), 0);
+  assert.equal(await count("event_notification"), 0);
+  assert.equal(
+    (await findEvent(db, patrolOccurrenceId(series.id, extraDate)))
+      .meetingPoint,
+    data.meetingPoint,
+  );
+  await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    data.firstDate,
+    templateInput(),
+    old.updatedAt,
+  );
+  assert.equal(
+    (await findEvent(db, patrolOccurrenceId(series.id, extraDate)))
+      .meetingPoint,
+    templateInput().meetingPoint,
+  );
+});
+
+test("stopping at the first date cancels exceptions/bookings, preserves history and never restarts on extension or maintenance", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  const events = await all(series.id);
+  await changeSignup(db, alice, events[0].id, "join");
+  await saveEvent(
+    db,
+    organizer,
+    {
+      type: "patrol",
+      startsAt: new Date(events[1].startsAt).toISOString(),
+      meetingPoint: "Exception",
+      meetingPointUrl: "",
+      spots: 2,
+      open: true,
+      hidden: false,
+    },
+    events[1].id,
+    events[1].updatedAt,
+  );
+  await db
+    .prepare("UPDATE event SET starts_at=0 WHERE id=?")
+    .bind(events[2].id)
+    .run();
+  const old = await findPatrolSeries(db, organizer, series.id);
+  await stopPatrolSeries(
+    db,
+    organizer,
+    series.id,
+    data.firstDate,
+    old.updatedAt,
+    "Stopping",
+    true,
+  );
+  assert.ok((await findEvent(db, events[0].id)).cancelledAt);
+  assert.ok((await findEvent(db, events[1].id)).cancelledAt);
+  assert.equal((await findEvent(db, events[2].id)).cancelledAt, null);
+  assert.equal(
+    await db.prepare("SELECT status FROM signup").first("status"),
+    "cancelled",
+  );
+  assert.equal(await count("event_notification"), 1);
+  const stopped = await findPatrolSeries(db, organizer, series.id);
+  await savePatrolSeries(
+    db,
+    organizer,
+    { ...data, endDate: addCalendarDays(data.firstDate, 365) },
+    series.id,
+    stopped.updatedAt,
+  );
+  await ensurePatrolOccurrences(db);
+  assert.equal((await window()).length, 0);
+  assert.equal((await all(series.id)).length, 3);
+  assert.equal(
+    (
+      await materializePatrolOccurrence(
+        db,
+        organizer,
+        series.id,
+        data.firstDate,
+      )
+    ).id,
+    events[0].id,
+  );
+  assert.ok((await findEvent(db, events[0].id)).cancelledAt);
+  await assert.rejects(
+    materializePatrolOccurrence(
+      db,
+      organizer,
+      series.id,
+      addCalendarDays(data.firstDate, 42),
+    ),
+    status(400),
+  );
+});
+
+test("bulk edits and stopping reject volunteers and revoked organizer sessions without writes", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  const old = await findPatrolSeries(db, organizer, series.id);
+  await assert.rejects(
+    updatePatrolSeriesFrom(
+      db,
+      alice,
+      series.id,
+      data.firstDate,
+      templateInput(),
+      old.updatedAt,
+    ),
+    status(403),
+  );
+  await assert.rejects(
+    stopPatrolSeries(db, alice, series.id, data.firstDate, old.updatedAt),
+    status(403),
+  );
+  await db.prepare("DELETE FROM session WHERE user_id='organizer'").run();
+  await assert.rejects(
+    updatePatrolSeriesFrom(
+      db,
+      organizer,
+      series.id,
+      data.firstDate,
+      templateInput(),
+      old.updatedAt,
+    ),
+    status(409),
+  );
+  await assert.rejects(
+    stopPatrolSeries(db, organizer, series.id, data.firstDate, old.updatedAt),
+    status(409),
+  );
+  assert.deepEqual(await findPatrolSeries(db, organizer, series.id), old);
+  assert.equal(await count("patrol_series_template"), 0);
+  assert.equal(await count("event_notification"), 0);
 });

@@ -10,6 +10,10 @@ const descriptions: Record<string, string> = {
     "You can email the volunteers registered for this event about the updated details.",
   "event-cancel":
     "You can email the volunteers registered for this event about its cancellation, including any reason you entered.",
+  series:
+    "You can email the volunteers whose booked patrol occurrences change. Individual exceptions keep their own details and are not emailed.",
+  "series-cancel":
+    "You can email the volunteers whose future patrol bookings are cancelled, including any reason you entered. Past occurrences are not changed.",
 };
 
 /** Consent is collected before the write so skipped emails are never queued. */

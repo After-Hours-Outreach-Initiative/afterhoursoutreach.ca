@@ -1,6 +1,6 @@
 ---
 import type { Actor } from "@/server/db/access";
-import type { EventRow, RosterRow } from "@/server/db/events";
+import type { EventRow, RosterRow, PatrolSeriesRow } from "@/server/db/events";
 import { signupBlockReason } from "@/server/db/policy";
 import { formatEventDate } from "@/data/event-time";
 import EventEditor from "./EventEditor.astro";
@@ -13,20 +13,25 @@ interface Props {
   roster: RosterRow[];
   destinations: EventRow[];
   filter: string;
+  series?: PatrolSeriesRow;
 }
-const { event, actor, organizer, roster, destinations, filter } = Astro.props;
+const { event, actor, organizer, roster, destinations, filter, series } =
+  Astro.props;
 const future = event.startsAt > Date.now();
 const left = Math.max(0, event.spots - event.confirmed);
-const blocked = signupBlockReason(
-  actor,
-  {
-    ...event,
-    startsAt: new Date(event.startsAt),
-    open: Boolean(event.open) && !event.hidden && !event.cancelledAt,
-    orientationSignupBlocked: Boolean(event.orientationSignupBlocked),
-  },
-  event.confirmed,
-);
+const blocked =
+  future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
+    ? "Registration is available only for the next three patrol occurrences in this series."
+    : signupBlockReason(
+        actor,
+        {
+          ...event,
+          startsAt: new Date(event.startsAt),
+          open: Boolean(event.open) && !event.hidden && !event.cancelledAt,
+          orientationSignupBlocked: Boolean(event.orientationSignupBlocked),
+        },
+        event.confirmed,
+      );
 ---
 
 <li
@@ -79,6 +84,16 @@ const blocked = signupBlockReason(
           {left === 0 ? "Full" : `${left} spots left`}
         </span>{" "}· {event.confirmed} of {event.spots} spots taken
       </p>
+      {
+        organizer && series && (
+          <p class="volunteer-help">
+            Recurring patrol · nominal date {event.occurrenceDate}
+            {!event.inSignupWindow && !event.cancelledAt && future
+              ? " · Outside the volunteer signup window"
+              : ""}
+          </p>
+        )
+      }
       {!event.signedUp && actor && blocked && <p>{blocked}</p>}
     </div>
     <div class="volunteer-actions">
@@ -138,5 +153,9 @@ const blocked = signupBlockReason(
       />
     )
   }
-  {organizer && future && !event.cancelledAt && <EventEditor event={event} />}
+  {
+    organizer && future && !event.cancelledAt && (
+      <EventEditor event={event} series={series} />
+    )
+  }
 </li>

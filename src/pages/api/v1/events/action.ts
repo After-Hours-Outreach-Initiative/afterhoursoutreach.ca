@@ -11,12 +11,46 @@ import {
   changeSignup,
   manageSignup,
   eventSchema,
+  patrolSeriesSchema,
+  patrolTemplateSchema,
+  savePatrolSeries,
+  updatePatrolSeriesFrom,
+  stopPatrolSeries,
+  materializePatrolOccurrence,
 } from "@/server/db/events";
 import { actionEmailResult } from "@/server/events/notifications";
 
 const id = z.string().min(1).max(200);
 const reason = z.string().trim().max(1000).default("");
 const inputSchema = z.discriminatedUnion("action", [
+  z.strictObject({
+    action: z.literal("save-series"),
+    id: id.optional(),
+    version: z.number().int().nonnegative().optional(),
+    series: patrolSeriesSchema,
+    notify: z.boolean().default(false),
+  }),
+  z.strictObject({
+    action: z.literal("update-series-from"),
+    id,
+    occurrenceDate: z.iso.date(),
+    version: z.number().int().nonnegative(),
+    template: patrolTemplateSchema,
+    notify: z.boolean().default(false),
+  }),
+  z.strictObject({
+    action: z.literal("stop-series"),
+    id,
+    occurrenceDate: z.iso.date(),
+    version: z.number().int().nonnegative(),
+    reason,
+    notify: z.boolean().default(false),
+  }),
+  z.strictObject({
+    action: z.literal("materialize-occurrence"),
+    id,
+    occurrenceDate: z.iso.date(),
+  }),
   z.strictObject({
     action: z.literal("save"),
     id: id.optional(),
@@ -64,8 +98,51 @@ export const POST: APIRoute = async ({ request }) => {
       30,
       60_000,
     );
-    let result: { operation?: string; message: string };
+    let result: { operation?: string; message: string; id?: string };
     switch (input.action) {
+      case "save-series":
+        result = await savePatrolSeries(
+          env.DB,
+          actor,
+          input.series,
+          input.id,
+          input.version,
+          input.notify,
+        );
+        break;
+      case "update-series-from":
+        result = await updatePatrolSeriesFrom(
+          env.DB,
+          actor,
+          input.id,
+          input.occurrenceDate,
+          input.template,
+          input.version,
+          input.notify,
+        );
+        break;
+      case "stop-series":
+        result = await stopPatrolSeries(
+          env.DB,
+          actor,
+          input.id,
+          input.occurrenceDate,
+          input.version,
+          input.reason,
+          input.notify,
+        );
+        break;
+      case "materialize-occurrence":
+        result = {
+          ...(await materializePatrolOccurrence(
+            env.DB,
+            actor,
+            input.id,
+            input.occurrenceDate,
+          )),
+          message: "Occurrence ready to manage. Find it in the event list.",
+        };
+        break;
       case "save":
         result = await saveEvent(
           env.DB,
@@ -103,8 +180,10 @@ export const POST: APIRoute = async ({ request }) => {
       case "retry-notifications":
         requireOrganizer(actor);
         if (
-          !(await env.DB.prepare("SELECT id FROM event_audit WHERE id=?")
-            .bind(input.operation)
+          !(await env.DB.prepare(
+            "SELECT id FROM event_audit WHERE id=? UNION ALL SELECT id FROM patrol_series_audit WHERE id=? LIMIT 1",
+          )
+            .bind(input.operation, input.operation)
             .first())
         )
           throw new RequestError(404, "Email action not found.");
@@ -124,6 +203,7 @@ export const POST: APIRoute = async ({ request }) => {
     );
     const response = Response.json(
       {
+        ...(result.id ? { id: result.id } : {}),
         ...delivery,
       },
       { headers: { "Cache-Control": "no-store" } },

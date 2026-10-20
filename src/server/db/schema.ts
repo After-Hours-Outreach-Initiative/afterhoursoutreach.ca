@@ -219,6 +219,8 @@ export const patrolSeries = sqliteTable(
     local_time: text().notNull(),
     interval_weeks: integer().notNull(),
     end_date: text(),
+    // Exclusive, permanent stop boundary (also represents stopping before first).
+    stopped_from: text(),
     time_zone: text().notNull().default("America/Vancouver"),
     meeting_point: text().notNull(),
     meeting_point_url: text(),
@@ -268,6 +270,39 @@ export const patrolSeriesAudit = sqliteTable(
   },
   (table) => [
     index("patrol_series_audit_time").on(table.series_id, table.created_at),
+  ],
+);
+
+// Effective-date templates leave the nominal cadence and occurrence IDs intact.
+// A later this-and-future edit replaces subsequent templates, not exceptions.
+export const patrolSeriesTemplate = sqliteTable(
+  "patrol_series_template",
+  {
+    id: text().primaryKey(),
+    series_id: text()
+      .notNull()
+      .references(() => patrolSeries.id),
+    effective_date: text().notNull(),
+    local_time: text().notNull(),
+    day_offset: integer().notNull().default(0),
+    meeting_point: text().notNull(),
+    meeting_point_url: text(),
+    spots: integer().notNull(),
+    open: integer({ mode: "boolean" }).notNull(),
+    hidden: integer({ mode: "boolean" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("patrol_series_template_date").on(
+      table.series_id,
+      table.effective_date,
+    ),
+    check(
+      "patrol_template_offset",
+      sql`${table.day_offset} BETWEEN -366 AND 366`,
+    ),
+    check("patrol_template_spots", sql`${table.spots} BETWEEN 1 AND 100`),
+    check("patrol_template_open", sql`${table.open} IN (0, 1)`),
+    check("patrol_template_hidden", sql`${table.hidden} IN (0, 1)`),
   ],
 );
 
