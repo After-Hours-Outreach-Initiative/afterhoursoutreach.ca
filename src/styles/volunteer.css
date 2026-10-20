@@ -871,6 +871,8 @@ body:has([data-application], [data-account-contents-flow]) {
 }
 .volunteer-training-divider {
   display: flex;
+  inline-size: min(120px, 100%);
+  justify-self: start;
   align-items: center;
   gap: 12px;
   color: #a1a1aa;
