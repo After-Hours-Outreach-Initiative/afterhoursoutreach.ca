@@ -445,6 +445,19 @@ for (const width of [390, 1280]) {
         "border-radius",
         "10px",
       );
+      await expect(reviewTracker).toHaveCSS(
+        "background-color",
+        "rgba(0, 0, 0, 0)",
+      );
+      expect(
+        await reviewTracker.evaluate((nav) => {
+          const backing = getComputedStyle(nav, "::before");
+          return [backing.backgroundColor, backing.top, backing.height];
+        }),
+      ).toEqual(["rgb(0, 0, 0)", "0px", "18px"]);
+      await expect(
+        reviewTracker.locator(".volunteer-contents-dropdown-band"),
+      ).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     }
     await expect(draftActions).toBeHidden();
     if (width < 1024) {
