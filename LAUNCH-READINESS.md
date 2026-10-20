@@ -1,4 +1,40 @@
-# Task7 integration readiness — 2026-10-20
+# Task8 production database preparation — 2026-10-20
+
+- **Prepared, not connected or deployed:** dedicated D1
+  `afterhoursoutreach-production` / `ca19de7e-de80-41a5-827a-7130c34ea3da`
+  in confirmed account `76222ab803494dc84947546283e1a63a`, for eventual Worker
+  `afterhoursoutreach-ca`. Inventory contained only staging before creation.
+- Verified OAuth identity `tudor.stoiu@gmail.com`, account membership including
+  Super Administrator / Workers Platform Admin, and `d1 (write)` scope before
+  writes. Used pinned local Wrangler 4.135.0 and its help/current authorization
+  docs. No credentials or secret values were printed or committed.
+- Applied the complete preserved 15-migration history through 0014 using the
+  isolated `wrangler.production-migrations.jsonc`. Remote ledger matches exactly;
+  no pending migrations, foreign keys enabled, zero violations, quick check OK.
+  All 23 application tables are empty; their schema, 28 named indexes and 24
+  triggers match the full local migration replay. No personal/synthetic data seeded.
+- Time Travel bookmark retrieval works read-only on the production storage
+  backend. WNAM primary, unrestricted jurisdiction, replication disabled. Actual
+  Free/Paid recovery window and named owner/approvals remain to be confirmed;
+  no restore or recovery drill performed.
+- Read-only live Worker checks: secret list empty, settings bindings empty
+  (no live auth URL/environment/D1), cron schedules empty. Desired source values
+  are canonical `https://afterhoursoutreach.ca`, production environment and
+  `0 16 * * *` / `30 * * * *`; **not** evidence of live configuration.
+  Resend domain/SPF/DKIM and both `accounts@`/`noreply@` senders remain unverified:
+  local send-only key cannot read domains (401 `restricted_api_key`). No email sent.
+- `wrangler.jsonc` production placeholder, Preview bindings/config and historical
+  migrations unchanged. No Worker deployment, secret write or Preview mutation.
+  Human connection commands, privacy/cutover gates, inbox and recovery ownership
+  checks are now at the **top of `TODO.md`**; approvals remain open. That file
+  is locally Git-excluded; `PRODUCTION-D1.md` preserves a tracked cutover handoff.
+- Local validation: `pnpm db:check`, regenerated Wrangler types / `pnpm check`
+  (233 files, zero diagnostics), and 7 focused migration-guard/Preview config tests
+  passed. Migration-only deployment dry run deliberately fails for missing
+  entrypoint/assets. Remote verification's initial compound-count SELECT exceeded
+  D1's limit; separate read-only count statements passed. No `docs/` tests run.
+
+## Task7 integration readiness (preserved)
 
 ## Scope and deployment
 
@@ -121,7 +157,7 @@ Remote walkthrough details:
 - Production mobile/sign-in/OTP-expiry and real-inbox launch acceptance remains a
   human cutover step, not authorization to deploy production during this task.
 
-## Exact task8 handoff (separate fresh agent)
+## Original task8 handoff (completed above; not cutover approval)
 
 Create/migrate a **dedicated production D1 only** in confirmed account
 `76222ab803494dc84947546283e1a63a` for Worker `afterhoursoutreach-ca`. Prepare a
