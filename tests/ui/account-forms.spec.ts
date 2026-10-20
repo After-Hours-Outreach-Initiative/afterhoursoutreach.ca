@@ -615,7 +615,8 @@ test("account contents navigate profile and settings sections on desktop and mob
         );
         await expect(dropdown).toHaveCSS("overscroll-behavior", "auto");
         await expect(summary).toHaveCSS("border-radius", "10px");
-        await expect(dropdown).toHaveCSS("border-radius", "10px");
+        await expect(dropdown).toHaveCSS("border-radius", "0px 0px 10px 10px");
+        await expect(dropdown).toHaveCSS("border-width", "0px 1px 1px");
         const expanded = (await dropdown.boundingBox())!;
         expect(expanded.x).toBe(initial.x);
         expect(expanded.width).toBe(initial.width);

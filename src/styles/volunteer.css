@@ -526,9 +526,20 @@ body:has([data-application], [data-account-contents-flow]) {
     inset-inline: calc(-1 * var(--contents-padding));
     padding: 0 var(--contents-padding) 16px;
   }
+  /* Extend behind the summary's lower corners without overlapping the scroller. */
+  .volunteer-contents-dropdown-band::before {
+    content: "";
+    position: absolute;
+    inset: -10px var(--contents-padding) auto;
+    height: 10px;
+    border-inline: var(--volunteer-border);
+    background: #0c0d10;
+    pointer-events: none;
+  }
   .volunteer-contents-dropdown {
     border: var(--volunteer-border);
-    border-radius: 10px;
+    border-top: 0;
+    border-radius: 0 0 10px 10px;
     box-shadow: none;
   }
   .volunteer-application-contents .volunteer-draft-save-status {

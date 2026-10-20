@@ -103,6 +103,14 @@ async function expectActionsPosition(page: Page) {
 async function expectDropdown(dropdown: Locator, scrolls = false) {
   await expect(dropdown.locator("..")).toHaveCSS("position", "absolute");
   await expect(dropdown).toHaveCSS("position", "relative");
+  await expect(dropdown).toHaveCSS("border-radius", "0px 0px 10px 10px");
+  await expect(dropdown).toHaveCSS("border-width", "0px 1px 1px");
+  expect(
+    await dropdown.locator("..").evaluate((band) => {
+      const fill = getComputedStyle(band, "::before");
+      return [fill.top, fill.height, fill.backgroundColor, fill.pointerEvents];
+    }),
+  ).toEqual(["-10px", "10px", "rgb(12, 13, 16)", "none"]);
   await expect(dropdown).toHaveCSS(
     "max-height",
     `${Math.max(0, dropdown.page().viewportSize()!.height - 78)}px`,
@@ -464,7 +472,11 @@ for (const width of [390, 1280]) {
       await reviewTracker.locator("summary").click();
       await expect(reviewTracker.locator("[data-contents-dropdown]")).toHaveCSS(
         "border-radius",
-        "10px",
+        "0px 0px 10px 10px",
+      );
+      await expect(reviewTracker.locator("[data-contents-dropdown]")).toHaveCSS(
+        "border-top-width",
+        "0px",
       );
     }
     await expect(reviewTracker.getByRole("link")).toHaveText([
@@ -789,7 +801,7 @@ test("one compact mobile tracker keeps its reading edge and scrolls its viewport
     await expect(tracker).toHaveCSS("position", "sticky");
     await expect(tracker).toHaveAttribute("data-contents-stuck", "");
     await expect(menu).not.toHaveCSS("box-shadow", "none");
-    await expect(dropdown).toHaveCSS("border-radius", "10px");
+    await expect(dropdown).toHaveCSS("border-radius", "0px 0px 10px 10px");
     await expectDropdown(dropdown, true);
     expect((await dropdown.boundingBox())!.height).toBe(viewport.height - 78);
     await expect(dropdown).toBeInViewport({ ratio: 1 });
@@ -1011,8 +1023,8 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(tracker).toHaveCSS("position", "sticky");
     await expect(dropdown.locator("..")).toHaveCSS("position", "absolute");
     await expect(summary).toHaveCSS("border-radius", "10px");
-    await expect(dropdown).toHaveCSS("border-radius", "10px");
-    await expect(dropdown).toHaveCSS("border-top-width", "1px");
+    await expect(dropdown).toHaveCSS("border-radius", "0px 0px 10px 10px");
+    await expect(dropdown).toHaveCSS("border-top-width", "0px");
     const expanded = (await dropdown.boundingBox())!;
     const bar = (await summary.boundingBox())!;
     expect(expanded.x).toBe(initial.x);
