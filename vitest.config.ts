@@ -17,7 +17,11 @@ export default defineConfig({
           name: "unit",
           environment: "node",
           include: ["tests/*.test.ts"],
-          exclude: ["tests/auth.test.ts", "tests/d1.test.ts"],
+          exclude: [
+            "tests/auth.test.ts",
+            "tests/d1.test.ts",
+            "tests/notifications.test.ts",
+          ],
         },
       },
       {
@@ -41,7 +45,11 @@ export default defineConfig({
         ],
         test: {
           name: "runtime",
-          include: ["tests/auth.test.ts", "tests/d1.test.ts"],
+          include: [
+            "tests/auth.test.ts",
+            "tests/d1.test.ts",
+            "tests/notifications.test.ts",
+          ],
           setupFiles: ["tests/helpers/runtime-setup.ts"],
           provide: {
             migrations: await readD1Migrations(

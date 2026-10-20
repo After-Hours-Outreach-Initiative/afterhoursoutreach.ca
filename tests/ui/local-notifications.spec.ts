@@ -104,7 +104,11 @@ test("local approval notifications work without crypto.randomUUID", async ({
       "Test email outcome",
     );
     await emailDialog
-      .getByRole("button", { name: "Simulate successful delivery" })
+      .getByRole("button", {
+        name: approve
+          ? "Simulate successful delivery"
+          : "Simulate delivery failure",
+      })
       .click();
     await expect(
       profileDialog.getByRole("button", {
@@ -114,6 +118,16 @@ test("local approval notifications work without crypto.randomUUID", async ({
     ).toBeEnabled();
     await expect(profileDialog).toBeVisible();
     await expect(profileDialog.locator("[data-form-message]")).toBeHidden();
+    const result = page.getByRole("dialog", {
+      name: "Volunteer access saved",
+      exact: true,
+    });
+    await expect(result).toContainText(
+      approve
+        ? "Local email simulation succeeded"
+        : "The change is saved, but the local email simulation failed",
+    );
+    await result.getByRole("button", { name: "Close", exact: true }).click();
   }
   expect(submissions).toEqual([
     {

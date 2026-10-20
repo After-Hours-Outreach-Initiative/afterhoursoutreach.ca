@@ -289,16 +289,18 @@ describe(
           assert.doesNotMatch(JSON.stringify(notifications), /sign.?up/i);
         }
         if (!notify) {
-          // Retrying must not resurrect emails skipped or omitted in the request.
-          const retry = (await (
-            await send(
-              "/api/v1/events/action",
-              { action: "retry-notifications" },
-              organizer.cookie,
-            )
-          ).json()) as { pending: number };
+          // Global retries are not an action: they must not sweep pending mail.
+          const retry = await worker.fetch(`${origin}/api/v1/events/action`, {
+            method: "POST",
+            headers: {
+              origin,
+              "content-type": "application/json",
+              cookie: organizer.cookie,
+            },
+            body: JSON.stringify({ action: "retry-notifications" }),
+          });
           assert.equal(await notificationCount(), 0);
-          assert.equal(retry.pending, 0);
+          assert.equal(retry.status, 400);
         }
       });
     }
@@ -340,6 +342,166 @@ describe(
         )?.status,
         "confirmed",
       );
+    });
+    test("failed email reports the saved event and scoped retries never repeat writes or unrelated mail", async () => {
+      const event = await createEvent();
+      await send(
+        "/api/v1/events/action",
+        { action: "join", id: event.id },
+        volunteer.cookie,
+      );
+      const result = (await (
+        await send(
+          "/api/v1/events/action",
+          {
+            action: "save",
+            id: event.id,
+            version: event.version,
+            event: {
+              ...eventData,
+              meetingPoint: "Saved despite email failure",
+            },
+            notify: true,
+          },
+          organizer.cookie,
+        )
+      ).json()) as { message: string; retryOperation: string };
+      assert.match(result.message, /^Event saved\..*could not be sent/);
+      assert.ok(result.retryOperation);
+      const before = await DB.prepare(
+        "SELECT updated_at,meeting_point FROM event WHERE id=?",
+      )
+        .bind(event.id)
+        .first();
+      const audits = await DB.prepare(
+        "SELECT count(*) AS n FROM event_audit",
+      ).first();
+      const unrelated = await DB.prepare(
+        "SELECT sum(attempts) AS n FROM event_notification WHERE operation_id!=?",
+      )
+        .bind(result.retryOperation)
+        .first();
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const retry = (await (
+          await send(
+            "/api/v1/events/action",
+            { action: "retry-notifications", operation: result.retryOperation },
+            organizer.cookie,
+          )
+        ).json()) as { message: string; retryOperation: string };
+        assert.match(retry.message, /change was not repeated/);
+        assert.equal(retry.retryOperation, result.retryOperation);
+      }
+      assert.deepEqual(
+        await DB.prepare(
+          "SELECT updated_at,meeting_point FROM event WHERE id=?",
+        )
+          .bind(event.id)
+          .first(),
+        before,
+      );
+      assert.deepEqual(
+        await DB.prepare("SELECT count(*) AS n FROM event_audit").first(),
+        audits,
+      );
+      assert.deepEqual(
+        await DB.prepare(
+          "SELECT sum(attempts) AS n FROM event_notification WHERE operation_id!=?",
+        )
+          .bind(result.retryOperation)
+          .first(),
+        unrelated,
+      );
+      const unauthorized = await worker.fetch(
+        `${origin}/api/v1/events/action`,
+        {
+          method: "POST",
+          headers: {
+            origin,
+            "content-type": "application/json",
+            cookie: volunteer.cookie,
+          },
+          body: JSON.stringify({
+            action: "retry-notifications",
+            operation: result.retryOperation,
+          }),
+        },
+      );
+      assert.equal(unauthorized.status, 403);
+      const html = await (
+        await send("/volunteer", undefined, organizer.cookie)
+      ).text();
+      assert.doesNotMatch(
+        html,
+        /Event notifications|Retry pending notifications|data-event-notifications/,
+      );
+    });
+    test("account changes survive email failure and email retries do not repeat account writes", async () => {
+      const status = await DB.prepare(
+        "SELECT updated_at AS version, patrol_approved AS patrolApproved FROM volunteer_status WHERE user_id=?",
+      )
+        .bind(volunteer.id)
+        .first<{ version: number; patrolApproved: number }>();
+      assert.ok(status);
+      const result = (await (
+        await send(
+          "/api/v1/organizer/action",
+          {
+            action: "status",
+            userId: volunteer.id,
+            version: status.version,
+            active: true,
+            applicationApproved: true,
+            patrolApproved: !status.patrolApproved,
+            notify: true,
+          },
+          organizer.cookie,
+        )
+      ).json()) as { message: string; retryOperation: string };
+      assert.match(
+        result.message,
+        /^Volunteer access saved\..*could not be sent/,
+      );
+      const saved = await DB.prepare(
+        "SELECT * FROM volunteer_status WHERE user_id=?",
+      )
+        .bind(volunteer.id)
+        .first();
+      const audits = await DB.prepare(
+        "SELECT count(*) AS n FROM audit_log WHERE action!='profile_viewed'",
+      ).first();
+      await send(
+        "/api/v1/organizer/action",
+        { action: "retry-notifications", operation: result.retryOperation },
+        organizer.cookie,
+      );
+      assert.deepEqual(
+        await DB.prepare("SELECT * FROM volunteer_status WHERE user_id=?")
+          .bind(volunteer.id)
+          .first(),
+        saved,
+      );
+      assert.deepEqual(
+        await DB.prepare(
+          "SELECT count(*) AS n FROM audit_log WHERE action!='profile_viewed'",
+        ).first(),
+        audits,
+      );
+      for (const cookie of [undefined, volunteer.cookie]) {
+        const denied = await worker.fetch(`${origin}/api/v1/organizer/action`, {
+          method: "POST",
+          headers: {
+            origin,
+            "content-type": "application/json",
+            ...(cookie ? { cookie } : {}),
+          },
+          body: JSON.stringify({
+            action: "retry-notifications",
+            operation: result.retryOperation,
+          }),
+        });
+        assert.ok(denied.status === 401 || denied.status === 403);
+      }
     });
     afterAll(async () => {
       await server.close();

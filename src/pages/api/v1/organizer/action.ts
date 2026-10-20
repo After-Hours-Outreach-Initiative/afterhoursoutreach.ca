@@ -10,10 +10,7 @@ import {
 } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { takeRateLimit } from "@/server/db/rate-limits";
-import {
-  deliverNotifications,
-  notificationNotice,
-} from "@/server/events/notifications";
+import { actionEmailResult } from "@/server/events/notifications";
 import { readJson, RequestError, errorResponse } from "@/server/http";
 
 const id = z.string().min(1).max(200);
@@ -26,6 +23,10 @@ const inputSchema = z.discriminatedUnion("action", [
     notify: z.boolean().default(false),
   }),
   z.strictObject({ action: z.literal("orientation"), userId: id, eventId: id }),
+  z.strictObject({
+    action: z.literal("retry-notifications"),
+    operation: z.uuid(),
+  }),
 ]);
 export const prerender = false;
 export const POST: APIRoute = async ({ request }) => {
@@ -50,37 +51,55 @@ export const POST: APIRoute = async ({ request }) => {
         "Check the volunteer action and form fields.",
       );
     const input = parsed.data;
+    if (
+      input.action === "retry-notifications" &&
+      !(await env.DB.prepare(
+        "SELECT id FROM audit_log WHERE id=? AND action IN ('approval_changed','active_changed','role_changed')",
+      )
+        .bind(input.operation)
+        .first())
+    )
+      throw new RequestError(404, "Email action not found.");
     const result =
-      input.action === "status"
-        ? await setVolunteerStatus(env.DB, actor, {
-            userId: input.userId,
-            version: input.version,
-            active: input.active,
-            applicationApproved: input.applicationApproved,
-            registrationApproved: input.registrationApproved,
-            patrolApproved: input.patrolApproved,
-            notify: input.notify,
-          })
-        : input.action === "role"
-          ? await setRole(env.DB, actor, input.userId, input.role, input.notify)
-          : await completeOrientation(
-              env.DB,
-              actor,
-              input.userId,
-              input.eventId,
-            );
-    let delivery = { failed: 0, sent: 0, pending: 0, expired: 0 };
-    if ("notify" in input && input.notify) {
-      try {
-        delivery = await deliverNotifications(bindings, result.operation);
-      } catch {
-        delivery = { failed: 1, sent: 0, pending: 1, expired: 0 };
-      }
-    }
+      input.action === "retry-notifications"
+        ? {
+            operation: input.operation,
+            message:
+              "Email retry complete. The account change was not repeated.",
+          }
+        : input.action === "status"
+          ? await setVolunteerStatus(env.DB, actor, {
+              userId: input.userId,
+              version: input.version,
+              active: input.active,
+              applicationApproved: input.applicationApproved,
+              registrationApproved: input.registrationApproved,
+              patrolApproved: input.patrolApproved,
+              notify: input.notify,
+            })
+          : input.action === "role"
+            ? await setRole(
+                env.DB,
+                actor,
+                input.userId,
+                input.role,
+                input.notify,
+              )
+            : await completeOrientation(
+                env.DB,
+                actor,
+                input.userId,
+                input.eventId,
+              );
+    const delivery = await actionEmailResult(
+      bindings,
+      result,
+      input.action === "retry-notifications" ||
+        ("notify" in input && input.notify),
+    );
     const response = Response.json(
       {
         ...delivery,
-        message: result.message + notificationNotice(delivery),
       },
       { headers: { "Cache-Control": "no-store" } },
     );
