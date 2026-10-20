@@ -401,6 +401,13 @@ for (const path of ["/apply", "/volunteer/account"]) {
         }
         const initial = await contents.boundingBox();
         const header = await page.locator(".site-header").boundingBox();
+        const panel = page.locator(".volunteer-panel").first();
+        const initialPanel = await panel.boundingBox();
+        if (width < 1024) {
+          expect(initialPanel!.y).toBe(initial!.y + initial!.height + 16);
+          await expect(panel).toHaveCSS("border-radius", "10px");
+          await expect(panel).toHaveCSS("border-top-width", "1px");
+        }
         if (path === "/apply" && width < 1024) {
           const intro = await page
             .locator(".volunteer-application-intro")
@@ -418,6 +425,7 @@ for (const path of ["/apply", "/volunteer/account"]) {
           page.locator("[data-application-flow], [data-account-contents-flow]"),
         ).toHaveAttribute("style", /--contents-scroll-offset:/);
         expect(await contents.boundingBox()).toEqual(initial);
+        expect(await panel.boundingBox()).toEqual(initialPanel);
         if (width < 1024) {
           await page.evaluate(
             (top) => scrollTo({ top, behavior: "instant" }),
@@ -553,18 +561,19 @@ test("account contents navigate profile and settings sections on desktop and mob
       await expect(summary.locator(".volunteer-contents-toggle")).toHaveCount(
         0,
       );
-      await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
+      await expect(summary).toHaveCSS("border-radius", "10px");
+      await expect(menu).toHaveCSS("border-radius", "10px");
       await expect(summary).toHaveCSS("background-color", "rgb(23, 26, 32)");
       await expect(header).toHaveCSS("position", "sticky");
       await expect(contents).not.toHaveAttribute("data-contents-stuck");
       const initial = (await summary.boundingBox())!;
-      const panel = (await page
-        .locator(".volunteer-panel")
-        .first()
-        .boundingBox())!;
+      const firstPanel = page.locator(".volunteer-panel").first();
+      await expect(firstPanel).toHaveCSS("border-radius", "10px");
+      await expect(firstPanel).toHaveCSS("border-top-width", "1px");
+      const panel = (await firstPanel.boundingBox())!;
       expect(initial).toEqual({
         x: width <= 640 ? 16 : 24,
-        y: panel.y - 54,
+        y: panel.y - 54 - 16,
         width: panel.width,
         height: 54,
       });
@@ -582,7 +591,8 @@ test("account contents navigate profile and settings sections on desktop and mob
           `${812 - headerHeight - 70}px`,
         );
         await expect(dropdown).toHaveCSS("overscroll-behavior", "auto");
-        await expect(dropdown).toHaveCSS("border-radius", "0px");
+        await expect(summary).toHaveCSS("border-radius", "10px");
+        await expect(dropdown).toHaveCSS("border-radius", "10px");
         const expanded = (await dropdown.boundingBox())!;
         expect(expanded.x).toBe(initial.x);
         expect(expanded.width).toBe(initial.width);
@@ -654,7 +664,8 @@ test("account contents navigate profile and settings sections on desktop and mob
         await expect(summary).toHaveAccessibleName("On this page");
         await expect(menu).not.toHaveAttribute("open");
         await expect(contents).toHaveAttribute("data-contents-stuck", "");
-        await expect(summary).toHaveCSS("border-radius", "0px");
+        await expect(summary).toHaveCSS("border-radius", "10px");
+        await expect(menu).toHaveCSS("border-radius", "10px");
         await expect(menu).not.toHaveCSS("box-shadow", "none");
         await expect
           .poll(async () => (await summary.boundingBox())!.y)
@@ -684,7 +695,7 @@ test("account contents navigate profile and settings sections on desktop and mob
       await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
       await expect(current).toHaveText("Your profile");
       await expect(contents).not.toHaveAttribute("data-contents-stuck");
-      await expect(summary).toHaveCSS("border-radius", "10px 10px 0px 0px");
+      await expect(summary).toHaveCSS("border-radius", "10px");
     }
     await expect(page.locator('[name="preferredName"]')).toBeHidden();
     await expect(

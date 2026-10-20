@@ -475,17 +475,14 @@ body:has([data-application], [data-account-contents-flow]) {
   [data-application-flow] > .volunteer-contents {
     margin: 0;
   }
-  /* The compact summary owns the first panel's shared seam. */
+  /* Keep the compact bar separate from the fully rounded content panel. */
   [data-application-flow]:has(> .volunteer-application-contents:not([hidden]))
     > [data-application],
   [data-account-contents-body] > .volunteer-panel:first-child {
-    margin-top: 0;
-    border-top: 0;
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
+    margin-top: 16px;
   }
   .volunteer-contents-menu {
-    border-radius: 10px 10px 0 0;
+    border-radius: 10px;
   }
   .volunteer-contents[data-contents-stuck] .volunteer-contents-menu {
     box-shadow: 0 4px 12px #0004;
@@ -494,7 +491,7 @@ body:has([data-application], [data-account-contents-flow]) {
     gap: 8px;
     padding-inline: 12px;
     border: var(--volunteer-border);
-    border-radius: 10px 10px 0 0;
+    border-radius: 10px;
   }
   @media (hover: hover) {
     .volunteer-contents summary:hover {
@@ -507,15 +504,9 @@ body:has([data-application], [data-account-contents-flow]) {
   .volunteer-contents summary:active {
     box-shadow: inset 0 0 0 100vmax #ffffff0d;
   }
-  .volunteer-contents[data-contents-stuck] .volunteer-contents-menu,
-  .volunteer-contents[data-contents-stuck] summary {
-    border-radius: 0;
-    background: var(--color-panel-soft);
-  }
   .volunteer-contents-dropdown {
     border: var(--volunteer-border);
-    border-top: 0;
-    border-radius: 0;
+    border-radius: 10px;
     box-shadow: none;
   }
   .volunteer-application-contents .volunteer-draft-save-status {
