@@ -1,14 +1,21 @@
-import type { Actor } from "../db/access";
-import type { EventRow } from "../db/events";
+import { canViewEvents, type Actor } from "../db/access";
+import type { EventRow, RosterRow } from "../db/events";
 
 // Only an opaque view version is returned by polling. The normal page rendering
 // still authorizes and supplies event details, signup controls and rosters.
 export async function eventViewVersion(
   events: EventRow[],
   actor: Actor | null,
+  rosters: RosterRow[] = [],
+  now = Date.now(),
 ) {
   const view = JSON.stringify({
     events,
+    // Crossing the start time changes the controls even if no database row changes.
+    started: events.map((event) => event.startsAt <= now),
+    // Counts alone miss attendee swaps, renamed volunteers and marked attendance.
+    // Never make other volunteers' activity part of a non-organizer's view.
+    rosters: actor?.role === "organizer" && canViewEvents(actor) ? rosters : [],
     actor: actor && {
       id: actor.id,
       role: actor.role,

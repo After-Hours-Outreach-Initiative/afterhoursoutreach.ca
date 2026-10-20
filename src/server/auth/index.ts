@@ -130,6 +130,9 @@ export function createAuth(
     sendEmail: (email) =>
       sendSignInEmail(bindings.RESEND_API_KEY, email, bindings.APP_ENV),
   };
+  // Simulated email must not exhaust the shared provider quota during local use.
+  // Per-address/IP limits and resend cooldowns still apply in development.
+  const consumeProviderBudget = !development && bindings.APP_ENV !== "local";
   const limitFactorVerification = async (userId: string) => {
     try {
       // The plugin's per-account lockout only covers signed-out challenges.
@@ -472,6 +475,8 @@ export function createAuth(
                 bindings.BETTER_AUTH_SECRET,
                 parsed.data.newEmail,
                 ip,
+                60_000,
+                consumeProviderBudget,
               );
               await cleanupAuthRecords(bindings.DB);
             } else {
@@ -530,6 +535,7 @@ export function createAuth(
               parsed.data.email,
               ip,
               30_000,
+              consumeProviderBudget,
             );
             await cleanupAuthRecords(bindings.DB);
           } else {

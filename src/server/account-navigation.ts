@@ -17,18 +17,25 @@ export async function loadAccountNavigation(
     organizer: false,
   };
   if (!bindings.BETTER_AUTH_SECRET) return signedOut;
-  const { actor, email, greetingName, headers } = await accountContext(
-    bindings,
-    request,
-  );
-  forwardCookies(headers, responseHeaders);
-  return actor
-    ? {
-        signedIn: true,
-        name: actor.name,
-        greetingName,
-        email,
-        organizer: actor.role === "organizer",
-      }
-    : signedOut;
+  try {
+    const { actor, email, greetingName, headers } = await accountContext(
+      bindings,
+      request,
+    );
+    forwardCookies(headers, responseHeaders);
+    return actor
+      ? {
+          signedIn: true,
+          name: actor.name,
+          greetingName,
+          email,
+          organizer: actor.role === "organizer",
+        }
+      : signedOut;
+  } catch {
+    // Public information must remain readable during an account-service outage.
+    // Do not log adapter errors: they can include private values or SQL bindings.
+    console.error(JSON.stringify({ event: "account_navigation_unavailable" }));
+    return signedOut;
+  }
 }

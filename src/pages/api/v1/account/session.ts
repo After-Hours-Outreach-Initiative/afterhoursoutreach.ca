@@ -25,7 +25,13 @@ export const POST: APIRoute = async ({ request }) => {
       auth,
       request,
     );
-    if (!current) throw new RequestError(401, "Sign in to manage sessions.");
+    if (!current?.user.emailVerified)
+      throw new RequestError(401, "Sign in to manage sessions.");
+    if (current.user.twoFactorEnabled && !current.session.twoFactorVerified)
+      throw new RequestError(
+        403,
+        "Sign in with your authenticator to manage sessions.",
+      );
     const parsed = z
       .object({ id: z.string().min(1).max(200) })
       .strict()

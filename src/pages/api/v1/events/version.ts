@@ -1,8 +1,8 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
-import { accountContext } from "@/server/db/access";
+import { accountContext, canViewEvents } from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
-import { listEvents } from "@/server/db/events";
+import { listEvents, listRosters } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
 import { errorResponse } from "@/server/http";
 
@@ -10,10 +10,16 @@ export const prerender = false;
 export const GET: APIRoute = async ({ request }) => {
   try {
     const { actor, headers } = await accountContext(env, request);
-    const version = await eventViewVersion(
-      await listEvents(env.DB, actor),
-      actor,
-    );
+    const events = await listEvents(env.DB, actor);
+    const rosters =
+      actor?.role === "organizer" && canViewEvents(actor)
+        ? await listRosters(
+            env.DB,
+            actor,
+            events.map((event) => event.id),
+          )
+        : [];
+    const version = await eventViewVersion(events, actor, rosters);
     const response = Response.json(
       { version },
       { headers: { "Cache-Control": "no-store" } },

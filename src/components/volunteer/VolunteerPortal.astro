@@ -34,7 +34,6 @@ try {
 }
 const events = await listEvents(env.DB, actor);
 const eventAccess = canViewEvents(actor);
-const eventVersion = await eventViewVersion(events, actor);
 const rosters =
   organizer && actor
     ? await listRosters(
@@ -43,6 +42,7 @@ const rosters =
         events.map((event) => event.id),
       )
     : [];
+const eventVersion = await eventViewVersion(events, actor, rosters);
 const notifications = organizer ? await countNotifications(env.DB) : null;
 const destinations = events.filter(
   (event) =>

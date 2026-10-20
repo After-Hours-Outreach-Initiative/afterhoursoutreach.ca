@@ -26,6 +26,11 @@ export const POST: APIRoute = async ({ request }) => {
     );
     if (!current?.user.emailVerified)
       throw new RequestError(401, "Sign in to edit your profile.");
+    if (current.user.twoFactorEnabled && !current.session.twoFactorVerified)
+      throw new RequestError(
+        403,
+        "Sign in with your authenticator to edit your profile.",
+      );
     await takeRateLimit(
       env.DB,
       env.BETTER_AUTH_SECRET,
@@ -34,8 +39,8 @@ export const POST: APIRoute = async ({ request }) => {
       60_000,
     );
     const input = await readJson(request);
-    // Older clients omit this field. New application tabs bind submission to the
-    // account they were opened for, just like autosave does.
+    // Older clients omit this field. Bind both application and profile tabs to
+    // the account they were opened for, just like autosave does.
     if (input && typeof input === "object" && "applicationUserId" in input) {
       if (input.applicationUserId !== current.user.id)
         throw new RequestError(

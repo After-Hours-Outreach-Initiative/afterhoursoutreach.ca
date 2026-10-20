@@ -118,6 +118,24 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     expect(await signedInNext()).not.toBe(approvedVersion);
     expect(await signedInNext()).toBe(await listingVersion(attendee.cookie));
 
+    const organizerSignIn = await send(
+      "/api/v1/auth/sign-in/email-otp",
+      await createSignInOTP(DB, secret, "version-organizer@example.org"),
+    );
+    expect(organizerSignIn.status).toBe(200);
+    const organizerCookie = organizerSignIn.headers
+      .getSetCookie()
+      .filter((value) => !value.includes("Max-Age=0"))
+      .map((value) => value.split(";")[0])
+      .join("; ");
+    const beforeRename = await readVersion(organizerCookie);
+    await DB.prepare("UPDATE profile SET preferred_name=? WHERE user_id=?")
+      .bind("Renamed attendee", attendee.id)
+      .run();
+    const organizerJoinedVersion = await readVersion(organizerCookie);
+    expect(organizerJoinedVersion).not.toBe(beforeRename);
+    expect(organizerJoinedVersion).toBe(await listingVersion(organizerCookie));
+
     const cancelled = await send(
       "/api/v1/events/action",
       { action: "cancel", id: "live" },
@@ -135,6 +153,8 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       attendee.cookie,
     );
     expect(joinedAgain.status, await joinedAgain.text()).toBe(200);
+    // The count is unchanged, but the old registration ID must not stay on screen.
+    expect(await readVersion(organizerCookie)).not.toBe(organizerJoinedVersion);
     await DB.prepare("UPDATE event SET hidden=1 WHERE id='live'").run();
     const hiddenPublicVersion = await listingVersion();
     expect(await publicNext()).toBe(hiddenPublicVersion);

@@ -43,6 +43,23 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    // Discover account dependencies before a cold-start reload can reset a form.
+    optimizeDeps: {
+      include: [
+        "better-auth/client",
+        "better-auth/client/plugins",
+        "qrcode",
+        "zod",
+      ],
+    },
+    // Avoid restarting the dev Worker when Astro's server imports are discovered.
+    environments: {
+      ssr: {
+        optimizeDeps: {
+          include: ["astro/app/manifest", "astro/logger/json"],
+        },
+      },
+    },
     // Account pages disallow inline scripts; keep Astro's scripts external.
     build: {
       assetsInlineLimit: (path) => (path.endsWith(".js") ? false : undefined),
