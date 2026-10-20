@@ -1,0 +1,492 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "afterhoursoutreach.ca/docs",
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "currentItemFontFamily": 2
+  },
+  "files": {
+    "cloudflare-logo": {
+      "id": "cloudflare-logo",
+      "mimeType": "image/svg+xml",
+      "created": 0,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMzInIGhlaWdodD0nMzInIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDMyIDMyJz48cmVjdCB3aWR0aD0nMzInIGhlaWdodD0nMzInIHJ4PSc0JyBmaWxsPSd3aGl0ZScvPjxnIHRyYW5zZm9ybT0ndHJhbnNsYXRlKDIgOS42KSBzY2FsZSguMTA5Mzc1KSc+PHBhdGggZmlsbD0nI2ZiYWQ0MScgZD0nTTIwNS41MiA1MC44MTNjLS44NTggMC0xLjcwNS4wMy0yLjU1MS4wNThxLS4yMDcuMDEyLS4zOTguMDk0YTEuNDIgMS40MiAwIDAgMC0uOTIuOTk0bC0zLjYyOCAxMi42NzJjLTEuNTY1IDUuNDQ5LS45ODMgMTAuNDggMS42NDYgMTQuMTc0YzIuNDEgMy40MTYgNi40MiA1LjQyMSAxMS4yODkgNS42NTVsMTkuNjc5IDEuMTk0Yy41ODUuMDMgMS4wOTIuMzEyIDEuNC43NzZhMS45MiAxLjkyIDAgMCAxIC4yIDEuNjkyYTIuNSAyLjUgMCAwIDEtMi4xMzQgMS42NjJsLTIwLjQ0OCAxLjE5M2MtMTEuMTEuNTE1LTIzLjA2MiA5LjU4LTI3LjI1NSAyMC42MzNsLTEuNDc0IDMuOWExLjA5MiAxLjA5MiAwIDAgMCAuOTY3IDEuNDloNzAuNDI1YTEuODcgMS44NyAwIDAgMCAxLjgxLTEuMzY1QTUxLjIgNTEuMiAwIDAgMCAyNTYgMTAxLjgyOGMwLTI4LjE2LTIyLjU4Mi01MC45ODQtNTAuNDQ5LTUwLjk4NCcvPjxwYXRoIGZpbGw9JyNmNjgyMWYnIGQ9J20xNzQuNzgyIDExNS4zNjJsMS4zMDMtNC41ODNjMS41NjgtNS40NDkuOTg3LTEwLjQ4LTEuNjM5LTE0LjE3M2MtMi40MTgtMy40MTctNi40MjQtNS40MjItMTEuMjk2LTUuNjU2bC05Mi4zMTItMS4xOTNhMS44MiAxLjgyIDAgMCAxLTEuNDU5LS43NzZhMS45MiAxLjkyIDAgMCAxLS4yMDMtMS42OTNhMi41IDIuNSAwIDAgMSAyLjE1NC0xLjY2Mmw5My4xNzMtMS4xOTNjMTEuMDYzLS41MTEgMjMuMDE1LTkuNTggMjcuMjA4LTIwLjYzM2w1LjMxMy0xNC4wNGMuMjE0LS41OTYuMjctMS4yMzguMTU2LTEuODZDMTkxLjEyNiAyMC41MSAxNjYuOTEgMCAxMzcuOTYgMEMxMTEuMjY5IDAgODguNjI2IDE3LjQwMyA4MC41IDQxLjU5NmEyNyAyNyAwIDAgMC0xOS4xNTYtNS4zNTlDNDguNTQ5IDM3LjUyNCAzOC4yNSA0Ny45NDYgMzYuOTc5IDYwLjg4YTI3LjkgMjcuOSAwIDAgMCAuNzAyIDkuNjQyQzE2Ljc3MyA3MS4xNDUgMCA4OC40NTQgMCAxMDkuNzI2YzAgMS45MjMuMTM3IDMuODE4LjQxMyA1LjY2N2MuMTE1Ljg5Ny44NzkgMS41NyAxLjc4MyAxLjU2OGgxNzAuNDhhMi4yMiAyLjIyIDAgMCAwIDIuMTA2LTEuNjMnLz48L2c+PC9zdmc+"
+    }
+  },
+  "elements": [
+    {
+      "id": "checkout",
+      "type": "rectangle",
+      "x": 0,
+      "y": 260,
+      "width": 240,
+      "height": 80,
+      "backgroundColor": "#f3f0ff",
+      "fillStyle": "solid",
+      "strokeColor": "#7048e8",
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "checkout-label"
+        },
+        {
+          "type": "arrow",
+          "id": "production-command"
+        },
+        {
+          "type": "arrow",
+          "id": "preview-command"
+        }
+      ]
+    },
+    {
+      "id": "checkout-label",
+      "type": "text",
+      "x": 10,
+      "y": 288.5,
+      "width": 220,
+      "height": 23,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "text": "Local working tree",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "checkout"
+    },
+    {
+      "id": "production-build",
+      "type": "rectangle",
+      "x": 380,
+      "y": 100,
+      "width": 240,
+      "height": 80,
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1971c2",
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "production-build-label"
+        },
+        {
+          "type": "arrow",
+          "id": "production-command"
+        },
+        {
+          "type": "arrow",
+          "id": "deploy"
+        }
+      ]
+    },
+    {
+      "id": "production-build-label",
+      "type": "text",
+      "x": 390,
+      "y": 128.5,
+      "width": 220,
+      "height": 23,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "text": "Build application",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "production-build"
+    },
+    {
+      "id": "preview-build",
+      "type": "rectangle",
+      "x": 380,
+      "y": 460,
+      "width": 240,
+      "height": 80,
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1971c2",
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "preview-build-label"
+        },
+        {
+          "type": "arrow",
+          "id": "preview-command"
+        },
+        {
+          "type": "arrow",
+          "id": "migrate"
+        }
+      ]
+    },
+    {
+      "id": "preview-build-label",
+      "type": "text",
+      "x": 390,
+      "y": 488.5,
+      "width": 220,
+      "height": 23,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "text": "Build preview application",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "preview-build"
+    },
+    {
+      "id": "migrations",
+      "type": "rectangle",
+      "x": 760,
+      "y": 460,
+      "width": 240,
+      "height": 85,
+      "backgroundColor": "#fff9db",
+      "fillStyle": "solid",
+      "strokeColor": "#e67700",
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "migrations-label"
+        },
+        {
+          "type": "arrow",
+          "id": "migrate"
+        },
+        {
+          "type": "arrow",
+          "id": "deploy-preview"
+        }
+      ]
+    },
+    {
+      "id": "migrations-label",
+      "type": "text",
+      "x": 770,
+      "y": 480,
+      "width": 220,
+      "height": 45,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "text": "Apply guarded\npreview migrations",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "migrations"
+    },
+    {
+      "id": "production",
+      "type": "rectangle",
+      "groupIds": [
+        "production-group"
+      ],
+      "x": 1140,
+      "y": 100,
+      "width": 260,
+      "height": 80,
+      "backgroundColor": "#fff4e6",
+      "fillStyle": "solid",
+      "strokeColor": "#e8590c",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "deploy"
+        }
+      ]
+    },
+    {
+      "id": "production-label",
+      "type": "text",
+      "x": 1226,
+      "y": 128.75,
+      "width": 158,
+      "height": 22.5,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Production Worker",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "production-group"
+      ]
+    },
+    {
+      "id": "preview",
+      "type": "rectangle",
+      "groupIds": [
+        "preview-group"
+      ],
+      "x": 1140,
+      "y": 460,
+      "width": 260,
+      "height": 80,
+      "backgroundColor": "#fff4e6",
+      "fillStyle": "solid",
+      "strokeColor": "#e8590c",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "deploy-preview"
+        }
+      ]
+    },
+    {
+      "id": "preview-label",
+      "type": "text",
+      "x": 1226,
+      "y": 488.75,
+      "width": 158,
+      "height": 22.5,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Preview Worker",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "preview-group"
+      ]
+    },
+    {
+      "id": "production-command",
+      "type": "arrow",
+      "x": 250,
+      "y": 280,
+      "width": 120,
+      "height": 140,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          55,
+          0
+        ],
+        [
+          55,
+          -140
+        ],
+        [
+          120,
+          -140
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "checkout",
+        "focus": -0.5,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "production-build",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "production-command-label",
+      "type": "text",
+      "x": 240,
+      "y": 100,
+      "width": 130,
+      "height": 20,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "pnpm deploy"
+    },
+    {
+      "id": "preview-command",
+      "type": "arrow",
+      "x": 250,
+      "y": 320,
+      "width": 120,
+      "height": 180,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          55,
+          0
+        ],
+        [
+          55,
+          180
+        ],
+        [
+          120,
+          180
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "checkout",
+        "focus": 0.5,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "preview-build",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "preview-command-label",
+      "type": "text",
+      "x": 240,
+      "y": 565,
+      "width": 190,
+      "height": 20,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "pnpm deploy:preview"
+    },
+    {
+      "id": "deploy",
+      "type": "arrow",
+      "x": 630,
+      "y": 140,
+      "width": 500,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          500,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "production-build",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "production",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "deploy-label",
+      "type": "text",
+      "x": 785,
+      "y": 105,
+      "width": 160,
+      "height": 20,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "wrangler deploy"
+    },
+    {
+      "id": "migrate",
+      "type": "arrow",
+      "x": 630,
+      "y": 500,
+      "width": 120,
+      "height": 2.5,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          120,
+          2.5
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "preview-build",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "migrations",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "deploy-preview",
+      "type": "arrow",
+      "x": 1010,
+      "y": 502.5,
+      "width": 120,
+      "height": 2.5,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          120,
+          -2.5
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "migrations",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "preview",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "deploy-preview-label",
+      "type": "text",
+      "x": 1010,
+      "y": 410,
+      "width": 120,
+      "height": 40,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "wrangler\npreview"
+    },
+    {
+      "id": "production-logo",
+      "type": "image",
+      "fileId": "cloudflare-logo",
+      "status": "saved",
+      "x": 1156,
+      "y": 112,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "production-group"
+      ]
+    },
+    {
+      "id": "preview-logo",
+      "type": "image",
+      "fileId": "cloudflare-logo",
+      "status": "saved",
+      "x": 1156,
+      "y": 472,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "preview-group"
+      ]
+    }
+  ]
+}

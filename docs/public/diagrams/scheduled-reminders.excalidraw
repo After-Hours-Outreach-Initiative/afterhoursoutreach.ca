@@ -1,0 +1,476 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "afterhoursoutreach.ca/docs",
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "currentItemFontFamily": 2
+  },
+  "files": {
+    "cloudflare-logo": {
+      "id": "cloudflare-logo",
+      "mimeType": "image/svg+xml",
+      "created": 0,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMzInIGhlaWdodD0nMzInIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDMyIDMyJz48cmVjdCB3aWR0aD0nMzInIGhlaWdodD0nMzInIHJ4PSc0JyBmaWxsPSd3aGl0ZScvPjxnIHRyYW5zZm9ybT0ndHJhbnNsYXRlKDIgOS42KSBzY2FsZSguMTA5Mzc1KSc+PHBhdGggZmlsbD0nI2ZiYWQ0MScgZD0nTTIwNS41MiA1MC44MTNjLS44NTggMC0xLjcwNS4wMy0yLjU1MS4wNThxLS4yMDcuMDEyLS4zOTguMDk0YTEuNDIgMS40MiAwIDAgMC0uOTIuOTk0bC0zLjYyOCAxMi42NzJjLTEuNTY1IDUuNDQ5LS45ODMgMTAuNDggMS42NDYgMTQuMTc0YzIuNDEgMy40MTYgNi40MiA1LjQyMSAxMS4yODkgNS42NTVsMTkuNjc5IDEuMTk0Yy41ODUuMDMgMS4wOTIuMzEyIDEuNC43NzZhMS45MiAxLjkyIDAgMCAxIC4yIDEuNjkyYTIuNSAyLjUgMCAwIDEtMi4xMzQgMS42NjJsLTIwLjQ0OCAxLjE5M2MtMTEuMTEuNTE1LTIzLjA2MiA5LjU4LTI3LjI1NSAyMC42MzNsLTEuNDc0IDMuOWExLjA5MiAxLjA5MiAwIDAgMCAuOTY3IDEuNDloNzAuNDI1YTEuODcgMS44NyAwIDAgMCAxLjgxLTEuMzY1QTUxLjIgNTEuMiAwIDAgMCAyNTYgMTAxLjgyOGMwLTI4LjE2LTIyLjU4Mi01MC45ODQtNTAuNDQ5LTUwLjk4NCcvPjxwYXRoIGZpbGw9JyNmNjgyMWYnIGQ9J20xNzQuNzgyIDExNS4zNjJsMS4zMDMtNC41ODNjMS41NjgtNS40NDkuOTg3LTEwLjQ4LTEuNjM5LTE0LjE3M2MtMi40MTgtMy40MTctNi40MjQtNS40MjItMTEuMjk2LTUuNjU2bC05Mi4zMTItMS4xOTNhMS44MiAxLjgyIDAgMCAxLTEuNDU5LS43NzZhMS45MiAxLjkyIDAgMCAxLS4yMDMtMS42OTNhMi41IDIuNSAwIDAgMSAyLjE1NC0xLjY2Mmw5My4xNzMtMS4xOTNjMTEuMDYzLS41MTEgMjMuMDE1LTkuNTggMjcuMjA4LTIwLjYzM2w1LjMxMy0xNC4wNGMuMjE0LS41OTYuMjctMS4yMzguMTU2LTEuODZDMTkxLjEyNiAyMC41MSAxNjYuOTEgMCAxMzcuOTYgMEMxMTEuMjY5IDAgODguNjI2IDE3LjQwMyA4MC41IDQxLjU5NmEyNyAyNyAwIDAgMC0xOS4xNTYtNS4zNTlDNDguNTQ5IDM3LjUyNCAzOC4yNSA0Ny45NDYgMzYuOTc5IDYwLjg4YTI3LjkgMjcuOSAwIDAgMCAuNzAyIDkuNjQyQzE2Ljc3MyA3MS4xNDUgMCA4OC40NTQgMCAxMDkuNzI2YzAgMS45MjMuMTM3IDMuODE4LjQxMyA1LjY2N2MuMTE1Ljg5Ny44NzkgMS41NyAxLjc4MyAxLjU2OGgxNzAuNDhhMi4yMiAyLjIyIDAgMCAwIDIuMTA2LTEuNjMnLz48L2c+PC9zdmc+"
+    },
+    "resend-logo": {
+      "id": "resend-logo",
+      "mimeType": "image/svg+xml",
+      "created": 0,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMzInIGhlaWdodD0nMzInIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nLTQgLTQgMzIgMzInPjxyZWN0IHg9Jy00JyB5PSctNCcgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJyByeD0nNCcgZmlsbD0nd2hpdGUnLz48cGF0aCBmaWxsPSdibGFjaycgZD0nTTE0LjY3OSAwYzQuNjQ4IDAgNy40MTMgMi43NjUgNy40MTMgNi40MzRzLTIuNzY1IDYuNDM0LTcuNDEzIDYuNDM0SDEyLjMzTDI0IDI0aC04LjI0NWwtOC44OC04LjQ0Yy0uNjM2LS41ODgtLjkzLTEuMjczLS45My0xLjg2YzAtLjgzMS41ODctMS41NjUgMS43MTMtMS44ODNsNC41NzQtMS4yMjRjMS43MzctLjQ2NSAyLjkzNi0xLjgxIDIuOTM2LTMuNTcyYzAtMi4xNTMtMS43NjEtMy40LTMuOTM5LTMuNEgwVjB6Jy8+PC9zdmc+"
+    }
+  },
+  "elements": [
+    {
+      "id": "worker-boundary",
+      "type": "rectangle",
+      "x": 320,
+      "y": 310,
+      "width": 650,
+      "height": 250,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "strokeStyle": "dashed",
+      "roughness": 0
+    },
+    {
+      "id": "worker-title",
+      "type": "text",
+      "x": 350,
+      "y": 330,
+      "width": 300,
+      "height": 25,
+      "fontSize": 20,
+      "fontFamily": 2,
+      "text": "Same application Worker",
+      "strokeColor": "#495057"
+    },
+    {
+      "id": "cron",
+      "type": "rectangle",
+      "groupIds": [
+        "cron-group"
+      ],
+      "x": 0,
+      "y": 390,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#f3f0ff",
+      "fillStyle": "solid",
+      "strokeColor": "#7048e8",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "trigger"
+        }
+      ]
+    },
+    {
+      "id": "cron-label",
+      "type": "text",
+      "x": 86,
+      "y": 412.5,
+      "width": 138,
+      "height": 45,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Cloudflare\nCron Triggers",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "cron-group"
+      ]
+    },
+    {
+      "id": "scheduled",
+      "type": "rectangle",
+      "groupIds": [
+        "scheduled-group"
+      ],
+      "x": 350,
+      "y": 390,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#fff4e6",
+      "fillStyle": "solid",
+      "strokeColor": "#e8590c",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "trigger"
+        },
+        {
+          "type": "arrow",
+          "id": "process"
+        }
+      ]
+    },
+    {
+      "id": "scheduled-label",
+      "type": "text",
+      "x": 436,
+      "y": 401.25,
+      "width": 138,
+      "height": 67.5,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Worker\nscheduled\nhandler",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "scheduled-group"
+      ]
+    },
+    {
+      "id": "reminders",
+      "type": "rectangle",
+      "x": 700,
+      "y": 390,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1971c2",
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "reminders-label"
+        },
+        {
+          "type": "arrow",
+          "id": "process"
+        },
+        {
+          "type": "arrow",
+          "id": "eligibility"
+        },
+        {
+          "type": "arrow",
+          "id": "email"
+        }
+      ]
+    },
+    {
+      "id": "reminders-label",
+      "type": "text",
+      "x": 710,
+      "y": 412.5,
+      "width": 220,
+      "height": 45,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "text": "Medic reminder\nprocessing",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "reminders"
+    },
+    {
+      "id": "d1",
+      "type": "rectangle",
+      "groupIds": [
+        "d1-group"
+      ],
+      "x": 1170,
+      "y": 80,
+      "width": 280,
+      "height": 90,
+      "backgroundColor": "#fff9db",
+      "fillStyle": "solid",
+      "strokeColor": "#e67700",
+      "strokeStyle": "dashed",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "eligibility"
+        }
+      ]
+    },
+    {
+      "id": "d1-label",
+      "type": "text",
+      "x": 1256,
+      "y": 102.5,
+      "width": 178,
+      "height": 45,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Production D1:\npending",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "d1-group"
+      ]
+    },
+    {
+      "id": "resend",
+      "type": "rectangle",
+      "groupIds": [
+        "resend-group"
+      ],
+      "x": 1170,
+      "y": 680,
+      "width": 280,
+      "height": 90,
+      "backgroundColor": "#ebfbee",
+      "fillStyle": "solid",
+      "strokeColor": "#2f9e44",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "email"
+        }
+      ]
+    },
+    {
+      "id": "resend-label",
+      "type": "text",
+      "x": 1256,
+      "y": 713.75,
+      "width": 178,
+      "height": 22.5,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Resend API",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "resend-group"
+      ]
+    },
+    {
+      "id": "trigger",
+      "type": "arrow",
+      "x": 250,
+      "y": 435,
+      "width": 90,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "cron",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "scheduled",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "process",
+      "type": "arrow",
+      "x": 600,
+      "y": 435,
+      "width": 90,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "scheduled",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "reminders",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "eligibility",
+      "type": "arrow",
+      "x": 950,
+      "y": 412.5,
+      "width": 210,
+      "height": 287.5,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          0
+        ],
+        [
+          90,
+          -287.5
+        ],
+        [
+          210,
+          -287.5
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "strokeStyle": "dashed",
+      "startBinding": {
+        "elementId": "reminders",
+        "focus": -0.5,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "d1",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "eligibility-label",
+      "type": "text",
+      "x": 980,
+      "y": 65,
+      "width": 180,
+      "height": 40,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "eligibility, outbox,\nand leases"
+    },
+    {
+      "id": "email",
+      "type": "arrow",
+      "x": 950,
+      "y": 457.5,
+      "width": 210,
+      "height": 267.5,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          150,
+          0
+        ],
+        [
+          150,
+          267.5
+        ],
+        [
+          210,
+          267.5
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "reminders",
+        "focus": 0.5,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "resend",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "email-label",
+      "type": "text",
+      "x": 930,
+      "y": 755,
+      "width": 170,
+      "height": 40,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "bounded email\ndelivery"
+    },
+    {
+      "id": "cron-logo",
+      "type": "image",
+      "fileId": "cloudflare-logo",
+      "status": "saved",
+      "x": 16,
+      "y": 407,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "cron-group"
+      ]
+    },
+    {
+      "id": "scheduled-logo",
+      "type": "image",
+      "fileId": "cloudflare-logo",
+      "status": "saved",
+      "x": 366,
+      "y": 407,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "scheduled-group"
+      ]
+    },
+    {
+      "id": "d1-logo",
+      "type": "image",
+      "fileId": "cloudflare-logo",
+      "status": "saved",
+      "x": 1186,
+      "y": 97,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "d1-group"
+      ]
+    },
+    {
+      "id": "resend-logo",
+      "type": "image",
+      "fileId": "resend-logo",
+      "status": "saved",
+      "x": 1186,
+      "y": 697,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "resend-group"
+      ]
+    }
+  ]
+}

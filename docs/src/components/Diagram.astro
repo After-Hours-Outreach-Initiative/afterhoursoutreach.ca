@@ -1,0 +1,22 @@
+---
+import ExcalidrawDiagram from "./ExcalidrawDiagram";
+
+interface Props {
+  name: string;
+  title: string;
+  description: string;
+  caption?: string;
+}
+
+const { name, title, description, caption } = Astro.props;
+const src = `/diagrams/${name}.excalidraw`;
+---
+
+<ExcalidrawDiagram
+  client:load
+  src={src}
+  title={title}
+  description={description}
+  caption={caption}
+/>
+<noscript><p>Enable JavaScript to view and edit this diagram.</p></noscript>

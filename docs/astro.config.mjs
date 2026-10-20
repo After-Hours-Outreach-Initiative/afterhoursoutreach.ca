@@ -1,9 +1,8 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
-import mermaid from "astro-mermaid";
-import githubIcons from "./src/icons/github.js";
-import cloudflareIcons from "./src/icons/cloudflare.js";
+import react from "@astrojs/react";
+import diagramFiles from "./src/integrations/diagram-files.ts";
 
 // This is a standalone local reader, not part of the application's build.
 export default defineConfig({
@@ -12,26 +11,18 @@ export default defineConfig({
     port: 4322,
   },
   vite: {
-    server: { strictPort: true },
+    server: {
+      strictPort: true,
+      // Saving must not reload the page and discard edits in other canvases.
+      watch: { ignored: ["**/public/diagrams/*.excalidraw*"] },
+    },
   },
   integrations: [
-    // Register before Starlight so Mermaid fences reach the diagram renderer.
-    mermaid({
-      autoTheme: true,
-      enableLog: false,
-      iconPacks: [
-        { name: "simple-icons", icons: githubIcons },
-        { name: "logos", icons: cloudflareIcons },
-      ],
-      mermaidConfig: {
-        securityLevel: "strict",
-        fontFamily: "inherit",
-        flowchart: { htmlLabels: false, curve: "linear" },
-      },
-    }),
+    diagramFiles(),
+    react(),
     starlight({
       title: "After Hours Outreach docs",
-      customCss: ["./src/styles/diagrams.css"],
+      customCss: ["./src/styles/layout.css", "./src/styles/diagrams.css"],
       // Pagefind needs a build; this reader only uses the development server.
       pagefind: false,
       sidebar: [
