@@ -865,6 +865,8 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-referral-options > label {
   min-width: 0;
   min-height: 44px;
+  /* Pad the touch target evenly without moving controls off the first line. */
+  padding-block: 10px;
   cursor: pointer;
 }
 .volunteer-training-divider {
