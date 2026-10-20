@@ -1,0 +1,17 @@
+/* Keep labels readable on narrow screens; scroll the diagram, not the page. */
+.sl-markdown-content pre.mermaid {
+  justify-content: flex-start;
+  max-width: 100%;
+  font-family: inherit;
+}
+
+.sl-markdown-content pre.mermaid svg {
+  flex: 0 0 auto;
+  min-width: 36rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl-markdown-content pre.mermaid:not([data-processed]) {
+    animation: none;
+  }
+}

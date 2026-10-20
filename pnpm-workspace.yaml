@@ -5,6 +5,13 @@ allowBuilds:
   esbuild: true
   workerd: true
 
+# Mermaid's Langium parser imports JSON-RPC internals without declaring it.
+# Bind its compatible version rather than borrowing the editor tooling's v9.
+packageExtensions:
+  "langium@3.3.1":
+    dependencies:
+      vscode-jsonrpc: 8.2.1
+
 # Keep the plugin on a published runtime compatible with local development.
 overrides:
   "@cloudflare/vite-plugin": 1.52.0
