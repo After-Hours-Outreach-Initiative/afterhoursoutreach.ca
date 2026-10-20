@@ -2,6 +2,8 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import mermaid from "astro-mermaid";
+import githubIcons from "./src/icons/github.js";
+import cloudflareIcons from "./src/icons/cloudflare.js";
 
 // This is a standalone local reader, not part of the application's build.
 export default defineConfig({
@@ -17,6 +19,10 @@ export default defineConfig({
     mermaid({
       autoTheme: true,
       enableLog: false,
+      iconPacks: [
+        { name: "simple-icons", icons: githubIcons },
+        { name: "logos", icons: cloudflareIcons },
+      ],
       mermaidConfig: {
         securityLevel: "strict",
         fontFamily: "inherit",

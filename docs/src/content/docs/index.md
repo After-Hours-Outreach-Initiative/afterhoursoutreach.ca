@@ -15,11 +15,11 @@ database bindings.
 ```mermaid
 flowchart TB
     accTitle: System overview
-    accDescr: GitHub builds deploy production and the current branch preview under one Cloudflare Worker. Previews use a shared preview D1 database. Production D1 is not yet provisioned. The application uses Resend for email.
-    repo["GitHub repository"]
+    accDescr: Builds from the afterhoursoutreach.ca GitHub repository deploy production and the current branch preview under one Cloudflare Worker. Previews use a shared preview D1 database. Production D1 is not yet provisioned. The application uses Resend for email.
+    repo@{ icon: "simple-icons:github", label: "afterhoursoutreach.ca", pos: "b", h: 48 }
     subgraph worker["afterhoursoutreach-ca"]
-        production["Production"]
-        preview["Branch previews"]
+        production@{ icon: "logos:cloudflare-icon", label: "Production Worker", pos: "b", h: 48 }
+        preview@{ icon: "logos:cloudflare-icon", label: "Worker previews", pos: "b", h: 48 }
     end
     productionDB[("Production D1: pending")]
     previewDB[("Shared preview D1")]
