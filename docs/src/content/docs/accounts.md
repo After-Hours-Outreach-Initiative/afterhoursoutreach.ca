@@ -1,4 +1,7 @@
-# Accounts
+---
+title: Accounts
+description: Volunteer applications, passwordless sign-in, profiles, and organizer roles.
+---
 
 How volunteers apply and sign in, and how organizers are told apart from
 volunteers.
@@ -28,7 +31,7 @@ Only pressing **Confirm sign-in** submits the code, so simply visiting the page
 does not consume it, including when a mail scanner runs JavaScript.
 
 The generated database baseline uses Better Auth's verification table, not the
-old email-challenge table. See [database migrations](../src/server/db/README.md)
+old email-challenge table. See [database migrations](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/src/server/db/README.md)
 before rebuilding a pre-production database that used the old migration history.
 
 ## Application
@@ -76,7 +79,7 @@ The form definitions live in `src/data/application.ts`. The profile endpoint
 remains `/api/v1/account/profile`, since it also handles ongoing profile edits.
 Organizer status requests use `applicationApproved`; the old `registrationApproved`
 input is accepted for older open forms, but conflicting values are rejected.
-See [storage compatibility](../src/server/db/README.md#application-storage-compatibility)
+See [storage compatibility](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/src/server/db/README.md#application-storage-compatibility)
 for the unchanged SQL names and historical records. No data migration is needed
 for this terminology change.
 
@@ -260,7 +263,7 @@ trash button. Deletion requires same-origin POST and explicit
 confirmation; deleting the current account also clears its browser session.
 The database still prevents deleting the last active organizer or accounts
 referenced by organizer-owned records, without partial cleanup.
-See [backend.md](backend.md#local-testing).
+See [backend.md](/backend/#local-testing).
 
 ## TODO
 

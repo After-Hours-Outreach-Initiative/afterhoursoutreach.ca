@@ -1,4 +1,7 @@
-# Events
+---
+title: Events
+description: Patrol and orientation visibility, sign-ups, and organizer management.
+---
 
 Patrols and orientations show up at the bottom of the `/volunteer` page. An
 active account with an organizer-approved application is required to view events or
