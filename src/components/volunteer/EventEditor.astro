@@ -1,12 +1,13 @@
 ---
-import type { EventRow } from "@/server/db/events";
+import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
 import DateInput from "./DateInput.astro";
 interface Props {
   event?: EventRow;
+  series?: PatrolSeriesRow;
 }
-const { event } = Astro.props;
+const { event, series } = Astro.props;
 const dialogId = `event-editor-${event?.id ?? "new"}`;
 const publicVisibility = Boolean(event?.open && !event.hidden);
 ---
@@ -39,6 +40,35 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
     }
     <div class="volunteer-fields">
       {
+        event?.seriesId && series && (
+          <>
+            <input type="hidden" name="seriesId" value={series.id} />
+            <input
+              type="hidden"
+              name="seriesVersion"
+              value={series.updatedAt}
+            />
+            <input
+              type="hidden"
+              name="occurrenceDate"
+              value={event.occurrenceDate!}
+            />
+            <label class="volunteer-field volunteer-wide">
+              Apply changes to
+              <select name="scope">
+                <option value="occurrence">Only this occurrence</option>
+                <option value="future">This and future occurrences</option>
+              </select>
+              <span class="volunteer-help">
+                Future edits keep bookings and individual exceptions unchanged.
+                Dates retain their original recurring identity; the date shift
+                may be up to 366 days earlier or later.
+              </span>
+            </label>
+          </>
+        )
+      }
+      {
         event ? (
           <div class="volunteer-field volunteer-wide" data-event-type-readonly>
             <span>Event type</span>
@@ -55,6 +85,42 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
               <option value="orientation">Orientation</option>
             </select>
           </label>
+        )
+      }
+      {
+        !event && (
+          <fieldset
+            class="volunteer-field volunteer-wide"
+            data-recurrence-controls
+          >
+            <legend>Repeat patrol</legend>
+            <label>
+              <input type="checkbox" name="recurring" /> Repeat every week or
+              every few weeks
+            </label>
+            <div class="volunteer-fields" data-recurrence-fields hidden>
+              <label class="volunteer-field">
+                Repeat every (weeks)
+                <input
+                  name="intervalWeeks"
+                  type="number"
+                  min="1"
+                  max="52"
+                  value="1"
+                  disabled
+                />
+              </label>
+              <label class="volunteer-field">
+                Last recurring date (optional, inclusive)
+                <input name="endDate" type="date" disabled />
+              </label>
+            </div>
+            <p class="volunteer-help">
+              Vancouver local time is kept across daylight saving changes.
+              Volunteers see the next three upcoming, non-cancelled occurrences
+              per series. Hidden, closed and full patrols still use a slot.
+            </p>
+          </fieldset>
         )
       }
       <DateInput
@@ -166,6 +232,35 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
         <h3>Cancel event</h3>
         <input type="hidden" name="id" value={event.id} />
         <input type="hidden" name="version" value={event.updatedAt} />
+        {series && (
+          <>
+            <input type="hidden" name="seriesId" value={series.id} />
+            <input
+              type="hidden"
+              name="seriesVersion"
+              value={series.updatedAt}
+            />
+            <input
+              type="hidden"
+              name="occurrenceDate"
+              value={event.occurrenceDate!}
+            />
+            <label class="volunteer-field">
+              Cancel
+              <select name="scope">
+                <option value="occurrence">Only this occurrence</option>
+                <option value="future">
+                  This and future occurrences (stop recurrence)
+                </option>
+              </select>
+            </label>
+            <p class="volunteer-help">
+              Cancelling future occurrences also cancels their bookings,
+              including individual exceptions. Past attendance and cancellation
+              history are kept.
+            </p>
+          </>
+        )}
         <div class="volunteer-field">
           <label for={`${dialogId}-reason`}>Reason (optional)</label>
           <textarea

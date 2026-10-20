@@ -1,0 +1,141 @@
+const str = (values: FormData, key: string) => String(values.get(key) ?? "");
+
+function eventFields(values: FormData) {
+  return {
+    meetingPoint: str(values, "meetingPoint"),
+    meetingPointUrl: str(values, "meetingPointUrl"),
+    spots: Number(values.get("spots")),
+    open: str(values, "publicVisibility") === "true",
+    hidden: str(values, "publicVisibility") !== "true",
+  };
+}
+
+export function recurringSaveAction(values: FormData) {
+  const start = str(values, "startsAt");
+  if (values.has("seriesId") && str(values, "scope") === "future") {
+    const dayOffset =
+      (Date.parse(`${start.slice(0, 10)}T00:00:00Z`) -
+        Date.parse(`${str(values, "occurrenceDate")}T00:00:00Z`)) /
+      86_400_000;
+    return {
+      action: "update-series-from",
+      id: str(values, "seriesId"),
+      version: Number(values.get("seriesVersion")),
+      occurrenceDate: str(values, "occurrenceDate"),
+      template: {
+        ...eventFields(values),
+        localTime: start.slice(11, 16),
+        dayOffset,
+      },
+    };
+  }
+  if (values.has("recurring") && str(values, "type") === "patrol")
+    return {
+      action: "save-series",
+      series: {
+        ...eventFields(values),
+        firstDate: start.slice(0, 10),
+        localTime: start.slice(11, 16),
+        intervalWeeks: Number(values.get("intervalWeeks")),
+        endDate: str(values, "endDate") || null,
+      },
+    };
+  return null;
+}
+
+export function recurringCancelAction(values: FormData) {
+  return values.has("seriesId") && str(values, "scope") === "future"
+    ? {
+        action: "stop-series",
+        id: str(values, "seriesId"),
+        version: Number(values.get("seriesVersion")),
+        occurrenceDate: str(values, "occurrenceDate"),
+        reason: str(values, "reason"),
+      }
+    : null;
+}
+
+export function seriesEndAction(values: FormData) {
+  const item = JSON.parse(str(values, "series"));
+  return {
+    action: "save-series",
+    id: str(values, "seriesId"),
+    version: Number(values.get("version")),
+    series: {
+      firstDate: item.firstDate,
+      localTime: item.localTime,
+      intervalWeeks: item.intervalWeeks,
+      endDate: str(values, "endDate") || null,
+      meetingPoint: item.meetingPoint,
+      meetingPointUrl: item.meetingPointUrl ?? "",
+      spots: item.spots,
+      open: Boolean(item.open),
+      hidden: Boolean(item.hidden),
+    },
+  };
+}
+
+export function initRecurrenceControls(root: Document | HTMLElement) {
+  for (const form of root.querySelectorAll<HTMLFormElement>(
+    "[data-event-save]",
+  )) {
+    if (form.dataset.submitting) continue;
+    const repeat = form.querySelector<HTMLInputElement>('[name="recurring"]');
+    const type = form.querySelector(
+      'select[name="type"]',
+    ) as HTMLSelectElement | null;
+    const controls = form.querySelector<HTMLElement>(
+      "[data-recurrence-controls]",
+    );
+    const fields = form.querySelector<HTMLElement>("[data-recurrence-fields]");
+    if (!repeat || !type || !controls || !fields) continue;
+    const update = () => {
+      const patrol = type.value === "patrol";
+      controls.hidden = !patrol;
+      repeat.disabled = !patrol;
+      fields.hidden = !patrol || !repeat.checked;
+      for (const input of fields.querySelectorAll<HTMLInputElement>("input"))
+        input.disabled = fields.hidden;
+    };
+    if (!form.dataset.recurrenceReady) {
+      form.dataset.recurrenceReady = "true";
+      type.addEventListener("change", update);
+      repeat.addEventListener("change", update);
+      form.addEventListener("reset", () => queueMicrotask(update));
+    }
+    update();
+  }
+}
+
+/** Keep open series drafts, just like individual event editors. */
+export function syncSeriesControls(page: Document, element?: HTMLFormElement) {
+  const root = document.querySelector<HTMLElement>("[data-series-list]");
+  const next = page.querySelector<HTMLElement>("[data-series-list]");
+  if (!root || !next) return false;
+  let deferred = false;
+  for (const updated of next.querySelectorAll<HTMLDetailsElement>(
+    "[data-live-series]",
+  )) {
+    const current = [
+      ...root.querySelectorAll<HTMLDetailsElement>("[data-live-series]"),
+    ].find((item) => item.dataset.liveSeries === updated.dataset.liveSeries);
+    if (current?.dataset.seriesVersion === updated.dataset.seriesVersion)
+      continue;
+    if (
+      current &&
+      (current.open || current.querySelector('[data-submitting="true"]')) &&
+      !current.contains(element ?? null)
+    ) {
+      deferred = true;
+      continue;
+    }
+    const replacement = document.importNode(updated, true);
+    if (current) {
+      replacement.open = current.open;
+      current.replaceWith(replacement);
+    } else root.appendChild(replacement);
+  }
+  const empty = root.querySelector("p:not([class])");
+  if (root.querySelector("[data-live-series]")) empty?.remove();
+  return deferred;
+}

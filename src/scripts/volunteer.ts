@@ -3,6 +3,13 @@ import { actionFragment, loadActionPage } from "./action-page";
 import { chooseNotification } from "./notification-choice";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
+  initRecurrenceControls,
+  recurringSaveAction,
+  recurringCancelAction,
+  seriesEndAction,
+  syncSeriesControls,
+} from "./event-recurrence";
+import {
   cancelVolunteerSearch,
   initVolunteerBrowser,
   syncVolunteerBrowser,
@@ -15,6 +22,7 @@ import {
 
 function initEventDates(root: Document | HTMLElement) {
   initDateInputs(root);
+  initRecurrenceControls(root);
   for (const button of root.querySelectorAll<HTMLButtonElement>(
     '[data-event-save]:not([data-submitting]) button[type="submit"]',
   ))
@@ -96,6 +104,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     document.dispatchEvent(new Event("account-content-updated"));
     return;
   }
+  deferredEventRefresh = syncSeriesControls(page, element);
   const list = root.querySelector<HTMLElement>("[data-event-list]")!;
   const previous = new Map(
     [...list.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
@@ -278,7 +287,13 @@ if (eventBrowser) {
     const refresh = pendingRefresh.then(async () => {
       if (controller.signal.aborted) return;
       if (!forceRefresh) {
-        const response = await fetch("/api/v1/events/version", {
+        const versionUrl = new URL("/api/v1/events/version", location.origin);
+        const selectedOccurrence = new URL(location.href).searchParams.get(
+          "occurrence",
+        );
+        if (selectedOccurrence)
+          versionUrl.searchParams.set("occurrence", selectedOccurrence);
+        const response = await fetch(versionUrl, {
           credentials: "same-origin",
           cache: "no-store",
           signal: controller.signal,
@@ -289,7 +304,7 @@ if (eventBrowser) {
         const needsDeferredRefresh =
           deferredEventRefresh &&
           !eventBrowser.querySelector(
-            'dialog[open], form[data-submitting="true"]',
+            'dialog[open], [data-live-series][open], form[data-submitting="true"]',
           );
         if (
           !forceRefresh &&
@@ -331,6 +346,19 @@ if (eventBrowser) {
   );
   window.addEventListener("pagehide", stopPolling);
   window.addEventListener("pageshow", startPolling);
+  document.addEventListener(
+    "toggle",
+    (event) => {
+      if (
+        deferredEventRefresh &&
+        event.target instanceof HTMLDetailsElement &&
+        event.target.matches("[data-live-series]") &&
+        !event.target.open
+      )
+        refreshDeferredEvents();
+    },
+    true,
+  );
   document.addEventListener(
     "close",
     (event) => {
@@ -383,15 +411,17 @@ function form(
     const loading = element.querySelector<HTMLElement>("[data-action-loading]");
     const label = button?.textContent;
     const loadingLabel = loading?.textContent;
-    const resultTitle = element.matches("[data-event-save]")
-      ? "Event saved"
-      : element.matches("[data-event-cancel]")
-        ? "Event cancelled"
-        : element.matches("[data-manage-signup]")
-          ? "Registration changed"
-          : element.matches("[data-organizer-role]")
-            ? "Account role saved"
-            : "Volunteer access saved";
+    const resultTitle = element.matches("[data-series-end], [data-series-stop]")
+      ? "Patrol series saved"
+      : element.matches("[data-event-save]")
+        ? "Event saved"
+        : element.matches("[data-event-cancel]")
+          ? "Event cancelled"
+          : element.matches("[data-manage-signup]")
+            ? "Registration changed"
+            : element.matches("[data-organizer-role]")
+              ? "Account role saved"
+              : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -401,7 +431,13 @@ function form(
     try {
       let notify: boolean | undefined;
       if (element.dataset.emailPrompt) {
-        const choice = await chooseNotification(element.dataset.emailPrompt);
+        const prompt =
+          values.has("seriesId") && values.get("scope") === "future"
+            ? element.matches("[data-event-save]")
+              ? "series"
+              : "series-cancel"
+            : element.dataset.emailPrompt;
+        const choice = await chooseNotification(prompt);
         if (choice === null) {
           if (element.hasAttribute("data-submit-on-change")) element.reset();
           return;
@@ -486,6 +522,9 @@ function form(
       }
       delete element.dataset.submitting;
       delete scope.dataset.submitting;
+      initRecurrenceControls(
+        element.closest<HTMLElement>("[data-event-browser]") ?? element,
+      );
       if (!saved && deferredEventRefresh && !element.closest("dialog[open]"))
         refreshDeferredEvents();
       if (
@@ -504,28 +543,71 @@ form("[data-live-signup]", "/api/v1/events/action", (v) => ({
   action: str(v, "action"),
   id: str(v, "id"),
 }));
-form("[data-event-save]", "/api/v1/events/action", (v) => ({
-  action: "save",
-  ...(v.has("id")
-    ? { id: str(v, "id"), version: Number(v.get("version")) }
-    : {}),
-  event: {
-    type: str(v, "type"),
-    startsAt: vancouverInstant(str(v, "startsAt")),
-    meetingPoint: str(v, "meetingPoint"),
-    meetingPointUrl: str(v, "meetingPointUrl"),
-    spots: Number(v.get("spots")),
-    // Keep the existing API/storage flags in sync from the single control.
-    open: str(v, "publicVisibility") === "true",
-    hidden: str(v, "publicVisibility") !== "true",
-  },
-}));
-form("[data-event-cancel]", "/api/v1/events/action", (v) => ({
-  action: "cancel-event",
-  id: str(v, "id"),
+form(
+  "[data-event-save]",
+  "/api/v1/events/action",
+  (v) =>
+    recurringSaveAction(v) ?? {
+      action: "save",
+      ...(v.has("id")
+        ? { id: str(v, "id"), version: Number(v.get("version")) }
+        : {}),
+      event: {
+        type: str(v, "type"),
+        startsAt: vancouverInstant(str(v, "startsAt")),
+        meetingPoint: str(v, "meetingPoint"),
+        meetingPointUrl: str(v, "meetingPointUrl"),
+        spots: Number(v.get("spots")),
+        // Keep the existing API/storage flags in sync from the single control.
+        open: str(v, "publicVisibility") === "true",
+        hidden: str(v, "publicVisibility") !== "true",
+      },
+    },
+);
+form(
+  "[data-event-cancel]",
+  "/api/v1/events/action",
+  (v) =>
+    recurringCancelAction(v) ?? {
+      action: "cancel-event",
+      id: str(v, "id"),
+      version: Number(v.get("version")),
+      reason: str(v, "reason"),
+    },
+);
+form("[data-series-end]", "/api/v1/events/action", seriesEndAction);
+form("[data-series-stop]", "/api/v1/events/action", (v) => ({
+  action: "stop-series",
+  id: str(v, "seriesId"),
   version: Number(v.get("version")),
+  occurrenceDate: str(v, "occurrenceDate"),
   reason: str(v, "reason"),
 }));
+form(
+  "[data-series-occurrence]",
+  "/api/v1/events/action",
+  (v) => ({
+    action: "materialize-occurrence",
+    id: str(v, "seriesId"),
+    occurrenceDate: str(v, "occurrenceDate"),
+  }),
+  async (element) => {
+    const value = (name: string) =>
+      element.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value;
+    const id = `patrol:${value("seriesId")}:${value("occurrenceDate")}`;
+    const url = new URL(location.href);
+    url.searchParams.set("occurrence", id);
+    url.searchParams.delete("type");
+    const page = await loadActionPage(url.href);
+    history.replaceState(null, "", url);
+    syncEvents(page, element);
+    const card = [
+      ...document.querySelectorAll<HTMLElement>("[data-live-event]"),
+    ].find((item) => item.dataset.liveEvent === id);
+    card?.scrollIntoView({ block: "nearest" });
+    card?.querySelector<HTMLButtonElement>("[data-show-dialog]")?.click();
+  },
+);
 form("[data-manage-signup]", "/api/v1/events/action", (v) => ({
   action: "manage-signup",
   id: str(v, "id"),

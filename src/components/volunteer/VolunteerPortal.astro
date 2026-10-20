@@ -6,12 +6,13 @@ import {
   requireOrganizer,
 } from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
-import { listEvents, listRosters } from "@/server/db/events";
+import { listEvents, listRosters, listPatrolSeries } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
 import EventCard from "./EventCard.astro";
 import EventEditor from "./EventEditor.astro";
+import PatrolSeriesControls from "./PatrolSeriesControls.astro";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
@@ -30,7 +31,12 @@ try {
 } catch {
   /* Organizer actions remain locked. */
 }
-const events = await listEvents(env.DB, actor);
+const events = await listEvents(
+  env.DB,
+  actor,
+  Astro.url.searchParams.get("occurrence") ?? undefined,
+);
+const series = organizer && actor ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
 const rosters =
   organizer && actor
@@ -40,12 +46,19 @@ const rosters =
         events.map((event) => event.id),
       )
     : [];
-const eventVersion = await eventViewVersion(events, actor, rosters);
+const eventVersion = await eventViewVersion(
+  events,
+  actor,
+  rosters,
+  Date.now(),
+  series,
+);
 const destinations = events.filter(
   (event) =>
     event.startsAt > Date.now() &&
     event.open &&
     !event.hidden &&
+    event.inSignupWindow &&
     !event.cancelledAt,
 );
 const filter = ["patrol", "orientation"].includes(
@@ -225,6 +238,7 @@ const filter = ["patrol", "orientation"].includes(
                 roster={rosters.filter((person) => person.eventId === event.id)}
                 destinations={destinations}
                 filter={filter}
+                series={series.find((item) => item.id === event.seriesId)}
               />
             ))}
           </ul>
@@ -254,6 +268,7 @@ const filter = ["patrol", "orientation"].includes(
       organizer && (
         <>
           <EventEditor />
+          <PatrolSeriesControls series={series} />
           <VolunteerProfileDialog />
         </>
       )

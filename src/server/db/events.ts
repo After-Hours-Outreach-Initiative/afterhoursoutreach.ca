@@ -23,6 +23,11 @@ export {
   ensurePatrolOccurrences,
   materializePatrolOccurrence,
   patrolOccurrenceId,
+  patrolTemplateSchema,
+  listPatrolTemplates,
+  patrolTemplateFor,
+  updatePatrolSeriesFrom,
+  stopPatrolSeries,
   type PatrolSeriesRow,
 } from "./patrol-series";
 
@@ -86,7 +91,11 @@ export function eventDescription(
     },
   ).format(new Date(event.startsAt))}\nMeeting point: ${event.meetingPoint}`;
 }
-export async function listEvents(db: Env["DB"], actor: Actor | null) {
+export async function listEvents(
+  db: Env["DB"],
+  actor: Actor | null,
+  selectedOccurrence?: string,
+) {
   if (!canViewEvents(actor)) return [];
   await ensurePatrolOccurrences(db);
   const organizer = Boolean(
@@ -117,13 +126,14 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
         .prepare(
           `${select}
         ORDER BY
+          (e.id = ?) DESC,
           (e.starts_at > ${nowMsSql}) DESC,
           CASE WHEN e.starts_at > ${nowMsSql}
             THEN e.starts_at END ASC,
           e.starts_at DESC
         LIMIT 100`,
         )
-        .bind(actor?.id ?? "", actor?.id ?? "")
+        .bind(actor?.id ?? "", actor?.id ?? "", selectedOccurrence ?? "")
     : db
         .prepare(
           `${select}
