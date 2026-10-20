@@ -404,7 +404,18 @@ for (const path of ["/apply", "/volunteer/account"]) {
         const panel = page.locator(".volunteer-panel").first();
         const initialPanel = await panel.boundingBox();
         if (width < 1024) {
-          expect(initialPanel!.y).toBe(initial!.y + initial!.height + 16);
+          expect(initialPanel!.y).toBe(initial!.y + initial!.height);
+          await expect(contents).toHaveCSS("background-color", "rgb(0, 0, 0)");
+          await expect(contents.locator("[data-contents-bar]")).toHaveCSS(
+            "padding",
+            "8px 0px 16px",
+          );
+          expect(
+            await contents.evaluate((nav) => {
+              const backing = getComputedStyle(nav, "::before");
+              return [backing.backgroundColor, backing.left, backing.right];
+            }),
+          ).toEqual(["rgb(0, 0, 0)", "-16px", "-16px"]);
           await expect(panel).toHaveCSS("border-radius", "10px");
           await expect(panel).toHaveCSS("border-top-width", "1px");
         }
@@ -585,10 +596,10 @@ test("account contents navigate profile and settings sections on desktop and mob
       ]) {
         await target.click();
         await expect(menu).toHaveAttribute("open", "");
-        await expect(dropdown).toHaveCSS("position", "absolute");
+        await expect(dropdown.locator("..")).toHaveCSS("position", "absolute");
         await expect(dropdown).toHaveCSS(
           "max-height",
-          `${812 - headerHeight - 70}px`,
+          `${812 - headerHeight - 78}px`,
         );
         await expect(dropdown).toHaveCSS("overscroll-behavior", "auto");
         await expect(summary).toHaveCSS("border-radius", "10px");
@@ -669,11 +680,11 @@ test("account contents navigate profile and settings sections on desktop and mob
         await expect(menu).not.toHaveCSS("box-shadow", "none");
         await expect
           .poll(async () => (await summary.boundingBox())!.y)
-          .toBe(headerHeight);
+          .toBe(headerHeight + 8);
         expect((await header.boundingBox())!.y).toBe(0);
         expect(
           Math.round((await page.locator(`#${id}`).boundingBox())!.y),
-        ).toBeGreaterThanOrEqual(headerHeight + 70);
+        ).toBeGreaterThanOrEqual(headerHeight + 94);
       }
     }
     if (width < 1024) {
@@ -685,7 +696,7 @@ test("account contents navigate profile and settings sections on desktop and mob
             top: scrollY + heading.getBoundingClientRect().top - offset,
             behavior: "instant",
           });
-        }, headerHeight + 70);
+        }, headerHeight + 94);
       await expect(current).toHaveText("Two-factor authentication");
       await expect(current).toHaveCSS("text-overflow", "ellipsis");
       await expect(summary).toHaveCSS("height", "54px");

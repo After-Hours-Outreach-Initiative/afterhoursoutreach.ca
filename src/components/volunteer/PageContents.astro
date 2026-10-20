@@ -99,28 +99,30 @@ const totalSections = entries.filter((entry) => entry.completable).length;
             <path d="m6 9 6 6 6-6"></path>
           </svg>
         </summary>
-        <div class="volunteer-contents-dropdown" data-contents-dropdown>
-          <PageContentsList
-            entries={entries}
-            application={application}
-            variant="menu"
-          />
-          {
-            application && !review && (
-              <>
-                <button
-                  type="submit"
-                  form="volunteer-application"
-                  data-application-review
-                  class="btn btn-primary"
-                  disabled
-                >
-                  Review application
-                </button>
-                <DraftSaveStatus />
-              </>
-            )
-          }
+        <div class="volunteer-contents-dropdown-band">
+          <div class="volunteer-contents-dropdown" data-contents-dropdown>
+            <PageContentsList
+              entries={entries}
+              application={application}
+              variant="menu"
+            />
+            {
+              application && !review && (
+                <>
+                  <button
+                    type="submit"
+                    form="volunteer-application"
+                    data-application-review
+                    class="btn btn-primary"
+                    disabled
+                  >
+                    Review application
+                  </button>
+                  <DraftSaveStatus />
+                </>
+              )
+            }
+          </div>
         </div>
       </details>
       {
