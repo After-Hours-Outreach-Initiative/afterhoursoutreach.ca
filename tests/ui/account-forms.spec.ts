@@ -1595,6 +1595,10 @@ test("all teams can select multiple relevant training answers and add Other deta
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     await expect(divider).toBeVisible();
+    await expect(divider).toHaveCSS("width", "120px");
+    const dividerBounds = await divider.boundingBox();
+    const noneBounds = await none.boundingBox();
+    expect(dividerBounds!.x).toBeCloseTo(noneBounds!.x, 1);
     expect(
       await training
         .locator(".volunteer-training-options")
