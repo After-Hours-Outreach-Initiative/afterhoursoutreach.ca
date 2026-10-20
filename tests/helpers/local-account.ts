@@ -132,15 +132,21 @@ export async function createLocalAccount(
     data: { email, otp: proof.localEmail.code },
   });
   expect(verified.status(), await verified.text()).toBe(200);
+  const current = await request.get("/api/v1/auth/get-session", { headers });
+  const { user }: { user: { id: string } } = await current.json();
   if (applicationSubmitted) {
     const profile = await request.post("/api/v1/account/profile", {
       headers,
-      data: { ...sampleAnswers, codeOfConductAccepted: true },
+      data: {
+        ...sampleAnswers,
+        codeOfConductAccepted: true,
+        applicationUserId: user.id,
+        intent: "submit",
+        draft: { revision: null, generation: null },
+      },
     });
     expect(profile.status(), await profile.text()).toBe(200);
   }
-  const current = await request.get("/api/v1/auth/get-session", { headers });
-  const { user }: { user: { id: string } } = await current.json();
   return { id: user.id, email, name: sampleAnswers.preferredName };
 }
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
+import { profileWriteBody } from "../helpers/profile-write";
 
 const origin = "https://afterhoursoutreach.ca";
 const secret = "organizer-email-test-secret-12345678901234567890";
@@ -60,7 +61,12 @@ describe(
       path: string,
       body: object | undefined,
       cookie?: string,
-    ) => {
+    ): ReturnType<typeof worker.fetch> => {
+      if (path === "/api/v1/account/profile" && body)
+        body = await profileWriteBody(
+          (path) => send(path, undefined, cookie),
+          body,
+        );
       const response = await worker.fetch(`${origin}${path}`, {
         method: body ? "POST" : "GET",
         headers: {

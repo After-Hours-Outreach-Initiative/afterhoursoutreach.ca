@@ -14,6 +14,8 @@ import {
   type ApplicationDraftAnswers,
 } from "../data/application-draft";
 import { restoreDateInputs, readDateInputs } from "./date-input";
+import { mergeAnswers } from "../data/answer-merge";
+import { renderAnswerConflicts } from "./answer-conflicts";
 
 const endpoint = "/api/v1/account/application-draft";
 const emptyAnswers = () => applicationDraftAnswersSchema.parse({});
@@ -248,7 +250,12 @@ export function initApplicationDraft(element: HTMLFormElement) {
   let revision = initial?.revision ?? null;
   let savedAnswers = initial?.answers ?? emptyAnswers();
   let savedAt = initial?.updatedAt ?? null;
-  let conflict: { draft: ApplicationDraft | null } | undefined;
+  let conflict:
+    | {
+        draft: ApplicationDraft | null;
+        fields: (keyof ApplicationDraftAnswers)[][];
+      }
+    | undefined;
   let inFlight: Promise<void> | undefined;
   let refreshing: Promise<void> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -291,6 +298,43 @@ export function initApplicationDraft(element: HTMLFormElement) {
     dateTimer = undefined;
     const unsaved = dirty();
     conflictPanel.hidden = !conflict;
+    if (conflict)
+      renderAnswerConflicts(
+        conflictPanel,
+        conflict.fields,
+        readDraftAnswers(element),
+        conflict.draft?.answers ?? emptyAnswers(),
+        (fields, source) => {
+          if (!conflict) return;
+          const remote = conflict.draft?.answers ?? emptyAnswers();
+          if (source === "account") {
+            const answers = readDraftAnswers(element);
+            for (const field of fields)
+              Object.assign(answers, { [field]: remote[field] });
+            restore(answers);
+          } else {
+            const consent = element.querySelector<HTMLInputElement>(
+              '[name="codeOfConductAccepted"]',
+            );
+            if (consent) consent.checked = false;
+          }
+          // Persist the explicit decision's new baseline, but retain original
+          // baselines for unresolved groups across refreshes and offline reloads.
+          savedAnswers = { ...savedAnswers };
+          for (const field of fields)
+            Object.assign(savedAnswers, { [field]: remote[field] });
+          conflict.fields = conflict.fields.filter((group) => group !== fields);
+          if (!conflict.fields.length) {
+            revision = conflict.draft?.revision ?? null;
+            savedAnswers = remote;
+            savedAt = conflict.draft?.updatedAt ?? null;
+            conflict = undefined;
+          }
+          persist();
+          renderStatus();
+          schedule(0);
+        },
+      );
     retry.hidden = !failure || Boolean(conflict) || stopped;
     const backupWarning =
       !localAvailable && unsaved
@@ -369,28 +413,31 @@ export function initApplicationDraft(element: HTMLFormElement) {
     }
     restoring = false;
   };
-  const reconcile = (remote: ApplicationDraft | null, notify = true) => {
+  const reconcile = (
+    remote: ApplicationDraft | null,
+    notify = true,
+    baseline = savedAnswers,
+  ) => {
     const answers = readDraftAnswers(element);
     const remoteAnswers = remote?.answers ?? emptyAnswers();
-    if (sameDraftAnswers(answers, remoteAnswers)) {
+    const merged = mergeAnswers(
+      lastAttempt && sameDraftAnswers(remoteAnswers, lastAttempt)
+        ? lastAttempt
+        : baseline,
+      answers,
+      remoteAnswers,
+    );
+    if (!sameDraftAnswers(answers, merged.answers))
+      restore(merged.answers, notify);
+    if (!merged.conflicts.length) {
       revision = remote?.revision ?? null;
       savedAnswers = remoteAnswers;
-      conflict = undefined;
-    } else if (!dirty()) {
-      restore(remoteAnswers, notify);
-      revision = remote?.revision ?? null;
-      savedAnswers = remoteAnswers;
-      conflict = undefined;
-    } else if (lastAttempt && sameDraftAnswers(remoteAnswers, lastAttempt)) {
-      // The write succeeded but its response was lost; retain any newer edits.
-      revision = remote?.revision ?? null;
-      savedAnswers = remoteAnswers;
-      conflict = undefined;
-    } else if (revision !== (remote?.revision ?? null)) {
-      conflict = { draft: remote };
-      cancelTimer();
+      savedAt = remote?.updatedAt ?? null;
     }
-    if (!conflict) savedAt = remote?.updatedAt ?? null;
+    conflict = merged.conflicts.length
+      ? { draft: remote, fields: merged.conflicts }
+      : undefined;
+    if (conflict) cancelTimer();
     persist();
     renderStatus();
   };
@@ -551,6 +598,19 @@ export function initApplicationDraft(element: HTMLFormElement) {
     clearApplicationDraft(userId);
     renderStatus();
   };
+  const submissionFound = () => {
+    // A different device may have submitted different answers, or this device
+    // may have lost its success response. Neither case authorizes clearing
+    // unsaved input or silently turning this application into a profile edit.
+    blocked = true;
+    paused = true;
+    cancelTimer();
+    failure =
+      "Your application has already been submitted. These answers have been kept on this page, and saving is paused. Open your account from the account menu to review the submitted application; it has not been replaced.";
+    persist();
+    renderStatus();
+    return failure;
+  };
   const fetchRemote = async () => {
     const response = await fetch(endpoint, {
       credentials: "same-origin",
@@ -567,8 +627,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
       throw new Error("Your account changed. Reload before continuing.");
     }
     if (result.submitted) {
-      finishSubmitted();
-      location.assign("/volunteer/account");
+      submissionFound();
       return;
     }
     blocked = false;
@@ -588,7 +647,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     refreshing = (async () => {
       try {
         await fetchRemote();
-        failure = "";
+        if (!blocked && !stopped) failure = "";
         retryDelay = 2000;
       } catch (error) {
         if (stopped) return;
@@ -625,6 +684,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
             revision,
             generation,
             answers,
+            baseline: savedAnswers,
           }),
           signal: AbortSignal.timeout(15_000),
           keepalive,
@@ -653,9 +713,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
         }
         const draft = applicationDraftSchema.parse(result.draft);
         if (stopped || checkDiscard()) return;
-        revision = draft.revision;
-        savedAnswers = draft.answers;
-        savedAt = draft.updatedAt;
+        reconcile(draft, true, answers);
         failure = "";
         retryDelay = 2000;
       } catch (error) {
@@ -712,33 +770,6 @@ export function initApplicationDraft(element: HTMLFormElement) {
     queueMicrotask(() => queueMicrotask(changed));
   });
   retry.addEventListener("click", () => void refresh());
-  element
-    .querySelector("[data-draft-keep-local]")
-    ?.addEventListener("click", () => {
-      if (!conflict) return;
-      revision = conflict.draft?.revision ?? null;
-      savedAnswers = conflict.draft?.answers ?? emptyAnswers();
-      savedAt = conflict.draft?.updatedAt ?? null;
-      conflict = undefined;
-      failure = "";
-      persist();
-      renderStatus();
-      schedule(0);
-    });
-  element
-    .querySelector("[data-draft-use-account]")
-    ?.addEventListener("click", () => {
-      if (!conflict) return;
-      const remote = conflict.draft;
-      restore(remote?.answers ?? emptyAnswers());
-      revision = remote?.revision ?? null;
-      savedAnswers = remote?.answers ?? emptyAnswers();
-      savedAt = remote?.updatedAt ?? null;
-      conflict = undefined;
-      failure = "";
-      persist();
-      renderStatus();
-    });
   const resumePendingWork = () => {
     if (discardRequest && retryDiscardOnReconnect) void discard();
     else void refresh();
@@ -780,6 +811,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
       renderStatus();
       await inFlight;
       await refreshing;
+      await fetchRemote();
       if (conflict || stopped || blocked)
         throw new Error(
           conflict
@@ -796,7 +828,11 @@ export function initApplicationDraft(element: HTMLFormElement) {
         throw new Error(
           "Review your answers and accept the Code of Conduct before submitting.",
         );
+      return { revision, generation };
     },
+    refresh,
+    submissionFound,
+    isStopped: () => stopped,
     resume() {
       paused = false;
       renderStatus();

@@ -10,6 +10,7 @@ import { applicationDraft, applicationDraftGeneration, user } from "./schema";
 import { permissionValues, writePermission, type Actor } from "./access";
 import { hasApplied } from "./profiles";
 import { RequestError } from "../http";
+import { mergeAnswers } from "../../data/answer-merge";
 
 export async function loadApplicationDraftState(
   binding: Env["DB"],
@@ -53,18 +54,44 @@ export async function saveApplicationDraft(
   const parsed = applicationDraftWriteSchema.safeParse(input);
   if (!parsed.success)
     throw new RequestError(400, "Check the application draft answers.");
-  const { userId, revision: previous, generation, answers } = parsed.data;
+  const { userId, generation, baseline } = parsed.data;
   // An old tab must not save its answers to a newly signed-in account.
   if (userId !== actor.id)
     throw new RequestError(
       403,
       "Your account changed. Reload before continuing.",
     );
-  const revision = crypto.randomUUID();
-  const updatedAt = Date.now();
-  const saved = await binding
-    .prepare(
-      `INSERT INTO application_draft (user_id, version, revision, answers, updated_at)
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const state = await loadApplicationDraftState(binding, actor.id);
+    let previous = parsed.data.revision;
+    let answers = parsed.data.answers;
+    // Never rebase across a discard, including an initially absent draft.
+    if (state.generation !== generation)
+      throw new RequestError(
+        409,
+        "Your draft was discarded. Reload before continuing.",
+      );
+    if (previous !== (state.draft?.revision ?? null) && baseline) {
+      const merged = mergeAnswers(
+        baseline,
+        answers,
+        state.draft?.answers ??
+          applicationDraftWriteSchema.shape.answers.parse({}),
+      );
+      if (merged.conflicts.length)
+        throw new RequestError(
+          409,
+          "Choose which answers to keep for the conflicting fields.",
+          { draft: state.draft, conflicts: merged.conflicts },
+        );
+      answers = merged.answers;
+      previous = state.draft?.revision ?? null;
+    }
+    const revision = crypto.randomUUID();
+    const updatedAt = Date.now();
+    const saved = await binding
+      .prepare(
+        `INSERT INTO application_draft (user_id, version, revision, answers, updated_at)
        SELECT ?, 1, ?, ?, ?
        WHERE NOT EXISTS (SELECT 1 FROM profile WHERE user_id=?)
        AND ${writePermission()}
@@ -74,39 +101,43 @@ export async function saveApplicationDraft(
          revision=excluded.revision, answers=excluded.answers, updated_at=excluded.updated_at
        WHERE application_draft.revision=?
        RETURNING revision`,
-    )
-    .bind(
-      actor.id,
-      revision,
-      JSON.stringify(answers),
-      updatedAt,
-      actor.id,
-      ...permissionValues(actor),
-      previous,
-      actor.id,
-      previous,
-      actor.id,
-      generation,
-      previous,
-    )
-    .first();
-  if (!saved) {
-    const permitted = await binding
-      .prepare(`SELECT 1 WHERE ${writePermission()}`)
-      .bind(...permissionValues(actor))
+      )
+      .bind(
+        actor.id,
+        revision,
+        JSON.stringify(answers),
+        updatedAt,
+        actor.id,
+        ...permissionValues(actor),
+        previous,
+        actor.id,
+        previous,
+        actor.id,
+        generation,
+        previous,
+      )
       .first();
-    if (!permitted) throw new RequestError(401, "Sign in to save your draft.");
-    if (await hasApplied(binding, actor.id))
+    if (!saved) {
+      const permitted = await binding
+        .prepare(`SELECT 1 WHERE ${writePermission()}`)
+        .bind(...permissionValues(actor))
+        .first();
+      if (!permitted)
+        throw new RequestError(401, "Sign in to save your draft.");
+      if (await hasApplied(binding, actor.id))
+        throw new RequestError(
+          410,
+          "Your application has already been submitted.",
+        );
+      if (baseline && attempt < 3) continue;
       throw new RequestError(
-        410,
-        "Your application has already been submitted.",
+        409,
+        "Your draft changed on another tab or device. Choose which answers to keep.",
       );
-    throw new RequestError(
-      409,
-      "Your draft changed on another tab or device. Choose which answers to keep.",
-    );
+    }
+    return { version: 1, revision, generation, answers, updatedAt };
   }
-  return { version: 1, revision, generation, answers, updatedAt };
+  throw new RequestError(409, "Your draft is changing. Retry saving.");
 }
 
 export async function discardApplicationDraft(

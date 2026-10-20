@@ -2,6 +2,7 @@ export class RequestError extends Error {
   constructor(
     public status: number,
     message: string,
+    public details?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -76,7 +77,7 @@ export function safeReturnTo(value: string | undefined): string {
 export function errorResponse(error: unknown) {
   if (error instanceof RequestError)
     return Response.json(
-      { message: error.message },
+      { ...error.details, message: error.message },
       {
         status: error.status,
         headers: {

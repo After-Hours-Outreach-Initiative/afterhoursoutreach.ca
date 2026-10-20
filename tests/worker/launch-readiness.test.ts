@@ -4,6 +4,7 @@ import { chromium, expect as browserExpect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { sampleAnswers } from "../helpers/local-account";
+import { profileWriteBody } from "../helpers/profile-write";
 
 const origin = "https://afterhoursoutreach.ca";
 const secret = "launch-readiness-test-secret-12345678901234567890";
@@ -25,13 +26,20 @@ describe("launch readiness regressions", { concurrent: false }, () => {
   let DB: Env["DB"];
   let owner: { id: string; cookie: string };
   let other: typeof owner;
-  const send = (path: string, cookie: string, body?: object) =>
-    worker.fetch(`${origin}${path}`, {
+  const send = async (
+    path: string,
+    cookie: string,
+    body?: object,
+  ): ReturnType<typeof worker.fetch> => {
+    if (path === "/api/v1/account/profile" && body)
+      body = await profileWriteBody((path) => send(path, cookie), body);
+    return worker.fetch(`${origin}${path}`, {
       method: body ? "POST" : "GET",
       headers: { origin, cookie, "content-type": "application/json" },
       ...(body ? { body: JSON.stringify(body) } : {}),
       redirect: "manual",
     });
+  };
   const person = async (email: string) => {
     const response = await send(
       "/api/v1/auth/sign-in/email-otp",

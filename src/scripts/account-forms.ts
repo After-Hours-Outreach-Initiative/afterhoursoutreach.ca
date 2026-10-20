@@ -5,12 +5,16 @@ import {
   trainingRequiredError,
   trainingExclusiveError,
   profileFormSections,
+  type ApplicationAnswers,
 } from "../data/application";
+import { mergeAnswers } from "../data/answer-merge";
+import { renderAnswerConflicts } from "./answer-conflicts";
 import { profileAnswerRows } from "../data/profile-answers";
 import {
   readDateInputs,
   saveDateInputDefaults,
   setDateInputActive,
+  restoreDateInputs,
 } from "./date-input";
 
 const requestFailed = "The request failed. Please try again.";
@@ -268,6 +272,14 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   )!;
   const feedback = element.querySelector<HTMLElement>("[data-form-message]")!;
   let active: (typeof sections)[number] | undefined;
+  let baseline = JSON.parse(
+    element.dataset.profileBaseline ?? "null",
+  ) as ApplicationAnswers;
+  let conflicts: (keyof ApplicationAnswers)[][] = [];
+  const conflictPanel = document.createElement("div");
+  conflictPanel.setAttribute("role", "group");
+  conflictPanel.setAttribute("aria-label", "Conflicting profile answers");
+  conflictPanel.hidden = true;
   // Unnamed partial edits can leave the canonical value unchanged. Snapshot the
   // exact parts per request so a late save cannot mark newer edits as saved.
   let savedDates = readDateInputs(element);
@@ -402,6 +414,8 @@ export function initAccountFormChanges(element: HTMLFormElement) {
     cancel.addEventListener("click", () => {
       if (element.dataset.submitting) return;
       element.reset();
+      conflicts = [];
+      conflictPanel.hidden = true;
       clearFormMessage(element);
       setEditing();
     });
@@ -418,7 +432,8 @@ export function initAccountFormChanges(element: HTMLFormElement) {
       // Leave only the open section's submit button in the form's implicit
       // Enter-key submission order; earlier hidden buttons must not intercept it.
       section.save.type = section === active ? "submit" : "button";
-      section.save.disabled = section !== active || submitting || !dirty;
+      section.save.disabled =
+        section !== active || submitting || !dirty || Boolean(conflicts.length);
       section.cancel.disabled = submitting;
     }
   };
@@ -426,40 +441,128 @@ export function initAccountFormChanges(element: HTMLFormElement) {
     element.addEventListener(event, update);
   element.addEventListener("reset", () => queueMicrotask(update));
   update();
+  const asAnswers = (
+    data: FormData,
+    dates?: Record<string, string>,
+  ): ApplicationAnswers => {
+    const result = { ...baseline };
+    for (const key of Object.keys(result) as (keyof ApplicationAnswers)[]) {
+      if (
+        Array.isArray(result[key]) &&
+        (data.has(key) || ["teams", "certifications", "training"].includes(key))
+      )
+        Object.assign(result, { [key]: data.getAll(key).map(String) });
+      else if (data.has(key))
+        Object.assign(result, { [key]: String(data.get(key)).trim() });
+    }
+    return { ...result, ...dates };
+  };
+  const restoreAnswers = (answers: ApplicationAnswers) => {
+    for (const control of element.querySelectorAll<
+      HTMLInputElement | HTMLTextAreaElement
+    >("[name]")) {
+      const value = answers[control.name as keyof ApplicationAnswers];
+      if (value === undefined) continue;
+      if (
+        control instanceof HTMLInputElement &&
+        ["radio", "checkbox"].includes(control.type)
+      )
+        control.checked =
+          Array.isArray(value) &&
+          (control.type !== "radio" || value.length === 1) &&
+          value.includes(control.value);
+      else if (typeof value === "string") control.value = value;
+    }
+    restoreDateInputs(element, { ...answers });
+    for (const control of element.querySelectorAll("input, textarea"))
+      control.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const renderConflicts = () => {
+    conflictPanel.hidden = !conflicts.length;
+    if (!conflicts.length) return;
+    active?.section.appendChild(conflictPanel);
+    renderAnswerConflicts(
+      conflictPanel,
+      conflicts,
+      asAnswers(values(), readDateInputs(element)),
+      baseline,
+      (fields, source) => {
+        if (source === "account") {
+          const current = asAnswers(values(), readDateInputs(element));
+          for (const field of fields)
+            Object.assign(current, { [field]: baseline[field] });
+          restoreAnswers(current);
+        }
+        conflicts = conflicts.filter((group) => group !== fields);
+        renderConflicts();
+        update();
+      },
+    );
+  };
+  const adopt = (latest: ApplicationAnswers, current: ApplicationAnswers) => {
+    baseline = latest;
+    element.dataset.profileBaseline = JSON.stringify(latest);
+    const next = new FormData();
+    for (const name of new Set([...saved.keys(), ...Object.keys(latest)])) {
+      const value = latest[name as keyof ApplicationAnswers];
+      if (Array.isArray(value))
+        for (const item of value) next.append(name, item);
+      else if (typeof value === "string") next.set(name, value);
+      else for (const item of saved.getAll(name)) next.append(name, item);
+    }
+    saved = next;
+    savedDates = {
+      birthDate: latest.birthDate,
+      certificationExpiry: latest.certificationExpiry,
+    };
+    restoreAnswers(current);
+    saveDateInputDefaults(element, savedDates);
+    for (const control of element.querySelectorAll<
+      HTMLInputElement | HTMLTextAreaElement
+    >("input[name], textarea[name]")) {
+      const value = control.value;
+      if (
+        control instanceof HTMLInputElement &&
+        ["radio", "checkbox"].includes(control.type)
+      ) {
+        const checked = control.checked;
+        control.defaultChecked = saved
+          .getAll(control.name)
+          .includes(control.value);
+        control.checked = checked;
+      } else {
+        control.defaultValue = String(saved.get(control.name) ?? "");
+        control.value = value;
+      }
+    }
+    renderSavedAnswers(saved);
+    renderConflicts();
+    update();
+  };
   return {
     update,
     values,
     submitButton: () => active?.save,
-    markSaved(values: FormData) {
-      // Edits made while the request is pending must remain unsaved.
-      saved = values;
-      savedDates = submittedDates.get(values) ?? savedDates;
-      saveDateInputDefaults(active!.fields, savedDates);
-      renderSavedAnswers(values);
-      // Cancel/reset must return to the latest save, not the initial page load.
-      for (const control of active!.fields.querySelectorAll<
-        HTMLInputElement | HTMLTextAreaElement
-      >("input[name], textarea[name]")) {
-        if (
-          control instanceof HTMLInputElement &&
-          ["radio", "checkbox"].includes(control.type)
-        ) {
-          if (
-            control.name === "certifications" &&
-            values.getAll(control.name).length > 1
-          )
-            continue;
-          const checked = control.checked;
-          control.defaultChecked = control.disabled
-            ? checked
-            : values.getAll(control.name).includes(control.value);
-          control.checked = checked;
-        } else {
-          const value = control.value;
-          control.defaultValue = String(values.get(control.name) ?? "").trim();
-          control.value = value;
-        }
-      }
+    conflicted(error: unknown) {
+      const latest = (error as { latest?: ApplicationAnswers })?.latest;
+      if (!latest) return;
+      const merged = mergeAnswers(
+        baseline,
+        asAnswers(values(), readDateInputs(element)),
+        latest,
+      );
+      conflicts = merged.conflicts;
+      adopt(latest, merged.answers);
+    },
+    markSaved(submitted: FormData, latest?: ApplicationAnswers) {
+      if (!latest) return;
+      const merged = mergeAnswers(
+        asAnswers(submitted, submittedDates.get(submitted)),
+        asAnswers(values(), readDateInputs(element)),
+        latest,
+      );
+      conflicts = merged.conflicts;
+      adopt(latest, merged.answers);
       if (!changed()) setEditing();
     },
   };

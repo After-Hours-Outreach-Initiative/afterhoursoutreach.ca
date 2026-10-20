@@ -65,6 +65,12 @@ test("draft API enforces authentication, origin, ownership, revisions, and priva
     };
     assert.equal(draft, null);
     assert.equal(submitted, false);
+    const unversioned = await worker.fetch(`${origin}/api/v1/account/profile`, {
+      method: "POST",
+      headers: { cookie, origin, "content-type": "application/json" },
+      body: JSON.stringify({ ...sampleAnswers, codeOfConductAccepted: true }),
+    });
+    assert.equal(unversioned.status, 428);
     const body = {
       userId,
       version: 1,
@@ -374,6 +380,12 @@ test("draft API enforces authentication, origin, ownership, revisions, and priva
       200,
     );
 
+    const submissionState = (await (
+      await send("GET", undefined, cookie)
+    ).json()) as {
+      generation: string | null;
+      draft: { revision: string } | null;
+    };
     const submittedResponse = await worker.fetch(
       `${origin}/api/v1/account/profile`,
       {
@@ -383,6 +395,11 @@ test("draft API enforces authentication, origin, ownership, revisions, and priva
           ...sampleAnswers,
           applicationUserId: userId,
           codeOfConductAccepted: true,
+          intent: "submit",
+          draft: {
+            revision: submissionState.draft?.revision ?? null,
+            generation: submissionState.generation,
+          },
         }),
       },
     );
