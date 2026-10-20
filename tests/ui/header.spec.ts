@@ -132,6 +132,11 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     });
 
     await page.goto("/");
+    expect(
+      await header.evaluate(
+        (element) => getComputedStyle(element, "::after").content,
+      ),
+    ).toBe("none");
     const brand = header.getByRole("link", {
       name: "After Hours Outreach Initiative, home",
       exact: true,
@@ -170,7 +175,40 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await expect(navigation).toHaveCSS("padding-right", `${gutter}px`);
       await expect(navigation.locator(".header-mobile-links")).toHaveCSS(
         "border-top-width",
-        "1px",
+        "0px",
+      );
+      await expect(navigation.locator(".header-mobile-link").first()).toHaveCSS(
+        "border-top-width",
+        "0px",
+      );
+      expect(
+        await header.evaluate((element) => {
+          const divider = getComputedStyle(element, "::after");
+          return {
+            content: divider.content,
+            position: divider.position,
+            left: divider.left,
+            bottom: divider.bottom,
+            width: divider.width,
+            border: divider.borderBottom,
+          };
+        }),
+      ).toEqual({
+        content: '""',
+        position: "absolute",
+        left: "0px",
+        bottom: "0px",
+        width: `${width}px`,
+        border: "1px solid rgb(39, 39, 42)",
+      });
+      const headerBox = await header.boundingBox();
+      expect(headerBox).toMatchObject({
+        x: 0,
+        width,
+        height: width < 640 ? 76 : 88,
+      });
+      expect((await navigation.boundingBox())!.y).toBe(
+        headerBox!.y + headerBox!.height,
       );
       for (const item of await navigation
         .locator(".header-mobile-links > li > a")
@@ -182,6 +220,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       });
       await expect(discord).toHaveClass("btn btn-primary");
       await expect(discord).toHaveCSS("justify-content", "center");
+      await expect(discord).toHaveCSS("margin-top", "32px");
       const discordBox = await discord.boundingBox();
       expect(discordBox!.x).toBe(gutter);
       expect(discordBox!.width).toBe(width - gutter * 2);
@@ -310,9 +349,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await expect(icon).toBeVisible();
       const sitePagesBox = await sitePages.boundingBox();
       const accountBox = await account.boundingBox();
-      expect(accountBox!.y).toBeGreaterThanOrEqual(
-        sitePagesBox!.y + sitePagesBox!.height + 16,
-      );
+      expect(accountBox!.y).toBe(sitePagesBox!.y + sitePagesBox!.height + 32);
       const nameBox = await account
         .locator("[data-account-menu-name]")
         .boundingBox();
