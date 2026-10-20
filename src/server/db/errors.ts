@@ -12,6 +12,11 @@ export function databaseWriteError(error: unknown): never {
     throw new RequestError(409, "This event is full.");
   if (message.includes("orientation_signup_limit"))
     throw new RequestError(409, orientationSignupLimitMessage);
+  if (message.includes("recurring_signup_window"))
+    throw new RequestError(
+      409,
+      "Registration is available only for the next three patrol occurrences in this series.",
+    );
   if (message.includes("signup_not_eligible"))
     throw new RequestError(
       403,

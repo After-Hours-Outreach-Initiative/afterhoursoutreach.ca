@@ -26,7 +26,7 @@ BEGIN
     JOIN profile p ON p.user_id = v.user_id
     WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1
       AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
-      AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
       AND (e.type = 'orientation' OR v.patrol_approved = 1)
   );
   SELECT RAISE(ABORT, 'event_full')
@@ -42,8 +42,85 @@ BEGIN
       WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
         AND s.event_id != NEW.event_id
         AND e.type = 'orientation' AND e.cancelled_at IS NULL
-        AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+        AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
     );
+END;
+--> statement-breakpoint
+
+-- Rank ALL future non-cancelled occurrences: closed, full and hidden ones still
+-- consume slots. The materialization frontier prevents a sparse/far-future row
+-- from becoming bookable when maintenance has not yet filled intervening dates.
+CREATE TRIGGER signup_recurring_window_insert
+BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
+    SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
+    WHERE e.id = NEW.event_id AND (
+      e.starts_at >= ps.generation_until OR
+      (SELECT count(*) FROM event preceding
+        WHERE preceding.series_id = e.series_id AND preceding.cancelled_at IS NULL
+          AND preceding.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+          AND (preceding.starts_at < e.starts_at OR
+            (preceding.starts_at = e.starts_at AND preceding.id < e.id))) >= 3
+    )
+  );
+END;
+--> statement-breakpoint
+CREATE TRIGGER signup_recurring_window_update
+BEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
+    SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
+    WHERE e.id = NEW.event_id AND (
+      e.starts_at >= ps.generation_until OR
+      (SELECT count(*) FROM event preceding
+        WHERE preceding.series_id = e.series_id AND preceding.cancelled_at IS NULL
+          AND preceding.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+          AND (preceding.starts_at < e.starts_at OR
+            (preceding.starts_at = e.starts_at AND preceding.id < e.id))) >= 3
+    )
+  );
+END;
+--> statement-breakpoint
+
+-- Occurrence identity and cancellation tombstones are permanent. An exception
+-- edits starts_at, never its nominal date; generation can only insert missing keys.
+CREATE TRIGGER recurring_occurrence_identity
+BEFORE UPDATE OF id, type, series_id, occurrence_date ON event
+WHEN (OLD.series_id IS NOT NULL OR NEW.series_id IS NOT NULL)
+  AND (NEW.id IS NOT OLD.id OR NEW.type IS NOT OLD.type
+    OR NEW.series_id IS NOT OLD.series_id OR NEW.occurrence_date IS NOT OLD.occurrence_date)
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_occurrence_identity');
+END;
+--> statement-breakpoint
+CREATE TRIGGER recurring_occurrence_no_delete
+BEFORE DELETE ON event WHEN OLD.series_id IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_occurrence_tombstone');
+END;
+--> statement-breakpoint
+CREATE TRIGGER recurring_occurrence_no_restore
+BEFORE UPDATE OF cancelled_at ON event
+WHEN OLD.series_id IS NOT NULL AND OLD.cancelled_at IS NOT NULL AND NEW.cancelled_at IS NOT OLD.cancelled_at
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_occurrence_tombstone');
+END;
+--> statement-breakpoint
+CREATE TRIGGER recurring_occurrence_created
+AFTER INSERT ON event WHEN NEW.series_id IS NOT NULL
+BEGIN
+  INSERT INTO event_audit (id, event_id, actor_id, action, changed_fields, created_at)
+    VALUES (lower(hex(randomblob(16))), NEW.id, NEW.created_by,
+      'series_occurrence_created', '["seriesId","occurrenceDate"]', NEW.created_at);
+END;
+--> statement-breakpoint
+CREATE TRIGGER patrol_series_schedule_immutable
+BEFORE UPDATE OF id, first_date, local_time, interval_weeks, time_zone ON patrol_series
+WHEN NEW.id IS NOT OLD.id OR NEW.first_date IS NOT OLD.first_date OR NEW.local_time IS NOT OLD.local_time
+  OR NEW.interval_weeks IS NOT OLD.interval_weeks OR NEW.time_zone IS NOT OLD.time_zone
+BEGIN
+  SELECT RAISE(ABORT, 'patrol_series_schedule_immutable');
 END;
 --> statement-breakpoint
 CREATE TRIGGER signup_confirm_update
@@ -56,7 +133,7 @@ BEGIN
     JOIN profile p ON p.user_id = v.user_id
     WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1
       AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
-      AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
       AND (e.type = 'orientation' OR v.patrol_approved = 1)
   );
   SELECT RAISE(ABORT, 'event_full')
@@ -71,7 +148,7 @@ BEGIN
       WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
         AND s.id != OLD.id AND s.event_id != NEW.event_id
         AND e.type = 'orientation' AND e.cancelled_at IS NULL
-        AND e.starts_at > (julianday('now') - 2440587.5) * 86400000
+        AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
     );
 END;
 --> statement-breakpoint

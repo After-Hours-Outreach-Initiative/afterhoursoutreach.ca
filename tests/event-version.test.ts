@@ -7,6 +7,9 @@ test("view versions detect capacity, signups, visibility and access changes with
   const event: EventRow = {
     id: "event",
     type: "orientation",
+    seriesId: null,
+    occurrenceDate: null,
+    inSignupWindow: 1,
     startsAt: 2_000_000_000_000,
     meetingPoint: "Meeting point",
     meetingPointUrl: null,
