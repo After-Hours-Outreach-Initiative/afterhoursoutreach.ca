@@ -51,6 +51,7 @@ export default defineConfig({
             },
           ],
         },
+        { label: "Docs site", slug: "docs-site" },
       ],
     }),
   ],
