@@ -360,7 +360,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(name).toHaveValue(sampleAnswers.preferredName);
     await expect(name).toBeEditable();
     for (const heading of await form.getByRole("heading", { level: 3 }).all()) {
-      await expect(heading).toHaveCSS("font-size", "22px");
+      await expect(heading).toHaveCSS("font-size", "24px");
       await expect(heading).toHaveCSS("font-weight", "700");
       await expect(heading.locator("..")).toHaveCSS(
         "border-bottom-width",

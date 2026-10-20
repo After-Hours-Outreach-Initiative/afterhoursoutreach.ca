@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --container-site: 1248px;
+  --container-site: 78rem;
   --color-ink: #050608;
   --color-panel-soft: #171a20;
   --color-blue: #4169e1;
@@ -68,7 +68,7 @@
 
   :focus-visible {
     outline: 3px solid #4169e1;
-    outline-offset: 4px;
+    outline-offset: 0.25rem;
   }
 
   svg path,
@@ -142,7 +142,7 @@
   }
 
   .switch:focus-visible + .switch-track {
-    @apply outline-2 outline-offset-2 outline-white;
+    @apply outline-2 outline-offset-[0.125rem] outline-white;
   }
 
   .switch-thumb {
