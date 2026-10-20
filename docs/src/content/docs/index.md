@@ -6,14 +6,59 @@ description: Application workflows, architecture, operations, and testing for Af
 Reference for the After Hours Outreach website: volunteer and organizer
 workflows, application architecture, development, and operations.
 
+## System overview
+
+GitHub holds the application source. Production and branch previews run under the
+same Cloudflare Worker, `afterhoursoutreach-ca`, but use different settings and
+database bindings.
+
+```mermaid
+flowchart TB
+    accTitle: System overview
+    accDescr: GitHub builds deploy production and the current branch preview under one Cloudflare Worker. Previews use a shared preview D1 database. Production D1 is not yet provisioned. The application uses Resend for email.
+    repo["GitHub repository"]
+    subgraph worker["afterhoursoutreach-ca"]
+        production["Production"]
+        preview["Branch previews"]
+    end
+    productionDB[("Production D1: pending")]
+    previewDB[("Shared preview D1")]
+    resend["Resend email API"]
+
+    repo -.->|main| production
+    repo -.->|current feature branch| preview
+    production -.->|planned DB binding| productionDB
+    preview -->|DB binding| previewDB
+    production -->|email delivery| resend
+    preview -->|email delivery| resend
+
+    classDef pending stroke-dasharray:5 5
+    class productionDB pending
+```
+
+Production serves `afterhoursoutreach.ca`; each preview has its own `workers.dev`
+URL. Preview databases are **not isolated per branch**: the configured previews
+share `afterhoursoutreach-staging`. Production D1 is still pending, so the
+production database-backed features are not launch-ready.
+
+The diagram shows the application topology, not a claim that all production
+features are live. Git-triggered builds and manual Wrangler commands are both
+supported; GitHub is not involved in serving browser requests.
+
+Continue into [System architecture](/system-architecture/) for the
+[deployment paths](/system-architecture/#delivery-and-environments),
+[request handling](/system-architecture/#inside-the-worker), and
+[scheduled work](/system-architecture/#scheduled-work).
+
 ## Find a guide
 
 - **Application workflows:** [Accounts](/accounts/) covers applications, sign-in,
   and profiles; [Events](/events/) covers visibility, sign-ups, and organizer
   management.
-- **Architecture and operations:** [Backend](/backend/) explains the server and
-  database workflows; [Deployment](/deployment/) covers application previews and
-  production releases.
+- **Architecture and operations:** [System architecture](/system-architecture/)
+  expands the system map; [Backend](/backend/) explains server and database
+  workflows; [Deployment](/deployment/) covers application previews and production
+  releases.
 - **[Privacy review](/privacy/):** implementation review and proposed practices,
   not an approved privacy policy.
 - **[Testing guide](/testing/):** current testing commands and isolation guidance.

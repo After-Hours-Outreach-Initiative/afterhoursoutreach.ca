@@ -68,3 +68,22 @@ explicit sidebar in `docs/astro.config.mjs`, then run `pnpm docs:check`.
 
 After changing the site configuration, restart the reader with `pnpm docs:stop`
 followed by `pnpm docs:dev`.
+
+## Diagrams
+
+Write diagrams as fenced `mermaid` blocks in Markdown. They render locally in
+the browser, without a diagram service or CDN, and follow the reader's theme.
+Give each diagram an accessible title and description, use short labels, and
+split different levels of detail into separate diagrams.
+
+````md
+```mermaid
+flowchart TD
+    accTitle: Browser request
+    accDescr: The browser sends an HTTPS request to the application Worker.
+    browser["Browser"] -->|HTTPS| worker["Worker"]
+```
+````
+
+Keep authoring instructions on this page, the high-level system map on
+[Overview](/), and detailed system diagrams on their architecture pages.

@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import mermaid from "astro-mermaid";
 
 // This is a standalone local reader, not part of the application's build.
 export default defineConfig({
@@ -12,8 +13,19 @@ export default defineConfig({
     server: { strictPort: true },
   },
   integrations: [
+    // Register before Starlight so Mermaid fences reach the diagram renderer.
+    mermaid({
+      autoTheme: true,
+      enableLog: false,
+      mermaidConfig: {
+        securityLevel: "strict",
+        fontFamily: "inherit",
+        flowchart: { htmlLabels: false, curve: "linear" },
+      },
+    }),
     starlight({
       title: "After Hours Outreach docs",
+      customCss: ["./src/styles/diagrams.css"],
       // Pagefind needs a build; this reader only uses the development server.
       pagefind: false,
       sidebar: [
@@ -28,6 +40,7 @@ export default defineConfig({
         {
           label: "Architecture and operations",
           items: [
+            { label: "System architecture", slug: "system-architecture" },
             { label: "Backend", slug: "backend" },
             { label: "Deployment", slug: "deployment" },
           ],

@@ -10,6 +10,18 @@ description: Branch preview and production deployment procedures, safeguards, an
 - Codebase:
   https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca
 
+## GitHub builds
+
+`main` is the production branch. Cloudflare Workers Builds is connected through
+the **Cloudflare Workers and Pages** GitHub app; there is no checked-in GitHub
+Actions deployment workflow. Successful GitHub checks confirm production builds
+for `main` and preview builds for `feat/patrol-scheduling-mockup`.
+
+The manual commands below are a separate supported deployment path. The full
+automatic branch rules and exact CI commands are managed in Cloudflare and have
+not been verified. See [System architecture](/system-architecture/#git-triggered-builds)
+for the confirmed connection and where to inspect its settings.
+
 ## Branch previews
 
 - Public Workers Previews under `afterhoursoutreach-ca`, not version URLs.
