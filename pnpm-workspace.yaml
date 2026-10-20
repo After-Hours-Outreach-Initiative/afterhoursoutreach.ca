@@ -1,3 +1,6 @@
+packages:
+  - docs
+
 allowBuilds:
   esbuild: true
   workerd: true
@@ -5,3 +8,6 @@ allowBuilds:
 # Keep the plugin on a published runtime compatible with local development.
 overrides:
   "@cloudflare/vite-plugin": 1.52.0
+  # Keep the docs integrations on Astro 7.2's compatible release set.
+  "@astrojs/starlight>@astrojs/mdx": 8.0.0
+  "@astrojs/starlight>@astrojs/markdown-satteri": 0.4.0
