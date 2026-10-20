@@ -381,11 +381,12 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(arrow).toHaveAttribute("focusable", "false");
     const identityBox = await identity.boundingBox();
     const arrowBox = await arrow.boundingBox();
+    const arrowSize = mobile ? 20 : 16;
     expect(arrowBox).toMatchObject({
-      x: identityBox!.x + identityBox!.width - 28,
+      x: identityBox!.x + identityBox!.width - 12 - arrowSize,
       y: identityBox!.y + 16,
-      width: 16,
-      height: 16,
+      width: arrowSize,
+      height: arrowSize,
     });
     const detailsBox = await identity
       .locator(".header-account-details")
