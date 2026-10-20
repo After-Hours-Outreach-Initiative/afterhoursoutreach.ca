@@ -229,6 +229,10 @@
   width: 44px;
   height: 44px;
 }
+.header-mobile-account .header-account-arrow {
+  width: 20px;
+  height: 20px;
+}
 .header-mobile-account .header-account-card a:not(.header-account-identity),
 .header-mobile-account .header-account-card button {
   min-height: 56px;
