@@ -1,4 +1,9 @@
-# Testing
+---
+title: Testing
+description: Run isolated Vitest and Playwright tests and compare benchmark snapshots.
+---
+
+<span id="testing"></span>
 
 Non-browser tests use Vitest, configured in `vitest.config.ts`. Playwright
 remains the browser runner.
@@ -90,9 +95,9 @@ PLAYWRIGHT_BASE_URL=https://your-preview.workers.dev pnpm test:ui
 
 ## Benchmark comparisons
 
-Preserve the original [baseline](test-benchmarks.md) and
-[simplified-suite snapshot](test-benchmarks-simplified.md). The
-[Vitest migration snapshot](test-benchmarks-vitest.md) records the passing
+Preserve the original [baseline](/test-benchmarks/) and
+[simplified-suite snapshot](/test-benchmarks-simplified/). The
+[Vitest migration snapshot](/test-benchmarks-vitest/) records the passing
 post-migration benchmark and its comparisons. Compare future changes with:
 
 ```sh

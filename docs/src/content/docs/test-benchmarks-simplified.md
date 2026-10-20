@@ -1,6 +1,17 @@
-# Simplified test-suite benchmark
+---
+title: Simplified test-suite benchmark
+description: Historical passing benchmark of the simplified test suite from October 7, 2026.
+---
+
+<span id="simplified-test-suite-benchmark"></span>
 
 Measured 2026-10-07T21:05:05.033Z on `chore/test-benchmark-baseline` at `3ea789d333d5d4c7e7424a745d5b52d4d0c79894`.
+
+:::caution[Historical report]
+Commands and tooling reflect the report date, not current usage. See
+[Testing](/testing/) for current commands; the legacy `--local-url` option is now
+rejected.
+:::
 
 **Valid baseline: all measured runs and warm-ups passed.**
 
@@ -300,4 +311,4 @@ Baseline: 2026-10-07T20:07:59.494Z, commit `a82ebc4884166e11e0399a5a6b40ed641654
 
 ## Raw data
 
-Structured measurements: `docs/benchmarks/test-simplified.json`. Raw runner JSON and command logs: `test-results/benchmarks/2026-10-07T21-05-05-033Z` (ignored by Git). The structured snapshot stores each measured run and every test name/duration; keep it with this report for future comparisons.
+Structured measurements: [`docs/benchmarks/test-simplified.json`](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/docs/benchmarks/test-simplified.json). Raw runner JSON and command logs: `test-results/benchmarks/2026-10-07T21-05-05-033Z` (ignored by Git). The structured snapshot stores each measured run and every test name/duration; keep it with this report for future comparisons.
