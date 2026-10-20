@@ -1601,19 +1601,27 @@ test("all teams can select multiple relevant training answers and add Other deta
       .locator(".volunteer-check")
       .evaluateAll((labels) =>
         labels.map((label) => {
+          const row = label.getBoundingClientRect();
           const input = label.querySelector("input")!.getBoundingClientRect();
           const text = label.querySelector("span")!;
           const bounds = text.getBoundingClientRect();
           const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
           return {
+            height: row.height,
+            paddingTop: bounds.top - row.top,
+            paddingBottom: row.bottom - bounds.bottom,
             lines: Math.round(bounds.height / lineHeight),
             offset:
               input.top + input.height / 2 - (bounds.top + lineHeight / 2),
           };
         }),
       );
-    for (const option of alignment)
+    for (const option of alignment) {
+      expect(option.height).toBeGreaterThanOrEqual(44);
+      expect(option.paddingTop).toBeGreaterThan(0);
+      expect(option.paddingTop).toBeCloseTo(option.paddingBottom, 1);
       expect(Math.abs(option.offset)).toBeLessThanOrEqual(1);
+    }
     if (width <= 375)
       expect(alignment.some((option) => option.lines > 1)).toBe(true);
     expect(
