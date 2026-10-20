@@ -3,10 +3,9 @@ import { test } from "vitest";
 import { chromium, expect, type Page } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
-import { sourceSchemaStatements } from "../helpers/source-schema";
+import { profileWriteBody } from "../helpers/profile-write";
 import { sampleAnswers } from "../helpers/local-account";
 import { addCalendarDays, vancouverInput } from "../../src/data/event-time";
-import journal from "../../drizzle/meta/_journal.json";
 import { fillDateInput } from "../helpers/date-input";
 
 test("organizer recurrence API and controls preserve exceptions/bookings; an open volunteer page rolls forward at start", async () => {
@@ -30,20 +29,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await server.listen();
     const worker = server.getWorker<Env>();
     const { DB } = await worker.getEnv();
-    // Disposable SOURCE schema: task7 generates ordered migrations after integration.
-    await DB.batch(
-      sourceSchemaStatements().map((statement) => DB.prepare(statement)),
-    );
-    await DB.prepare(
-      "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT)",
-    ).run();
-    await DB.batch(
-      journal.entries.map(({ tag }) =>
-        DB.prepare("INSERT INTO d1_migrations (name) VALUES (?)").bind(
-          `${tag}.sql`,
-        ),
-      ),
-    );
+    await worker.applyD1Migrations("DB");
     const send = (path: string, body?: object, cookie = "") =>
       worker.fetch(`${origin}${path}`, {
         method: body ? "POST" : "GET",
@@ -75,7 +61,10 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       await ok(
         await send(
           "/api/v1/account/profile",
-          { ...sampleAnswers, codeOfConductAccepted: true },
+          await profileWriteBody((path) => send(path, undefined, cookie), {
+            ...sampleAnswers,
+            codeOfConductAccepted: true,
+          }),
           cookie,
         ),
       );

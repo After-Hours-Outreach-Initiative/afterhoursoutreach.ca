@@ -17,6 +17,7 @@ import {
   generateDatabaseMigration,
   parseTriggers,
 } from "../scripts/generate-db";
+import journal from "../drizzle/meta/_journal.json";
 
 const directories: string[] = [];
 const databases: DatabaseSync[] = [];
@@ -49,6 +50,64 @@ END;`);
 
 test("checked-in migrations are generated, unedited, and match the current sources", async () => {
   assert.equal(await generateDatabaseMigration({ check: true }), null);
+});
+
+test("recurrence migration preserves existing events, bookings, completions, audits and pending email", () => {
+  const db = database();
+  db.exec("PRAGMA foreign_keys=ON");
+  const migrate = (tag: string) => {
+    db.exec("BEGIN");
+    db.exec(
+      readFileSync(new URL(`../drizzle/${tag}.sql`, import.meta.url), "utf8"),
+    );
+    db.exec("COMMIT");
+  };
+  for (const { tag } of journal.entries.filter(({ idx }) => idx < 14))
+    migrate(tag);
+  db.exec(`
+    INSERT INTO user (id,name,email,role,created_at,updated_at) VALUES ('existing','Sample','sample@example.org','organizer',0,0);
+    INSERT INTO profile (user_id,preferred_name,phone,birth_date,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,medical_certification,training_experience,registered_at,updated_at)
+      VALUES ('existing','Sample','555','2000-01-01','Contact','555','Friend','Friend','Help','[]','None','None',0,0);
+    INSERT INTO volunteer_status (user_id,registration_approved,updated_at) VALUES ('existing',1,0);
+    INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES ('existing-event','orientation',${Date.now() + 86_400_000},'Sample point',3,'existing',0,0);
+    INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('existing-booking','existing-event','existing',0,0);
+    INSERT INTO orientation_completion VALUES ('existing-completion','existing','existing-event','existing',0);
+    INSERT INTO event_audit VALUES ('existing-audit','existing-event','existing','created','[]',0);
+    INSERT INTO event_notification (id,operation_id,user_id,subject,body,delivery_to,created_at)
+      VALUES ('existing-mail','existing-audit','existing','Sample subject','Sample body','sample@example.org',0);
+  `);
+  const tables = [
+    "user",
+    "profile",
+    "volunteer_status",
+    "signup",
+    "orientation_completion",
+    "event_audit",
+    "event_notification",
+  ];
+  const before = tables.map((table) =>
+    db.prepare(`SELECT * FROM ${table}`).all(),
+  );
+  const oldEvent = db.prepare("SELECT * FROM event").get();
+  migrate("0014_patrol_submission_integration");
+  assert.deepEqual(
+    tables.map((table) => db.prepare(`SELECT * FROM ${table}`).all()),
+    before,
+  );
+  const { series_id, occurrence_date, ...event } = db
+    .prepare("SELECT * FROM event")
+    .get()!;
+  assert.deepEqual(event, { ...oldEvent });
+  assert.equal(series_id, null);
+  assert.equal(occurrence_date, null);
+  assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+  assert.equal(
+    db
+      .prepare("SELECT count(*) n FROM application_submission_notification")
+      .get()?.n,
+    0,
+  );
 });
 
 test("the Code of Conduct migration preserves existing profiles without inventing acknowledgement", () => {
@@ -236,7 +295,7 @@ test("generation creates runnable schema and triggers and is a no-op without cha
   db.exec(contents);
   db.exec("INSERT INTO note VALUES (1, 'Sample')");
   assert.throws(
-    () => db.exec("INSERT INTO note VALUES (2, '')"),
+    () => db.exec("INSERT INTO note (id,title) VALUES (2, '')"),
     /empty_title/,
   );
 });
@@ -288,6 +347,8 @@ test("schema rebuilds preserve data and reinstall unchanged triggers", async () 
       {
         id: integer().primaryKey(),
         title: text().notNull(),
+        added_nullable: text(),
+        added_default: integer().notNull().default(7),
       },
       (table) => [
         check("note_title_length", sql`length(${table.title}) <= 100`),
@@ -311,8 +372,16 @@ test("schema rebuilds preserve data and reinstall unchanged triggers", async () 
     db.prepare("SELECT title FROM note WHERE id=1").get()?.title,
     "Sample",
   );
+  assert.equal(
+    db.prepare("SELECT added_nullable FROM note").get()?.added_nullable,
+    null,
+  );
+  assert.equal(
+    db.prepare("SELECT added_default FROM note").get()?.added_default,
+    7,
+  );
   assert.throws(
-    () => db.exec("INSERT INTO note VALUES (2, '')"),
+    () => db.exec("INSERT INTO note (id,title) VALUES (2, '')"),
     /empty_title/,
   );
   assert.equal(
@@ -393,6 +462,8 @@ test("generated table rebuilds preserve referenced rows and triggers in D1", asy
           {
             id: integer().primaryKey(),
             title: text().notNull(),
+            added_nullable: text(),
+            added_default: integer().notNull().default(7),
           },
           (table) => [
             check("note_title_length", sql`length(${table.title}) <= 100`),
@@ -405,13 +476,22 @@ test("generated table rebuilds preserve referenced rows and triggers in D1", asy
       (await DB.prepare("SELECT title FROM note WHERE id=1").first())?.title,
       "Sample",
     );
+    assert.deepEqual(
+      await DB.prepare(
+        "SELECT added_nullable,added_default FROM note WHERE id=1",
+      ).first(),
+      {
+        added_nullable: null,
+        added_default: 7,
+      },
+    );
     assert.equal(
       (await DB.prepare("SELECT note_id FROM note_link WHERE id=1").first())
         ?.note_id,
       1,
     );
     await assert.rejects(
-      DB.prepare("INSERT INTO note VALUES (2, '')").run(),
+      DB.prepare("INSERT INTO note (id,title) VALUES (2, '')").run(),
       /empty_title/,
     );
     await assert.rejects(

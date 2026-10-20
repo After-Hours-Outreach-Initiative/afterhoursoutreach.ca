@@ -29,6 +29,9 @@ import {
   runSubmissionNotificationJob,
 } from "../src/server/submission-notifications";
 import { sourceSchemaStatements } from "./helpers/source-schema";
+import { deliverNotifications } from "../src/server/events/notifications";
+import { processMedicCertificationNotifications } from "../src/server/medic-certifications";
+import { addCalendarDays, vancouverInput } from "../src/data/event-time";
 
 vi.stubEnv("DEV", false);
 vi.stubEnv("PROD", true);
@@ -572,6 +575,49 @@ test("exhausted shared budget preserves unattempted intents, and concurrent rese
   assert.equal(provider.mock.calls.length, 1);
   assert.equal(await budgetCount(), 80);
   assert.equal((await rows()).filter((row) => row.status === "sent").length, 1);
+});
+
+test("submission, event and medic delivery race within the same 80-email budget; a Preview build cannot run medic delivery", async () => {
+  await submit();
+  await db.batch([
+    queueNotification(
+      db,
+      "shared-budget-event",
+      actor.id,
+      "Sample event",
+      "Sample message",
+    ),
+    db
+      .prepare(
+        'UPDATE profile SET teams=\'["outreach","medic"]\',medical_certifications=\'["advanced-first-aid"]\',medical_certification_expiry=? WHERE user_id=?',
+      )
+      .bind(
+        addCalendarDays(vancouverInput(Date.now()).slice(0, 10), 1),
+        actor.id,
+      ),
+  ]);
+  await takeEmailBudget(db, secret, 78);
+  let emails = 0;
+  const provider: typeof fetch = async (_url, init) => {
+    const payload = JSON.parse(String(init?.body));
+    emails += Array.isArray(payload) ? payload.length : 1;
+    return Array.isArray(payload)
+      ? Response.json({ data: payload.map(() => ({ id: "accepted" })) })
+      : Response.json({ id: "accepted" });
+  };
+  await Promise.all([
+    deliverSubmissionNotifications(bindings(), {}, provider),
+    deliverNotifications(bindings(), "shared-budget-event", provider),
+    processMedicCertificationNotifications(bindings(), true, provider),
+  ]);
+  assert.equal(await budgetCount(), 80);
+  assert.equal(emails, 2);
+  vi.stubEnv("MODE", "preview");
+  assert.deepEqual(
+    await processMedicCertificationNotifications(bindings(), true, provider),
+    { skipped: true },
+  );
+  assert.equal(emails, 2);
 });
 
 test("budget reservation and outbox mark are one D1 transaction; rollover reserves again but retains key/clock", async () => {

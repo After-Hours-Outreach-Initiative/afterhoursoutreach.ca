@@ -135,13 +135,32 @@ function prepareD1Statements(
     }
   }
   // D1 migrations run in transactions: foreign_keys=OFF has no effect there.
-  return statements.map((statement) =>
-    statement.replace(
+  return statements.map((statement) => {
+    // Drizzle Kit 0.31 can include newly added columns in a rebuild's source
+    // SELECT. SQLite either rejects them or (with DQS enabled) copies their
+    // names as literal strings. Omit new columns from the copy so the rebuilt
+    // table supplies its declared defaults/NULL, just like ALTER ADD COLUMN.
+    const copy =
+      /^INSERT INTO `__new_([^`]+)`\(("[^"]+"(?:, "[^"]+")*)\) SELECT ("[^"]+"(?:, "[^"]+")*) FROM `([^`]+)`;$/.exec(
+        statement,
+      );
+    if (copy && copy[1] === copy[4] && copy[2] === copy[3]) {
+      const columns = copy[2]
+        .split(", ")
+        .filter((quoted) =>
+          Object.hasOwn(previous.tables[copy[4]].columns, quoted.slice(1, -1)),
+        );
+      if (!columns.length)
+        throw new Error(`Cannot copy rebuilt table ${copy[4]}.`);
+      const projection = columns.join(", ");
+      statement = `INSERT INTO \`__new_${copy[1]}\`(${projection}) SELECT ${projection} FROM \`${copy[4]}\`;`;
+    }
+    return statement.replace(
       /^PRAGMA foreign_keys=(OFF|ON);$/i,
       (_match, state: string) =>
         `PRAGMA defer_foreign_keys=${state.toUpperCase() === "OFF" ? "ON" : "OFF"};`,
-    ),
-  );
+    );
+  });
 }
 
 /** All triggers are rebuilt around schema changes, including SQLite table rebuilds. */

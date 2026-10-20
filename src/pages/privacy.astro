@@ -188,16 +188,20 @@ const account = await loadAccountNavigation(
         also stored in D1. Do not put sensitive answers in emailed reasons.
       </p>
       <p class="mt-6">
-        <strong>Planned first-submission notification — rollout pending.</strong
-        >
-        A minimal email is planned for the fixed organizer recipients Ivan, info@afterhoursoutreach.ca,
-        and Molina when an application is first submitted. It is to contain only the
-        applicant’s name, submission time, and an organizer-only review link, not
-        application answers. The review link requires authorized organizer sign-in.
-        Delivery through Resend, the exact recipient inboxes, and any delivery records
-        must be confirmed against the notification implementation before this is described
-        as an active practice. Draft saves and later profile edits are not the planned
-        trigger.
+        In production, first application submissions automatically queue a
+        minimal email to three fixed organizer inboxes:
+        ivan.zheng@afterhoursoutreach.ca, info@afterhoursoutreach.ca, and
+        molina.dewilde@afterhoursoutreach.ca. Resend receives the applicant’s
+        display name (preferred name, or full name when none is provided),
+        submission time, and an organizer-only review link, not the other
+        application answers. The link requires authorized organizer sign-in and
+        grants no access by itself. D1 keeps the fixed recipient, message
+        content, delivery attempts, and status, including unresolved deliveries
+        that can no longer be retried safely. Provider acceptance is not
+        confirmation of inbox delivery. Draft saves, submission retries, and
+        later profile edits do not create another notification. Local
+        development simulates these messages; preview builds suppress them
+        without storing message content or sending to the organizer inboxes.
       </p>
       <p class="mt-6">
         Some public pages connect to Shopify’s image CDN, including donation

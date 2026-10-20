@@ -38,7 +38,11 @@ export async function processMedicCertificationNotifications(
   fetcher: typeof fetch = fetch,
   now = Date.now(),
 ) {
-  if (import.meta.env?.DEV || bindings.APP_ENV !== "production")
+  if (
+    import.meta.env?.DEV ||
+    import.meta.env?.MODE === "preview" ||
+    bindings.APP_ENV !== "production"
+  )
     return { skipped: true };
   if (
     !bindings.RESEND_API_KEY ||
