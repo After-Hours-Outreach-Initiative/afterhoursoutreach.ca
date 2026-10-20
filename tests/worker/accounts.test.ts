@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { profileWriteBody } from "../helpers/profile-write";
 import { existsSync } from "node:fs";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
@@ -88,13 +89,18 @@ describe(
         await send("/api/v1/auth/get-session", undefined, cookie)
       ).json()) as typeof current;
     });
-    const send = (
+    const send = async (
       path: string,
       body?: object,
       cookie?: string,
       requestOrigin = origin,
-    ) =>
-      worker.fetch(`${origin}${path}`, {
+    ): ReturnType<typeof worker.fetch> => {
+      if (path === "/api/v1/account/profile" && body)
+        body = await profileWriteBody(
+          (path) => send(path, undefined, cookie),
+          body,
+        );
+      return worker.fetch(`${origin}${path}`, {
         method: body ? "POST" : "GET",
         headers: {
           origin: requestOrigin,
@@ -104,6 +110,7 @@ describe(
         ...(body ? { body: JSON.stringify(body) } : {}),
         redirect: "manual",
       });
+    };
     test("site origins reject unrelated, preview and forwarded-host CSRF", async () => {
       for (const host of [
         "https://evil.example.org",

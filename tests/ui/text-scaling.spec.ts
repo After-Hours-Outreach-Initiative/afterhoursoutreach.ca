@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { profileWriteBody } from "../helpers/profile-write";
 import {
   createLocalAccount,
   openLocalAccountSwitcher,
@@ -328,7 +329,10 @@ for (const root of [16, 20, 24]) {
       // without submitting a second full application through the browser.
       const submitted = await page.request.post("/api/v1/account/profile", {
         headers: { origin: baseURL! },
-        data: { ...sampleAnswers, codeOfConductAccepted: true },
+        data: await profileWriteBody((path) => page.request.get(path), {
+          ...sampleAnswers,
+          codeOfConductAccepted: true,
+        }),
       });
       expect(submitted.status(), await submitted.text()).toBe(200);
       await page.setViewportSize({ width: 1280, height: 900 });

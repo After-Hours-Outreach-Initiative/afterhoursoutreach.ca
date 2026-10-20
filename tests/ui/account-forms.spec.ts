@@ -1,3 +1,4 @@
+import { profileWriteBody } from "../helpers/profile-write";
 import {
   devices,
   expect,
@@ -812,12 +813,12 @@ test("formatted phones survive draft reloads and profile saves and resets", asyn
 
   const submitted = await page.request.post("/api/v1/account/profile", {
     headers: { origin: baseURL! },
-    data: {
+    data: await profileWriteBody((path) => page.request.get(path), {
       ...sampleAnswers,
       phone: "6045550100",
       emergencyPhone: "6045550101",
       codeOfConductAccepted: true,
-    },
+    }),
   });
   expect(submitted.status(), await submitted.text()).toBe(200);
   await page.goto("/volunteer/account");
@@ -2179,12 +2180,12 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   const certifications = ["advanced-first-aid", "nurse"];
   const seeded = await page.request.post("/api/v1/account/profile", {
     headers: { origin: baseURL! },
-    data: {
+    data: await profileWriteBody((path) => page.request.get(path), {
       ...sampleAnswers,
       certifications,
       experience: "Saved experience",
       certificationExpiry: "2030-10-14",
-    },
+    }),
   });
   expect(seeded.status(), await seeded.text()).toBe(200);
   await page.goto("/volunteer/account");

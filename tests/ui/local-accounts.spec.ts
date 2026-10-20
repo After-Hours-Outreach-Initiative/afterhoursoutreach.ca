@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { profileWriteBody } from "../helpers/profile-write";
 import {
   createLocalAccount,
   fillApplicationField,
@@ -69,7 +70,11 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   const before = await disposableUsers();
   const invalid = await page.request.post("/api/v1/account/profile", {
     headers: { origin: baseURL! },
-    data: { ...sampleAnswers, teams: [], codeOfConductAccepted: true },
+    data: await profileWriteBody((path) => page.request.get(path), {
+      ...sampleAnswers,
+      teams: [],
+      codeOfConductAccepted: true,
+    }),
   });
   expect(invalid.status()).toBe(400);
   expect(await draft()).toMatchObject({
@@ -217,7 +222,10 @@ test("unfinished application shows a clickable yellow warning card without clipp
   await expect(page).toHaveURL(/\/apply$/);
   const application = await page.request.post("/api/v1/account/profile", {
     headers: { origin: baseURL! },
-    data: { ...sampleAnswers, codeOfConductAccepted: true },
+    data: await profileWriteBody((path) => page.request.get(path), {
+      ...sampleAnswers,
+      codeOfConductAccepted: true,
+    }),
   });
   expect(application.status(), await application.text()).toBe(200);
   await page.goto("/volunteer");

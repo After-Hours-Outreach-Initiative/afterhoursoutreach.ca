@@ -10,6 +10,8 @@ import { orientationSignupLimitMessage } from "../src/server/db/policy";
 import {
   loadApplicationDraft,
   saveApplicationDraft,
+  discardApplicationDraft,
+  loadApplicationDraftState,
 } from "../src/server/db/application-drafts";
 import {
   hasApplied,
@@ -312,6 +314,335 @@ test("application queue counts all submitted unapproved applications independent
   assert.equal(organizerQueue.rows[0].id, actor.id);
 });
 
+const completeAnswers = () =>
+  draftProfileValues(
+    applicationDraftAnswersSchema.parse({
+      firstName: "Volunteer",
+      lastName: "Applicant",
+      phone: "604-555-0100",
+      birthDate: "1995-01-01",
+      emergencyName: "Contact",
+      emergencyPhone: "604-555-0101",
+      emergencyRelationship: "Friend",
+      heardAboutUsSources: ["internet"],
+      motivation: "I want to help.",
+      teams: ["outreach"],
+      training: ["none"],
+    }),
+  );
+
+test("drafts merge independent concurrent edits, reject same-field changes, and retry lost responses", async () => {
+  const actor = await draftActor();
+  const first = await saveApplicationDraft(env.DB, actor, draftInput(actor));
+  const request = {
+    ...draftInput(actor, first.revision),
+    baseline: first.answers,
+  };
+  await Promise.all([
+    saveApplicationDraft(env.DB, actor, {
+      ...request,
+      answers: { ...first.answers, phone: "local phone" },
+    }),
+    saveApplicationDraft(env.DB, actor, {
+      ...request,
+      answers: { ...first.answers, pronouns: "remote pronouns" },
+    }),
+  ]);
+  const merged = (await loadApplicationDraft(env.DB, actor.id))!;
+  assert.equal(merged.answers.phone, "local phone");
+  assert.equal(merged.answers.pronouns, "remote pronouns");
+  await saveApplicationDraft(env.DB, actor, {
+    ...request,
+    answers: { ...first.answers, phone: "local phone" },
+  });
+  assert.deepEqual(
+    (await loadApplicationDraft(env.DB, actor.id))?.answers,
+    merged.answers,
+  );
+  await assert.rejects(
+    saveApplicationDraft(env.DB, actor, {
+      ...request,
+      answers: { ...first.answers, phone: "different phone" },
+    }),
+    statusError(409),
+  );
+});
+
+test("profile edits merge independent fields, retain same-field input for explicit choice, and retry without duplicate audit", async () => {
+  const actor = await draftActor();
+  const baseline = completeAnswers();
+  await saveProfile(env.DB, actor.id, {
+    ...baseline,
+    codeOfConductAccepted: true,
+  });
+  const [one, two] = await Promise.all([
+    saveProfile(
+      env.DB,
+      actor.id,
+      { ...baseline, phone: "604-555-0111" },
+      { actor, baseline, intent: "edit" },
+    ),
+    saveProfile(
+      env.DB,
+      actor.id,
+      { ...baseline, pronouns: "they/them" },
+      { actor, baseline, intent: "edit" },
+    ),
+  ]);
+  assert.equal(one.firstSubmitted, false);
+  assert.equal(two.firstSubmitted, false);
+  const latest = (await loadProfile(env.DB, actor.id))!;
+  assert.equal(latest.phone, "604-555-0111");
+  assert.equal(latest.pronouns, "they/them");
+  const audits = () =>
+    env.DB.prepare("SELECT count(*) FROM audit_log WHERE subject_id=?")
+      .bind(actor.id)
+      .first("count(*)");
+  const count = await audits();
+  await saveProfile(
+    env.DB,
+    actor.id,
+    { ...baseline, phone: "604-555-0111" },
+    { baseline, intent: "edit" },
+  );
+  assert.equal(await audits(), count);
+  await assert.rejects(
+    saveProfile(
+      env.DB,
+      actor.id,
+      { ...baseline, phone: "604-555-0122" },
+      { baseline, intent: "edit" },
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof RequestError && error.status === 409);
+      assert.deepEqual(error.details?.latest, latest);
+      return true;
+    },
+  );
+  await saveProfile(
+    env.DB,
+    actor.id,
+    { ...latest, phone: "604-555-0122" },
+    { baseline: latest, intent: "edit" },
+  );
+  assert.equal((await loadProfile(env.DB, actor.id))?.phone, "604-555-0122");
+  await assert.rejects(
+    saveProfile(env.DB, actor.id, baseline),
+    statusError(428),
+  );
+  const beforeRetry = (await loadProfile(env.DB, actor.id))!;
+  const padded = { ...beforeRetry, preferredName: "  Trimmed retry  " };
+  await saveProfile(env.DB, actor.id, padded, {
+    baseline: beforeRetry,
+    intent: "edit",
+  });
+  const retryAudits = await audits();
+  await saveProfile(env.DB, actor.id, padded, {
+    baseline: beforeRetry,
+    intent: "edit",
+  });
+  assert.equal(await audits(), retryAudits);
+  assert.equal(
+    (await loadProfile(env.DB, actor.id))?.preferredName,
+    "Trimmed retry",
+  );
+});
+
+test("concurrent first submissions are insert-only and durable first-submission intents run once", async () => {
+  const actor = await draftActor();
+  const answers = completeAnswers();
+  // A stand-in intent in an existing table tests the transaction contract without
+  // implementing notification delivery or requiring a schema change.
+  const options = {
+    actor,
+    intent: "submit" as const,
+    firstSubmissionStatements: ({
+      operationId,
+      writeGuard,
+    }: {
+      operationId: string;
+      writeGuard: string;
+    }) => [
+      env.DB.prepare(
+        `INSERT INTO audit_log (id,actor_id,subject_id,action,changed_fields,created_at) SELECT ?,?,?,'submission_intent','[]',0 WHERE ${writeGuard}`,
+      ).bind(crypto.randomUUID(), actor.id, actor.id, operationId),
+    ],
+  };
+  const results = await Promise.all([
+    saveProfile(
+      env.DB,
+      actor.id,
+      { ...answers, codeOfConductAccepted: true },
+      options,
+    ),
+    saveProfile(
+      env.DB,
+      actor.id,
+      { ...answers, phone: "604-555-0199", codeOfConductAccepted: true },
+      options,
+    ),
+  ]);
+  assert.equal(results.filter((result) => result.firstSubmitted).length, 1);
+  const winner = results.find((result) => result.firstSubmitted)!;
+  assert.deepEqual(await loadProfile(env.DB, actor.id), winner.answers);
+  const snapshot = await loadSubmittedApplication(env.DB, actor.id);
+  assert.deepEqual(snapshot?.answers, winner.answers);
+  const retry = await saveProfile(
+    env.DB,
+    actor.id,
+    {
+      ...answers,
+      preferredName: "Must not overwrite",
+      codeOfConductAccepted: true,
+    },
+    options,
+  );
+  assert.equal(retry.alreadySubmitted, true);
+  assert.deepEqual(await loadProfile(env.DB, actor.id), winner.answers);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
+    2,
+  );
+});
+
+test("simultaneous same-field profile edits allow one winner and preserve the original submission", async () => {
+  const actor = await draftActor();
+  const baseline = completeAnswers();
+  await saveProfile(env.DB, actor.id, {
+    ...baseline,
+    codeOfConductAccepted: true,
+  });
+  const original = await loadSubmittedApplication(env.DB, actor.id);
+  const results = await Promise.allSettled(
+    ["One", "Two"].map((preferredName) =>
+      saveProfile(
+        env.DB,
+        actor.id,
+        { ...baseline, preferredName },
+        { actor, baseline, intent: "edit" },
+      ),
+    ),
+  );
+  assert.equal(
+    results.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  const rejected = results.find((result) => result.status === "rejected");
+  assert.ok(
+    rejected?.status === "rejected" && statusError(409)(rejected.reason),
+  );
+  assert.deepEqual(await loadSubmittedApplication(env.DB, actor.id), original);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
+    2,
+  );
+});
+
+test("submission checks draft revisions/generations, races autosave safely, and revoked sessions cannot submit", async () => {
+  const actor = await draftActor();
+  const answers = completeAnswers();
+  const {
+    heardAboutUs: _referral,
+    certification: _certification,
+    ...draftAnswers
+  } = answers;
+  const draft = await saveApplicationDraft(env.DB, actor, {
+    ...draftInput(actor),
+    answers: draftAnswers,
+  });
+  const input = { ...answers, codeOfConductAccepted: true };
+  const options = {
+    actor,
+    intent: "submit" as const,
+    draft: { revision: draft.revision, generation: null },
+  };
+  const race = await Promise.allSettled([
+    saveProfile(env.DB, actor.id, input, options),
+    saveApplicationDraft(env.DB, actor, {
+      ...draftInput(actor, draft.revision),
+      baseline: draft.answers,
+      answers: { ...draft.answers, pronouns: "late edit" },
+    }),
+  ]);
+  if (race[0].status === "fulfilled") {
+    assert.equal(await loadApplicationDraft(env.DB, actor.id), null);
+    assert.equal(await hasApplied(env.DB, actor.id), true);
+  } else {
+    assert.ok(statusError(409)(race[0].reason));
+    assert.equal(await hasApplied(env.DB, actor.id), false);
+    assert.equal(
+      (await loadApplicationDraft(env.DB, actor.id))?.answers.pronouns,
+      "late edit",
+    );
+  }
+  const discarded = await draftActor("discarded");
+  const old = await saveApplicationDraft(
+    env.DB,
+    discarded,
+    draftInput(discarded),
+  );
+  const discardId = crypto.randomUUID();
+  await discardApplicationDraft(env.DB, discarded, {
+    userId: discarded.id,
+    generation: null,
+    discardId,
+  });
+  await assert.rejects(
+    saveApplicationDraft(env.DB, discarded, {
+      ...draftInput(discarded, old.revision),
+      baseline: old.answers,
+    }),
+    statusError(409),
+  );
+  await assert.rejects(
+    saveProfile(env.DB, discarded.id, input, {
+      actor: discarded,
+      intent: "submit",
+      draft: { revision: old.revision, generation: null },
+    }),
+    statusError(409),
+  );
+  assert.deepEqual(await loadApplicationDraftState(env.DB, discarded.id), {
+    draft: null,
+    generation: discardId,
+  });
+  await env.DB.prepare("DELETE FROM session WHERE id=?")
+    .bind(discarded.sessionId)
+    .run();
+  await assert.rejects(
+    saveProfile(env.DB, discarded.id, input, {
+      actor: discarded,
+      intent: "submit",
+      draft: { revision: null, generation: discardId },
+    }),
+    statusError(401),
+  );
+  assert.equal(await hasApplied(env.DB, discarded.id), false);
+});
+
+test("durable first-submission intent failures roll back answers and side effects", async () => {
+  const actor = await draftActor();
+  await assert.rejects(
+    saveProfile(
+      env.DB,
+      actor.id,
+      { ...completeAnswers(), codeOfConductAccepted: true },
+      {
+        actor,
+        intent: "submit",
+        firstSubmissionStatements: () => [
+          env.DB.prepare("INSERT INTO table_that_does_not_exist VALUES (1)"),
+        ],
+      },
+    ),
+  );
+  assert.equal(await hasApplied(env.DB, actor.id), false);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
+    0,
+  );
+});
+
 test("first completed orientation uses the earliest attended event, not when attendance was recorded", async () => {
   const actor = await draftActor();
   const other = await draftActor("other-volunteer");
@@ -536,15 +867,20 @@ test("submission atomically removes drafts; failed submissions retain them and l
   await env.DB.prepare("UPDATE user SET email=? WHERE id=?")
     .bind("changed@example.org", actor.id)
     .run();
-  await saveProfile(env.DB, actor.id, {
-    ...answers,
-    preferredName: "Changed nickname",
-    phone: "604-555-0199",
-    emergencyName: "Changed contact",
-    medicalConditions: "Changed safety answer",
-    teams: ["outreach", "non-patrol"],
-    training: ["naloxone-administration"],
-  });
+  await saveProfile(
+    env.DB,
+    actor.id,
+    {
+      ...answers,
+      preferredName: "Changed nickname",
+      phone: "604-555-0199",
+      emergencyName: "Changed contact",
+      medicalConditions: "Changed safety answer",
+      teams: ["outreach", "non-patrol"],
+      training: ["naloxone-administration"],
+    },
+    { baseline: answers },
+  );
   assert.equal((await loadProfile(env.DB, actor.id))?.phone, "604-555-0199");
   assert.deepEqual(
     await loadSubmittedApplication(env.DB, actor.id),

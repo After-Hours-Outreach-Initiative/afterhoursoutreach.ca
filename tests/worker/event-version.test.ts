@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
+import { profileWriteBody } from "../helpers/profile-write";
 import { sampleAnswers } from "../helpers/local-account";
 
 test("built Worker returns scoped versions for signups, cancellations and revoked sessions", async () => {
@@ -20,12 +21,22 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     const worker = server.getWorker<Env>();
     await worker.applyD1Migrations("DB");
     const { DB } = await worker.getEnv();
-    const send = (path: string, body?: object, cookie = "") =>
-      worker.fetch(`${origin}${path}`, {
+    const send = async (
+      path: string,
+      body?: object,
+      cookie = "",
+    ): ReturnType<typeof worker.fetch> => {
+      if (path === "/api/v1/account/profile" && body)
+        body = await profileWriteBody(
+          (path) => send(path, undefined, cookie),
+          body,
+        );
+      return worker.fetch(`${origin}${path}`, {
         method: body ? "POST" : "GET",
         headers: { origin, "content-type": "application/json", cookie },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
+    };
     const person = async (email: string) => {
       const proof = await createSignInOTP(DB, secret, email);
       const signedIn = await send("/api/v1/auth/sign-in/email-otp", proof);

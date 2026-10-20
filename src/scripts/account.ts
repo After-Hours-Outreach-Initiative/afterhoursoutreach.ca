@@ -5,6 +5,7 @@ import { actionFragment, loadActionPage } from "./action-page";
 import {
   applicationDisplayName,
   profileIdentityFields,
+  type ApplicationAnswers,
 } from "../data/application";
 import { accountGreeting } from "../data/account-navigation";
 import {
@@ -50,15 +51,28 @@ async function post(path: string, body: object) {
     credentials: "same-origin",
     body: JSON.stringify(body),
   });
-  const result: { message?: string; next?: string } = await response.json();
+  const result: {
+    message?: string;
+    next?: string;
+    answers?: ApplicationAnswers;
+    latest?: ApplicationAnswers;
+    draftChanged?: boolean;
+    alreadySubmitted?: boolean;
+  } = await response.json();
   if (!response.ok)
-    throw new Error(result.message || "The request failed. Please try again.");
+    throw Object.assign(
+      new Error(result.message || "The request failed. Please try again."),
+      result,
+    );
   return result;
 }
 
 function form(
   selector: string,
-  submit: (element: HTMLFormElement, values: FormData) => Promise<void>,
+  submit: (
+    element: HTMLFormElement,
+    values: FormData,
+  ) => Promise<void | ApplicationAnswers>,
 ) {
   const initialized = new WeakMap<
     HTMLFormElement,
@@ -130,9 +144,10 @@ function form(
       }
     }
     try {
-      await submit(element, values);
-      changes?.markSaved(values);
+      const answers = await submit(element, values);
+      changes?.markSaved(values, answers ?? undefined);
     } catch (error) {
+      changes?.conflicted(error);
       message(element, accountErrorMessage(error));
     } finally {
       delete element.dataset.submitting;
@@ -188,7 +203,10 @@ form("[data-account-profile]", async (element, values) => {
   const draft = applicationDrafts.get(element);
   let result: Awaited<ReturnType<typeof post>>;
   try {
-    await draft?.beforeSubmit();
+    const draftState = await draft?.beforeSubmit();
+    // Reconciliation may have merged remote answers while awaiting autosave.
+    // Never submit the snapshot captured before that wait.
+    if (draft) values = applicationSubmissionValues(element);
     const body = Object.fromEntries(
       [...values].filter(
         ([key]) =>
@@ -201,12 +219,16 @@ form("[data-account-profile]", async (element, values) => {
             !profileIdentityFields.some((field) => field === key)),
       ),
     );
-    result = await post("/api/v1/account/profile", {
+    const payload = {
       ...body,
       teams: values.getAll("teams"),
       certifications: values.getAll("certifications"),
       training: values.getAll("training"),
       applicationUserId: element.dataset.profileUserId,
+      intent: draft ? "submit" : "edit",
+      ...(draft
+        ? { draft: draftState }
+        : { baseline: JSON.parse(element.dataset.profileBaseline ?? "null") }),
       ...(element.hasAttribute("data-application") && {
         heardAboutUsSources: values.getAll("heardAboutUsSources"),
         heardAboutUsOther: values
@@ -216,10 +238,29 @@ form("[data-account-profile]", async (element, values) => {
           : "",
         codeOfConductAccepted: values.get("codeOfConductAccepted") === "true",
       }),
-    });
+    };
+    // Submitted answers become immutable. Freeze application controls only for
+    // the final request so typing cannot be discarded by its success redirect.
+    // Profile editors remain editable and rebase newer input on acknowledgement.
+    const frozen = draft
+      ? [...element.querySelectorAll<HTMLFieldSetElement>("fieldset")].map(
+          (field) => ({ field, disabled: field.disabled }),
+        )
+      : [];
+    for (const { field } of frozen) field.disabled = true;
+    try {
+      result = await post("/api/v1/account/profile", payload);
+    } finally {
+      if (!draft?.isStopped())
+        for (const { field, disabled } of frozen) field.disabled = disabled;
+    }
+    if (draft && result.alreadySubmitted)
+      throw new Error(draft.submissionFound());
     draft?.submitted();
   } catch (error) {
     draft?.resume();
+    if ((error as { draftChanged?: boolean })?.draftChanged)
+      await draft?.refresh();
     throw error;
   }
   // Saved legal names are display metadata, not editable profile controls.
@@ -233,7 +274,9 @@ form("[data-account-profile]", async (element, values) => {
     lastName: String(
       values.get("lastName") ?? element.dataset.profileLastName ?? "",
     ),
-    preferredName: String(values.get("preferredName") ?? ""),
+    preferredName:
+      result.answers?.preferredName ??
+      String(values.get("preferredName") ?? ""),
   };
   for (const menuName of document.querySelectorAll<HTMLElement>(
     "[data-account-menu-name]",
@@ -256,6 +299,7 @@ form("[data-account-profile]", async (element, values) => {
     message(element, result.message || "Profile saved.", "success");
     location.assign(result.next ?? "/volunteer/account");
   }
+  return result.answers;
 });
 
 function closeEmailEditor(settings: HTMLElement) {

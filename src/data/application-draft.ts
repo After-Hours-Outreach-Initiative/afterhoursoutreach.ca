@@ -62,6 +62,7 @@ export const applicationDraftWriteSchema = z.strictObject({
   revision: z.uuid().nullable(),
   generation: z.uuid().nullable().default(null),
   answers: applicationDraftAnswersSchema,
+  baseline: applicationDraftAnswersSchema.optional(),
 });
 
 export const localApplicationDraftSchema = z.strictObject({

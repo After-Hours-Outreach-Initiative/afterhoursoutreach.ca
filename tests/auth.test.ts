@@ -29,7 +29,7 @@ import {
 import {
   loadProfile,
   profileSchema,
-  saveProfile,
+  saveProfile as writeProfile,
 } from "../src/server/db/profiles";
 import {
   readJson,
@@ -42,6 +42,18 @@ let bindings: AuthBindings;
 let outbox: SignInEmail[];
 let auth: ReturnType<typeof createAuth>;
 const origin = "https://afterhoursoutreach.ca";
+
+// These sequential validation/auth cases edit the profile just loaded. Explicit
+// stale-baseline and first-submission races are exercised in d1.test.ts.
+async function saveProfile(binding: Env["DB"], userId: string, input: unknown) {
+  const baseline = await loadProfile(binding, userId);
+  return writeProfile(
+    binding,
+    userId,
+    input,
+    baseline ? { intent: "edit", baseline } : { intent: "submit" },
+  );
+}
 
 beforeEach(async () => {
   bindings = {

@@ -469,12 +469,16 @@ for (const keepLocal of [true, false]) {
       localApplicationSaveIndicator(page).locator("svg"),
     ).toBeHidden();
     await page.unroute(`**${endpoint}`);
-    await page
-      .getByRole("button", {
-        name: keepLocal ? "Keep these answers" : "Use account answers",
-        exact: true,
-      })
-      .click();
+    // Legal name and date of birth are separate conflicts, not a whole-form
+    // overwrite choice. Resolve each explicitly.
+    for (let choice = 0; choice < 2; choice++)
+      await page
+        .getByRole("button", {
+          name: keepLocal ? "Keep my answers" : "Use account answers",
+          exact: true,
+        })
+        .first()
+        .click();
     await expect(page.locator("[data-draft-conflict]")).toBeHidden();
     await expect(page.locator('[name="firstName"]')).toHaveValue(
       keepLocal ? "Local changes" : "Other device",
