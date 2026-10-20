@@ -44,6 +44,11 @@ const otherTrainingField = applicationFields.find(
     {
       trainingOptions.map((option, index) => (
         <>
+          {option.value === "none" && (
+            <div class="volunteer-training-divider" aria-hidden="true">
+              or
+            </div>
+          )}
           <label class="volunteer-check">
             <input
               type="checkbox"

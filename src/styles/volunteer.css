@@ -867,6 +867,20 @@ body:has([data-application], [data-account-contents-flow]) {
   min-height: 44px;
   cursor: pointer;
 }
+.volunteer-training-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #a1a1aa;
+  font-size: 14px;
+  font-weight: normal;
+}
+.volunteer-training-divider::before,
+.volunteer-training-divider::after {
+  content: "";
+  flex: 1;
+  border-top: var(--volunteer-border);
+}
 /* Keep the entire follow-up field in the option's text column. */
 .volunteer-certification-options > [data-other-training],
 .volunteer-training-options > [data-other-relevant-training],

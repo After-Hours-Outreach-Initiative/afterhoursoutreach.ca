@@ -1553,6 +1553,9 @@ test("all teams can select multiple relevant training answers and add Other deta
     exact: true,
   });
   const details = training.locator("[data-other-relevant-training]");
+  const divider = training.locator(
+    '[data-other-relevant-training] + .volunteer-training-divider:has(+ label > input[value="none"])',
+  );
   const otherText = details.locator('[name="otherTraining"]');
   const other = training.getByRole("checkbox", { name: "Other", exact: true });
   const naloxone = training.getByRole("checkbox", {
@@ -1582,8 +1585,10 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(
     training.locator(".volunteer-training-options > label"),
   ).toHaveText(trainingOptions.map((option) => option.label));
+  await expect(divider).toHaveText("or");
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
+    await expect(divider).toBeVisible();
     expect(
       await training
         .locator(".volunteer-training-options")
@@ -1644,6 +1649,10 @@ test("all teams can select multiple relevant training answers and add Other deta
   await reviewLocalApplication(page);
   await expect(naloxone).toBeFocused();
   await expect(training.locator("[data-error=training]")).toBeVisible();
+  await expectChoiceErrorRail(
+    training.locator(".volunteer-training-options"),
+    true,
+  );
   expect(requests).toHaveLength(0);
   await none.check();
   await reviewLocalApplication(page);
@@ -1701,6 +1710,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(crisis).toBeChecked();
   await expect(other).toBeChecked();
   await expect(otherText).toHaveValue("Crisis intervention course");
+  await expect(divider).toBeVisible();
   const save = form
     .locator('[data-profile-fields="training-and-safety"]')
     .getByRole("button", { name: "Save", exact: true, includeHidden: true })
