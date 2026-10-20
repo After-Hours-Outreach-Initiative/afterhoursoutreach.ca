@@ -2,6 +2,11 @@ import { vancouverInstant } from "../data/event-time";
 import { actionFragment, loadActionPage } from "./action-page";
 import { chooseNotification } from "./notification-choice";
 import { initDateInputs, readDateInputs } from "./date-input";
+import {
+  showActionEmailFeedback,
+  simulateActionEmail,
+  type EmailActionResult,
+} from "./action-email-feedback";
 
 function initEventDates(root: Document | HTMLElement) {
   initDateInputs(root);
@@ -58,14 +63,6 @@ document
       applyFilter(new URL(location.href).searchParams.get("type") ?? "all"),
     );
   });
-
-function syncNotifications(page: Document) {
-  const target = document.querySelector<HTMLElement>(
-    "[data-event-notifications]",
-  );
-  if (target)
-    target.replaceWith(actionFragment(page, "[data-event-notifications]"));
-}
 
 function syncEvents(page: Document, element?: HTMLFormElement) {
   const root = document.querySelector<HTMLElement>("[data-event-browser]");
@@ -213,18 +210,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
 async function refreshEvents(element: HTMLFormElement) {
   const page = await loadActionPage();
   syncEvents(page, element);
-  syncNotifications(page);
-}
-
-async function refreshNotifications(element: HTMLFormElement) {
-  const restoreFocus =
-    element.contains(document.activeElement) ||
-    document.activeElement === document.body;
-  syncNotifications(await loadActionPage());
-  if (restoreFocus)
-    document
-      .querySelector<HTMLElement>("[data-retry-notifications] button")
-      ?.focus({ preventScroll: true });
 }
 
 async function refreshVolunteer(element: HTMLFormElement) {
@@ -268,14 +253,9 @@ async function refreshVolunteer(element: HTMLFormElement) {
         ...actionFragment(host, "[data-volunteer-results]").childNodes,
       );
     syncEvents(host);
-    syncNotifications(host);
   }
 }
 
-interface Result {
-  message?: string;
-  localNotifications?: { to: string; subject: string; body: string }[];
-}
 let pendingRefresh = Promise.resolve();
 
 const eventBrowser = document.querySelector<HTMLElement>(
@@ -402,6 +382,16 @@ function form(
     for (const control of controls) control.disabled = true;
     const loading = element.querySelector<HTMLElement>("[data-action-loading]");
     const label = button?.textContent;
+    const loadingLabel = loading?.textContent;
+    const resultTitle = element.matches("[data-event-save]")
+      ? "Event saved"
+      : element.matches("[data-event-cancel]")
+        ? "Event cancelled"
+        : element.matches("[data-manage-signup]")
+          ? "Registration changed"
+          : element.matches("[data-organizer-role]")
+            ? "Account role saved"
+            : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -419,10 +409,18 @@ function form(
         notify = choice;
       }
       element.setAttribute("aria-busy", "true");
-      if (loading) loading.hidden = false;
-      if (button?.dataset.loadingLabel) {
-        button.textContent = button.dataset.loadingLabel;
+      if (loading) {
+        loading.hidden = false;
+        if (notify) loading.textContent = "Sending…";
+      }
+      if (button && (notify || button.dataset.loadingLabel)) {
+        button.textContent = notify ? "Sending…" : button.dataset.loadingLabel!;
         button.setAttribute("aria-busy", "true");
+      }
+      if (notify && message) {
+        message.hidden = false;
+        message.setAttribute("role", "status");
+        message.textContent = "Sending…";
       }
       const response = await fetch(endpoint, {
         method: "POST",
@@ -433,20 +431,31 @@ function form(
           ...(notify === undefined ? {} : { notify }),
         }),
       });
-      const result: Result = await response.json();
+      const result: EmailActionResult = await response.json();
       if (!response.ok)
         throw new Error(result.message || "The change could not be saved.");
       saved = true;
-      if (import.meta.env.DEV && result.localNotifications?.length) {
-        const { chooseEmailOutcome } =
-          await import("../dev/scripts/local-email-dialog");
-        await chooseEmailOutcome(result.localNotifications, true);
+      await simulateActionEmail(result);
+      if (notify && message) {
+        message.textContent = result.message ?? "Change saved.";
+        message.setAttribute(
+          "role",
+          result.retryOperation || result.expired ? "alert" : "status",
+        );
       }
       // Writes may run concurrently, but each refresh must fetch and apply after
       // the previous one. Otherwise a slower, older response can undo newer UI.
       const refresh = pendingRefresh.then(() => complete(element));
       pendingRefresh = refresh.catch(() => {});
-      await refresh;
+      let refreshFailed = false;
+      try {
+        await refresh;
+      } catch {
+        refreshFailed = true;
+        result.message = `${result.message ?? "Change saved."} The view could not be refreshed; reload to see the saved change.`;
+      }
+      if (notify || refreshFailed)
+        showActionEmailFeedback(resultTitle, endpoint, result);
     } catch (error) {
       // Failed automatic toggles must not look like committed settings.
       if (!saved && element.hasAttribute("data-submit-on-change"))
@@ -454,20 +463,27 @@ function form(
       if (message) {
         message.setAttribute("role", "alert");
         message.dataset.messageKind = "error";
-        message.textContent =
-          error instanceof Error
-            ? error.message
-            : "The change could not be saved.";
+        message.textContent = saved
+          ? "The change is saved, but its feedback could not be displayed. Reload to see the saved change."
+          : error instanceof TypeError
+            ? "The action could not be confirmed. Reload before making further changes."
+            : error instanceof Error
+              ? error.message
+              : "The action could not be confirmed. Reload before making further changes.";
         message.hidden = false;
       }
     } finally {
       for (const control of controls) control.disabled = false;
       if (button) {
         button.removeAttribute("aria-busy");
-        if (button.dataset.loadingLabel) button.textContent = label ?? "";
+        if (button.dataset.loadingLabel || button.textContent === "Sending…")
+          button.textContent = label ?? "";
       }
       element.removeAttribute("aria-busy");
-      if (loading) loading.hidden = true;
+      if (loading) {
+        loading.hidden = true;
+        loading.textContent = loadingLabel ?? "";
+      }
       delete element.dataset.submitting;
       delete scope.dataset.submitting;
       if (!saved && deferredEventRefresh && !element.closest("dialog[open]"))
@@ -516,14 +532,6 @@ form("[data-manage-signup]", "/api/v1/events/action", (v) => ({
   ...(v.get("destination") ? { destination: str(v, "destination") } : {}),
   reason: str(v, "reason"),
 }));
-form(
-  "[data-retry-notifications]",
-  "/api/v1/events/action",
-  () => ({
-    action: "retry-notifications",
-  }),
-  refreshNotifications,
-);
 form(
   "[data-organizer-status]",
   "/api/v1/organizer/action",
@@ -763,6 +771,11 @@ document.addEventListener("click", (event) => {
   if (
     !(dialog instanceof HTMLDialogElement) ||
     !dialog.matches(".volunteer-dialog")
+  )
+    return;
+  if (
+    dialog.hasAttribute("data-action-email-feedback") &&
+    dialog.getAttribute("aria-busy") === "true"
   )
     return;
   const bounds = dialog.getBoundingClientRect();

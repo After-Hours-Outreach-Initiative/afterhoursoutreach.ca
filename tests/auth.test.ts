@@ -215,7 +215,7 @@ test("event delivery retries use stable idempotency keys and atomic leases witho
     return new Response("PRIVATE PROVIDER BODY", { status: 503 });
   };
   const failure = await deliverNotifications(bindings, operation, rejected);
-  assert.equal(failure.failed, 1);
+  assert.equal(failure.unconfirmed, 1);
   assert.equal(failure.pending, 1);
   assert.doesNotMatch(
     JSON.stringify(failure),
@@ -227,9 +227,9 @@ test("event delivery retries use stable idempotency keys and atomic leases witho
     keys.push(new Headers(init?.headers).get("Idempotency-Key")!);
     payloads.push(String(init?.body));
     const payload = JSON.parse(String(init?.body));
-    assert.equal(payload.subject, "Sample subject");
-    assert.doesNotMatch(payload.text, /public branch preview/);
-    return new Response("{}", { status: 200 });
+    assert.equal(payload[0].subject, "Sample subject");
+    assert.doesNotMatch(payload[0].text, /public branch preview/);
+    return Response.json({ data: [{ id: "accepted" }] });
   };
   await Promise.all([
     deliverNotifications(
@@ -305,6 +305,8 @@ test("notifications share the sign-in sending budget and old pending mail is not
   assert.equal(expired.pending, 0);
   assert.equal(expired.expired, 1);
   assert.deepEqual(await countNotifications(bindings.DB, operation), {
+    sent: 0,
+    simulated: 0,
     pending: 0,
     expired: 1,
   });

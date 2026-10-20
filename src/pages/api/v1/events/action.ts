@@ -12,10 +12,7 @@ import {
   manageSignup,
   eventSchema,
 } from "@/server/db/events";
-import {
-  deliverNotifications,
-  notificationNotice,
-} from "@/server/events/notifications";
+import { actionEmailResult } from "@/server/events/notifications";
 
 const id = z.string().min(1).max(200);
 const reason = z.string().trim().max(1000).default("");
@@ -42,7 +39,10 @@ const inputSchema = z.discriminatedUnion("action", [
     reason,
     notify: z.boolean().default(false),
   }),
-  z.strictObject({ action: z.literal("retry-notifications") }),
+  z.strictObject({
+    action: z.literal("retry-notifications"),
+    operation: z.uuid(),
+  }),
 ]);
 export const prerender = false;
 export const POST: APIRoute = async ({ request }) => {
@@ -102,26 +102,29 @@ export const POST: APIRoute = async ({ request }) => {
         break;
       case "retry-notifications":
         requireOrganizer(actor);
-        result = { message: "Notification retry complete." };
+        if (
+          !(await env.DB.prepare("SELECT id FROM event_audit WHERE id=?")
+            .bind(input.operation)
+            .first())
+        )
+          throw new RequestError(404, "Email action not found.");
+        result = {
+          operation: input.operation,
+          message:
+            "Email retry complete. The event/registration change was not repeated.",
+        };
         break;
     }
     // Never send (or create retryable mail) without explicit organizer consent.
-    let delivery = { failed: 0, sent: 0, pending: 0, expired: 0 };
-    if (
+    const delivery = await actionEmailResult(
+      bindings,
+      result,
       input.action === "retry-notifications" ||
-      ("notify" in input && input.notify)
-    ) {
-      // A delivery failure must never undo a committed event/signup change.
-      try {
-        delivery = await deliverNotifications(bindings, result.operation);
-      } catch {
-        delivery = { failed: 1, sent: 0, pending: 1, expired: 0 };
-      }
-    }
+        ("notify" in input && input.notify),
+    );
     const response = Response.json(
       {
         ...delivery,
-        message: result.message + notificationNotice(delivery),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

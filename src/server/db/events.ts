@@ -160,9 +160,9 @@ function notifyRoster(
 ) {
   return db
     .prepare(
-      `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
-        SELECT lower(hex(randomblob(16))), ?, s.user_id, ?, ?, ?
-        FROM signup s
+      `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+        SELECT lower(hex(randomblob(16))), ?, s.user_id, ?, ?, ?, u.email
+        FROM signup s JOIN user u ON u.id=s.user_id AND u.email_verified=1
         WHERE s.event_id = ?
           AND s.status = 'confirmed'
           AND EXISTS (SELECT 1 FROM event_audit WHERE id = ?)
@@ -529,9 +529,9 @@ export async function manageSignup(
     statements.push(
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
-          SELECT ?, ?, ?, ?, ?, ?
-          WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?) AND ? = 1`,
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+          SELECT ?, ?, ?, ?, ?, ?, email FROM user
+          WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?) AND ? = 1`,
         )
         .bind(
           crypto.randomUUID(),
@@ -542,6 +542,7 @@ export async function manageSignup(
             : "Your After Hours Outreach event registration was removed",
           `${eventDescription(old)}\n\n${next ? `An organizer moved your registration to:\n${eventDescription(next)}` : "An organizer removed your registration."}${reason ? `\nReason: ${reason}` : ""}`,
           now,
+          row.userId,
           operation,
           Number(notify),
         ),

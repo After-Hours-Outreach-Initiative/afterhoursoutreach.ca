@@ -1184,7 +1184,7 @@ describe(
                   exact: true,
                 })
                 .waitFor(),
-            loadingLabel: "Saving…",
+            loadingLabel: "Sending…",
             pending: async () => {
               await expect(
                 profileDialog.getByLabel("Active volunteer", { exact: true }),
@@ -1194,6 +1194,23 @@ describe(
               ).toBeDisabled();
             },
           });
+          const accessEmailResult = page.getByRole("dialog", {
+            name: "Volunteer access saved",
+            exact: true,
+          });
+          await expect(accessEmailResult).toContainText(
+            "Volunteer access saved.",
+          );
+          await expect(accessEmailResult).toContainText("could not be sent");
+          await expect(
+            accessEmailResult.getByRole("button", {
+              name: "Retry email only",
+              exact: true,
+            }),
+          ).toBeVisible();
+          await accessEmailResult
+            .getByRole("button", { name: "Close", exact: true })
+            .click();
           await expect(profileDialog).toBeVisible();
           assert.equal(
             await profileDialog.evaluate((popup) => popup.scrollTop),
@@ -1436,7 +1453,7 @@ describe(
                 expect(createdCard.locator(".volunteer-spots")).toHaveText(
                   `${spots} spots left`,
                 ),
-              loadingLabel: "Saving…",
+              loadingLabel: spots === 9 ? "Sending…" : "Saving…",
               pending: async () => {
                 for (const radio of await visibility.getByRole("radio").all())
                   await expect(radio).toBeDisabled();
@@ -1448,6 +1465,24 @@ describe(
                 ).toBeDisabled();
               },
             });
+            if (spots === 9) {
+              const eventEmailResult = page.getByRole("dialog", {
+                name: "Event saved",
+                exact: true,
+              });
+              await expect(eventEmailResult).toContainText(
+                "No emails were needed for this change.",
+              );
+              await expect(
+                eventEmailResult.getByRole("button", {
+                  name: "Retry email only",
+                  exact: true,
+                }),
+              ).toBeHidden();
+              await eventEmailResult
+                .getByRole("button", { name: "Close", exact: true })
+                .click();
+            }
             assert.deepEqual(
               await DB.prepare("SELECT open, hidden FROM event WHERE id=?")
                 .bind(await createdCard.getAttribute("data-live-event"))
@@ -1626,8 +1661,53 @@ describe(
                 "Volunteers (1)",
               );
             },
-            loadingLabel: "Saving…",
+            loadingLabel: "Sending…",
           });
+          const registrationEmailResult = page.getByRole("dialog", {
+            name: "Registration changed",
+            exact: true,
+          });
+          await expect(registrationEmailResult).toContainText(
+            "Registration moved.",
+          );
+          await expect(registrationEmailResult).toContainText(
+            "could not be sent",
+          );
+          const retryEmail = registrationEmailResult.getByRole("button", {
+            name: "Retry email only",
+            exact: true,
+          });
+          const retryRequest = page.waitForRequest(
+            (request) =>
+              request.url().endsWith("/api/v1/events/action") &&
+              request.postDataJSON().action === "retry-notifications",
+          );
+          await retryEmail.click();
+          const emailOperation = (await retryRequest).postDataJSON().operation;
+          assert.ok(emailOperation);
+          await expect(registrationEmailResult).toContainText(
+            "change was not repeated",
+          );
+          await expect(retryEmail).toBeEnabled();
+          // Expired records remain stored, but this action can no longer resend
+          // them outside the provider's idempotency window.
+          const expiredAt = Date.now() - 24 * 60 * 60 * 1000;
+          await DB.batch([
+            DB.prepare(
+              "UPDATE event_notification SET created_at=? WHERE operation_id=?",
+            ).bind(expiredAt, emailOperation),
+            DB.prepare(
+              "UPDATE event_notification_batch SET created_at=? WHERE operation_id=?",
+            ).bind(expiredAt, emailOperation),
+          ]);
+          await retryEmail.click();
+          await expect(registrationEmailResult).toContainText(
+            "no longer safe to retry",
+          );
+          await expect(retryEmail).toBeHidden();
+          await registrationEmailResult
+            .getByRole("button", { name: "Close", exact: true })
+            .click();
           await expect(card.locator(".volunteer-roster")).toHaveAttribute(
             "open",
             "",
@@ -1786,40 +1866,11 @@ describe(
             loadingLabel: "Cancelling…",
           });
           await expect(cancelEditor).toBeHidden();
-          // Retry only refreshes delivery status, with fresh server counts.
-          await DB.prepare(
-            "UPDATE event_notification SET created_at=? WHERE status IN ('pending','sending')",
-          )
-            .bind(Date.now() - 24 * 60 * 60 * 1000)
-            .run();
-          for (let attempt = 0; attempt < 2; attempt++) {
-            const retryForm = page.locator("[data-retry-notifications]");
-            await inPlaceAction(page, {
-              endpoint: "/api/v1/events/action",
-              form: retryForm,
-              trigger: () =>
-                retryForm
-                  .getByRole("button", {
-                    name: "Retry pending notifications",
-                    exact: true,
-                  })
-                  .click(),
-              updated: () =>
-                expect(
-                  retryForm.getByRole("button", {
-                    name: "Retry pending notifications",
-                    exact: true,
-                  }),
-                ).toBeEnabled(),
-              loadingLabel: "Retrying…",
-            });
-            await expect(
-              page.locator("[data-event-notifications]"),
-            ).toContainText("0 notifications awaiting delivery.");
-            await expect(
-              page.locator("[data-event-notifications]"),
-            ).toContainText("notifications expired and cannot be retried.");
-          }
+          await expect(
+            page.locator(
+              "[data-event-notifications], [data-retry-notifications]",
+            ),
+          ).toHaveCount(0);
           assert.deepEqual(errors, []);
         } finally {
           await browser.close();

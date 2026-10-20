@@ -246,12 +246,13 @@ export async function setVolunteerStatus(
       // Only queue opted-in mail, before cancellation loses the original roster.
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
           SELECT lower(hex(randomblob(16))), ?, s.user_id,
             'Your After Hours Outreach event registration was cancelled',
-            'Your registration for ' || e.type || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.', ?
+            'Your registration for ' || e.type || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.', ?, u.email
           FROM signup s
           JOIN event e ON e.id = s.event_id
+          JOIN user u ON u.id=s.user_id AND u.email_verified=1
           WHERE s.user_id = ?
             AND s.status = 'confirmed'
             AND e.starts_at > ?
@@ -293,9 +294,9 @@ export async function setVolunteerStatus(
         ),
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
-          SELECT ?, ?, ?, 'Your After Hours Outreach volunteer access changed', ?, ?
-          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+          SELECT ?, ?, ?, 'Your After Hours Outreach volunteer access changed', ?, ?, email FROM user
+          WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
           crypto.randomUUID(),
@@ -303,6 +304,7 @@ export async function setVolunteerStatus(
           userId,
           `Volunteer account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting organizer approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. Sign in to view your events. Orientation attendance does not automatically grant patrol approval.`,
           now,
+          userId,
           operation,
           Number(notify),
         ),
@@ -391,9 +393,9 @@ export async function setRole(
         .bind(userId, operation),
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at)
-          SELECT ?, ?, ?, 'Your After Hours Outreach account role changed', ?, ?
-          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+          SELECT ?, ?, ?, 'Your After Hours Outreach account role changed', ?, ?, email FROM user
+          WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
           crypto.randomUUID(),
@@ -401,6 +403,7 @@ export async function setRole(
           userId,
           `Your role is now ${role}. Sign in again to continue.`,
           now,
+          userId,
           operation,
           Number(notify),
         ),

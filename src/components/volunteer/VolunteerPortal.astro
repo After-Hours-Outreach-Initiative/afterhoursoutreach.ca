@@ -8,12 +8,10 @@ import {
 import { forwardCookies } from "@/server/auth";
 import { listEvents, listRosters } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
-import { countNotifications } from "@/server/db/notifications";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
 import EventCard from "./EventCard.astro";
 import EventEditor from "./EventEditor.astro";
-import EventNotifications from "./EventNotifications.astro";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
@@ -43,7 +41,6 @@ const rosters =
       )
     : [];
 const eventVersion = await eventViewVersion(events, actor, rosters);
-const notifications = organizer ? await countNotifications(env.DB) : null;
 const destinations = events.filter(
   (event) =>
     event.startsAt > Date.now() &&
@@ -254,11 +251,10 @@ const filter = ["patrol", "orientation"].includes(
       )
     }
     {
-      organizer && notifications && (
+      organizer && (
         <>
           <EventEditor />
           <VolunteerProfileDialog />
-          <EventNotifications counts={notifications} />
         </>
       )
     }

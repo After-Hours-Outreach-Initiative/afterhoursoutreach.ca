@@ -1,4 +1,4 @@
-// Stay inside the provider's idempotency lifetime before retrying delivery.
+// Stay inside Resend's 24-hour idempotency lifetime, including after a timeout.
 export const notificationRetryHours = 23;
 const retryWindowMs = notificationRetryHours * 60 * 60 * 1000;
 const leaseMs = 60 * 1000;
@@ -8,6 +8,12 @@ export interface EventEmail {
   to: string;
   subject: string;
   body: string;
+  created_at: number;
+}
+export interface NotificationBatch {
+  id: string;
+  payload: string;
+  budget_window: number | null;
 }
 
 export function queueNotification(
@@ -19,78 +25,168 @@ export function queueNotification(
 ) {
   return db
     .prepare(
-      "INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+    SELECT ?, ?, id, ?, ?, ?, email FROM user WHERE id=? AND email_verified=1`,
     )
-    .bind(crypto.randomUUID(), operation, userId, subject, body, Date.now());
+    .bind(crypto.randomUUID(), operation, subject, body, Date.now(), userId);
 }
 
-// Keep expired outbox records, but never describe them as retryable pending mail.
-export async function countNotifications(db: Env["DB"], operation?: string) {
+export async function countNotifications(db: Env["DB"], operation: string) {
   const cutoff = Date.now() - retryWindowMs;
   const counts = await db
     .prepare(
       `SELECT
-        count(CASE WHEN created_at > ? THEN 1 END) AS pending,
-        count(CASE WHEN created_at <= ? THEN 1 END) AS expired
-      FROM event_notification
-      WHERE status IN ('pending', 'sending')
-        ${operation ? "AND operation_id = ?" : ""}`,
+    count(CASE WHEN n.status IN ('sent','local') THEN 1 END) AS sent,
+    count(CASE WHEN n.status = 'local' THEN 1 END) AS simulated,
+    count(CASE WHEN n.status IN ('pending','sending') AND coalesce(b.created_at,n.created_at) > ? AND delivery_to IS NOT NULL THEN 1 END) AS pending,
+    count(CASE WHEN n.status IN ('pending','sending') AND (coalesce(b.created_at,n.created_at) <= ? OR delivery_to IS NULL) THEN 1 END) AS expired
+    FROM event_notification n LEFT JOIN event_notification_batch b ON b.id=n.batch_id WHERE n.operation_id=?`,
     )
-    .bind(cutoff, cutoff, ...(operation ? [operation] : []))
-    .first<{ pending: number; expired: number }>();
-  return counts ?? { pending: 0, expired: 0 };
+    .bind(cutoff, cutoff, operation)
+    .first<{
+      sent: number;
+      simulated: number;
+      pending: number;
+      expired: number;
+    }>();
+  return counts ?? { sent: 0, simulated: 0, pending: 0, expired: 0 };
 }
 
-export async function pendingNotifications(
-  db: Env["DB"],
-  limit: number,
-  operation?: string,
-) {
-  const now = Date.now();
+export async function pendingNotifications(db: Env["DB"], operation: string) {
   const rows = await db
     .prepare(
-      `SELECT n.id, u.email AS "to", n.subject, n.body FROM event_notification n
-      JOIN user u ON u.id = n.user_id WHERE u.email_verified = 1
-      AND (n.status = 'pending' OR (n.status = 'sending' AND n.lease_until < ?))
-      AND n.created_at > ? ${operation ? "AND n.operation_id = ?" : ""} ORDER BY n.created_at LIMIT ?`,
+      `SELECT id, delivery_to AS "to", subject, body, created_at FROM event_notification
+    WHERE operation_id=? AND batch_id IS NULL AND delivery_to IS NOT NULL
+    AND status='pending' AND created_at > ? ORDER BY created_at, id LIMIT 100`,
     )
-    .bind(now, now - retryWindowMs, ...(operation ? [operation] : []), limit)
+    .bind(operation, Date.now() - retryWindowMs)
     .all<EventEmail>();
   return rows.results;
 }
 
-/** Claim atomically and freeze the origin so concurrent retries use one payload. */
-export function claimNotification(db: Env["DB"], id: string, origin: string) {
+/** Transactional membership prevents two concurrent requests grouping the same mail. */
+export async function createNotificationBatch(
+  db: Env["DB"],
+  operation: string,
+  emails: EventEmail[],
+  origin: string,
+) {
+  const id = crypto.randomUUID();
+  const ids = JSON.stringify(emails.map((email) => email.id));
+  const payload = JSON.stringify(
+    emails.map((email) => ({
+      from: "After Hours Outreach <noreply@afterhoursoutreach.ca>",
+      to: [email.to],
+      subject: email.subject,
+      text: `${email.body}\n\nEvents: ${origin}/volunteer`,
+    })),
+  );
+  const results = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO event_notification_batch (id, operation_id, payload, created_at)
+      SELECT ?, ?, ?, ? WHERE (SELECT count(*) FROM event_notification
+        WHERE id IN (SELECT value FROM json_each(?)) AND batch_id IS NULL AND operation_id=?) = ?`,
+      )
+      .bind(
+        id,
+        operation,
+        payload,
+        Math.min(...emails.map((email) => email.created_at)),
+        ids,
+        operation,
+        emails.length,
+      ),
+    db
+      .prepare(
+        `UPDATE event_notification SET batch_id=?, delivery_origin=?
+      WHERE id IN (SELECT value FROM json_each(?)) AND EXISTS(SELECT 1 FROM event_notification_batch WHERE id=?)`,
+      )
+      .bind(id, origin, ids, id),
+  ]);
+  return results[0].meta.changes ? id : null;
+}
+
+export async function pendingBatches(db: Env["DB"], operation: string) {
+  const rows = await db
+    .prepare(
+      `SELECT id FROM event_notification_batch
+    WHERE operation_id=? AND status IN ('pending','sending') AND created_at > ? ORDER BY created_at, id`,
+    )
+    .bind(operation, Date.now() - retryWindowMs)
+    .all<{ id: string }>();
+  return rows.results;
+}
+
+export function claimBatch(db: Env["DB"], id: string, token: string) {
   const now = Date.now();
   return db
     .prepare(
-      `UPDATE event_notification SET status = 'sending', lease_until = ?, attempts = attempts + 1, delivery_origin=coalesce(delivery_origin,?)
-      WHERE id = ? AND (status = 'pending' OR (status = 'sending' AND lease_until < ?))
-        AND created_at > ?
-      RETURNING id, delivery_origin`,
+      `UPDATE event_notification_batch SET status='sending', outcome=CASE WHEN status='sending' THEN 'unconfirmed' ELSE outcome END, lease_token=?, lease_until=?
+    WHERE id=? AND status IN ('pending','sending') AND (lease_until IS NULL OR lease_until < ?)
+    AND created_at > ? RETURNING id, payload, budget_window`,
     )
-    .bind(now + leaseMs, origin, id, now, now - retryWindowMs)
-    .first<{ id: string; delivery_origin: string }>();
+    .bind(token, now + leaseMs, id, now, now - retryWindowMs)
+    .first<NotificationBatch>();
 }
 
-export function recordNotificationDelivery(
+export async function finishBatch(
   db: Env["DB"],
   id: string,
-  local: boolean,
+  token: string,
+  outcome: "sent" | "local" | "failed" | "unconfirmed" | null,
+) {
+  const accepted = outcome === "sent" || outcome === "local";
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE event_notification_batch SET status=?, outcome=CASE WHEN ?=1 THEN NULL WHEN outcome='unconfirmed' THEN outcome ELSE coalesce(?,outcome) END, lease_until=NULL
+      WHERE id=? AND lease_token=?`,
+      )
+      .bind(
+        accepted ? outcome : "pending",
+        Number(accepted),
+        outcome,
+        id,
+        token,
+      ),
+    db
+      .prepare(
+        `UPDATE event_notification SET status=?, sent_at=?, attempts=attempts+1
+      WHERE batch_id=? AND EXISTS(SELECT 1 FROM event_notification_batch WHERE id=? AND lease_token=?)`,
+      )
+      .bind(
+        accepted ? outcome : "pending",
+        accepted ? Date.now() : null,
+        id,
+        id,
+        token,
+      ),
+  ]);
+}
+
+export function markBatchBudget(
+  db: Env["DB"],
+  id: string,
+  token: string,
+  start: number,
 ) {
   return db
     .prepare(
-      "UPDATE event_notification SET status = ?, sent_at = ?, lease_until = NULL WHERE id = ?",
+      "UPDATE event_notification_batch SET budget_window=? WHERE id=? AND lease_token=?",
     )
-    .bind(local ? "local" : "sent", Date.now(), id)
+    .bind(start, id, token)
     .run();
 }
 
-export function releaseNotification(db: Env["DB"], id: string) {
-  return db
-    .prepare(
-      "UPDATE event_notification SET status = 'pending', lease_until = NULL WHERE id = ?",
-    )
-    .bind(id)
-    .run();
+export async function uncertainNotifications(db: Env["DB"], operation: string) {
+  return (
+    (await db
+      .prepare(
+        `SELECT count(*) AS n FROM event_notification n JOIN event_notification_batch b ON b.id=n.batch_id
+    WHERE n.operation_id=? AND n.status IN ('pending','sending') AND (b.outcome='unconfirmed' OR b.status='sending')`,
+      )
+      .bind(operation)
+      .first<number>("n")) ?? 0
+  );
 }

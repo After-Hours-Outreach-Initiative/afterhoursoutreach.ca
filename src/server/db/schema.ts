@@ -332,6 +332,27 @@ export const eventAudit = sqliteTable(
   (table) => [index("event_audit_time").on(table.event_id, table.created_at)],
 );
 
+// Immutable provider requests: a retry must replay the same batch, not regroup it.
+export const eventNotificationBatch = sqliteTable(
+  "event_notification_batch",
+  {
+    id: text().primaryKey(),
+    operation_id: text().notNull(),
+    payload: text().notNull(),
+    status: text({ enum: ["pending", "sending", "sent", "local"] })
+      .notNull()
+      .default("pending"),
+    outcome: text({ enum: ["failed", "unconfirmed"] }),
+    budget_window: timestamp(),
+    lease_token: text(),
+    lease_until: timestamp(),
+    created_at: timestamp().notNull(),
+  },
+  (table) => [
+    index("event_notification_batch_operation").on(table.operation_id),
+  ],
+);
+
 export const eventNotification = sqliteTable(
   "event_notification",
   {
@@ -344,6 +365,9 @@ export const eventNotification = sqliteTable(
     body: text().notNull(),
     // Freeze the sending origin across retries on previews sharing one D1.
     delivery_origin: text(),
+    // Null on legacy records, which must not be swept into a new send action.
+    delivery_to: text(),
+    batch_id: text().references(() => eventNotificationBatch.id),
     status: text({ enum: ["pending", "sending", "sent", "local"] })
       .notNull()
       .default("pending"),

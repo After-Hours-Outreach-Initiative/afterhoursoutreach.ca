@@ -80,17 +80,53 @@ export async function limitEmailRequests(
   if (consumeProviderBudget) await takeEmailBudget(binding, secret);
 }
 
-export function takeEmailBudget(
+export async function emailBudgetRemaining(
   binding: Env["DB"],
   secret: string | undefined,
 ) {
-  return takeRateLimit(
-    binding,
+  const start =
+    Math.floor(Date.now() / emailPolicy.budgetWindowMs) *
+    emailPolicy.budgetWindowMs;
+  const key = await hashAuthValue(
     secret,
-    "send-total",
-    emailPolicy.dailyLimit,
-    emailPolicy.budgetWindowMs,
+    `rate:send-total:${emailPolicy.budgetWindowMs}:${start}`,
   );
+  const count = await binding
+    .prepare("SELECT count FROM auth_rate_limit WHERE key=?")
+    .bind(key)
+    .first<number>("count");
+  return Math.max(0, emailPolicy.dailyLimit - (count ?? 0));
+}
+
+export async function takeEmailBudget(
+  binding: Env["DB"],
+  secret: string | undefined,
+  count = 1,
+) {
+  if (!Number.isInteger(count) || count < 1 || count > emailPolicy.dailyLimit)
+    throw new RangeError("Invalid email budget count.");
+  const start =
+    Math.floor(Date.now() / emailPolicy.budgetWindowMs) *
+    emailPolicy.budgetWindowMs;
+  const key = await hashAuthValue(
+    secret,
+    `rate:send-total:${emailPolicy.budgetWindowMs}:${start}`,
+  );
+  const row = await binding
+    .prepare(
+      `INSERT INTO auth_rate_limit (key, count, expires_at) VALUES (?, ?, ?)
+    ON CONFLICT (key) DO UPDATE SET count = count + excluded.count WHERE count + excluded.count <= ?
+    RETURNING count`,
+    )
+    .bind(
+      key,
+      count,
+      start + emailPolicy.budgetWindowMs,
+      emailPolicy.dailyLimit,
+    )
+    .first();
+  if (!row) throw new RequestError(429, "Too many requests. Try again later.");
+  return start;
 }
 
 export async function cleanupAuthRecords(binding: Env["DB"], now = Date.now()) {
