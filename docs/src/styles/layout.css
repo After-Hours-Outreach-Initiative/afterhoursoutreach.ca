@@ -1,0 +1,32 @@
+:root {
+  --sl-sidebar-width: 16rem;
+  --docs-toc-width: 14rem;
+}
+
+/* Let pages and diagrams use all the space between the navigation panels. */
+.main-pane {
+  min-width: 0;
+}
+
+.main-pane .sl-container {
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* Keep Starlight's mobile navigation below its desktop TOC breakpoint. */
+@media (min-width: 72rem) {
+  .right-sidebar-container {
+    flex: 0 0 var(--docs-toc-width);
+    width: var(--docs-toc-width);
+  }
+
+  .right-sidebar {
+    inset-inline-end: 0;
+    width: var(--docs-toc-width);
+  }
+
+  [data-has-sidebar][data-has-toc] .main-pane {
+    flex: 1 1 0;
+    width: auto;
+  }
+}

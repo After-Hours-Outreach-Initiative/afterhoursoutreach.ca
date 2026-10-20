@@ -1,0 +1,93 @@
+---
+title: System architecture
+description: Deployment paths, environment boundaries, request handling, and scheduled processing.
+---
+
+import Diagram from "../../components/Diagram.astro";
+
+## Delivery and environments
+
+### Deployments
+
+<Diagram
+  name="git-deployments"
+  title="Git-triggered deployment paths"
+  description="GitHub commits trigger production or preview builds through Cloudflare Workers Builds. Production and Worker Previews run under the afterhoursoutreach-ca Worker."
+/>
+
+- The source repository is
+  [After-Hours-Outreach-Initiative/afterhoursoutreach.ca](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca).
+- `main` is the production branch.
+- We use [Cloudflare Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/)
+  for Git-triggered builds and deployments.
+- We use [Worker Previews](https://developers.cloudflare.com/workers/previews/)
+  for branch previews.
+
+### Environment boundaries
+
+| Environment       | Runtime                                                                    | Database                                                                        | Email and scheduled work                                                                            |
+| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Local development | Astro dev server with local Workers simulation                             | Persistent local D1 under `.wrangler/state/`; remote bindings disabled          | Simulated email dialogs; medic reminder jobs skipped                                                |
+| Branch previews   | Previews under `afterhoursoutreach-ca`, each with its own URL and settings | Shared `afterhoursoutreach-staging` D1 by default                               | Real, rate-limited Resend delivery for sign-in and opted-in event mail; medic reminder jobs skipped |
+| Production        | `afterhoursoutreach-ca` serving `afterhoursoutreach.ca`                    | Dedicated production D1 **not yet provisioned**; checked-in ID is a placeholder | Real delivery and production-only reminder processing require completed production configuration    |
+
+Preview bindings do not grant automatic database isolation. Two branches using
+the same preview D1 see and change the same preview records. Production must never
+be pointed at that database. Preview secrets are configured separately from
+production secrets.
+
+The old `afterhoursoutreach-ca-staging` Worker was retired; the word `staging` in
+the retained D1 name does not mean there is still a separate staging Worker.
+Cloudflare manages DNS for the production domain; Porkbun is its registrar.
+
+## Inside the Worker
+
+This view shows a database-backed page or API request. Worker internals are
+libraries and modules in the same application, not extra deployed services.
+
+<Diagram
+  name="request-handling"
+  title="Application request handling"
+  description="Browser requests enter the Worker fetch handler, then Astro pages and API endpoints. Better Auth handles authentication, domain workflows handle accounts and events, and both use the database layer and email delivery modules. D1 and Resend are external services."
+/>
+
+- **Astro** renders application pages on the server and routes HTTP API requests
+  under `/api/v1/`. Static files are delivered through Workers Static Assets.
+- **Better Auth** manages sign-in, sessions, and optional two-factor
+  authentication. It uses D1 through the Drizzle adapter; it is not an external
+  identity-provider service.
+- **Domain workflows** apply authorization and coordinate profile, application,
+  event, signup, and organizer changes. `src/server/db/` is the source of truth
+  for persisted workflows; SQL constraints and triggers also protect invariants
+  such as event capacity.
+- **D1** holds application records, sessions, rate limits, notification outboxes,
+  and delivery leases. The browser never connects to D1 directly.
+- **Resend** delivers sign-in and opted-in notifications in deployed environments.
+  Notifications are recorded with the originating change before delivery is
+  attempted, so an email failure does not undo the saved change. Local development
+  uses simulated delivery instead of contacting Resend.
+
+See [Backend](/backend/), [Accounts](/accounts/), and [Events](/events/) for the
+detailed behavior and access rules.
+
+## Scheduled work
+
+Medic certification reminders use the Worker's `scheduled` handler, separately
+from the browser request path. The implementation is production-only and still
+requires the pending production D1 and other launch prerequisites.
+
+<Diagram
+  name="scheduled-reminders"
+  title="Production medic certification reminders"
+  description="Cloudflare Cron Triggers invoke the same Worker's scheduled handler. Medic reminder processing checks eligibility and persistent delivery state in production D1, then sends bounded email batches through Resend. Production D1 remains pending; preview and local environments skip this processing."
+/>
+
+Daily discovery runs at **16:00 UTC**; delivery and retries run at **30 minutes
+past each hour**. D1 tracks eligibility, outbox state, and atomic delivery leases;
+stable Resend idempotency keys protect retries from duplicate sends.
+
+This is not a general event-email dispatcher. Event notification delivery/retries
+remain request- or organizer-triggered. Local development and `APP_ENV !=
+production`, including branch previews, skip medic reminder processing. The
+configured Cron Triggers target production, not a per-preview scheduler. See
+[Deployment: medic certification reminders](/deployment/#medic-certification-reminders).

@@ -8,6 +8,9 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+Do not write or run tests for the documentation site (`docs/`), including
+browser/Playwright tests for its diagrams or editing controls.
+
 ## Design
 
 Do not use UI eyebrows: the small, uppercase, letter-spaced label sitting above

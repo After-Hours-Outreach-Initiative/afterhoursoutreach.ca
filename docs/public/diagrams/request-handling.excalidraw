@@ -1,0 +1,921 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "afterhoursoutreach.ca/docs",
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "currentItemFontFamily": 2
+  },
+  "files": {
+    "cloudflare-logo": {
+      "id": "cloudflare-logo",
+      "mimeType": "image/svg+xml",
+      "created": 0,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMzInIGhlaWdodD0nMzInIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDMyIDMyJz48cmVjdCB3aWR0aD0nMzInIGhlaWdodD0nMzInIHJ4PSc0JyBmaWxsPSd3aGl0ZScvPjxnIHRyYW5zZm9ybT0ndHJhbnNsYXRlKDIgOS42KSBzY2FsZSguMTA5Mzc1KSc+PHBhdGggZmlsbD0nI2ZiYWQ0MScgZD0nTTIwNS41MiA1MC44MTNjLS44NTggMC0xLjcwNS4wMy0yLjU1MS4wNThxLS4yMDcuMDEyLS4zOTguMDk0YTEuNDIgMS40MiAwIDAgMC0uOTIuOTk0bC0zLjYyOCAxMi42NzJjLTEuNTY1IDUuNDQ5LS45ODMgMTAuNDggMS42NDYgMTQuMTc0YzIuNDEgMy40MTYgNi40MiA1LjQyMSAxMS4yODkgNS42NTVsMTkuNjc5IDEuMTk0Yy41ODUuMDMgMS4wOTIuMzEyIDEuNC43NzZhMS45MiAxLjkyIDAgMCAxIC4yIDEuNjkyYTIuNSAyLjUgMCAwIDEtMi4xMzQgMS42NjJsLTIwLjQ0OCAxLjE5M2MtMTEuMTEuNTE1LTIzLjA2MiA5LjU4LTI3LjI1NSAyMC42MzNsLTEuNDc0IDMuOWExLjA5MiAxLjA5MiAwIDAgMCAuOTY3IDEuNDloNzAuNDI1YTEuODcgMS44NyAwIDAgMCAxLjgxLTEuMzY1QTUxLjIgNTEuMiAwIDAgMCAyNTYgMTAxLjgyOGMwLTI4LjE2LTIyLjU4Mi01MC45ODQtNTAuNDQ5LTUwLjk4NCcvPjxwYXRoIGZpbGw9JyNmNjgyMWYnIGQ9J20xNzQuNzgyIDExNS4zNjJsMS4zMDMtNC41ODNjMS41NjgtNS40NDkuOTg3LTEwLjQ4LTEuNjM5LTE0LjE3M2MtMi40MTgtMy40MTctNi40MjQtNS40MjItMTEuMjk2LTUuNjU2bC05Mi4zMTItMS4xOTNhMS44MiAxLjgyIDAgMCAxLTEuNDU5LS43NzZhMS45MiAxLjkyIDAgMCAxLS4yMDMtMS42OTNhMi41IDIuNSAwIDAgMSAyLjE1NC0xLjY2Mmw5My4xNzMtMS4xOTNjMTEuMDYzLS41MTEgMjMuMDE1LTkuNTggMjcuMjA4LTIwLjYzM2w1LjMxMy0xNC4wNGMuMjE0LS41OTYuMjctMS4yMzguMTU2LTEuODZDMTkxLjEyNiAyMC41MSAxNjYuOTEgMCAxMzcuOTYgMEMxMTEuMjY5IDAgODguNjI2IDE3LjQwMyA4MC41IDQxLjU5NmEyNyAyNyAwIDAgMC0xOS4xNTYtNS4zNTlDNDguNTQ5IDM3LjUyNCAzOC4yNSA0Ny45NDYgMzYuOTc5IDYwLjg4YTI3LjkgMjcuOSAwIDAgMCAuNzAyIDkuNjQyQzE2Ljc3MyA3MS4xNDUgMCA4OC40NTQgMCAxMDkuNzI2YzAgMS45MjMuMTM3IDMuODE4LjQxMyA1LjY2N2MuMTE1Ljg5Ny44NzkgMS41NyAxLjc4MyAxLjU2OGgxNzAuNDhhMi4yMiAyLjIyIDAgMCAwIDIuMTA2LTEuNjMnLz48L2c+PC9zdmc+"
+    },
+    "resend-logo": {
+      "id": "resend-logo",
+      "mimeType": "image/svg+xml",
+      "created": 0,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMzInIGhlaWdodD0nMzInIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nLTQgLTQgMzIgMzInPjxyZWN0IHg9Jy00JyB5PSctNCcgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJyByeD0nNCcgZmlsbD0nd2hpdGUnLz48cGF0aCBmaWxsPSdibGFjaycgZD0nTTE0LjY3OSAwYzQuNjQ4IDAgNy40MTMgMi43NjUgNy40MTMgNi40MzRzLTIuNzY1IDYuNDM0LTcuNDEzIDYuNDM0SDEyLjMzTDI0IDI0aC04LjI0NWwtOC44OC04LjQ0Yy0uNjM2LS41ODgtLjkzLTEuMjczLS45My0xLjg2YzAtLjgzMS41ODctMS41NjUgMS43MTMtMS44ODNsNC41NzQtMS4yMjRjMS43MzctLjQ2NSAyLjkzNi0xLjgxIDIuOTM2LTMuNTcyYzAtMi4xNTMtMS43NjEtMy40LTMuOTM5LTMuNEgwVjB6Jy8+PC9zdmc+"
+    },
+    "astro-logo": {
+      "id": "astro-logo",
+      "mimeType": "image/svg+xml",
+      "created": 0,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMzInIGhlaWdodD0nMzInIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nLTQgLTQgMzIgMzInPjxyZWN0IHg9Jy00JyB5PSctNCcgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJyByeD0nNCcgZmlsbD0nd2hpdGUnLz48cGF0aCBmaWxsPScjYmM1MmVlJyBkPSdNOC4zNTggMjAuMTYyYy0xLjE4Ni0xLjA3LTEuNTMyLTMuMzE2LTEuMDM4LTQuOTQ0Yy44NTYgMS4wMjYgMi4wNDMgMS4zNTIgMy4yNzIgMS41MzVjMS44OTcuMjgzIDMuNzYuMTc3IDUuNTIyLS42NzhjLjIwMi0uMDk4LjM4OC0uMjI5LjYwOC0uMzZjLjE2Ni40NzMuMjA5Ljk1LjE1MSAxLjQzN2MtLjE0IDEuMTg1LS43MzggMi4xLTEuNjg4IDIuNzk0Yy0uMzguMjc3LS43ODIuNTI1LTEuMTc1Ljc4N2MtMS4yMDUuODA0LTEuNTMxIDEuNzQ3LTEuMDc4IDMuMTE5bC4wNDQuMTQ4YTMuMTYgMy4xNiAwIDAgMS0xLjQwNy0xLjE4OGEzLjMgMy4zIDAgMCAxLS41NDQtMS44MTVjLS4wMDQtLjMyLS4wMDQtLjY0Mi0uMDQ4LS45NThjLS4xMDYtLjc2OS0uNDcyLTEuMTEzLTEuMTYxLTEuMTMzYy0uNzA3LS4wMi0xLjI2Ny40MTEtMS40MTUgMS4wOWMtLjAxMi4wNTMtLjAyOC4xMDQtLjA0NS4xNjV6bS01Ljk2MS00LjQ0NXMzLjI0LTEuNTc1IDYuNDktMS41NzVsMi40NTEtNy41NjVjLjA5Mi0uMzY2LjM2LS42MTQuNjYyLS42MTRzLjU3LjI0OC42NjIuNjE0bDIuNDUgNy41NjVjMy44NSAwIDYuNDkxIDEuNTc1IDYuNDkxIDEuNTc1TDE2LjA4OC43MjdDMTUuOTMuMjg1IDE1LjY2MyAwIDE1LjMwMyAwSDguNjk3Yy0uMzYgMC0uNjE1LjI4NS0uNzg0LjcyN3onLz48L3N2Zz4="
+    },
+    "better-auth-logo": {
+      "id": "better-auth-logo",
+      "mimeType": "image/svg+xml",
+      "created": 0,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMzInIGhlaWdodD0nMzInIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nLTQgLTQgMzIgMzInPjxyZWN0IHg9Jy00JyB5PSctNCcgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJyByeD0nNCcgZmlsbD0nd2hpdGUnLz48cGF0aCBmaWxsPSdibGFjaycgZD0nTTAgMy4zOXYxNy4yMmg1Ljc4M3YtNS41NWg2LjQzNFY4LjkzOUg1Ljc4M1YzLjM5Wm0xMi4yMTcgNS41NWg1LjYzOHY2LjEyMmgtNS42Mzh2NS41NDhIMjRWMy4zOTFIMTIuMjE3WicvPjwvc3ZnPg=="
+    },
+    "drizzle-logo": {
+      "id": "drizzle-logo",
+      "mimeType": "image/svg+xml",
+      "created": 0,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMzInIGhlaWdodD0nMzInIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nLTQgLTQgMzIgMzInPjxyZWN0IHg9Jy00JyB5PSctNCcgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJyByeD0nNCcgZmlsbD0nIzFlMWUxZScvPjxwYXRoIGZpbGw9JyNjNWY3NGYnIGQ9J001LjM1MyAxMS44MjNhMS4wMzYgMS4wMzYgMCAwIDAtLjM5NS0xLjQyMmExLjA2MyAxLjA2MyAwIDAgMC0xLjQzNy4zOTlMLjEzOCAxNi43MDJhMS4wMzUgMS4wMzUgMCAwIDAgLjM5NSAxLjQyMmExLjA2MyAxLjA2MyAwIDAgMCAxLjQzNy0uMzk4em0xMS4yMTYgMGExLjAzNiAxLjAzNiAwIDAgMC0uMzk0LTEuNDIyYTEuMDY0IDEuMDY0IDAgMCAwLTEuNDM4LjM5OWwtMy4zODIgNS45MDJhMS4wMzYgMS4wMzYgMCAwIDAgLjM5NCAxLjQyMmMuNTA2LjI4MyAxLjE1LjEwNCAxLjQzOC0uMzk4em03LjI5My00LjUyNWExLjAzNiAxLjAzNiAwIDAgMC0uMzk1LTEuNDIyYTEuMDYgMS4wNiAwIDAgMC0xLjQzNy4zOTlsLTMuMzgzIDUuOTAyYTEuMDM2IDEuMDM2IDAgMCAwIC4zOTUgMS40MjJhMS4wNjMgMS4wNjMgMCAwIDAgMS40MzctLjM5OXptLTExLjIxOSAwYTEuMDM1IDEuMDM1IDAgMCAwLS4zOTQtMS40MjJhMS4wNjQgMS4wNjQgMCAwIDAtMS40MzguMzk4bC0zLjM4MiA1LjkwM2ExLjAzNiAxLjAzNiAwIDAgMCAuMzk0IDEuNDIyYy41MDYuMjgyIDEuMTUuMTA0IDEuNDM4LS4zOTl6Jy8+PC9zdmc+"
+    }
+  },
+  "elements": [
+    {
+      "id": "worker-boundary",
+      "type": "rectangle",
+      "x": 320,
+      "y": 60,
+      "width": 1010,
+      "height": 720,
+      "strokeColor": "#868e96",
+      "backgroundColor": "transparent",
+      "strokeStyle": "dashed",
+      "roughness": 0
+    },
+    {
+      "id": "worker-title",
+      "type": "text",
+      "x": 350,
+      "y": 80,
+      "width": 280,
+      "height": 25,
+      "fontSize": 20,
+      "fontFamily": 2,
+      "text": "Application Worker",
+      "strokeColor": "#495057"
+    },
+    {
+      "id": "browser",
+      "type": "rectangle",
+      "x": 0,
+      "y": 320,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#f3f0ff",
+      "fillStyle": "solid",
+      "strokeColor": "#7048e8",
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "browser-label"
+        },
+        {
+          "type": "arrow",
+          "id": "https"
+        }
+      ]
+    },
+    {
+      "id": "browser-label",
+      "type": "text",
+      "x": 10,
+      "y": 353.5,
+      "width": 220,
+      "height": 23,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "text": "Browser",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "browser"
+    },
+    {
+      "id": "entry",
+      "type": "rectangle",
+      "groupIds": [
+        "entry-group"
+      ],
+      "x": 350,
+      "y": 260,
+      "width": 240,
+      "height": 80,
+      "backgroundColor": "#fff4e6",
+      "fillStyle": "solid",
+      "strokeColor": "#e8590c",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "https"
+        },
+        {
+          "type": "arrow",
+          "id": "route"
+        }
+      ]
+    },
+    {
+      "id": "entry-label",
+      "type": "text",
+      "x": 436,
+      "y": 277.5,
+      "width": 138,
+      "height": 45,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Worker fetch\nhandler",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "entry-group"
+      ]
+    },
+    {
+      "id": "routes",
+      "type": "rectangle",
+      "groupIds": [
+        "routes-group"
+      ],
+      "x": 350,
+      "y": 460,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1971c2",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "route"
+        },
+        {
+          "type": "arrow",
+          "id": "auth-route"
+        },
+        {
+          "type": "arrow",
+          "id": "workflow-route"
+        }
+      ]
+    },
+    {
+      "id": "routes-label",
+      "type": "text",
+      "x": 436,
+      "y": 482.5,
+      "width": 138,
+      "height": 45,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Astro pages and\nAPI endpoints",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "routes-group"
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "rectangle",
+      "groupIds": [
+        "auth-group"
+      ],
+      "x": 700,
+      "y": 140,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1971c2",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "auth-route"
+        },
+        {
+          "type": "arrow",
+          "id": "auth-db"
+        },
+        {
+          "type": "arrow",
+          "id": "auth-email"
+        }
+      ]
+    },
+    {
+      "id": "auth-label",
+      "type": "text",
+      "x": 786,
+      "y": 173.75,
+      "width": 138,
+      "height": 22.5,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Better Auth",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "auth-group"
+      ]
+    },
+    {
+      "id": "workflows",
+      "type": "rectangle",
+      "x": 700,
+      "y": 620,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1971c2",
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "workflows-label"
+        },
+        {
+          "type": "arrow",
+          "id": "workflow-route"
+        },
+        {
+          "type": "arrow",
+          "id": "workflow-db"
+        },
+        {
+          "type": "arrow",
+          "id": "workflow-email"
+        }
+      ]
+    },
+    {
+      "id": "workflows-label",
+      "type": "text",
+      "x": 710,
+      "y": 642.5,
+      "width": 220,
+      "height": 45,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "text": "Account and\nevent workflows",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "workflows"
+    },
+    {
+      "id": "database",
+      "type": "rectangle",
+      "groupIds": [
+        "database-group"
+      ],
+      "x": 1050,
+      "y": 140,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1971c2",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "auth-db"
+        },
+        {
+          "type": "arrow",
+          "id": "workflow-db"
+        },
+        {
+          "type": "arrow",
+          "id": "sql"
+        }
+      ]
+    },
+    {
+      "id": "database-label",
+      "type": "text",
+      "x": 1136,
+      "y": 151.25,
+      "width": 138,
+      "height": 67.5,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Drizzle and\ndatabase\nmodules",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "database-group"
+      ]
+    },
+    {
+      "id": "delivery",
+      "type": "rectangle",
+      "x": 1050,
+      "y": 620,
+      "width": 240,
+      "height": 90,
+      "backgroundColor": "#ebfbee",
+      "fillStyle": "solid",
+      "strokeColor": "#2f9e44",
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "delivery-label"
+        },
+        {
+          "type": "arrow",
+          "id": "auth-email"
+        },
+        {
+          "type": "arrow",
+          "id": "workflow-email"
+        },
+        {
+          "type": "arrow",
+          "id": "email-https"
+        }
+      ]
+    },
+    {
+      "id": "delivery-label",
+      "type": "text",
+      "x": 1060,
+      "y": 653.5,
+      "width": 220,
+      "height": 23,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "text": "Email delivery modules",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "delivery"
+    },
+    {
+      "id": "d1",
+      "type": "rectangle",
+      "groupIds": [
+        "d1-group"
+      ],
+      "x": 1400,
+      "y": 140,
+      "width": 260,
+      "height": 90,
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "strokeColor": "#1971c2",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "sql"
+        }
+      ]
+    },
+    {
+      "id": "d1-label",
+      "type": "text",
+      "x": 1486,
+      "y": 162.5,
+      "width": 158,
+      "height": 45,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Environment's\nD1 database",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "d1-group"
+      ]
+    },
+    {
+      "id": "resend",
+      "type": "rectangle",
+      "groupIds": [
+        "resend-group"
+      ],
+      "x": 1400,
+      "y": 620,
+      "width": 260,
+      "height": 90,
+      "backgroundColor": "#ebfbee",
+      "fillStyle": "solid",
+      "strokeColor": "#2f9e44",
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "email-https"
+        }
+      ]
+    },
+    {
+      "id": "resend-label",
+      "type": "text",
+      "x": 1486,
+      "y": 653.75,
+      "width": 158,
+      "height": 22.5,
+      "fontSize": 18,
+      "fontFamily": 2,
+      "lineHeight": 1.25,
+      "autoResize": false,
+      "text": "Resend API",
+      "textAlign": "left",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "groupIds": [
+        "resend-group"
+      ]
+    },
+    {
+      "id": "https",
+      "type": "arrow",
+      "x": 250,
+      "y": 365,
+      "width": 90,
+      "height": 65,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          40,
+          0
+        ],
+        [
+          40,
+          -65
+        ],
+        [
+          90,
+          -65
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "browser",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "entry",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "https-label",
+      "type": "text",
+      "x": 255,
+      "y": 270,
+      "width": 70,
+      "height": 20,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "HTTPS"
+    },
+    {
+      "id": "route",
+      "type": "arrow",
+      "x": 470,
+      "y": 350,
+      "width": 0,
+      "height": 100,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "entry",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "routes",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "auth-route",
+      "type": "arrow",
+      "x": 600,
+      "y": 482.5,
+      "width": 90,
+      "height": 297.5,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          40,
+          0
+        ],
+        [
+          40,
+          -297.5
+        ],
+        [
+          90,
+          -297.5
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "routes",
+        "focus": -0.5,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "auth",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "workflow-route",
+      "type": "arrow",
+      "x": 600,
+      "y": 527.5,
+      "width": 90,
+      "height": 137.5,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          65,
+          0
+        ],
+        [
+          65,
+          137.5
+        ],
+        [
+          90,
+          137.5
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "routes",
+        "focus": 0.5,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "workflows",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "auth-db",
+      "type": "arrow",
+      "x": 950,
+      "y": 185,
+      "width": 90,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "auth",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "database",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "workflow-email",
+      "type": "arrow",
+      "x": 950,
+      "y": 665,
+      "width": 90,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "workflows",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "delivery",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "workflow-email-label",
+      "type": "text",
+      "x": 945,
+      "y": 720,
+      "width": 130,
+      "height": 40,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "opted-in\nnotifications"
+    },
+    {
+      "id": "auth-email",
+      "type": "arrow",
+      "x": 950,
+      "y": 207.5,
+      "width": 90,
+      "height": 435,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          435
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "auth",
+        "focus": 0.5,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "delivery",
+        "focus": -0.5,
+        "gap": 10
+      }
+    },
+    {
+      "id": "auth-email-label",
+      "type": "text",
+      "x": 870,
+      "y": 350,
+      "width": 80,
+      "height": 40,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "sign-in\nemail"
+    },
+    {
+      "id": "workflow-db",
+      "type": "arrow",
+      "x": 950,
+      "y": 642.5,
+      "width": 90,
+      "height": 435,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          -435
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "workflows",
+        "focus": -0.5,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "database",
+        "focus": 0.5,
+        "gap": 10
+      }
+    },
+    {
+      "id": "sql",
+      "type": "arrow",
+      "x": 1300,
+      "y": 185,
+      "width": 90,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "database",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "d1",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "sql-label",
+      "type": "text",
+      "x": 1290,
+      "y": 90,
+      "width": 130,
+      "height": 40,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "SQL and\ntransactions"
+    },
+    {
+      "id": "email-https",
+      "type": "arrow",
+      "x": 1300,
+      "y": 665,
+      "width": 90,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          0
+        ]
+      ],
+      "endArrowhead": "arrow",
+      "startBinding": {
+        "elementId": "delivery",
+        "focus": 0,
+        "gap": 10
+      },
+      "endBinding": {
+        "elementId": "resend",
+        "focus": 0,
+        "gap": 10
+      }
+    },
+    {
+      "id": "email-https-label",
+      "type": "text",
+      "x": 1310,
+      "y": 630,
+      "width": 70,
+      "height": 20,
+      "fontSize": 16,
+      "fontFamily": 2,
+      "text": "HTTPS"
+    },
+    {
+      "id": "entry-logo",
+      "type": "image",
+      "fileId": "cloudflare-logo",
+      "status": "saved",
+      "x": 366,
+      "y": 272,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "entry-group"
+      ]
+    },
+    {
+      "id": "routes-logo",
+      "type": "image",
+      "fileId": "astro-logo",
+      "status": "saved",
+      "x": 366,
+      "y": 477,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "routes-group"
+      ]
+    },
+    {
+      "id": "auth-logo",
+      "type": "image",
+      "fileId": "better-auth-logo",
+      "status": "saved",
+      "x": 716,
+      "y": 157,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "auth-group"
+      ]
+    },
+    {
+      "id": "database-logo",
+      "type": "image",
+      "fileId": "drizzle-logo",
+      "status": "saved",
+      "x": 1066,
+      "y": 157,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "database-group"
+      ]
+    },
+    {
+      "id": "d1-logo",
+      "type": "image",
+      "fileId": "cloudflare-logo",
+      "status": "saved",
+      "x": 1416,
+      "y": 157,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "d1-group"
+      ]
+    },
+    {
+      "id": "resend-logo",
+      "type": "image",
+      "fileId": "resend-logo",
+      "status": "saved",
+      "x": 1416,
+      "y": 637,
+      "width": 56,
+      "height": 56,
+      "scale": [
+        1,
+        1
+      ],
+      "groupIds": [
+        "resend-group"
+      ]
+    }
+  ]
+}

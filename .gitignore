@@ -8,6 +8,8 @@ dist-preview/
 
 # dependencies
 node_modules/
+# Excalidraw fonts copied from the installed package for the local docs reader.
+docs/public/excalidraw/
 
 # logs
 npm-debug.log*
