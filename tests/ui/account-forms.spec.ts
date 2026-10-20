@@ -346,6 +346,12 @@ test("Other referral details align with the option text and show readable help",
   await page.goto("/apply");
   const form = page.locator("[data-account-profile]");
   await form.locator('[name="heardAboutUsSources"][value="other"]').check();
+  await expect(
+    form.locator('label[for="profile-heardAboutUsOther"]'),
+  ).toHaveClass("sr-only");
+  await expect(form.locator('[name="heardAboutUsOther"]')).toHaveAccessibleName(
+    "Other source",
+  );
   await expect(form.locator("#help-heardAboutUsOther")).toBeVisible();
   await expect(form.locator("#help-heardAboutUsOther")).toHaveText(
     "Briefly describe how you found out about us (200 characters or fewer).",
