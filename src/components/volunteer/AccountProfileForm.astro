@@ -120,7 +120,7 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                       Outreach is required to apply. Other teams are optional.
                     </span>
                   </div>
-                  <div class="volunteer-team-options">
+                  <div class="volunteer-team-options volunteer-choice-options">
                     {teams.map((team) => (
                       <label
                         for={`profile-team-${team.value}`}
@@ -171,13 +171,10 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                         </span>
                       </label>
                     ))}
-                    {application && (
-                      <FieldError
-                        field="teams"
-                        message={outreachRequiredError}
-                      />
-                    )}
                   </div>
+                  {application && (
+                    <FieldError field="teams" message={outreachRequiredError} />
+                  )}
                   {!application && (
                     <div data-profile-team-training hidden={!medicSelected}>
                       <p class="volunteer-help">
