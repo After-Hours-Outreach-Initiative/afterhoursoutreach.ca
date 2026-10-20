@@ -173,6 +173,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       const gutter = width < 640 ? 16 : 24;
       await expect(navigation).toHaveCSS("padding-left", `${gutter}px`);
       await expect(navigation).toHaveCSS("padding-right", `${gutter}px`);
+      await expect(navigation).toHaveCSS("padding-top", "0px");
       await expect(navigation.locator(".header-mobile-links")).toHaveCSS(
         "border-top-width",
         "0px",
@@ -180,6 +181,10 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await expect(navigation.locator(".header-mobile-link").first()).toHaveCSS(
         "border-top-width",
         "0px",
+      );
+      await expect(navigation.locator(".header-mobile-link").first()).toHaveCSS(
+        "padding",
+        "16px 0px",
       );
       expect(
         await header.evaluate((element) => {
@@ -349,7 +354,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await expect(icon).toBeVisible();
       const sitePagesBox = await sitePages.boundingBox();
       const accountBox = await account.boundingBox();
-      expect(accountBox!.y).toBe(sitePagesBox!.y + sitePagesBox!.height + 32);
+      expect(accountBox!.y).toBe(sitePagesBox!.y + sitePagesBox!.height + 48);
       const nameBox = await account
         .locator("[data-account-menu-name]")
         .boundingBox();
