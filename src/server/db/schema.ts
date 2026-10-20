@@ -210,11 +210,75 @@ export const volunteerStatus = sqliteTable(
   ],
 );
 
+// A series is only a generation template, never a registration destination.
+export const patrolSeries = sqliteTable(
+  "patrol_series",
+  {
+    id: text().primaryKey(),
+    first_date: text().notNull(),
+    local_time: text().notNull(),
+    interval_weeks: integer().notNull(),
+    end_date: text(),
+    time_zone: text().notNull().default("America/Vancouver"),
+    meeting_point: text().notNull(),
+    meeting_point_url: text(),
+    spots: integer().notNull(),
+    open: integer({ mode: "boolean" }).notNull().default(true),
+    hidden: integer({ mode: "boolean" }).notNull().default(false),
+    // Exclusive instant of the first unmaterialized future nominal occurrence.
+    // Signup fails closed beyond this frontier, even if maintenance is delayed.
+    generation_until: timestamp()
+      .notNull()
+      .default(sql`0`),
+    created_by: text()
+      .notNull()
+      .references(() => user.id),
+    created_at: timestamp().notNull(),
+    updated_at: timestamp().notNull(),
+  },
+  (table) => [
+    check(
+      "patrol_series_interval",
+      sql`${table.interval_weeks} BETWEEN 1 AND 52`,
+    ),
+    check("patrol_series_spots", sql`${table.spots} BETWEEN 1 AND 100`),
+    check("patrol_series_zone", sql`${table.time_zone} = 'America/Vancouver'`),
+    check(
+      "patrol_series_end",
+      sql`${table.end_date} IS NULL OR ${table.end_date} >= ${table.first_date}`,
+    ),
+    check("patrol_series_open_boolean", sql`${table.open} IN (0, 1)`),
+    check("patrol_series_hidden_boolean", sql`${table.hidden} IN (0, 1)`),
+  ],
+);
+
+export const patrolSeriesAudit = sqliteTable(
+  "patrol_series_audit",
+  {
+    id: text().primaryKey(),
+    series_id: text()
+      .notNull()
+      .references(() => patrolSeries.id),
+    actor_id: text()
+      .notNull()
+      .references(() => user.id),
+    action: text().notNull(),
+    changed_fields: text({ mode: "json" }).$type<string[]>().notNull(),
+    created_at: timestamp().notNull(),
+  },
+  (table) => [
+    index("patrol_series_audit_time").on(table.series_id, table.created_at),
+  ],
+);
+
 export const event = sqliteTable(
   "event",
   {
     id: text().primaryKey(),
     type: text({ enum: ["patrol", "orientation"] }).notNull(),
+    series_id: text().references(() => patrolSeries.id),
+    // Immutable nominal local date, independent of starts_at exception edits.
+    occurrence_date: text(),
     // Store an absolute instant; show times in America/Vancouver in the UI.
     starts_at: timestamp().notNull(),
     meeting_point: text().notNull(),
@@ -233,6 +297,15 @@ export const event = sqliteTable(
     check("event_type", sql`${table.type} IN ('patrol', 'orientation')`),
     check("event_positive_spots", sql`${table.spots} > 0`),
     check("event_hidden_boolean", sql`${table.hidden} IN (0, 1)`),
+    check(
+      "event_series_occurrence",
+      sql`(${table.series_id} IS NULL AND ${table.occurrence_date} IS NULL) OR (${table.series_id} IS NOT NULL AND ${table.occurrence_date} IS NOT NULL AND ${table.type} = 'patrol')`,
+    ),
+    uniqueIndex("event_series_occurrence_unique").on(
+      table.series_id,
+      table.occurrence_date,
+    ),
+    index("event_series_start").on(table.series_id, table.starts_at, table.id),
     index("event_starts_at").on(table.starts_at),
   ],
 );

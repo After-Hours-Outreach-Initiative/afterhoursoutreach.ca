@@ -10,6 +10,21 @@ import {
 import { RequestError } from "../http";
 import { nowMsSql, profileDisplayNameSql } from "./sql";
 import { databaseWriteError } from "./errors";
+import {
+  ensurePatrolOccurrences,
+  recurringSignupWindowSql,
+} from "./patrol-series";
+
+export {
+  patrolSeriesSchema,
+  savePatrolSeries,
+  listPatrolSeries,
+  findPatrolSeries,
+  ensurePatrolOccurrences,
+  materializePatrolOccurrence,
+  patrolOccurrenceId,
+  type PatrolSeriesRow,
+} from "./patrol-series";
 
 export const eventSchema = z.strictObject({
   type: z.enum(["patrol", "orientation"]),
@@ -29,6 +44,9 @@ export const eventSchema = z.strictObject({
 export interface EventRow {
   id: string;
   type: "patrol" | "orientation";
+  seriesId: string | null;
+  occurrenceDate: string | null;
+  inSignupWindow: number;
   startsAt: number;
   meetingPoint: string;
   meetingPointUrl: string | null;
@@ -50,6 +68,8 @@ export interface RosterRow {
 }
 const eventColumns = `
   e.id, e.type, e.starts_at AS startsAt,
+  e.series_id AS seriesId, e.occurrence_date AS occurrenceDate,
+  ${recurringSignupWindowSql()} AS inSignupWindow,
   e.meeting_point AS meetingPoint, e.meeting_point_url AS meetingPointUrl,
   e.spots, e.open, e.hidden,
   e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
@@ -68,6 +88,7 @@ export function eventDescription(
 }
 export async function listEvents(db: Env["DB"], actor: Actor | null) {
   if (!canViewEvents(actor)) return [];
+  await ensurePatrolOccurrences(db);
   const organizer = Boolean(
     actor?.role === "organizer" &&
     actor.applicationSubmitted &&
@@ -106,16 +127,19 @@ export async function listEvents(db: Env["DB"], actor: Actor | null) {
     : db
         .prepare(
           `${select}
-        WHERE e.starts_at > ?
+        WHERE e.starts_at > ${nowMsSql}
           AND e.cancelled_at IS NULL
-          AND ((e.open = 1 AND e.hidden = 0) OR EXISTS(
+          AND ${recurringSignupWindowSql()}
+          AND (e.series_id IS NULL OR e.hidden = 0)
+          AND ((e.series_id IS NOT NULL AND e.hidden = 0)
+            OR (e.open = 1 AND e.hidden = 0) OR EXISTS(
             SELECT 1 FROM signup
             WHERE event_id = e.id AND user_id = ? AND status = 'confirmed'
           ))
         ORDER BY e.starts_at ASC
         LIMIT 100`,
         )
-        .bind(actor?.id ?? "", actor?.id ?? "", Date.now(), actor?.id ?? "");
+        .bind(actor?.id ?? "", actor?.id ?? "", actor?.id ?? "");
   const rows = await statement.all<EventRow>();
   return rows.results;
 }
@@ -300,6 +324,7 @@ export async function saveEvent(
           409,
           "This event changed. Reload before editing it.",
         );
+      if (old.seriesId) await ensurePatrolOccurrences(db, old.seriesId);
     }
     return { operation, message: "Event saved." };
   } catch (error) {
@@ -363,6 +388,7 @@ export async function cancelEvent(
       409,
       "This event changed or was already cancelled. Reload the page.",
     );
+  if (old.seriesId) await ensurePatrolOccurrences(db, old.seriesId);
   return {
     operation,
     message: "Event cancelled. Existing registrations were cancelled too.",
@@ -377,6 +403,7 @@ export async function changeSignup(
 ) {
   if (!actor) throw new RequestError(401, "Sign in to register.");
   requireVolunteer(actor);
+  if (action === "join") await ensurePatrolOccurrences(db);
   const event = await findEvent(db, eventId);
   if (event.startsAt <= Date.now())
     throw new RequestError(409, "Registration closes when the event starts.");
@@ -472,6 +499,7 @@ export async function manageSignup(
   notify = false,
 ) {
   requireOrganizer(actor);
+  if (destination) await ensurePatrolOccurrences(db);
   const row = await db
     .prepare(
       `SELECT event_id AS eventId, user_id AS userId

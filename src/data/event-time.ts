@@ -42,3 +42,29 @@ export function vancouverInstant(input: string): string {
     );
   return new Date(candidates[0]).toISOString();
 }
+
+/** Add calendar days, not elapsed 24-hour periods in the Vancouver time zone. */
+export function addCalendarDays(date: string, days: number) {
+  const instant = Date.parse(`${date}T00:00:00Z`) + days * 86_400_000;
+  return new Date(instant).toISOString().slice(0, 10);
+}
+
+/**
+ * Recurrences keep their local wall time. At a DST fold choose the earlier
+ * instant; at a gap move forward by the gap (Temporal's "compatible" policy).
+ * Unlike an interactive input, a future occurrence must not break generation.
+ */
+export function vancouverOccurrenceInstant(date: string, time: string) {
+  const input = `${date}T${time}`;
+  const naive = Date.parse(`${input}:00Z`);
+  if (!Number.isFinite(naive)) throw new Error("Invalid recurrence date.");
+  const candidates = [7, 8].map((offset) => naive + offset * 3_600_000);
+  const matches = candidates.filter((value) => vancouverInput(value) === input);
+  if (matches.length) return Math.min(...matches);
+  // Only the spring-forward gap may be normalized. Invalid calendar dates fail.
+  const shifted = candidates.find(
+    (value) => vancouverInput(value) === `${date}T03:${time.slice(3)}`,
+  );
+  if (time.startsWith("02:") && shifted !== undefined) return shifted;
+  throw new Error("Invalid recurrence date or local time.");
+}
