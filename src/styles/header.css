@@ -187,7 +187,7 @@
 }
 .header-mobile-panel {
   max-height: calc(100dvh - 5.5rem);
-  padding-top: 8px;
+  padding-top: 0;
   padding-bottom: 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -222,7 +222,7 @@
   font-size: 18px;
 }
 .header-mobile-account {
-  margin: 32px 0 16px;
+  margin: 48px 0 16px;
 }
 .header-mobile-account .header-account-identity {
   display: flex;
