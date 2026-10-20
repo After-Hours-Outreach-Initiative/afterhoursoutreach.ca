@@ -44,6 +44,7 @@ export function initPageContents(
   const header = document.querySelector<HTMLElement>("body > header");
   let stickyHeight = 0;
   let barHeight = 0;
+  let readingGap = 0;
   let frame = 0;
 
   const measure = () => {
@@ -63,6 +64,10 @@ export function initPageContents(
       ? bar.getBoundingClientRect().height
       : 0;
     if (!barHeight) menu.open = false;
+    // Match the shared 1rem scroll-margin gap without rescaling measured pixels.
+    readingGap = Number.parseFloat(
+      getComputedStyle(document.documentElement).fontSize,
+    );
     flow.style.setProperty("--contents-sticky-offset", `${stickyHeight}px`);
     flow.style.setProperty("--contents-bar-height", `${barHeight}px`);
     flow.style.setProperty(
@@ -91,8 +96,11 @@ export function initPageContents(
   // and below sticky navigation when a short screen requires a higher position.
   const actionsReadingEdge = (height: number) =>
     Math.max(
-      stickyHeight + barHeight + 16 + height / 2,
-      Math.min(window.innerHeight * 0.75, window.innerHeight - 16 - height / 2),
+      stickyHeight + barHeight + readingGap + height / 2,
+      Math.min(
+        window.innerHeight * 0.75,
+        window.innerHeight - readingGap - height / 2,
+      ),
     );
   const update = () => {
     frame = 0;
@@ -104,7 +112,7 @@ export function initPageContents(
     }
     // Use the reading edge, not intersection ratios: a tall section remains
     // current throughout its fields, and collapsed summaries still participate.
-    const readingEdge = stickyHeight + barHeight + 16;
+    const readingEdge = stickyHeight + barHeight + readingGap;
     let active = sections[0];
     for (const section of sections) {
       if (section === actions) continue;

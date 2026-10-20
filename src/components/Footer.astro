@@ -8,11 +8,11 @@ import { organization } from "@/data/organization";
 
 <footer class="bg-black text-white" id="contact">
   <div
-    class="mx-auto grid w-full max-w-[1248px] grid-cols-1 items-start gap-x-24 gap-y-12 px-6 py-14 max-sm:px-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto]"
+    class="mx-auto grid w-full max-w-site grid-cols-1 items-start gap-x-24 gap-y-12 px-6 py-14 max-sm:px-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto]"
   >
-    <div>
+    <div class="min-w-0">
       <a
-        class="flex shrink-0 items-center gap-4"
+        class="flex flex-wrap items-center gap-4"
         href="/"
         aria-label="After Hours Outreach Initiative, home"
       >
@@ -27,7 +27,9 @@ import { organization } from "@/data/organization";
           loading="lazy"
           decoding="async"
         />
-        <span class="flex flex-col leading-tight whitespace-nowrap">
+        <span
+          class="flex min-w-0 max-w-full flex-col leading-tight wrap-anywhere"
+        >
           <strong class="font-heading text-xl leading-none font-bold"
             >After Hours</strong
           >
@@ -42,7 +44,7 @@ import { organization } from "@/data/organization";
         aria-label="Contact"
       >
         <a
-          class="inline-flex items-center gap-2.5 hover:text-white"
+          class="inline-flex min-w-0 max-w-full items-center gap-2.5 hover:text-white"
           href={`mailto:${contactEmail}`}
         >
           {/* lucide: mail */}
@@ -57,7 +59,7 @@ import { organization } from "@/data/organization";
             <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path>
             <rect x="2" y="4" width="20" height="16" rx="2"></rect>
           </svg>
-          {contactEmail}</a
+          <span class="min-w-0 wrap-anywhere">{contactEmail}</span></a
         >
         <a
           class="inline-flex items-center gap-2.5 hover:text-white"
@@ -166,7 +168,7 @@ import { organization } from "@/data/organization";
     </div>
   </div>
 
-  <div class="mx-auto w-full max-w-[1248px] px-6 max-sm:px-4">
+  <div class="mx-auto w-full max-w-site px-6 max-sm:px-4">
     <div class="flex justify-center py-6 text-zinc-400">
       <p class="m-0 text-base">
         &copy; {`${new Date().getFullYear()} ${organization.legalName}`}

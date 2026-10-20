@@ -1,3 +1,5 @@
+@reference "./tailwind.css";
+
 :root {
   --site-header-height: 5.5rem;
 }
@@ -14,14 +16,15 @@
 }
 .header-link,
 .header-account-toggle {
+  @apply text-base;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 44px;
+  gap: 0.375rem;
+  min-height: 2.75rem;
   color: #d4d4d8;
-  font-size: 16px;
   font-weight: 500;
+  line-height: inherit;
   white-space: nowrap;
   transition: color 150ms;
 }
@@ -43,8 +46,8 @@
   display: none;
 }
 .header-chevron {
-  width: 14px;
-  height: 14px;
+  width: 0.875em;
+  height: 0.875em;
   flex-shrink: 0;
   transition: transform 150ms;
 }
@@ -52,17 +55,17 @@
   transform: rotate(180deg);
 }
 .header-account-toggle {
-  min-width: 44px;
-  gap: 10px;
-  padding: 4px 12px 4px 4px;
-  border-radius: 999px;
+  min-width: 2.75rem;
+  gap: 0.625rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  border-radius: 62.4375rem;
 }
 .header-account-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 2.25em;
+  height: 2.25em;
   flex-shrink: 0;
   border: 1px solid #334d9d;
   border-radius: 50%;
@@ -70,7 +73,7 @@
   color: #c7d2fe;
 }
 .header-account-label {
-  max-width: 160px;
+  max-width: 10rem;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -80,39 +83,40 @@
 }
 .header-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 0.5rem);
   z-index: 1;
 }
 .header-dropdown,
 .header-account-card {
-  padding: 4px;
+  padding: 0.25rem;
   border: 1px solid #3f3f46;
-  border-radius: 10px;
+  border-radius: 0.625rem;
   background: #0c0d10;
-  box-shadow: 0 12px 30px #0008;
+  box-shadow: 0 0.75rem 1.875rem #0008;
 }
 .header-volunteer-dropdown {
-  left: -12px;
-  width: 200px;
+  left: -0.75rem;
+  width: 12.5rem;
 }
 .header-account-dropdown {
   right: 0;
-  width: 260px;
-  max-width: calc(100vw - 32px);
+  width: 16.25rem;
+  max-width: calc(100vw - 2rem);
 }
 .header-dropdown a,
 .header-dropdown button,
 .header-account-card a,
 .header-account-card button {
+  @apply text-base;
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 44px;
-  padding: 8px 12px;
-  border-radius: 6px;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
   color: #d4d4d8;
-  font-size: 16px;
   font-weight: 500;
+  line-height: inherit;
   text-align: left;
 }
 .header-dropdown a:hover,
@@ -124,14 +128,14 @@
   background: #171a20;
 }
 .header-account-card .header-account-identity {
-  gap: 8px;
-  padding: 12px;
+  gap: 0.5rem;
+  padding: 0.75rem;
   color: white;
   font-weight: 400;
   overflow-wrap: anywhere;
 }
 .header-account-divider {
-  margin: 4px -4px;
+  margin: 0.25rem -0.25rem;
   border: 0;
   border-top: 1px solid #27272a;
 }
@@ -141,10 +145,10 @@
 }
 .header-account-arrow {
   align-self: flex-start;
-  width: 16px;
-  height: 16px;
+  width: 1em;
+  height: 1em;
   flex-shrink: 0;
-  margin-top: 4px;
+  margin-top: 0.25rem;
   color: #a1a1aa;
 }
 .header-account-name {
@@ -153,13 +157,13 @@
 }
 .header-account-email,
 .header-account-message {
-  margin-top: 4px;
+  @apply text-sm;
+  margin-top: 0.25rem;
   color: #a1a1aa;
-  font-size: 14px;
   line-height: 1.5;
 }
 .header-account-message {
-  padding: 8px 12px;
+  padding: 0.5rem 0.75rem;
 }
 .header-account-card button:disabled {
   cursor: wait;
@@ -186,21 +190,23 @@
   }
 }
 .header-mobile-panel {
-  max-height: calc(100dvh - 5.5rem);
+  max-height: calc(
+    100dvh - var(--site-header-rendered-height, var(--site-header-height))
+  );
   padding-top: 0;
-  padding-bottom: 16px;
+  padding-bottom: 1rem;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 .header-mobile-link {
+  @apply text-xl;
   display: flex;
   align-items: center;
-  min-height: 48px;
+  min-height: 3rem;
   width: 100%;
-  padding: 16px 0;
+  padding: 1rem 0;
   border-bottom: 1px solid #27272a;
   color: #d4d4d8;
-  font-size: 20px;
   line-height: 1.5;
   text-align: left;
 }
@@ -210,42 +216,40 @@
   background: #171a20;
 }
 .header-mobile-children {
-  margin-left: 20px;
+  margin-left: 1.25rem;
 }
 .header-mobile-children .header-mobile-link {
-  padding-left: 12px;
-  font-size: 18px;
+  @apply text-lg;
+  padding-left: 0.75rem;
+  line-height: 1.5;
 }
 .header-mobile-panel [data-header-discord] {
+  @apply text-lg;
   width: 100%;
-  margin-top: 32px;
-  font-size: 18px;
+  margin-top: 2rem;
+  line-height: 1.5;
 }
 .header-mobile-account {
-  margin: 48px 0 16px;
+  margin: 3rem 0 1rem;
 }
 .header-mobile-account .header-account-identity {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 .header-mobile-account .header-account-icon {
   align-self: flex-start;
-  width: 44px;
-  height: 44px;
+  width: 2.75em;
+  height: 2.75em;
 }
 .header-mobile-account .header-account-arrow {
-  width: 20px;
-  height: 20px;
+  width: 1.25em;
+  height: 1.25em;
 }
 .header-mobile-account .header-account-card a:not(.header-account-identity),
 .header-mobile-account .header-account-card button {
-  min-height: 56px;
-  padding: 12px 16px;
-  font-size: 18px;
-}
-@media (max-width: 639px) {
-  .header-mobile-panel {
-    max-height: calc(100dvh - 4.75rem);
-  }
+  @apply text-lg;
+  min-height: 3.5rem;
+  padding: 0.75rem 1rem;
+  line-height: inherit;
 }

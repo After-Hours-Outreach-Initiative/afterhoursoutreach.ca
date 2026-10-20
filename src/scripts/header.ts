@@ -4,6 +4,15 @@ const menus = [
 ];
 const mobileNav = header.querySelector<HTMLDetailsElement>(".mobile-nav")!;
 
+// Wrapped branding can make the header taller than its responsive minimum.
+// Keep the panel's height allowance separate so the header can shrink again.
+new ResizeObserver(() => {
+  header.style.setProperty(
+    "--site-header-rendered-height",
+    `${header.getBoundingClientRect().height}px`,
+  );
+}).observe(header);
+
 function closeMenus(except?: HTMLDetailsElement) {
   for (const menu of menus) if (menu !== except) menu.open = false;
 }
@@ -43,9 +52,7 @@ document.addEventListener("keydown", (event) => {
 header.querySelectorAll(".mobile-nav a, .header-dropdown a").forEach((link) => {
   link.addEventListener("click", () => closeMenus());
 });
-matchMedia("(min-width: 1024px)").addEventListener("change", () =>
-  closeMenus(),
-);
+matchMedia("(min-width: 64rem)").addEventListener("change", () => closeMenus());
 
 // Account pages own this action so they can synchronize unsaved application
 // drafts first. Other pages load the auth client only when signing out.
