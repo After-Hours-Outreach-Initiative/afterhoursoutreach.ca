@@ -57,4 +57,32 @@ test("view versions detect capacity, signups, visibility and access changes with
   expect(
     await eventViewVersion([event], { ...actor, sessionId: "renewed" }),
   ).toBe(original);
+
+  const organizer: Actor = { ...actor, role: "organizer" };
+  const roster = [
+    {
+      id: "signup",
+      eventId: event.id,
+      userId: "attendee",
+      name: "Attendee",
+      completed: 0,
+    },
+  ];
+  const rosterVersion = await eventViewVersion([event], organizer, roster);
+  for (const change of [
+    { id: "replacement-signup", userId: "replacement-attendee" },
+    { name: "Updated name" },
+    { completed: 1 },
+  ]) {
+    const updated = [{ ...roster[0], ...change }];
+    expect(await eventViewVersion([event], organizer, updated)).not.toBe(
+      rosterVersion,
+    );
+    expect(await eventViewVersion([event], actor, updated)).toBe(original);
+  }
+  expect(
+    await eventViewVersion([event], organizer, roster, event.startsAt - 1),
+  ).not.toBe(
+    await eventViewVersion([event], organizer, roster, event.startsAt),
+  );
 });

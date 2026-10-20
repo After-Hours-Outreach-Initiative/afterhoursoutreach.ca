@@ -52,6 +52,7 @@ export async function limitEmailRequests(
   email: string,
   ip: string,
   cooldownMs = 60_000,
+  consumeProviderBudget = true,
 ) {
   // Internal policy only: callers cannot supply a cooldown through the auth API.
   if (cooldownMs !== 30_000 && cooldownMs !== 60_000)
@@ -76,7 +77,7 @@ export async function limitEmailRequests(
         : "Wait one minute before requesting another email.",
     );
   await takeRateLimit(binding, secret, `send-email:${email}`, 3, 3_600_000);
-  await takeEmailBudget(binding, secret);
+  if (consumeProviderBudget) await takeEmailBudget(binding, secret);
 }
 
 export function takeEmailBudget(

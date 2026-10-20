@@ -15,6 +15,12 @@ packageExtensions:
 # Keep the plugin on a published runtime compatible with local development.
 overrides:
   "@cloudflare/vite-plugin": 1.52.0
+  # Preserve the existing adapter's tested dev RPC behavior after security updates.
+  "vite": 8.2.1
+  # Patched transitive versions while the pinned toolchain still bundles older ones.
+  "sharp@<0.35.5": 0.35.5
+  "undici@>=7.0.0 <7.29.1": 7.29.1
+  "source-map-js@<1.2.2": 1.2.2
   # Keep the docs integrations on Astro 7.2's compatible release set.
   "@astrojs/starlight>@astrojs/mdx": 8.0.0
   "@astrojs/starlight>@astrojs/markdown-satteri": 0.4.0

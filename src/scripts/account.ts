@@ -170,6 +170,9 @@ for (const flow of document.querySelectorAll<HTMLElement>(
   initPageContents(flow);
 
 initEmailSignIn(finish);
+document.addEventListener("account-content-updated", () =>
+  initEmailSignIn(finish),
+);
 
 form("[data-second-factor]", async (_element, values) => {
   const backup = values.has("backup");
@@ -203,8 +206,8 @@ form("[data-account-profile]", async (element, values) => {
       teams: values.getAll("teams"),
       certifications: values.getAll("certifications"),
       training: values.getAll("training"),
+      applicationUserId: element.dataset.profileUserId,
       ...(element.hasAttribute("data-application") && {
-        applicationUserId: element.dataset.profileUserId,
         heardAboutUsSources: values.getAll("heardAboutUsSources"),
         heardAboutUsOther: values
           .getAll("heardAboutUsSources")

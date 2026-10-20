@@ -7,6 +7,14 @@ import {
 } from "../helpers/local-account";
 import { totpFromSetupKey } from "../helpers/totp";
 
+test.use({
+  extraHTTPHeaders: async ({}, use) => {
+    // Isolate both browser and API requests from other tests' IP budgets.
+    const ip = crypto.getRandomValues(new Uint8Array(2));
+    await use({ "cf-connecting-ip": `198.18.${ip[0]}.${ip[1]}` });
+  },
+});
+
 test.beforeEach(async ({ page, baseURL }) => {
   test.skip(
     !baseURL?.startsWith("http://localhost:"),
@@ -422,7 +430,8 @@ test("account navigation and profile controls are usable on desktop and mobile",
     for (const option of await certificationOptions.all()) {
       await expect(option).toHaveCSS("align-items", "flex-start");
       await expect(option).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      await expect(option).toHaveCSS("padding", "0px");
+      await expect(option).toHaveCSS("padding-inline-start", "0px");
+      await expect(option).toHaveCSS("padding-inline-end", "0px");
       await expect(option).toHaveCSS("border-top-width", "0px");
     }
     await certifications

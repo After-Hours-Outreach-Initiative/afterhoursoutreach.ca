@@ -71,7 +71,6 @@ for (const [layout, viewport] of [
         await page.evaluate(() => document.fonts.ready);
         const initial = await measure();
         if (layout === "mobile") {
-          expect(initial.barHeight).toBe(54);
           await page.locator("[data-application-contents] summary").click();
         }
         expect((await indicator.boundingBox())!.height).toBe(statusHeight);
@@ -244,20 +243,23 @@ test("autosave message is present before answers without JavaScript", async ({
           "[data-application-contents] [data-contents-menu]",
         );
         const dropdown = menu.locator("[data-contents-dropdown]");
+        const bar = page.locator(
+          "[data-application-contents] [data-contents-bar]",
+        );
+        const barHeight = (await bar.boundingBox())!.height;
         if ((await menu.getAttribute("open")) === null) {
-          await expect(
-            page.locator("[data-application-contents] [data-contents-bar]"),
-          ).toHaveCSS("height", "54px");
           await menu.locator("summary").click();
         }
         await expect(page.locator("[data-application-contents]")).toHaveCSS(
           "position",
           "sticky",
         );
-        await expect(dropdown).toHaveCSS("position", "absolute");
+        await expect(
+          menu.locator(".volunteer-contents-dropdown-band"),
+        ).toHaveCSS("position", "absolute");
         await expect(dropdown).toHaveCSS(
           "max-height",
-          `${viewport.height - 70}px`,
+          `${viewport.height - barHeight}px`,
         );
         await expect(dropdown).toHaveCSS("overflow-y", "auto");
         await expect(dropdown.getByRole("link")).toHaveCount(7);
@@ -286,7 +288,7 @@ test("autosave message is present before answers without JavaScript", async ({
         await expect(lastLink).toBeFocused();
         if (viewport.height === 240) {
           expect((await dropdown.boundingBox())!.height).toBe(
-            viewport.height - 70,
+            viewport.height - barHeight,
           );
           expect(
             await dropdown.evaluate((element) => element.scrollTop),

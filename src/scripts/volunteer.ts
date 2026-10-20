@@ -85,11 +85,13 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       new URL(location.href).searchParams.get("type") ?? "all",
     );
     initEventDates(root);
+    document.dispatchEvent(new Event("account-content-updated"));
     return;
   }
   if (root.dataset.eventAccess !== "true") {
     root.replaceChildren(...refreshed.childNodes);
     root.dataset.eventVersion = refreshed.dataset.eventVersion;
+    document.dispatchEvent(new Event("account-content-updated"));
     return;
   }
   const list = root.querySelector<HTMLElement>("[data-event-list]")!;

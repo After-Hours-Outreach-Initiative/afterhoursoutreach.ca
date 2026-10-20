@@ -9,11 +9,14 @@ import { safeReturnTo } from "../server/http";
 import type { SignInEmail } from "../server/auth/services";
 
 const resendCooldownMs = 30_000;
+const initializedPanels = new WeakSet<HTMLElement>();
 
 export function initEmailSignIn(finish: (result: object) => void) {
   for (const panel of document.querySelectorAll<HTMLElement>(
     ".volunteer-signin-panel",
   )) {
+    if (initializedPanels.has(panel)) continue;
+    initializedPanels.add(panel);
     const request = panel.querySelector<HTMLFormElement>(
       "[data-email-request]",
     );

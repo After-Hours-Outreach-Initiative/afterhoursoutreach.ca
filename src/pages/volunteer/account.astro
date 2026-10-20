@@ -55,7 +55,10 @@ try {
     Astro.request,
   );
   forwardCookies(headers, Astro.response.headers);
-  if (!current)
+  if (
+    !current?.user.emailVerified ||
+    (current.user.twoFactorEnabled && !current.session.twoFactorVerified)
+  )
     return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/account");
   values = await loadProfile(env.DB, current.user.id);
   if (!values) return Astro.redirect("/apply");

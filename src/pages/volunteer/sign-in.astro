@@ -17,7 +17,10 @@ if (env.BETTER_AUTH_SECRET) {
       Astro.request,
     );
     forwardCookies(headers, Astro.response.headers);
-    if (current)
+    if (
+      current?.user.emailVerified &&
+      (!current.user.twoFactorEnabled || current.session.twoFactorVerified)
+    )
       return Astro.redirect(
         safeReturnTo(Astro.url.searchParams.get("returnTo") ?? undefined),
       );

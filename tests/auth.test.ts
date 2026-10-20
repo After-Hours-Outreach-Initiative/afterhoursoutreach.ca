@@ -123,6 +123,40 @@ const answers = {
   medicalConditions: "Sample private answer",
 };
 
+test("simulated sign-in email preserves provider quota while hosted requests still enforce it", async () => {
+  const start = Math.floor(Date.now() / 86_400_000) * 86_400_000;
+  const key = await hashAuthValue(
+    bindings.BETTER_AUTH_SECRET,
+    `rate:send-total:86400000:${start}`,
+  );
+  await bindings.DB.prepare(
+    "INSERT INTO auth_rate_limit (key, count, expires_at) VALUES (?, 80, ?)",
+  )
+    .bind(key, start + 86_400_000)
+    .run();
+  const local = createAuth({ ...bindings, APP_ENV: "local" }, "192.0.2.2");
+  const response = await local.handler(
+    new Request(`${origin}/api/v1/auth/email-otp/send-verification-otp`, {
+      method: "POST",
+      headers: { origin, "content-type": "application/json" },
+      body: JSON.stringify({ email: "local@example.org", type: "sign-in" }),
+    }),
+  );
+  assert.equal(response.status, 200, await response.text());
+  assert.equal(
+    await bindings.DB.prepare("SELECT count FROM auth_rate_limit WHERE key=?")
+      .bind(key)
+      .first("count"),
+    80,
+  );
+  const hosted = await request("/email-otp/send-verification-otp", {
+    email: "hosted@example.org",
+    type: "sign-in",
+  });
+  assert.equal(hosted.status, 429);
+  assert.equal(outbox.length, 0);
+});
+
 test("local D1 event notifications never contact a provider, even with a real-shaped key", async () => {
   const { cookie } = await signIn();
   const current = await auth.api.getSession({
