@@ -22,7 +22,7 @@
 .dialog-header,
 .dialog-footer {
   flex: 0 0 auto;
-  padding: 1rem var(--dialog-padding);
+  padding: 0.75rem var(--dialog-padding);
   background: #0c0d10;
 }
 .dialog-header {
