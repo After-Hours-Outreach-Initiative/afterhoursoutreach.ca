@@ -98,8 +98,8 @@ export function initPageContents(
         else link.removeAttribute("aria-current");
       }
   };
-  // Keep the buttons together near 3/4 of the viewport, above its bottom gap
-  // and below sticky navigation when a short screen requires a higher position.
+  // Count the final actions as current when they reach the lower reading edge,
+  // even when the document ends before they can reach the headings' top edge.
   const actionsReadingEdge = (height: number) =>
     Math.max(
       stickyHeight + barHeight + readingGap + height / 2,
@@ -156,44 +156,15 @@ export function initPageContents(
       if (parent instanceof HTMLDetailsElement) parent.open = true;
     }
   };
-  const visit = (hash: string) => {
+  const revealSection = (hash: string) => {
     const section = sections.find((section) => section.hash === hash);
     const target = section?.target;
     if (!section || !target || content.hidden || contents.hidden) return;
     reveal(target);
     menu.open = false;
-    measure();
-    activate(section);
-    const focusTarget =
-      target instanceof HTMLDetailsElement
-        ? target.querySelector<HTMLElement>("summary")
-        : target;
-    focusTarget?.focus({ preventScroll: true });
-    if (hash === `#${topId}`) window.scrollTo({ top: 0, behavior: "instant" });
-    else if (section === actions) {
-      // Cancel an earlier validation/review smooth scroll and let its last
-      // queued frame settle before positioning the buttons.
-      window.scrollTo({ top: window.scrollY, behavior: "instant" });
-      requestAnimationFrame(() => {
-        if (
-          content.hidden ||
-          contents.hidden ||
-          document.activeElement !== target
-        )
-          return;
-        const bounds = target.getBoundingClientRect();
-        window.scrollTo({
-          top:
-            window.scrollY +
-            bounds.top +
-            bounds.height / 2 -
-            actionsReadingEdge(bounds.height),
-          behavior: "instant",
-        });
-        schedule();
-      });
-    } else target.scrollIntoView({ block: "start", behavior: "instant" });
-    schedule();
+    // Prepare hidden content and CSS scroll margins before the native jump.
+    // The browser owns fragment scrolling, focus and history restoration.
+    refresh();
   };
   for (const { links } of sections) {
     for (const link of links)
@@ -207,12 +178,7 @@ export function initPageContents(
           event.shiftKey
         )
           return;
-        event.preventDefault();
-        // Review jumps stay within the step, preserving Back/Edit navigation.
-        // Other jumps retain history without racing measured scroll offsets.
-        if (!review && location.hash !== link.hash)
-          history.pushState(history.state, "", link.hash);
-        visit(link.hash);
+        revealSection(link.hash);
       });
   }
   flow.addEventListener("toggle", refresh, true);
@@ -266,22 +232,9 @@ export function initPageContents(
   });
   window.addEventListener("scroll", schedule, { passive: true });
   window.addEventListener("resize", refresh);
-  window.addEventListener("pageshow", (event) => {
-    refresh();
-    // Override initial native jumps for the intro and action alignment, while
-    // leaving bfcache scroll restoration alone on subsequent page visits.
-    if (
-      !event.persisted &&
-      (location.hash === `#${topId}` || location.hash === actions?.hash)
-    )
-      requestAnimationFrame(() => visit(location.hash));
-  });
-  window.addEventListener("hashchange", () => {
-    // History traversal restores scroll after dispatching its events. Apply the
-    // measured anchor jump afterwards so focus and the reading edge agree.
-    requestAnimationFrame(() => visit(location.hash));
-  });
+  window.addEventListener("pageshow", refresh);
+  window.addEventListener("hashchange", () => revealSection(location.hash));
   window.addEventListener("popstate", schedule);
   refresh();
-  visit(location.hash);
+  revealSection(location.hash);
 }

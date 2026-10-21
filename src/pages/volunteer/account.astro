@@ -164,9 +164,7 @@ const contents = [
         )
       }
       <section class="volunteer-panel">
-        <h2 id="account-profile-heading" data-contents-section tabindex="-1">
-          Your profile
-        </h2>
+        <h2 id="account-profile-heading" data-contents-section>Your profile</h2>
         <div class="account-profile-summary mt-6 mb-8">
           <dl>
             <div>
@@ -203,13 +201,13 @@ const contents = [
       </section>
       <SubmittedApplication submission={submission} />
       <section class="volunteer-panel">
-        <h2 id="account-settings-heading" data-contents-section tabindex="-1">
+        <h2 id="account-settings-heading" data-contents-section>
           Account settings
         </h2>
         <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />
         <div class="volunteer-setting" data-factor-settings>
           <div>
-            <h3 id="account-factor-heading" data-contents-section tabindex="-1">
+            <h3 id="account-factor-heading" data-contents-section>
               Two-factor authentication
             </h3>
             {
@@ -415,11 +413,7 @@ const contents = [
         </div>
         <div class="volunteer-setting" data-account-sessions>
           <div class="w-full">
-            <h3
-              id="account-sessions-heading"
-              data-contents-section
-              tabindex="-1"
-            >
+            <h3 id="account-sessions-heading" data-contents-section>
               Sessions
             </h3>
             {

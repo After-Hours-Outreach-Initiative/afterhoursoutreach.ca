@@ -445,9 +445,7 @@ body:has([data-application], [data-account-contents-flow]) {
   visibility: visible;
 }
 .volunteer-contents a:focus-visible,
-.volunteer-contents summary:focus-visible,
-.volunteer-actions[data-contents-actions]:focus-visible,
-.volunteer-application-section > .volunteer-profile-heading:focus-visible {
+.volunteer-contents summary:focus-visible {
   outline: 3px solid #4169e1;
   outline-offset: 0.25rem;
 }
@@ -645,6 +643,8 @@ body:has([data-application], [data-account-contents-flow]) {
   }
 }
 [data-application-questions],
+[data-application-section],
+[data-contents-actions],
 .volunteer-application-section,
 [data-application-review-step] h3,
 [data-application] [data-application-step-heading],
