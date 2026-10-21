@@ -14,7 +14,7 @@ interface Props {
 }
 const { event, series } = Astro.props;
 const dialogId = `event-editor-${event?.id ?? "new"}`;
-const publicVisibility = Boolean(event?.open && !event.hidden);
+const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
 ---
 
 <dialog
