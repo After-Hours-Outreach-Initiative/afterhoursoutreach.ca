@@ -1359,6 +1359,7 @@ body:has([data-application], [data-account-contents-flow]) {
   line-height: 1.6;
 }
 .volunteer-field:has(:user-invalid) > [data-error],
+.volunteer-date-input:has([aria-invalid="true"]) > [data-error],
 .volunteer-team-options:has(input[name="teams"]:user-invalid) + [data-error],
 .volunteer-certifications:has(input[name="certifications"]:user-invalid)
   > [data-error],
@@ -1370,12 +1371,14 @@ body:has([data-application], [data-account-contents-flow]) {
 }
 .volunteer-portal
   input:user-invalid:not(.volunteer-choice-options > label > input),
+.volunteer-date-input input[aria-invalid="true"],
 .volunteer-portal textarea:user-invalid,
 .volunteer-portal select:user-invalid {
   border-color: #f87171;
 }
 .volunteer-portal
-  :user-invalid:focus-visible:not(.volunteer-choice-options > label > input) {
+  :user-invalid:focus-visible:not(.volunteer-choice-options > label > input),
+.volunteer-date-input [aria-invalid="true"]:focus-visible {
   outline-color: #f87171;
 }
 .volunteer-portal

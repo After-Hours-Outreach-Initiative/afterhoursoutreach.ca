@@ -8,7 +8,7 @@ import {
   dateParts,
   type DateParts,
 } from "../data/date-input";
-import { vancouverInstant } from "../data/event-time";
+import { futureEventInstant, vancouverInstant } from "../data/event-time";
 
 const parts = ["day", "month", "year"] as const;
 const initialized = new WeakMap<HTMLFieldSetElement, () => void>();
@@ -99,16 +99,25 @@ export function setDateInputActive(
 
 export function initDateInputs(root: Document | HTMLElement) {
   for (const group of groups(root)) {
-    if (initialized.has(group)) continue;
+    const refresh = initialized.get(group);
+    if (refresh) {
+      // Recheck the clock when an event is saved after sitting open.
+      refresh();
+      continue;
+    }
     const fields = controls(group);
     const feedback = group.querySelector<HTMLElement>("[data-error] span")!;
     const fallback = feedback.textContent!;
     const birthDate = group.hasAttribute("data-birth-date");
+    const futureOnly = group.hasAttribute("data-date-future");
+    let showError = false;
     const update = () => {
       sync(group);
       const { day, month, year, time } = fields;
-      for (const input of [day, month, year, time])
+      for (const input of [day, month, year, time]) {
         input?.setCustomValidity("");
+        if (futureOnly) input?.removeAttribute("aria-invalid");
+      }
       if (day.readOnly) return;
       if (
         !day.required &&
@@ -171,20 +180,50 @@ export function initDateInputs(root: Document | HTMLElement) {
         if (!time.value) error = ["time", "Enter a start time."];
         else {
           try {
-            vancouverInstant(fields.canonical.value);
+            if (futureOnly) futureEventInstant(fields.canonical.value);
+            else vancouverInstant(fields.canonical.value);
           } catch (failure) {
             error = ["time", (failure as Error).message];
           }
         }
       }
-      if (error) fields[error[0]]!.setCustomValidity(error[1]);
+      if (error) {
+        const input = fields[error[0]]!;
+        input.setCustomValidity(error[1]);
+        if (futureOnly && showError) input.setAttribute("aria-invalid", "true");
+      }
       feedback.textContent = error?.[1] ?? fallback;
     };
     initialized.set(group, update);
     // Target listeners run before form-level autosave and dirty tracking.
     group.addEventListener("input", update);
     group.addEventListener("change", update);
-    group.form?.addEventListener("reset", () => queueMicrotask(update));
+    if (futureOnly) {
+      // A calendar error can belong to an untouched part (e.g. day 31 after
+      // changing the month). Expose it on the visible control, not the hidden
+      // canonical value, without relying solely on :user-invalid.
+      group.addEventListener("focusout", (event) => {
+        if (
+          event.relatedTarget instanceof Node &&
+          group.contains(event.relatedTarget)
+        )
+          return;
+        showError = true;
+        update();
+      });
+      group.addEventListener(
+        "invalid",
+        () => {
+          showError = true;
+          update();
+        },
+        true,
+      );
+    }
+    group.form?.addEventListener("reset", () => {
+      showError = false;
+      queueMicrotask(update);
+    });
     update();
   }
 }

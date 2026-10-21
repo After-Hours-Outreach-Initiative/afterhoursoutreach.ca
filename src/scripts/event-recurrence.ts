@@ -123,6 +123,8 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     );
     const fields = form.querySelector<HTMLElement>("[data-recurrence-fields]");
     if (!repeat || !type || !controls || !fields) continue;
+    const endDate = fields.querySelector<HTMLInputElement>('[name="endDate"]')!;
+    const start = form.querySelector<HTMLInputElement>('[name="startsAt"]')!;
     const update = () => {
       const patrol = type.value === "patrol";
       controls.hidden = !patrol;
@@ -130,11 +132,18 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
       fields.hidden = !patrol || !repeat.checked;
       for (const input of fields.querySelectorAll<HTMLInputElement>("input"))
         input.disabled = fields.hidden;
+      endDate.min = start.value.slice(0, 10);
     };
     if (!form.dataset.recurrenceReady) {
       form.dataset.recurrenceReady = "true";
       type.addEventListener("change", update);
       repeat.addEventListener("change", update);
+      form
+        .querySelector('[data-date-input="startsAt"]')
+        ?.addEventListener("input", update);
+      form
+        .querySelector('[data-date-input="startsAt"]')
+        ?.addEventListener("change", update);
       form.addEventListener("reset", () => queueMicrotask(update));
     }
     update();
