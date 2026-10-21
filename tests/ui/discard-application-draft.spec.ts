@@ -139,10 +139,8 @@ for (const [layout, viewport] of [
     await page.locator('[data-birth-date-part="day"]').fill("23");
     await page.locator('[name="teams"][value="medic"]').check();
     await page
-      .locator(
-        '[data-date-input="certificationExpiry"] [data-date-part="year"]',
-      )
-      .fill("203");
+      .locator('[data-date-input="certificationExpiry"] [data-native-date]')
+      .fill("2030-02-14");
     await page.locator('[name="medicalConditions"]').fill("Private old answer");
     await saved(page, "Old application");
     await page.locator('[name="phone"]').fill("Unsynced answer");
@@ -160,7 +158,7 @@ for (const [layout, viewport] of [
       ).toHaveValue("");
     await expect(
       page.locator(
-        '[data-date-input="certificationExpiry"] [data-date-part="year"]',
+        '[data-date-input="certificationExpiry"] [data-native-date]',
       ),
     ).toHaveValue("");
     await expect(page.locator('[name="medicalConditions"]')).toHaveValue("");

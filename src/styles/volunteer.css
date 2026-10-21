@@ -694,6 +694,45 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-date-parts input {
   min-width: 0;
 }
+.volunteer-native-date {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.volunteer-native-date input {
+  min-width: 0;
+}
+.volunteer-native-date input::-webkit-date-and-time-value {
+  min-height: 1.5em;
+  text-align: left;
+}
+.volunteer-date-placeholder {
+  display: none;
+  position: absolute;
+  inset: 1px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: calc(0.375rem - 1px);
+  background: #050608;
+  color: #a1a1aa;
+  pointer-events: none;
+}
+/* Reveal native date segments during keyboard entry, even before a full date. */
+.volunteer-native-date
+  input[data-empty]:not(:focus)
+  + .volunteer-date-placeholder {
+  display: flex;
+}
+.volunteer-native-date input[readonly] + .volunteer-date-placeholder {
+  background: #171a20;
+}
+.volunteer-date-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
 .volunteer-portal input[type="checkbox"],
 .volunteer-portal input[type="radio"] {
   width: var(--volunteer-check-size);

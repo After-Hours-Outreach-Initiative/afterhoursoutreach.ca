@@ -1,5 +1,6 @@
 ---
 import type { PatrolSeriesRow } from "@/server/db/events";
+import NativeDateInput from "./NativeDateInput.astro";
 interface Props {
   series: PatrolSeriesRow[];
 }
@@ -55,9 +56,8 @@ const { series } = Astro.props;
           <input type="hidden" name="seriesId" value={item.id} />
           <label class="volunteer-field">
             Scheduled date to manage
-            <input
+            <NativeDateInput
               name="occurrenceDate"
-              type="date"
               min={item.firstDate}
               required
             />
@@ -89,9 +89,8 @@ const { series } = Astro.props;
           <input type="hidden" name="series" value={JSON.stringify(item)} />
           <label class="volunteer-field">
             Last recurring date (optional, inclusive)
-            <input
+            <NativeDateInput
               name="endDate"
-              type="date"
               min={item.firstDate}
               value={item.endDate ?? ""}
             />
@@ -121,9 +120,8 @@ const { series } = Astro.props;
           <input type="hidden" name="version" value={item.updatedAt} />
           <label class="volunteer-field">
             Stop from scheduled date
-            <input
+            <NativeDateInput
               name="occurrenceDate"
-              type="date"
               min={item.firstDate}
               max={item.endDate ?? undefined}
               required

@@ -9,6 +9,7 @@ import {
   type DateParts,
 } from "../data/date-input";
 import { futureEventInstant, vancouverInstant } from "../data/event-time";
+import { syncNativeDateInput } from "./native-date-input";
 
 const parts = ["day", "month", "year"] as const;
 const initialized = new WeakMap<HTMLFieldSetElement, () => void>();
@@ -18,6 +19,7 @@ function controls(group: HTMLFieldSetElement) {
     canonical: group.querySelector<HTMLInputElement>(
       'input[type="hidden"][name]',
     )!,
+    date: group.querySelector<HTMLInputElement>("[data-native-date]"),
     day: group.querySelector<HTMLInputElement>('[data-date-part="day"]')!,
     month: group.querySelector<HTMLInputElement>('[data-date-part="month"]')!,
     year: group.querySelector<HTMLInputElement>('[data-date-part="year"]')!,
@@ -27,18 +29,21 @@ function controls(group: HTMLFieldSetElement) {
 
 function sync(group: HTMLFieldSetElement) {
   const fields = controls(group);
-  const value = {
-    day: fields.day.value,
-    month: fields.month.value,
-    year: fields.year.value,
-  };
+  const value = fields.date
+    ? dateParts(fields.date.value)
+    : {
+        day: fields.day.value,
+        month: fields.month.value,
+        year: fields.year.value,
+      };
   const date = canonicalDate(value);
   const time = fields.time?.value;
   fields.canonical.value =
     date && (!fields.time || /^\d{2}:\d{2}$/.test(time!))
       ? `${date}${fields.time ? `T${time}` : ""}`
       : "";
-  return dateDraftValue(value);
+  if (fields.date) syncNativeDateInput(fields.date);
+  return fields.date ? fields.date.value : dateDraftValue(value);
 }
 
 function groups(root: Document | HTMLElement) {
@@ -61,7 +66,8 @@ export function restoreDateInputs(
     if (typeof value !== "string") continue;
     const fields = controls(group);
     const restored = dateParts(value);
-    for (const part of parts) fields[part].value = restored[part];
+    if (fields.date) fields.date.value = canonicalDate(restored);
+    else for (const part of parts) fields[part].value = restored[part];
     sync(group);
     initialized.get(group)?.();
   }
@@ -74,6 +80,13 @@ export function saveDateInputDefaults(
   for (const group of groups(root)) {
     const fields = controls(group);
     const saved = dateParts(values[group.dataset.dateInput!] ?? "");
+    if (fields.date) {
+      const current = fields.date.value;
+      fields.date.defaultValue = canonicalDate(saved);
+      fields.date.value = current;
+      syncNativeDateInput(fields.date);
+      continue;
+    }
     for (const part of parts) {
       const input = fields[part];
       const current = input.value;
@@ -89,7 +102,7 @@ export function setDateInputActive(
 ) {
   group.hidden = !active;
   for (const input of group.querySelectorAll<HTMLInputElement>(
-    "[data-date-part]",
+    "[data-date-part], [data-native-date]",
   )) {
     input.required = active;
     input.readOnly = !active;
@@ -113,6 +126,32 @@ export function initDateInputs(root: Document | HTMLElement) {
     let showError = false;
     const update = () => {
       sync(group);
+      if (fields.date) {
+        const { date, time } = fields;
+        for (const input of [date, time]) {
+          input?.setCustomValidity("");
+          if (futureOnly) input?.removeAttribute("aria-invalid");
+        }
+        let error = "";
+        if (!date.readOnly && date.value && time) {
+          if (!time.value) error = "Enter a start time.";
+          else {
+            try {
+              if (futureOnly) futureEventInstant(fields.canonical.value);
+              else vancouverInstant(fields.canonical.value);
+            } catch (failure) {
+              error = (failure as Error).message;
+            }
+          }
+          time.setCustomValidity(error);
+          if (futureOnly && showError && error)
+            time.setAttribute("aria-invalid", "true");
+        }
+        if (futureOnly && showError && !date.validity.valid)
+          date.setAttribute("aria-invalid", "true");
+        feedback.textContent = error || fallback;
+        return;
+      }
       const { day, month, year, time } = fields;
       for (const input of [day, month, year, time]) {
         input?.setCustomValidity("");
