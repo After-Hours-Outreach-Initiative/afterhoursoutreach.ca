@@ -202,7 +202,7 @@ test("other viewers see signups and cancellations through polling without losing
     .getByRole("link", { name: "Manage events →", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Create event", exact: true }),
+    page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
   const meetingPoint = `Live availability ${crypto.randomUUID()}`;
   const created = await page.request.post("/api/v1/events/action", {

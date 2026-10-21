@@ -198,6 +198,12 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     for (const cookie of [attendee.cookie, organizerCookie]) {
       const html = await (await send("/events", undefined, cookie)).text();
       expect(html).toContain('data-live-event="live"');
+      expect(html).toContain("data-live-signup");
+      expect(html).toMatch(
+        cookie === attendee.cookie
+          ? />\s*Unregister\s*<\/button>/
+          : />\s*Register\s*<\/button>/,
+      );
       expect(html).not.toMatch(
         /data-live-event="(?:hidden|past)"|data-event-save|data-live-series|data-manage-signup|volunteer-roster|Renamed attendee/,
       );
@@ -210,6 +216,14 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     expect(managementHtml).toContain("← View events");
     expect(managementHtml).toContain("data-event-save");
     expect(managementHtml).toContain("volunteer-roster");
+    expect(managementHtml).not.toMatch(/data-live-signup|Sign in to register/);
+    expect(managementHtml.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g)).toEqual([
+      '<h1 id="events-heading">Manage events</h1>',
+    ]);
+    expect(managementHtml).not.toMatch(/<h2\b[^>]*>\s*Events\s*<\/h2>/);
+    expect(managementHtml).toMatch(
+      /<button[^>]*data-show-dialog="event-editor-new"[^>]*>[\s\S]*?\bCreate\s*<\/button>/,
+    );
     expect(await readVersion(organizerCookie, true)).toBe(
       await listingVersion(organizerCookie, true),
     );

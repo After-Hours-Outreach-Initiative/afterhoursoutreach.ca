@@ -72,9 +72,7 @@ test("event and profile dialogs preserve their layout and content throughout the
   for (const width of [1280, 320]) {
     await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
     await page.goto("/manage/events");
-    await page
-      .getByRole("button", { name: "Create event", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Create", exact: true }).click();
     await expectStableExit(page.locator("#event-editor-new"));
     await page
       .locator('[data-live-event="local-fixture-event-orientation"]')

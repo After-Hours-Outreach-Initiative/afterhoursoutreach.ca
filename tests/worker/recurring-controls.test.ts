@@ -284,7 +284,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     );
     await organizerPage.goto(`${origin}/manage/events`);
     await organizerPage
-      .getByRole("button", { name: "Create event", exact: true })
+      .getByRole("button", { name: "Create", exact: true })
       .click();
     const creator = organizerPage.locator("#event-editor-new");
     await creator
