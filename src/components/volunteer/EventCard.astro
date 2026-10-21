@@ -18,7 +18,8 @@ interface Props {
 const { event, actor, organizer, roster, destinations, filter, series } =
   Astro.props;
 const future = event.startsAt > Date.now();
-const left = Math.max(0, event.spots - event.confirmed);
+const left = event.availableSpots;
+const totalLeft = Math.max(0, event.spots - event.confirmed);
 const blocked =
   future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
     ? "Registration is available only for the next three patrol occurrences in this series."
@@ -37,8 +38,9 @@ const blocked =
 <li
   class="volunteer-event-card"
   data-live-event={event.id}
-  data-event-type={event.type}
-  hidden={filter !== "all" && filter !== event.type}
+  data-event-type="patrol"
+  data-includes-orientation={String(Boolean(event.includesOrientation))}
+  hidden={filter === "orientation" && !event.includesOrientation}
 >
   <div class="volunteer-event-top">
     <div>
@@ -55,10 +57,9 @@ const blocked =
         ) : null
       }
       <h3>
-        {event.type === "patrol" ? "Patrol" : "Orientation"} · {
-          formatEventDate(event.startsAt)
-        }
+        Patrol · {formatEventDate(event.startsAt)}
       </h3>
+      {Boolean(event.includesOrientation) && <p>Includes orientation</p>}
       <p>
         Meeting at{" "}
         {
@@ -81,9 +82,26 @@ const blocked =
             },
           ]}
         >
-          {left === 0 ? "Full" : `${left} spots left`}
+          {
+            totalLeft === 0
+              ? "Full"
+              : left === 0
+                ? "No places available to you"
+                : event.includesOrientation
+                  ? `${left} spots available to you`
+                  : `${left} spots left`
+          }
         </span>{" "}· {event.confirmed} of {event.spots} spots taken
       </p>
+      {
+        Boolean(event.includesOrientation) && (
+          <p class="volunteer-help">
+            Two places reserved for volunteers without completed orientation;
+            maximum four, included in total capacity. No minimum number of
+            orientation registrations.
+          </p>
+        )
+      }
       {
         organizer && series && (
           <p class="volunteer-help">

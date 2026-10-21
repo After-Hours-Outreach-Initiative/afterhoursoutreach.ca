@@ -96,11 +96,11 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     );
     await expect(discord).toHaveCount(0);
     await volunteer
-      .getByRole("button", { name: "Orientations", exact: true })
+      .getByRole("button", { name: "Includes orientation", exact: true })
       .click();
     await expect(volunteer).toHaveURL(/\?type=orientation$/);
     const orientation = volunteer
-      .locator('[data-live-event][data-event-type="orientation"]')
+      .locator('[data-live-event][data-includes-orientation="true"]')
       .filter({ hasText: "Strathcona Community Centre" });
     await orientation
       .getByRole("button", { name: "Register", exact: true })

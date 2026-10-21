@@ -9,7 +9,6 @@ import {
 const values = (extra: Record<string, string> = {}) => {
   const result = new FormData();
   for (const [key, value] of Object.entries({
-    type: "patrol",
     startsAt: "2026-11-03T20:30",
     meetingPoint: "Meeting point",
     meetingPointUrl: "",
@@ -20,7 +19,7 @@ const values = (extra: Record<string, string> = {}) => {
     result.set(key, value);
   return result;
 };
-test("creation keeps Vancouver wall time and inclusive end date, with recurrence restricted to patrols", () => {
+test("creation keeps Vancouver wall time and inclusive end date with optional orientation on recurring patrols", () => {
   expect(recurringSaveAction(values())).toBeNull();
   expect(
     recurringSaveAction(
@@ -36,13 +35,17 @@ test("creation keeps Vancouver wall time and inclusive end date, with recurrence
       meetingPoint: "Meeting point",
       meetingPointUrl: "",
       spots: 8,
+      includesOrientation: false,
       open: true,
       hidden: false,
     },
   });
   expect(
-    recurringSaveAction(values({ type: "orientation", recurring: "on" })),
-  ).toBeNull();
+    recurringSaveAction(values({ includesOrientation: "on", recurring: "on" })),
+  ).toMatchObject({
+    action: "save-series",
+    series: { includesOrientation: true },
+  });
 });
 test("this-and-future edits use nominal identities and series versions, not occurrence IDs or UTC offsets", () => {
   const data = values({
@@ -53,13 +56,20 @@ test("this-and-future edits use nominal identities and series versions, not occu
     occurrenceDate: "2026-11-01",
     scope: "future",
     publicVisibility: "false",
+    includesOrientation: "on",
   });
   expect(recurringSaveAction(data)).toMatchObject({
     action: "update-series-from",
     id: "series",
     version: 8,
     occurrenceDate: "2026-11-01",
-    template: { dayOffset: 2, localTime: "20:30", open: false, hidden: true },
+    template: {
+      dayOffset: 2,
+      localTime: "20:30",
+      open: false,
+      hidden: true,
+      includesOrientation: true,
+    },
   });
   expect(recurringCancelAction(data)).toEqual({
     action: "stop-series",
@@ -99,6 +109,7 @@ test("end-date updates send only the established series contract and preserve vi
       spots: 8,
       open: 0,
       hidden: 0,
+      includesOrientation: 1,
       stoppedFrom: "2026-12-01",
       updatedAt: 9,
     }),
@@ -117,6 +128,7 @@ test("end-date updates send only the established series contract and preserve vi
       spots: 8,
       open: false,
       hidden: false,
+      includesOrientation: true,
     },
   });
 });

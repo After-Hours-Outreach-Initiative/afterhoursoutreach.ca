@@ -122,11 +122,11 @@ test("other viewers see signups and cancellations through polling without losing
     data: {
       action: "save",
       event: {
-        type: "orientation",
+        includesOrientation: true,
         startsAt: new Date(Date.now() + 86_400_000).toISOString(),
         meetingPoint,
         meetingPointUrl: "",
-        spots: 1,
+        spots: 2,
         open: true,
         hidden: false,
       },
@@ -139,6 +139,11 @@ test("other viewers see signups and cancellations through polling without losing
   // Creating the event in a different request must also update this viewer.
   await expect(organizerCard).toBeVisible({ timeout: 15_000 });
   const eventId = await organizerCard.getAttribute("data-live-event");
+  const reserved = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: { action: "join", id: eventId },
+  });
+  expect(reserved.status(), await reserved.text()).toBe(200);
   const visitorContext = await browser.newContext();
   const viewerContext = await browser.newContext();
   const attendeeContext = await browser.newContext();
@@ -168,7 +173,7 @@ test("other viewers see signups and cancellations through polling without losing
     ).toHaveCount(0);
     for (const current of [viewer, attendee])
       await expect(card(current).locator(".volunteer-spots")).toHaveText(
-        "1 spots left",
+        "1 spots available to you",
       );
     await organizerCard
       .getByRole("button", { name: "Edit", exact: true })
@@ -211,7 +216,7 @@ test("other viewers see signups and cancellations through polling without losing
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
     await expect(
-      viewer.getByRole("button", { name: "Orientations", exact: true }),
+      viewer.getByRole("button", { name: "Includes orientation", exact: true }),
     ).toBeFocused();
     expect(failedRefreshes).toBeGreaterThanOrEqual(2);
     await viewer.unroute("**/events?type=orientation");
@@ -221,10 +226,12 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(editor).toBeVisible();
     await expect(viewer).toHaveURL(/\?type=orientation$/);
     await expect(
-      viewer.locator('[data-event-type="patrol"]:visible'),
+      viewer.locator(
+        '[data-live-event][data-includes-orientation="false"]:visible',
+      ),
     ).toHaveCount(0);
     await editor.getByRole("button", { name: "Close", exact: true }).click();
-    await expect(organizerCard.locator("summary")).toHaveText("Volunteers (1)");
+    await expect(organizerCard.locator("summary")).toHaveText("Volunteers (2)");
     // Pause polling while the attendee cancels. Becoming visible must catch up
     // even though the cancellation happened while this viewer was hidden.
     await viewer.evaluate(() => {
@@ -249,13 +256,13 @@ test("other viewers see signups and cancellations through polling without losing
       document.dispatchEvent(new Event("visibilitychange"));
     });
     await expect(card(viewer).locator(".volunteer-spots")).toHaveText(
-      "1 spots left",
+      "1 spots available to you",
       { timeout: 15_000 },
     );
     await expect(
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toBeEnabled();
-    await expect(organizerCard.locator("summary")).toHaveText("Volunteers (0)");
+    await expect(organizerCard.locator("summary")).toHaveText("Volunteers (1)");
     expect(documents).toEqual([]);
     expect(errors).toEqual([]);
   } finally {

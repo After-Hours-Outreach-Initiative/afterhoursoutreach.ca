@@ -8,7 +8,12 @@ import {
   permissionValues,
 } from "./access";
 import { RequestError } from "../http";
-import { nowMsSql, profileDisplayNameSql } from "./sql";
+import { includesOrientationSql, nowMsSql, profileDisplayNameSql } from "./sql";
+import {
+  availableSignupSpots,
+  orientationCapacityMessage,
+  validOrientationCapacity,
+} from "./policy";
 import { databaseWriteError } from "./errors";
 import {
   ensurePatrolOccurrences,
@@ -31,24 +36,40 @@ export {
   type PatrolSeriesRow,
 } from "./patrol-series";
 
-export const eventSchema = z.strictObject({
-  type: z.enum(["patrol", "orientation"]),
-  startsAt: z.iso.datetime({ offset: true }),
-  meetingPoint: z.string().trim().min(1).max(500),
-  meetingPointUrl: z.union([
-    z.literal(""),
-    z
-      .url()
-      .max(2048)
-      .refine((value) => new URL(value).protocol === "https:"),
-  ]),
-  spots: z.number().int().min(1).max(100),
-  open: z.boolean(),
-  hidden: z.boolean(),
-});
+export const eventSchema = z
+  .strictObject({
+    // Accept old clients during rollout; includesOrientation is the public model.
+    type: z.enum(["patrol", "orientation"]).optional(),
+    includesOrientation: z.boolean().optional(),
+    startsAt: z.iso.datetime({ offset: true }),
+    meetingPoint: z.string().trim().min(1).max(500),
+    meetingPointUrl: z.union([
+      z.literal(""),
+      z
+        .url()
+        .max(2048)
+        .refine((value) => new URL(value).protocol === "https:"),
+    ]),
+    spots: z.number().int().min(1).max(100),
+    open: z.boolean(),
+    hidden: z.boolean(),
+  })
+  .refine(
+    (value) =>
+      value.includesOrientation !== undefined || value.type !== undefined,
+  )
+  .transform(({ type, ...value }) => ({
+    ...value,
+    includesOrientation: value.includesOrientation ?? type === "orientation",
+  }))
+  .refine(validOrientationCapacity, {
+    message: orientationCapacityMessage,
+    path: ["spots"],
+  });
 export interface EventRow {
   id: string;
   type: "patrol" | "orientation";
+  includesOrientation: number;
   seriesId: string | null;
   occurrenceDate: string | null;
   inSignupWindow: number;
@@ -61,6 +82,9 @@ export interface EventRow {
   cancelledAt: number | null;
   updatedAt: number;
   confirmed: number;
+  orientationConfirmed: number;
+  orientationCompleted: number;
+  availableSpots: number;
   // This and later nominal occurrences, including bookings outside the page/window.
   futureConfirmed: number;
   futureEditableConfirmed: number;
@@ -75,7 +99,8 @@ export interface RosterRow {
   completed: number;
 }
 const eventColumns = `
-  e.id, e.type, e.starts_at AS startsAt,
+  e.id, CASE WHEN ${includesOrientationSql()} THEN 'orientation' ELSE 'patrol' END AS type,
+  ${includesOrientationSql()} AS includesOrientation, e.starts_at AS startsAt,
   e.series_id AS seriesId, e.occurrence_date AS occurrenceDate,
   ${recurringSignupWindowSql()} AS inSignupWindow,
   e.meeting_point AS meetingPoint, e.meeting_point_url AS meetingPointUrl,
@@ -83,9 +108,10 @@ const eventColumns = `
   e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
 
 export function eventDescription(
-  event: Pick<EventRow, "type" | "startsAt" | "meetingPoint">,
+  event: Pick<EventRow, "type" | "startsAt" | "meetingPoint"> &
+    Partial<Pick<EventRow, "includesOrientation">>,
 ) {
-  return `${event.type === "patrol" ? "Patrol" : "Orientation"}: ${new Intl.DateTimeFormat(
+  return `Patrol${(event.includesOrientation ?? event.type === "orientation") ? " (includes orientation)" : ""}: ${new Intl.DateTimeFormat(
     "en-CA",
     {
       timeZone: "America/Vancouver",
@@ -114,6 +140,9 @@ export async function listEvents(
   const select = `SELECT ${eventColumns},
     (SELECT count(*) FROM signup
       WHERE event_id = e.id AND status = 'confirmed') AS confirmed,
+    (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
+      AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) AS orientationConfirmed,
+    EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = ?) AS orientationCompleted,
     ${organizer ? `(${futureSignups})` : "0"} AS futureConfirmed,
     ${
       organizer
@@ -124,14 +153,14 @@ export async function listEvents(
     } AS futureEditableConfirmed,
     EXISTS(SELECT 1 FROM signup
       WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp,
-    (e.type = 'orientation' AND EXISTS(
+    (${includesOrientationSql()} AND EXISTS(
       SELECT 1 FROM volunteer_status v
       WHERE v.user_id = ? AND v.patrol_approved = 0
         AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = v.user_id)
         AND EXISTS(
           SELECT 1 FROM signup s JOIN event booked ON booked.id = s.event_id
           WHERE s.user_id = v.user_id AND s.status = 'confirmed'
-            AND booked.type = 'orientation' AND booked.cancelled_at IS NULL
+            AND ${includesOrientationSql("booked")} AND booked.cancelled_at IS NULL
             AND booked.starts_at > ${nowMsSql}
         )
     )) AS orientationSignupBlocked
@@ -148,7 +177,12 @@ export async function listEvents(
           e.starts_at DESC
         LIMIT 100`,
         )
-        .bind(actor?.id ?? "", actor?.id ?? "", selectedOccurrence ?? "")
+        .bind(
+          actor?.id ?? "",
+          actor?.id ?? "",
+          actor?.id ?? "",
+          selectedOccurrence ?? "",
+        )
     : db
         .prepare(
           `${select}
@@ -164,9 +198,17 @@ export async function listEvents(
         ORDER BY e.starts_at ASC
         LIMIT 100`,
         )
-        .bind(actor?.id ?? "", actor?.id ?? "", actor?.id ?? "");
+        .bind(
+          actor?.id ?? "",
+          actor?.id ?? "",
+          actor?.id ?? "",
+          actor?.id ?? "",
+        );
   const rows = await statement.all<EventRow>();
-  return rows.results;
+  return rows.results.map((row) => ({
+    ...row,
+    availableSpots: availableSignupSpots(row, row.confirmed),
+  }));
 }
 export async function findEvent(db: Env["DB"], id: string) {
   const row = await db
@@ -240,7 +282,10 @@ export async function saveEvent(
   if (!parsed.success)
     throw new RequestError(
       400,
-      "Check the event type, date, capacity (1–100), meeting point, and HTTPS map link.",
+      parsed.error.issues.find(
+        (issue) => issue.message === orientationCapacityMessage,
+      )?.message ??
+        "Check the orientation setting, date, capacity (1–100), meeting point, and HTTPS map link.",
     );
   const data = parsed.data;
   const startsAt = new Date(data.startsAt).getTime();
@@ -255,15 +300,15 @@ export async function saveEvent(
         db
           .prepare(
             `INSERT INTO event (
-              id, type, starts_at, meeting_point, meeting_point_url,
+              id, type, includes_orientation, starts_at, meeting_point, meeting_point_url,
               spots, open, hidden, created_by, created_at, updated_at
             )
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            SELECT ?, 'patrol', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             WHERE ${writePermission(true)}`,
           )
           .bind(
             id,
-            data.type,
+            Number(data.includesOrientation),
             startsAt,
             data.meetingPoint,
             data.meetingPointUrl || null,
@@ -288,16 +333,13 @@ export async function saveEvent(
         throw new RequestError(409, "Cancelled events cannot be edited.");
       if (old.startsAt <= now)
         throw new RequestError(409, "Past events cannot be edited.");
-      if (old.type !== data.type)
-        throw new RequestError(
-          409,
-          "An existing event's type cannot be changed. Create another event instead.",
-        );
       const fields = Object.keys(data).filter((key) => {
         const expected =
           key === "startsAt"
             ? startsAt
-            : key === "open" || key === "hidden"
+            : key === "open" ||
+                key === "hidden" ||
+                key === "includesOrientation"
               ? Number(data[key])
               : key === "meetingPointUrl"
                 ? data[key] || null
@@ -309,7 +351,7 @@ export async function saveEvent(
         db
           .prepare(
             `UPDATE event
-            SET starts_at = ?,
+            SET includes_orientation = ?, starts_at = ?,
                 meeting_point = ?,
                 meeting_point_url = ?,
                 spots = ?,
@@ -323,6 +365,7 @@ export async function saveEvent(
               AND ${writePermission(true)}`,
           )
           .bind(
+            Number(data.includesOrientation),
             startsAt,
             data.meetingPoint,
             data.meetingPointUrl || null,
@@ -340,7 +383,7 @@ export async function saveEvent(
           operation,
           id,
           "Your After Hours Outreach event changed",
-          `${eventDescription({ ...old, startsAt, meetingPoint: data.meetingPoint })}\n\n${data.open ? "Registration is open." : "Registration is closed. Your existing spot is still reserved."}`,
+          `${eventDescription({ ...old, includesOrientation: Number(data.includesOrientation), startsAt, meetingPoint: data.meetingPoint })}\n\n${data.open ? "Registration is open." : "Registration is closed. Your existing spot is still reserved."}`,
           notify,
         ),
       ]);

@@ -65,11 +65,9 @@ const destinations = events.filter(
     event.inSignupWindow &&
     !event.cancelledAt,
 );
-const filter = ["patrol", "orientation"].includes(
-  Astro.url.searchParams.get("type") ?? "",
-)
-  ? Astro.url.searchParams.get("type")!
-  : "all";
+// Legacy ?type=patrol now means all patrols, including those with orientation.
+const filter =
+  Astro.url.searchParams.get("type") === "orientation" ? "orientation" : "all";
 ---
 
 <AccountLayout
@@ -232,8 +230,7 @@ const filter = ["patrol", "orientation"].includes(
           >
             {[
               ["all", "All events"],
-              ["orientation", "Orientations"],
-              ["patrol", "Patrols"],
+              ["orientation", "Includes orientation"],
             ].map(([type, label]) => (
               <button
                 class="volunteer-filter"
@@ -265,7 +262,7 @@ const filter = ["patrol", "orientation"].includes(
             data-empty-events
             role="status"
             hidden={events.some(
-              (event) => filter === "all" || event.type === filter,
+              (event) => filter === "all" || Boolean(event.includesOrientation),
             )}
           >
             {events.length

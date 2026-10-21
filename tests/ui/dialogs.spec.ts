@@ -117,7 +117,7 @@ test("application dialogs keep their chrome visible while only their body scroll
       page.getByRole("button", { name: "Development controls", exact: true }),
     ).toBeFocused();
 
-    const add = page.getByRole("button", { name: "Create event", exact: true });
+    const add = page.locator('[data-show-dialog="event-editor-new"]');
     await add.click();
     const create = page.getByRole("dialog", { name: "Create event" });
     await expectPinnedChrome(create);
@@ -133,7 +133,7 @@ test("application dialogs keep their chrome visible while only their body scroll
       ).toBeGreaterThan(0);
     expect(
       await create
-        .getByRole("button", { name: "Save event" })
+        .getByRole("button", { name: "Create event" })
         .evaluate((element: HTMLButtonElement) =>
           element.form?.hasAttribute("data-event-save"),
         ),
@@ -147,12 +147,12 @@ test("application dialogs keep their chrome visible while only their body scroll
         endpoint: "/api/v1/events/action",
         form: create.locator("[data-event-save]"),
         trigger: () =>
-          create.getByRole("button", { name: "Save event" }).click(),
+          create.getByRole("button", { name: "Create event" }).click(),
         updated: () =>
           expect(create.locator("[data-form-message]")).toHaveText(
             "Please try again.",
           ),
-        loadingLabel: "Saving…",
+        loadingLabel: "Creating…",
         pending: async () => {
           await expect(
             create.getByRole("spinbutton", { name: "Volunteer spots" }),
@@ -165,7 +165,7 @@ test("application dialogs keep their chrome visible while only their body scroll
         },
       });
       await expect(
-        create.getByRole("button", { name: "Save event" }),
+        create.getByRole("button", { name: "Create event" }),
       ).toBeEnabled();
       await expect(create.locator("[data-form-message]")).toBeInViewport();
       for (const name of [

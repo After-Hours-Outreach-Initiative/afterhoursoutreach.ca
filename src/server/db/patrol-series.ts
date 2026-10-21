@@ -14,6 +14,7 @@ import {
 } from "./access";
 import { databaseWriteError } from "./errors";
 import { nowMsSql } from "./sql";
+import { orientationCapacityMessage, validOrientationCapacity } from "./policy";
 
 export const patrolSeriesSchema = z
   .strictObject({
@@ -32,8 +33,13 @@ export const patrolSeriesSchema = z
     spots: z.number().int().min(1).max(100),
     open: z.boolean(),
     hidden: z.boolean(),
+    includesOrientation: z.boolean().default(false),
   })
-  .refine((value) => !value.endDate || value.endDate >= value.firstDate);
+  .refine((value) => !value.endDate || value.endDate >= value.firstDate)
+  .refine(validOrientationCapacity, {
+    message: orientationCapacityMessage,
+    path: ["spots"],
+  });
 
 export interface PatrolSeriesRow {
   id: string;
@@ -48,6 +54,7 @@ export interface PatrolSeriesRow {
   spots: number;
   open: number;
   hidden: number;
+  includesOrientation: number;
   generationUntil: number;
   createdBy: string;
   createdAt: number;
@@ -56,7 +63,7 @@ export interface PatrolSeriesRow {
 const seriesColumns = `id, first_date AS firstDate, local_time AS localTime,
   interval_weeks AS intervalWeeks, end_date AS endDate, stopped_from AS stoppedFrom, time_zone AS timeZone,
   meeting_point AS meetingPoint, meeting_point_url AS meetingPointUrl,
-  spots, open, hidden, generation_until AS generationUntil,
+   spots, open, hidden, includes_orientation AS includesOrientation, generation_until AS generationUntil,
   created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt`;
 
 export const patrolTemplateSchema = z
@@ -68,16 +75,22 @@ export const patrolTemplateSchema = z
     spots: true,
     open: true,
     hidden: true,
+    includesOrientation: true,
   })
-  .extend({ dayOffset: z.number().int().min(-366).max(366).default(0) });
+  .extend({ dayOffset: z.number().int().min(-366).max(366).default(0) })
+  .refine(validOrientationCapacity, {
+    message: orientationCapacityMessage,
+    path: ["spots"],
+  });
 export type PatrolTemplateInput = z.infer<typeof patrolTemplateSchema>;
 export interface PatrolTemplate extends Omit<
   PatrolTemplateInput,
-  "open" | "hidden" | "meetingPointUrl"
+  "open" | "hidden" | "meetingPointUrl" | "includesOrientation"
 > {
   effectiveDate: string;
   open: number;
   hidden: number;
+  includesOrientation: number;
   meetingPointUrl: string | null;
 }
 export async function listPatrolTemplates(
@@ -94,7 +107,7 @@ async function readTemplates(db: Env["DB"], seriesId: string) {
       .prepare(
         `SELECT effective_date AS effectiveDate, local_time AS localTime,
     day_offset AS dayOffset, meeting_point AS meetingPoint, meeting_point_url AS meetingPointUrl,
-    spots, open, hidden FROM patrol_series_template WHERE series_id = ? ORDER BY effective_date`,
+     spots, open, hidden, includes_orientation AS includesOrientation FROM patrol_series_template WHERE series_id = ? ORDER BY effective_date`,
       )
       .bind(seriesId)
       .all<PatrolTemplate>()
@@ -264,11 +277,11 @@ function insertOccurrences(
     .prepare(
       `INSERT INTO event (
       id, type, series_id, occurrence_date, starts_at, meeting_point, meeting_point_url,
-      spots, open, hidden, created_by, created_at, updated_at)
+       spots, open, hidden, includes_orientation, created_by, created_at, updated_at)
     SELECT 'patrol:' || ps.id || ':' || json_extract(j.value, '$.date'), 'patrol', ps.id,
       json_extract(j.value, '$.date'), json_extract(j.value, '$.startsAt'),
        json_extract(j.value, '$.meetingPoint'), json_extract(j.value, '$.meetingPointUrl'),
-       json_extract(j.value, '$.spots'), json_extract(j.value, '$.open'), json_extract(j.value, '$.hidden'), ps.created_by, ?, ?
+        json_extract(j.value, '$.spots'), json_extract(j.value, '$.open'), json_extract(j.value, '$.hidden'), json_extract(j.value, '$.includesOrientation'), ps.created_by, ?, ?
     FROM patrol_series ps, json_each(?) j
     WHERE ps.id = ? AND ps.updated_at = ?
     ON CONFLICT(series_id, occurrence_date) DO NOTHING`,
@@ -306,6 +319,17 @@ export async function ensurePatrolOccurrences(
         .all<OccurrenceSnapshot>()
     ).results;
     const plan = planPatrolOccurrences(series, existing, now, templates);
+    // Legacy one-place orientation defaults remain readable, but must be edited
+    // before they can create new occurrences under the two-place minimum.
+    if (
+      plan.occurrences.some(
+        (event) =>
+          !validOrientationCapacity(
+            patrolTemplateFor(series, templates, event.date),
+          ),
+      )
+    )
+      continue;
     if (
       !plan.occurrences.length &&
       plan.generationUntil <= series.generationUntil
@@ -349,7 +373,10 @@ export async function savePatrolSeries(
   if (!parsed.success)
     throw new RequestError(
       400,
-      "Check the first local date/time, weekly interval (1–52), end date, meeting point, capacity and HTTPS map link.",
+      parsed.error.issues.find(
+        (issue) => issue.message === orientationCapacityMessage,
+      )?.message ??
+        "Check the first local date/time, weekly interval (1–52), end date, meeting point, capacity and HTTPS map link.",
     );
   const data = parsed.data;
   const now = Date.now();
@@ -387,12 +414,13 @@ export async function savePatrolSeries(
     data.spots,
     Number(data.open),
     Number(data.hidden),
+    Number(data.includesOrientation),
   ];
   try {
     const write = old
       ? db
           .prepare(
-            `UPDATE patrol_series SET meeting_point = ?, meeting_point_url = ?, spots = ?, open = ?, hidden = ?,
+            `UPDATE patrol_series SET meeting_point = ?, meeting_point_url = ?, spots = ?, open = ?, hidden = ?, includes_orientation = ?,
           end_date = ?, generation_until = CASE WHEN end_date IS ? THEN generation_until ELSE 0 END, updated_at = ?
         WHERE id = ? AND updated_at = ? AND ${writePermission(true)}`,
           )
@@ -408,8 +436,8 @@ export async function savePatrolSeries(
       : db
           .prepare(
             `INSERT INTO patrol_series (id, first_date, local_time, interval_weeks, end_date,
-          meeting_point, meeting_point_url, spots, open, hidden, created_by, created_at, updated_at)
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
+          meeting_point, meeting_point_url, spots, open, hidden, includes_orientation, created_by, created_at, updated_at)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
           )
           .bind(
             id,
@@ -524,6 +552,8 @@ export async function materializePatrolOccurrence(
   requireScheduledDate(series, occurrenceDate);
   const templates = await readTemplates(db, seriesId);
   const template = patrolTemplateFor(series, templates, occurrenceDate);
+  if (!validOrientationCapacity(template))
+    throw new RequestError(400, orientationCapacityMessage);
   const startsAt = templateStart(occurrenceDate, template);
   if (startsAt <= Date.now())
     throw new RequestError(409, "Past occurrences cannot be created.");
@@ -538,8 +568,8 @@ export async function materializePatrolOccurrence(
     db
       .prepare(
         `INSERT INTO event (id, type, series_id, occurrence_date, starts_at,
-      meeting_point, meeting_point_url, spots, open, hidden, created_by, created_at, updated_at)
-       SELECT ?, 'patrol', id, ?, ?, ?, ?, ?, ?, ?, created_by, ?, ?
+      meeting_point, meeting_point_url, spots, open, hidden, includes_orientation, created_by, created_at, updated_at)
+       SELECT ?, 'patrol', id, ?, ?, ?, ?, ?, ?, ?, ?, created_by, ?, ?
       FROM patrol_series WHERE id = ? AND changes() = 1
       ON CONFLICT(series_id, occurrence_date) DO NOTHING`,
       )
@@ -552,6 +582,7 @@ export async function materializePatrolOccurrence(
         template.spots,
         template.open,
         template.hidden,
+        template.includesOrientation,
         Date.now(),
         Date.now(),
         seriesId,
@@ -607,7 +638,10 @@ export async function updatePatrolSeriesFrom(
   if (!parsed.success)
     throw new RequestError(
       400,
-      "Check the recurring time, date offset, capacity, meeting point and HTTPS map link.",
+      parsed.error.issues.find(
+        (issue) => issue.message === orientationCapacityMessage,
+      )?.message ??
+        "Check the recurring time, date offset, capacity, meeting point and HTTPS map link.",
     );
   const data = parsed.data;
   const series = await findPatrolSeries(db, actor, id);
@@ -637,6 +671,7 @@ export async function updatePatrolSeriesFrom(
     data.spots,
     Number(data.open),
     Number(data.hidden),
+    Number(data.includesOrientation),
   ];
   try {
     const results = await db.batch([
@@ -677,8 +712,8 @@ export async function updatePatrolSeriesFrom(
       db
         .prepare(
           `INSERT INTO patrol_series_template (id,series_id,effective_date,local_time,day_offset,
-        meeting_point,meeting_point_url,spots,open,hidden)
-        SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
+         meeting_point,meeting_point_url,spots,open,hidden,includes_orientation)
+         SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
         )
         .bind(operation, id, date, ...values, operation),
       db
@@ -687,7 +722,7 @@ export async function updatePatrolSeriesFrom(
         SELECT ? || ':' || e.id,e.id,?,'series_updated',?,? FROM event e JOIN json_each(?) j ON e.id = json_extract(j.value,'$.id')
         WHERE e.cancelled_at IS NULL AND e.starts_at > ${nowMsSql}
           AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'updated')
-          AND (e.starts_at != json_extract(j.value,'$.startsAt') OR e.meeting_point != ? OR e.meeting_point_url IS NOT ? OR e.spots != ? OR e.open != ? OR e.hidden != ?)
+           AND (e.starts_at != json_extract(j.value,'$.startsAt') OR e.meeting_point != ? OR e.meeting_point_url IS NOT ? OR e.spots != ? OR e.open != ? OR e.hidden != ? OR coalesce(e.includes_orientation, e.type = 'orientation') != ?)
           AND EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
         )
         .bind(
@@ -702,7 +737,7 @@ export async function updatePatrolSeriesFrom(
       db
         .prepare(
           `UPDATE event SET starts_at = (SELECT json_extract(j.value,'$.startsAt') FROM json_each(?) j WHERE json_extract(j.value,'$.id') = event.id),
-        meeting_point = ?, meeting_point_url = ?, spots = ?, open = ?, hidden = ?, updated_at = max(updated_at + 1, ?)
+         meeting_point = ?, meeting_point_url = ?, spots = ?, open = ?, hidden = ?, includes_orientation = ?, updated_at = max(updated_at + 1, ?)
         WHERE EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || event.id)`,
         )
         .bind(JSON.stringify(updates), ...values.slice(2), now, operation),

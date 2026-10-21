@@ -2881,19 +2881,14 @@ test("event editor shows native number and URL errors without submitting", async
   await profiles
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("button", { name: "Create event", exact: true }).click();
+  await page.locator('[data-show-dialog="event-editor-new"]').click();
   const dialog = page.getByRole("dialog", {
     name: "Create event",
     exact: true,
   });
   const form = dialog.locator("[data-event-save]");
-  const eventType = form.getByRole("group", {
-    name: "Event type",
-    exact: true,
-  });
-  const patrol = eventType.getByRole("radio", { name: "Patrol", exact: true });
-  const orientation = eventType.getByRole("radio", {
-    name: "Orientation",
+  const orientation = form.getByRole("checkbox", {
+    name: "Includes orientation",
     exact: true,
   });
   const recurrence = form.locator("[data-recurrence-controls]");
@@ -2902,30 +2897,32 @@ test("event editor shows native number and URL errors without submitting", async
   });
   const interval = form.getByLabel("Interval (weeks)", { exact: true });
   const endDate = form.locator('[name="endDate"]');
-  await expect(eventType.getByRole("radio")).toHaveCount(2);
-  await expect(patrol).toBeChecked();
+  await expect(form.locator('[name="type"]')).toHaveCount(0);
+  await expect(orientation).not.toBeChecked();
   await expect(
     recurrence.locator(".volunteer-recurrence-label svg"),
   ).toHaveAttribute("aria-hidden", "true");
   await recurring.check();
   await interval.fill("3");
   await endDate.fill("2030-02-01");
-  await patrol.focus();
-  await patrol.press("ArrowRight");
+  await orientation.check();
   await expect(orientation).toBeChecked();
-  await expect(recurrence).toBeHidden();
-  await expect(recurring).not.toBeChecked();
+  await expect(recurrence).toBeVisible();
+  await expect(recurring).toBeChecked();
   for (const input of [recurring, interval, endDate])
-    await expect(input).toBeDisabled();
+    await expect(input).toBeEnabled();
   expect(
     await form.evaluate((element: HTMLFormElement) => {
       const values = new FormData(element);
-      return ["type", "recurring", "intervalWeeks", "endDate"].map((key) =>
-        values.get(key),
-      );
+      return [
+        "includesOrientation",
+        "recurring",
+        "intervalWeeks",
+        "endDate",
+      ].map((key) => values.get(key));
     }),
-  ).toEqual(["orientation", null, null, null]);
-  await patrol.check();
+  ).toEqual(["on", "on", "3", "2030-02-01"]);
+  await recurring.uncheck();
   await expect(recurrence).toBeVisible();
   await expect(recurring).not.toBeChecked();
   await expect(form.locator("[data-recurrence-fields]")).toBeHidden();
@@ -2980,7 +2977,7 @@ test("event editor shows native number and URL errors without submitting", async
   await expect(placeholder).toBeHidden();
   await expect(date).toHaveCSS("color", color);
   await form.evaluate((element: HTMLFormElement) => element.reset());
-  await expect(patrol).toBeChecked();
+  await expect(orientation).not.toBeChecked();
   await expect(recurrence).toBeVisible();
   await expect(recurring).toBeEnabled();
   await expect(interval).toHaveValue("1");
@@ -3032,7 +3029,7 @@ test("event editor shows native number and URL errors without submitting", async
     "2025-11-02T01:30",
   ]) {
     await fillDateInput(form, "startsAt", value);
-    await dialog.getByRole("button", { name: "Save event" }).click();
+    await dialog.getByRole("button", { name: "Create event" }).click();
     await expect(value ? time : date).toBeFocused();
     await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
     const pastStart = pastStarts.includes(value);
@@ -3066,14 +3063,14 @@ test("event editor shows native number and URL errors without submitting", async
     "2030-01-01T20:00",
   );
   await date.fill("");
-  await dialog.getByRole("button", { name: "Save event" }).click();
+  await dialog.getByRole("button", { name: "Create event" }).click();
   await expect(date).toBeFocused();
   await expectDateErrorRail(false);
   await expect(date).toHaveAttribute("aria-invalid", "true");
   await expect(time).not.toHaveAttribute("aria-invalid");
   await date.fill("2030-01-01");
   await time.fill("");
-  await dialog.getByRole("button", { name: "Save event" }).click();
+  await dialog.getByRole("button", { name: "Create event" }).click();
   await expect(time).toBeFocused();
   await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
   await expectDateErrorRail(false);
@@ -3081,7 +3078,7 @@ test("event editor shows native number and URL errors without submitting", async
   expect(requests).toEqual([]);
   await time.fill("20:00");
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Create event", exact: true }).click();
+  await page.locator('[data-show-dialog="event-editor-new"]').click();
   await expect(date).toHaveValue("2030-01-01");
   await expect(time).toHaveValue("20:00");
   await expect(
@@ -3147,7 +3144,7 @@ test("event editor shows native number and URL errors without submitting", async
   const map = form.getByLabel("Map link (optional)");
   await spots.fill("0");
   await map.fill("not-a-url");
-  await dialog.getByRole("button", { name: "Save event" }).click();
+  await dialog.getByRole("button", { name: "Create event" }).click();
   await expect(form.locator("[data-error$='-spots']")).toBeVisible();
   await expect(form.locator("[data-error$='-meetingPointUrl']")).toBeVisible();
   await expect(spots).toBeFocused();
@@ -3164,7 +3161,7 @@ test("event editor shows native number and URL errors without submitting", async
     ["", "1"],
   ]) {
     await spots.fill(invalid);
-    await dialog.getByRole("button", { name: "Save event" }).click();
+    await dialog.getByRole("button", { name: "Create event" }).click();
     await expect(form.locator("[data-error$='-spots']")).toBeVisible();
     expect(requests).toEqual([]);
     await increase.click();
@@ -3187,6 +3184,26 @@ test("event editor shows native number and URL errors without submitting", async
     .fill("Test meeting point");
   await spots.fill("8");
   await map.fill("https://example.org/map");
+  // Changing orientation changes the native minimum, not the organizer's draft.
+  await spots.fill("1");
+  await orientation.check();
+  await expect(spots).toHaveAttribute("min", "2");
+  await expect(spots).toHaveValue("1");
+  await dialog.getByRole("button", { name: "Create event" }).click();
+  await expect(form.locator('[data-error$="-spots"]')).toBeVisible();
+  await expect(form.locator('[data-error$="-spots"]')).toContainText(
+    "from 2 to 100",
+  );
+  expect(requests).toEqual([]);
+  await decrease.click();
+  await expect(spots).toHaveValue("2");
+  await decrease.click();
+  await expect(spots).toHaveValue("2");
+  await orientation.uncheck();
+  await expect(spots).toHaveAttribute("min", "1");
+  await decrease.click();
+  await expect(spots).toHaveValue("1");
+  await spots.fill("8");
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
   expect(requests).toEqual([]);
   await page.keyboard.press("Escape");
@@ -3209,10 +3226,19 @@ test("event editor shows native number and URL errors without submitting", async
   await expect(
     editForm.locator('input[type="radio"][name="type"]'),
   ).toHaveCount(0);
-  await expect(editForm.locator('[name="type"]')).toHaveValue("orientation");
-  await expect(editForm.locator("[data-event-type-readonly]")).toContainText(
-    "Orientation",
-  );
+  await expect(editForm.locator('[name="type"]')).toHaveCount(0);
+  const editOrientation = editForm.getByRole("checkbox", {
+    name: "Includes orientation",
+    exact: true,
+  });
+  await expect(editOrientation).toBeChecked();
+  await expect(editSpots).toHaveAttribute("min", "2");
+  await editOrientation.uncheck();
+  await expect(editOrientation).not.toBeChecked();
+  await expect(editSpots).toHaveAttribute("min", "1");
+  await editForm.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(editOrientation).toBeChecked();
+  await expect(editSpots).toHaveAttribute("min", "2");
   const editDateGroup = editForm.locator('[data-date-input="startsAt"]');
   const editDate = editDateGroup.locator("[data-native-date]");
   const editTime = editForm.getByLabel("Start time");

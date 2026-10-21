@@ -73,7 +73,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     await DB.prepare(
       `INSERT INTO event
       (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
-       VALUES ('live','orientation',?,'Polling meeting point',1,?,?,?)`,
+       VALUES ('live','orientation',?,'Polling meeting point',2,?,?,?)`,
     )
       .bind(now + 86_400_000, organizer.id, now, now)
       .run();
@@ -173,7 +173,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     expect(await publicNext()).toBe(hiddenPublicVersion);
     const hiddenPersonalVersion = await listingVersion(attendee.cookie);
     expect(await signedInNext()).toBe(hiddenPersonalVersion);
-    await DB.prepare("UPDATE event SET spots=2 WHERE id='live'").run();
+    await DB.prepare("UPDATE event SET spots=3 WHERE id='live'").run();
     expect(await listingVersion()).toBe(hiddenPublicVersion);
     const capacityVersion = await listingVersion(attendee.cookie);
     expect(capacityVersion).not.toBe(hiddenPersonalVersion);

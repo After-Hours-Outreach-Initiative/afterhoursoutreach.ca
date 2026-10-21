@@ -79,10 +79,15 @@ test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   }
 
   const database = createDatabase(binding);
+  await binding
+    .prepare(
+      "UPDATE volunteer_status SET patrol_approved=1,approved_by='organizer',approved_at=0",
+    )
+    .run();
   const now = new Date();
   await database.insert(event).values({
     id: "orientation",
-    type: "orientation",
+    type: "patrol",
     starts_at: new Date(now.getTime() + 86_400_000),
     meeting_point: "Meeting point",
     spots: 1,
@@ -977,7 +982,7 @@ test("new local applications preserve old fixtures; deletion protects only manua
     .run();
   await env.DB.prepare(
     `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
-    VALUES ('protected-event', 'orientation', 0, 'Meeting point', 1, ?, 0, 0)`,
+    VALUES ('protected-event', 'orientation', 0, 'Meeting point', 2, ?, 0, 0)`,
   )
     .bind(id)
     .run();

@@ -106,6 +106,20 @@
       "when": 1792530400690,
       "tag": "0014_patrol_submission_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1792561390137,
+      "tag": "0015_patrol_orientation_capacity",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1792562818472,
+      "tag": "0016_orientation_minimum_capacity",
+      "breakpoints": true
     }
   ]
 }

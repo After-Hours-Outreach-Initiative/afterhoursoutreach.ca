@@ -283,7 +283,7 @@ describe(
       let patrol: Awaited<ReturnType<typeof createEvent>>;
       let destination: Awaited<ReturnType<typeof createEvent>>;
       beforeAll(async () => {
-        orientation = await createEvent("orientation", 1);
+        orientation = await createEvent("orientation", 2);
         patrol = await createEvent("patrol", 3);
         destination = await createEvent("orientation", 2);
       });
@@ -392,6 +392,7 @@ describe(
       });
 
       test("last spot is atomic across simultaneous signups without queuing email", async () => {
+        await ok(await join(orientation.id, organizer.cookie));
         const responses = await Promise.all([
           join(orientation.id, alice.cookie),
           join(orientation.id, bob.cookie),
@@ -427,7 +428,7 @@ describe(
               .bind(orientation.id)
               .first()
           )?.n,
-          1,
+          2,
         );
       });
 
@@ -857,7 +858,7 @@ describe(
 
       test("revoking application approval cancels future orientations and patrols without changing patrol approval", async () => {
         await ok(await status(alice.id, true, true));
-        const orientationEvent = await createEvent("orientation");
+        const orientationEvent = await createEvent("orientation", 3);
         const patrolEvent = await createEvent("patrol");
         for (const event of [orientationEvent, patrolEvent])
           await ok(await join(event.id, alice.cookie));
@@ -1330,24 +1331,18 @@ describe(
           await page.unroute("**/api/v1/organizer/action");
           alice.cookie = await signIn(alice.email);
           await page.goto(`${origin}/events`);
-          await page
-            .getByRole("button", { name: "Create event", exact: true })
-            .click();
+          await page.locator('[data-show-dialog="event-editor-new"]').click();
           const dialog = page.getByRole("dialog", {
             name: "Create event",
             exact: true,
           });
-          const eventType = dialog.getByRole("group", {
-            name: "Event type",
+          await expect(dialog.locator('[name="type"]')).toHaveCount(0);
+          const includesOrientation = dialog.getByRole("checkbox", {
+            name: "Includes orientation",
             exact: true,
           });
-          await expect(eventType.getByRole("radio")).toHaveCount(2);
-          await expect(
-            eventType.getByRole("radio", { name: "Patrol", exact: true }),
-          ).toBeChecked();
-          await expect(
-            eventType.getByRole("radio", { name: "Orientation", exact: true }),
-          ).toBeEnabled();
+          await expect(includesOrientation).not.toBeChecked();
+          await expect(includesOrientation).toBeEnabled();
           const visibilityChoices = dialog.getByRole("group", {
             name: "Public visibility",
             exact: true,
@@ -1362,7 +1357,7 @@ describe(
             name: "Hidden",
             exact: true,
           });
-          await expect(hidden).toBeChecked();
+          await expect(visible).toBeChecked();
           // The toggle supports keyboard use and does not save until submission.
           await page.emulateMedia({ reducedMotion: "reduce" });
           await hidden.focus();
@@ -1384,10 +1379,10 @@ describe(
             form: dialog.locator("[data-event-save]"),
             trigger: () =>
               dialog
-                .getByRole("button", { name: "Save event", exact: true })
+                .getByRole("button", { name: "Create event", exact: true })
                 .click(),
             updated: () => createdCard.waitFor(),
-            loadingLabel: "Saving…",
+            loadingLabel: "Creating…",
           });
           await expect(dialog).toBeHidden();
           assert.equal(
@@ -1414,14 +1409,14 @@ describe(
             await expect(
               editor.locator('input[type="radio"][name="type"]'),
             ).toHaveCount(0);
-            await expect(
-              editor.locator(
-                "[data-event-type-readonly] .volunteer-readonly-value",
-              ),
-            ).toHaveText("Patrol");
-            await expect(
-              editor.locator('input[type="hidden"][name="type"]'),
-            ).toHaveValue("patrol");
+            await expect(editor.locator('[name="type"]')).toHaveCount(0);
+            const orientationToggle = editor.getByRole("checkbox", {
+              name: "Includes orientation",
+              exact: true,
+            });
+            if (spots === 9) await expect(orientationToggle).not.toBeChecked();
+            else await expect(orientationToggle).toBeChecked();
+            await orientationToggle.setChecked(spots === 9);
             const visibility = editor.getByRole("group", {
               name: "Public visibility",
               exact: true,
@@ -1453,7 +1448,9 @@ describe(
                   .click(),
               updated: () =>
                 expect(createdCard.locator(".volunteer-spots")).toHaveText(
-                  `${spots} spots left`,
+                  spots === 9
+                    ? "4 spots available to you"
+                    : `${spots} spots left`,
                 ),
               loadingLabel: spots === 9 ? "Sending…" : "Saving…",
               pending: async () => {
@@ -1492,13 +1489,11 @@ describe(
               { open: spots === 9 ? 0 : 1, hidden: spots === 9 ? 1 : 0 },
             );
           }
-          await page
-            .getByRole("button", { name: "Create event", exact: true })
-            .click();
+          await page.locator('[data-show-dialog="event-editor-new"]').click();
           await expect(
             dialog.getByLabel("Meeting point", { exact: true }),
           ).toHaveValue("");
-          await expect(hidden).toBeChecked();
+          await expect(visible).toBeChecked();
           await visibilityChoices.getByText("Visible", { exact: true }).click();
           await fillDateInput(dialog, "startsAt", "2031-04-13T20:30");
           await dialog
@@ -1512,33 +1507,31 @@ describe(
             form: dialog.locator("[data-event-save]"),
             trigger: () =>
               dialog
-                .getByRole("button", { name: "Save event", exact: true })
+                .getByRole("button", { name: "Create event", exact: true })
                 .click(),
             updated: () => destinationCard.waitFor(),
-            loadingLabel: "Saving…",
+            loadingLabel: "Creating…",
           });
           const filters = page.getByRole("group", {
             name: "Filter events",
             exact: true,
           });
           await filters
-            .getByRole("button", { name: "Orientations", exact: true })
-            .click();
-          assert.equal(
-            await page
-              .locator('[data-live-event][data-event-type="patrol"]:visible')
-              .count(),
-            0,
-          );
-          await filters
-            .getByRole("button", { name: "Patrols", exact: true })
+            .getByRole("button", { name: "Includes orientation", exact: true })
             .click();
           assert.equal(
             await page
               .locator(
-                '[data-live-event][data-event-type="orientation"]:visible',
+                '[data-live-event][data-includes-orientation="false"]:visible',
               )
               .count(),
+            0,
+          );
+          await filters
+            .getByRole("button", { name: "All events", exact: true })
+            .click();
+          assert.equal(
+            await page.locator("[data-live-event][hidden]").count(),
             0,
           );
           await filters
@@ -1601,7 +1594,7 @@ describe(
             exact: true,
           });
           await volunteerFilters
-            .getByRole("button", { name: "Patrols", exact: true })
+            .getByRole("button", { name: "All events", exact: true })
             .click();
           await changeSpot("join", () =>
             card.getByText("Registered", { exact: true }).waitFor(),
@@ -1612,13 +1605,13 @@ describe(
           await expect(
             card.getByRole("button", { name: "Unregister", exact: true }),
           ).toBeFocused();
-          await expect(page).toHaveURL(/\?type=patrol$/);
+          await expect(page).toHaveURL(/\/events$/);
           await volunteerFilters
-            .getByRole("button", { name: "Orientations", exact: true })
+            .getByRole("button", { name: "Includes orientation", exact: true })
             .click();
           await expect(card).toBeHidden();
           await volunteerFilters
-            .getByRole("button", { name: "Patrols", exact: true })
+            .getByRole("button", { name: "All events", exact: true })
             .click();
           await expect(card).toBeVisible();
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
@@ -1803,7 +1796,7 @@ describe(
           await changeSpot("cancel", () => card.waitFor({ state: "detached" }));
           await expect(
             volunteerFilters.getByRole("button", {
-              name: "Patrols",
+              name: "All events",
               exact: true,
             }),
           ).toBeFocused();

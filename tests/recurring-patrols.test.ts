@@ -30,6 +30,10 @@ import {
   type PatrolTemplate,
 } from "../src/server/db/patrol-series";
 import { RequestError } from "../src/server/http";
+import {
+  completeOrientation,
+  setVolunteerStatus,
+} from "../src/server/db/volunteers";
 import { sourceSchemaStatements } from "./helpers/source-schema";
 
 vi.stubEnv("DEV", false);
@@ -248,6 +252,7 @@ test("effective day shifts plan the true earliest starts across template boundar
       spots: 8,
       open: 1,
       hidden: 0,
+      includesOrientation: 0,
     }));
     const candidates = Array.from({ length: 63 }, (_, index) => {
       const date = addCalendarDays(firstDate, index * 7);
@@ -731,6 +736,7 @@ test("validation and authorization reject invalid recurrence input or stale orga
     { localTime: "25:00" },
     { endDate: "2000-01-01" },
     { meetingPointUrl: "http://example.org" },
+    { includesOrientation: true, spots: 1 },
   ])
     await assert.rejects(
       savePatrolSeries(db, organizer, { ...input(), ...extra }),
@@ -953,6 +959,213 @@ test("bulk capacity violations roll back template, event/audit changes, notifica
   assert.equal(await count("patrol_series_template"), 0);
   assert.equal(await count("event_audit"), audits);
   assert.equal(await count("event_notification"), 0);
+});
+
+test("revoking patrol approval preserves orientation bookings but cancels regular patrol bookings", async () => {
+  const orientationSeries = await savePatrolSeries(db, organizer, {
+    ...input(),
+    includesOrientation: true,
+  });
+  const patrolSeries = await savePatrolSeries(db, organizer, input());
+  const orientation = (await all(orientationSeries.id))[0];
+  const patrol = (await all(patrolSeries.id))[0];
+  await changeSignup(db, alice, orientation.id, "join");
+  await changeSignup(db, alice, patrol.id, "join");
+  await setVolunteerStatus(db, organizer, {
+    userId: alice.id,
+    version: 0,
+    active: true,
+    patrolApproved: false,
+    notify: true,
+  });
+  const bookings = (
+    await db
+      .prepare("SELECT event_id AS eventId, status FROM signup WHERE user_id=?")
+      .bind(alice.id)
+      .all<{ eventId: string; status: string }>()
+  ).results;
+  assert.equal(
+    bookings.find((row) => row.eventId === orientation.id)?.status,
+    "confirmed",
+  );
+  assert.equal(
+    bookings.find((row) => row.eventId === patrol.id)?.status,
+    "cancelled",
+  );
+  assert.equal(
+    await db
+      .prepare(
+        "SELECT count(*) n FROM event_notification WHERE subject='Your After Hours Outreach event registration was cancelled'",
+      )
+      .first("n"),
+    1,
+  );
+});
+
+test("orientation settings persist on series, future templates and individual exceptions; invalid toggles roll back bookings", async () => {
+  const data = { ...input(), spots: 8, includesOrientation: true };
+  const series = await savePatrolSeries(db, organizer, data);
+  const events = await all(series.id);
+  const old = await findPatrolSeries(db, organizer, series.id);
+  assert.equal(old.includesOrientation, 1);
+  await assert.rejects(
+    db
+      .prepare("UPDATE patrol_series SET spots=1 WHERE id=?")
+      .bind(series.id)
+      .run(),
+    /orientation_minimum_capacity/,
+  );
+  await assert.rejects(
+    db
+      .prepare(
+        `INSERT INTO patrol_series_template
+    (id,series_id,effective_date,local_time,day_offset,meeting_point,meeting_point_url,spots,open,hidden,includes_orientation)
+    SELECT 'invalid-template',id,first_date,local_time,0,meeting_point,meeting_point_url,1,open,hidden,1 FROM patrol_series WHERE id=?`,
+      )
+      .bind(series.id)
+      .run(),
+    /orientation_minimum_capacity/,
+  );
+  await assert.rejects(
+    saveEvent(
+      db,
+      organizer,
+      {
+        startsAt: new Date(events[0].startsAt).toISOString(),
+        meetingPoint: data.meetingPoint,
+        meetingPointUrl: "",
+        spots: 1,
+        open: true,
+        hidden: false,
+        includesOrientation: true,
+      },
+      events[0].id,
+      events[0].updatedAt,
+    ),
+    (error: unknown) =>
+      error instanceof RequestError &&
+      error.status === 400 &&
+      /at least 2 total/.test(error.message),
+  );
+  await assert.rejects(
+    updatePatrolSeriesFrom(
+      db,
+      organizer,
+      series.id,
+      data.firstDate,
+      { ...templateInput(), includesOrientation: true, spots: 1 },
+      old.updatedAt,
+    ),
+    (error: unknown) =>
+      error instanceof RequestError &&
+      error.status === 400 &&
+      /at least 2 total/.test(error.message),
+  );
+  assert.ok(events.every((event) => event.includesOrientation === 1));
+  await db
+    .prepare(
+      "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id='bob'",
+    )
+    .run();
+  await changeSignup(
+    db,
+    { ...bob, patrolApproved: false },
+    events[1].id,
+    "join",
+  );
+  const individual = {
+    startsAt: new Date(events[1].startsAt).toISOString(),
+    meetingPoint: data.meetingPoint,
+    meetingPointUrl: "",
+    spots: 8,
+    open: true,
+    hidden: false,
+    includesOrientation: false,
+  };
+  await assert.rejects(
+    saveEvent(db, organizer, individual, events[1].id, events[1].updatedAt),
+    status(409),
+  );
+  const template = { ...templateInput(), spots: 8, includesOrientation: false };
+  const booked = await all(series.id);
+  await assert.rejects(
+    updatePatrolSeriesFrom(
+      db,
+      organizer,
+      series.id,
+      events[1].occurrenceDate!,
+      template,
+      old.updatedAt,
+      true,
+    ),
+    status(409),
+  );
+  assert.deepEqual(await findPatrolSeries(db, organizer, series.id), old);
+  assert.deepEqual(await all(series.id), booked);
+  assert.equal(await count("patrol_series_template"), 0);
+  assert.equal(await count("event_notification"), 0);
+  await changeSignup(
+    db,
+    { ...bob, patrolApproved: false },
+    events[1].id,
+    "cancel",
+  );
+  await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    events[1].occurrenceDate!,
+    template,
+    old.updatedAt,
+  );
+  assert.equal(
+    (await listPatrolTemplates(db, organizer, series.id))[0]
+      .includesOrientation,
+    0,
+  );
+  assert.equal((await findEvent(db, events[0].id)).includesOrientation, 1);
+  assert.equal((await findEvent(db, events[1].id)).includesOrientation, 0);
+  const distant = await materializePatrolOccurrence(
+    db,
+    organizer,
+    series.id,
+    addCalendarDays(data.firstDate, 70),
+  );
+  assert.equal((await findEvent(db, distant.id)).includesOrientation, 0);
+  const current = await findEvent(db, events[1].id);
+  await saveEvent(
+    db,
+    organizer,
+    {
+      ...individual,
+      startsAt: new Date(current.startsAt).toISOString(),
+      includesOrientation: true,
+    },
+    current.id,
+    current.updatedAt,
+  );
+  await ensurePatrolOccurrences(db);
+  assert.equal((await findEvent(db, current.id)).includesOrientation, 1);
+  // Storage keeps the immutable recurring patrol identity, not a mutually exclusive type.
+  assert.equal(
+    await db
+      .prepare("SELECT type FROM event WHERE id=?")
+      .bind(current.id)
+      .first("type"),
+    "patrol",
+  );
+  const preview = (await listEvents(db, alice)).find(
+    (event) => event.id === events[0].id,
+  )!;
+  assert.equal(preview.orientationCompleted, 0);
+  assert.equal(preview.availableSpots, 4);
+  await changeSignup(db, alice, events[0].id, "join");
+  await db
+    .prepare("UPDATE event SET starts_at=0 WHERE id=?")
+    .bind(events[0].id)
+    .run();
+  await completeOrientation(db, organizer, alice.id, events[0].id);
+  assert.equal(await count("orientation_completion"), 1);
 });
 
 test("an occurrence generated between the bulk read and write cannot retain stale defaults unnoticed", async () => {
