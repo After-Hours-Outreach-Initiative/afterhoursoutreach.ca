@@ -23,6 +23,11 @@ const account = await loadAccountNavigation(
       <h1 class="max-w-4xl text-blue" id="not-found-heading">
         404: Page not found
       </h1>
+      <p class="mt-6 max-w-2xl text-zinc-300">
+        <code class="rounded bg-panel-soft px-2 py-1 font-mono wrap-anywhere"
+          >{Astro.url.pathname}</code
+        >
+      </p>
       <p class="mt-8 max-w-2xl text-zinc-300">
         We couldn&rsquo;t find the page you&rsquo;re looking for. It may have
         moved, or the address may be incorrect.
@@ -32,13 +37,6 @@ const account = await loadAccountNavigation(
         aria-label="Find another page"
       >
         <a class="btn btn-primary" href="/">Back to home</a>
-        <a class="btn btn-outline" href="/about">About us</a>
-        <a
-          class="btn btn-outline"
-          href={account.signedIn ? "/events" : "/volunteer"}
-        >
-          {account.signedIn ? "View events" : "Volunteer with us"}
-        </a>
       </nav>
     </div>
   </section>
