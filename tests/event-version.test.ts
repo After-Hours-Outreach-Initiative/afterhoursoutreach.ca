@@ -19,6 +19,8 @@ test("view versions detect capacity, signups, visibility and access changes with
     cancelledAt: null,
     updatedAt: 1,
     confirmed: 0,
+    futureConfirmed: 0,
+    futureEditableConfirmed: 0,
     signedUp: 0,
     orientationSignupBlocked: 0,
   };
@@ -39,6 +41,8 @@ test("view versions detect capacity, signups, visibility and access changes with
   expect(await eventViewVersion([event], actor)).toBe(original);
   for (const update of [
     { confirmed: 1 },
+    { futureConfirmed: 1 },
+    { futureEditableConfirmed: 1 },
     { signedUp: 1 },
     { orientationSignupBlocked: 1 },
     { spots: 2 },

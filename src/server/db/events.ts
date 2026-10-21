@@ -61,6 +61,9 @@ export interface EventRow {
   cancelledAt: number | null;
   updatedAt: number;
   confirmed: number;
+  // This and later nominal occurrences, including bookings outside the page/window.
+  futureConfirmed: number;
+  futureEditableConfirmed: number;
   signedUp: number;
   orientationSignupBlocked: number;
 }
@@ -104,9 +107,21 @@ export async function listEvents(
     actor.active &&
     (!actor.twoFactorEnabled || actor.twoFactorVerified),
   );
+  const futureSignups = `SELECT count(*) FROM signup s JOIN event future ON future.id = s.event_id
+    WHERE future.series_id = e.series_id AND future.occurrence_date >= e.occurrence_date
+      AND future.cancelled_at IS NULL AND future.starts_at > ${nowMsSql}
+      AND s.status = 'confirmed'`;
   const select = `SELECT ${eventColumns},
     (SELECT count(*) FROM signup
       WHERE event_id = e.id AND status = 'confirmed') AS confirmed,
+    ${organizer ? `(${futureSignups})` : "0"} AS futureConfirmed,
+    ${
+      organizer
+        ? `(${futureSignups}
+        AND NOT EXISTS(SELECT 1 FROM event_audit a
+          WHERE a.event_id = future.id AND a.action = 'updated'))`
+        : "0"
+    } AS futureEditableConfirmed,
     EXISTS(SELECT 1 FROM signup
       WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp,
     (e.type = 'orientation' AND EXISTS(

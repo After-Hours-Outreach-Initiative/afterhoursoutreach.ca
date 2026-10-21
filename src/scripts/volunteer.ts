@@ -8,6 +8,7 @@ import {
   recurringCancelAction,
   seriesEndAction,
   syncSeriesControls,
+  eventEmailPrompt,
 } from "./event-recurrence";
 import {
   cancelVolunteerSearch,
@@ -159,6 +160,21 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       );
       if (availability && nextAvailability)
         availability.replaceWith(document.importNode(nextAvailability, true));
+      // Signup counts can change while an editor is open. Refresh only email
+      // eligibility; leave the organizer's fields, reason and scope draft intact.
+      for (const selector of ["[data-event-save]", "[data-event-cancel]"]) {
+        const form = card.querySelector(selector);
+        const nextForm = updated.querySelector(selector);
+        if (!form || !nextForm) continue;
+        for (const attribute of [
+          "data-email-prompt",
+          "data-future-email-prompt",
+        ]) {
+          const value = nextForm.getAttribute(attribute);
+          if (value === null) form.removeAttribute(attribute);
+          else form.setAttribute(attribute, value);
+        }
+      }
     }
     if (
       !card ||
@@ -430,13 +446,12 @@ function form(
     let saved = false;
     try {
       let notify: boolean | undefined;
-      if (element.dataset.emailPrompt) {
-        const prompt =
-          values.has("seriesId") && values.get("scope") === "future"
-            ? element.matches("[data-event-save]")
-              ? "series"
-              : "series-cancel"
-            : element.dataset.emailPrompt;
+      const prompt = eventEmailPrompt(
+        values,
+        element.dataset.emailPrompt,
+        element.dataset.futureEmailPrompt,
+      );
+      if (prompt) {
         const choice = await chooseNotification(prompt);
         if (choice === null) {
           if (element.hasAttribute("data-submit-on-change")) element.reset();

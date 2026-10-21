@@ -26,7 +26,10 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
   <form
     class="volunteer-form"
     data-event-save
-    data-email-prompt={event ? "event" : undefined}
+    data-email-prompt={event && event.confirmed > 0 ? "event" : undefined}
+    data-future-email-prompt={event && event.futureEditableConfirmed > 0
+      ? "series"
+      : undefined}
     action="/api/v1/events/action"
     method="post"
   >
@@ -223,7 +226,10 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
       <form
         class="volunteer-form volunteer-danger"
         data-event-cancel
-        data-email-prompt="event-cancel"
+        data-email-prompt={event.confirmed > 0 ? "event-cancel" : undefined}
+        data-future-email-prompt={
+          event.futureConfirmed > 0 ? "series-cancel" : undefined
+        }
         action="/api/v1/events/action"
         method="post"
       >
@@ -259,7 +265,11 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
             </p>
           </>
         )}
-        <div class="volunteer-field">
+        <div
+          class="volunteer-field"
+          data-event-cancel-reason
+          hidden={event.confirmed === 0}
+        >
           <label for={`${dialogId}-reason`}>Reason (optional)</label>
           <textarea
             id={`${dialogId}-reason`}
@@ -267,6 +277,7 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
             aria-describedby={`error-${dialogId}-reason`}
             maxlength="1000"
             rows="3"
+            disabled={event.confirmed === 0}
           />
           <FieldError
             field={`${dialogId}-reason`}

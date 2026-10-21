@@ -3,6 +3,7 @@ import {
   recurringSaveAction,
   recurringCancelAction,
   seriesEndAction,
+  eventEmailPrompt,
 } from "../src/scripts/event-recurrence";
 
 const values = (extra: Record<string, string> = {}) => {
@@ -67,9 +68,22 @@ test("this-and-future edits use nominal identities and series versions, not occu
     occurrenceDate: "2026-11-01",
     reason: "",
   });
+  // An empty occurrence must still offer mail for later affected bookings;
+  // booked exceptions alone only qualify for series cancellation mail.
+  expect(eventEmailPrompt(data, undefined, "series")).toBe("series");
+  expect(eventEmailPrompt(data, "event", undefined)).toBeUndefined();
+  expect(eventEmailPrompt(data, undefined, "series-cancel")).toBe(
+    "series-cancel",
+  );
+  expect(eventEmailPrompt(data)).toBeUndefined();
   data.set("scope", "occurrence");
   expect(recurringSaveAction(data)).toBeNull();
   expect(recurringCancelAction(data)).toBeNull();
+  expect(eventEmailPrompt(data, undefined, "series")).toBeUndefined();
+  expect(eventEmailPrompt(data, "event", undefined)).toBe("event");
+  expect(eventEmailPrompt(data, "event-cancel", "series-cancel")).toBe(
+    "event-cancel",
+  );
 });
 test("end-date updates send only the established series contract and preserve visibility flags", () => {
   const data = values({

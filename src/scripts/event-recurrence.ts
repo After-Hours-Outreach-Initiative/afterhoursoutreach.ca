@@ -75,7 +75,41 @@ export function seriesEndAction(values: FormData) {
   };
 }
 
+export function eventEmailPrompt(
+  values: FormData,
+  occurrencePrompt?: string,
+  futurePrompt?: string,
+) {
+  return values.has("seriesId") && values.get("scope") === "future"
+    ? futurePrompt
+    : occurrencePrompt;
+}
+
 export function initRecurrenceControls(root: Document | HTMLElement) {
+  for (const form of root.querySelectorAll<HTMLFormElement>(
+    "[data-event-cancel]",
+  )) {
+    if (form.closest("[data-submitting]")) continue;
+    const reason = form.querySelector<HTMLElement>(
+      "[data-event-cancel-reason]",
+    );
+    const input = reason?.querySelector<HTMLTextAreaElement>("textarea");
+    if (!reason || !input) continue;
+    const update = () => {
+      reason.hidden = !eventEmailPrompt(
+        new FormData(form),
+        form.dataset.emailPrompt,
+        form.dataset.futureEmailPrompt,
+      );
+      input.disabled = reason.hidden;
+    };
+    if (!form.dataset.cancelReasonReady) {
+      form.dataset.cancelReasonReady = "true";
+      form.querySelector('[name="scope"]')?.addEventListener("change", update);
+      form.addEventListener("reset", () => queueMicrotask(update));
+    }
+    update();
+  }
   for (const form of root.querySelectorAll<HTMLFormElement>(
     "[data-event-save]",
   )) {
