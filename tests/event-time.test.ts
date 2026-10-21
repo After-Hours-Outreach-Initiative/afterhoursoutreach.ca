@@ -43,7 +43,7 @@ test("event starts must be strictly in the future in Vancouver time", () => {
   ])
     assert.throws(
       () => futureEventInstant(input, now),
-      /future start date and time/,
+      /^Error: Choose a future start date and time\.$/,
     );
   assert.equal(
     futureEventInstant("2030-07-02T20:31", now),
@@ -51,7 +51,7 @@ test("event starts must be strictly in the future in Vancouver time", () => {
   );
   assert.throws(
     () => futureEventInstant("2030-07-02T20:31", now + 60_000),
-    /future start date and time/,
+    /^Error: Choose a future start date and time\.$/,
   );
   assert.throws(() => futureEventInstant("2030-02-30T20:30", now));
   // Historical DST boundaries are stable across different timezone DB versions.

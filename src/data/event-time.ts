@@ -46,7 +46,7 @@ export function vancouverInstant(input: string): string {
 export function futureEventInstant(input: string, now = Date.now()): string {
   const instant = vancouverInstant(input);
   if (Date.parse(instant) <= now)
-    throw new Error("Choose a future start date and time (Vancouver time).");
+    throw new Error("Choose a future start date and time.");
   return instant;
 }
 

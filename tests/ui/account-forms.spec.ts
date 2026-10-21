@@ -2847,6 +2847,7 @@ test("event editor shows native number and URL errors without submitting", async
   await expect(dialog).not.toContainText("Vancouver");
   for (const value of [
     "",
+    "2025-01-01T20:00",
     // Historical transitions are stable across browser/runtime tzdata versions.
     "2025-03-09T02:30",
     "2025-11-02T01:30",
@@ -2855,6 +2856,7 @@ test("event editor shows native number and URL errors without submitting", async
     await form.getByRole("button", { name: "Save event" }).click();
     await expect(value ? time : date).toBeFocused();
     await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
+    await expect(dialog).not.toContainText("Vancouver");
     expect(requests).toEqual([]);
   }
   await fillDateInput(form, "startsAt", "2030-01-01T20:00");
