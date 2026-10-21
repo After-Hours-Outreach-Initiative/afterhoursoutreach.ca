@@ -2,6 +2,7 @@
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import MoonIcon from "@/components/icons/MoonIcon.astro";
 import AccountIcon from "@/components/icons/AccountIcon.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import HeaderAccountCard from "@/components/HeaderAccountCard.astro";
 import { navLinks, social } from "@/data/site";
 import { accountGreeting } from "@/data/account-navigation";
@@ -204,6 +205,7 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
                   aria-current={isCurrent(link.href) ? "page" : undefined}
                 >
                   {link.label}
+                  <ArrowRightIcon class="header-mobile-arrow" />
                 </a>
                 {link.href === "/volunteer" && (
                   <ul
@@ -222,6 +224,7 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
                           }
                         >
                           {child.label}
+                          <ArrowRightIcon class="header-mobile-arrow" />
                         </a>
                       </li>
                     ))}
@@ -237,7 +240,14 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
           data-mobile-account
           hidden={!signedIn}
         >
-          <HeaderAccountCard {signedIn} {name} {email} {accountPage} showIcon />
+          <HeaderAccountCard
+            {signedIn}
+            {name}
+            {email}
+            {accountPage}
+            showIcon
+            showArrows
+          />
         </section>
         <a
           class="btn btn-primary"
@@ -249,6 +259,7 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
         >
           <DiscordIcon class="btn-icon fill-current" />
           Join Discord
+          <ArrowRightIcon class="header-mobile-arrow" />
         </a>
       </nav>
     </details>

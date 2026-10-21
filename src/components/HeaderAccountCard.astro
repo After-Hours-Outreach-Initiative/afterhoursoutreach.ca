@@ -1,5 +1,6 @@
 ---
 import AccountIcon from "@/components/icons/AccountIcon.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 
 interface Props {
   signedIn: boolean;
@@ -8,6 +9,7 @@ interface Props {
   accountPage: boolean;
   class?: string;
   showIcon?: boolean;
+  showArrows?: boolean;
 }
 
 const {
@@ -17,6 +19,7 @@ const {
   accountPage,
   class: className,
   showIcon = false,
+  showArrows = false,
 } = Astro.props;
 ---
 
@@ -46,26 +49,18 @@ const {
         {email}
       </p>
     </div>
-    <svg
-      class="header-account-arrow"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M5 12h14m-6-6 6 6-6 6"></path>
-    </svg>
+    <ArrowRightIcon class="header-account-arrow" />
   </a>
   <hr class="header-account-divider" />
-  <a href="/volunteer/account" aria-current={accountPage ? "page" : undefined}
-    >Account</a
-  >
+  <a href="/volunteer/account" aria-current={accountPage ? "page" : undefined}>
+    Account
+    {showArrows && <ArrowRightIcon class="header-mobile-arrow" />}
+  </a>
   <form data-sign-out action="/api/v1/auth/sign-out" method="post">
-    <button type="submit">Sign out</button>
+    <button type="submit">
+      Sign out
+      {showArrows && <ArrowRightIcon class="header-mobile-arrow" />}
+    </button>
     <p class="header-account-message" data-form-message role="status" hidden>
     </p>
   </form>

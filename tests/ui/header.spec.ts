@@ -261,7 +261,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     ).toBeHidden();
     await expect(
       navigation.getByRole("link", { name: "About", exact: true }),
-    ).toHaveCSS("color", "rgb(255, 255, 255)");
+    ).toHaveCSS("color", mobile ? "rgb(212, 212, 216)" : "rgb(255, 255, 255)");
 
     await viewAs(page, baseURL!, true);
     await page.goto("/about");
@@ -335,7 +335,10 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await page.mouse.move(0, 0);
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
-    ).toHaveCSS("background-color", "rgb(23, 26, 32)");
+    ).toHaveCSS(
+      "background-color",
+      mobile ? "rgba(0, 0, 0, 0)" : "rgb(23, 26, 32)",
+    );
 
     await expect(
       account.locator(
@@ -426,7 +429,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     const arrowBox = await arrow.boundingBox();
     const arrowSize = mobile ? 20 : 16;
     expect(arrowBox).toMatchObject({
-      x: identityBox!.x + identityBox!.width - 12 - arrowSize,
+      x: identityBox!.x + identityBox!.width - (mobile ? 16 : 12) - arrowSize,
       y: identityBox!.y + 16,
       width: arrowSize,
       height: arrowSize,
