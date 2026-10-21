@@ -93,6 +93,16 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
             Existing bookings must remain eligible.
           </p>
         </div>
+        <DateInput
+          name="startsAt"
+          id={`${dialogId}-startsAt`}
+          errorField={`${dialogId}-startsAt`}
+          label="Start date"
+          value={event ? vancouverInput(event.startsAt) : ""}
+          withTime
+          defaultTime="21:00"
+          warnPast
+        />
         {
           !event && (
             <div
@@ -144,16 +154,6 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
             </div>
           )
         }
-        <DateInput
-          name="startsAt"
-          id={`${dialogId}-startsAt`}
-          errorField={`${dialogId}-startsAt`}
-          label="Start date"
-          value={event ? vancouverInput(event.startsAt) : ""}
-          withTime
-          defaultTime="21:00"
-          warnPast
-        />
         <div class="volunteer-field">
           <label for={`${dialogId}-spots`}>Volunteer spots</label>
           <div class="volunteer-spots-stepper">
