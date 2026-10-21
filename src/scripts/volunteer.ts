@@ -249,7 +249,7 @@ async function refreshVolunteer(element: HTMLFormElement) {
   )!.value;
   const profile = element.closest<HTMLElement>("[data-volunteer-profile]")!;
   const hostUrl = location.href;
-  const profileUrl = `/volunteer/volunteers/${encodeURIComponent(userId)}`;
+  const profileUrl = `/volunteers/${encodeURIComponent(userId)}`;
   const onProfilePage = location.pathname === profileUrl;
   const [page, host] = await Promise.all([
     loadActionPage(profileUrl),

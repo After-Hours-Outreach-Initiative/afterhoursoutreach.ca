@@ -251,7 +251,7 @@ test("only the winning first submission transaction records exactly three privat
     assert.equal(payload.subject, "New volunteer application submitted");
     assert.equal(
       payload.text,
-      `Applicant: ${snapshot.answers.preferredName}\nSubmitted: ${snapshot.submittedAt}\nOrganizer review (authorized organizer sign-in required): https://afterhoursoutreach.ca/volunteer/volunteers/applicant`,
+      `Applicant: ${snapshot.answers.preferredName}\nSubmitted: ${snapshot.submittedAt}\nOrganizer review (authorized organizer sign-in required): https://afterhoursoutreach.ca/volunteers/applicant`,
     );
     assert.doesNotMatch(
       row.payload!,

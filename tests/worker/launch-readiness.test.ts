@@ -85,6 +85,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
         method: request.method(),
         headers: { ...(await request.allHeaders()), cookie },
         body: request.postData() ?? undefined,
+        redirect: "manual",
       });
       await route.fulfill({
         status: response.status,
@@ -160,7 +161,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
     }
   });
 
-  test("a sign-in panel inserted by live polling remains usable after session expiry", async () => {
+  test("live polling redirects to a usable sign-in page after session expiry", async () => {
     const { browser, page, useCookie } = await browserWithSession(owner.cookie);
     try {
       let contentType = "";
@@ -171,7 +172,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
           await route.fulfill({ json: { success: true } });
         },
       );
-      await page.goto(`${origin}/volunteer`);
+      await page.goto(`${origin}/events`);
       await browserExpect(
         page.locator("[data-application-pending]"),
       ).toBeVisible();
@@ -186,7 +187,9 @@ describe("launch readiness regressions", { concurrent: false }, () => {
         .click();
       await browserExpect.poll(() => contentType).toContain("application/json");
       await browserExpect(page.locator("[data-email-code]")).toBeVisible();
-      await browserExpect(page).toHaveURL(`${origin}/volunteer`);
+      await browserExpect(page).toHaveURL(
+        `${origin}/volunteer/sign-in?returnTo=%2Fevents`,
+      );
     } finally {
       await browser.close();
     }
@@ -198,7 +201,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
       "/about",
       "/donate",
       "/privacy",
-      "/volunteer",
+      "/events",
       "/volunteer/account",
       "/apply",
       "/api/v1/events/version",

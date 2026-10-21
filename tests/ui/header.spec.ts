@@ -7,7 +7,7 @@ async function viewAs(page: Page, origin: string, organizer: boolean) {
     headers: { origin },
     data: {
       userId: `local-fixture-user-${organizer ? "robin" : "casey"}`,
-      returnTo: "/volunteer",
+      returnTo: "/events",
     },
   });
   expect(response.status(), await response.text()).toBe(200);
@@ -167,8 +167,12 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(
       header.getByRole("link", { name: "Join Discord", exact: true }),
     ).toHaveCSS("font-size", mobile ? "18px" : "16px");
-    await expect(header.locator("[data-volunteer-menu]")).toBeHidden();
-    await expect(header.locator("[data-volunteer-children]")).toBeHidden();
+    await expect(
+      navigation.getByRole("link", { name: "Events", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("link", { name: "Volunteers", exact: true }),
+    ).toHaveCount(0);
     if (mobile) {
       await expect(navigation).toHaveCSS("background-color", "rgb(0, 0, 0)");
       const gutter = width < 640 ? 16 : 24;
@@ -185,7 +189,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       );
       await expect(navigation.locator(".header-mobile-link").first()).toHaveCSS(
         "padding",
-        "16px 0px",
+        "16px 21px 16px 0px",
       );
       expect(
         await header.evaluate((element) => {
@@ -252,13 +256,18 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     ).toHaveText("Casey Lee");
     for (const discord of await header.locator("[data-header-discord]").all())
       await expect(discord).toBeHidden();
-    await expect(header.locator("[data-volunteer-menu]")).toBeHidden();
     await expect(
       navigation.getByRole("link", { name: "Volunteer", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("link", { name: "Events", exact: true }),
     ).toBeVisible();
     await expect(
       navigation.getByRole("link", { name: "Events", exact: true }),
-    ).toBeHidden();
+    ).toHaveAttribute("href", "/events");
+    await expect(
+      navigation.getByRole("link", { name: "Volunteers", exact: true }),
+    ).toHaveCount(0);
     await expect(
       navigation.getByRole("link", { name: "About", exact: true }),
     ).toHaveCSS("color", mobile ? "rgb(212, 212, 216)" : "rgb(255, 255, 255)");
@@ -270,75 +279,42 @@ for (const width of [1280, 1024, 768, 375, 320]) {
         .getByRole("button", { name: "Open navigation", exact: true })
         .click();
       await expect(account).toBeVisible();
-      const parent = navigation.getByRole("link", {
-        name: "Volunteer",
-        exact: true,
-      });
-      const children = navigation.getByRole("list", {
-        name: "Volunteer pages",
-      });
-      await expect(children.getByRole("link")).toHaveText([
-        "Events",
-        "Volunteers",
-      ]);
-      await expect(children).toHaveCSS("border-left-width", "0px");
-      await expect(
-        children.getByRole("link", { name: "Events", exact: true }),
-      ).toHaveCSS("font-size", "18px");
-      for (const child of await children.getByRole("link").all())
-        await expect(child).toHaveCSS("border-bottom-width", "1px");
-      const parentBox = await parent.boundingBox();
-      const childBox = await children
-        .getByRole("link", { name: "Events", exact: true })
-        .boundingBox();
-      expect(childBox!.x).toBeGreaterThan(parentBox!.x);
-      const lastChildBox = await children
-        .getByRole("link", { name: "Volunteers", exact: true })
-        .boundingBox();
-      const donateBox = await navigation
-        .getByRole("link", { name: "Donate", exact: true })
-        .boundingBox();
-      expect(donateBox!.y).toBe(lastChildBox!.y + lastChildBox!.height);
-      await children
-        .getByRole("link", { name: "Volunteers", exact: true })
-        .click();
-    } else {
-      const volunteer = header.locator("[data-volunteer-menu]");
-      await expect(volunteer).toBeVisible();
-      const toggle = volunteer.locator("summary");
-      await toggle.focus();
-      await toggle.press("Enter");
-      await expect(toggle).toHaveAttribute("aria-expanded", "true");
-      await expect(volunteer.getByRole("link")).toHaveText([
-        "Events",
-        "Volunteers",
-      ]);
-      await volunteer
-        .getByRole("link", { name: "Volunteers", exact: true })
-        .click();
     }
-    await expect(page).toHaveURL(/\/volunteer\/volunteers$/);
+    await expect(
+      navigation.getByRole("link", { name: "Volunteer", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("link", { name: "Events", exact: true }),
+    ).toBeVisible();
+    const volunteersLink = navigation.getByRole("link", {
+      name: "Volunteers",
+      exact: true,
+    });
+    await expect(volunteersLink).toHaveAttribute("href", "/volunteers");
+    await expect(volunteersLink).toHaveCSS(
+      "font-size",
+      mobile ? "20px" : "16px",
+    );
+    await volunteersLink.click();
+    await expect(page).toHaveURL(/\/volunteers$/);
     await page.waitForLoadState("load");
     await expect(page.locator("[data-volunteer-browser]")).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Volunteers", level: 2, exact: true }),
     ).toBeVisible();
     await expect(page.locator(".volunteer-nav")).toHaveCount(0);
-    const toggle = mobile
-      ? header.locator(".mobile-nav > summary")
-      : header.locator("[data-volunteer-menu] > summary");
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const toggle = header.locator(".mobile-nav > summary");
+    if (mobile) {
+      await toggle.click();
+      await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    }
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveAttribute("aria-current", "page");
     await page.mouse.move(0, 0);
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
-    ).toHaveCSS(
-      "background-color",
-      mobile ? "rgba(0, 0, 0, 0)" : "rgb(23, 26, 32)",
-    );
+    ).toHaveCSS("color", mobile ? "rgb(212, 212, 216)" : "rgb(255, 255, 255)");
 
     await expect(
       account.locator(
@@ -699,7 +675,7 @@ test("organizer Volunteers heading matches the Events heading", async ({
   baseURL,
 }) => {
   await viewAs(page, baseURL!, true);
-  await page.goto("/volunteer");
+  await page.goto("/events");
   const events = page.getByRole("heading", {
     name: "Events",
     level: 2,
@@ -708,7 +684,7 @@ test("organizer Volunteers heading matches the Events heading", async ({
   const size = await events.evaluate(
     (element) => getComputedStyle(element).fontSize,
   );
-  await page.goto("/volunteer/volunteers");
+  await page.goto("/volunteers");
   const volunteers = page.getByRole("heading", {
     name: "Volunteers",
     level: 2,

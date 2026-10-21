@@ -66,7 +66,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     await expect(
       page.getByRole("button", { name: "Add an event", exact: true }),
     ).toBeVisible();
-    await page.goto(`/volunteer/volunteers/${account.id}`);
+    await page.goto(`/volunteers/${account.id}`);
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();

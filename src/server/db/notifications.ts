@@ -78,7 +78,7 @@ export async function createNotificationBatch(
       from: "After Hours Outreach <noreply@afterhoursoutreach.ca>",
       to: [email.to],
       subject: email.subject,
-      text: `${email.body}\n\nEvents: ${origin}/volunteer`,
+      text: `${email.body}\n\nEvents: ${origin}/events`,
     })),
   );
   const results = await db.batch([

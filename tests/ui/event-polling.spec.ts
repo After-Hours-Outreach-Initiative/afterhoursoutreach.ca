@@ -158,8 +158,8 @@ test("other viewers see signups and cancellations through polling without losing
       current.on("pageerror", (error) => errors.push(error.message));
     await Promise.all([
       visitor.goto(`${baseURL}/volunteer?type=orientation`),
-      viewer.goto(`${baseURL}/volunteer?type=orientation`),
-      attendee.goto(`${baseURL}/volunteer?type=orientation`),
+      viewer.goto(`${baseURL}/events?type=orientation`),
+      attendee.goto(`${baseURL}/events?type=orientation`),
     ]);
     const card = (current: typeof page) =>
       current.locator(`[data-live-event="${eventId}"]`);
@@ -188,7 +188,7 @@ test("other viewers see signups and cancellations through polling without losing
       if (request.resourceType() === "document") documents.push(request.url());
     });
     let failedRefreshes = 0;
-    await viewer.route("**/volunteer?type=orientation", (route) => {
+    await viewer.route("**/events?type=orientation", (route) => {
       if (failedRefreshes++ === 0)
         return route.fulfill({ status: 503, body: "Temporary failure" });
       return route.continue();
@@ -214,7 +214,7 @@ test("other viewers see signups and cancellations through polling without losing
       viewer.getByRole("button", { name: "Orientations", exact: true }),
     ).toBeFocused();
     expect(failedRefreshes).toBeGreaterThanOrEqual(2);
-    await viewer.unroute("**/volunteer?type=orientation");
+    await viewer.unroute("**/events?type=orientation");
     await expect(
       editor.getByLabel("Meeting point", { exact: true }),
     ).toHaveValue("Unsaved organizer draft");

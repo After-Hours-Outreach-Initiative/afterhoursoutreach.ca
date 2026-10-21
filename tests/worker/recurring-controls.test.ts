@@ -220,7 +220,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     const selectedHtml = await (
       await ok(
         await send(
-          `/volunteer?occurrence=${encodeURIComponent(far.id)}`,
+          `/events?occurrence=${encodeURIComponent(far.id)}`,
           undefined,
           organizer.cookie,
         ),
@@ -272,7 +272,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     organizerPage.on("pageerror", (error) =>
       organizerErrors.push(error.message),
     );
-    await organizerPage.goto(`${origin}/volunteer`);
+    await organizerPage.goto(`${origin}/events`);
     await organizerPage
       .getByRole("button", { name: "Add an event", exact: true })
       .click();
@@ -405,9 +405,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     const awaiting = await DB.prepare(
       "SELECT count(*) n FROM profile p JOIN volunteer_status v ON v.user_id=p.user_id WHERE v.registration_approved=0",
     ).first<number>("n");
-    await organizerPage.goto(
-      `${origin}/volunteer/volunteers?approval=awaiting`,
-    );
+    await organizerPage.goto(`${origin}/volunteers?approval=awaiting`);
     await expect(
       organizerPage.locator("[data-awaiting-approval-count]"),
     ).toHaveText(String(awaiting));
@@ -435,7 +433,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
       .bind(Date.now() + 3_000, initial[0].id)
       .run();
-    await page.goto(`${origin}/volunteer`);
+    await page.goto(`${origin}/events`);
     await expect(
       page.locator(`[data-live-event="${initial[0].id}"]`),
     ).toBeVisible();

@@ -25,7 +25,7 @@ export async function loadActionPage(
       throw new Error("Unexpected redirect");
     }
     if (response.status === 401 || response.status === 403)
-      location.assign("/volunteer");
+      location.assign("/events");
     if (!response.ok) throw new Error("Refresh failed");
     return new DOMParser().parseFromString(await response.text(), "text/html");
   } catch {

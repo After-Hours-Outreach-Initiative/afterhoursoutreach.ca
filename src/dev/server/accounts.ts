@@ -123,10 +123,10 @@ export function developmentAccounts(bindings: AuthBindings) {
           else if (/^\/apply\/?(?:\?|$)/.test(next))
             next = "/volunteer/account";
           else if (
-            next.startsWith("/volunteer/volunteers") &&
+            /^\/volunteers(?:\/|\?|$)/.test(next) &&
             !("role" in person && person.role === "organizer")
           )
-            next = "/volunteer";
+            next = "/events";
           return ctx.json({ next });
         },
       ),

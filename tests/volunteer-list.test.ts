@@ -15,24 +15,29 @@ test("organizer list state preserves approval, search and pagination in profile 
     volunteerListState(new URL(url, "https://example.org").searchParams),
   ).toEqual(state);
   expect(volunteerListUrl({ ...state, offset: 0 })).toBe(
-    "/volunteer/volunteers?q=Alex+%26+Sam&approval=awaiting",
+    "/volunteers?q=Alex+%26+Sam&approval=awaiting",
   );
+  expect(
+    volunteerListReturnUrl(
+      "/volunteer/volunteers?q=Alex+%26+Sam&approval=awaiting",
+    ),
+  ).toBe(volunteerListUrl({ ...state, offset: 0 }));
 });
 
 test("list return destinations are restricted and untrusted filter inputs are normalized", () => {
   for (const value of [
     null,
-    "https://evil.example/volunteer/volunteers?q=x",
+    "https://evil.example/volunteers?q=x",
     "//evil.example",
-    "/volunteer/volunteers/another?q=x",
+    "/volunteers/another?q=x",
     "/volunteer/events",
   ])
-    expect(volunteerListReturnUrl(value)).toBe("/volunteer/volunteers");
+    expect(volunteerListReturnUrl(value)).toBe("/volunteers");
   expect(
     volunteerListReturnUrl(
-      "/volunteer/volunteers?approval=viewed&offset=-50&extra=ignored",
+      "/volunteers?approval=viewed&offset=-50&extra=ignored",
     ),
-  ).toBe("/volunteer/volunteers");
+  ).toBe("/volunteers");
   expect(
     volunteerListState(
       new URLSearchParams({ q: "x".repeat(200), offset: "999999" }),

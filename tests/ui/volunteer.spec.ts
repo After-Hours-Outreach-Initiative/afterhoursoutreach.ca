@@ -508,9 +508,9 @@ test("account navigation and profile controls are usable on desktop and mobile",
       .getByRole("navigation", {
         name: width < 1024 ? "Mobile navigation" : "Primary navigation",
       })
-      .getByRole("link", { name: "Volunteer", exact: true })
+      .getByRole("link", { name: "Events", exact: true })
       .click();
-    await expect(page).toHaveURL(/\/volunteer\/?$/);
+    await expect(page).toHaveURL(/\/events\/?$/);
   }
   await page
     .getByRole("button", { name: "Open navigation", exact: true })

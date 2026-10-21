@@ -92,18 +92,74 @@ test("organizers review submitted applications with a global queue count and per
         redirect: "manual",
         headers: { cookie: auth },
       });
-    const listPath =
-      "/volunteer/volunteers?approval=awaiting&q=applicant&offset=50";
+    const listPath = "/volunteers?approval=awaiting&q=applicant&offset=50";
     const anonymous = await get(listPath, "");
     assert.equal(anonymous.status, 302);
     assert.equal(
       new URL(anonymous.headers.get("location")!, origin).searchParams.get(
         "returnTo",
       ),
-      "/volunteer/volunteers?q=applicant&approval=awaiting&offset=50",
+      "/volunteers?q=applicant&approval=awaiting&offset=50",
     );
-    for (const path of [listPath, "/volunteer/volunteers/applicant-50"])
+    for (const path of [listPath, "/volunteers/applicant-50"])
       assert.equal((await get(path, volunteerCookie)).status, 403);
+    for (const [oldPath, destination] of [
+      [
+        "/volunteer?type=orientation&occurrence=a%2Fb",
+        "/events?type=orientation&occurrence=a%2Fb",
+      ],
+      [
+        "/volunteer/volunteers?approval=awaiting&q=applicant&offset=50",
+        listPath,
+      ],
+      [
+        "/volunteer/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
+        "/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
+      ],
+    ]) {
+      const legacy = await get(oldPath);
+      assert.equal(
+        legacy.status,
+        oldPath.startsWith("/volunteer?") ? 302 : 301,
+      );
+      assert.equal(legacy.headers.get("location"), destination);
+      assert.equal(legacy.headers.get("cache-control"), "no-store");
+    }
+    const eventPath = "/events?type=orientation&occurrence=a%2Fb";
+    const introduction = await get("/volunteer?type=orientation", "");
+    assert.equal(introduction.status, 200);
+    assert.match(
+      await introduction.text(),
+      /data-return-to="\/events\?type=orientation"/,
+    );
+    const signedOutEvents = await get(eventPath, "");
+    assert.equal(signedOutEvents.status, 302);
+    assert.equal(
+      new URL(
+        signedOutEvents.headers.get("location")!,
+        origin,
+      ).searchParams.get("returnTo"),
+      eventPath,
+    );
+    for (const auth of [cookie, volunteerCookie]) {
+      const events = await get("/events", auth);
+      assert.equal(events.status, 200);
+      assert.equal(events.headers.get("cache-control"), "no-store");
+      assert.equal(
+        events.headers.get("x-robots-tag"),
+        "noindex, nofollow, noarchive",
+      );
+      assert.equal(events.headers.get("referrer-policy"), "no-referrer");
+      assert.match(
+        events.headers.get("content-security-policy")!,
+        /frame-src 'none'/,
+      );
+      const eventHtml = await events.text();
+      assert.match(eventHtml, /<title>Events \|/);
+      assert.match(eventHtml, /href="\/events"/);
+      assert.doesNotMatch(eventHtml, /href="\/volunteer"/);
+      assert.equal(eventHtml.includes('href="/volunteers"'), auth === cookie);
+    }
     const response = await get(listPath);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("cache-control"), "no-store");
@@ -172,11 +228,11 @@ test("organizers review submitted applications with a global queue count and per
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await expect(allApplicants).toBeFocused();
     await expect(results.locator("li")).toHaveCount(50);
-    await expect(page).toHaveURL(`${origin}/volunteer/volunteers?q=applicant`);
+    await expect(page).toHaveURL(`${origin}/volunteers?q=applicant`);
     await awaitingApproval.click();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(
-      `${origin}/volunteer/volunteers?q=applicant&approval=awaiting`,
+      `${origin}/volunteers?q=applicant&approval=awaiting`,
     );
     await page.goBack();
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
@@ -212,7 +268,7 @@ test("organizers review submitted applications with a global queue count and per
       searchStarted = resolve;
     });
     let held = false;
-    await page.route("**/volunteer/volunteers?*", async (route) => {
+    await page.route("**/volunteers?*", async (route) => {
       const request = route.request();
       if (
         held ||
@@ -260,7 +316,7 @@ test("organizers review submitted applications with a global queue count and per
       page.getByRole("link", { name: "Back to volunteers" }),
     ).toHaveAttribute(
       "href",
-      "/volunteer/volunteers?q=applicant&approval=awaiting&offset=50",
+      "/volunteers?q=applicant&approval=awaiting&offset=50",
     );
     await page
       .getByRole("button", { name: "Revoke application approval" })
@@ -288,7 +344,7 @@ test("organizers review submitted applications with a global queue count and per
     await expect(
       results.getByRole("heading", { name: "approved", exact: true }),
     ).toBeVisible();
-    await expect(page).toHaveURL(`${origin}/volunteer/volunteers?q=approved`);
+    await expect(page).toHaveURL(`${origin}/volunteers?q=approved`);
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(results.locator("li")).toHaveCount(0);
@@ -339,10 +395,7 @@ test("organizers review submitted applications with a global queue count and per
     await plain.locator("[data-volunteer-profile-link]").click();
     await expect(
       plain.getByRole("link", { name: "Back to volunteers" }),
-    ).toHaveAttribute(
-      "href",
-      "/volunteer/volunteers?q=applicant-52&approval=awaiting",
-    );
+    ).toHaveAttribute("href", "/volunteers?q=applicant-52&approval=awaiting");
     // Returning through bfcache must refresh approval changes without losing the
     // restored search or page, even when the last page becomes empty.
     await page.waitForLoadState("load");
@@ -369,7 +422,7 @@ test("organizers review submitted applications with a global queue count and per
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1",
     ).run();
-    await page.goto(`${origin}/volunteer/volunteers?approval=awaiting`);
+    await page.goto(`${origin}/volunteers?approval=awaiting`);
     await expect(count).toHaveText("0");
     await expect(
       results.getByText("No applications are awaiting approval."),
