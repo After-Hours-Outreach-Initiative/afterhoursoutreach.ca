@@ -15,7 +15,7 @@ test("organizer list state preserves approval, search and pagination in profile 
     volunteerListState(new URL(url, "https://example.org").searchParams),
   ).toEqual(state);
   expect(volunteerListUrl({ ...state, offset: 0 })).toBe(
-    "/volunteers?q=Alex+%26+Sam&approval=awaiting",
+    "/manage/volunteers?q=Alex+%26+Sam&approval=awaiting",
   );
   expect(
     volunteerListReturnUrl(
@@ -32,12 +32,12 @@ test("list return destinations are restricted and untrusted filter inputs are no
     "/volunteers/another?q=x",
     "/volunteer/events",
   ])
-    expect(volunteerListReturnUrl(value)).toBe("/volunteers");
+    expect(volunteerListReturnUrl(value)).toBe("/manage/volunteers");
   expect(
     volunteerListReturnUrl(
       "/volunteers?approval=viewed&offset=-50&extra=ignored",
     ),
-  ).toBe("/volunteers");
+  ).toBe("/manage/volunteers");
   expect(
     volunteerListState(
       new URLSearchParams({ q: "x".repeat(200), offset: "999999" }),

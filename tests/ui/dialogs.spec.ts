@@ -71,7 +71,7 @@ test("event and profile dialogs preserve their layout and content throughout the
 
   for (const width of [1280, 320]) {
     await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
-    await page.goto("/volunteer");
+    await page.goto("/manage/events");
     await page
       .getByRole("button", { name: "Create event", exact: true })
       .click();
@@ -82,7 +82,7 @@ test("event and profile dialogs preserve their layout and content throughout the
       .click();
     await expectStableExit(page.getByRole("dialog", { name: "Edit event" }));
 
-    await page.goto("/volunteers");
+    await page.goto("/manage/volunteers");
     await page.locator("[data-volunteer-profile-link]").first().click();
     const profile = page.locator("[data-volunteer-profile-dialog]");
     await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
@@ -103,6 +103,7 @@ test("application dialogs keep their chrome visible while only their body scroll
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
   await expect(page.locator("[data-event-list]")).toBeVisible();
+  await page.goto("/manage/events");
   await page.route("**/api/v1/events/action", (route) =>
     route.fulfill({ status: 503, json: { message: "Please try again." } }),
   );
@@ -195,7 +196,7 @@ test("application dialogs keep their chrome visible while only their body scroll
     await registration.locator(".dialog-close").click();
   }
 
-  await page.goto("/volunteers");
+  await page.goto("/manage/volunteers");
   await page.locator("[data-volunteer-profile-link]").first().click();
   const profile = page.getByRole("dialog", {
     name: "Volunteer profile",

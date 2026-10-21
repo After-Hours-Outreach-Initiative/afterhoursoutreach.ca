@@ -54,7 +54,8 @@ test("account and organizer routes require sign-in without loading mockups", asy
     "/apply",
     "/volunteer/account",
     "/events",
-    "/volunteers",
+    "/manage/events",
+    "/manage/volunteers",
   ]) {
     const response = await request.get(path);
     expect(response.status()).toBe(200);

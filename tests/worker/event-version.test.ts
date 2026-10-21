@@ -32,6 +32,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
           body,
         );
       return worker.fetch(`${origin}${path}`, {
+        redirect: "manual",
         method: body ? "POST" : "GET",
         headers: { origin, "content-type": "application/json", cookie },
         ...(body ? { body: JSON.stringify(body) } : {}),
@@ -77,16 +78,24 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     )
       .bind(now + 86_400_000, organizer.id, now, now)
       .run();
-    const listingVersion = async (cookie = "") => {
+    const listingVersion = async (cookie = "", manage = false) => {
       const html = await (
-        await send(cookie ? "/events" : "/volunteer", undefined, cookie)
+        await send(
+          manage ? "/manage/events" : cookie ? "/events" : "/volunteer",
+          undefined,
+          cookie,
+        )
       ).text();
       const version = html.match(/data-event-version="([a-f0-9]{64})"/)?.[1];
       expect(version).toBeDefined();
       return version;
     };
-    const readVersion = async (cookie = "") => {
-      const response = await send("/api/v1/events/version", undefined, cookie);
+    const readVersion = async (cookie = "", manage = false) => {
+      const response = await send(
+        `/api/v1/events/version${manage ? "?view=manage" : ""}`,
+        undefined,
+        cookie,
+      );
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toBe("application/json");
       expect(response.headers.get("cache-control")).toBe("no-store");
@@ -141,13 +150,81 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       .filter((value) => !value.includes("Max-Age=0"))
       .map((value) => value.split(";")[0])
       .join("; ");
-    const beforeRename = await readVersion(organizerCookie);
+    for (const path of [
+      "/manage/events",
+      "/manage/volunteers",
+      `/manage/volunteers/${attendee.id}`,
+    ]) {
+      const anonymous = await send(path);
+      expect(anonymous.status).toBe(302);
+      expect(
+        new URL(anonymous.headers.get("location")!, origin).searchParams.get(
+          "returnTo",
+        ),
+      ).toBe(path);
+      expect((await send(path, undefined, attendee.cookie)).status).toBe(403);
+      const allowed = await send(path, undefined, organizerCookie);
+      expect(allowed.status).toBe(200);
+      expect(allowed.headers.get("cache-control")).toBe("no-store");
+      expect(allowed.headers.get("referrer-policy")).toBe("no-referrer");
+    }
+    expect((await send("/api/v1/events/version?view=manage")).status).toBe(401);
+    expect(
+      (
+        await send(
+          "/api/v1/events/version?view=manage",
+          undefined,
+          attendee.cookie,
+        )
+      ).status,
+    ).toBe(403);
+    await DB.prepare(
+      `INSERT INTO event
+      (id,type,starts_at,meeting_point,spots,hidden,created_by,created_at,updated_at)
+      VALUES ('hidden','patrol',?,'Private meeting point',3,1,?,?,?),
+             ('past','patrol',?,'Past meeting point',3,0,?,?,?)`,
+    )
+      .bind(
+        now + 86_400_000,
+        organizer.id,
+        now,
+        now,
+        now - 1000,
+        organizer.id,
+        now,
+        now,
+      )
+      .run();
+    for (const cookie of [attendee.cookie, organizerCookie]) {
+      const html = await (await send("/events", undefined, cookie)).text();
+      expect(html).toContain('data-live-event="live"');
+      expect(html).not.toMatch(
+        /data-live-event="(?:hidden|past)"|data-event-save|data-live-series|data-manage-signup|volunteer-roster|Renamed attendee/,
+      );
+    }
+    const managementHtml = await (
+      await send("/manage/events", undefined, organizerCookie)
+    ).text();
+    expect(managementHtml).toContain('data-live-event="hidden"');
+    expect(managementHtml).toContain('data-live-event="past"');
+    expect(managementHtml).toContain("← View events");
+    expect(managementHtml).toContain("data-event-save");
+    expect(managementHtml).toContain("volunteer-roster");
+    expect(await readVersion(organizerCookie, true)).toBe(
+      await listingVersion(organizerCookie, true),
+    );
+    const browsingVersion = await readVersion(organizerCookie);
+    const beforeRename = await readVersion(organizerCookie, true);
     await DB.prepare("UPDATE profile SET preferred_name=? WHERE user_id=?")
       .bind("Renamed attendee", attendee.id)
       .run();
-    const organizerJoinedVersion = await readVersion(organizerCookie);
+    const organizerJoinedVersion = await readVersion(organizerCookie, true);
     expect(organizerJoinedVersion).not.toBe(beforeRename);
-    expect(organizerJoinedVersion).toBe(await listingVersion(organizerCookie));
+    expect(organizerJoinedVersion).toBe(
+      await listingVersion(organizerCookie, true),
+    );
+    expect(await readVersion(organizerCookie)).toBe(browsingVersion);
+    expect(browsingVersion).toBe(await listingVersion(organizerCookie));
 
     const cancelled = await send(
       "/api/v1/events/action",
@@ -167,7 +244,9 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     );
     expect(joinedAgain.status, await joinedAgain.text()).toBe(200);
     // The count is unchanged, but the old registration ID must not stay on screen.
-    expect(await readVersion(organizerCookie)).not.toBe(organizerJoinedVersion);
+    expect(await readVersion(organizerCookie, true)).not.toBe(
+      organizerJoinedVersion,
+    );
     await DB.prepare("UPDATE event SET hidden=1 WHERE id='live'").run();
     const hiddenPublicVersion = await listingVersion();
     expect(await publicNext()).toBe(hiddenPublicVersion);

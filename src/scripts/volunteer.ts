@@ -264,7 +264,7 @@ async function refreshVolunteer(element: HTMLFormElement) {
   )!.value;
   const profile = element.closest<HTMLElement>("[data-volunteer-profile]")!;
   const hostUrl = location.href;
-  const profileUrl = `/volunteers/${encodeURIComponent(userId)}`;
+  const profileUrl = `/manage/volunteers/${encodeURIComponent(userId)}`;
   const onProfilePage = location.pathname === profileUrl;
   const [page, host] = await Promise.all([
     loadActionPage(profileUrl),
@@ -329,6 +329,8 @@ if (eventBrowser) {
       if (controller.signal.aborted) return;
       if (!forceRefresh) {
         const versionUrl = new URL("/api/v1/events/version", location.origin);
+        if (eventBrowser.dataset.eventView === "manage")
+          versionUrl.searchParams.set("view", "manage");
         const selectedOccurrence = new URL(location.href).searchParams.get(
           "occurrence",
         );

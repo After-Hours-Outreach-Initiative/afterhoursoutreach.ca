@@ -435,7 +435,7 @@ describe(
       );
       assert.equal(unauthorized.status, 403);
       const html = await (
-        await send("/events", undefined, organizer.cookie)
+        await send("/manage/events", undefined, organizer.cookie)
       ).text();
       assert.doesNotMatch(
         html,

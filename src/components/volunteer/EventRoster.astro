@@ -19,7 +19,7 @@ const { event, roster, future, destinations } = Astro.props;
         <li>
           <div>
             <a
-              href={`/volunteers/${encodeURIComponent(person.userId)}`}
+              href={`/manage/volunteers/${encodeURIComponent(person.userId)}`}
               data-volunteer-profile-link
             >
               {person.name}

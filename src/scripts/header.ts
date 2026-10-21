@@ -14,7 +14,9 @@ new ResizeObserver(() => {
 }).observe(header);
 
 function closeMenus(except?: HTMLDetailsElement) {
-  for (const menu of menus) if (menu !== except) menu.open = false;
+  for (const menu of menus)
+    if (menu !== except && (!except || !menu.contains(except)))
+      menu.open = false;
 }
 
 for (const menu of menus) {
@@ -27,6 +29,9 @@ for (const menu of menus) {
         menu.open ? "Close navigation" : "Open navigation",
       );
     if (menu.open) closeMenus(menu);
+    else
+      for (const child of menus)
+        if (menu.contains(child) && child !== menu) child.open = false;
   });
   menu.addEventListener("focusout", (event) => {
     if (
@@ -44,9 +49,9 @@ document.addEventListener("click", (event) => {
 });
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
-  const open = menus.find((menu) => menu.open);
+  const open = [...menus].reverse().find((menu) => menu.open);
   if (!open) return;
-  closeMenus();
+  open.open = false;
   open.querySelector<HTMLElement>("summary")?.focus();
 });
 // Keep the mobile menu visible until navigation replaces the current page.

@@ -124,10 +124,12 @@ export async function listEvents(
   db: Env["DB"],
   actor: Actor | null,
   selectedOccurrence?: string,
+  view: "manage" | "volunteer" = "manage",
 ) {
   if (!canViewEvents(actor)) return [];
   await ensurePatrolOccurrences(db);
   const organizer = Boolean(
+    view === "manage" &&
     actor?.role === "organizer" &&
     actor.applicationSubmitted &&
     actor.active &&

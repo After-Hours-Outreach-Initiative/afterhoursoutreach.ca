@@ -28,7 +28,7 @@ const { pathname } = Astro.url;
 const current = pathname.replace(/\/$/, "");
 const isCurrent = (href: string) =>
   current === href ||
-  (href === "/volunteers" && current.startsWith(`${href}/`));
+  (href === "/manage/volunteers" && current.startsWith(`${href}/`));
 const links = siteNavigation(signedIn, organizer);
 const accountPage = current === "/volunteer/account" || current === "/apply";
 ---
@@ -56,15 +56,45 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
       aria-label="Primary navigation"
     >
       {
-        links.map((link) => (
-          <a
-            class="header-link"
-            href={link.href}
-            aria-current={isCurrent(link.href) ? "page" : undefined}
-          >
-            {link.label}
-          </a>
-        ))
+        links.map((link) =>
+          link.children ? (
+            <details class="header-menu" data-header-menu>
+              <summary class="header-link" role="button" aria-expanded="false">
+                {link.label}
+                <svg
+                  class="header-chevron"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
+              <ul class="header-dropdown header-manage-dropdown">
+                {link.children.map((child) => (
+                  <li>
+                    <a
+                      href={child.href}
+                      aria-current={isCurrent(child.href) ? "page" : undefined}
+                    >
+                      {child.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : (
+            <a
+              class="header-link"
+              href={link.href}
+              aria-current={isCurrent(link.href) ? "page" : undefined}
+            >
+              {link.label}
+            </a>
+          ),
+        )
       }
     </nav>
 
@@ -148,14 +178,52 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
           {
             links.map((link) => (
               <li>
-                <a
-                  class="header-mobile-link"
-                  href={link.href}
-                  aria-current={isCurrent(link.href) ? "page" : undefined}
-                >
-                  {link.label}
-                  <ArrowRightIcon class="header-mobile-arrow" />
-                </a>
+                {link.children ? (
+                  <details class="header-menu" data-header-menu>
+                    <summary
+                      class="header-mobile-link"
+                      role="button"
+                      aria-expanded="false"
+                    >
+                      {link.label}
+                      <svg
+                        class="header-chevron header-mobile-arrow"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </summary>
+                    <ul class="header-mobile-children">
+                      {link.children.map((child) => (
+                        <li>
+                          <a
+                            class="header-mobile-link"
+                            href={child.href}
+                            aria-current={
+                              isCurrent(child.href) ? "page" : undefined
+                            }
+                          >
+                            {child.label}
+                            <ArrowRightIcon class="header-mobile-arrow" />
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : (
+                  <a
+                    class="header-mobile-link"
+                    href={link.href}
+                    aria-current={isCurrent(link.href) ? "page" : undefined}
+                  >
+                    {link.label}
+                    <ArrowRightIcon class="header-mobile-arrow" />
+                  </a>
+                )}
               </li>
             ))
           }

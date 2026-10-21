@@ -50,7 +50,7 @@ async function expectInsideViewport(page: Page, target: Locator) {
 
 async function chooseSection(contents: Locator, id: string) {
   const menu = contents.locator("[data-contents-menu]");
-  if (await menu.isVisible()) await menu.locator("summary").click();
+  if (await menu.isVisible()) await menu.locator(":scope > summary").click();
   await contents.locator(`a[href="#${id}"]:visible`).click();
 }
 
@@ -372,6 +372,9 @@ for (const root of [16, 20, 24]) {
           await openLocalAccountSwitcher(page)
         )
           .locator('[data-switch-user="local-fixture-user-robin"]')
+          .click();
+        await page
+          .getByRole("link", { name: "Manage events →", exact: true })
           .click();
         const card = page.locator(
           '[data-live-event="local-fixture-event-orientation"]',

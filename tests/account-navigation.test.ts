@@ -29,8 +29,15 @@ test("site navigation replaces the public Volunteer link with top-level role-awa
   ]);
   expect(siteNavigation(true, true).map((link) => link.href)).toEqual([
     "/events",
-    "/volunteers",
+    "/manage/events",
     "/donate",
     "/about",
   ]);
+  expect(siteNavigation(true, true)[1]).toMatchObject({
+    label: "Manage",
+    children: [
+      { label: "Events", href: "/manage/events" },
+      { label: "Volunteers", href: "/manage/volunteers" },
+    ],
+  });
 });

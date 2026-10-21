@@ -21,13 +21,13 @@ export function volunteerListUrl(state: ReturnType<typeof volunteerListState>) {
   if (state.approval === "awaiting") params.set("approval", state.approval);
   if (state.offset) params.set("offset", String(state.offset));
   const query = params.toString();
-  return `/volunteers${query ? `?${query}` : ""}`;
+  return `/manage/volunteers${query ? `?${query}` : ""}`;
 }
 
 /** Only return to the organizer list, never a supplied external destination. */
 export function volunteerListReturnUrl(value: string | null) {
-  if (!value || !/^\/(?:volunteer\/)?volunteers\?/.test(value))
-    return "/volunteers";
+  if (!value || !/^\/(?:(?:manage|volunteer)\/)?volunteers\?/.test(value))
+    return "/manage/volunteers";
   return volunteerListUrl(
     volunteerListState(new URLSearchParams(value.split("?")[1])),
   );
