@@ -549,9 +549,27 @@ test("mobile navigation dims the page only while open", async ({ page }) => {
   await expect(backdrop).toBeHidden();
 
   await toggle.click();
-  // Navigation remains above the backdrop and usable.
+  // Keep the current page covered until the destination finishes loading.
+  await page.evaluate(() => {
+    document.addEventListener(
+      "click",
+      () => {
+        const menu = document.querySelector<HTMLDetailsElement>(".mobile-nav")!;
+        sessionStorage.setItem(
+          "mobile-menu-open-on-navigation",
+          String(menu.open),
+        );
+      },
+      { once: true },
+    );
+  });
   await menu.getByRole("link", { name: "About", exact: true }).click();
   await expect(page).toHaveURL(/\/about$/);
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("mobile-menu-open-on-navigation"),
+    ),
+  ).toBe("true");
   await expect(backdrop).toBeHidden();
 
   await page.setViewportSize({ width: 768, height: 812 });
