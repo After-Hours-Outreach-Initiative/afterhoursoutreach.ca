@@ -77,25 +77,19 @@ try {
             <h2 id="volunteers-heading">Volunteers</h2>
           </div>
           <nav
-            class="volunteer-actions mb-6"
+            class="volunteer-filters"
             aria-label="Application approval"
             data-volunteer-filters
           >
             <a
-              class:list={[
-                "btn",
-                approval === "all" ? "btn-primary" : "btn-quiet",
-              ]}
+              class="volunteer-filter"
               href={volunteerListUrl({ ...state, approval: "all", offset: 0 })}
               aria-current={approval === "all" ? "page" : undefined}
             >
               All applicants
             </a>
             <a
-              class:list={[
-                "btn",
-                approval === "awaiting" ? "btn-primary" : "btn-quiet",
-              ]}
+              class="volunteer-filter"
               href={volunteerListUrl({
                 ...state,
                 approval: "awaiting",

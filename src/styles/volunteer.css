@@ -1117,12 +1117,41 @@ body:has([data-application], [data-account-contents-flow]) {
   margin-top: 3rem;
 }
 .volunteer-filters {
+  gap: 0.5rem;
   margin-bottom: 1.5rem;
 }
-.volunteer-filters [aria-pressed="true"] {
-  border-color: #4169e1;
-  background: #16214a;
+.volunteer-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-zinc-600);
+  border-radius: 999rem;
+  background: transparent;
+  color: #d4d4d8;
+  @apply text-base;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+}
+.volunteer-filter:hover {
+  border-color: white;
   color: white;
+}
+.volunteer-filter:is([aria-pressed="true"], [aria-current="page"]) {
+  border-color: #818cf8;
+  background: var(--color-blue-deep);
+  color: #e0e7ff;
+}
+.volunteer-filter:is([aria-pressed="true"], [aria-current="page"]):hover {
+  border-color: #a5b4fc;
+  background: #223265;
+  color: white;
+}
+.volunteer-filter:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 0.25rem;
 }
 .volunteer-event-list {
   display: flex;
