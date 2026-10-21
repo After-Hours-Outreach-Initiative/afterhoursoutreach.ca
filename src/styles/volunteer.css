@@ -1186,6 +1186,9 @@ body:has([data-application], [data-account-contents-flow]) {
   gap: 1.25rem;
   margin-bottom: 1.5rem;
 }
+.volunteer-section-heading h1 {
+  @apply text-2xl md:text-4xl;
+}
 .volunteer-section-heading p {
   margin-top: 0.5rem;
   color: #a1a1aa;
