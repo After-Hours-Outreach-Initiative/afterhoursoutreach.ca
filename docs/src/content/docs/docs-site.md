@@ -74,6 +74,10 @@ explicit sidebar in `docs/astro.config.mjs`, then run `pnpm docs:check`.
 After changing the site configuration, restart the reader with `pnpm docs:stop`
 followed by `pnpm docs:dev`.
 
+The reader keeps development and production Vite dependency caches separate so
+running `pnpm docs:check` or building the docs cannot replace the live reader's
+React runtime and break interactive controls.
+
 ## Diagrams
 
 Diagrams are native `.excalidraw` files in `docs/public/diagrams/`. These files are

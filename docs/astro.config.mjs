@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from "astro/config";
+import { fileURLToPath } from "node:url";
 import starlight from "@astrojs/starlight";
 import react from "@astrojs/react";
 import diagramFiles from "./src/integrations/diagram-files.ts";
@@ -12,6 +13,14 @@ export default defineConfig({
     port: 4322,
   },
   vite: {
+    // Astro check/build use production React. Keep their optimized dependencies
+    // separate so they cannot replace the running dev server's JSX runtime.
+    cacheDir: fileURLToPath(
+      new URL(
+        `./node_modules/.vite/${process.env.NODE_ENV === "production" ? "production" : "development"}/`,
+        import.meta.url,
+      ),
+    ),
     server: {
       strictPort: true,
       // Saving must not reload the page and discard edits in other canvases.
