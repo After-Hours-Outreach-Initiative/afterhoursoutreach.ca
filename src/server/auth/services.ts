@@ -9,7 +9,8 @@ export interface SignInEmail {
   purpose?: "change-email";
 }
 
-const signInExpiry = "The link and code expire in 10 minutes.";
+const signInExpiry =
+  "The link and code expire in 10 minutes and can only be used once.";
 const signInSecurity =
   "If you did not request this, you can safely ignore this email.";
 
@@ -74,7 +75,7 @@ export async function sendSignInEmail(
       subject:
         email.purpose === "change-email"
           ? "Confirm your After Hours Outreach email change"
-          : `${email.code} is your After Hours Outreach sign-in code`,
+          : `${email.code} is your sign-in code`,
       text:
         email.purpose === "change-email"
           ? `Enter this code in your account settings to confirm your new email address: ${email.code}\n\nThe code expires in ten minutes and can only be used once. Requesting a new code for this address replaces the previous code. Your email address will not change until you confirm it.\n\nIf you did not request this, ignore this email.`
