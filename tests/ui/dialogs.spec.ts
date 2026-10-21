@@ -28,6 +28,70 @@ async function expectPinnedChrome(dialog: Locator) {
   await expect(close).toHaveText("");
 }
 
+async function expectStableExit(dialog: Locator) {
+  const { before, frames } = await dialog.evaluate(async (element) => {
+    const dialog = element as HTMLDialogElement;
+    await Promise.allSettled(
+      dialog.getAnimations().map((animation) => animation.finished),
+    );
+    const body = dialog.querySelector<HTMLElement>(".dialog-body")!;
+    body.scrollTop = body.scrollHeight;
+    const layout = () => ({
+      width: dialog.offsetWidth,
+      height: dialog.offsetHeight,
+      bodyWidth: body.offsetWidth,
+      bodyHeight: body.offsetHeight,
+      children: body.childElementCount,
+      scroll: body.scrollTop,
+    });
+    const before = layout();
+    dialog.querySelector<HTMLButtonElement>(".dialog-close")!.click();
+    const frames: ReturnType<typeof layout>[] = [];
+    while (getComputedStyle(dialog).display !== "none") {
+      frames.push(layout());
+      await new Promise(requestAnimationFrame);
+    }
+    return { before, frames };
+  });
+  expect(frames.length).toBeGreaterThan(0);
+  for (const frame of frames) expect(frame).toEqual(before);
+}
+
+test("event and profile dialogs preserve their layout and content throughout the exit transition", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+
+  for (const width of [1280, 320]) {
+    await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
+    await page.goto("/volunteer");
+    await page
+      .getByRole("button", { name: "Create event", exact: true })
+      .click();
+    await expectStableExit(page.locator("#event-editor-new"));
+    await page
+      .locator('[data-live-event="local-fixture-event-orientation"]')
+      .getByRole("button", { name: "Edit", exact: true })
+      .click();
+    await expectStableExit(page.getByRole("dialog", { name: "Edit event" }));
+
+    await page.goto("/volunteers");
+    await page.locator("[data-volunteer-profile-link]").first().click();
+    const profile = page.locator("[data-volunteer-profile-dialog]");
+    await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
+    await expect(profile.locator(".volunteer-profile-loading")).toHaveCount(0);
+    await expectStableExit(profile);
+    await expect(profile.locator("[data-profile-dialog-content]")).toBeEmpty();
+  }
+});
+
 test("application dialogs keep their chrome visible while only their body scrolls", async ({
   page,
 }) => {
