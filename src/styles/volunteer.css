@@ -171,6 +171,9 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-fields.volunteer-emergency-contact-fields {
   grid-template-columns: minmax(0, 1fr);
 }
+[data-event-save] .volunteer-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
 .volunteer-name-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
