@@ -225,6 +225,10 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             )
             .click();
         const card = page.locator(`[data-live-event="${booked}"]`);
+        const rosterSelector = manage
+          ? ".volunteer-roster"
+          : ".public-event-roster";
+        await expect(card.locator(rosterSelector)).toHaveCount(1);
         for (const label of ["Volunteers", "Orientees"]) {
           await expect(
             card.locator(".event-row-label", { hasText: label }),
@@ -242,6 +246,8 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           ),
         ).toHaveCount(3);
         const emptyCard = page.locator(`[data-live-event="${empty}"]`);
+        const emptyRoster = emptyCard.locator(rosterSelector);
+        await expect(emptyRoster).toHaveCount(0);
         await expect(
           emptyCard.locator(".attendee-medic:not(.attendee-booked)"),
         ).toHaveCount(2);
@@ -280,24 +286,50 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           ).toBeVisible();
         } else {
           await expect(emptyCard.locator("[data-live-signup]")).toHaveCount(1);
-          if (width === 375) {
-            await emptyCard
-              .getByRole("button", { name: "Register", exact: true })
-              .click();
-            await expect(
-              emptyCard.getByRole("button", {
-                name: "Unregister",
-                exact: true,
-              }),
-            ).toBeEnabled();
-            await expectActionPosition();
-            await emptyCard
-              .getByRole("button", { name: "Unregister", exact: true })
-              .click();
-            await expect(
-              emptyCard.getByRole("button", { name: "Register", exact: true }),
-            ).toBeEnabled();
-          }
+        }
+        if (width === 375) {
+          const setRegistration = async (join: boolean) => {
+            if (manage) {
+              const response = await send(
+                "/api/v1/events/action",
+                viewer.cookie,
+                { action: join ? "join" : "cancel", id: empty },
+              );
+              expect(response.status, await response.clone().text()).toBe(200);
+            } else {
+              await emptyCard
+                .getByRole("button", {
+                  name: join ? "Register" : "Unregister",
+                  exact: true,
+                })
+                .click();
+              await expect(
+                emptyCard.getByRole("button", {
+                  name: join ? "Unregister" : "Register",
+                  exact: true,
+                }),
+              ).toBeEnabled();
+            }
+          };
+          await setRegistration(true);
+          await expect(emptyRoster.locator("summary")).toHaveText(
+            "Volunteers (1)",
+            { timeout: 15_000 },
+          );
+          await expect(emptyRoster).not.toHaveAttribute("open");
+          await emptyRoster.locator("summary").click();
+          await expectActionPosition();
+          await setRegistration(false);
+          await expect(emptyRoster).toHaveCount(0, { timeout: 15_000 });
+          await expect(
+            emptyCard.locator(".event-avatar-description"),
+          ).toHaveAttribute("open", "");
+          await expect(
+            emptyCard.locator(".attendee-medic:not(.attendee-booked)"),
+          ).toHaveCount(2);
+          await expect(
+            emptyCard.locator(".attendee-orientee:not(.attendee-booked)"),
+          ).toHaveCount(2);
         }
         const crowded = page.locator('[data-live-event="crowded"]');
         await expect(
