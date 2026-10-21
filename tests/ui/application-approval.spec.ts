@@ -5,7 +5,7 @@ import {
   openLocalAccountSwitcher,
 } from "../helpers/local-account";
 
-test("organizer approval unlocks events in place; revocation hides them again", async ({
+test("pending applications poll every minute, then approval restores five-second event checks", async ({
   page,
   browser,
   baseURL,
@@ -64,7 +64,14 @@ test("organizer approval unlocks events in place; revocation hides them again", 
         .getByRole("status")
         .filter({ hasText: "awaiting organizer approval" }),
     ).toHaveCount(0);
+    await volunteer.clock.install();
+    await volunteer.clock.pauseAt(new Date());
+    let checks = 0;
+    volunteer.on("requestfinished", (request) => {
+      if (request.url().endsWith("/api/v1/events/version")) checks++;
+    });
     await volunteer.goto(`${baseURL}/volunteer`);
+    await expect.poll(() => checks).toBe(1);
 
     await page.goto("/volunteer");
     await (
@@ -88,6 +95,11 @@ test("organizer approval unlocks events in place; revocation hides them again", 
         exact: true,
       }),
     ).toBeEnabled();
+    await volunteer.clock.runFor(59_999);
+    expect(checks).toBe(1);
+    await expect(pending).toBeVisible();
+    await volunteer.clock.runFor(1);
+    await expect.poll(() => checks).toBe(2);
     await expect(volunteer.locator("[data-event-list]")).toBeVisible({
       timeout: 15_000,
     });
@@ -95,6 +107,10 @@ test("organizer approval unlocks events in place; revocation hides them again", 
       0,
     );
     await expect(discord).toHaveCount(0);
+    await volunteer.clock.runFor(4_999);
+    expect(checks).toBe(2);
+    await volunteer.clock.runFor(1);
+    await expect.poll(() => checks).toBe(3);
     await volunteer
       .getByRole("button", { name: "Includes orientation", exact: true })
       .click();
@@ -124,6 +140,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     await expect(
       page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeEnabled();
+    await volunteer.clock.runFor(5_000);
     await expect(
       volunteer.getByRole("heading", {
         name: "Application Submitted",
@@ -133,6 +150,11 @@ test("organizer approval unlocks events in place; revocation hides them again", 
       volunteer.locator("[data-live-event], [data-event-list]"),
     ).toHaveCount(0);
     await expect(discord).toBeVisible();
+    const revokedChecks = checks;
+    await volunteer.clock.runFor(59_999);
+    expect(checks).toBe(revokedChecks);
+    await volunteer.clock.runFor(1);
+    await expect.poll(() => checks).toBe(revokedChecks + 1);
     expect(
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),
     ).toBe(403);
