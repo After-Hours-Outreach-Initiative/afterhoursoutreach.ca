@@ -189,7 +189,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       );
       await expect(navigation.locator(".header-mobile-link").first()).toHaveCSS(
         "padding",
-        "16px 21px 16px 0px",
+        "16px 21px",
       );
       expect(
         await header.evaluate((element) => {
@@ -432,9 +432,27 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(accountLink).toBeVisible();
     const signOut = card.getByRole("button", { name: "Sign out", exact: true });
     await expect(signOut).toBeVisible();
+    await expect(signOut.locator("svg")).toHaveCount(0);
+    await expect(accountLink.locator(".header-mobile-arrow")).toHaveCount(
+      mobile ? 1 : 0,
+    );
     for (const action of [accountLink, signOut]) {
       await expect(action).toHaveCSS("font-size", mobile ? "18px" : "16px");
       await expect(action).toHaveCSS("min-height", mobile ? "56px" : "44px");
+    }
+    if (mobile) {
+      const textStarts = await navigation
+        .locator(
+          ".header-mobile-link, .header-account-card > a:not(.header-account-identity), .header-account-card button",
+        )
+        .evaluateAll((elements) =>
+          elements.map((element) => {
+            const range = document.createRange();
+            range.selectNodeContents(element.firstChild!);
+            return range.getBoundingClientRect().x;
+          }),
+        );
+      expect(new Set(textStarts).size).toBe(1);
     }
     for (const discord of await header.locator("[data-header-discord]").all())
       await expect(discord).toBeHidden();

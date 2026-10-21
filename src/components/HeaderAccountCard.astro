@@ -57,10 +57,7 @@ const {
     {showArrows && <ArrowRightIcon class="header-mobile-arrow" />}
   </a>
   <form data-sign-out action="/api/v1/auth/sign-out" method="post">
-    <button type="submit">
-      Sign out
-      {showArrows && <ArrowRightIcon class="header-mobile-arrow" />}
-    </button>
+    <button type="submit">Sign out</button>
     <p class="header-account-message" data-form-message role="status" hidden>
     </p>
   </form>
