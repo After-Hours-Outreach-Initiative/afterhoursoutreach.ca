@@ -8,6 +8,11 @@ in the application build. Reading and checking the docs requires no Wrangler,
 database, Cloudflare credentials, or application secrets, and does not require
 starting the application server.
 
+The optional [Operations dashboard](/dashboard/) adds privileged, local-only
+administration of remote D1 databases and monitoring of Resend limits. It uses
+Wrangler credentials separately from ordinary reading; see
+[Dashboard administration](/operations-dashboard/) for setup and safeguards.
+
 ## Read locally
 
 Run these commands **from the repository root**, not from `docs/`:

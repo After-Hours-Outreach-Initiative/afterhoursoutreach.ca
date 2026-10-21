@@ -3,6 +3,7 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import react from "@astrojs/react";
 import diagramFiles from "./src/integrations/diagram-files.ts";
+import localDashboard from "./src/integrations/local-dashboard.ts";
 
 // This is a standalone local reader, not part of the application's build.
 export default defineConfig({
@@ -15,10 +16,24 @@ export default defineConfig({
       strictPort: true,
       // Saving must not reload the page and discard edits in other canvases.
       watch: { ignored: ["**/public/diagrams/*.excalidraw*"] },
+      // Local admin logs and application secrets must not be served by Vite's
+      // workspace filesystem endpoint either.
+      fs: {
+        deny: [
+          ".env",
+          ".env.*",
+          "*.{crt,pem}",
+          "**/.git/**",
+          "**/.dev.vars*",
+          "**/.wrangler/**",
+          "**/.cloudflare/**",
+        ],
+      },
     },
   },
   integrations: [
     diagramFiles(),
+    localDashboard(),
     react(),
     starlight({
       title: "After Hours Outreach docs",
@@ -27,6 +42,7 @@ export default defineConfig({
       pagefind: false,
       sidebar: [
         { label: "Overview", slug: "" },
+        { label: "Operations dashboard", link: "/dashboard/" },
         {
           label: "Application workflows",
           items: [
@@ -40,6 +56,7 @@ export default defineConfig({
             { label: "System architecture", slug: "system-architecture" },
             { label: "Backend", slug: "backend" },
             { label: "Deployment", slug: "deployment" },
+            { label: "Dashboard administration", slug: "operations-dashboard" },
           ],
         },
         { label: "Privacy review", slug: "privacy" },
