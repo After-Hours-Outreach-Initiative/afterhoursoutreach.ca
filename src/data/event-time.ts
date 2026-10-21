@@ -43,10 +43,16 @@ export function vancouverInstant(input: string): string {
   return new Date(candidates[0]).toISOString();
 }
 
+/** A valid wall time that fails the combined date-and-time constraint. */
+export class PastEventStartError extends Error {
+  constructor() {
+    super("Choose a future start date and time.");
+  }
+}
+
 export function futureEventInstant(input: string, now = Date.now()): string {
   const instant = vancouverInstant(input);
-  if (Date.parse(instant) <= now)
-    throw new Error("Choose a future start date and time.");
+  if (Date.parse(instant) <= now) throw new PastEventStartError();
   return instant;
 }
 
