@@ -3,6 +3,7 @@ import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
 import DateInput from "./DateInput.astro";
+import NativeDateInput from "./NativeDateInput.astro";
 interface Props {
   event?: EventRow;
   series?: PatrolSeriesRow;
@@ -117,10 +118,9 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
                 <label for={`${dialogId}-endDate`}>
                   Last recurring date (optional, inclusive)
                 </label>
-                <input
+                <NativeDateInput
                   id={`${dialogId}-endDate`}
                   name="endDate"
-                  type="date"
                   aria-describedby={`error-${dialogId}-endDate`}
                   disabled
                 />

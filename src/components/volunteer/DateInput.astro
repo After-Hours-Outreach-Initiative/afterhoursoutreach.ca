@@ -1,6 +1,7 @@
 ---
 import FieldError from "@/components/FieldError.astro";
 import { dateParts, canonicalDate } from "@/data/date-input";
+import NativeDateInput from "./NativeDateInput.astro";
 
 interface Props {
   name: string;
@@ -46,7 +47,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
   data-certification-expiry={name === "certificationExpiry" || undefined}
   hidden={!active}
 >
-  <legend>
+  <legend id={`${id}-label`}>
     {label}{
       required && (
         <span class="volunteer-required" aria-hidden="true">
@@ -63,32 +64,46 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
       </span>
     )
   }
-  <div class="volunteer-date-parts">
-    {
-      (["day", "month", "year"] as const).map((part) => (
-        <div class="volunteer-field">
-          <label for={`${id}-${part}`}>
-            {part[0].toUpperCase() + part.slice(1)}
-          </label>
-          <input
-            id={`${id}-${part}`}
-            data-date-part={part}
-            data-birth-date-part={birthDate ? part : undefined}
-            type="text"
-            inputmode="numeric"
-            autocomplete={birthDate ? `bday-${part}` : "off"}
-            aria-describedby={describedBy}
-            value={parts[part]}
-            required={required && active}
-            readonly={!active}
-            pattern={part === "year" ? String.raw`\d{4}` : String.raw`\d{1,2}`}
-            maxlength="10"
-            spellcheck={false}
-          />
-        </div>
-      ))
-    }
-  </div>
+  {
+    birthDate ? (
+      <div class="volunteer-date-parts">
+        {(["day", "month", "year"] as const).map((part) => (
+          <div class="volunteer-field">
+            <label for={`${id}-${part}`}>
+              {part[0].toUpperCase() + part.slice(1)}
+            </label>
+            <input
+              id={`${id}-${part}`}
+              data-date-part={part}
+              data-birth-date-part={part}
+              type="text"
+              inputmode="numeric"
+              autocomplete={`bday-${part}`}
+              aria-describedby={describedBy}
+              value={parts[part]}
+              required={required && active}
+              readonly={!active}
+              pattern={
+                part === "year" ? String.raw`\d{4}` : String.raw`\d{1,2}`
+              }
+              maxlength="10"
+              spellcheck={false}
+            />
+          </div>
+        ))}
+      </div>
+    ) : (
+      <NativeDateInput
+        id={id}
+        aria-labelledby={`${id}-label`}
+        aria-describedby={describedBy}
+        value={date}
+        required={required && active}
+        readonly={!active}
+        autocomplete="off"
+      />
+    )
+  }
   {
     withTime && (
       <div class="volunteer-field">

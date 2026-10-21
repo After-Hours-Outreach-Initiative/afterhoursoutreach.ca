@@ -7,9 +7,13 @@ export async function fillDateInput(
 ) {
   const group = scope.locator(`[data-date-input="${name}"]`);
   const [date, time] = value.split("T");
-  const [year, month, day] = date.split("-");
-  for (const [part, answer] of Object.entries({ day, month, year }))
-    await group.locator(`[data-date-part="${part}"]`).fill(answer ?? "");
+  const native = group.locator("[data-native-date]");
+  if (await native.count()) await native.fill(date);
+  else {
+    const [year, month, day] = date.split("-");
+    for (const [part, answer] of Object.entries({ day, month, year }))
+      await group.locator(`[data-date-part="${part}"]`).fill(answer ?? "");
+  }
   if (time !== undefined)
     await group.locator("[data-date-time-input]").fill(time);
 }
