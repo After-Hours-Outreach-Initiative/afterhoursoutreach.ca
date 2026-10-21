@@ -1313,7 +1313,7 @@ test("relevant training and Other details round-trip independently of medical ce
   );
   assert.ok(actor);
   assert.deepEqual(
-    await viewVolunteerProfile(bindings.DB, actor, id),
+    (await viewVolunteerProfile(bindings.DB, actor, id))?.answers,
     expected,
   );
   await assert.rejects(
@@ -1360,7 +1360,7 @@ test("relevant training and Other details round-trip independently of medical ce
   });
   assert.deepEqual((await loadProfile(bindings.DB, id))?.teams, ["non-patrol"]);
   assert.deepEqual(
-    (await viewVolunteerProfile(bindings.DB, actor, id))?.teams,
+    (await viewVolunteerProfile(bindings.DB, actor, id))?.answers.teams,
     ["non-patrol"],
   );
 });
@@ -1459,7 +1459,7 @@ test("highest certification and expiry round-trip, preserve legacy answers and a
     .run();
   assert.deepEqual(await loadProfile(bindings.DB, id), expected);
   assert.deepEqual(
-    await viewVolunteerProfile(bindings.DB, organizer, id),
+    (await viewVolunteerProfile(bindings.DB, organizer, id))?.answers,
     expected,
   );
   // Do not invent a highest credential or discard old multiselect answers.

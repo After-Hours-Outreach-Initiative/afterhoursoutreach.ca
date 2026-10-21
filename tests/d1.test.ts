@@ -238,7 +238,13 @@ test("application queue counts all submitted unapproved applications independent
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
     0,
   );
-  await viewVolunteerProfile(env.DB, actor, "pending-02");
+  const profile = await viewVolunteerProfile(env.DB, actor, "pending-02");
+  assert.equal(profile?.email, "pending-02@example.org");
+  assert.equal(profile?.answers.preferredName, "pending-02");
+  assert.equal(profile?.submittedAt, "1970-01-01T00:00:00.000Z");
+  // Legacy profiles have no recorded acknowledgement; never invent one.
+  assert.equal(profile?.codeOfConductVersion, null);
+  assert.equal(profile?.codeOfConductAcceptedAt, null);
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting")).rows
       .length,
@@ -312,6 +318,13 @@ test("application queue counts all submitted unapproved applications independent
   );
   assert.equal(organizerQueue.awaitingApprovalCount, count + 1);
   assert.equal(organizerQueue.rows[0].id, actor.id);
+  await env.DB.prepare("DELETE FROM session WHERE id=?")
+    .bind(actor.sessionId)
+    .run();
+  await assert.rejects(
+    viewVolunteerProfile(env.DB, actor, "pending-02"),
+    statusError(403),
+  ); // A stale organizer actor cannot disclose email or application answers.
 });
 
 const completeAnswers = () =>

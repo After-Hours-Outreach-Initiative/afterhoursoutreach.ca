@@ -1,0 +1,156 @@
+---
+import {
+  applicationFields,
+  applicationTeamOptions,
+  certificationOptions,
+  formatApplicationSubmittedTime,
+  heardAboutUsOptions,
+  heardAboutUsQuestion,
+  trainingOptions,
+  type ApplicationAnswers,
+} from "@/data/application";
+import AnswerValue from "./AnswerValue.astro";
+
+interface Props {
+  answers: ApplicationAnswers;
+  email: string;
+  submittedAt: string;
+  codeOfConductVersion: string | null;
+  codeOfConductAcceptedAt: string | null;
+  idPrefix?: string;
+}
+const {
+  answers,
+  email,
+  submittedAt,
+  codeOfConductVersion,
+  codeOfConductAcceptedAt,
+  idPrefix = "submitted",
+} = Astro.props;
+const sections = [
+  { key: "submission", heading: "Submission details" },
+  { key: "personal-info", heading: "Personal info" },
+  { key: "emergency-contact", heading: "Emergency contact" },
+  { key: "team-interests", heading: "Team interests" },
+  { key: "training-and-safety", heading: "Training and safety" },
+  { key: "about-volunteering", heading: "About volunteering" },
+];
+const choices = (
+  selected: string[],
+  options: readonly { value: string; label: string }[],
+) =>
+  selected.map(
+    (value) => options.find((option) => option.value === value)?.label ?? value,
+  );
+const rows: {
+  section: string;
+  label: string;
+  value: string | string[];
+  wide?: boolean;
+}[] = [
+  {
+    section: "submission",
+    label: "Submitted",
+    value: formatApplicationSubmittedTime(submittedAt),
+  },
+  {
+    section: "submission",
+    label: "Code of Conduct version accepted",
+    value: codeOfConductVersion ?? "Not recorded",
+  },
+  {
+    section: "submission",
+    label: "Code of Conduct accepted",
+    value: codeOfConductAcceptedAt
+      ? formatApplicationSubmittedTime(codeOfConductAcceptedAt)
+      : "Not recorded",
+  },
+  {
+    section: "personal-info",
+    label: "Email",
+    value: email,
+  },
+  ...applicationFields
+    .filter((field) => field.name !== "heardAboutUs" || answers.heardAboutUs)
+    .map((field) => ({
+      section: field.section,
+      label: field.label,
+      value: answers[field.name],
+      wide: "multiline" in field,
+    })),
+  {
+    section: "team-interests",
+    label: "Teams",
+    value: choices(answers.teams, applicationTeamOptions),
+  },
+  {
+    section: "training-and-safety",
+    label: "Highest medical certification or licence",
+    value: choices(answers.certifications, certificationOptions),
+  },
+  ...(answers.certification
+    ? [
+        {
+          section: "training-and-safety",
+          label: "Additional certification answer",
+          value: answers.certification,
+          wide: true,
+        },
+      ]
+    : []),
+  {
+    section: "training-and-safety",
+    label: "Relevant training and experience",
+    value: choices(answers.training, trainingOptions),
+  },
+  {
+    section: "about-volunteering",
+    label: heardAboutUsQuestion,
+    value: choices(answers.heardAboutUsSources, heardAboutUsOptions),
+  },
+  ...(answers.heardAboutUsOther
+    ? [
+        {
+          section: "about-volunteering",
+          label: "Other referral details",
+          value: answers.heardAboutUsOther,
+          wide: true,
+        },
+      ]
+    : []),
+];
+---
+
+<div class="account-profile-summary mt-8">
+  {
+    sections.map((section) => (
+      <section
+        class="volunteer-profile-section"
+        aria-labelledby={`${idPrefix}-${section.key}`}
+      >
+        <h3
+          class="volunteer-profile-heading mb-6"
+          id={`${idPrefix}-${section.key}`}
+        >
+          {section.heading}
+        </h3>
+        <dl>
+          {rows
+            .filter((row) => row.section === section.key)
+            .map((row) => (
+              <div
+                class:list={{
+                  "volunteer-wide": row.wide || Array.isArray(row.value),
+                }}
+              >
+                <dt>{row.label}</dt>
+                <dd>
+                  <AnswerValue value={row.value} />
+                </dd>
+              </div>
+            ))}
+        </dl>
+      </section>
+    ))
+  }
+</div>

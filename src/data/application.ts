@@ -37,6 +37,12 @@ export interface SubmittedApplication {
   codeOfConductAcceptedAt: string;
 }
 
+export const formatApplicationSubmittedTime = (value: string) =>
+  new Date(value).toLocaleString("en-CA", {
+    timeZone: "America/Vancouver",
+    timeZoneName: "short",
+  });
+
 export function applicationDisplayName(
   answers: Pick<
     ApplicationAnswers,
