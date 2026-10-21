@@ -700,8 +700,17 @@ if (profileDialog && profileContent) {
     "[data-profile-dialog-loading]",
   );
   let pending: AbortController | undefined;
-  profileDialog.addEventListener("close", () => {
-    pending?.abort();
+  profileDialog.addEventListener("close", async () => {
+    if (profileDialog.open) return;
+    const closingRequest = pending;
+    closingRequest?.abort();
+    // The native close event precedes the visible exit. Wait only for the
+    // dialog's own transitions, not animations inside the fetched profile.
+    await Promise.allSettled(
+      profileDialog.getAnimations().map((animation) => animation.finished),
+    );
+    // A rapid reopen (even followed by another close) owns its own cleanup.
+    if (profileDialog.open || pending !== closingRequest) return;
     pending = undefined;
     profileContent.replaceChildren();
     profileContent.removeAttribute("aria-busy");

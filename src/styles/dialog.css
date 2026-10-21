@@ -10,10 +10,11 @@
   border-radius: 0.75rem;
   background: #0c0d10;
   color: #f4f4f5;
+  /* Native close removes [open] before the discrete exit transition ends. */
+  flex-direction: column;
 }
 .dialog-frame[open] {
   display: flex;
-  flex-direction: column;
 }
 .dialog-frame::backdrop {
   background: #000b;
