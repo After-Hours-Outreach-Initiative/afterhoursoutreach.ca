@@ -296,10 +296,42 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       name: "Manage",
       exact: true,
     });
+    const manageMenu = manage.locator("..");
+    await manage.hover();
+    if (mobile) {
+      await expect(manage).toHaveAttribute("aria-expanded", "false");
+      await manage.click();
+      await expect(manage).toHaveAttribute("aria-expanded", "true");
+      await manage.click();
+    } else {
+      await expect(manageMenu).toHaveAttribute("open", "");
+      await expect(manage).toHaveAttribute("aria-expanded", "true");
+      const triggerBox = (await manage.boundingBox())!;
+      const dropdownBox = (await manageMenu.locator("ul").boundingBox())!;
+      await page.mouse.move(
+        triggerBox.x + triggerBox.width / 2,
+        (triggerBox.y + triggerBox.height + dropdownBox.y) / 2,
+        { steps: 5 },
+      );
+      await expect(manageMenu).toHaveAttribute("open", "");
+      await manageMenu
+        .getByRole("link", { name: "Events", exact: true })
+        .hover();
+      await expect(manage).toHaveAttribute("aria-expanded", "true");
+      await page.mouse.move(0, 0);
+      await expect(manage).toHaveAttribute("aria-expanded", "false");
+      await manage.hover();
+      await manage.click();
+      await expect(manageMenu).not.toHaveAttribute("open");
+      await expect(manage).toHaveAttribute("aria-expanded", "false");
+      await manage.click();
+      await page.mouse.move(0, 0);
+      await expect(manage).toHaveAttribute("aria-expanded", "true");
+      await manage.press("Escape");
+    }
     await manage.focus();
     await manage.press("Enter");
     await expect(manage).toHaveAttribute("aria-expanded", "true");
-    const manageMenu = manage.locator("..");
     await expect(
       manageMenu.getByRole("link", { name: "Events", exact: true }),
     ).toHaveAttribute("href", "/manage/events");
@@ -333,7 +365,8 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await toggle.click();
       await expect(toggle).toHaveAttribute("aria-expanded", "true");
     }
-    await manage.click();
+    await manage.focus();
+    await manage.press("Enter");
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveAttribute("aria-current", "page");
@@ -380,6 +413,8 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       expect(accountBox!.width).toBe(width - accountBox!.x * 2);
     } else {
       const accountToggle = account.locator("summary");
+      await accountToggle.hover();
+      await expect(accountToggle).toHaveAttribute("aria-expanded", "false");
       await accountToggle.click();
       await expect(accountToggle).toHaveAttribute("aria-expanded", "true");
       await expect(toggle).toHaveAttribute("aria-expanded", "false");

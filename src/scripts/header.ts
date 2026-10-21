@@ -3,6 +3,7 @@ const menus = [
   ...header.querySelectorAll<HTMLDetailsElement>("[data-header-menu]"),
 ];
 const mobileNav = header.querySelector<HTMLDetailsElement>(".mobile-nav")!;
+const desktop = matchMedia("(min-width: 64rem)");
 
 // Wrapped branding can make the header taller than its responsive minimum.
 // Keep the panel's height allowance separate so the header can shrink again.
@@ -40,6 +41,24 @@ for (const menu of menus) {
     )
       menu.open = false;
   });
+  if (menu.hasAttribute("data-header-hover-menu")) {
+    let openedOnHover = false;
+    menu.addEventListener("pointerenter", (event) => {
+      if (event.pointerType !== "mouse" || !desktop.matches || menu.open)
+        return;
+      openedOnHover = true;
+      menu.open = true;
+    });
+    // Native click/keyboard toggling takes ownership from hover.
+    menu.querySelector("summary")!.addEventListener("click", () => {
+      openedOnHover = false;
+    });
+    menu.addEventListener("pointerleave", () => {
+      if (openedOnHover && !menu.contains(document.activeElement))
+        menu.open = false;
+      openedOnHover = false;
+    });
+  }
 }
 
 document.addEventListener("click", (event) => {
@@ -58,7 +77,7 @@ document.addEventListener("keydown", (event) => {
 header.querySelectorAll(".header-dropdown a").forEach((link) => {
   link.addEventListener("click", () => closeMenus());
 });
-matchMedia("(min-width: 64rem)").addEventListener("change", () => closeMenus());
+desktop.addEventListener("change", () => closeMenus());
 
 // Account pages own this action so they can synchronize unsaved application
 // drafts first. Other pages load the auth client only when signing out.
