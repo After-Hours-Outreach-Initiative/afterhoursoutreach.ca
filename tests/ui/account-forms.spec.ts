@@ -3080,7 +3080,59 @@ test("event editor shows native number and URL errors without submitting", async
   await form
     .getByLabel("Meeting point", { exact: true })
     .fill("Test meeting point");
-  const spots = form.getByLabel("Volunteer spots");
+  const spots = form.getByRole("spinbutton", { name: "Volunteer spots" });
+  const decrease = form.getByRole("button", {
+    name: "Decrease volunteer spots",
+  });
+  const increase = form.getByRole("button", {
+    name: "Increase volunteer spots",
+  });
+  await expect(spots).toHaveAttribute("type", "number");
+  for (const [name, value] of Object.entries({
+    min: "1",
+    max: "100",
+    step: "1",
+  }))
+    await expect(spots).toHaveAttribute(name, value);
+  await expect(spots).toHaveCSS("appearance", "textfield");
+  for (const button of [decrease, increase]) {
+    await expect(button).toHaveAttribute("type", "button");
+    await expect(button.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  }
+  await form.evaluate((element) => {
+    for (const type of ["input", "change"])
+      element.addEventListener(type, (event) => {
+        if ((event.target as HTMLInputElement).name === "spots")
+          element.dataset.spotsEvents = `${element.dataset.spotsEvents ?? ""}${type},`;
+      });
+  });
+  await decrease.locator("svg").click();
+  await expect(spots).toHaveValue("7");
+  await increase.press("Enter");
+  await expect(spots).toHaveValue("8");
+  await expect(form).toHaveAttribute(
+    "data-spots-events",
+    "input,change,input,change,",
+  );
+  const viewport = page.viewportSize()!;
+  for (const width of [320, 375, 1280]) {
+    await page.setViewportSize({ width, height: 812 });
+    const [minus, number, plus] = await Promise.all(
+      [decrease, spots, increase].map((control) => control.boundingBox()),
+    );
+    expect(minus!.x + minus!.width).toBeLessThan(number!.x);
+    expect(number!.x + number!.width).toBeLessThan(plus!.x);
+    for (const box of [minus!, number!, plus!]) {
+      expect(box.height).toBeGreaterThanOrEqual(52);
+      expect(box.y).toBe(number!.y);
+    }
+    expect(
+      await dialog.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      ),
+    ).toBe(false);
+  }
+  await page.setViewportSize(viewport);
   const map = form.getByLabel("Map link (optional)");
   await spots.fill("0");
   await map.fill("not-a-url");
@@ -3090,12 +3142,38 @@ test("event editor shows native number and URL errors without submitting", async
   await expect(spots).toBeFocused();
   await expect(spots).toHaveCSS("border-top-color", "rgb(248, 113, 113)");
   expect(requests).toEqual([]);
-  for (const invalid of ["101", "1.5"]) {
+  await increase.click();
+  await expect(spots).toHaveValue("1");
+  await expect(form.locator("[data-error$='-spots']")).toBeHidden();
+  await decrease.click();
+  await expect(spots).toHaveValue("1");
+  for (const [invalid, corrected] of [
+    ["101", "100"],
+    ["1.5", "2"],
+    ["", "1"],
+  ]) {
     await spots.fill(invalid);
     await dialog.getByRole("button", { name: "Save event" }).click();
     await expect(form.locator("[data-error$='-spots']")).toBeVisible();
     expect(requests).toEqual([]);
+    await increase.click();
+    await expect(spots).toHaveValue(corrected);
+    await expect(form.locator("[data-error$='-spots']")).toBeHidden();
   }
+  await spots.fill("100");
+  await increase.click();
+  await expect(spots).toHaveValue("100");
+  await spots.press("ArrowDown");
+  await expect(spots).toHaveValue("99");
+  await spots.fill("");
+  await decrease.click();
+  await expect(spots).toHaveValue("1");
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(spots).toHaveValue("8");
+  await fillDateInput(form, "startsAt", "2030-01-01T20:00");
+  await form
+    .getByLabel("Meeting point", { exact: true })
+    .fill("Test meeting point");
   await spots.fill("8");
   await map.fill("https://example.org/map");
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
@@ -3107,6 +3185,16 @@ test("event editor shows native number and URL errors without submitting", async
     .click();
   const edit = page.getByRole("dialog", { name: "Edit event", exact: true });
   const editForm = edit.locator("[data-event-save]");
+  const editSpots = editForm.getByRole("spinbutton", {
+    name: "Volunteer spots",
+  });
+  const savedSpots = await editSpots.inputValue();
+  await editForm
+    .getByRole("button", { name: "Increase volunteer spots" })
+    .click();
+  await expect(editSpots).toHaveValue(String(Number(savedSpots) + 1));
+  await editForm.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(editSpots).toHaveValue(savedSpots);
   await expect(
     editForm.locator('input[type="radio"][name="type"]'),
   ).toHaveCount(0);

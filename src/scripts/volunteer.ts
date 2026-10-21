@@ -37,6 +37,10 @@ function initEventDates(root: Document | HTMLElement) {
   )) {
     const button = submitButton(form);
     if (button) button.disabled = false;
+    for (const step of form.querySelectorAll<HTMLButtonElement>(
+      "[data-spots-step]",
+    ))
+      step.disabled = false;
   }
 }
 // Compare against the server HTML, not transient loading/filter/expanded state.
@@ -672,6 +676,27 @@ document.addEventListener("change", (event) => {
   event.target
     .closest<HTMLFormElement>("form[data-submit-on-change]")
     ?.requestSubmit();
+});
+document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  const step = event.target.closest<HTMLButtonElement>("[data-spots-step]");
+  if (!step || step.disabled || step.closest("[data-submitting]")) return;
+  const input = step.form?.querySelector<HTMLInputElement>(
+    'input[name="spots"]',
+  );
+  if (!input || input.disabled || input.readOnly) return;
+  const before = input.value;
+  const value = input.valueAsNumber;
+  // Recover empty/out-of-range drafts at the nearest limit; otherwise retain
+  // native integer-step rounding and keyboard editing on the number input.
+  if (!Number.isFinite(value) || value < Number(input.min))
+    input.value = input.min;
+  else if (value > Number(input.max)) input.value = input.max;
+  else input.stepUp(Number(step.dataset.spotsStep));
+  if (input.value !== before) {
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
 });
 document.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
