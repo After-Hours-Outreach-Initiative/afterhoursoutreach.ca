@@ -171,9 +171,13 @@ const blocked =
     </div>
   </div>
   <EventAttendance event={event} />
-  {!organizer && publicRoster && <PublicEventRoster roster={publicRoster} />}
   {
-    organizer && (
+    !organizer && publicRoster && publicRoster.length > 0 && (
+      <PublicEventRoster roster={publicRoster} />
+    )
+  }
+  {
+    organizer && roster.length > 0 && (
       <EventRoster
         event={event}
         roster={roster}
