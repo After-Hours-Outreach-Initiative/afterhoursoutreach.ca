@@ -49,7 +49,8 @@ document.addEventListener("keydown", (event) => {
   closeMenus();
   open.querySelector<HTMLElement>("summary")?.focus();
 });
-header.querySelectorAll(".mobile-nav a, .header-dropdown a").forEach((link) => {
+// Keep the mobile menu visible until navigation replaces the current page.
+header.querySelectorAll(".header-dropdown a").forEach((link) => {
   link.addEventListener("click", () => closeMenus());
 });
 matchMedia("(min-width: 64rem)").addEventListener("change", () => closeMenus());
