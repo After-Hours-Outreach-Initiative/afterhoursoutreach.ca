@@ -43,19 +43,6 @@ export function vancouverInstant(input: string): string {
   return new Date(candidates[0]).toISOString();
 }
 
-/** A valid wall time that fails the combined date-and-time constraint. */
-export class PastEventStartError extends Error {
-  constructor() {
-    super("Choose a future start date and time.");
-  }
-}
-
-export function futureEventInstant(input: string, now = Date.now()): string {
-  const instant = vancouverInstant(input);
-  if (Date.parse(instant) <= now) throw new PastEventStartError();
-  return instant;
-}
-
 /** Add calendar days, not elapsed 24-hour periods in the Vancouver time zone. */
 export function addCalendarDays(date: string, days: number) {
   const instant = Date.parse(`${date}T00:00:00Z`) + days * 86_400_000;

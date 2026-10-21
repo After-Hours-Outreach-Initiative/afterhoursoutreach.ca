@@ -152,7 +152,7 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
           value={event ? vancouverInput(event.startsAt) : ""}
           withTime
           defaultTime="21:00"
-          futureOnly
+          warnPast
         />
         <div class="volunteer-field">
           <label for={`${dialogId}-spots`}>Volunteer spots</label>

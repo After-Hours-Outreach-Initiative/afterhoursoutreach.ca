@@ -14,7 +14,7 @@ interface Props {
   birthDate?: boolean;
   withTime?: boolean;
   defaultTime?: string;
-  futureOnly?: boolean;
+  warnPast?: boolean;
   errorField?: string;
 }
 const {
@@ -28,7 +28,7 @@ const {
   birthDate = false,
   withTime = false,
   defaultTime = "",
-  futureOnly = false,
+  warnPast = false,
   errorField = name,
 } = Astro.props;
 const parts = dateParts(withTime ? value.split("T")[0] : value);
@@ -46,7 +46,6 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
   data-date-input={name}
   data-birth-date={birthDate || undefined}
   data-date-time={withTime || undefined}
-  data-date-future={futureOnly || undefined}
   data-certification-expiry={name === "certificationExpiry" || undefined}
   hidden={!active}
 >
@@ -138,4 +137,16 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
       : ""}
   />
   <FieldError field={errorField} message={message} />
+  {
+    warnPast && (
+      <p
+        class="volunteer-help volunteer-date-warning"
+        data-date-past-warning
+        role="status"
+        hidden
+      >
+        The start date and time are in the past.
+      </p>
+    )
+  }
 </fieldset>

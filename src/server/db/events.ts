@@ -289,8 +289,8 @@ export async function saveEvent(
     );
   const data = parsed.data;
   const startsAt = new Date(data.startsAt).getTime();
-  if (!Number.isFinite(startsAt) || startsAt <= Date.now())
-    throw new RequestError(400, "Choose a future event date.");
+  if (!Number.isFinite(startsAt))
+    throw new RequestError(400, "Choose a valid event date.");
   const operation = crypto.randomUUID();
   const now = Date.now();
   try {

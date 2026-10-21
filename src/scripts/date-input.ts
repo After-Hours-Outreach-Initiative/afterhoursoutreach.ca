@@ -8,11 +8,7 @@ import {
   dateParts,
   type DateParts,
 } from "../data/date-input";
-import {
-  futureEventInstant,
-  PastEventStartError,
-  vancouverInstant,
-} from "../data/event-time";
+import { vancouverInstant } from "../data/event-time";
 import { syncNativePickerInput } from "./native-picker-input";
 
 const parts = ["day", "month", "year"] as const;
@@ -126,48 +122,48 @@ export function initDateInputs(root: Document | HTMLElement) {
     const feedback = group.querySelector<HTMLElement>("[data-error] span")!;
     const fallback = feedback.textContent!;
     const birthDate = group.hasAttribute("data-birth-date");
-    const futureOnly = group.hasAttribute("data-date-future");
+    const withTime = group.hasAttribute("data-date-time");
+    const warning = group.querySelector<HTMLElement>(
+      "[data-date-past-warning]",
+    );
+    const checkTime = () => {
+      const instant = vancouverInstant(fields.canonical.value);
+      if (warning) warning.hidden = Date.parse(instant) >= Date.now();
+    };
     let showError = false;
     const update = () => {
       sync(group);
+      if (warning) warning.hidden = true;
       if (fields.date) {
         const { date, time } = fields;
         for (const input of [date, time]) {
           input?.setCustomValidity("");
-          if (futureOnly) input?.removeAttribute("aria-invalid");
+          if (withTime) input?.removeAttribute("aria-invalid");
         }
-        if (futureOnly) group.removeAttribute("aria-invalid");
+        if (withTime) group.removeAttribute("aria-invalid");
         let error = "";
-        let pastStart = false;
         if (!date.readOnly && date.value && time) {
           if (!time.value) error = "Enter a start time.";
           else if (date.validity.valid && time.validity.valid) {
             try {
-              if (futureOnly) futureEventInstant(fields.canonical.value);
-              else vancouverInstant(fields.canonical.value);
+              checkTime();
             } catch (failure) {
               error = (failure as Error).message;
-              pastStart = failure instanceof PastEventStartError;
             }
           }
           time.setCustomValidity(error);
-          if (futureOnly && showError && error)
+          if (withTime && showError && error)
             time.setAttribute("aria-invalid", "true");
         }
-        if (futureOnly && showError) {
-          // Past starts invalidate the pair, not just the time. Keep native
-          // validity on time so submission still focuses the existing control.
-          if (pastStart) group.setAttribute("aria-invalid", "true");
-          if (!date.validity.valid || pastStart)
-            date.setAttribute("aria-invalid", "true");
-        }
+        if (withTime && showError && !date.validity.valid)
+          date.setAttribute("aria-invalid", "true");
         feedback.textContent = error || fallback;
         return;
       }
       const { day, month, year, time } = fields;
       for (const input of [day, month, year, time]) {
         input?.setCustomValidity("");
-        if (futureOnly) input?.removeAttribute("aria-invalid");
+        if (withTime) input?.removeAttribute("aria-invalid");
       }
       if (day.readOnly) return;
       if (
@@ -231,8 +227,7 @@ export function initDateInputs(root: Document | HTMLElement) {
         if (!time.value) error = ["time", "Enter a start time."];
         else {
           try {
-            if (futureOnly) futureEventInstant(fields.canonical.value);
-            else vancouverInstant(fields.canonical.value);
+            checkTime();
           } catch (failure) {
             error = ["time", (failure as Error).message];
           }
@@ -241,7 +236,7 @@ export function initDateInputs(root: Document | HTMLElement) {
       if (error) {
         const input = fields[error[0]]!;
         input.setCustomValidity(error[1]);
-        if (futureOnly && showError) input.setAttribute("aria-invalid", "true");
+        if (withTime && showError) input.setAttribute("aria-invalid", "true");
       }
       feedback.textContent = error?.[1] ?? fallback;
     };
@@ -249,7 +244,7 @@ export function initDateInputs(root: Document | HTMLElement) {
     // Target listeners run before form-level autosave and dirty tracking.
     group.addEventListener("input", update);
     group.addEventListener("change", update);
-    if (futureOnly) {
+    if (withTime) {
       // A calendar error can belong to an untouched part (e.g. day 31 after
       // changing the month). Expose it on the visible control, not the hidden
       // canonical value, without relying solely on :user-invalid.
