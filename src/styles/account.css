@@ -99,8 +99,8 @@
     grid-row: 1;
   }
 }
-/* Keep profile headings one adjacent type-scale step apart at every width. */
-#account-profile-heading {
+/* Keep account panel headings one type-scale step above profile subsections. */
+[data-account-contents-body] > .volunteer-panel > h2 {
   @apply text-xl md:text-2xl;
 }
 [data-profile-section] > .volunteer-profile-section-heading {
