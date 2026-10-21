@@ -238,6 +238,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     ).text();
     expect(selectedHtml).toContain(`data-live-event="${far.id}"`);
     expect(selectedHtml).toContain("Outside the volunteer signup window");
+    expect(selectedHtml).not.toMatch(
+      /data-live-signup|You can register|You can’t register|Registration is available only/,
+    );
     expect(selectedHtml).toContain('value="future"');
     expect(
       selectedHtml.match(new RegExp(`data-series-card="${series.id}"`, "g")),
@@ -392,8 +395,8 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await ok(
       await action({ action: "cancel", id: initial[0].id }, volunteer.cookie),
     );
-    await expect(firstCard.locator(".volunteer-spots")).toHaveText(
-      "1 spots left",
+    await expect(firstCard.locator("[data-event-availability]")).toHaveText(
+      "0 of 3 spots taken",
       { timeout: 15_000 },
     );
     await expect(

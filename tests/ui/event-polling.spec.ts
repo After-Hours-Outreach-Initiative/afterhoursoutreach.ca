@@ -259,7 +259,7 @@ test("other viewers see signups and cancellations through polling without losing
     ).toHaveCount(0);
     for (const current of [viewer, attendee])
       await expect(card(current).locator(".volunteer-spots")).toHaveText(
-        "1 spots available to you",
+        "You can register",
       );
     await organizerCard
       .getByRole("button", { name: "Edit", exact: true })
@@ -293,11 +293,20 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       card(attendee).getByRole("button", { name: "Unregister", exact: true }),
     ).toBeEnabled();
-    for (const current of [viewer, page])
-      await expect(card(current).locator(".volunteer-spots")).toHaveText(
-        "No places available to you",
-        { timeout: 15_000 },
-      );
+    await expect(card(viewer).locator(".volunteer-spots")).toHaveText(
+      "You can’t register",
+      { timeout: 15_000 },
+    );
+    await expect(card(viewer)).toContainText(
+      "The remaining places are reserved for approved medics or volunteers who have not completed orientation.",
+    );
+    await expect(organizerCard.locator("[data-event-availability]")).toHaveText(
+      "2 of 4 spots taken",
+      { timeout: 15_000 },
+    );
+    await expect(
+      organizerCard.locator(".volunteer-spots, [data-live-signup]"),
+    ).toHaveCount(0);
     await expect(
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
@@ -344,7 +353,7 @@ test("other viewers see signups and cancellations through polling without losing
       document.dispatchEvent(new Event("visibilitychange"));
     });
     await expect(card(viewer).locator(".volunteer-spots")).toHaveText(
-      "1 spots available to you",
+      "You can register",
       { timeout: 15_000 },
     );
     await expect(
