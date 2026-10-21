@@ -24,8 +24,8 @@ function deliveryPayload(row: MedicNotification, origin: string) {
       : "Your medic certification has expired",
     text: `${
       warning
-        ? `Your volunteer profile lists a medic certification expiry date of ${row.expiry}, within the next 30 days. It remains valid through that date (Vancouver time). Please arrange renewal.`
-        : `The medic certification expiry date on your volunteer profile was ${row.expiry}. It is now expired (Vancouver time). Please renew before volunteering as a medic.`
+        ? `Your volunteer profile lists a medic certification expiry date of ${row.expiry}, within the next 30 days. It remains valid through that date. Please arrange renewal.`
+        : `The medic certification expiry date on your volunteer profile was ${row.expiry}. It is now expired. Please renew before volunteering as a medic.`
     }
 \nIf you have renewed or this date is incorrect, update the certification expiry date in your account: ${origin}/volunteer/account`,
   });

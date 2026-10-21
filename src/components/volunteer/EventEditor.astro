@@ -116,7 +116,6 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
               </label>
             </div>
             <p class="volunteer-help">
-              Vancouver local time is kept across daylight saving changes.
               Volunteers see the next three upcoming, non-cancelled occurrences
               per series. Hidden, closed and full patrols still use a slot.
             </p>
@@ -129,7 +128,6 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
         errorField={`${dialogId}-startsAt`}
         label="Start date"
         value={event ? vancouverInput(event.startsAt) : ""}
-        help="Vancouver time, regardless of your device’s time zone."
         withTime
       />
       <div class="volunteer-field">
