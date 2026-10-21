@@ -35,8 +35,6 @@ const {
   publicRoster,
 } = Astro.props;
 const future = event.startsAt > Date.now();
-const left = event.availableSpots;
-const totalLeft = Math.max(0, event.spots - event.confirmed);
 const blocked =
   future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
     ? "Registration is available only for the next three patrol occurrences in this series."
@@ -69,11 +67,6 @@ const blocked =
   <div class="volunteer-event-top">
     <div>
       {
-        Boolean(event.signedUp) && (
-          <span class="volunteer-badge">Registered</span>
-        )
-      }
-      {
         event.cancelledAt ? (
           <p class="volunteer-hidden">Cancelled</p>
         ) : event.hidden || !event.open ? (
@@ -95,25 +88,28 @@ const blocked =
         }
       </p>
       <p data-event-availability aria-live="polite" aria-atomic="true">
-        <span
-          class:list={[
-            "volunteer-spots",
-            {
-              "volunteer-spots-full": left === 0,
-              "volunteer-spots-low": left > 0 && left <= 2,
-            },
-          ]}
-        >
-          {
-            totalLeft === 0
-              ? "Full"
-              : left === 0
-                ? "No places available to you"
-                : event.includesOrientation
-                  ? `${left} spots available to you`
-                  : `${left} spots left`
-          }
-        </span>{" "}· {event.confirmed} of {event.spots} spots taken
+        {
+          !organizer && (
+            <>
+              <span
+                class:list={[
+                  "volunteer-spots",
+                  {
+                    "volunteer-spots-full": !event.signedUp && Boolean(blocked),
+                  },
+                ]}
+              >
+                {event.signedUp
+                  ? "Registered"
+                  : blocked
+                    ? "You can’t register"
+                    : "You can register"}
+              </span>{" "}
+              ·{" "}
+            </>
+          )
+        }
+        {event.confirmed} of {event.spots} spots taken
       </p>
       {
         organizer && series && (
@@ -125,7 +121,7 @@ const blocked =
           </p>
         )
       }
-      {!event.signedUp && actor && blocked && <p>{blocked}</p>}
+      {!organizer && !event.signedUp && actor && blocked && <p>{blocked}</p>}
     </div>
     <div class="volunteer-actions">
       {

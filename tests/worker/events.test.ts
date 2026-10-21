@@ -381,6 +381,15 @@ describe(
             await send("/api/v1/events", undefined, person.cookie),
           );
           assert.match(await events.text(), /Sample meeting point/);
+          const listing = await (
+            await ok(await send("/events", undefined, person.cookie))
+          ).text();
+          assert.match(listing, /You can register/);
+          assert.match(listing, /You can’t register/);
+          assert.match(
+            listing,
+            /Organizer approval is required to register for patrols/,
+          );
           await ok(await join(patrol.id, person.cookie), 403);
           const audit = await DB.prepare(
             "SELECT changed_fields FROM audit_log WHERE subject_id=? AND action='approval_changed'",
@@ -1451,11 +1460,9 @@ describe(
                   .getByRole("button", { name: "Save event", exact: true })
                   .click(),
               updated: () =>
-                expect(createdCard.locator(".volunteer-spots")).toHaveText(
-                  spots === 9
-                    ? "5 spots available to you"
-                    : `${spots - 2} spots left`,
-                ),
+                expect(
+                  createdCard.locator("[data-event-availability]"),
+                ).toHaveText(`0 of ${spots} spots taken`),
               loadingLabel: "Saving…",
               pending: async () => {
                 for (const radio of await visibility.getByRole("radio").all())
@@ -1590,7 +1597,7 @@ describe(
             card.getByText("Registered", { exact: true }).waitFor(),
           );
           await expect(card.locator(".volunteer-spots")).toHaveText(
-            "5 spots left",
+            "Registered",
           );
           await expect(
             card.getByRole("button", { name: "Unregister", exact: true }),
@@ -1754,7 +1761,7 @@ describe(
               .waitFor(),
           );
           await expect(card.locator(".volunteer-spots")).toHaveText(
-            "6 spots left",
+            "You can register",
           );
           await expect(
             card.getByText("Registered", { exact: true }),
