@@ -127,6 +127,9 @@
   color: white;
   background: #171a20;
 }
+.header-account-card [data-sign-out] button {
+  color: #f87171;
+}
 .header-account-card .header-account-identity {
   gap: 0.5rem;
   padding: 0.75rem;
