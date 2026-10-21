@@ -115,18 +115,23 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
   )) {
     if (form.dataset.submitting) continue;
     const repeat = form.querySelector<HTMLInputElement>('[name="recurring"]');
-    const type = form.querySelector(
-      'select[name="type"]',
-    ) as HTMLSelectElement | null;
+    const types = [
+      ...form.querySelectorAll<HTMLInputElement>(
+        'input[type="radio"][name="type"]',
+      ),
+    ];
     const controls = form.querySelector<HTMLElement>(
       "[data-recurrence-controls]",
     );
     const fields = form.querySelector<HTMLElement>("[data-recurrence-fields]");
-    if (!repeat || !type || !controls || !fields) continue;
+    if (!repeat || !types.length || !controls || !fields) continue;
     const endDate = fields.querySelector<HTMLInputElement>('[name="endDate"]')!;
     const start = form.querySelector<HTMLInputElement>('[name="startsAt"]')!;
     const update = () => {
-      const patrol = type.value === "patrol";
+      const patrol = types.some(
+        (type) => type.checked && type.value === "patrol",
+      );
+      if (!patrol) repeat.checked = false;
       controls.hidden = !patrol;
       repeat.disabled = !patrol;
       fields.hidden = !patrol || !repeat.checked;
@@ -136,7 +141,7 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     };
     if (!form.dataset.recurrenceReady) {
       form.dataset.recurrenceReady = "true";
-      type.addEventListener("change", update);
+      for (const type of types) type.addEventListener("change", update);
       repeat.addEventListener("change", update);
       form
         .querySelector('[data-date-input="startsAt"]')

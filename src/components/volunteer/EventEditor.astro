@@ -86,13 +86,19 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
               <input type="hidden" name="type" value={event.type} />
             </div>
           ) : (
-            <label class="volunteer-field volunteer-wide">
-              Event type
-              <select name="type">
-                <option value="patrol">Patrol</option>
-                <option value="orientation">Orientation</option>
-              </select>
-            </label>
+            <fieldset class="volunteer-event-type volunteer-wide">
+              <legend>Event type</legend>
+              <div class="volunteer-event-type-options volunteer-choice-options">
+                <label class="volunteer-check">
+                  <input type="radio" name="type" value="patrol" checked />
+                  <span>Patrol</span>
+                </label>
+                <label class="volunteer-check">
+                  <input type="radio" name="type" value="orientation" />
+                  <span>Orientation</span>
+                </label>
+              </div>
+            </fieldset>
           )
         }
         {

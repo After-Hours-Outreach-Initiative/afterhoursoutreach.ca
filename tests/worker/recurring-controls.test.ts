@@ -277,9 +277,11 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .getByRole("button", { name: "Create event", exact: true })
       .click();
     const creator = organizerPage.locator("#event-editor-new");
-    await creator.locator('[name="type"]').selectOption("orientation");
+    await creator
+      .getByRole("radio", { name: "Orientation", exact: true })
+      .check();
     await expect(creator.locator("[data-recurrence-controls]")).toBeHidden();
-    await creator.locator('[name="type"]').selectOption("patrol");
+    await creator.getByRole("radio", { name: "Patrol", exact: true }).check();
     await creator.locator('[name="recurring"]').check();
     await expect(creator.locator('[name="intervalWeeks"]')).toBeEnabled();
     await creator.locator('[name="intervalWeeks"]').fill("2");

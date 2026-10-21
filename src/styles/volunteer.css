@@ -938,6 +938,7 @@ body:has([data-application], [data-account-contents-flow]) {
   margin-top: 0.75rem;
   color: #f87171;
 }
+.volunteer-event-type,
 .volunteer-certifications,
 .volunteer-relevant-training,
 .volunteer-referral-sources {
@@ -947,12 +948,14 @@ body:has([data-application], [data-account-contents-flow]) {
   border: 0;
   @apply text-base/[inherit];
 }
+.volunteer-event-type legend,
 .volunteer-certifications legend,
 .volunteer-relevant-training legend,
 .volunteer-referral-sources legend {
   margin-bottom: 0.5rem;
   font-weight: normal;
 }
+.volunteer-event-type-options,
 .volunteer-certification-options,
 .volunteer-training-options,
 .volunteer-referral-options {
@@ -961,6 +964,7 @@ body:has([data-application], [data-account-contents-flow]) {
   gap: 0.75rem;
   margin-block: 1rem;
 }
+.volunteer-event-type-options > label,
 .volunteer-certification-options > label,
 .volunteer-training-options > label,
 .volunteer-referral-options > label {

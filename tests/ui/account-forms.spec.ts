@@ -2843,6 +2843,44 @@ test("event editor shows native number and URL errors without submitting", async
     exact: true,
   });
   const form = dialog.locator("[data-event-save]");
+  const eventType = form.getByRole("group", {
+    name: "Event type",
+    exact: true,
+  });
+  const patrol = eventType.getByRole("radio", { name: "Patrol", exact: true });
+  const orientation = eventType.getByRole("radio", {
+    name: "Orientation",
+    exact: true,
+  });
+  const recurrence = form.locator("[data-recurrence-controls]");
+  const repeat = form.locator('[name="recurring"]');
+  const interval = form.locator('[name="intervalWeeks"]');
+  const endDate = form.locator('[name="endDate"]');
+  await expect(eventType.getByRole("radio")).toHaveCount(2);
+  await expect(patrol).toBeChecked();
+  await repeat.check();
+  await interval.fill("3");
+  await endDate.fill("2030-02-01");
+  await patrol.focus();
+  await patrol.press("ArrowRight");
+  await expect(orientation).toBeChecked();
+  await expect(recurrence).toBeHidden();
+  await expect(repeat).not.toBeChecked();
+  for (const input of [repeat, interval, endDate])
+    await expect(input).toBeDisabled();
+  expect(
+    await form.evaluate((element: HTMLFormElement) => {
+      const values = new FormData(element);
+      return ["type", "recurring", "intervalWeeks", "endDate"].map((key) =>
+        values.get(key),
+      );
+    }),
+  ).toEqual(["orientation", null, null, null]);
+  await patrol.check();
+  await expect(recurrence).toBeVisible();
+  await expect(repeat).not.toBeChecked();
+  await expect(form.locator("[data-recurrence-fields]")).toBeHidden();
+  await orientation.check();
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/events/action")
@@ -2893,6 +2931,12 @@ test("event editor shows native number and URL errors without submitting", async
   await expect(placeholder).toBeHidden();
   await expect(date).toHaveCSS("color", color);
   await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(patrol).toBeChecked();
+  await expect(recurrence).toBeVisible();
+  await expect(repeat).toBeEnabled();
+  await expect(interval).toHaveValue("1");
+  await expect(endDate).toHaveValue("");
+  await expect(interval).toBeDisabled();
   await expect(date).toHaveValue("");
   await expect(placeholder).toBeVisible();
   await date.fill("2030-01-01");
@@ -3025,6 +3069,13 @@ test("event editor shows native number and URL errors without submitting", async
     .click();
   const edit = page.getByRole("dialog", { name: "Edit event", exact: true });
   const editForm = edit.locator("[data-event-save]");
+  await expect(
+    editForm.locator('input[type="radio"][name="type"]'),
+  ).toHaveCount(0);
+  await expect(editForm.locator('[name="type"]')).toHaveValue("orientation");
+  await expect(editForm.locator("[data-event-type-readonly]")).toContainText(
+    "Orientation",
+  );
   const editDateGroup = editForm.locator('[data-date-input="startsAt"]');
   const editDate = editDateGroup.locator("[data-native-date]");
   const editTime = editForm.getByLabel("Start time");
