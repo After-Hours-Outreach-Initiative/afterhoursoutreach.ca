@@ -1,4 +1,4 @@
-const selector = "[data-native-date], [data-native-time]";
+const selector = "[data-native-date]";
 
 export function syncNativePickerInput(input: HTMLInputElement) {
   input.toggleAttribute("data-empty", !input.value);

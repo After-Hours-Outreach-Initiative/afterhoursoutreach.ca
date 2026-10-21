@@ -2866,41 +2866,48 @@ test("event editor shows native number and URL errors without submitting", async
   };
   await expectDateErrorRail(false);
   await expect(time).toHaveAttribute("type", "time");
-  for (const [input, value, text] of [
-    [date, "2030-01-01", "Select a date"],
-    [time, "20:00", "Select a time"],
-  ] as const) {
-    const placeholder = input.locator("+ .volunteer-picker-placeholder");
-    await expect(placeholder).toHaveText(text);
-    await expect(placeholder).toBeVisible();
-    await expect(placeholder).toHaveAttribute("aria-hidden", "true");
-    await expect(placeholder).toHaveCSS("pointer-events", "none");
-    const color = await input.evaluate(
-      (element) => getComputedStyle(element).color,
-    );
-    await expect(placeholder).toHaveCSS("color", color);
-    const icon = placeholder.locator("svg");
-    await expect(icon).toHaveAttribute("aria-hidden", "true");
-    const iconBox = (await icon.boundingBox())!;
-    const textBox = (await placeholder.locator("span").boundingBox())!;
-    expect(iconBox.x + iconBox.width).toBeLessThan(textBox.x);
-    await input.click({ position: { x: 12, y: 12 } });
-    await expect(input).toBeFocused();
-    await expect(placeholder).toBeHidden();
-    await input.press("ArrowUp");
-    await expect(placeholder).toBeHidden();
-    await input.fill(value);
-    await input.blur();
-    await expect(placeholder).toBeHidden();
-    await expect(input).toHaveCSS("color", color);
-    await form.evaluate((element: HTMLFormElement) => element.reset());
-    await expect(input).toHaveValue("");
-    await expect(placeholder).toBeVisible();
-    await input.fill(value);
-    await input.fill("");
-    await input.blur();
-    await expect(placeholder).toBeVisible();
-  }
+  await expect(time).toHaveValue("21:00");
+  await expect(time).not.toHaveAttribute("data-empty");
+  await expect(time.locator("+ .volunteer-picker-placeholder")).toHaveCount(0);
+  const placeholder = date.locator("+ .volunteer-picker-placeholder");
+  await expect(placeholder).toHaveText("Select a date");
+  await expect(placeholder).toBeVisible();
+  await expect(placeholder).toHaveAttribute("aria-hidden", "true");
+  await expect(placeholder).toHaveCSS("pointer-events", "none");
+  const color = await date.evaluate(
+    (element) => getComputedStyle(element).color,
+  );
+  await expect(placeholder).toHaveCSS("color", color);
+  const icon = placeholder.locator("svg");
+  await expect(icon).toHaveAttribute("aria-hidden", "true");
+  const iconBox = (await icon.boundingBox())!;
+  const textBox = (await placeholder.locator("span").boundingBox())!;
+  expect(iconBox.x + iconBox.width).toBeLessThan(textBox.x);
+  await date.click({ position: { x: 12, y: 12 } });
+  await expect(date).toBeFocused();
+  await expect(placeholder).toBeHidden();
+  await date.press("ArrowUp");
+  await expect(placeholder).toBeHidden();
+  await date.fill("2030-01-01");
+  await date.blur();
+  await expect(placeholder).toBeHidden();
+  await expect(date).toHaveCSS("color", color);
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(date).toHaveValue("");
+  await expect(placeholder).toBeVisible();
+  await date.fill("2030-01-01");
+  await date.fill("");
+  await date.blur();
+  await expect(placeholder).toBeVisible();
+  await date.fill("2030-01-01");
+  await expect(form.locator('[name="startsAt"]')).toHaveValue(
+    "2030-01-01T21:00",
+  );
+  await time.fill("20:00");
+  await form.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(date).toHaveValue("");
+  await expect(time).toHaveValue("21:00");
+  await expect(form.locator('[name="startsAt"]')).toHaveValue("");
   const expectDateFieldsToFit = async () => {
     const viewport = page.viewportSize()!;
     for (const width of [320, 375]) {
@@ -3019,28 +3026,34 @@ test("event editor shows native number and URL errors without submitting", async
   const edit = page.getByRole("dialog", { name: "Edit event", exact: true });
   const editForm = edit.locator("[data-event-save]");
   const editDateGroup = editForm.locator('[data-date-input="startsAt"]');
+  const editDate = editDateGroup.locator("[data-native-date]");
+  const editTime = editForm.getByLabel("Start time");
+  await expect(editTime).toHaveValue("18:00");
+  await expect(editTime.locator("+ .volunteer-picker-placeholder")).toHaveCount(
+    0,
+  );
   await fillDateInput(editForm, "startsAt", pastStarts[0]);
   await editForm.getByLabel("Meeting point", { exact: true }).focus();
   await expect(editDateGroup).toHaveAttribute("aria-invalid", "true");
   await editForm.evaluate((element: HTMLFormElement) => element.reset());
   await expect(editDateGroup).not.toHaveAttribute("aria-invalid");
   await expect(editDateGroup.locator('[aria-invalid="true"]')).toHaveCount(0);
-  for (const input of [
-    editForm.locator('[data-date-input="startsAt"] [data-native-date]'),
-    editForm.getByLabel("Start time"),
-  ]) {
+  for (const input of [editDate, editTime]) {
     const saved = await input.inputValue();
     expect(saved).not.toBe("");
-    await expect(input.locator("+ .volunteer-picker-placeholder")).toBeHidden();
     await input.fill("");
     await input.blur();
-    await expect(
-      input.locator("+ .volunteer-picker-placeholder"),
-    ).toBeVisible();
+    if (input === editDate)
+      await expect(
+        input.locator("+ .volunteer-picker-placeholder"),
+      ).toBeVisible();
     await editForm.evaluate((element: HTMLFormElement) => element.reset());
     await expect(input).toHaveValue(saved);
-    await expect(input.locator("+ .volunteer-picker-placeholder")).toBeHidden();
   }
+  await expect(editTime).toHaveValue("18:00");
+  await expect(
+    editDate.locator("+ .volunteer-picker-placeholder"),
+  ).toBeHidden();
 });
 
 test("failed profile saves keep unsaved changes retryable", async ({
