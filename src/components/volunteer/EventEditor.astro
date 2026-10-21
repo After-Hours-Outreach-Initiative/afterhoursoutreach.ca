@@ -283,7 +283,9 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
           action="/api/v1/events/action"
           method="post"
         >
-          <h3>Cancel event</h3>
+          <h3 data-event-cancel-heading hidden={event.confirmed === 0}>
+            Cancel event
+          </h3>
           <input type="hidden" name="id" value={event.id} />
           <input type="hidden" name="version" value={event.updatedAt} />
           {series && (
