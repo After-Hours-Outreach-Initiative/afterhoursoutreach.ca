@@ -46,6 +46,7 @@ const {
     class="m-0 overflow-x-hidden bg-ink font-body text-base leading-relaxed text-zinc-100 antialiased"
   >
     <a
+      data-skip-to-main
       class="fixed top-4 left-4 z-[100] -translate-y-40 rounded-lg bg-blue px-5 py-3 text-base font-bold text-white transition-transform focus:translate-y-0"
       href="#main-content">Skip to main content</a
     >
@@ -69,10 +70,34 @@ const {
     }
     <Header {...account} />
 
-    <main id="main-content">
+    <main id="main-content" tabindex="-1">
       <slot />
     </main>
 
     <Footer signedIn={account.signedIn} organizer={account.organizer} />
   </body>
 </html>
+
+<script>
+  document
+    .querySelector<HTMLAnchorElement>("[data-skip-to-main]")
+    ?.addEventListener("click", (event) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+
+      const main = document.getElementById("main-content");
+      if (!main) return;
+
+      // Skip navigation, not the viewport. Keep the fragment as a fallback
+      // without JavaScript or if focus cannot move to the main landmark.
+      main.focus({ preventScroll: true });
+      if (document.activeElement === main) event.preventDefault();
+    });
+</script>
