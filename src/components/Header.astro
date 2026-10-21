@@ -3,6 +3,8 @@ import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import MoonIcon from "@/components/icons/MoonIcon.astro";
 import AccountIcon from "@/components/icons/AccountIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import MenuIcon from "@/components/icons/MenuIcon.svg";
+import CloseIcon from "@/components/icons/CloseIcon.svg";
 import HeaderAccountCard from "@/components/HeaderAccountCard.astro";
 import { siteNavigation, social } from "@/data/site";
 import { accountGreeting } from "@/data/account-navigation";
@@ -130,19 +132,13 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
       data-header-menu
     >
       <summary
-        class="flex size-12 cursor-pointer list-none flex-col items-center justify-center gap-2 rounded-lg"
+        class="flex size-12 cursor-pointer list-none items-center justify-center rounded-lg"
         aria-label="Open navigation"
         role="button"
         aria-expanded="false"
       >
-        <span
-          class="h-0.5 w-7 bg-white transition-transform group-open:translate-y-2.5 group-open:rotate-45"
-        ></span>
-        <span class="h-0.5 w-7 bg-white transition-opacity group-open:opacity-0"
-        ></span>
-        <span
-          class="h-0.5 w-7 bg-white transition-transform group-open:-translate-y-2.5 group-open:-rotate-45"
-        ></span>
+        <MenuIcon class="size-8 group-open:hidden" />
+        <CloseIcon class="hidden size-8 group-open:block" />
       </summary>
       <nav
         class="header-mobile-panel absolute inset-x-0 top-full w-full bg-black px-6 max-sm:px-4"
