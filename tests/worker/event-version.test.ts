@@ -78,7 +78,9 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       .bind(now + 86_400_000, organizer.id, now, now)
       .run();
     const listingVersion = async (cookie = "") => {
-      const html = await (await send("/volunteer", undefined, cookie)).text();
+      const html = await (
+        await send(cookie ? "/events" : "/volunteer", undefined, cookie)
+      ).text();
       const version = html.match(/data-event-version="([a-f0-9]{64})"/)?.[1];
       expect(version).toBeDefined();
       return version;
@@ -107,7 +109,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     expect(await signedInNext()).toBe(await listingVersion(attendee.cookie));
     // Pending accounts see no event activity; approval immediately changes their scoped view.
     expect(
-      await (await send("/volunteer", undefined, attendee.cookie)).text(),
+      await (await send("/events", undefined, attendee.cookie)).text(),
     ).toContain("Application awaiting approval");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",

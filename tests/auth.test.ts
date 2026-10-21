@@ -2400,8 +2400,26 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     "/\\evil.example",
     "/volunteer/sign-in",
     "/api/v1/auth/get-session",
+    "/events-other",
+    "/volunteers-other",
   ])
     assert.equal(safeReturnTo(value), "/volunteer/account");
+  for (const [value, expected] of [
+    [
+      "/events?type=patrol&occurrence=a%2Fb",
+      "/events?type=patrol&occurrence=a%2Fb",
+    ],
+    ["/volunteer?type=orientation", "/events?type=orientation"],
+    [
+      "/volunteers?approval=awaiting&q=Alex+Lee",
+      "/volunteers?approval=awaiting&q=Alex+Lee",
+    ],
+    [
+      "/volunteer/volunteers/alex?returnTo=%2Fvolunteers",
+      "/volunteers/alex?returnTo=%2Fvolunteers",
+    ],
+  ])
+    assert.equal(safeReturnTo(value), expected);
   const request = new Request(origin, {
     method: "POST",
     headers: { "content-type": "application/json" },

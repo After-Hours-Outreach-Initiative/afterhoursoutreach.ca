@@ -608,7 +608,7 @@ describe(
     });
 
     test("application and edits round-trip through the real API", async () => {
-      const beforeApplication = await send("/volunteer", undefined, cookie);
+      const beforeApplication = await send("/events", undefined, cookie);
       assert.equal(beforeApplication.status, 200);
       const prompt = await beforeApplication.text();
       assert.match(prompt, /volunteer-application-warning/);
@@ -649,7 +649,7 @@ describe(
         cookie,
       );
       assert.equal(response.status, 200, await response.clone().text());
-      const submittedPortal = await send("/volunteer", undefined, cookie);
+      const submittedPortal = await send("/events", undefined, cookie);
       assert.equal(submittedPortal.status, 200);
       assert.doesNotMatch(
         await submittedPortal.text(),

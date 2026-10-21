@@ -15,7 +15,7 @@ async function renderEvents(root: HTMLElement) {
       loading.textContent =
         response.status === 401
           ? "Sign in with an approved volunteer account to view upcoming events."
-          : "Event access requires an active, approved application. Visit the volunteer page to check your account.";
+          : "Event access requires an active, approved application. Visit the events page to check your account.";
       return;
     }
     if (!response.ok) throw new Error("Unavailable events");
@@ -44,7 +44,7 @@ async function renderEvents(root: HTMLElement) {
       location.className = "mt-2 text-base text-zinc-400";
       location.textContent = event.meetingPoint;
       const link = document.createElement("a");
-      link.href = "/volunteer";
+      link.href = "/events";
       link.className = "btn btn-outline";
       link.textContent = "View event";
       info.appendChild(heading);
@@ -57,7 +57,7 @@ async function renderEvents(root: HTMLElement) {
     root.appendChild(list);
   } catch {
     loading.textContent =
-      "Events are temporarily unavailable. Try the volunteer page again shortly.";
+      "Events are temporarily unavailable. Try the events page again shortly.";
   }
 }
 if (root) void renderEvents(root);

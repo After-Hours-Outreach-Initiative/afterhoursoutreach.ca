@@ -5,7 +5,6 @@ import {
   canViewEvents,
   requireOrganizer,
 } from "@/server/db/access";
-import { forwardCookies } from "@/server/auth";
 import { listEvents, listRosters, listPatrolSeries } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
 import AccountLayout from "./AccountLayout.astro";
@@ -20,11 +19,10 @@ import WarningIcon from "@/components/icons/WarningIcon.astro";
 import { social } from "@/data/site";
 import "@/styles/volunteer.css";
 
-const { actor, headers, email, greetingName } = await accountContext(
-  env,
-  Astro.request,
-);
-forwardCookies(headers, Astro.response.headers);
+interface Props {
+  account: Awaited<ReturnType<typeof accountContext>>;
+}
+const { actor, email, greetingName } = Astro.props.account;
 let organizer = false;
 try {
   requireOrganizer(actor);
@@ -70,7 +68,7 @@ const filter = ["patrol", "orientation"].includes(
 ---
 
 <AccountLayout
-  title="Volunteer"
+  title={actor ? "Events" : "Volunteer"}
   description="Volunteer with After Hours Outreach Initiative, doing evening street outreach in Vancouver's Downtown Eastside."
   signedIn={Boolean(actor)}
   organizer={actor?.role === "organizer"}
@@ -83,7 +81,7 @@ const filter = ["patrol", "orientation"].includes(
     slot="heading"
     class:list={["max-w-4xl text-blue", { "sr-only": Boolean(actor) }]}
   >
-    Volunteer
+    {actor ? "Events" : "Volunteer"}
   </h1>
   <div
     data-event-browser
@@ -108,7 +106,7 @@ const filter = ["patrol", "orientation"].includes(
             volunteer events.
           </p>
 
-          <SignInPanel returnTo="/volunteer" />
+          <SignInPanel returnTo={`/events${Astro.url.search}`} />
         </div>
       ) : !actor.applicationSubmitted ? (
         <section class="volunteer-panel">

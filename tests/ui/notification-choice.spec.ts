@@ -92,7 +92,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
     version++;
     await route.fulfill({ json: { message: "Volunteer access saved." } });
   });
-  await page.route("**/volunteer/volunteers/test-email-choice", (route) =>
+  await page.route("**/volunteers/test-email-choice", (route) =>
     route.fulfill({
       contentType: "text/html",
       body: profile(),

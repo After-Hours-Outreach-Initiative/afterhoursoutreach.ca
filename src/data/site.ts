@@ -10,6 +10,17 @@ export const navLinks = [
   ...(donationsOpen ? [{ label: "Donate", href: donateHref }] : []),
 ];
 
+export function siteNavigation(signedIn: boolean, organizer = false) {
+  return navLinks.flatMap((link) =>
+    signedIn && link.href === "/volunteer"
+      ? [
+          { label: "Events", href: "/events" },
+          ...(organizer ? [{ label: "Volunteers", href: "/volunteers" }] : []),
+        ]
+      : [link],
+  );
+}
+
 export const gofundmeUrl = "https://gofund.me/4547012cb";
 
 export const volunteerFormUrl =

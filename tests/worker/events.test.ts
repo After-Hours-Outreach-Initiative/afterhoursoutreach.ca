@@ -257,14 +257,10 @@ describe(
         403,
       );
       await ok(
-        await send(
-          `/volunteer/volunteers/${alice.id}`,
-          undefined,
-          alice.cookie,
-        ),
+        await send(`/volunteers/${alice.id}`, undefined, alice.cookie),
         403,
       );
-      await ok(await send("/volunteer/volunteers"), 302);
+      await ok(await send("/volunteers"), 302);
     });
 
     const createEvent = async (type = "orientation", spots = 2) => {
@@ -343,7 +339,7 @@ describe(
       test("application approval gates listings and orientations independently of patrol approval", async () => {
         for (const person of [alice, bob]) {
           const page = await ok(
-            await send("/volunteer", undefined, person.cookie),
+            await send("/events", undefined, person.cookie),
           );
           const html = await page.text();
           assert.match(html, /Application awaiting approval/);
@@ -551,11 +547,7 @@ describe(
           ),
         );
         const response = await ok(
-          await send(
-            `/volunteer/volunteers/${alice.id}`,
-            undefined,
-            organizer.cookie,
-          ),
+          await send(`/volunteers/${alice.id}`, undefined, organizer.cookie),
         );
         const profileHtml = await response.text();
         assert.match(profileHtml, /PRIVATE HEALTH ANSWER/);
@@ -575,7 +567,7 @@ describe(
         );
         assert.equal(response.headers.get("referrer-policy"), "no-referrer");
         const team = await ok(
-          await send("/volunteer/volunteers", undefined, organizer.cookie),
+          await send("/volunteers", undefined, organizer.cookie),
         );
         assert.doesNotMatch(await team.text(), /PRIVATE HEALTH ANSWER/);
       });
@@ -636,7 +628,7 @@ describe(
           new RegExp(`data-live-event="${patrol.id}"`),
         );
         assert.match(
-          await (await send("/volunteer", undefined, alice.cookie)).text(),
+          await (await send("/events", undefined, alice.cookie)).text(),
           new RegExp(`data-live-event="${patrol.id}"`),
         );
         await ok(await join(patrol.id, bob.cookie), 403);
@@ -671,7 +663,7 @@ describe(
           );
           const visible = flags.open && !flags.hidden;
           const html = await (
-            await ok(await send("/volunteer", undefined, bob.cookie))
+            await ok(await send("/events", undefined, bob.cookie))
           ).text();
           assert.equal(listed.test(html), visible);
           for (const cookie of [alice.cookie, bob.cookie, organizer.cookie]) {
@@ -684,7 +676,7 @@ describe(
             );
           }
           assert.match(
-            await (await send("/volunteer", undefined, alice.cookie)).text(),
+            await (await send("/events", undefined, alice.cookie)).text(),
             listed,
           );
           if (!visible) await ok(await join(event.id, bob.cookie), 403);
@@ -915,7 +907,7 @@ describe(
         }
         await ok(await send("/api/v1/events", undefined, alice.cookie), 403);
         assert.doesNotMatch(
-          await (await send("/volunteer", undefined, alice.cookie)).text(),
+          await (await send("/events", undefined, alice.cookie)).text(),
           /data-live-event=/,
         );
         await ok(await status(alice.id, false, false));
@@ -1012,7 +1004,7 @@ describe(
           0,
         );
         bob.cookie = await signIn(bob.email);
-        await ok(await send("/volunteer/volunteers", undefined, bob.cookie));
+        await ok(await send("/volunteers", undefined, bob.cookie));
         await ok(
           await send(
             "/api/v1/organizer/action",
@@ -1031,10 +1023,7 @@ describe(
           0,
         );
         bob.cookie = await signIn(bob.email);
-        await ok(
-          await send("/volunteer/volunteers", undefined, bob.cookie),
-          403,
-        );
+        await ok(await send("/volunteers", undefined, bob.cookie), 403);
         const audit = await DB.prepare(
           "SELECT changed_fields FROM audit_log WHERE action='role_changed' AND subject_id=?",
         )
@@ -1087,7 +1076,7 @@ describe(
               body: Buffer.from(await response.arrayBuffer()),
             });
           });
-          await page.goto(`${origin}/volunteer`);
+          await page.goto(`${origin}/events`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           const nav = page.locator(".mobile-nav");
           const account = nav.locator("summary");
@@ -1098,16 +1087,14 @@ describe(
             "Sample Organizer",
           );
           await account.waitFor();
-          await page.goto(`${origin}/volunteer/volunteers`);
+          await page.goto(`${origin}/volunteers`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
           const teamSearch = page.getByRole("searchbox", {
             name: "Find a volunteer",
           });
           await teamSearch.fill("Sample Alice");
-          await page.waitForURL(
-            `${origin}/volunteer/volunteers?q=Sample+Alice`,
-          );
+          await page.waitForURL(`${origin}/volunteers?q=Sample+Alice`);
           await page
             .locator("[data-volunteer-results]")
             .getByRole("heading", { name: "Sample Alice", exact: true })
@@ -1123,7 +1110,7 @@ describe(
           const profileGate = new Promise<void>((resolve) => {
             releaseProfile = resolve;
           });
-          const profilePattern = `**/volunteer/volunteers/${alice.id}*`;
+          const profilePattern = `**/volunteers/${alice.id}*`;
           await page.route(profilePattern, async (route) => {
             await profileGate;
             await route.fallback();
@@ -1170,7 +1157,7 @@ describe(
             await profileDialog.innerText(),
             /PRIVATE HEALTH ANSWER/,
           );
-          assert.match(page.url(), /\/volunteer\/volunteers\?q=Sample\+Alice$/);
+          assert.match(page.url(), /\/volunteers\?q=Sample\+Alice$/);
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
             form: profileDialog.locator(
@@ -1236,7 +1223,7 @@ describe(
               .first(),
             { active: 0, approved: 1 },
           );
-          await page.goto(`${origin}/volunteer/volunteers/${alice.id}`);
+          await page.goto(`${origin}/volunteers/${alice.id}`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
           await inPlaceAction(page, {
@@ -1264,7 +1251,7 @@ describe(
               .first(),
             { active: 1, approved: 1 },
           );
-          await page.goto(`${origin}/volunteer/volunteers?q=Sample+Alice`);
+          await page.goto(`${origin}/volunteers?q=Sample+Alice`);
           await page
             .getByRole("link", {
               name: "View profile and approval",
@@ -1342,7 +1329,7 @@ describe(
           ).toBeEnabled();
           await page.unroute("**/api/v1/organizer/action");
           alice.cookie = await signIn(alice.email);
-          await page.goto(`${origin}/volunteer`);
+          await page.goto(`${origin}/events`);
           await page
             .getByRole("button", { name: "Add an event", exact: true })
             .click();
@@ -1556,7 +1543,7 @@ describe(
             true,
           );
           routeCookie = bob.cookie;
-          await page.goto(`${origin}/volunteer`);
+          await page.goto(`${origin}/events`);
           const card = page
             .locator("[data-live-event]")
             .filter({ hasText: "Browser-created meeting point" });
@@ -1766,7 +1753,7 @@ describe(
           });
           assert.equal(await signupDialog.isVisible(), false);
           routeCookie = bob.cookie;
-          await page.goto(`${origin}/volunteer`);
+          await page.goto(`${origin}/events`);
           await changeSpot("join", () =>
             card.getByText("Registered", { exact: true }).waitFor(),
           );
@@ -1801,7 +1788,7 @@ describe(
           await DB.prepare("UPDATE event SET hidden=1 WHERE id=?")
             .bind(hiddenEventId)
             .run();
-          await page.goto(`${origin}/volunteer?type=patrol`);
+          await page.goto(`${origin}/events?type=patrol`);
           await expect(
             card.getByText("Public visibility off", { exact: true }),
           ).toBeVisible();
@@ -1829,7 +1816,7 @@ describe(
           await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
             .bind(Date.now() - 1000, attendance.id)
             .run();
-          await page.goto(`${origin}/volunteer`);
+          await page.goto(`${origin}/events`);
           const attendanceCard = page.locator(
             `[data-live-event="${attendance.id}"]`,
           );

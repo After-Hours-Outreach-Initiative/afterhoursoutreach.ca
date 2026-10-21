@@ -2,8 +2,19 @@
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import FacebookIcon from "@/components/icons/FacebookIcon.astro";
 import LinkedInIcon from "@/components/icons/LinkedInIcon.astro";
-import { contactEmail, contactPhone, navLinks, social } from "@/data/site";
+import {
+  contactEmail,
+  contactPhone,
+  siteNavigation,
+  social,
+} from "@/data/site";
 import { organization } from "@/data/organization";
+interface Props {
+  signedIn: boolean;
+  organizer?: boolean;
+}
+const { signedIn, organizer = false } = Astro.props;
+const links = siteNavigation(signedIn, organizer);
 ---
 
 <footer class="bg-black text-white" id="contact">
@@ -93,7 +104,7 @@ import { organization } from "@/data/organization";
         aria-label="Footer navigation"
       >
         {
-          navLinks.map((link) => (
+          links.map((link) => (
             <a class="hover:text-white" href={link.href}>
               {link.label}
             </a>
