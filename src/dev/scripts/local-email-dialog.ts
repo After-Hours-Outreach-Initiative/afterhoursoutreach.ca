@@ -1,5 +1,6 @@
 // Imported by the real account/event UI through DEV-gated dynamic imports.
 import "../styles/local-email-dialog.css";
+import { createDialogHeader } from "../../scripts/dialog";
 
 let nextDialogId = 0;
 
@@ -19,21 +20,24 @@ export function localEmailDialog(options: {
   if (!import.meta.env.DEV)
     throw new Error("Email simulation is local-development only.");
   const dialog = document.createElement("dialog");
-  dialog.className = "dialog-pop local-email-dialog";
+  dialog.className = "dialog-pop dialog-frame local-email-dialog";
   const heading = document.createElement("h2");
   // This is only an accessible DOM label, not a security token. Use a counter
   // so development over HTTP LAN addresses doesn't need secure-context crypto.
   heading.id = `local-email-${++nextDialogId}`;
   heading.textContent = options.title ?? "Test email outcome";
   dialog.setAttribute("aria-labelledby", heading.id);
+  const { header, close } = createDialogHeader(heading, "Close email test");
+  close.addEventListener("click", () => dialog.close());
+  const content = document.createElement("div");
+  content.className = "dialog-body";
   const warning = document.createElement("p");
   warning.textContent = "Local test only. No real emails are sent.";
-  dialog.appendChild(heading);
-  dialog.appendChild(warning);
+  content.appendChild(warning);
   if (options.description) {
     const description = document.createElement("p");
     description.textContent = options.description;
-    dialog.appendChild(description);
+    content.appendChild(description);
   }
   for (const email of options.emails ?? []) {
     const article = document.createElement("article");
@@ -57,10 +61,11 @@ export function localEmailDialog(options: {
         article.appendChild(link);
       }
     }
-    dialog.appendChild(article);
+    content.appendChild(article);
   }
   const actions = document.createElement("div");
-  actions.className = "local-email-actions";
+  actions.className = "dialog-footer local-email-actions";
+  actions.hidden = options.actions.length === 0;
   for (const action of options.actions) {
     const button = document.createElement("button");
     button.type = "button";
@@ -69,13 +74,7 @@ export function localEmailDialog(options: {
     button.addEventListener("click", () => dialog.close(action.value));
     actions.appendChild(button);
   }
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "btn btn-quiet";
-  close.textContent = "Close email test";
-  close.addEventListener("click", () => dialog.close());
-  actions.appendChild(close);
-  dialog.appendChild(actions);
+  for (const child of [header, content, actions]) dialog.appendChild(child);
   document.body.appendChild(dialog);
   return new Promise((resolve) => {
     dialog.addEventListener(

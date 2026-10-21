@@ -2903,7 +2903,7 @@ test("event editor shows native number and URL errors without submitting", async
     "2025-11-02T01:30",
   ]) {
     await fillDateInput(form, "startsAt", value);
-    await form.getByRole("button", { name: "Save event" }).click();
+    await dialog.getByRole("button", { name: "Save event" }).click();
     await expect(value ? time : date).toBeFocused();
     await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
     await expect(dialog).not.toContainText("Vancouver");
@@ -2921,7 +2921,7 @@ test("event editor shows native number and URL errors without submitting", async
   const map = form.getByLabel("Map link (optional)");
   await spots.fill("0");
   await map.fill("not-a-url");
-  await form.getByRole("button", { name: "Save event" }).click();
+  await dialog.getByRole("button", { name: "Save event" }).click();
   await expect(form.locator("[data-error$='-spots']")).toBeVisible();
   await expect(form.locator("[data-error$='-meetingPointUrl']")).toBeVisible();
   await expect(spots).toBeFocused();
@@ -2929,7 +2929,7 @@ test("event editor shows native number and URL errors without submitting", async
   expect(requests).toEqual([]);
   for (const invalid of ["101", "1.5"]) {
     await spots.fill(invalid);
-    await form.getByRole("button", { name: "Save event" }).click();
+    await dialog.getByRole("button", { name: "Save event" }).click();
     await expect(form.locator("[data-error$='-spots']")).toBeVisible();
     expect(requests).toEqual([]);
   }

@@ -21,13 +21,23 @@ import {
   type EmailActionResult,
 } from "./action-email-feedback";
 
+function submitButton(form: HTMLFormElement) {
+  // Native form ownership also includes buttons in the persistent dialog footer.
+  return Array.from(form.elements).find(
+    (control): control is HTMLButtonElement =>
+      control instanceof HTMLButtonElement && control.type === "submit",
+  );
+}
+
 function initEventDates(root: Document | HTMLElement) {
   initDateInputs(root);
   initRecurrenceControls(root);
-  for (const button of root.querySelectorAll<HTMLButtonElement>(
-    '[data-event-save]:not([data-submitting]) button[type="submit"]',
-  ))
-    button.disabled = false;
+  for (const form of root.querySelectorAll<HTMLFormElement>(
+    "[data-event-save]:not([data-submitting])",
+  )) {
+    const button = submitButton(form);
+    if (button) button.disabled = false;
+  }
 }
 // Compare against the server HTML, not transient loading/filter/expanded state.
 const renderedCards = new WeakMap<HTMLElement, string>();
@@ -410,9 +420,7 @@ function form(
       readDateInputs(element);
       if (!element.reportValidity()) return;
     }
-    const button = element.querySelector<HTMLButtonElement>(
-      'button[type="submit"]',
-    );
+    const button = submitButton(element);
     if (button?.disabled) return;
     const focused = document.activeElement;
     element.dataset.submitting = "true";
@@ -522,6 +530,8 @@ function form(
               ? error.message
               : "The action could not be confirmed. Reload before making further changes.";
         message.hidden = false;
+        if (element.closest(".dialog-frame"))
+          message.scrollIntoView({ block: "nearest" });
       }
     } finally {
       for (const control of controls) control.disabled = false;
@@ -695,7 +705,7 @@ if (profileDialog && profileContent) {
     pending = undefined;
     profileContent.replaceChildren();
     profileContent.removeAttribute("aria-busy");
-    profileDialog.scrollTop = 0;
+    profileContent.scrollTop = 0;
   });
   document.addEventListener("click", async (event) => {
     if (
@@ -719,7 +729,7 @@ if (profileDialog && profileContent) {
       profileContent.replaceChildren(loadingTemplate.content.cloneNode(true));
     else profileContent.textContent = "Loading";
     profileContent.setAttribute("aria-busy", "true");
-    profileDialog.scrollTop = 0;
+    profileContent.scrollTop = 0;
     profileDialog.showModal();
     try {
       // The normal private page still authenticates, checks organizer access,

@@ -3,6 +3,7 @@ import Layout from "@/layouts/Layout.astro";
 import "@/styles/account.css";
 import "@/styles/volunteer.css";
 import CodeIcon from "@/components/icons/CodeIcon.astro";
+import DialogHeader from "@/components/DialogHeader.astro";
 interface Props {
   title: string;
   description: string;
@@ -56,44 +57,42 @@ const {
             </button>
             <dialog
               id="development-account-dialog"
-              class="dialog-pop volunteer-dialog"
+              class="dialog-pop dialog-frame volunteer-dialog"
               data-account-switcher
               aria-labelledby="development-account-dialog-heading"
             >
-              <div class="volunteer-section-heading">
-                <h2 id="development-account-dialog-heading">
-                  Local development
-                </h2>
-                <button
-                  class="btn btn-quiet"
-                  type="button"
-                  data-close-account-switcher
-                  aria-label="Close development controls"
-                >
-                  Close
-                </button>
-              </div>
-              <div class="volunteer-form">
-                <div class="account-profile-switcher">
-                  <p id="development-account-label">View as</p>
-                  <div
-                    class="account-profile-buttons"
-                    data-view-as
-                    role="group"
-                    aria-labelledby="development-account-label"
-                    aria-busy="true"
-                  >
-                    <button
-                      class="btn btn-quiet account-profile-button"
-                      type="button"
-                      data-switch-user=""
-                      aria-pressed="false"
-                      disabled
+              <DialogHeader
+                id="development-account-dialog-heading"
+                title="Local development"
+                closeLabel="Close development controls"
+                closeAttributes={{ "data-close-account-switcher": "" }}
+              />
+              <div class="dialog-body">
+                <div class="volunteer-form">
+                  <div class="account-profile-switcher">
+                    <p id="development-account-label">View as</p>
+                    <div
+                      class="account-profile-buttons"
+                      data-view-as
+                      role="group"
+                      aria-labelledby="development-account-label"
+                      aria-busy="true"
                     >
-                      Visitor
-                    </button>
+                      <button
+                        class="btn btn-quiet account-profile-button"
+                        type="button"
+                        data-switch-user=""
+                        aria-pressed="false"
+                        disabled
+                      >
+                        Visitor
+                      </button>
+                    </div>
                   </div>
+                  <p data-switch-message role="status" hidden />
                 </div>
+              </div>
+              <div class="dialog-footer">
                 <a
                   class="btn btn-quiet"
                   href="/volunteer/sign-in"
@@ -101,7 +100,6 @@ const {
                 >
                   Create an account
                 </a>
-                <p data-switch-message role="status" hidden />
               </div>
             </dialog>
           </Fragment>

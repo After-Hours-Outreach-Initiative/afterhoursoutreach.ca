@@ -200,16 +200,19 @@ for (const root of [16, 20, 24]) {
         exact: true,
       });
       await expect(emailDialog).toHaveClass(/\blocal-email-dialog\b/);
-      await expect(emailDialog.locator(":scope > h2")).toHaveCSS(
+      await expect(emailDialog.locator(".dialog-header > h2")).toHaveCSS(
         "font-size",
-        `${(30 / 16) * root}px`,
+        `${1.25 * root}px`,
       );
       await expect(emailDialog.locator("article > h3")).toHaveCSS(
         "font-size",
         `${(20 / 16) * root}px`,
       );
       // Assert the simulation UI, not the transactional email body's type scale.
-      await expect(emailDialog).toHaveCSS("padding", `${1.25 * root}px`);
+      await expect(emailDialog.locator(".dialog-body")).toHaveCSS(
+        "padding",
+        `${1.25 * root}px`,
+      );
       await expect(emailDialog).toHaveCSS("border-top-width", "1px");
       await expectInsideViewport(page, emailDialog);
       await expectNoHorizontalOverflow(page);
@@ -273,7 +276,10 @@ for (const root of [16, 20, 24]) {
         "font-size",
         `${1.5 * root}px`,
       );
-      await expect(dialog).toHaveCSS("padding", `${(28 / 16) * root}px`);
+      await expect(dialog.locator(".dialog-body")).toHaveCSS(
+        "padding",
+        `${(28 / 16) * root}px`,
+      );
       await expect(dialog).toHaveCSS("border-top-width", "1px");
       await expect(dialog).toBeInViewport({ ratio: 1 });
       await expectNoHorizontalOverflow(page);

@@ -1,0 +1,29 @@
+---
+import CloseIcon from "./icons/CloseIcon.svg";
+import "@/styles/dialog.css";
+
+interface Props {
+  id: string;
+  title: string;
+  closeLabel?: string;
+  closeAttributes?: Record<string, string>;
+}
+const {
+  id,
+  title,
+  closeLabel = "Close",
+  closeAttributes = { "data-dismiss-dialog": "" },
+} = Astro.props;
+---
+
+<div class="dialog-header">
+  <h2 id={id}>{title}</h2>
+  <button
+    class="btn btn-quiet dialog-close"
+    type="button"
+    aria-label={closeLabel}
+    {...closeAttributes}
+  >
+    <CloseIcon />
+  </button>
+</div>
