@@ -2295,22 +2295,17 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     name: "Emergency contact",
     exact: true,
   });
-  const emergencyDescription = emergencyContact.locator(
-    ".volunteer-profile-section-heading + p",
-  );
-  await expect(emergencyDescription).toHaveText(emergencyContactDescription);
-  await expect(emergencyContact).toHaveAccessibleDescription(
-    emergencyContactDescription,
-  );
-  await expect(
-    form.getByText(emergencyContactDescription, { exact: true }),
-  ).toHaveCount(1);
+  const emergencyDescription = form.getByText(emergencyContactDescription, {
+    exact: true,
+  });
+  await expect(emergencyDescription).toHaveCount(0);
+  await expect(emergencyContact).toHaveAccessibleDescription("");
   await expect(name).toHaveAttribute("aria-describedby", "error-emergencyName");
   const medicalConditions = form.locator('[name="medicalConditions"]');
   const answer = (name: string) =>
     form.locator(`[data-profile-answer="${name}"] dd`);
   const expectTextView = async (contact = sampleAnswers.emergencyName) => {
-    await expect(emergencyDescription).toBeVisible();
+    await expect(emergencyDescription).toHaveCount(0);
     await expect(form.locator("[data-profile-answers]:visible")).toHaveCount(4);
     await expect(
       form.locator("input:visible, textarea:visible, select:visible"),
@@ -2397,7 +2392,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await expect(preferredName).toBeHidden();
   await expect(preferredName).toBeDisabled();
   await expect(name).toBeEditable();
-  await expect(emergencyDescription).toBeVisible();
+  await expect(emergencyDescription).toHaveCount(0);
   for (const width of [1280, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await expectEmergencyContactRows(emergencyContact);
