@@ -2164,6 +2164,56 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(save).toBeDisabled();
 });
 
+test("profile headings scale responsively and wrap beside their edit buttons", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const form = page.locator("[data-account-profile]");
+  const rows = form.locator(".volunteer-profile-section-heading");
+  await expect(rows).toHaveCount(4);
+  await expect(rows.first().getByRole("button")).toBeEnabled();
+
+  for (const width of [320, 375, 640, 767, 768, 1024, 1280]) {
+    await page.setViewportSize({ width, height: 812 });
+    await expect(page.locator("#account-profile-heading")).toHaveCSS(
+      "font-size",
+      width < 768 ? "20px" : "24px",
+    );
+    for (const row of await rows.all()) {
+      const heading = row.getByRole("heading", { level: 3 });
+      const edit = row.getByRole("button");
+      await expect(heading).toHaveCSS(
+        "font-size",
+        width < 768 ? "18px" : "20px",
+      );
+      const titleBounds = (await heading.boundingBox())!;
+      const editBounds = (await edit.boundingBox())!;
+      expect(titleBounds.x + titleBounds.width).toBeLessThan(editBounds.x);
+      expect(titleBounds.y + titleBounds.height / 2).toBeCloseTo(
+        editBounds.y + editBounds.height / 2,
+        0,
+      );
+      expect(editBounds.width).toBeGreaterThanOrEqual(44);
+      expect(editBounds.height).toBeGreaterThanOrEqual(44);
+    }
+    if (width === 320) {
+      const wraps = await form
+        .getByRole("heading", { name: "Training and safety", exact: true })
+        .evaluate(
+          (heading) =>
+            heading.getBoundingClientRect().height >
+            parseFloat(getComputedStyle(heading).lineHeight),
+        );
+      expect(wraps).toBe(true);
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
+  }
+});
+
 test("profile sections edit in isolation, preserve saved answers, and cancel to the latest save", async ({
   page,
   baseURL,

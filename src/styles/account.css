@@ -99,6 +99,18 @@
     grid-row: 1;
   }
 }
+/* Keep profile headings one adjacent type-scale step apart at every width. */
+#account-profile-heading {
+  @apply text-xl md:text-2xl;
+}
+[data-profile-section] > .volunteer-profile-section-heading {
+  /* Wrap the title, not its edit action. */
+  flex-wrap: nowrap;
+}
+[data-profile-section] .volunteer-profile-heading {
+  flex: 1;
+  @apply text-lg md:text-xl;
+}
 .account-profile-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
