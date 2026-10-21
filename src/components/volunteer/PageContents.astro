@@ -11,9 +11,17 @@ interface Props {
   }[];
   application?: boolean;
   review?: boolean;
+  heading?: string;
+  /** Compact label while the navigation is not sticky. */
+  idleHeading?: string;
 }
-const { entries, application = false, review = false } = Astro.props;
-const heading = application ? "Sections" : "On this page";
+const {
+  entries,
+  application = false,
+  review = false,
+  heading = application ? "Sections" : "On this page",
+  idleHeading,
+} = Astro.props;
 const totalSections = entries.filter((entry) => entry.completable).length;
 ---
 
@@ -23,6 +31,7 @@ const totalSections = entries.filter((entry) => entry.completable).length;
     { "volunteer-application-contents": application },
   ]}
   data-page-contents
+  data-contents-idle-heading={idleHeading}
   data-application-contents={(application && !review) || undefined}
   data-application-review-contents={review || undefined}
   hidden={review}
@@ -47,7 +56,7 @@ const totalSections = entries.filter((entry) => entry.completable).length;
             <path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"></path>
           </svg>
           <span class="volunteer-contents-current" data-contents-current>
-            {application ? heading : entries[0]?.heading}
+            {idleHeading ?? (application ? heading : entries[0]?.heading)}
           </span>
           {
             application && !review && (
