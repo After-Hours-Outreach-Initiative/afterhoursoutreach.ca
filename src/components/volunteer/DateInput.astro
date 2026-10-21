@@ -110,7 +110,15 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
   {
     withTime && (
       <div class="volunteer-field">
-        <label for={`${id}-time`}>Start time</label>
+        <label for={`${id}-time`}>
+          Start time
+          {required && (
+            <span class="volunteer-required" aria-hidden="true">
+              {" "}
+              *
+            </span>
+          )}
+        </label>
         <input
           id={`${id}-time`}
           data-date-time-input
