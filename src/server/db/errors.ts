@@ -1,5 +1,10 @@
 import { RequestError } from "../http";
-import { orientationSignupLimitMessage } from "./policy";
+import {
+  orientationFullMessage,
+  orientationReservedMessage,
+  orientationSignupLimitMessage,
+  orientationCapacityMessage,
+} from "./policy";
 
 /** Translate database invariants into responses without exposing SQL or values. */
 export function databaseWriteError(error: unknown): never {
@@ -10,6 +15,17 @@ export function databaseWriteError(error: unknown): never {
       : "";
   if (message.includes("event_full"))
     throw new RequestError(409, "This event is full.");
+  if (message.includes("orientation_minimum_capacity"))
+    throw new RequestError(400, orientationCapacityMessage);
+  if (message.includes("orientation_places_full"))
+    throw new RequestError(409, orientationFullMessage);
+  if (message.includes("orientation_places_reserved"))
+    throw new RequestError(409, orientationReservedMessage);
+  if (message.includes("orientation_edit_conflict"))
+    throw new RequestError(
+      409,
+      "These orientation or capacity changes conflict with existing registrations or completion history. Keep two places reserved for volunteers without orientation completion, with no more than four such volunteers, and retain orientation where booked volunteers need it.",
+    );
   if (message.includes("orientation_signup_limit"))
     throw new RequestError(409, orientationSignupLimitMessage);
   if (message.includes("recurring_signup_window"))

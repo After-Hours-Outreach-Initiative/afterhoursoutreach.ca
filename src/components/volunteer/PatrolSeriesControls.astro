@@ -21,7 +21,8 @@ const { series } = Astro.props;
   {
     series.length === 0 && (
       <p>
-        No recurring patrols yet. Choose “Repeat patrol” when adding an event.
+        No recurring patrols yet. Choose “Recurring patrol” when creating an
+        event.
       </p>
     )
   }
@@ -36,6 +37,7 @@ const { series } = Astro.props;
           {item.meetingPoint} · Every {item.intervalWeeks}{" "}
           {item.intervalWeeks === 1 ? "week" : "weeks"} from {item.firstDate}{" "}
           (original time {item.localTime})
+          {item.includesOrientation ? " · Includes orientation by default" : ""}
           {item.stoppedFrom
             ? ` · Stopped from ${item.stoppedFrom}`
             : item.endDate

@@ -5,6 +5,11 @@
 export const nowMsSql =
   "CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)";
 
+// Backend-owned aliases only. Null preserves deployed orientation events while
+// allowing an explicit override on both standalone and recurring patrols.
+export const includesOrientationSql = (alias = "e") =>
+  `coalesce(${alias}.includes_orientation, ${alias}.type = 'orientation')`;
+
 // Queries using profile alias p and user alias u. Match applicationDisplayName.
 export const profileFullNameSql = `trim(coalesce(p.first_name, '') || ' ' ||
   CASE WHEN coalesce(p.middle_names, '') <> '' THEN p.middle_names || ' ' ELSE '' END ||

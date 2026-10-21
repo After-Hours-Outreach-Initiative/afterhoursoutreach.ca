@@ -18,9 +18,10 @@ export const GET: APIRoute = async ({ request }) => {
           Boolean(event.open) &&
           !event.hidden,
       )
-      .map(({ id, type, startsAt, meetingPoint }) => ({
+      .map(({ id, type, includesOrientation, startsAt, meetingPoint }) => ({
         id,
         type,
+        includesOrientation,
         startsAt,
         meetingPoint,
       }));

@@ -1,6 +1,6 @@
 interface EventSummary {
   id: string;
-  type: "patrol" | "orientation";
+  includesOrientation: number;
   startsAt: number;
   meetingPoint: string;
 }
@@ -39,7 +39,7 @@ async function renderEvents(root: HTMLElement) {
       const info = document.createElement("div");
       const heading = document.createElement("h3");
       heading.className = "text-xl";
-      heading.textContent = `${event.type === "patrol" ? "Patrol" : "Orientation"} · ${format.format(new Date(event.startsAt))}`;
+      heading.textContent = `Patrol${event.includesOrientation ? " (includes orientation)" : ""} · ${format.format(new Date(event.startsAt))}`;
       const location = document.createElement("p");
       location.className = "mt-2 text-base text-zinc-400";
       location.textContent = event.meetingPoint;

@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import { databaseWriteError } from "../src/server/db/errors";
 import { RequestError } from "../src/server/http";
-import { orientationSignupLimitMessage } from "../src/server/db/policy";
+import {
+  orientationCapacityMessage,
+  orientationSignupLimitMessage,
+} from "../src/server/db/policy";
 
 for (const [invariant, status, message] of [
   ["orientation_signup_limit", 409, orientationSignupLimitMessage],
+  ["orientation_minimum_capacity", 400, orientationCapacityMessage],
   [
     "signup_not_eligible",
     403,

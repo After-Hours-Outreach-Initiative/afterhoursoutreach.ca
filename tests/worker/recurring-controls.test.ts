@@ -101,6 +101,16 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     };
     const action = (body: object, cookie = organizer.cookie) =>
       send("/api/v1/events/action", body, cookie);
+    const tooSmall = await action({
+      action: "save-series",
+      series: {
+        ...seriesInput,
+        includesOrientation: true,
+        spots: 1,
+      },
+    });
+    expect(tooSmall.status).toBe(400);
+    expect(await tooSmall.text()).toContain("at least 2 total volunteer spots");
     await ok(
       await action(
         { action: "save-series", series: seriesInput },
@@ -278,10 +288,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .click();
     const creator = organizerPage.locator("#event-editor-new");
     await creator
-      .getByRole("radio", { name: "Orientation", exact: true })
+      .getByRole("checkbox", { name: "Includes orientation", exact: true })
       .check();
-    await expect(creator.locator("[data-recurrence-controls]")).toBeHidden();
-    await creator.getByRole("radio", { name: "Patrol", exact: true }).check();
+    await expect(creator.locator("[data-recurrence-controls]")).toBeVisible();
     await creator.locator('[name="recurring"]').check();
     await expect(creator.locator('[name="intervalWeeks"]')).toBeEnabled();
     await creator.locator('[name="intervalWeeks"]').fill("2");
@@ -297,13 +306,20 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .filter({ hasText: /^Visible$/ })
       .click();
     await creator
-      .getByRole("button", { name: "Save event", exact: true })
+      .getByRole("button", { name: "Create event", exact: true })
       .click();
     await expect(creator).not.toBeVisible();
     const uiSeries = await DB.prepare(
       "SELECT id FROM patrol_series WHERE meeting_point='UI recurring patrol'",
     ).first<string>("id");
     expect(uiSeries).toBeTruthy();
+    expect(
+      await DB.prepare(
+        "SELECT includes_orientation FROM patrol_series WHERE id=?",
+      )
+        .bind(uiSeries)
+        .first("includes_orientation"),
+    ).toBe(1);
     const manager = organizerPage.locator(`[data-live-series="${uiSeries}"]`);
     await manager.locator("summary").click();
     const uiDate = addCalendarDays(firstDate, 42);
@@ -317,6 +333,12 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     const uiCard = organizerPage.locator(`[data-live-event="${uiId}"]`);
     const editor = uiCard.locator("dialog");
     await expect(editor).toBeVisible();
+    await expect(
+      editor.getByRole("checkbox", {
+        name: "Includes orientation",
+        exact: true,
+      }),
+    ).toBeChecked();
     await expect(uiCard).toContainText("Outside the volunteer signup window");
     await expect(
       uiCard.getByRole("button", { name: "Register", exact: true }),
@@ -325,19 +347,43 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .locator('[data-event-save] [name="scope"]')
       .selectOption("future");
     await editor
+      .getByRole("checkbox", { name: "Includes orientation", exact: true })
+      .uncheck();
+    await editor
       .getByLabel("Meeting point", { exact: true })
       .fill("UI future meeting point");
     await editor
       .getByRole("button", { name: "Save event", exact: true })
       .click();
+    await expect(uiCard.locator("dialog")).not.toBeVisible();
+    // Empty occurrences do not offer roster email or a cancellation reason.
     await expect(
       organizerPage.getByRole("dialog", { name: "Send an email?" }),
-    ).toContainText("whose booked patrol occurrences change");
-    await organizerPage
-      .getByRole("button", { name: "Save without email", exact: true })
+    ).not.toBeVisible();
+    await expect(uiCard).toContainText("UI future meeting point");
+    expect(
+      await DB.prepare(
+        "SELECT includes_orientation FROM patrol_series_template WHERE series_id=?",
+      )
+        .bind(uiSeries)
+        .first("includes_orientation"),
+    ).toBe(0);
+    // The same orientation setting can then be overridden on just this patrol.
+    await uiCard.getByRole("button", { name: "Edit", exact: true }).click();
+    await uiCard
+      .locator("dialog")
+      .getByRole("checkbox", { name: "Includes orientation", exact: true })
+      .check();
+    await uiCard
+      .locator("dialog")
+      .getByRole("button", { name: "Save event", exact: true })
       .click();
     await expect(uiCard.locator("dialog")).not.toBeVisible();
-    await expect(uiCard).toContainText("UI future meeting point");
+    expect(
+      await DB.prepare("SELECT includes_orientation FROM event WHERE id=?")
+        .bind(uiId)
+        .first("includes_orientation"),
+    ).toBe(1);
     // An open manager is protected from polling; closing it applies the deferred version.
     await manager.locator("summary").click();
     const uiVersion = await DB.prepare(
@@ -360,6 +406,13 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(uiCard).toContainText("Cancelled");
+    expect(
+      await DB.prepare(
+        "SELECT includes_orientation FROM patrol_series WHERE id=?",
+      )
+        .bind(uiSeries)
+        .first("includes_orientation"),
+    ).toBe(1);
     // Existing cancellation history remains accessible beyond the shortened end.
     await manager
       .locator('[data-series-occurrence] [name="occurrenceDate"]')
@@ -381,14 +434,12 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .click();
     const cancelForm = uiFirstCard.locator("[data-event-cancel]");
     await cancelForm.locator('[name="scope"]').selectOption("future");
+    await expect(
+      cancelForm.locator("[data-event-cancel-heading]"),
+    ).toBeHidden();
+    await expect(cancelForm.locator("[data-event-cancel-reason]")).toBeHidden();
     await uiFirstCard
       .getByRole("button", { name: "Cancel event", exact: true })
-      .click();
-    await expect(
-      organizerPage.getByRole("dialog", { name: "Send an email?" }),
-    ).toContainText("whose future patrol bookings are cancelled");
-    await organizerPage
-      .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(uiFirstCard.locator(".volunteer-hidden")).toHaveText(
       "Cancelled",

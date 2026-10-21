@@ -227,6 +227,7 @@ export const patrolSeries = sqliteTable(
     spots: integer().notNull(),
     open: integer({ mode: "boolean" }).notNull().default(true),
     hidden: integer({ mode: "boolean" }).notNull().default(false),
+    includes_orientation: integer({ mode: "boolean" }).notNull().default(false),
     // Exclusive instant of the first unmaterialized future nominal occurrence.
     // Signup fails closed beyond this frontier, even if maintenance is delayed.
     generation_until: timestamp()
@@ -290,6 +291,7 @@ export const patrolSeriesTemplate = sqliteTable(
     spots: integer().notNull(),
     open: integer({ mode: "boolean" }).notNull(),
     hidden: integer({ mode: "boolean" }).notNull(),
+    includes_orientation: integer({ mode: "boolean" }).notNull().default(false),
   },
   (table) => [
     uniqueIndex("patrol_series_template_date").on(
@@ -310,7 +312,10 @@ export const event = sqliteTable(
   "event",
   {
     id: text().primaryKey(),
+    // Legacy storage only: every event is a patrol. Null overrides below inherit
+    // this historical orientation flag without rewriting events or their history.
     type: text({ enum: ["patrol", "orientation"] }).notNull(),
+    includes_orientation: integer({ mode: "boolean" }),
     series_id: text().references(() => patrolSeries.id),
     // Immutable nominal local date, independent of starts_at exception edits.
     occurrence_date: text(),

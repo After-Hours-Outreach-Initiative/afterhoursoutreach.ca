@@ -19,6 +19,7 @@ import {
   materializePatrolOccurrence,
 } from "@/server/db/events";
 import { actionEmailResult } from "@/server/events/notifications";
+import { orientationCapacityMessage } from "@/server/db/policy";
 
 const id = z.string().min(1).max(200);
 const reason = z.string().trim().max(1000).default("");
@@ -89,7 +90,12 @@ export const POST: APIRoute = async ({ request }) => {
     if (!actor) throw new RequestError(401, "Sign in to continue.");
     const parsed = inputSchema.safeParse(await readJson(request));
     if (!parsed.success)
-      throw new RequestError(400, "Check the event action and form fields.");
+      throw new RequestError(
+        400,
+        parsed.error.issues.find(
+          (issue) => issue.message === orientationCapacityMessage,
+        )?.message ?? "Check the event action and form fields.",
+      );
     const input = parsed.data;
     await takeRateLimit(
       env.DB,

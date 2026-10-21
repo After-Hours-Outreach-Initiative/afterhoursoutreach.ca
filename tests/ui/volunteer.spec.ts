@@ -80,7 +80,7 @@ test("volunteer-page sign-in is usable on mobile and opens the shared code form"
   ).toBe(false);
 });
 
-test("event type buttons filter instantly, preserve deep links, and never submit a confirmation form", async ({
+test("event filters include orientation without excluding other patrols, preserve deep links, and never submit a confirmation form", async ({
   page,
 }) => {
   await (
@@ -95,7 +95,7 @@ test("event type buttons filter instantly, preserve deep links, and never submit
   });
   const cards = page.locator("[data-live-event]");
   const types = await cards.evaluateAll((nodes) =>
-    nodes.map((node) => (node as HTMLElement).dataset.eventType),
+    nodes.map((node) => (node as HTMLElement).dataset.includesOrientation),
   );
   // Polling may add events from another test/viewer while this filter is active.
   // Verify every current card's visibility, not a stale initial list length.
@@ -108,7 +108,8 @@ test("event type buttons filter instantly, preserve deep links, and never submit
               const card = node as HTMLElement;
               return (
                 card.hidden ===
-                (selected !== "all" && card.dataset.eventType !== selected)
+                (selected === "orientation" &&
+                  card.dataset.includesOrientation !== "true")
               );
             }),
           type,
@@ -116,21 +117,23 @@ test("event type buttons filter instantly, preserve deep links, and never submit
       )
       .toBe(true);
   const filters = page.getByRole("group", { name: "Filter events" });
-  expect(types).toContain("orientation");
-  expect(types).toContain("patrol");
+  expect(types).toContain("true");
+  expect(types).toContain("false");
   await filters
-    .getByRole("button", { name: "Orientations", exact: true })
+    .getByRole("button", { name: "Includes orientation", exact: true })
     .click();
   await expect(
-    filters.getByRole("button", { name: "Orientations", exact: true }),
+    filters.getByRole("button", { name: "Includes orientation", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   await expect(page).toHaveURL(/\?type=orientation$/);
-  await filters.getByRole("button", { name: "Patrols", exact: true }).click();
-  await expectFilter("patrol");
+  await filters
+    .getByRole("button", { name: "All events", exact: true })
+    .click();
+  await expectFilter("all");
   await page.goBack();
   await expect(
-    filters.getByRole("button", { name: "Orientations", exact: true }),
+    filters.getByRole("button", { name: "Includes orientation", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   expect(documents).toEqual([]);

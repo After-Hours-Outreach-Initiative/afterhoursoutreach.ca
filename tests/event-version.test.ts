@@ -7,6 +7,7 @@ test("view versions detect capacity, signups, visibility and access changes with
   const event: EventRow = {
     id: "event",
     type: "orientation",
+    includesOrientation: 1,
     seriesId: null,
     occurrenceDate: null,
     inSignupWindow: 1,
@@ -19,6 +20,9 @@ test("view versions detect capacity, signups, visibility and access changes with
     cancelledAt: null,
     updatedAt: 1,
     confirmed: 0,
+    orientationConfirmed: 0,
+    orientationCompleted: 0,
+    availableSpots: 1,
     futureConfirmed: 0,
     futureEditableConfirmed: 0,
     signedUp: 0,
@@ -41,6 +45,10 @@ test("view versions detect capacity, signups, visibility and access changes with
   expect(await eventViewVersion([event], actor)).toBe(original);
   for (const update of [
     { confirmed: 1 },
+    { includesOrientation: 0 },
+    { orientationConfirmed: 1 },
+    { orientationCompleted: 1 },
+    { availableSpots: 0 },
     { futureConfirmed: 1 },
     { futureEditableConfirmed: 1 },
     { signedUp: 1 },

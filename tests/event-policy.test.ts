@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
   canViewVolunteerProfile,
+  availableSignupSpots,
+  orientationFullMessage,
+  orientationReservedMessage,
   orientationSignupLimitMessage,
   signupBlockReason,
   type SignupEvent,
@@ -54,6 +57,41 @@ test("an existing first-orientation booking shows the cancellation/rebooking rea
       now,
     ),
     orientationSignupLimitMessage,
+  );
+});
+
+test("availability and block reasons use orientation completion, total capacity and category limits", () => {
+  const patrol = {
+    ...event,
+    includesOrientation: true,
+    orientationConfirmed: 0,
+    orientationCompleted: true,
+  };
+  assert.equal(availableSignupSpots(patrol, 6), 0);
+  assert.equal(
+    signupBlockReason(volunteer, patrol, 6, now),
+    orientationReservedMessage,
+  );
+  assert.equal(
+    availableSignupSpots({ ...patrol, orientationCompleted: false }, 6),
+    2,
+  );
+  const newFull = {
+    ...patrol,
+    orientationConfirmed: 4,
+    orientationCompleted: false,
+  };
+  assert.equal(
+    signupBlockReason(volunteer, newFull, 4, now),
+    orientationFullMessage,
+  );
+  assert.equal(
+    availableSignupSpots({ ...newFull, orientationCompleted: true }, 4),
+    4,
+  );
+  assert.equal(
+    availableSignupSpots({ ...patrol, orientationConfirmed: 2 }, 8),
+    0,
   );
 });
 

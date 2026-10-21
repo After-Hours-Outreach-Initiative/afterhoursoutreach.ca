@@ -5,23 +5,23 @@ operations. Edit files here, not generated SQL in `drizzle/`.
 
 ## Where rules live
 
-| Source                        | Responsibility                                                                                                                                        |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema.ts`                   | Tables, defaults, relationships, checks, and unique indexes.                                                                                          |
-| `triggers.sql`                | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation event types, visibility, and organizer protection/bootstrap. |
-| `events.ts`                   | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                        |
-| `volunteers.ts`               | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                |
-| `profiles.ts`                 | Application validation and transactional profile updates.                                                                                             |
-| `application-drafts.ts`       | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                        |
-| `access.ts`                   | Verified account context and authorization, rechecked inside writes.                                                                                  |
-| `policy.ts`                   | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                 |
-| `sessions.ts`                 | Ownership-scoped session lookup and second-factor verification markers.                                                                               |
-| `notifications.ts`            | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                               |
-| `medic-certifications.ts`     | Certification reminder eligibility, renewal-cycle ledger, atomic claims, and bounded retry state.                                                     |
-| `submission-notifications.ts` | Fixed-recipient first-submission ledger, transactional intent creation, production claims and shared budget reservations; Preview suppression.        |
-| `rate-limits.ts`              | Persistent request/email counters and cleanup.                                                                                                        |
-| `errors.ts`                   | Safe translation of database invariant errors into application errors.                                                                                |
-| `index.ts`, `sql.ts`          | Request-scoped Drizzle connection and shared SQL clock.                                                                                               |
+| Source                        | Responsibility                                                                                                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema.ts`                   | Tables, defaults, relationships, checks, and unique indexes.                                                                                                |
+| `triggers.sql`                | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation places/completion, visibility, and organizer protection/bootstrap. |
+| `events.ts`                   | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                              |
+| `volunteers.ts`               | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                      |
+| `profiles.ts`                 | Application validation and transactional profile updates.                                                                                                   |
+| `application-drafts.ts`       | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                              |
+| `access.ts`                   | Verified account context and authorization, rechecked inside writes.                                                                                        |
+| `policy.ts`                   | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                       |
+| `sessions.ts`                 | Ownership-scoped session lookup and second-factor verification markers.                                                                                     |
+| `notifications.ts`            | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                                     |
+| `medic-certifications.ts`     | Certification reminder eligibility, renewal-cycle ledger, atomic claims, and bounded retry state.                                                           |
+| `submission-notifications.ts` | Fixed-recipient first-submission ledger, transactional intent creation, production claims and shared budget reservations; Preview suppression.              |
+| `rate-limits.ts`              | Persistent request/email counters and cleanup.                                                                                                              |
+| `errors.ts`                   | Safe translation of database invariant errors into application errors.                                                                                      |
+| `index.ts`, `sql.ts`          | Request-scoped Drizzle connection and shared SQL clock.                                                                                                     |
 
 HTTP request parsing and responses remain in `src/pages/api/v1/`. Better Auth's
 integration remains in `src/server/auth/`. Email transport and delivery orchestration
@@ -70,6 +70,56 @@ switching. Each write atomically checks session access, the prior revision, and
 the absence of a submitted profile. Profile submission deletes the draft in the
 same D1 batch; late autosaves cannot recreate it. User deletion cascades to drafts.
 
+## Patrols that include orientation
+
+Every event is a patrol; `includesOrientation` is an editable setting, not an
+exclusive event type. The legacy `event.type` column is retained without a parent
+table rebuild: a nullable `event.includes_orientation` override inherits
+`type = 'orientation'` when null. Historical orientations, signups and completion
+records are unchanged. New events use legacy `type = 'patrol'` and an explicit
+override, including recurring occurrences. Application queries expose the effective
+`includesOrientation` and temporarily retain a derived `type` for older callers.
+`eventSchema` accepts `includesOrientation` (boolean), or the legacy `type` input;
+when both are present the explicit orientation setting wins.
+`0015_patrol_orientation_capacity.sql` adds only columns and replacement triggers;
+apply it before deploying code that reads the new setting.
+
+For patrols that include orientation, total capacity still includes everyone:
+
+- At least two places are reserved for volunteers with **no**
+  `orientation_completion` record. New or edited orientation patrols, series and
+  templates require at least two total places.
+- No more than four such volunteers can book the event, even if separately
+  patrol-approved. The other category is defined by any completion record, not
+  by approval, age of account, or the orientation on this particular event.
+- With capacity eight, at most six completed volunteers and at most four
+  first-timers may register, with at most eight registrations in total.
+- Zero or one first-timer never cancels or prevents the patrol; unused reserved
+  places simply remain unavailable to completed volunteers.
+
+`0016_orientation_minimum_capacity.sql` adds insert/relevant-edit guards without
+rewriting historical one-place orientations, bookings, completion records, series
+or templates. Existing snapshots stay readable and cancellable. Legacy invalid
+recurring defaults do not generate new occurrences until corrected by an organizer;
+coverage maintenance itself does not change those defaults.
+
+Insert, reassignment/move and reactivation triggers enforce these limits inside
+the write. Orientation/capacity edits reject incompatible existing bookings,
+including removing orientation needed by a volunteer without patrol approval,
+and cannot remove recorded completion history. Bulk edits roll back their
+templates, versions, audits and notifications too. Existing historical excess
+bookings are not removed; completion/status changes never silently cancel spots.
+Approval and completion remain independent, and all existing access, visibility,
+session and application-readiness checks still apply.
+
+`listEvents` includes effective `includesOrientation`, `orientationConfirmed`
+(confirmed volunteers without any completion), `orientationCompleted` (the
+viewer's completion status), and category-aware `availableSpots`.
+`signupBlockReason` accepts these same values and explains full categories or
+reserved places. Availability is capacity-only; the eligibility/booking-limit
+reason must still be checked. Both counts and viewer status participate in the
+existing view-version polling.
+
 ## First-orientation booking limit
 
 Application-approved volunteers with neither an `orientation_completion` record
@@ -106,7 +156,10 @@ await generation, and SQL signup guards fail closed beyond its coverage frontier
 notify?)` provides actual **this-and-future** editing, including already-generated
   occurrences. The template contains `localTime`, `dayOffset` (−366…366 relative to
   each nominal date), meeting point/link, capacity, open and hidden. The effective
-  template applies during generation too. An earlier edit replaces later templates,
+  template applies during generation too. Both series defaults and effective
+  templates include `includesOrientation`, which is copied to every new snapshot;
+  individual overrides use the same setting through `saveEvent`. An earlier edit
+  replaces later templates,
   but preserves earlier templates, individual `saveEvent` exceptions, cancellation
   tombstones, past occurrences, event IDs, and every booking row. Capacity failures
   roll back the entire operation. Any `event_audit` action `updated` marks a permanent

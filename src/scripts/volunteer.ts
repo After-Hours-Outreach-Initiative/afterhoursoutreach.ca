@@ -52,10 +52,11 @@ for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
 initEventDates(document);
 
 function applyEventFilter(root: HTMLElement, type: string) {
-  const selected = ["patrol", "orientation"].includes(type) ? type : "all";
+  const selected = type === "orientation" ? "orientation" : "all";
   let visible = 0;
-  for (const card of root.querySelectorAll<HTMLElement>("[data-event-type]")) {
-    card.hidden = selected !== "all" && card.dataset.eventType !== selected;
+  for (const card of root.querySelectorAll<HTMLElement>("[data-live-event]")) {
+    card.hidden =
+      selected === "orientation" && card.dataset.includesOrientation !== "true";
     if (!card.hidden) visible++;
   }
   for (const button of root.querySelectorAll<HTMLButtonElement>(
@@ -582,7 +583,7 @@ form(
         ? { id: str(v, "id"), version: Number(v.get("version")) }
         : {}),
       event: {
-        type: str(v, "type"),
+        includesOrientation: v.has("includesOrientation"),
         startsAt: vancouverInstant(str(v, "startsAt")),
         meetingPoint: str(v, "meetingPoint"),
         meetingPointUrl: str(v, "meetingPointUrl"),

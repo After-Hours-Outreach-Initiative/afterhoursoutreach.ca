@@ -76,34 +76,23 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
             </>
           )
         }
-        {
-          event ? (
-            <div
-              class="volunteer-field volunteer-wide"
-              data-event-type-readonly
-            >
-              <span>Event type</span>
-              <span class="volunteer-readonly-value">
-                {event.type === "patrol" ? "Patrol" : "Orientation"}
-              </span>
-              <input type="hidden" name="type" value={event.type} />
-            </div>
-          ) : (
-            <fieldset class="volunteer-event-type volunteer-wide">
-              <legend>Event type</legend>
-              <div class="volunteer-event-type-options volunteer-choice-options">
-                <label class="volunteer-check">
-                  <input type="radio" name="type" value="patrol" checked />
-                  <span>Patrol</span>
-                </label>
-                <label class="volunteer-check">
-                  <input type="radio" name="type" value="orientation" />
-                  <span>Orientation</span>
-                </label>
-              </div>
-            </fieldset>
-          )
-        }
+        <div class="volunteer-field volunteer-wide">
+          <label class="volunteer-check">
+            <input
+              type="checkbox"
+              name="includesOrientation"
+              checked={Boolean(event?.includesOrientation)}
+              aria-describedby={`${dialogId}-orientation-help`}
+            />
+            <span>Includes orientation</span>
+          </label>
+          <p class="volunteer-help" id={`${dialogId}-orientation-help`}>
+            Orientation places count toward total capacity: reserve two for
+            volunteers without completed orientation, with a maximum of four.
+            Fewer than two orientation registrations do not cancel the patrol.
+            Existing bookings must remain eligible.
+          </p>
+        </div>
         {
           !event && (
             <div
@@ -182,7 +171,7 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
               id={`${dialogId}-spots`}
               name="spots"
               type="number"
-              min="1"
+              min={event?.includesOrientation ? "2" : "1"}
               max="100"
               step="1"
               aria-describedby={`error-${dialogId}-spots`}
@@ -202,7 +191,9 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
           </div>
           <FieldError
             field={`${dialogId}-spots`}
-            message="Enter a whole number from 1 to 100."
+            message={event?.includesOrientation
+              ? "Enter a whole number from 2 to 100 for a patrol that includes orientation."
+              : "Enter a whole number from 1 to 100."}
           />
         </div>
         <div class="volunteer-field">

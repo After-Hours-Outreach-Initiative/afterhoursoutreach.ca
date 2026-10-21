@@ -52,7 +52,7 @@ test("checked-in migrations are generated, unedited, and match the current sourc
   assert.equal(await generateDatabaseMigration({ check: true }), null);
 });
 
-test("recurrence migration preserves existing events, bookings, completions, audits and pending email", () => {
+test("recurrence and orientation migrations preserve existing events, bookings, completions, audits and pending email", () => {
   const db = database();
   db.exec("PRAGMA foreign_keys=ON");
   const migrate = (tag: string) => {
@@ -70,7 +70,7 @@ test("recurrence migration preserves existing events, bookings, completions, aud
       VALUES ('existing','Sample','555','2000-01-01','Contact','555','Friend','Friend','Help','[]','None','None',0,0);
     INSERT INTO volunteer_status (user_id,registration_approved,updated_at) VALUES ('existing',1,0);
     INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
-      VALUES ('existing-event','orientation',${Date.now() + 86_400_000},'Sample point',3,'existing',0,0);
+      VALUES ('existing-event','orientation',${Date.now() + 86_400_000},'Sample point',1,'existing',0,0);
     INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('existing-booking','existing-event','existing',0,0);
     INSERT INTO orientation_completion VALUES ('existing-completion','existing','existing-event','existing',0);
     INSERT INTO event_audit VALUES ('existing-audit','existing-event','existing','created','[]',0);
@@ -101,6 +101,70 @@ test("recurrence migration preserves existing events, bookings, completions, aud
   assert.deepEqual(event, { ...oldEvent });
   assert.equal(series_id, null);
   assert.equal(occurrence_date, null);
+  const recurrenceEvent = db.prepare("SELECT * FROM event").get();
+  migrate("0015_patrol_orientation_capacity");
+  assert.deepEqual(
+    tables.map((table) => db.prepare(`SELECT * FROM ${table}`).all()),
+    before,
+  );
+  const { includes_orientation, ...orientationEvent } = db
+    .prepare("SELECT * FROM event")
+    .get()!;
+  assert.deepEqual(orientationEvent, { ...recurrenceEvent });
+  assert.equal(includes_orientation, null);
+  const legacyEvent = db.prepare("SELECT * FROM event").get();
+  db.exec(`INSERT INTO patrol_series (id,first_date,local_time,interval_weeks,meeting_point,spots,includes_orientation,created_by,created_at,updated_at)
+    VALUES ('legacy-series','2030-01-01','20:00',1,'Meeting point',1,1,'existing',0,0);
+    INSERT INTO patrol_series_template (id,series_id,effective_date,local_time,meeting_point,spots,open,hidden,includes_orientation)
+    VALUES ('legacy-template','legacy-series','2030-01-08','20:00','Meeting point',1,1,0,1)`);
+  const legacySeries = db.prepare("SELECT * FROM patrol_series").get();
+  const legacyTemplate = db
+    .prepare("SELECT * FROM patrol_series_template")
+    .get();
+  migrate("0016_orientation_minimum_capacity");
+  assert.deepEqual(db.prepare("SELECT * FROM event").get(), legacyEvent);
+  assert.deepEqual(
+    db.prepare("SELECT * FROM patrol_series").get(),
+    legacySeries,
+  );
+  assert.deepEqual(
+    db.prepare("SELECT * FROM patrol_series_template").get(),
+    legacyTemplate,
+  );
+  assert.deepEqual(
+    tables.map((table) => db.prepare(`SELECT * FROM ${table}`).all()),
+    before,
+  );
+  assert.throws(
+    () =>
+      db.exec(
+        "UPDATE event SET meeting_point='Edited point' WHERE id='existing-event'",
+      ),
+    /orientation_minimum_capacity/,
+  );
+  assert.deepEqual(db.prepare("SELECT * FROM event").get(), legacyEvent);
+  assert.throws(
+    () =>
+      db.exec(
+        "UPDATE patrol_series SET end_date='2030-12-31' WHERE id='legacy-series'",
+      ),
+    /orientation_minimum_capacity/,
+  );
+  assert.throws(
+    () =>
+      db.exec(
+        "UPDATE patrol_series_template SET meeting_point='Edited point' WHERE id='legacy-template'",
+      ),
+    /orientation_minimum_capacity/,
+  );
+  assert.equal(
+    db
+      .prepare(
+        "SELECT coalesce(includes_orientation, type='orientation') AS includesOrientation FROM event",
+      )
+      .get()?.includesOrientation,
+    1,
+  );
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
   assert.equal(
     db

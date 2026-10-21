@@ -5,6 +5,7 @@ function eventFields(values: FormData) {
     meetingPoint: str(values, "meetingPoint"),
     meetingPointUrl: str(values, "meetingPointUrl"),
     spots: Number(values.get("spots")),
+    includesOrientation: values.has("includesOrientation"),
     open: str(values, "publicVisibility") === "true",
     hidden: str(values, "publicVisibility") !== "true",
   };
@@ -29,7 +30,7 @@ export function recurringSaveAction(values: FormData) {
       },
     };
   }
-  if (values.has("recurring") && str(values, "type") === "patrol")
+  if (values.has("recurring"))
     return {
       action: "save-series",
       series: {
@@ -69,6 +70,7 @@ export function seriesEndAction(values: FormData) {
       meetingPoint: item.meetingPoint,
       meetingPointUrl: item.meetingPointUrl ?? "",
       spots: item.spots,
+      includesOrientation: Boolean(item.includesOrientation),
       open: Boolean(item.open),
       hidden: Boolean(item.hidden),
     },
@@ -118,35 +120,44 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     "[data-event-save]",
   )) {
     if (form.dataset.submitting) continue;
+    const orientation = form.querySelector<HTMLInputElement>(
+      '[name="includesOrientation"]',
+    );
+    const spots = form.querySelector<HTMLInputElement>('[name="spots"]');
+    const capacityFeedback = form.querySelector<HTMLElement>(
+      '[data-error$="-spots"] span',
+    );
+    if (orientation && spots && capacityFeedback) {
+      const updateCapacity = () => {
+        spots.min = orientation.checked ? "2" : "1";
+        capacityFeedback.textContent = orientation.checked
+          ? "Enter a whole number from 2 to 100 for a patrol that includes orientation."
+          : "Enter a whole number from 1 to 100.";
+      };
+      if (!form.dataset.capacityReady) {
+        form.dataset.capacityReady = "true";
+        orientation.addEventListener("change", updateCapacity);
+        form.addEventListener("reset", () => queueMicrotask(updateCapacity));
+      }
+      updateCapacity();
+    }
     const recurring =
       form.querySelector<HTMLInputElement>('[name="recurring"]');
-    const types = [
-      ...form.querySelectorAll<HTMLInputElement>(
-        'input[type="radio"][name="type"]',
-      ),
-    ];
     const controls = form.querySelector<HTMLElement>(
       "[data-recurrence-controls]",
     );
     const fields = form.querySelector<HTMLElement>("[data-recurrence-fields]");
-    if (!recurring || !types.length || !controls || !fields) continue;
+    if (!recurring || !controls || !fields) continue;
     const endDate = fields.querySelector<HTMLInputElement>('[name="endDate"]')!;
     const start = form.querySelector<HTMLInputElement>('[name="startsAt"]')!;
     const update = () => {
-      const patrol = types.some(
-        (type) => type.checked && type.value === "patrol",
-      );
-      if (!patrol) recurring.checked = false;
-      controls.hidden = !patrol;
-      recurring.disabled = !patrol;
-      fields.hidden = !patrol || !recurring.checked;
+      fields.hidden = !recurring.checked;
       for (const input of fields.querySelectorAll<HTMLInputElement>("input"))
         input.disabled = fields.hidden;
       endDate.min = start.value.slice(0, 10);
     };
     if (!form.dataset.recurrenceReady) {
       form.dataset.recurrenceReady = "true";
-      for (const type of types) type.addEventListener("change", update);
       recurring.addEventListener("change", update);
       form
         .querySelector('[data-date-input="startsAt"]')

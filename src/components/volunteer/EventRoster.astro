@@ -26,7 +26,7 @@ const { event, roster, future, destinations } = Astro.props;
             </a>
             {Boolean(person.completed) && <span>Orientation completed</span>}
           </div>
-          {event.type === "orientation" &&
+          {Boolean(event.includesOrientation) &&
             !future &&
             !event.cancelledAt &&
             !person.completed && (

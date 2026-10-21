@@ -43,7 +43,7 @@ const { signup, destinations } = Astro.props;
           {
             destinations.map((event) => (
               <option value={event.id}>
-                {event.type} · {formatEventDate(event.startsAt)}
+                {`Patrol${event.includesOrientation ? " (includes orientation)" : ""} · ${formatEventDate(event.startsAt)}`}
               </option>
             ))
           }

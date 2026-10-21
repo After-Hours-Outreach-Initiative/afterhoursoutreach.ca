@@ -11,7 +11,12 @@ import {
 } from "../../data/application";
 import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
-import { nowMsSql, profileDisplayNameSql, profileFullNameSql } from "./sql";
+import {
+  includesOrientationSql,
+  nowMsSql,
+  profileDisplayNameSql,
+  profileFullNameSql,
+} from "./sql";
 import type { VolunteerApprovalFilter } from "../../data/volunteer-list";
 
 export interface VolunteerRow {
@@ -285,14 +290,14 @@ export async function setVolunteerStatus(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
           SELECT lower(hex(randomblob(16))), ?, s.user_id,
             'Your After Hours Outreach event registration was cancelled',
-            'Your registration for ' || e.type || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.', ?, u.email
+            'Your registration for a patrol' || CASE WHEN ${includesOrientationSql()} THEN ' (includes orientation)' ELSE '' END || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.', ?, u.email
           FROM signup s
           JOIN event e ON e.id = s.event_id
           JOIN user u ON u.id=s.user_id AND u.email_verified=1
           WHERE s.user_id = ?
             AND s.status = 'confirmed'
             AND e.starts_at > ?
-            AND (? = 0 OR (? = 0 AND EXISTS(SELECT 1 FROM user WHERE id = s.user_id AND role != 'organizer')) OR (? = 0 AND e.type = 'patrol'))
+            AND (? = 0 OR (? = 0 AND EXISTS(SELECT 1 FROM user WHERE id = s.user_id AND role != 'organizer')) OR (? = 0 AND NOT ${includesOrientationSql()}))
             AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)
             AND ? = 1`,
         )
@@ -314,8 +319,8 @@ export async function setVolunteerStatus(
           WHERE user_id = ?
             AND status = 'confirmed'
             AND event_id IN(
-              SELECT id FROM event
-              WHERE starts_at > ? AND (? = 0 OR (? = 0 AND EXISTS(SELECT 1 FROM user WHERE id = signup.user_id AND role != 'organizer')) OR (? = 0 AND type = 'patrol'))
+              SELECT e.id FROM event e
+              WHERE e.starts_at > ? AND (? = 0 OR (? = 0 AND EXISTS(SELECT 1 FROM user WHERE id = signup.user_id AND role != 'organizer')) OR (? = 0 AND NOT ${includesOrientationSql()}))
             )
             AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
         )
@@ -471,7 +476,7 @@ export async function completeOrientation(
       FROM event e
       JOIN signup s ON s.event_id = e.id
       WHERE e.id = ?
-        AND e.type = 'orientation'
+        AND coalesce(e.includes_orientation, e.type = 'orientation')
         AND e.cancelled_at IS NULL
         AND e.starts_at <= ?
         AND s.user_id = ?
@@ -497,7 +502,7 @@ export async function completeOrientation(
             WHERE e.id = ?
               AND s.user_id = ?
               AND s.status = 'confirmed'
-              AND e.type = 'orientation'
+              AND coalesce(e.includes_orientation, e.type = 'orientation')
               AND e.cancelled_at IS NULL
               AND e.starts_at <= ${nowMsSql}
           )
