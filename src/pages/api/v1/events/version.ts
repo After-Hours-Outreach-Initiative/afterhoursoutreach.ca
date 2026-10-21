@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
-import { accountContext, canViewEvents } from "@/server/db/access";
+import { accountContext, requireOrganizer } from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
 import { listEvents, listRosters, listPatrolSeries } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
@@ -10,17 +10,18 @@ export const prerender = false;
 export const GET: APIRoute = async ({ request }) => {
   try {
     const { actor, headers } = await accountContext(env, request);
+    const params = new URL(request.url).searchParams;
+    const manage = params.get("view") === "manage";
+    if (manage) requireOrganizer(actor);
     const events = await listEvents(
       env.DB,
       actor,
-      new URL(request.url).searchParams.get("occurrence") ?? undefined,
+      params.get("occurrence") ?? undefined,
+      manage ? "manage" : "volunteer",
     );
-    const series =
-      actor?.role === "organizer" && canViewEvents(actor)
-        ? await listPatrolSeries(env.DB, actor)
-        : [];
+    const series = manage && actor ? await listPatrolSeries(env.DB, actor) : [];
     const rosters =
-      actor?.role === "organizer" && canViewEvents(actor)
+      manage && actor
         ? await listRosters(
             env.DB,
             actor,

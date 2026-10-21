@@ -123,7 +123,7 @@ export function developmentAccounts(bindings: AuthBindings) {
           else if (/^\/apply\/?(?:\?|$)/.test(next))
             next = "/volunteer/account";
           else if (
-            /^\/volunteers(?:\/|\?|$)/.test(next) &&
+            /^\/manage(?:\/|\?|$)/.test(next) &&
             !("role" in person && person.role === "organizer")
           )
             next = "/events";

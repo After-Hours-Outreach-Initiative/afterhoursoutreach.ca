@@ -22,10 +22,13 @@ import "@/styles/volunteer.css";
 
 interface Props {
   account: Awaited<ReturnType<typeof accountContext>>;
+  manage?: boolean;
 }
+const { manage = false } = Astro.props;
 const { actor, email, greetingName } = Astro.props.account;
-const title =
-  !actor && Astro.url.pathname.replace(/\/$/, "") === "/volunteer"
+const title = manage
+  ? "Manage events"
+  : !actor && Astro.url.pathname.replace(/\/$/, "") === "/volunteer"
     ? "Volunteer"
     : "Events";
 let organizer = false;
@@ -39,11 +42,13 @@ const events = await listEvents(
   env.DB,
   actor,
   Astro.url.searchParams.get("occurrence") ?? undefined,
+  manage ? "manage" : "volunteer",
 );
-const series = organizer && actor ? await listPatrolSeries(env.DB, actor) : [];
+const management = manage && organizer;
+const series = management && actor ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
 const rosters =
-  organizer && actor
+  management && actor
     ? await listRosters(
         env.DB,
         actor,
@@ -82,12 +87,20 @@ const filter =
 >
   <h1
     slot="heading"
-    class:list={["max-w-4xl text-blue", { "sr-only": eventAccess }]}
+    class:list={["max-w-4xl text-blue", { "sr-only": eventAccess && !manage }]}
   >
     {title}
   </h1>
+  {
+    manage && (
+      <a class="btn btn-quiet" href="/events">
+        ← View events
+      </a>
+    )
+  }
   <div
     data-event-browser
+    data-event-view={manage ? "manage" : "volunteer"}
     data-event-version={eventVersion}
     data-event-access={String(eventAccess)}
   >
@@ -196,7 +209,7 @@ const filter =
       )
     }
     {
-      actor?.role === "organizer" && !organizer && (
+      manage && actor?.role === "organizer" && !organizer && (
         <p class="volunteer-notice">
           Organizer tools require an active application. If you enabled an
           authenticator, finish signing in with it.{" "}
@@ -211,7 +224,7 @@ const filter =
             <div>
               <h2 id="events-heading">Events</h2>
             </div>
-            {organizer && (
+            {management ? (
               <button
                 class="btn btn-primary"
                 data-show-dialog="event-editor-new"
@@ -220,7 +233,11 @@ const filter =
                 <PlusIcon class="btn-icon" />
                 Create event
               </button>
-            )}
+            ) : actor?.role === "organizer" ? (
+              <a class="btn btn-quiet" href="/manage/events">
+                Manage events →
+              </a>
+            ) : null}
           </div>
           <form
             class="volunteer-filters"
@@ -249,7 +266,7 @@ const filter =
               <EventCard
                 event={event}
                 actor={actor}
-                organizer={organizer}
+                organizer={management}
                 roster={rosters.filter((person) => person.eventId === event.id)}
                 destinations={destinations}
                 filter={filter}
@@ -280,7 +297,7 @@ const filter =
       )
     }
     {
-      organizer && (
+      management && (
         <>
           <EventEditor />
           <PatrolSeriesControls series={series} />

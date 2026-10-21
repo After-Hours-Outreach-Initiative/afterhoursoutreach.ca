@@ -61,7 +61,7 @@ export function safeReturnTo(value: string | undefined): string {
     const url = new URL(value, "https://local.invalid");
     if (
       url.origin !== "https://local.invalid" ||
-      !/^(?:\/(?:volunteer|volunteers)(?:\/|$)|\/(?:events|apply|register)\/?$)/.test(
+      !/^(?:\/(?:volunteer|volunteers)(?:\/|$)|\/manage\/(?:events\/?|volunteers(?:\/[^/]+)?\/?)$|\/(?:events|apply|register)\/?$)/.test(
         url.pathname,
       ) ||
       url.pathname.startsWith("/volunteer/sign-in")
@@ -71,10 +71,12 @@ export function safeReturnTo(value: string | undefined): string {
     if (/^\/(?:volunteer\/)?register\/?$/.test(url.pathname))
       return "/apply" + url.search;
     if (/^\/volunteer\/?$/.test(url.pathname)) return "/events" + url.search;
-    if (/^\/volunteer\/volunteers(?:\/|$)/.test(url.pathname))
+    if (/^\/(?:volunteer\/)?volunteers(?:\/|$)/.test(url.pathname))
       return (
-        url.pathname.replace("/volunteer/volunteers", "/volunteers") +
-        url.search
+        url.pathname.replace(
+          /^\/(?:volunteer\/)?volunteers/,
+          "/manage/volunteers",
+        ) + url.search
       );
     return url.pathname + url.search;
   } catch {

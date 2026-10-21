@@ -80,9 +80,9 @@ test("pending applications poll every minute, then approval restores five-second
       .locator('[data-switch-user="local-fixture-user-robin"]')
       .click();
     await expect(
-      page.getByRole("button", { name: "Create event", exact: true }),
+      page.getByRole("link", { name: "Manage events →", exact: true }),
     ).toBeVisible();
-    await page.goto(`/volunteers/${account.id}`);
+    await page.goto(`/manage/volunteers/${account.id}`);
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();

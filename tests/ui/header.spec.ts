@@ -173,6 +173,9 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("button", { name: "Manage", exact: true }),
+    ).toHaveCount(0);
     if (mobile) {
       await expect(navigation).toHaveCSS("background-color", "rgb(0, 0, 0)");
       const gutter = width < 640 ? 16 : 24;
@@ -269,6 +272,9 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveCount(0);
     await expect(
+      navigation.getByRole("button", { name: "Manage", exact: true }),
+    ).toHaveCount(0);
+    await expect(
       navigation.getByRole("link", { name: "About", exact: true }),
     ).toHaveCSS("color", mobile ? "rgb(212, 212, 216)" : "rgb(255, 255, 255)");
 
@@ -286,17 +292,36 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(
       navigation.getByRole("link", { name: "Events", exact: true }),
     ).toBeVisible();
+    const manage = navigation.getByRole("button", {
+      name: "Manage",
+      exact: true,
+    });
+    await manage.focus();
+    await manage.press("Enter");
+    await expect(manage).toHaveAttribute("aria-expanded", "true");
+    const manageMenu = manage.locator("..");
+    await expect(
+      manageMenu.getByRole("link", { name: "Events", exact: true }),
+    ).toHaveAttribute("href", "/manage/events");
+    if (mobile) {
+      await expect(header.locator(".mobile-nav")).toHaveAttribute("open", "");
+      await expect(manage).toHaveCSS("border-bottom-width", "1px");
+      for (const child of await manageMenu.locator("a").all()) {
+        await expect(child).toHaveCSS("border-top-width", "0px");
+        await expect(child).toHaveCSS("border-bottom-width", "0px");
+      }
+    }
     const volunteersLink = navigation.getByRole("link", {
       name: "Volunteers",
       exact: true,
     });
-    await expect(volunteersLink).toHaveAttribute("href", "/volunteers");
+    await expect(volunteersLink).toHaveAttribute("href", "/manage/volunteers");
     await expect(volunteersLink).toHaveCSS(
       "font-size",
-      mobile ? "20px" : "16px",
+      mobile ? "18px" : "16px",
     );
     await volunteersLink.click();
-    await expect(page).toHaveURL(/\/volunteers$/);
+    await expect(page).toHaveURL(/\/manage\/volunteers$/);
     await page.waitForLoadState("load");
     await expect(page.locator("[data-volunteer-browser]")).toBeVisible();
     await expect(
@@ -308,6 +333,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await toggle.click();
       await expect(toggle).toHaveAttribute("aria-expanded", "true");
     }
+    await manage.click();
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveAttribute("aria-current", "page");
@@ -315,6 +341,10 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveCSS("color", mobile ? "rgb(212, 212, 216)" : "rgb(255, 255, 255)");
+    await page.keyboard.press("Escape");
+    await expect(manage).toBeFocused();
+    await expect(manage).toHaveAttribute("aria-expanded", "false");
+    if (mobile) await expect(toggle).toHaveAttribute("aria-expanded", "true");
 
     await expect(
       account.locator(
@@ -443,7 +473,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     if (mobile) {
       const textStarts = await navigation
         .locator(
-          ".header-mobile-link, .header-account-card > a:not(.header-account-identity), .header-account-card button",
+          ".header-mobile-links > li > .header-mobile-link, .header-account-card > a:not(.header-account-identity), .header-account-card button",
         )
         .evaluateAll((elements) =>
           elements.map((element) => {
@@ -501,7 +531,7 @@ test("mobile navigation dims the page only while open", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
   const menu = page.locator(".mobile-nav");
-  const toggle = menu.locator("summary");
+  const toggle = menu.locator(":scope > summary");
   const backdrop = page.locator(".header-mobile-backdrop");
   await expect(backdrop).toBeHidden();
 
@@ -702,7 +732,7 @@ test("organizer Volunteers heading matches the Events heading", async ({
   const size = await events.evaluate(
     (element) => getComputedStyle(element).fontSize,
   );
-  await page.goto("/volunteers");
+  await page.goto("/manage/volunteers");
   const volunteers = page.getByRole("heading", {
     name: "Volunteers",
     level: 2,

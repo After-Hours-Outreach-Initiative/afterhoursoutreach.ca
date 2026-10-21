@@ -3,7 +3,7 @@ import { defineMiddleware } from "astro:middleware";
 export const onRequest = defineMiddleware(async (context, next) => {
   const response = await next();
   const privateRoute =
-    /^\/(?:api\/v1\/(?:auth|account|events|organizer)(?:\/|$)|(?:volunteer|volunteers)(?:\/|$)|(?:events|apply|register|privacy)\/?$)/.test(
+    /^\/(?:api\/v1\/(?:auth|account|events|organizer)(?:\/|$)|(?:manage|volunteer|volunteers)(?:\/|$)|(?:events|apply|register|privacy)\/?$)/.test(
       context.url.pathname,
     );
   if (!privateRoute) return response;

@@ -155,7 +155,7 @@ export async function approveLocalApplication(
   origin: string,
   userId: string,
 ) {
-  const profile = await organizer.get(`/volunteers/${userId}`);
+  const profile = await organizer.get(`/manage/volunteers/${userId}`);
   expect(profile.status(), await profile.text()).toBe(200);
   const version = (await profile.text()).match(
     /name="version" value="(\d+)"/,

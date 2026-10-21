@@ -10,12 +10,32 @@ export const navLinks = [
   { label: "About", href: "/about" },
 ];
 
-export function siteNavigation(signedIn: boolean, organizer = false) {
+interface NavigationLink {
+  label: string;
+  href: string;
+  children?: { label: string; href: string }[];
+}
+
+export function siteNavigation(
+  signedIn: boolean,
+  organizer = false,
+): NavigationLink[] {
   return navLinks.flatMap((link) =>
     signedIn && link.href === "/volunteer"
       ? [
           { label: "Events", href: "/events" },
-          ...(organizer ? [{ label: "Volunteers", href: "/volunteers" }] : []),
+          ...(organizer
+            ? [
+                {
+                  label: "Manage",
+                  href: "/manage/events",
+                  children: [
+                    { label: "Events", href: "/manage/events" },
+                    { label: "Volunteers", href: "/manage/volunteers" },
+                  ],
+                },
+              ]
+            : []),
         ]
       : [link],
   );

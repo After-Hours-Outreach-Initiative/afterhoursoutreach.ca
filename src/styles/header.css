@@ -94,7 +94,7 @@
   background: #0c0d10;
   box-shadow: 0 0.75rem 1.875rem #0008;
 }
-.header-volunteer-dropdown {
+.header-manage-dropdown {
   left: -0.75rem;
   width: 12.5rem;
 }
@@ -232,6 +232,7 @@
   @apply text-lg;
   padding-left: 0.75rem;
   line-height: 1.5;
+  border: 0;
 }
 .header-mobile-panel [data-header-discord] {
   @apply text-lg;
