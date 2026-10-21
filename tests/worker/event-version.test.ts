@@ -110,7 +110,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     // Pending accounts see no event activity; approval immediately changes their scoped view.
     expect(
       await (await send("/events", undefined, attendee.cookie)).text(),
-    ).toContain("Application awaiting approval");
+    ).toContain("Application Submitted");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
     )

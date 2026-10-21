@@ -76,8 +76,12 @@ test("successful first submission passes a transactional intent hook and schedul
     background.push(promise);
   });
   assert.equal(response.status, 200);
-  const body = (await response.json()) as { firstSubmitted: boolean };
+  const body = (await response.json()) as {
+    firstSubmitted: boolean;
+    next: string;
+  };
   assert.equal(body.firstSubmitted, true);
+  assert.equal(body.next, "/events");
   assert.equal(mocks.save.mock.calls[0][1], "applicant");
   assert.equal(
     mocks.save.mock.calls[0][3].firstSubmissionStatements,
@@ -119,6 +123,11 @@ test("profile edits and duplicate submissions do not start organizer notificatio
     });
     const response = await invoke(intent);
     assert.equal(response.status, 200);
+    const body = (await response.json()) as { next: string };
+    assert.equal(
+      body.next,
+      intent === "submit" ? "/events" : "/volunteer/account",
+    );
   }
   assert.equal(mocks.job.mock.calls.length, 0);
 });

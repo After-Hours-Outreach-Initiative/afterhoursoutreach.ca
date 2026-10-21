@@ -342,7 +342,7 @@ describe(
             await send("/events", undefined, person.cookie),
           );
           const html = await page.text();
-          assert.match(html, /Application awaiting approval/);
+          assert.match(html, /Application Submitted/);
           assert.doesNotMatch(
             html,
             /Sample meeting point|data-live-event=|data-event-list/,

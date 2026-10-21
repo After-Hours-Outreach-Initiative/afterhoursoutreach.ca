@@ -86,7 +86,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const response = Response.json(
       {
         ...saved,
-        next: "/volunteer/account",
+        next: intent === "submit" ? "/events" : "/volunteer/account",
         message: saved.alreadySubmitted
           ? "Your application was already submitted. The submitted answers have not been replaced."
           : "Profile saved.",

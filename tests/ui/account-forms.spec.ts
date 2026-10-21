@@ -1288,6 +1288,8 @@ test("application shows all required errors and saves after they are corrected",
   await toggle.click();
   await expect(confirmation).toBeChecked();
   await page.getByRole("button", { name: "Submit application" }).click();
+  await expect(page).toHaveURL(/\/events$/);
+  await page.getByRole("link", { name: "View Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
@@ -1518,6 +1520,8 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   await page
     .getByRole("button", { name: "Submit application", exact: true })
     .click();
+  await expect(page).toHaveURL(/\/events$/);
+  await page.getByRole("link", { name: "View Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
@@ -1786,6 +1790,8 @@ test("all teams can select multiple relevant training answers and add Other deta
   await medic.uncheck();
   await expect(training).toBeVisible();
   await submitLocalApplication(page);
+  await expect(page).toHaveURL(/\/events$/);
+  await page.getByRole("link", { name: "View Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   await page.getByRole("button", { name: "Edit training and safety" }).click();
@@ -2069,6 +2075,8 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).toHaveAttribute("required", "");
   await expect(experience).toHaveValue("Naloxone training");
   await submitLocalApplication(page);
+  await expect(page).toHaveURL(/\/events$/);
+  await page.getByRole("link", { name: "View Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   for (const [name, value] of [

@@ -584,7 +584,7 @@ test("resuming requires a fresh review and consent; submission clears both draft
     form.locator('[name="codeOfConductAccepted"]'),
   ).not.toBeChecked();
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/volunteer\/account$/);
+  await expect(page).toHaveURL(/\/events$/);
   expect(
     await page.evaluate(
       (key) => localStorage.getItem(key),

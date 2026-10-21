@@ -21,7 +21,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     await volunteer.goto(`${baseURL}/volunteer`);
     await expect(
       volunteer.getByRole("heading", {
-        name: "Application awaiting approval",
+        name: "Application Submitted",
       }),
     ).toBeVisible();
     await expect(
@@ -30,13 +30,22 @@ test("organizer approval unlocks events in place; revocation hides them again", 
       ),
     ).toHaveCount(0);
     const portal = volunteer.locator("[data-event-browser]");
+    const pending = portal.locator("[data-application-pending]");
+    await expect(pending.locator("p").first()).toHaveText(
+      `We'll review your application and email you at ${account.email} to let you know whether it's approved and what to do next.`,
+    );
+    await expect(pending.locator("strong")).toHaveText(account.email);
+    await expect(pending.locator("h2 svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
     await expect(
       portal.getByText(
-        "You can review your submitted application and update your profile while you wait.",
+        "You can see your submitted application on the account page.",
       ),
     ).toBeVisible();
     await expect(
-      portal.getByRole("link", { name: "Review application and profile" }),
+      portal.getByRole("link", { name: "View Account", exact: true }),
     ).toHaveAttribute("href", "/volunteer/account");
     await expect(
       portal.getByText(
@@ -117,7 +126,7 @@ test("organizer approval unlocks events in place; revocation hides them again", 
     ).toBeEnabled();
     await expect(
       volunteer.getByRole("heading", {
-        name: "Application awaiting approval",
+        name: "Application Submitted",
       }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(
