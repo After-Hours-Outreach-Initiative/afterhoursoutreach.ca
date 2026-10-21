@@ -9,7 +9,7 @@ import {
   type DateParts,
 } from "../data/date-input";
 import { futureEventInstant, vancouverInstant } from "../data/event-time";
-import { syncNativeDateInput } from "./native-date-input";
+import { syncNativePickerInput } from "./native-picker-input";
 
 const parts = ["day", "month", "year"] as const;
 const initialized = new WeakMap<HTMLFieldSetElement, () => void>();
@@ -42,7 +42,8 @@ function sync(group: HTMLFieldSetElement) {
     date && (!fields.time || /^\d{2}:\d{2}$/.test(time!))
       ? `${date}${fields.time ? `T${time}` : ""}`
       : "";
-  if (fields.date) syncNativeDateInput(fields.date);
+  if (fields.date) syncNativePickerInput(fields.date);
+  if (fields.time) syncNativePickerInput(fields.time);
   return fields.date ? fields.date.value : dateDraftValue(value);
 }
 
@@ -84,7 +85,7 @@ export function saveDateInputDefaults(
       const current = fields.date.value;
       fields.date.defaultValue = canonicalDate(saved);
       fields.date.value = current;
-      syncNativeDateInput(fields.date);
+      syncNativePickerInput(fields.date);
       continue;
     }
     for (const part of parts) {
