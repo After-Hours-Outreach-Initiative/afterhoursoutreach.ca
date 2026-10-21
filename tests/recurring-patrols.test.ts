@@ -73,7 +73,7 @@ const input = () => ({
   endDate: null as string | null,
   meetingPoint: "Meeting point",
   meetingPointUrl: "",
-  spots: 2,
+  spots: 4,
   open: true,
   hidden: false,
 });
@@ -452,7 +452,7 @@ test("closed/full/hidden occurrences consume slots; hidden recurring occurrences
   await db.batch([
     db.prepare("UPDATE event SET hidden=1 WHERE id=?").bind(events[0].id),
     db.prepare("UPDATE event SET open=0 WHERE id=?").bind(events[1].id),
-    db.prepare("UPDATE event SET spots=1 WHERE id=?").bind(events[2].id),
+    db.prepare("UPDATE event SET spots=3 WHERE id=?").bind(events[2].id),
   ]);
   await changeSignup(db, alice, events[2].id, "join");
   assert.deepEqual(
@@ -592,7 +592,7 @@ test("one-occurrence rescheduling remains attached to the original nominal date 
       startsAt: new Date(movedStart).toISOString(),
       meetingPoint: "Exception meeting point",
       meetingPointUrl: "",
-      spots: 1,
+      spots: 3,
       open: false,
       hidden: true,
     },
@@ -687,7 +687,7 @@ test("series defaults are versioned and future-only; inclusive end dates stop ge
 test("existing capacity, approvals, sessions and standalone behavior remain enforced", async () => {
   const series = await savePatrolSeries(db, organizer, {
     ...input(),
-    spots: 1,
+    spots: 3,
   });
   const first = (await all(series.id))[0];
   const attempts = await Promise.allSettled(
@@ -699,7 +699,7 @@ test("existing capacity, approvals, sessions and standalone behavior remain enfo
   );
   await assert.rejects(
     db.prepare("UPDATE event SET spots=0 WHERE id=?").bind(first.id).run(),
-    /capacity_below_signups|CHECK/,
+    /capacity_below_signups|CHECK|event_minimum_capacity|orientation_edit_conflict/,
   );
   const second = (await all(series.id))[1];
   await db
@@ -718,7 +718,7 @@ test("existing capacity, approvals, sessions and standalone behavior remain enfo
       ).toISOString(),
       meetingPoint: "Standalone",
       meetingPointUrl: "",
-      spots: 2,
+      spots: 4,
       open: true,
       hidden: false,
     });
@@ -795,7 +795,7 @@ const templateInput = () => ({
   dayOffset: 1,
   meetingPoint: "Updated meeting point",
   meetingPointUrl: "https://example.org/map",
-  spots: 3,
+  spots: 5,
   open: true,
   hidden: false,
 });
@@ -816,7 +816,7 @@ test("this-and-future updates booked materialized occurrences with stable IDs, p
       startsAt: new Date(events[2].startsAt).toISOString(),
       meetingPoint: "Individual exception",
       meetingPointUrl: "",
-      spots: 2,
+      spots: 4,
       open: true,
       hidden: false,
     },
@@ -989,7 +989,7 @@ test("bulk capacity violations roll back template, event/audit changes, notifica
       organizer,
       series.id,
       data.firstDate,
-      { ...templateInput(), spots: 1 },
+      { ...templateInput(), spots: 3 },
       old.updatedAt,
       true,
     ),
@@ -1054,7 +1054,7 @@ test("orientation settings persist on series, future templates and individual ex
       .prepare("UPDATE patrol_series SET spots=1 WHERE id=?")
       .bind(series.id)
       .run(),
-    /orientation_minimum_capacity/,
+    /event_minimum_capacity/,
   );
   await assert.rejects(
     db
@@ -1065,7 +1065,7 @@ test("orientation settings persist on series, future templates and individual ex
       )
       .bind(series.id)
       .run(),
-    /orientation_minimum_capacity/,
+    /event_minimum_capacity/,
   );
   await assert.rejects(
     saveEvent(
@@ -1281,7 +1281,7 @@ test("stopping at the first date cancels exceptions/bookings, preserves history 
       startsAt: new Date(events[1].startsAt).toISOString(),
       meetingPoint: "Exception",
       meetingPointUrl: "",
-      spots: 2,
+      spots: 4,
       open: true,
       hidden: false,
     },

@@ -114,7 +114,7 @@ test("preview fixtures use the real schema without credentials, privileges, or q
         "SELECT spots, (SELECT count(*) FROM signup WHERE event_id=event.id AND status='confirmed') AS confirmed FROM event WHERE id=?",
       )
       .get(previewEventId("full-orientation"))!;
-    assert.equal(full.spots, full.confirmed);
+    assert.equal(full.spots, Number(full.confirmed) + 2);
     assert.equal(
       db
         .prepare("SELECT hidden FROM event WHERE id=?")

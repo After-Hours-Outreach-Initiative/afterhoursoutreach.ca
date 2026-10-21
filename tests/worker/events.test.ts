@@ -155,7 +155,7 @@ describe(
         email,
       };
     };
-    const eventInput = (type = "orientation", spots = 2) => ({
+    const eventInput = (type = "orientation", spots = 4) => ({
       type,
       startsAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
       meetingPoint: "Sample meeting point",
@@ -263,7 +263,7 @@ describe(
       await ok(await send("/manage/volunteers"), 302);
     });
 
-    const createEvent = async (type = "orientation", spots = 2) => {
+    const createEvent = async (type = "orientation", spots = 4) => {
       const data = eventInput(type, spots);
       await ok(
         await send(
@@ -283,9 +283,9 @@ describe(
       let patrol: Awaited<ReturnType<typeof createEvent>>;
       let destination: Awaited<ReturnType<typeof createEvent>>;
       beforeAll(async () => {
-        orientation = await createEvent("orientation", 2);
-        patrol = await createEvent("patrol", 3);
-        destination = await createEvent("orientation", 2);
+        orientation = await createEvent("orientation", 4);
+        patrol = await createEvent("patrol", 5);
+        destination = await createEvent("orientation", 4);
       });
       const join = (eventId: string, cookie: string) =>
         send("/api/v1/events/action", { action: "join", id: eventId }, cookie);
@@ -588,7 +588,7 @@ describe(
               action: "save",
               id: patrol.id,
               version: row!.version,
-              event: { ...patrol.data, spots: 1 },
+              event: { ...patrol.data, spots: 3 },
             },
             organizer.cookie,
           ),
@@ -602,7 +602,7 @@ describe(
               action: "save",
               id: patrol.id,
               version: row!.version,
-              event: { ...patrol.data, spots: 2 },
+              event: { ...patrol.data, spots: 4 },
             },
             organizer.cookie,
           ),
@@ -620,7 +620,7 @@ describe(
               action: "save",
               id: patrol.id,
               version,
-              event: { ...patrol.data, spots: 2, hidden: true },
+              event: { ...patrol.data, spots: 4, hidden: true },
             },
             organizer.cookie,
           ),
@@ -859,7 +859,7 @@ describe(
 
       test("revoking application approval cancels future orientations and patrols without changing patrol approval", async () => {
         await ok(await status(alice.id, true, true));
-        const orientationEvent = await createEvent("orientation", 3);
+        const orientationEvent = await createEvent("orientation", 5);
         const patrolEvent = await createEvent("patrol");
         for (const event of [orientationEvent, patrolEvent])
           await ok(await join(event.id, alice.cookie));
@@ -916,7 +916,7 @@ describe(
       });
 
       test("opted-in cancellation preserves records, cancels spots and queues notifications atomically", async () => {
-        const event = await createEvent("patrol", 2);
+        const event = await createEvent("patrol", 4);
         await ok(await join(event.id, bob.cookie));
         await ok(
           await send(
@@ -1453,8 +1453,8 @@ describe(
               updated: () =>
                 expect(createdCard.locator(".volunteer-spots")).toHaveText(
                   spots === 9
-                    ? "7 spots available to you"
-                    : `${spots} spots left`,
+                    ? "5 spots available to you"
+                    : `${spots - 2} spots left`,
                 ),
               loadingLabel: "Saving…",
               pending: async () => {
@@ -1590,7 +1590,7 @@ describe(
             card.getByText("Registered", { exact: true }).waitFor(),
           );
           await expect(card.locator(".volunteer-spots")).toHaveText(
-            "7 spots left",
+            "5 spots left",
           );
           await expect(
             card.getByRole("button", { name: "Unregister", exact: true }),
@@ -1613,7 +1613,7 @@ describe(
           );
           routeCookie = organizer.cookie;
           await page.goto(`${origin}/manage/events`);
-          await card.locator("summary").click();
+          await card.locator(".volunteer-roster > summary").click();
           await card
             .getByRole("button", { name: "Move or remove", exact: true })
             .click();
@@ -1639,12 +1639,12 @@ describe(
                 })
                 .click(),
             updated: async () => {
-              await expect(card.locator("summary")).toHaveText(
-                "Volunteers (0)",
-              );
-              await expect(destinationCard.locator("summary")).toHaveText(
-                "Volunteers (1)",
-              );
+              await expect(
+                card.locator(".volunteer-roster > summary"),
+              ).toHaveText("Volunteers (0)");
+              await expect(
+                destinationCard.locator(".volunteer-roster > summary"),
+              ).toHaveText("Volunteers (1)");
             },
             loadingLabel: "Sending…",
           });
@@ -1697,7 +1697,7 @@ describe(
             "open",
             "",
           );
-          await destinationCard.locator("summary").click();
+          await destinationCard.locator(".volunteer-roster > summary").click();
           await destinationCard
             .getByRole("button", { name: "Move or remove", exact: true })
             .click();
@@ -1713,12 +1713,12 @@ describe(
                 })
                 .click(),
             updated: async () => {
-              await expect(card.locator("summary")).toHaveText(
-                "Volunteers (1)",
-              );
-              await expect(destinationCard.locator("summary")).toHaveText(
-                "Volunteers (0)",
-              );
+              await expect(
+                card.locator(".volunteer-roster > summary"),
+              ).toHaveText("Volunteers (1)");
+              await expect(
+                destinationCard.locator(".volunteer-roster > summary"),
+              ).toHaveText("Volunteers (0)");
             },
             loadingLabel: "Saving…",
           });
@@ -1754,7 +1754,7 @@ describe(
               .waitFor(),
           );
           await expect(card.locator(".volunteer-spots")).toHaveText(
-            "8 spots left",
+            "6 spots left",
           );
           await expect(
             card.getByText("Registered", { exact: true }),
@@ -1802,7 +1802,7 @@ describe(
             "Sample Bob",
           );
           routeCookie = organizer.cookie;
-          const attendance = await createEvent("orientation", 2);
+          const attendance = await createEvent("orientation", 5);
           await ok(await join(attendance.id, bob.cookie));
           await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
             .bind(Date.now() - 1000, attendance.id)
@@ -1811,7 +1811,7 @@ describe(
           const attendanceCard = page.locator(
             `[data-live-event="${attendance.id}"]`,
           );
-          await attendanceCard.locator("summary").click();
+          await attendanceCard.locator(".volunteer-roster > summary").click();
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
             form: attendanceCard.locator("[data-organizer-orientation]"),

@@ -3108,7 +3108,7 @@ test("event editor shows native number and URL errors without submitting invalid
   });
   await expect(spots).toHaveAttribute("type", "number");
   for (const [name, value] of Object.entries({
-    min: "1",
+    min: "2",
     max: "100",
     step: "1",
   }))
@@ -3162,14 +3162,14 @@ test("event editor shows native number and URL errors without submitting invalid
   await expect(spots).toHaveCSS("border-top-color", "rgb(248, 113, 113)");
   expect(requests).toEqual([]);
   await increase.click();
-  await expect(spots).toHaveValue("1");
+  await expect(spots).toHaveValue("2");
   await expect(form.locator("[data-error$='-spots']")).toBeHidden();
   await decrease.click();
-  await expect(spots).toHaveValue("1");
+  await expect(spots).toHaveValue("2");
   for (const [invalid, corrected] of [
     ["101", "100"],
     ["1.5", "2"],
-    ["", "1"],
+    ["", "2"],
   ]) {
     await spots.fill(invalid);
     await dialog.getByRole("button", { name: "Create event" }).click();
@@ -3186,7 +3186,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await expect(spots).toHaveValue("99");
   await spots.fill("");
   await decrease.click();
-  await expect(spots).toHaveValue("1");
+  await expect(spots).toHaveValue("2");
   await form.evaluate((element: HTMLFormElement) => element.reset());
   await expect(spots).toHaveValue("8");
   await fillDateInput(form, "startsAt", "2030-01-01T20:00");
@@ -3198,22 +3198,22 @@ test("event editor shows native number and URL errors without submitting invalid
   // Changing orientation changes the native minimum, not the organizer's draft.
   await spots.fill("1");
   await orientation.check();
-  await expect(spots).toHaveAttribute("min", "2");
+  await expect(spots).toHaveAttribute("min", "4");
   await expect(spots).toHaveValue("1");
   await dialog.getByRole("button", { name: "Create event" }).click();
   await expect(form.locator('[data-error$="-spots"]')).toBeVisible();
   await expect(form.locator('[data-error$="-spots"]')).toContainText(
-    "from 2 to 100",
+    "from 4 to 100",
   );
   expect(requests).toEqual([]);
   await decrease.click();
-  await expect(spots).toHaveValue("2");
+  await expect(spots).toHaveValue("4");
   await decrease.click();
-  await expect(spots).toHaveValue("2");
+  await expect(spots).toHaveValue("4");
   await orientation.uncheck();
-  await expect(spots).toHaveAttribute("min", "1");
+  await expect(spots).toHaveAttribute("min", "2");
   await decrease.click();
-  await expect(spots).toHaveValue("1");
+  await expect(spots).toHaveValue("3");
   await spots.fill("8");
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
   expect(requests).toEqual([]);
@@ -3256,13 +3256,13 @@ test("event editor shows native number and URL errors without submitting invalid
     exact: true,
   });
   await expect(editOrientation).toBeChecked();
-  await expect(editSpots).toHaveAttribute("min", "2");
+  await expect(editSpots).toHaveAttribute("min", "4");
   await editOrientation.uncheck();
   await expect(editOrientation).not.toBeChecked();
-  await expect(editSpots).toHaveAttribute("min", "1");
+  await expect(editSpots).toHaveAttribute("min", "2");
   await editForm.evaluate((element: HTMLFormElement) => element.reset());
   await expect(editOrientation).toBeChecked();
-  await expect(editSpots).toHaveAttribute("min", "2");
+  await expect(editSpots).toHaveAttribute("min", "4");
   const editDateGroup = editForm.locator('[data-date-input="startsAt"]');
   const editDate = editDateGroup.locator("[data-native-date]");
   const editTime = editForm.getByLabel("Start time");

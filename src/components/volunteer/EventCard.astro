@@ -1,11 +1,18 @@
 ---
 import type { Actor } from "@/server/db/access";
-import type { EventRow, RosterRow, PatrolSeriesRow } from "@/server/db/events";
+import type {
+  EventRow,
+  RosterRow,
+  PublicRosterRow,
+  PatrolSeriesRow,
+} from "@/server/db/events";
 import { signupBlockReason } from "@/server/db/policy";
 import { formatEventDate } from "@/data/event-time";
 import { matchesEventFilter } from "@/data/event-browser";
 import EventEditor from "./EventEditor.astro";
 import EventRoster from "./EventRoster.astro";
+import EventAttendance from "./EventAttendance.astro";
+import PublicEventRoster from "./PublicEventRoster.astro";
 
 interface Props {
   event: EventRow;
@@ -15,9 +22,18 @@ interface Props {
   destinations: EventRow[];
   filter: string;
   series?: PatrolSeriesRow;
+  publicRoster?: PublicRosterRow[];
 }
-const { event, actor, organizer, roster, destinations, filter, series } =
-  Astro.props;
+const {
+  event,
+  actor,
+  organizer,
+  roster,
+  destinations,
+  filter,
+  series,
+  publicRoster,
+} = Astro.props;
 const future = event.startsAt > Date.now();
 const left = event.availableSpots;
 const totalLeft = Math.max(0, event.spots - event.confirmed);
@@ -97,15 +113,6 @@ const blocked =
         </span>{" "}· {event.confirmed} of {event.spots} spots taken
       </p>
       {
-        Boolean(event.includesOrientation) && (
-          <p class="volunteer-help">
-            Two places reserved for volunteers without completed orientation;
-            maximum four, included in total capacity. No minimum number of
-            orientation registrations.
-          </p>
-        )
-      }
-      {
         organizer && series && (
           <p class="volunteer-help">
             Recurring patrol · nominal date {event.occurrenceDate}
@@ -164,6 +171,8 @@ const blocked =
       }
     </div>
   </div>
+  <EventAttendance event={event} />
+  {!organizer && publicRoster && <PublicEventRoster roster={publicRoster} />}
   {
     organizer && (
       <EventRoster

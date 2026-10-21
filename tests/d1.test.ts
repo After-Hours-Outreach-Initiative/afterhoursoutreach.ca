@@ -5,7 +5,12 @@ import { localEventFixtures } from "../scripts/local-event-fixtures";
 import { localAccountFixtures } from "../scripts/local-account-fixtures";
 import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
-import { changeSignup, listEvents } from "../src/server/db/events";
+import {
+  changeSignup,
+  listEvents,
+  listPublicRosters,
+  manageSignup,
+} from "../src/server/db/events";
 import { orientationSignupLimitMessage } from "../src/server/db/policy";
 import {
   loadApplicationDraft,
@@ -90,7 +95,7 @@ test("Drizzle and capacity constraints work in the D1 runtime", async () => {
     type: "patrol",
     starts_at: new Date(now.getTime() + 86_400_000),
     meeting_point: "Meeting point",
-    spots: 1,
+    spots: 3,
     created_by: "organizer",
     created_at: now,
     updated_at: now,
@@ -115,7 +120,7 @@ test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   );
   const failure = attempts.find((result) => result.status === "rejected");
   assert.ok(failure?.status === "rejected");
-  assert.match(String(failure.reason), /event_full/);
+  assert.match(String(failure.reason), /signup_places_reserved/);
   const count = await binding
     .prepare("SELECT count(*) AS count FROM signup WHERE status = 'confirmed'")
     .first<{ count: number }>();
@@ -146,6 +151,175 @@ async function draftActor(id = "draft-volunteer"): Promise<Actor> {
     patrolApproved: false,
   };
 }
+
+test("concurrent D1 registrations preserve both reservations; cancellations and failed organizer moves are atomic", async () => {
+  const organizer = {
+    ...(await draftActor("organizer")),
+    role: "organizer" as const,
+    applicationSubmitted: true,
+    active: true,
+    applicationApproved: true,
+  };
+  await env.DB.prepare(
+    "UPDATE user SET role='organizer' WHERE id='organizer'",
+  ).run();
+  await env.DB.batch(
+    ["history", "target", "source"].map((id) =>
+      env.DB.prepare(
+        `INSERT INTO event
+    (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+    VALUES (?, 'orientation', ?, 'Point', ?, 'organizer',0,0)`,
+      ).bind(
+        id,
+        id === "history" ? 0 : Date.now() + 86_400_000,
+        id === "target" ? 5 : 8,
+      ),
+    ),
+  );
+  const people: Actor[] = [];
+  for (const id of [
+    "general-1",
+    "general-2",
+    "orientee-1",
+    "orientee-2",
+    "orientee-3",
+    "medic-1",
+    "medic-2",
+    "medic-3",
+  ]) {
+    const actor = {
+      ...(await draftActor(id)),
+      applicationSubmitted: true,
+      active: true,
+      applicationApproved: true,
+      patrolApproved: true,
+    };
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,emergency_contact_name,
+        emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,medical_certification,training_experience,registered_at,updated_at)
+        VALUES (?, 'Alice', 'PrivateSurname', 'PRIVATE FULL NAME', 'PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None',0,0)`,
+      ).bind(id, id.startsWith("medic") ? '["medic"]' : "[]"),
+      env.DB.prepare(
+        "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,1,'organizer',0,0)",
+      ).bind(id),
+    ]);
+    if (!id.startsWith("orientee"))
+      await env.DB.prepare(
+        "INSERT INTO orientation_completion VALUES (?,?, 'history','organizer',0)",
+      )
+        .bind(`${id}-completion`, id)
+        .run();
+    people.push(actor);
+  }
+  const generals = await Promise.allSettled(
+    people
+      .slice(0, 2)
+      .map((actor) => changeSignup(env.DB, actor, "target", "join")),
+  );
+  assert.equal(
+    generals.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  const reserved = await Promise.allSettled(
+    people
+      .slice(2)
+      .map((actor) => changeSignup(env.DB, actor, "target", "join")),
+  );
+  assert.equal(
+    reserved.filter((result) => result.status === "fulfilled").length,
+    4,
+  );
+  const target = (
+    await listEvents(env.DB, people[0], undefined, "volunteer")
+  ).find((row) => row.id === "target")!;
+  assert.deepEqual(
+    [target.confirmed, target.medicConfirmed, target.orientationConfirmed],
+    [5, 2, 2],
+  );
+  const roster = await listPublicRosters(env.DB, people[0], [
+    "target",
+    "history",
+    ...Array.from({ length: 98 }, (_, index) => `unlisted-${index}`),
+  ]);
+  assert.equal(roster.people.length, 5);
+  assert.ok(
+    roster.people.every(
+      (row) =>
+        row.name === "Alice P." &&
+        Object.keys(row).sort().join() === "category,eventId,name",
+    ),
+  );
+  assert.doesNotMatch(
+    JSON.stringify(roster),
+    /PRIVATE|PrivateSurname|medic-[123]|general-[12]/,
+  );
+  await assert.rejects(
+    listPublicRosters(env.DB, { ...people[0], applicationApproved: false }, [
+      "target",
+    ]),
+    statusError(403),
+  );
+  const general = people[generals[0].status === "rejected" ? 0 : 1];
+  const bookedGeneral = people[generals[0].status === "fulfilled" ? 0 : 1];
+  // Same signup, abbreviated name and category: reassignment must still change
+  // the opaque version, never the safe projection or expose either identity.
+  await env.DB.prepare(
+    "UPDATE signup SET user_id=? WHERE event_id='target' AND user_id=? AND status='confirmed'",
+  )
+    .bind(general.id, bookedGeneral.id)
+    .run();
+  const swapped = await listPublicRosters(env.DB, people[0], ["target"]);
+  assert.deepEqual(swapped.people, roster.people);
+  assert.notEqual(swapped.version, roster.version);
+  await env.DB.prepare(
+    "UPDATE signup SET user_id=? WHERE event_id='target' AND user_id=? AND status='confirmed'",
+  )
+    .bind(bookedGeneral.id, general.id)
+    .run();
+  const medic = people.find(
+    (_actor, index) => index >= 5 && reserved[index - 2].status === "fulfilled",
+  )!;
+  await changeSignup(env.DB, medic, "target", "cancel");
+  await changeSignup(env.DB, general, "source", "join");
+  const source = await env.DB.prepare(
+    "SELECT id FROM signup WHERE event_id='source' AND status='confirmed'",
+  ).first<string>("id");
+  const audits = await env.DB.prepare(
+    "SELECT count(*) n FROM event_audit",
+  ).first<number>("n");
+  await assert.rejects(
+    manageSignup(env.DB, organizer, source!, "target", "", true),
+    statusError(409),
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT status FROM signup WHERE id=?")
+      .bind(source)
+      .first("status"),
+    "confirmed",
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_audit").first("n"),
+    audits,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_notification").first(
+      "n",
+    ),
+    0,
+  );
+  await changeSignup(env.DB, medic, "target", "join");
+  const orientee = people.find(
+    (_actor, index) =>
+      index >= 2 && index < 5 && reserved[index - 2].status === "fulfilled",
+  )!;
+  await changeSignup(env.DB, orientee, "target", "cancel");
+  await assert.rejects(
+    changeSignup(env.DB, general, "target", "join"),
+    statusError(409),
+  );
+  await changeSignup(env.DB, orientee, "target", "join");
+});
 
 const draftInput = (actor: Actor, revision: string | null = null) => ({
   version: 1,
@@ -671,7 +845,7 @@ test("first completed orientation uses the earliest attended event, not when att
     starts.map((startsAt, index) =>
       env.DB.prepare(
         `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
-        VALUES (?, 'orientation', ?, 'Meeting point', 3, ?, 0, 0)`,
+        VALUES (?, 'orientation', ?, 'Meeting point', 4, ?, 0, 0)`,
       ).bind(`orientation-${index}`, startsAt, actor.id),
     ),
   );
@@ -721,7 +895,7 @@ test("concurrent first-orientation signups reserve one booking; cancellation and
     ...eventIds.map((id) =>
       env.DB.prepare(
         `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
-        VALUES (?, 'orientation', ?, 'Meeting point', 3, ?, 0, 0)`,
+        VALUES (?, 'orientation', ?, 'Meeting point', 4, ?, 0, 0)`,
       ).bind(id, Date.now() + 86_400_000, actor.id),
     ),
   ]);
@@ -982,7 +1156,7 @@ test("new local applications preserve old fixtures; deletion protects only manua
     .run();
   await env.DB.prepare(
     `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
-    VALUES ('protected-event', 'orientation', 0, 'Meeting point', 2, ?, 0, 0)`,
+    VALUES ('protected-event', 'orientation', 0, 'Meeting point', 4, ?, 0, 0)`,
   )
     .bind(id)
     .run();

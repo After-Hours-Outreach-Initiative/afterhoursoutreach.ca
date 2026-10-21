@@ -15,6 +15,9 @@ export interface SignupEvent {
   open: boolean;
   spots: number;
   orientationConfirmed?: number;
+  medicConfirmed?: number;
+  // Server-derived: team selection, both organizer approvals and completion.
+  medicEligible?: boolean | number;
   // Whether the current volunteer has ANY recorded orientation completion.
   orientationCompleted?: boolean | number;
   orientationSignupBlocked?: boolean;
@@ -26,16 +29,16 @@ export const orientationSignupLimitMessage =
 export const orientationFullMessage =
   "All four places for volunteers who have not completed orientation are booked.";
 export const orientationReservedMessage =
-  "The remaining places are reserved for volunteers who have not completed orientation.";
+  "The remaining places are reserved for approved medics or volunteers who have not completed orientation.";
 
 export const orientationCapacityMessage =
-  "Patrols that include orientation need at least 2 total volunteer spots. Increase capacity to 2 or turn off Includes orientation.";
+  "Patrols need at least 2 total volunteer spots, or 4 when including orientation, to preserve reserved places.";
 
 export function validOrientationCapacity(event: {
   includesOrientation: boolean | number;
   spots: number;
 }) {
-  return !event.includesOrientation || event.spots >= 2;
+  return event.spots >= (event.includesOrientation ? 4 : 2);
 }
 
 export function eventIncludesOrientation(
@@ -53,16 +56,34 @@ export function availableSignupSpots(
     | "spots"
     | "orientationConfirmed"
     | "orientationCompleted"
+    | "medicConfirmed"
+    | "medicEligible"
   >,
   confirmed: number,
 ) {
-  const total = Math.max(0, event.spots - confirmed);
-  if (!eventIncludesOrientation(event)) return total;
-  const firstTimers = event.orientationConfirmed ?? 0;
-  const category = event.orientationCompleted
-    ? event.spots - Math.min(2, event.spots) - (confirmed - firstTimers)
-    : 4 - firstTimers;
-  return Math.max(0, Math.min(total, category));
+  const orientation = eventIncludesOrientation(event);
+  const orientee = orientation && !event.orientationCompleted;
+  const medic = !orientee && Boolean(event.medicEligible);
+  const medics = event.medicConfirmed ?? 0;
+  const orientees = event.orientationConfirmed ?? 0;
+  // Try successive additions in the viewer's mutually exclusive category. Each
+  // addition must leave room for BOTH categories' outstanding reservations.
+  let available = 0;
+  for (let added = 1; added <= event.spots - confirmed; added++) {
+    const afterOrientees = orientees + (orientee ? added : 0);
+    if (orientee && afterOrientees > 4) break;
+    const outstandingMedics = Math.max(0, 2 - medics - (medic ? added : 0));
+    const outstandingOrientees = orientation
+      ? Math.max(0, 2 - afterOrientees)
+      : 0;
+    if (
+      confirmed + added + outstandingMedics + outstandingOrientees >
+      event.spots
+    )
+      break;
+    available = added;
+  }
+  return available;
 }
 
 /** UI feedback only; database triggers enforce eligibility and limits atomically. */
@@ -85,10 +106,12 @@ export function signupBlockReason(
   if (!includesOrientation && !volunteer.patrolApproved)
     return "Organizer approval is required to register for patrols.";
   if (confirmed >= event.spots) return "This event is full.";
-  if (includesOrientation && !availableSignupSpots(event, confirmed))
-    return event.orientationCompleted
-      ? orientationReservedMessage
-      : orientationFullMessage;
+  if (!availableSignupSpots(event, confirmed))
+    return includesOrientation &&
+      !event.orientationCompleted &&
+      (event.orientationConfirmed ?? 0) >= 4
+      ? orientationFullMessage
+      : orientationReservedMessage;
   if (includesOrientation && event.orientationSignupBlocked)
     return orientationSignupLimitMessage;
   return null;

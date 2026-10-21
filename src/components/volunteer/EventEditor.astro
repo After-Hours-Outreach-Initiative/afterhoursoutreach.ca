@@ -171,7 +171,7 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
               id={`${dialogId}-spots`}
               name="spots"
               type="number"
-              min={event?.includesOrientation ? "2" : "1"}
+              min={event?.includesOrientation ? "4" : "2"}
               max="100"
               step="1"
               aria-describedby={`error-${dialogId}-spots`}
@@ -192,8 +192,8 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
           <FieldError
             field={`${dialogId}-spots`}
             message={event?.includesOrientation
-              ? "Enter a whole number from 2 to 100 for a patrol that includes orientation."
-              : "Enter a whole number from 1 to 100."}
+              ? "Enter a whole number from 4 to 100 for a patrol that includes orientation."
+              : "Enter a whole number from 2 to 100."}
           />
         </div>
         <div class="volunteer-field">

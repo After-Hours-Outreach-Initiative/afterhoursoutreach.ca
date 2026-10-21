@@ -212,7 +212,7 @@ test("other viewers see signups and cancellations through polling without losing
         startsAt: new Date(Date.now() + 86_400_000).toISOString(),
         meetingPoint,
         meetingPointUrl: "",
-        spots: 2,
+        spots: 4,
         open: true,
         hidden: false,
       },
@@ -295,7 +295,7 @@ test("other viewers see signups and cancellations through polling without losing
     ).toBeEnabled();
     for (const current of [viewer, page])
       await expect(card(current).locator(".volunteer-spots")).toHaveText(
-        "Full",
+        "No places available to you",
         { timeout: 15_000 },
       );
     await expect(
@@ -317,7 +317,9 @@ test("other viewers see signups and cancellations through polling without losing
       ),
     ).toHaveCount(0);
     await editor.getByRole("button", { name: "Close", exact: true }).click();
-    await expect(organizerCard.locator("summary")).toHaveText("Volunteers (2)");
+    await expect(
+      organizerCard.locator(".volunteer-roster > summary"),
+    ).toHaveText("Volunteers (2)");
     // Pause polling while the attendee cancels. Becoming visible must catch up
     // even though the cancellation happened while this viewer was hidden.
     await viewer.evaluate(() => {
@@ -348,7 +350,9 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toBeEnabled();
-    await expect(organizerCard.locator("summary")).toHaveText("Volunteers (1)");
+    await expect(
+      organizerCard.locator(".volunteer-roster > summary"),
+    ).toHaveText("Volunteers (1)");
     expect(documents).toEqual([]);
     expect(errors).toEqual([]);
   } finally {

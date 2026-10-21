@@ -319,8 +319,8 @@ export async function ensurePatrolOccurrences(
         .all<OccurrenceSnapshot>()
     ).results;
     const plan = planPatrolOccurrences(series, existing, now, templates);
-    // Legacy one-place orientation defaults remain readable, but must be edited
-    // before they can create new occurrences under the two-place minimum.
+    // Legacy undersized defaults remain readable, but must be edited before
+    // creating occurrences under the two-place/four-with-orientation minimum.
     if (
       plan.occurrences.some(
         (event) =>

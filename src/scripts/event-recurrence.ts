@@ -129,10 +129,10 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     );
     if (orientation && spots && capacityFeedback) {
       const updateCapacity = () => {
-        spots.min = orientation.checked ? "2" : "1";
+        spots.min = orientation.checked ? "4" : "2";
         capacityFeedback.textContent = orientation.checked
-          ? "Enter a whole number from 2 to 100 for a patrol that includes orientation."
-          : "Enter a whole number from 1 to 100.";
+          ? "Enter a whole number from 4 to 100 for a patrol that includes orientation."
+          : "Enter a whole number from 2 to 100.";
       };
       if (!form.dataset.capacityReady) {
         form.dataset.capacityReady = "true";

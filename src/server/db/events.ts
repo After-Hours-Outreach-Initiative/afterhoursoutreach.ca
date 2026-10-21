@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  publicAttendeeName,
+  type AttendeeCategory,
+} from "../../data/event-roster";
 import type { Actor } from "./access";
 import {
   requireOrganizer,
@@ -8,7 +12,12 @@ import {
   permissionValues,
 } from "./access";
 import { RequestError } from "../http";
-import { includesOrientationSql, nowMsSql, profileDisplayNameSql } from "./sql";
+import {
+  approvedMedicSql,
+  includesOrientationSql,
+  nowMsSql,
+  profileDisplayNameSql,
+} from "./sql";
 import {
   availableSignupSpots,
   orientationCapacityMessage,
@@ -83,6 +92,8 @@ export interface EventRow {
   updatedAt: number;
   confirmed: number;
   orientationConfirmed: number;
+  medicConfirmed: number;
+  medicEligible: number;
   orientationCompleted: number;
   availableSpots: number;
   // This and later nominal occurrences, including bookings outside the page/window.
@@ -97,6 +108,16 @@ export interface RosterRow {
   userId: string;
   name: string;
   completed: number;
+}
+export interface PublicRosterRow {
+  eventId: string;
+  name: string;
+  category: AttendeeCategory;
+}
+export interface PublicRoster {
+  people: PublicRosterRow[];
+  // Opaque membership digest catches swaps even when abbreviated names match.
+  version: string;
 }
 const eventColumns = `
   e.id, CASE WHEN ${includesOrientationSql()} THEN 'orientation' ELSE 'patrol' END AS type,
@@ -145,6 +166,9 @@ export async function listEvents(
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
       AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) AS orientationConfirmed,
     EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = ?) AS orientationCompleted,
+    (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
+      AND ${approvedMedicSql("s.user_id")}) AS medicConfirmed,
+    ${approvedMedicSql("?")} AS medicEligible,
     ${organizer ? `(${futureSignups})` : "0"} AS futureConfirmed,
     ${
       organizer
@@ -183,6 +207,7 @@ export async function listEvents(
           actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
+          actor?.id ?? "",
           selectedOccurrence ?? "",
         )
     : db
@@ -201,6 +226,7 @@ export async function listEvents(
         LIMIT 100`,
         )
         .bind(
+          actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
@@ -287,7 +313,7 @@ export async function saveEvent(
       parsed.error.issues.find(
         (issue) => issue.message === orientationCapacityMessage,
       )?.message ??
-        "Check the orientation setting, date, capacity (1–100), meeting point, and HTTPS map link.",
+        "Check the orientation setting, date, capacity (2–100, or 4–100 with orientation), meeting point, and HTTPS map link.",
     );
   const data = parsed.data;
   const startsAt = new Date(data.startsAt).getTime();
@@ -532,6 +558,69 @@ export async function changeSignup(
   } catch (error) {
     return databaseWriteError(error);
   }
+}
+
+/** Safe roster for approved event viewers. Recheck visibility in SQL rather than
+ * trusting event IDs supplied by a caller. Never return IDs or private profiles. */
+export async function listPublicRosters(
+  db: Env["DB"],
+  actor: Actor,
+  eventIds: string[],
+): Promise<PublicRoster> {
+  requireVolunteer(actor);
+  const ids = eventIds.slice(0, 100);
+  if (!ids.length) return { people: [], version: "" };
+  const rows = await db
+    .prepare(
+      `SELECT s.id AS membership, s.user_id AS attendeeIdentity, s.event_id AS eventId,
+    p.first_name AS firstName, p.last_name AS lastName, ${profileDisplayNameSql} AS legacyName,
+    CASE WHEN ${includesOrientationSql()} AND NOT EXISTS (
+      SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id
+    ) THEN 'orientee' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'volunteer' END AS category
+    FROM signup s JOIN event e ON e.id = s.event_id
+    JOIN profile p ON p.user_id = s.user_id JOIN user u ON u.id = s.user_id
+     WHERE s.status = 'confirmed' AND e.id IN (SELECT value FROM json_each(?))
+      AND e.starts_at > ${nowMsSql} AND e.cancelled_at IS NULL
+      AND ${recurringSignupWindowSql()}
+      AND (e.series_id IS NULL OR e.hidden = 0)
+      AND ((e.series_id IS NOT NULL AND e.hidden = 0) OR (e.open = 1 AND e.hidden = 0)
+        OR EXISTS (SELECT 1 FROM signup own WHERE own.event_id = e.id AND own.user_id = ? AND own.status = 'confirmed'))
+    ORDER BY s.event_id, s.id LIMIT 10000`,
+    )
+    // One JSON binding keeps a full 100-event page below D1's 100-parameter limit.
+    .bind(JSON.stringify(ids), actor.id)
+    .all<{
+      membership: string;
+      attendeeIdentity: string;
+      eventId: string;
+      firstName: string | null;
+      lastName: string | null;
+      legacyName: string;
+      category: AttendeeCategory;
+    }>();
+  const people = rows.results.map((row) => ({
+    eventId: row.eventId,
+    name: publicAttendeeName(row.firstName, row.lastName, row.legacyName),
+    category: row.category,
+  }));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(
+      JSON.stringify(
+        rows.results.map((row, index) => [
+          row.membership,
+          row.attendeeIdentity,
+          people[index],
+        ]),
+      ),
+    ),
+  );
+  return {
+    people,
+    version: [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join(""),
+  };
 }
 
 export async function listRosters(

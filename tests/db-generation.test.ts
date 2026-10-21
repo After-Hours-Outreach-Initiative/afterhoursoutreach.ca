@@ -122,6 +122,7 @@ test("recurrence and orientation migrations preserve existing events, bookings, 
     .prepare("SELECT * FROM patrol_series_template")
     .get();
   migrate("0016_orientation_minimum_capacity");
+  migrate("0017_medic_orientee_reservations");
   assert.deepEqual(db.prepare("SELECT * FROM event").get(), legacyEvent);
   assert.deepEqual(
     db.prepare("SELECT * FROM patrol_series").get(),
@@ -140,7 +141,7 @@ test("recurrence and orientation migrations preserve existing events, bookings, 
       db.exec(
         "UPDATE event SET meeting_point='Edited point' WHERE id='existing-event'",
       ),
-    /orientation_minimum_capacity/,
+    /event_minimum_capacity/,
   );
   assert.deepEqual(db.prepare("SELECT * FROM event").get(), legacyEvent);
   assert.throws(
@@ -148,14 +149,14 @@ test("recurrence and orientation migrations preserve existing events, bookings, 
       db.exec(
         "UPDATE patrol_series SET end_date='2030-12-31' WHERE id='legacy-series'",
       ),
-    /orientation_minimum_capacity/,
+    /event_minimum_capacity/,
   );
   assert.throws(
     () =>
       db.exec(
         "UPDATE patrol_series_template SET meeting_point='Edited point' WHERE id='legacy-template'",
       ),
-    /orientation_minimum_capacity/,
+    /event_minimum_capacity/,
   );
   assert.equal(
     db

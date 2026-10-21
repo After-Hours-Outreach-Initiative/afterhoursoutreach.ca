@@ -143,7 +143,7 @@ test("local fixtures restore open, full, hidden, and past events in the real sch
         "SELECT spots, (SELECT count(*) FROM signup WHERE event_id = event.id AND status = 'confirmed') AS confirmed FROM event WHERE id = ?",
       )
       .get(fixtureEventId("full-patrol"))!;
-    assert.equal(full.spots, full.confirmed);
+    assert.equal(full.spots, Number(full.confirmed) + 2);
     const hidden = db
       .prepare("SELECT open, hidden FROM event WHERE id = ?")
       .get(fixtureEventId("hidden-orientation"))!;

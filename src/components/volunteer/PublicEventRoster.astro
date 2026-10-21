@@ -1,0 +1,43 @@
+---
+import type { PublicRosterRow } from "@/server/db/events";
+import AttendeeAvatar from "./AttendeeAvatar.astro";
+interface Props {
+  roster: PublicRosterRow[];
+}
+const { roster } = Astro.props;
+---
+
+<details class="public-event-roster">
+  <summary>Volunteers ({roster.length})</summary>
+  <ul>
+    {
+      roster.map((person) => (
+        <li>
+          <>
+            <AttendeeAvatar category={person.category} />
+            <span>{person.name}</span>
+          </>
+        </li>
+      ))
+    }
+  </ul>
+</details>
+
+<style>
+  summary {
+    cursor: pointer;
+  }
+  ul {
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+  }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    overflow-wrap: anywhere;
+  }
+</style>

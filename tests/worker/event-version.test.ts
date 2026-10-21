@@ -74,7 +74,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     await DB.prepare(
       `INSERT INTO event
       (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
-       VALUES ('live','orientation',?,'Polling meeting point',2,?,?,?)`,
+       VALUES ('live','orientation',?,'Polling meeting point',4,?,?,?)`,
     )
       .bind(now + 86_400_000, organizer.id, now, now)
       .run();
@@ -241,6 +241,20 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     );
     expect(await readVersion(organizerCookie)).toBe(browsingVersion);
     expect(browsingVersion).toBe(await listingVersion(organizerCookie));
+    await DB.prepare("UPDATE profile SET first_name='Changed' WHERE user_id=?")
+      .bind(attendee.id)
+      .run();
+    const renamedPublicVersion = await readVersion(organizerCookie);
+    expect(renamedPublicVersion).not.toBe(browsingVersion);
+    expect(renamedPublicVersion).toBe(await listingVersion(organizerCookie));
+    const publicHtml = await (
+      await send("/events", undefined, organizerCookie)
+    ).text();
+    expect(publicHtml).toContain("public-event-roster");
+    expect(publicHtml).toContain("Changed V.");
+    expect(publicHtml).not.toMatch(
+      /Renamed attendee|data-volunteer-profile-link|data-manage-signup/,
+    );
 
     const cancelled = await send(
       "/api/v1/events/action",
@@ -268,7 +282,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     expect(await publicNext()).toBe(hiddenPublicVersion);
     const hiddenPersonalVersion = await listingVersion(attendee.cookie);
     expect(await signedInNext()).toBe(hiddenPersonalVersion);
-    await DB.prepare("UPDATE event SET spots=3 WHERE id='live'").run();
+    await DB.prepare("UPDATE event SET spots=5 WHERE id='live'").run();
     expect(await listingVersion()).toBe(hiddenPublicVersion);
     const capacityVersion = await listingVersion(attendee.cookie);
     expect(capacityVersion).not.toBe(hiddenPersonalVersion);

@@ -66,6 +66,7 @@ test("availability and block reasons use orientation completion, total capacity 
     includesOrientation: true,
     orientationConfirmed: 0,
     orientationCompleted: true,
+    medicConfirmed: 2,
   };
   assert.equal(availableSignupSpots(patrol, 6), 0);
   assert.equal(
@@ -79,6 +80,7 @@ test("availability and block reasons use orientation completion, total capacity 
   const newFull = {
     ...patrol,
     orientationConfirmed: 4,
+    medicConfirmed: 0,
     orientationCompleted: false,
   };
   assert.equal(
@@ -87,11 +89,51 @@ test("availability and block reasons use orientation completion, total capacity 
   );
   assert.equal(
     availableSignupSpots({ ...newFull, orientationCompleted: true }, 4),
-    4,
+    2,
   );
   assert.equal(
     availableSignupSpots({ ...patrol, orientationConfirmed: 2 }, 8),
     0,
+  );
+});
+
+test("dynamic reservations share extras but never consume outstanding places; first-time medics are orientees only", () => {
+  const base = {
+    ...event,
+    includesOrientation: true,
+    orientationCompleted: true,
+    orientationConfirmed: 0,
+    medicConfirmed: 0,
+    medicEligible: false,
+  };
+  assert.equal(availableSignupSpots(base, 0), 4);
+  assert.equal(availableSignupSpots({ ...base, medicEligible: true }, 0), 6);
+  assert.equal(
+    availableSignupSpots(
+      { ...base, orientationCompleted: false, medicEligible: true },
+      0,
+    ),
+    4,
+  );
+  assert.equal(
+    availableSignupSpots({ ...base, orientationConfirmed: 3 }, 3),
+    3,
+  );
+  assert.equal(availableSignupSpots({ ...base, medicConfirmed: 3 }, 3), 3);
+  assert.equal(
+    availableSignupSpots({ ...base, orientationConfirmed: 4 }, 6),
+    0,
+  );
+  assert.equal(
+    availableSignupSpots({ ...base, includesOrientation: false }, 6),
+    0,
+  );
+  assert.equal(
+    availableSignupSpots(
+      { ...base, includesOrientation: false, medicEligible: true },
+      6,
+    ),
+    2,
   );
 });
 

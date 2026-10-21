@@ -5,7 +5,12 @@ import {
   canViewEvents,
   requireOrganizer,
 } from "@/server/db/access";
-import { listEvents, listRosters, listPatrolSeries } from "@/server/db/events";
+import {
+  listEvents,
+  listRosters,
+  listPublicRosters,
+  listPatrolSeries,
+} from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
@@ -60,12 +65,21 @@ const rosters =
         events.map((event) => event.id),
       )
     : [];
+const publicRoster =
+  !management && eventAccess && actor
+    ? await listPublicRosters(
+        env.DB,
+        actor,
+        events.map((event) => event.id),
+      )
+    : undefined;
 const eventVersion = await eventViewVersion(
   events,
   actor,
   rosters,
   Date.now(),
   series,
+  publicRoster,
 );
 const destinations = events.filter(
   (event) =>
@@ -331,6 +345,9 @@ const hasVisibleEvents = management
                     event={event}
                     actor={actor}
                     organizer={management}
+                    publicRoster={publicRoster?.people.filter(
+                      (person) => person.eventId === event.id,
+                    )}
                     roster={rosters.filter(
                       (person) => person.eventId === event.id,
                     )}

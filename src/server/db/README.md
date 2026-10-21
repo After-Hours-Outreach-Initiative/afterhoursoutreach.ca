@@ -84,18 +84,31 @@ when both are present the explicit orientation setting wins.
 `0015_patrol_orientation_capacity.sql` adds only columns and replacement triggers;
 apply it before deploying code that reads the new setting.
 
-For patrols that include orientation, total capacity still includes everyone:
+Total capacity includes everyone, with two **medic** places reserved on every
+patrol. A medic must have `medic` in `profile.teams`, both authoritative organizer
+approvals (`registration_approved` and `patrol_approved`), and any
+`orientation_completion` record. No extra certification gate is imposed.
 
-- At least two places are reserved for volunteers with **no**
-  `orientation_completion` record. New or edited orientation patrols, series and
-  templates require at least two total places.
-- No more than four such volunteers can book the event, even if separately
-  patrol-approved. The other category is defined by any completion record, not
-  by approval, age of account, or the orientation on this particular event.
-- With capacity eight, at most six completed volunteers and at most four
-  first-timers may register, with at most eight registrations in total.
-- Zero or one first-timer never cancels or prevents the patrol; unused reserved
-  places simply remain unavailable to completed volunteers.
+Patrols with orientation also reserve two **orientee** places, with a maximum of
+four orientees and no minimum attendance. Anyone without a completion record,
+including a first-time medic or a patrol-approved first-timer, counts only as an
+orientee on these patrols. Each person occupies one place. Existing patrol approval
+still permits attending a regular patrol without completion, but never fills a
+medic reservation without completion.
+
+After a candidate is added, `total + max(0, 2 - medics) + outstandingOrientees`
+must not exceed capacity; `outstandingOrientees = max(0, 2 - orientees)` only when
+orientation is included. Extra medics and third/fourth orientees share the general
+pool, without consuming the other category's outstanding reservations. Cancellations
+free the appropriate category. SQLite insert/update triggers enforce this atomically,
+including raw SQL, reactivation, reassignment and organizer moves (failed moves roll
+back cancellation, audits and notifications).
+
+New or edited events, series and templates need capacity two, or four with
+orientation. Apply `0017_medic_orientee_reservations.sql` before deploying this code.
+It replaces triggers only: legacy undersized rows and bookings are not rewritten or
+deleted, remain readable/cancellable, and must be corrected before new bookings or
+relevant edits. Invalid recurring defaults do not generate new occurrences.
 
 `0016_orientation_minimum_capacity.sql` adds insert/relevant-edit guards without
 rewriting historical one-place orientations, bookings, completion records, series
@@ -113,12 +126,19 @@ Approval and completion remain independent, and all existing access, visibility,
 session and application-readiness checks still apply.
 
 `listEvents` includes effective `includesOrientation`, `orientationConfirmed`
-(confirmed volunteers without any completion), `orientationCompleted` (the
-viewer's completion status), and category-aware `availableSpots`.
+(confirmed volunteers without any completion), `medicConfirmed` (approved,
+completed medics), `medicEligible` (the viewer's medic eligibility),
+`orientationCompleted` (the viewer's completion status), and category-aware `availableSpots`.
 `signupBlockReason` accepts these same values and explains full categories or
 reserved places. Availability is capacity-only; the eligibility/booking-limit
 reason must still be checked. Both counts and viewer status participate in the
-existing view-version polling.
+existing view-version polling. `listPublicRosters` separately authorizes approved
+event access and rechecks volunteer visibility per event in SQL; its projection is
+only event ID, abbreviated name and mutually exclusive category. An opaque membership
+digest catches attendee swaps without exposing identifiers. Public names/categories
+and that digest participate in `/events` polling; organizer-only full rosters never
+enter the volunteer view. Structured first/last names take precedence, with an
+abbreviated legacy fallback. No private profile answers or profile links are rendered.
 
 ## First-orientation booking limit
 

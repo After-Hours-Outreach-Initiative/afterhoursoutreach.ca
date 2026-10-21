@@ -21,6 +21,8 @@ test("view versions detect capacity, signups, visibility and access changes with
     updatedAt: 1,
     confirmed: 0,
     orientationConfirmed: 0,
+    medicConfirmed: 0,
+    medicEligible: 0,
     orientationCompleted: 0,
     availableSpots: 1,
     futureConfirmed: 0,
@@ -41,6 +43,39 @@ test("view versions detect capacity, signups, visibility and access changes with
     twoFactorVerified: false,
   };
   const original = await eventViewVersion([event], actor);
+  const publicRoster = {
+    people: [
+      { eventId: event.id, name: "Alice P.", category: "medic" as const },
+    ],
+    version: "membership-one",
+  };
+  const publicVersion = await eventViewVersion(
+    [event],
+    actor,
+    [],
+    undefined,
+    [],
+    publicRoster,
+  );
+  for (const update of [
+    { ...publicRoster, version: "membership-two" },
+    {
+      ...publicRoster,
+      people: [{ ...publicRoster.people[0], name: "Alex P." }],
+    },
+    {
+      ...publicRoster,
+      people: [{ ...publicRoster.people[0], category: "volunteer" as const }],
+    },
+  ]) {
+    expect(
+      await eventViewVersion([event], actor, [], undefined, [], update),
+    ).not.toBe(publicVersion);
+    const pending = { ...actor, applicationApproved: false };
+    expect(await eventViewVersion([], pending, [], undefined, [], update)).toBe(
+      await eventViewVersion([], pending),
+    );
+  }
   expect(original).toMatch(/^[a-f0-9]{64}$/);
   expect(await eventViewVersion([event], actor)).toBe(original);
   for (const update of [
