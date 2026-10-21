@@ -1178,6 +1178,29 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-conduct-confirmation input {
   margin-top: 0.25rem;
 }
+.volunteer-back-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  min-height: 2.75rem;
+  margin-bottom: 1.5rem;
+  padding-block: 0.5rem;
+  border-radius: 0.25rem;
+  color: #a1a1aa;
+  @apply text-base;
+  text-decoration: none;
+  text-underline-offset: 0.25rem;
+  transition: color 150ms;
+}
+.volunteer-back-link:is(:hover, :focus-visible) {
+  color: white;
+  text-decoration: underline;
+}
+.volunteer-back-link:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 0.25rem;
+}
 .volunteer-section-heading {
   display: flex;
   flex-wrap: wrap;

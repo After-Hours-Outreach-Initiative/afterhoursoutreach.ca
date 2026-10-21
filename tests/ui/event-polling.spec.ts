@@ -198,9 +198,7 @@ test("other viewers see signups and cancellations through polling without losing
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page
-    .getByRole("link", { name: "Manage events →", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();

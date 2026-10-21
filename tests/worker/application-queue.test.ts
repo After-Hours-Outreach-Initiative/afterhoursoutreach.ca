@@ -172,7 +172,10 @@ test("organizers review submitted applications with a global queue count and per
         eventHtml.includes('href="/manage/volunteers"'),
         auth === cookie,
       );
-      assert.equal(eventHtml.includes("Manage events →"), auth === cookie);
+      assert.equal(
+        eventHtml.includes('href="/manage/events"'),
+        auth === cookie,
+      );
       assert.doesNotMatch(
         eventHtml,
         /data-event-save|data-live-series|data-manage-signup|volunteer-roster|data-volunteer-profile-dialog/,
