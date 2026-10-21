@@ -2823,6 +2823,27 @@ test("event editor shows native number and URL errors without submitting", async
   await expect(placeholder).toBeVisible();
   const time = dateGroup.getByLabel("Start time");
   await expect(time).toHaveAttribute("type", "time");
+  const expectDateFieldsToFit = async () => {
+    const viewport = page.viewportSize()!;
+    for (const width of [320, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      const bounds = (await form.boundingBox())!;
+      for (const input of [date, time]) {
+        const field = (await input.boundingBox())!;
+        expect(field.x).toBeGreaterThanOrEqual(bounds.x - 1);
+        expect(field.x + field.width).toBeLessThanOrEqual(
+          bounds.x + bounds.width + 1,
+        );
+      }
+      expect(
+        await dialog.evaluate(
+          (element) => element.scrollWidth > element.clientWidth,
+        ),
+      ).toBe(false);
+    }
+    await page.setViewportSize(viewport);
+  };
+  await expectDateFieldsToFit();
   await expect(dialog).not.toContainText("Vancouver");
   for (const value of [
     "",
@@ -2840,6 +2861,7 @@ test("event editor shows native number and URL errors without submitting", async
   await expect(form.locator('[name="startsAt"]')).toHaveValue(
     "2030-01-01T20:00",
   );
+  await expectDateFieldsToFit();
   await form
     .getByLabel("Meeting point", { exact: true })
     .fill("Test meeting point");

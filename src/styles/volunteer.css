@@ -677,6 +677,8 @@ body:has([data-application], [data-account-contents-flow]) {
   color-scheme: dark;
 }
 .volunteer-date-input {
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   border: 0;
@@ -697,12 +699,28 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-native-date {
   position: relative;
   display: block;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
-.volunteer-native-date input {
+/* Safari's native date/time appearance can ignore the container's width. */
+.volunteer-portal input:is([type="date"], [type="time"]) {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
-.volunteer-native-date input::-webkit-date-and-time-value {
+.volunteer-portal
+  input:is([type="date"], [type="time"])::-webkit-datetime-edit {
+  min-width: 0;
+  padding: 0;
+}
+.volunteer-portal
+  input:is([type="date"], [type="time"])::-webkit-date-and-time-value {
+  min-width: 0;
   min-height: 1.5em;
   text-align: left;
 }
