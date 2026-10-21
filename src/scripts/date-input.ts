@@ -8,7 +8,11 @@ import {
   dateParts,
   type DateParts,
 } from "../data/date-input";
-import { futureEventInstant, vancouverInstant } from "../data/event-time";
+import {
+  futureEventInstant,
+  PastEventStartError,
+  vancouverInstant,
+} from "../data/event-time";
 import { syncNativePickerInput } from "./native-picker-input";
 
 const parts = ["day", "month", "year"] as const;
@@ -133,23 +137,31 @@ export function initDateInputs(root: Document | HTMLElement) {
           input?.setCustomValidity("");
           if (futureOnly) input?.removeAttribute("aria-invalid");
         }
+        if (futureOnly) group.removeAttribute("aria-invalid");
         let error = "";
+        let pastStart = false;
         if (!date.readOnly && date.value && time) {
           if (!time.value) error = "Enter a start time.";
-          else {
+          else if (date.validity.valid && time.validity.valid) {
             try {
               if (futureOnly) futureEventInstant(fields.canonical.value);
               else vancouverInstant(fields.canonical.value);
             } catch (failure) {
               error = (failure as Error).message;
+              pastStart = failure instanceof PastEventStartError;
             }
           }
           time.setCustomValidity(error);
           if (futureOnly && showError && error)
             time.setAttribute("aria-invalid", "true");
         }
-        if (futureOnly && showError && !date.validity.valid)
-          date.setAttribute("aria-invalid", "true");
+        if (futureOnly && showError) {
+          // Past starts invalidate the pair, not just the time. Keep native
+          // validity on time so submission still focuses the existing control.
+          if (pastStart) group.setAttribute("aria-invalid", "true");
+          if (!date.validity.valid || pastStart)
+            date.setAttribute("aria-invalid", "true");
+        }
         feedback.textContent = error || fallback;
         return;
       }

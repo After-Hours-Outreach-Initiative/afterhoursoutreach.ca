@@ -863,11 +863,13 @@ body:has([data-application], [data-account-contents-flow]) {
   margin-top: 1rem;
   gap: 0.75rem;
 }
-.volunteer-choice-options {
+.volunteer-choice-options,
+.volunteer-date-input[data-date-time] {
   position: relative;
 }
-.volunteer-choice-options::before {
-  /* Draw in the existing gutter without shifting choices or Other details. */
+.volunteer-choice-options::before,
+.volunteer-date-input[data-date-time]::before {
+  /* Draw in the existing gutter without shifting fields or details. */
   content: "";
   position: absolute;
   inset-block: 0;
@@ -875,7 +877,8 @@ body:has([data-application], [data-account-contents-flow]) {
   border-inline-start: 3px solid transparent;
   pointer-events: none;
 }
-.volunteer-choice-options:has(> label > input:enabled:user-invalid)::before {
+.volunteer-choice-options:has(> label > input:enabled:user-invalid)::before,
+.volunteer-date-input[data-date-time][aria-invalid="true"]::before {
   border-inline-start-color: #f87171;
 }
 .volunteer-team-option {

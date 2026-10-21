@@ -23,6 +23,7 @@ import {
 import { totpFromSetupKey } from "../helpers/totp";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { fillDateInput } from "../helpers/date-input";
+import { vancouverInput } from "../../src/data/event-time";
 import {
   certificationOptions,
   certificationQuestion,
@@ -2854,6 +2855,16 @@ test("event editor shows native number and URL errors without submitting", async
   });
   const date = dateGroup.locator("[data-native-date]");
   const time = dateGroup.getByLabel("Start time");
+  const expectDateErrorRail = async (invalid: boolean) => {
+    await expect
+      .poll(() =>
+        dateGroup.evaluate(
+          (group) => getComputedStyle(group, "::before").borderLeft,
+        ),
+      )
+      .toBe(`3px solid ${invalid ? "rgb(248, 113, 113)" : "rgba(0, 0, 0, 0)"}`);
+  };
+  await expectDateErrorRail(false);
   await expect(time).toHaveAttribute("type", "time");
   for (const [input, value, text] of [
     [date, "2030-01-01", "Select a date"],
@@ -2912,9 +2923,10 @@ test("event editor shows native number and URL errors without submitting", async
   };
   await expectDateFieldsToFit();
   await expect(dialog).not.toContainText("Vancouver");
+  const pastStarts = ["2025-01-01T20:00", vancouverInput(Date.now() - 60_000)];
   for (const value of [
     "",
-    "2025-01-01T20:00",
+    ...pastStarts,
     // Historical transitions are stable across browser/runtime tzdata versions.
     "2025-03-09T02:30",
     "2025-11-02T01:30",
@@ -2923,17 +2935,49 @@ test("event editor shows native number and URL errors without submitting", async
     await dialog.getByRole("button", { name: "Save event" }).click();
     await expect(value ? time : date).toBeFocused();
     await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
+    const pastStart = pastStarts.includes(value);
+    await expectDateErrorRail(pastStart);
+    if (pastStart) {
+      await expect(dateGroup).toHaveAttribute("aria-invalid", "true");
+      for (const field of [date, time]) {
+        await expect(field).toHaveAttribute("aria-invalid", "true");
+        await expect(field).toHaveCSS("border-top-color", "rgb(248, 113, 113)");
+        await expect(field).toHaveAccessibleDescription(
+          "Choose a future start date and time.",
+        );
+      }
+      await expect(dateGroup).toHaveAccessibleDescription(
+        "Choose a future start date and time.",
+      );
+      await expectDateFieldsToFit();
+    } else {
+      await expect(dateGroup).not.toHaveAttribute("aria-invalid");
+      if (value) await expect(date).not.toHaveAttribute("aria-invalid");
+    }
     await expect(dialog).not.toContainText("Vancouver");
     expect(requests).toEqual([]);
   }
   await fillDateInput(form, "startsAt", "2030-01-01T20:00");
+  await expectDateErrorRail(false);
+  await expect(dateGroup).not.toHaveAttribute("aria-invalid");
+  for (const field of [date, time])
+    await expect(field).not.toHaveAttribute("aria-invalid");
   await expect(form.locator('[name="startsAt"]')).toHaveValue(
     "2030-01-01T20:00",
   );
+  await date.fill("");
+  await dialog.getByRole("button", { name: "Save event" }).click();
+  await expect(date).toBeFocused();
+  await expectDateErrorRail(false);
+  await expect(date).toHaveAttribute("aria-invalid", "true");
+  await expect(time).not.toHaveAttribute("aria-invalid");
+  await date.fill("2030-01-01");
   await time.fill("");
   await dialog.getByRole("button", { name: "Save event" }).click();
   await expect(time).toBeFocused();
   await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
+  await expectDateErrorRail(false);
+  await expect(date).not.toHaveAttribute("aria-invalid");
   expect(requests).toEqual([]);
   await time.fill("20:00");
   await page.keyboard.press("Escape");
@@ -2974,6 +3018,13 @@ test("event editor shows native number and URL errors without submitting", async
     .click();
   const edit = page.getByRole("dialog", { name: "Edit event", exact: true });
   const editForm = edit.locator("[data-event-save]");
+  const editDateGroup = editForm.locator('[data-date-input="startsAt"]');
+  await fillDateInput(editForm, "startsAt", pastStarts[0]);
+  await editForm.getByLabel("Meeting point", { exact: true }).focus();
+  await expect(editDateGroup).toHaveAttribute("aria-invalid", "true");
+  await editForm.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(editDateGroup).not.toHaveAttribute("aria-invalid");
+  await expect(editDateGroup.locator('[aria-invalid="true"]')).toHaveCount(0);
   for (const input of [
     editForm.locator('[data-date-input="startsAt"] [data-native-date]'),
     editForm.getByLabel("Start time"),
