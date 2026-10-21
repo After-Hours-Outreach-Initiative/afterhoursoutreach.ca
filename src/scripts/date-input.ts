@@ -47,7 +47,6 @@ function sync(group: HTMLFieldSetElement) {
       ? `${date}${fields.time ? `T${time}` : ""}`
       : "";
   if (fields.date) syncNativePickerInput(fields.date);
-  if (fields.time) syncNativePickerInput(fields.time);
   return fields.date ? fields.date.value : dateDraftValue(value);
 }
 

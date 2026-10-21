@@ -13,6 +13,7 @@ interface Props {
   active?: boolean;
   birthDate?: boolean;
   withTime?: boolean;
+  defaultTime?: string;
   futureOnly?: boolean;
   errorField?: string;
 }
@@ -26,12 +27,13 @@ const {
   active = true,
   birthDate = false,
   withTime = false,
+  defaultTime = "",
   futureOnly = false,
   errorField = name,
 } = Astro.props;
 const parts = dateParts(withTime ? value.split("T")[0] : value);
 const date = canonicalDate(parts);
-const time = withTime ? (value.split("T")[1] ?? "") : "";
+const time = withTime ? (value.split("T")[1] ?? defaultTime) : "";
 const message = birthDate
   ? "Enter your date of birth."
   : `Enter a valid ${label.toLowerCase()}${withTime ? " and time" : ""}.`;
@@ -109,7 +111,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
     withTime && (
       <div class="volunteer-field">
         <label for={`${id}-time`}>Start time</label>
-        <NativePickerInput
+        <input
           id={`${id}-time`}
           data-date-time-input
           type="time"

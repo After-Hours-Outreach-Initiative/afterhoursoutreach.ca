@@ -147,6 +147,7 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
           label="Start date"
           value={event ? vancouverInput(event.startsAt) : ""}
           withTime
+          defaultTime="21:00"
           futureOnly
         />
         <div class="volunteer-field">

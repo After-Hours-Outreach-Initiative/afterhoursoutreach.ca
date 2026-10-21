@@ -1,32 +1,22 @@
 ---
 import type { HTMLAttributes } from "astro/types";
 import CalendarIcon from "@/components/icons/CalendarIcon.astro";
-import ClockIcon from "@/components/icons/ClockIcon.astro";
 
-type Props = Omit<HTMLAttributes<"input">, "type"> & {
-  type?: "date" | "time";
-};
-const { type = "date", value = "", ...attributes } = Astro.props;
+type Props = Omit<HTMLAttributes<"input">, "type">;
+const { value = "", ...attributes } = Astro.props;
 ---
 
 <span class="volunteer-native-picker">
   <input
     {...attributes}
-    type={type}
+    type="date"
     value={value}
-    data-native-date={type === "date" || undefined}
-    data-native-time={type === "time" || undefined}
+    data-native-date
     data-empty={!value || undefined}
   />
   <span class="volunteer-picker-placeholder" aria-hidden="true">
-    {
-      type === "date" ? (
-        <CalendarIcon class="volunteer-picker-icon" />
-      ) : (
-        <ClockIcon class="volunteer-picker-icon" />
-      )
-    }
-    <span>{type === "date" ? "Select a date" : "Select a time"}</span>
+    <CalendarIcon class="volunteer-picker-icon" />
+    <span>Select a date</span>
   </span>
 </span>
 
