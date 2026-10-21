@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { formatEventDate } from "../../src/data/event-time";
 import { social } from "../../src/data/site";
 import {
   createLocalAccount,
@@ -119,6 +120,18 @@ test("event filters include orientation without excluding other patrols, preserv
   const filters = page.getByRole("group", { name: "Filter events" });
   expect(types).toContain("true");
   expect(types).toContain("false");
+  const response = await page.request.get("/api/v1/events");
+  expect(response.ok()).toBe(true);
+  const { events } = await response.json();
+  for (const event of events) {
+    const card = page.locator(`[data-live-event="${event.id}"]`);
+    await expect(card.getByRole("heading", { level: 3 })).toHaveText(
+      formatEventDate(event.startsAt),
+    );
+    await expect(card.locator("h3 + p")).toHaveText(
+      event.includesOrientation ? "Orientation + Patrol" : "Patrol",
+    );
+  }
   await filters
     .getByRole("button", { name: "Includes orientation", exact: true })
     .click();
