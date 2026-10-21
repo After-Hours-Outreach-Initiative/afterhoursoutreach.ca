@@ -118,9 +118,12 @@ export async function viewVolunteerProfile(
           medical_certifications AS certifications,
           relevant_training AS training, other_training AS otherTraining,
           coalesce(medical_certification_expiry, '') AS certificationExpiry,
-          coalesce(medical_conditions, '') AS medicalConditions
-        FROM profile
-        WHERE user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
+          coalesce(medical_conditions, '') AS medicalConditions,
+          u.email, p.registered_at AS submittedAt,
+          p.code_of_conduct_version AS codeOfConductVersion,
+          p.code_of_conduct_accepted_at AS codeOfConductAcceptedAt
+        FROM profile p JOIN user u ON u.id = p.user_id
+        WHERE p.user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
       )
       .bind(userId, accessId),
   ]);
@@ -138,22 +141,42 @@ export async function viewVolunteerProfile(
         certifications: string;
         training: string;
         heardAboutUsSources: string | null;
+        email: string;
+        submittedAt: number;
+        codeOfConductVersion: string | null;
+        codeOfConductAcceptedAt: number | null;
       })
     | undefined;
   if (!row) return null;
+  const {
+    email,
+    submittedAt,
+    codeOfConductVersion,
+    codeOfConductAcceptedAt,
+    ...answers
+  } = row;
   const sources = row.heardAboutUsSources
     ? (JSON.parse(row.heardAboutUsSources) as string[])
     : [];
   return {
-    ...row,
-    heardAboutUsSources: sources,
-    heardAboutUsOther: sources.includes("other") ? row.heardAboutUsOther : "",
-    teams: JSON.parse(row.teams) as string[],
-    certifications: normalizeCertifications(
-      JSON.parse(row.certifications) as string[],
-    ),
-    training: JSON.parse(row.training) as string[],
-  } satisfies ApplicationAnswers;
+    answers: {
+      ...answers,
+      heardAboutUsSources: sources,
+      heardAboutUsOther: sources.includes("other") ? row.heardAboutUsOther : "",
+      teams: JSON.parse(row.teams) as string[],
+      certifications: normalizeCertifications(
+        JSON.parse(row.certifications) as string[],
+      ),
+      training: JSON.parse(row.training) as string[],
+    } satisfies ApplicationAnswers,
+    email,
+    submittedAt: new Date(submittedAt).toISOString(),
+    codeOfConductVersion,
+    codeOfConductAcceptedAt:
+      codeOfConductAcceptedAt === null
+        ? null
+        : new Date(codeOfConductAcceptedAt).toISOString(),
+  };
 }
 
 export const statusSchema = z.strictObject({

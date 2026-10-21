@@ -9,19 +9,13 @@ import {
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
 import { volunteerListReturnUrl } from "@/data/volunteer-list";
-import {
-  certificationOptions,
-  profileFields,
-  trainingOptions,
-  applicationDisplayName,
-  heardAboutUsOptions,
-  heardAboutUsQuestion,
-} from "@/data/application";
+import { applicationDisplayName } from "@/data/application";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
 import "@/styles/volunteer.css";
 export const prerender = false;
-let values;
+let profile;
 let person: VolunteerRow | null = null;
 let accountName = "";
 let accountGreeting = "";
@@ -43,7 +37,7 @@ try {
   accountName = actor.name;
   accountGreeting = greetingName;
   accountEmail = email;
-  values = await viewVolunteerProfile(env.DB, actor, Astro.params.id ?? "");
+  profile = await viewVolunteerProfile(env.DB, actor, Astro.params.id ?? "");
   person = await findVolunteer(env.DB, actor, Astro.params.id ?? "");
 } catch (error) {
   return new Response(
@@ -53,7 +47,7 @@ try {
     { status: error instanceof RequestError ? error.status : 503 },
   );
 }
-if (!values || !person)
+if (!profile || !person)
   return new Response("Volunteer not found", { status: 404 });
 ---
 
@@ -68,7 +62,7 @@ if (!values || !person)
 >
   <section class="volunteer-panel">
     <div data-volunteer-profile>
-      <h2>{applicationDisplayName(values)}</h2>
+      <h2>{applicationDisplayName(profile.answers)}</h2>
       <p>
         {
           person.applicationApproved
@@ -77,64 +71,7 @@ if (!values || !person)
         }
       </p>
       <VolunteerControls person={person} />
-      <dl class="volunteer-profile-details">
-        <div>
-          <dt>{heardAboutUsQuestion}</dt>
-          <dd>
-            {
-              heardAboutUsOptions
-                .filter((option) =>
-                  values.heardAboutUsSources.includes(option.value),
-                )
-                .map((option) =>
-                  option.value === "other"
-                    ? `Other: ${values.heardAboutUsOther}`
-                    : option.label,
-                )
-                .join(", ") ||
-                values.heardAboutUs ||
-                "Not provided"
-            }
-          </dd>
-        </div>
-        {
-          profileFields.map((field) => (
-            <div>
-              <>
-                <dt>{field.label}</dt>
-                <dd>
-                  {values[field.name as keyof typeof values] || "Not provided"}
-                </dd>
-              </>
-            </div>
-          ))
-        }
-        <div>
-          <dt>Highest medical certification or licence</dt>
-          <dd>
-            {
-              certificationOptions
-                .filter((option) =>
-                  values.certifications.includes(option.value),
-                )
-                .map((option) => option.label)
-                .join(", ") || "Not provided"
-            }
-          </dd>
-        </div>
-        <div><dt>Teams</dt><dd>{values.teams.join(", ")}</dd></div>
-        <div>
-          <dt>Relevant training and experience</dt>
-          <dd>
-            {
-              trainingOptions
-                .filter((option) => values.training.includes(option.value))
-                .map((option) => option.label)
-                .join(", ") || "Not provided"
-            }
-          </dd>
-        </div>
-      </dl>
+      <ApplicationSummary {...profile} idPrefix="volunteer" />
     </div>
   </section>
   <a class="btn btn-outline" href={returnUrl}>Back to volunteers</a>

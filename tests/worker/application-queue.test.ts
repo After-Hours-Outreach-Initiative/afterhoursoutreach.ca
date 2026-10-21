@@ -4,6 +4,7 @@ import { test } from "vitest";
 import { chromium, expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
+import { formatApplicationSubmittedTime } from "../../src/data/application";
 
 test("organizers review submitted applications with a global queue count and persistent list context", async () => {
   const origin = "https://afterhoursoutreach.ca";
@@ -63,6 +64,12 @@ test("organizers review submitted applications with a global queue count and per
         ).bind(id, pendingIds.includes(id) ? 0 : 1),
       ]);
     }
+    const submittedAt = "2026-09-15T18:30:00.000Z";
+    await DB.prepare(
+      "UPDATE profile SET registered_at=?, code_of_conduct_version='2026-09-01', code_of_conduct_accepted_at=? WHERE user_id='applicant-50'",
+    )
+      .bind(Date.parse(submittedAt), Date.parse(submittedAt))
+      .run();
     await DB.prepare(
       "INSERT INTO application_draft (user_id, version, revision, answers, updated_at) VALUES ('draft-only', 1, 'draft-revision', ?, 0)",
     )
@@ -252,6 +259,30 @@ test("organizers review submitted applications with a global queue count and per
     await expect(
       dialog.getByText("Application awaiting approval", { exact: true }),
     ).toBeVisible();
+    const summary = dialog.locator(".account-profile-summary");
+    await expect(summary.getByRole("heading")).toHaveText([
+      "Submission details",
+      "Personal info",
+      "Emergency contact",
+      "Team interests",
+      "Training and safety",
+      "About volunteering",
+    ]);
+    const answer = (label: string) =>
+      summary
+        .locator("dl > div")
+        .filter({ has: page.getByText(label, { exact: true }) })
+        .locator("dd");
+    await expect(answer("Email")).toHaveText("applicant-50@example.org");
+    await expect(answer("Submitted")).toHaveText(
+      formatApplicationSubmittedTime(submittedAt),
+    );
+    await expect(answer("Code of Conduct version accepted")).toHaveText(
+      "2026-09-01",
+    );
+    await expect(answer("Code of Conduct accepted")).toHaveText(
+      formatApplicationSubmittedTime(submittedAt),
+    );
     assert.equal(await auditCount(), 1);
     // Merely reading the application is not review completion.
     await dialog
