@@ -98,6 +98,91 @@ test("event checks run every five seconds, retry failures, and pause without ove
   }
 });
 
+test("event polling pauses after five idle minutes and checks for updates on return without reloading", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
+  let checks = 0;
+  let finishedChecks = 0;
+  let version: string | null = null;
+  page.on("requestfinished", (request) => {
+    if (request.url().endsWith("/api/v1/events/version")) finishedChecks++;
+  });
+  await page.route("**/api/v1/events/version", async (route) => {
+    const check = ++checks;
+    version ??= await page
+      .locator("[data-event-browser]")
+      .getAttribute("data-event-version");
+    await route.fulfill({
+      json: { version: check === 5 ? "0".repeat(64) : version },
+    });
+  });
+  await page.goto("/volunteer");
+  await expect.poll(() => finishedChecks).toBe(1);
+  let documents = 0;
+  let pageRefreshes = 0;
+  page.on("request", (request) => {
+    if (request.resourceType() === "document") documents++;
+    else if (new URL(request.url()).pathname === "/volunteer") pageRefreshes++;
+  });
+
+  await page.clock.fastForward(240_000);
+  await expect.poll(() => finishedChecks).toBe(2);
+  await page.mouse.move(20, 20);
+  expect(checks).toBe(2);
+  // Activity extends the deadline past the original five-minute timeout.
+  await page.clock.fastForward(60_000);
+  await expect.poll(() => finishedChecks).toBe(3);
+  await page.clock.fastForward(239_999);
+  await expect.poll(() => finishedChecks).toBe(4);
+  await page.clock.runFor(1);
+  await page.clock.fastForward(300_000);
+  expect(checks).toBe(4);
+  expect(pageRefreshes).toBe(0);
+
+  // A changed version on return refreshes the content, not the document.
+  await page.keyboard.press("Shift");
+  await expect.poll(() => finishedChecks).toBe(5);
+  await expect.poll(() => pageRefreshes).toBe(1);
+  await page.clock.runFor(4_999);
+  expect(checks).toBe(5);
+  await page.clock.runFor(1);
+  await expect.poll(() => finishedChecks).toBe(6);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: true,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.clock.fastForward(300_000);
+  await page.evaluate(() => {
+    for (const type of [
+      "pointerdown",
+      "pointermove",
+      "keydown",
+      "input",
+      "click",
+      "wheel",
+    ])
+      document.dispatchEvent(new Event(type));
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.clock.runFor(5_000);
+  expect(checks).toBe(6);
+  await page.evaluate(() => {
+    Reflect.deleteProperty(document, "hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect.poll(() => finishedChecks).toBe(7);
+  await page.clock.runFor(5_000);
+  await expect.poll(() => finishedChecks).toBe(8);
+  expect(documents).toBe(0);
+  expect(pageRefreshes).toBe(1);
+});
+
 test("other viewers see signups and cancellations through polling without losing filters, focus or drafts", async ({
   page,
   browser,

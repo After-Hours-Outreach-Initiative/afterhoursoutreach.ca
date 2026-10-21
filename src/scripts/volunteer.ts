@@ -302,6 +302,9 @@ const eventBrowser = document.querySelector<HTMLElement>(
   "[data-event-browser]",
 );
 if (eventBrowser) {
+  const inactivityTimeout = 5 * 60_000;
+  let lastActivity = Date.now();
+  let inactivityTimer: number | undefined;
   let timer: number | undefined;
   let pollInterval: number | undefined;
   let polling = false;
@@ -310,7 +313,13 @@ if (eventBrowser) {
   let forceRefresh = false;
   const refreshLiveEvents = (force = false) => {
     forceRefresh ||= force;
-    if (liveRefreshQueued || !polling || document.hidden) return;
+    if (
+      liveRefreshQueued ||
+      !polling ||
+      document.hidden ||
+      Date.now() - lastActivity >= inactivityTimeout
+    )
+      return;
     liveRefreshQueued = true;
     const controller = new AbortController();
     pendingPoll = controller;
@@ -374,14 +383,42 @@ if (eventBrowser) {
     polling = false;
     window.clearInterval(timer);
     timer = undefined;
+    window.clearTimeout(inactivityTimer);
+    inactivityTimer = undefined;
     pendingPoll?.abort();
+  };
+  const checkInactivity = () => {
+    const remaining = inactivityTimeout - (Date.now() - lastActivity);
+    if (remaining <= 0) stopPolling();
+    else inactivityTimer = window.setTimeout(checkInactivity, remaining);
   };
   const startPolling = () => {
     if (polling || document.hidden) return;
+    lastActivity = Date.now();
     polling = true;
+    inactivityTimer = window.setTimeout(checkInactivity, inactivityTimeout);
     syncPollingInterval();
     refreshLiveEvents();
   };
+  const recordActivity = () => {
+    if (document.hidden) return;
+    // Move the deadline without resetting timers on every pointer move or key.
+    lastActivity = Date.now();
+    startPolling();
+  };
+  for (const type of [
+    "pointerdown",
+    "pointermove",
+    "keydown",
+    "input",
+    "click",
+    "wheel",
+  ])
+    document.addEventListener(type, recordActivity, {
+      passive: true,
+      capture: true,
+    });
+  window.addEventListener("focus", recordActivity);
   document.addEventListener("account-content-updated", () => {
     if (polling) syncPollingInterval();
   });
