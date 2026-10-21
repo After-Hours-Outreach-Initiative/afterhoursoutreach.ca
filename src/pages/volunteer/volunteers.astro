@@ -76,26 +76,31 @@ try {
           <div class="volunteer-section-heading">
             <h2 id="volunteers-heading">Volunteers</h2>
           </div>
-          <nav
+          <form
             class="volunteer-filters"
+            method="get"
+            role="group"
             aria-label="Application approval"
             data-volunteer-filters
           >
-            <a
+            {search && <input type="hidden" name="q" value={search} />}
+            <button
               class="volunteer-filter"
-              href={volunteerListUrl({ ...state, approval: "all", offset: 0 })}
-              aria-current={approval === "all" ? "page" : undefined}
+              type="submit"
+              name="approval"
+              value="all"
+              data-volunteer-filter="all"
+              aria-pressed={approval === "all" ? "true" : "false"}
             >
               All applicants
-            </a>
-            <a
+            </button>
+            <button
               class="volunteer-filter"
-              href={volunteerListUrl({
-                ...state,
-                approval: "awaiting",
-                offset: 0,
-              })}
-              aria-current={approval === "awaiting" ? "page" : undefined}
+              type="submit"
+              name="approval"
+              value="awaiting"
+              data-volunteer-filter="awaiting"
+              aria-pressed={approval === "awaiting" ? "true" : "false"}
             >
               <span>
                 Awaiting approval (
@@ -104,16 +109,14 @@ try {
                 </span>
                 )
               </span>
-            </a>
-          </nav>
+            </button>
+          </form>
           <form
             class="volunteer-search"
             method="get"
             data-volunteer-search-form
           >
-            {approval === "awaiting" && (
-              <input type="hidden" name="approval" value="awaiting" />
-            )}
+            <input type="hidden" name="approval" value={approval} />
             <label class="volunteer-search-field">
               <span class="sr-only">Find a volunteer</span>
               <SearchIcon class="volunteer-search-icon" />

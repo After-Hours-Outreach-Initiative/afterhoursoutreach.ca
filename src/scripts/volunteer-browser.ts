@@ -39,18 +39,36 @@ export function initVolunteerBrowser() {
     // leave a new count attached to stale results (or the reverse).
     const nextResults = actionFragment(page, "[data-volunteer-results]");
     const nextFilters = actionFragment(page, "[data-volunteer-filters]");
+    const focused = document.activeElement;
+    const focusedFilter =
+      focused instanceof HTMLButtonElement && filters.contains(focused)
+        ? focused.dataset.volunteerFilter
+        : undefined;
     results.replaceChildren(...nextResults.childNodes);
     filters.replaceChildren(...nextFilters.childNodes);
+    form.querySelector<HTMLInputElement>('[name="approval"]')!.value =
+      filters.querySelector<HTMLButtonElement>('[aria-pressed="true"]')!.value;
+    if (focusedFilter)
+      filters
+        .querySelector<HTMLButtonElement>(
+          `[data-volunteer-filter="${focusedFilter}"]`,
+        )
+        ?.focus({ preventScroll: true });
   };
-  const loadResults = async (resetOffset = true) => {
-    cancelSearch();
-    const controller = new AbortController();
-    pending = controller;
+  const searchUrl = (resetOffset = true) => {
     const url = new URL(location.href);
     if (search.value) url.searchParams.set("q", search.value);
     else url.searchParams.delete("q");
     if (resetOffset) url.searchParams.delete("offset");
-    // Keep the approval filter from the current URL, even during live search.
+    return url;
+  };
+  const loadResults = async (
+    url = searchUrl(),
+    historyMode: "push" | "replace" | "none" = "replace",
+  ) => {
+    cancelSearch();
+    const controller = new AbortController();
+    pending = controller;
     results.setAttribute("aria-busy", "true");
     error.hidden = true;
     try {
@@ -69,7 +87,8 @@ export function initVolunteerBrowser() {
       );
       if (!controller.signal.aborted) {
         replaceResults(page);
-        history.replaceState(null, "", url);
+        if (historyMode === "push") history.pushState(null, "", url);
+        else if (historyMode === "replace") history.replaceState(null, "", url);
       }
     } catch (reason) {
       if (!controller.signal.aborted) {
@@ -103,9 +122,27 @@ export function initVolunteerBrowser() {
     event.preventDefault();
     void loadResults();
   });
+  filters.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest<HTMLButtonElement>(
+      "[data-volunteer-filter]",
+    );
+    if (!button) return;
+    event.preventDefault();
+    const url = searchUrl();
+    if (button.dataset.volunteerFilter === "awaiting")
+      url.searchParams.set("approval", "awaiting");
+    else url.searchParams.delete("approval");
+    void loadResults(url, "push");
+  });
+  window.addEventListener("popstate", () => {
+    const url = new URL(location.href);
+    search.value = url.searchParams.get("q") ?? "";
+    void loadResults(url, "none");
+  });
   window.addEventListener("pagehide", cancelSearch);
   window.addEventListener("pageshow", (event) => {
     // Browser Back may restore the list from bfcache after a full-page approval.
-    if (event.persisted) void loadResults(false);
+    if (event.persisted) void loadResults(searchUrl(false));
   });
 }
