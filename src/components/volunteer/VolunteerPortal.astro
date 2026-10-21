@@ -15,6 +15,7 @@ import EventEditor from "./EventEditor.astro";
 import PatrolSeriesControls from "./PatrolSeriesControls.astro";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
+import PlusIcon from "@/components/icons/PlusIcon.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
 import { social } from "@/data/site";
 import "@/styles/volunteer.css";
@@ -202,6 +203,7 @@ const filter = ["patrol", "orientation"].includes(
                 data-show-dialog="event-editor-new"
                 type="button"
               >
+                <PlusIcon class="btn-icon" />
                 Add an event
               </button>
             )}
