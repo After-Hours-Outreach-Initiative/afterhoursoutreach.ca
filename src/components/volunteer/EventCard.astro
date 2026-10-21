@@ -56,10 +56,8 @@ const blocked =
           <p class="volunteer-hidden">Public visibility off</p>
         ) : null
       }
-      <h3>
-        Patrol · {formatEventDate(event.startsAt)}
-      </h3>
-      {Boolean(event.includesOrientation) && <p>Includes orientation</p>}
+      <h3>{formatEventDate(event.startsAt)}</h3>
+      <p>{event.includesOrientation ? "Orientation + Patrol" : "Patrol"}</p>
       <p>
         Meeting at{" "}
         {
