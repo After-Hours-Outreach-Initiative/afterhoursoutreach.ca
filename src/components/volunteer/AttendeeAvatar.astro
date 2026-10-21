@@ -23,7 +23,7 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
     aria-hidden="true"
     focusable="false"
     stroke="currentColor"
-    stroke-width="1.6"
+    stroke-width="1.15"
     stroke-linejoin="round"
   >
     <circle cx="12" cy="6" r="3.5"></circle>
@@ -34,9 +34,9 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
 <style>
   .attendee-avatar {
     display: inline-flex;
-    width: 1.75rem;
-    height: 2rem;
-    flex: 0 0 1.75rem;
+    width: var(--attendee-avatar-width);
+    height: 1.5rem;
+    flex: 0 0 var(--attendee-avatar-width);
   }
   svg {
     width: 100%;

@@ -255,28 +255,51 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           emptyCard.locator(".attendee-orientee:not(.attendee-booked)"),
         ).toHaveCount(2);
         await expect(emptyCard.locator(".attendee-volunteer")).toHaveCount(0);
+        for (const [state, focus] of [
+          ["filled", card],
+          ["empty", emptyCard],
+        ] as const) {
+          await expect(focus.locator("details[open]")).toHaveCount(0);
+          await focus.evaluate((element) =>
+            window.scrollTo({
+              top: element.getBoundingClientRect().top + scrollY - 110,
+              behavior: "instant",
+            }),
+          );
+          await page.screenshot({
+            path: `/tmp/opencode/event-attendance/${manage ? "manage" : "events"}-${state}-collapsed-${width}.png`,
+          });
+          console.log(
+            `${manage ? "manage" : "events"} ${state} ${width}: ${Math.round((await focus.boundingBox())!.height)}px`,
+          );
+        }
         const expectActionPosition = async () => {
           const position = await emptyCard.evaluate((element) => {
             const bounds = (selector: string) =>
               element.querySelector(selector)!.getBoundingClientRect();
             const action = bounds(".volunteer-actions");
             const attendance = bounds(".event-attendance");
-            const details = bounds(".volunteer-event-top > div:first-child");
+            const details = bounds(".volunteer-event-info");
+            const layout = bounds(".volunteer-event-layout");
             return {
               afterAttendance: action.top >= attendance.bottom,
-              centerOffset:
-                action.top +
-                action.height / 2 -
-                (details.top + details.height / 2),
-              rightOffset: action.right - bounds(".volunteer-event-top").right,
+              attendanceBesideInfo: attendance.left >= details.right,
+              actionBesideAttendance: action.left >= attendance.right,
+              topOffset: action.top - layout.top,
+              rightOffset: action.right - layout.right,
+              controlHeight: bounds(".volunteer-actions .btn").height,
             };
           });
-          expect(position.afterAttendance).toBe(!manage && width < 640);
-          if (width >= 640) {
-            expect(Math.abs(position.centerOffset)).toBeLessThan(1);
+          expect(position.afterAttendance).toBe(width < 1024);
+          expect(position.controlHeight).toBeGreaterThanOrEqual(44);
+          if (width >= 1024) {
+            expect(position.attendanceBesideInfo).toBe(true);
+            expect(position.actionBesideAttendance).toBe(true);
+            expect(Math.abs(position.topOffset)).toBeLessThan(1);
             expect(Math.abs(position.rightOffset)).toBeLessThan(1);
           }
         };
+        await expectActionPosition();
         await emptyCard.locator(".event-avatar-description > summary").click();
         await expectActionPosition();
         if (manage) {
@@ -335,12 +358,10 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(
           crowded.locator(".event-attendance .attendee-booked"),
         ).toHaveCount(100);
-        expect(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth > innerWidth,
-          ),
-        ).toBe(false);
-        if (!manage) {
+        if (manage) {
+          await card.locator(".volunteer-roster > summary").click();
+          await expect(card.locator(".volunteer-roster li")).toHaveCount(8);
+        } else {
           await card.locator(".public-event-roster > summary").click();
           const roster = card.locator(".public-event-roster");
           await expect(roster.locator("li")).toHaveCount(8);
@@ -374,11 +395,20 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             await expect(roster.locator("summary")).toBeFocused();
           }
         }
-        await card.scrollIntoViewIfNeeded();
-        await page.screenshot({
-          path: `/tmp/opencode/event-attendance/${manage ? "manage" : "events"}-${width}.png`,
-          fullPage: true,
-        });
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth > innerWidth,
+          ),
+        ).toBe(false);
+        for (const [state, focus] of [
+          ["expanded-legend", emptyCard],
+          ["roster", card],
+          ["crowded", crowded],
+        ] as const)
+          await focus.screenshot({
+            path: `/tmp/opencode/event-attendance/${manage ? "manage" : "events"}-${state}-${width}.png`,
+            style: "header, [data-skip-to-main] { visibility: hidden; }",
+          });
       }
     }
   } finally {
