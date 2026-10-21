@@ -12,6 +12,7 @@ interface Props {
   active?: boolean;
   birthDate?: boolean;
   withTime?: boolean;
+  futureOnly?: boolean;
   errorField?: string;
 }
 const {
@@ -24,6 +25,7 @@ const {
   active = true,
   birthDate = false,
   withTime = false,
+  futureOnly = false,
   errorField = name,
 } = Astro.props;
 const parts = dateParts(withTime ? value.split("T")[0] : value);
@@ -40,6 +42,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
   data-date-input={name}
   data-birth-date={birthDate || undefined}
   data-date-time={withTime || undefined}
+  data-date-future={futureOnly || undefined}
   data-certification-expiry={name === "certificationExpiry" || undefined}
   hidden={!active}
 >

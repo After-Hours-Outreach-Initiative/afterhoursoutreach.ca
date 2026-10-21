@@ -113,10 +113,22 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
                   disabled
                 />
               </label>
-              <label class="volunteer-field">
-                Last recurring date (optional, inclusive)
-                <input name="endDate" type="date" disabled />
-              </label>
+              <div class="volunteer-field">
+                <label for={`${dialogId}-endDate`}>
+                  Last recurring date (optional, inclusive)
+                </label>
+                <input
+                  id={`${dialogId}-endDate`}
+                  name="endDate"
+                  type="date"
+                  aria-describedby={`error-${dialogId}-endDate`}
+                  disabled
+                />
+                <FieldError
+                  field={`${dialogId}-endDate`}
+                  message="Choose a valid last recurring date on or after the start date."
+                />
+              </div>
             </div>
             <p class="volunteer-help">
               Volunteers see the next three upcoming, non-cancelled occurrences
@@ -132,6 +144,7 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
         label="Start date"
         value={event ? vancouverInput(event.startsAt) : ""}
         withTime
+        futureOnly
       />
       <div class="volunteer-field">
         <label for={`${dialogId}-spots`}>Volunteer spots</label>
