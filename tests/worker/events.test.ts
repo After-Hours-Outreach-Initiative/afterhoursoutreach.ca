@@ -1331,10 +1331,10 @@ describe(
           alice.cookie = await signIn(alice.email);
           await page.goto(`${origin}/events`);
           await page
-            .getByRole("button", { name: "Add an event", exact: true })
+            .getByRole("button", { name: "Create event", exact: true })
             .click();
           const dialog = page.getByRole("dialog", {
-            name: "Add an event",
+            name: "Create event",
             exact: true,
           });
           await expect(
@@ -1485,7 +1485,7 @@ describe(
             );
           }
           await page
-            .getByRole("button", { name: "Add an event", exact: true })
+            .getByRole("button", { name: "Create event", exact: true })
             .click();
           await expect(
             dialog.getByLabel("Meeting point", { exact: true }),
