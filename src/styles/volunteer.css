@@ -1301,11 +1301,16 @@ body:has([data-application], [data-account-contents-flow]) {
   outline-offset: 0.25rem;
 }
 .volunteer-event-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* The 78rem page maximum fits at most three 22rem tracks. Nested lists
+     size to their own card, and auto-fit lets fewer visible cards fill the row. */
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  align-items: start;
   gap: 1.125rem;
 }
 .volunteer-event-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
   border: 1px solid #3f3f46;
   border-radius: 0.5rem;
   padding: 1.5rem;
