@@ -5,9 +5,9 @@ export const donationsOpen = true;
 export const donateHref = "/donate";
 
 export const navLinks = [
-  { label: "About", href: "/about" },
   { label: "Volunteer", href: "/volunteer" },
   ...(donationsOpen ? [{ label: "Donate", href: donateHref }] : []),
+  { label: "About", href: "/about" },
 ];
 
 export function siteNavigation(signedIn: boolean, organizer = false) {
