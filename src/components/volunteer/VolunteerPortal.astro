@@ -85,12 +85,15 @@ const filter =
   email={email}
   publicSpacing={!actor}
 >
-  <h1
-    slot="heading"
-    class:list={["max-w-4xl text-blue", { "sr-only": eventAccess && !manage }]}
-  >
-    {title}
-  </h1>
+  <Fragment slot="heading">
+    {
+      !manage && (
+        <h1 class:list={["max-w-4xl text-blue", { "sr-only": eventAccess }]}>
+          {title}
+        </h1>
+      )
+    }
+  </Fragment>
   {
     manage && (
       <a class="btn btn-quiet" href="/events">
@@ -222,7 +225,11 @@ const filter =
         <section class="volunteer-events" aria-labelledby="events-heading">
           <div class="volunteer-section-heading">
             <div>
-              <h2 id="events-heading">Events</h2>
+              {manage ? (
+                <h1 id="events-heading">Manage events</h1>
+              ) : (
+                <h2 id="events-heading">Events</h2>
+              )}
             </div>
             {management ? (
               <button
@@ -231,7 +238,7 @@ const filter =
                 type="button"
               >
                 <PlusIcon class="btn-icon" />
-                Create event
+                Create
               </button>
             ) : actor?.role === "organizer" ? (
               <a class="btn btn-primary" href="/manage/events">

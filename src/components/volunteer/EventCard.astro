@@ -116,7 +116,7 @@ const blocked =
     </div>
     <div class="volunteer-actions">
       {
-        event.signedUp && future ? (
+        organizer ? null : event.signedUp && future ? (
           <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="cancel" />
