@@ -374,7 +374,7 @@ for (const root of [16, 20, 24]) {
           .locator('[data-switch-user="local-fixture-user-robin"]')
           .click();
         await page
-          .getByRole("link", { name: "Manage events →", exact: true })
+          .getByRole("link", { name: "Manage events", exact: true })
           .click();
         const card = page.locator(
           '[data-live-event="local-fixture-event-orientation"]',

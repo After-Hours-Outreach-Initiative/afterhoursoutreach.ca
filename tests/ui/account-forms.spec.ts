@@ -2876,9 +2876,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await profiles
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page
-    .getByRole("link", { name: "Manage events →", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   await page.locator('[data-show-dialog="event-editor-new"]').click();
   const dialog = page.getByRole("dialog", {
     name: "Create event",

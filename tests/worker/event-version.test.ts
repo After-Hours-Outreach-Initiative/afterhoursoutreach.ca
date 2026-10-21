@@ -213,7 +213,9 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     ).text();
     expect(managementHtml).toContain('data-live-event="hidden"');
     expect(managementHtml).toContain('data-live-event="past"');
-    expect(managementHtml).toContain("← View events");
+    expect(managementHtml).toMatch(
+      /<a\b[^>]*href="\/events"[^>]*>\s*<svg\b[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg>\s*<span>View events<\/span>\s*<\/a>/,
+    );
     expect(managementHtml).toContain("data-event-save");
     expect(managementHtml).toContain("volunteer-roster");
     expect(managementHtml).not.toMatch(/data-live-signup|Sign in to register/);
