@@ -97,7 +97,7 @@
 
   /* Filled blue, for the main action on a page. */
   .btn-primary {
-    @apply border-2 border-blue bg-blue font-bold text-white hover:bg-blue-dark;
+    @apply border-2 border-blue bg-blue font-bold text-white hover:border-blue-dark hover:bg-blue-dark;
   }
 
   /* Blue outline, for an action that sits beside the primary one. */
