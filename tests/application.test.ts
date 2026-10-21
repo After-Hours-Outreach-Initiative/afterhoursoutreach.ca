@@ -3,10 +3,22 @@ import {
   latestApplicationBirthDate,
   normalizeCertifications,
   outreachRequiredError,
+  profileFormSections,
 } from "../src/data/application";
 import { profileSchema } from "../src/server/db/profiles";
 
 const birthDateSchema = profileSchema.shape.birthDate;
+
+test("emergency contact helper text appears only in the application", () => {
+  const emergencyContact = (application: boolean) =>
+    profileFormSections(application).find(
+      (section) => section.key === "emergency-contact",
+    );
+  expect(emergencyContact(false)?.description).toBeUndefined();
+  expect(emergencyContact(true)?.description).toBe(
+    "Someone we can contact if you need help during an event.",
+  );
+});
 
 test("applications require an explicit Outreach selection and leave other teams optional", () => {
   const schema = profileSchema.shape.teams;

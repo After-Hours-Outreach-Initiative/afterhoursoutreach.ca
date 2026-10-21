@@ -360,7 +360,9 @@ export function profileFormSections(application = false) {
     {
       key: "emergency-contact",
       heading: "Emergency contact",
-      description: "Someone we can contact if you need help during an event.",
+      description: application
+        ? "Someone we can contact if you need help during an event."
+        : undefined,
     },
     { key: "team-interests", heading: "Team interests" },
     { key: "training-and-safety", heading: "Training and safety" },
