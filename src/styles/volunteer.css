@@ -1119,6 +1119,10 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-events {
   margin-top: 3rem;
 }
+[data-event-browser] > .volunteer-events:first-child,
+[data-volunteer-browser] {
+  margin-top: 0;
+}
 .volunteer-filters {
   gap: 0.5rem;
   margin-bottom: 1.5rem;
