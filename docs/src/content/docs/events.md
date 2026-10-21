@@ -22,10 +22,12 @@ A list of event cards for patrols and orientations, each consists of the date,
 the start time, the meeting location, and how many spots are left. Event signups
 should be closed when the start time passes.
 
-The browser checks `/api/v1/events/version` every five seconds and refreshes
-event cards only when their scoped version changes. Polling pauses in hidden
-tabs and checks immediately when returning to the page. Your own saved changes
-still refresh immediately; filters, focus, and open editor drafts are preserved.
+The browser checks `/api/v1/events/version` every five seconds, or every 60 seconds
+while awaiting application approval, and refreshes event cards only when their
+scoped version changes. Approval is detected automatically and restores five-second
+polling. Polling pauses in hidden tabs and checks immediately when returning to the
+page. Your own saved changes still refresh immediately; filters, focus, and open
+editor drafts are preserved.
 
 ## Views per type of user
 

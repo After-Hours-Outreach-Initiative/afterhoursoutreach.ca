@@ -303,6 +303,7 @@ const eventBrowser = document.querySelector<HTMLElement>(
 );
 if (eventBrowser) {
   let timer: number | undefined;
+  let pollInterval: number | undefined;
   let polling = false;
   let pendingPoll: AbortController | undefined;
   let liveRefreshQueued = false;
@@ -350,7 +351,7 @@ if (eventBrowser) {
       const page = await loadActionPage(location.href, controller.signal);
       if (!controller.signal.aborted) syncEvents(page);
     });
-    // A failed check or refresh is retried on the next five-second tick.
+    // A failed check or refresh is retried on the next polling tick.
     pendingRefresh = refresh.catch(() => {});
     void pendingRefresh.finally(() => {
       pendingPoll = undefined;
@@ -360,6 +361,15 @@ if (eventBrowser) {
     });
   };
   refreshDeferredEvents = () => refreshLiveEvents(true);
+  const syncPollingInterval = () => {
+    const interval = eventBrowser.querySelector("[data-application-pending]")
+      ? 60_000
+      : 5_000;
+    if (timer !== undefined && pollInterval === interval) return;
+    window.clearInterval(timer);
+    pollInterval = interval;
+    timer = window.setInterval(() => refreshLiveEvents(), interval);
+  };
   const stopPolling = () => {
     polling = false;
     window.clearInterval(timer);
@@ -369,9 +379,12 @@ if (eventBrowser) {
   const startPolling = () => {
     if (polling || document.hidden) return;
     polling = true;
-    timer = window.setInterval(() => refreshLiveEvents(), 5_000);
+    syncPollingInterval();
     refreshLiveEvents();
   };
+  document.addEventListener("account-content-updated", () => {
+    if (polling) syncPollingInterval();
+  });
   document.addEventListener("visibilitychange", () =>
     document.hidden ? stopPolling() : startPolling(),
   );
