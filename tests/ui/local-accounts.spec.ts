@@ -114,7 +114,7 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   ])
     await page.locator(`[name="${name}"][value="${value}"]`).check();
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/volunteer\/account$/);
+  await expect(page).toHaveURL(/\/events$/);
   expect(await current()).toMatchObject({
     id: second.id,
     name: sampleAnswers.preferredName,

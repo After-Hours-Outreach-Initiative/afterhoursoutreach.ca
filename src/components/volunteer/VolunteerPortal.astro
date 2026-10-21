@@ -16,6 +16,7 @@ import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import { social } from "@/data/site";
 import "@/styles/volunteer.css";
 
@@ -142,17 +143,32 @@ const filter = ["patrol", "orientation"].includes(
         </p>
       ) : !actor.applicationApproved && actor.role !== "organizer" ? (
         <section class="volunteer-panel" data-application-pending>
-          <h2>Application awaiting approval</h2>
+          <h2 class="flex items-center gap-4">
+            <svg
+              class="size-12 shrink-0 text-green-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+            Application Submitted
+          </h2>
           <p>
-            An organizer will review your application before you can view events
-            or sign up for an orientation.
+            We'll review your application and email you at{" "}
+            <strong>{email}</strong> to let you know whether it's approved and
+            what to do next.
           </p>
-          <p>
-            You can review your submitted application and update your profile
-            while you wait.
-          </p>
+          <p>You can see your submitted application on the account page.</p>
           <a class="btn btn-outline mt-6" href="/volunteer/account">
-            Review application and profile
+            View Account
+            <ArrowRightIcon class="btn-icon" />
           </a>
         </section>
       ) : null

@@ -1497,6 +1497,10 @@ describe(
         await newPage
           .getByRole("button", { name: "Submit application" })
           .click();
+        await expect(newPage).toHaveURL(`${origin}/events`);
+        await newPage
+          .getByRole("link", { name: "View Account", exact: true })
+          .click();
         await newPage
           .getByRole("heading", { name: "Your account", exact: true })
           .waitFor();

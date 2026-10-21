@@ -297,8 +297,7 @@ form("[data-account-profile]", async (element, values) => {
       );
   }
   if (element.hasAttribute("data-application")) {
-    message(element, result.message || "Profile saved.", "success");
-    location.assign(result.next ?? "/volunteer/account");
+    location.assign(result.next ?? "/events");
   }
   return result.answers;
 });
