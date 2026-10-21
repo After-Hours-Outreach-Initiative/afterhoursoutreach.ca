@@ -24,6 +24,10 @@ interface Props {
   account: Awaited<ReturnType<typeof accountContext>>;
 }
 const { actor, email, greetingName } = Astro.props.account;
+const title =
+  !actor && Astro.url.pathname.replace(/\/$/, "") === "/volunteer"
+    ? "Volunteer"
+    : "Events";
 let organizer = false;
 try {
   requireOrganizer(actor);
@@ -69,7 +73,7 @@ const filter = ["patrol", "orientation"].includes(
 ---
 
 <AccountLayout
-  title={actor ? "Events" : "Volunteer"}
+  title={title}
   description="Volunteer with After Hours Outreach Initiative, doing evening street outreach in Vancouver's Downtown Eastside."
   signedIn={Boolean(actor)}
   organizer={actor?.role === "organizer"}
@@ -80,9 +84,9 @@ const filter = ["patrol", "orientation"].includes(
 >
   <h1
     slot="heading"
-    class:list={["max-w-4xl text-blue", { "sr-only": Boolean(actor) }]}
+    class:list={["max-w-4xl text-blue", { "sr-only": eventAccess }]}
   >
-    {actor ? "Events" : "Volunteer"}
+    {title}
   </h1>
   <div
     data-event-browser
@@ -207,9 +211,7 @@ const filter = ["patrol", "orientation"].includes(
         <section class="volunteer-events" aria-labelledby="events-heading">
           <div class="volunteer-section-heading">
             <div>
-              <h2 id="events-heading">
-                {organizer ? "Events" : "Upcoming events"}
-              </h2>
+              <h2 id="events-heading">Events</h2>
             </div>
             {organizer && (
               <button
