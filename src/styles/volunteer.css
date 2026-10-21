@@ -1076,6 +1076,9 @@ body:has([data-application], [data-account-contents-flow]) {
   line-height: 1.6;
   color: #a1a1aa;
 }
+.volunteer-portal p.volunteer-date-warning {
+  color: #fcd34d;
+}
 .volunteer-notice {
   padding: 1rem 1.25rem;
   border: 1px solid #3f3f46;

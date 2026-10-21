@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import {
-  futureEventInstant,
-  vancouverInput,
-  vancouverInstant,
-} from "../src/data/event-time";
+import { vancouverInput, vancouverInstant } from "../src/data/event-time";
 
 test("event calendar inputs always use Vancouver time", () => {
   assert.equal(
@@ -33,32 +29,13 @@ test("event calendar inputs always use Vancouver time", () => {
   );
 });
 
-test("event starts must be strictly in the future in Vancouver time", () => {
-  // Vancouver is still on July 2 even though the UTC date is already July 3.
-  const now = Date.parse("2030-07-03T03:30:00Z");
-  for (const input of [
-    "2030-07-01T20:30",
-    "2030-07-02T20:29",
-    "2030-07-02T20:30",
-  ])
-    assert.throws(
-      () => futureEventInstant(input, now),
-      /^Error: Choose a future start date and time\.$/,
-    );
+test("event starts allow past Vancouver dates while rejecting invalid wall times", () => {
   assert.equal(
-    futureEventInstant("2030-07-02T20:31", now),
-    "2030-07-03T03:31:00.000Z",
+    vancouverInstant("2025-07-02T20:30"),
+    "2025-07-03T03:30:00.000Z",
   );
-  assert.throws(
-    () => futureEventInstant("2030-07-02T20:31", now + 60_000),
-    /^Error: Choose a future start date and time\.$/,
-  );
-  assert.throws(() => futureEventInstant("2030-02-30T20:30", now));
+  assert.throws(() => vancouverInstant("2030-02-30T20:30"));
   // Historical DST boundaries are stable across different timezone DB versions.
-  const beforeDstChanges = Date.parse("2025-01-01T00:00:00Z");
   for (const input of ["2025-03-09T02:30", "2025-11-02T01:30"])
-    assert.throws(
-      () => futureEventInstant(input, beforeDstChanges),
-      /skipped or ambiguous/,
-    );
+    assert.throws(() => vancouverInstant(input), /skipped or ambiguous/);
 });

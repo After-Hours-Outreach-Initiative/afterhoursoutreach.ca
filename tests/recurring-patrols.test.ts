@@ -728,9 +728,50 @@ test("existing capacity, approvals, sessions and standalone behavior remain enfo
   assert.equal(visible.filter((event) => event.seriesId).length, 3);
 });
 
+test("standalone events can be created or rescheduled into the past without reopening history or registration", async () => {
+  const data = {
+    includesOrientation: false,
+    startsAt: new Date(Date.now() - 3_600_000).toISOString(),
+    meetingPoint: "Past event",
+    meetingPointUrl: "",
+    spots: 2,
+    open: true,
+    hidden: false,
+  };
+  await saveEvent(db, organizer, data);
+  const [past] = await listEvents(db, organizer);
+  assert.equal(past.startsAt, Date.parse(data.startsAt));
+  await assert.rejects(changeSignup(db, alice, past.id, "join"), status(409));
+  await assert.rejects(
+    saveEvent(
+      db,
+      organizer,
+      { ...data, meetingPoint: "Changed" },
+      past.id,
+      past.updatedAt,
+    ),
+    status(409),
+  );
+  await saveEvent(db, organizer, {
+    ...data,
+    startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+  });
+  const [future] = await listEvents(db, organizer);
+  await saveEvent(db, organizer, data, future.id, future.updatedAt);
+  assert.equal(
+    (await findEvent(db, future.id)).startsAt,
+    Date.parse(data.startsAt),
+  );
+  await assert.rejects(
+    saveEvent(db, organizer, { ...data, startsAt: "invalid" }),
+    status(400),
+  );
+});
+
 test("validation and authorization reject invalid recurrence input or stale organizer sessions", async () => {
   for (const extra of [
     { firstDate: "2026-02-30" },
+    { firstDate: "2025-01-01" },
     { intervalWeeks: 0 },
     { intervalWeeks: 53 },
     { localTime: "25:00" },

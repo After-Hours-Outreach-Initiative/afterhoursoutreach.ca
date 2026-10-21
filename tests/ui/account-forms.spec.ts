@@ -2868,7 +2868,7 @@ test("failed email-change requests remain retryable without changing the account
   await expect(confirm.locator('[name="newEmail"]')).toHaveValue("");
 });
 
-test("event editor shows native number and URL errors without submitting", async ({
+test("event editor shows native number and URL errors without submitting invalid forms", async ({
   page,
 }) => {
   await page.goto("/volunteer");
@@ -3015,10 +3015,39 @@ test("event editor shows native number and URL errors without submitting", async
   };
   await expectDateFieldsToFit();
   await expect(dialog).not.toContainText("Vancouver");
+  const warning = dateGroup.locator("[data-date-past-warning]");
   const pastStarts = ["2025-01-01T20:00", vancouverInput(Date.now() - 60_000)];
+  for (const value of pastStarts) {
+    await fillDateInput(form, "startsAt", value);
+    await time.blur();
+    await expect(warning).toBeVisible();
+    await expect(warning).toHaveText(
+      "The start date and time are in the past.",
+    );
+    await expect(warning).toHaveAttribute("role", "status");
+    await expect(warning).toHaveCSS("color", "rgb(252, 211, 77)");
+    await expect(date).not.toHaveAttribute("min");
+    await expect(dateGroup).not.toHaveAttribute("aria-invalid");
+    for (const field of [date, time]) {
+      expect(
+        await field.evaluate((input: HTMLInputElement) =>
+          input.checkValidity(),
+        ),
+      ).toBe(true);
+      await expect(field).not.toHaveAttribute("aria-invalid");
+    }
+    await expect(form.locator("[data-error$='-startsAt']")).toBeHidden();
+    await expectDateErrorRail(false);
+  }
+  // Changing just the time also updates the warning, using Vancouver time.
+  await page.clock.setFixedTime(new Date("2026-07-03T03:30:00Z"));
+  await fillDateInput(form, "startsAt", "2026-07-02T20:29");
+  await expect(warning).toBeVisible();
+  await time.fill("20:31");
+  await expect(warning).toBeHidden();
+  await page.clock.setFixedTime(new Date());
   for (const value of [
     "",
-    ...pastStarts,
     // Historical transitions are stable across browser/runtime tzdata versions.
     "2025-03-09T02:30",
     "2025-11-02T01:30",
@@ -3027,29 +3056,15 @@ test("event editor shows native number and URL errors without submitting", async
     await dialog.getByRole("button", { name: "Create event" }).click();
     await expect(value ? time : date).toBeFocused();
     await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
-    const pastStart = pastStarts.includes(value);
-    await expectDateErrorRail(pastStart);
-    if (pastStart) {
-      await expect(dateGroup).toHaveAttribute("aria-invalid", "true");
-      for (const field of [date, time]) {
-        await expect(field).toHaveAttribute("aria-invalid", "true");
-        await expect(field).toHaveCSS("border-top-color", "rgb(248, 113, 113)");
-        await expect(field).toHaveAccessibleDescription(
-          "Choose a future start date and time.",
-        );
-      }
-      await expect(dateGroup).toHaveAccessibleDescription(
-        "Choose a future start date and time.",
-      );
-      await expectDateFieldsToFit();
-    } else {
-      await expect(dateGroup).not.toHaveAttribute("aria-invalid");
-      if (value) await expect(date).not.toHaveAttribute("aria-invalid");
-    }
+    await expectDateErrorRail(false);
+    await expect(warning).toBeHidden();
+    await expect(dateGroup).not.toHaveAttribute("aria-invalid");
+    if (value) await expect(date).not.toHaveAttribute("aria-invalid");
     await expect(dialog).not.toContainText("Vancouver");
     expect(requests).toEqual([]);
   }
   await fillDateInput(form, "startsAt", "2030-01-01T20:00");
+  await expect(warning).toBeHidden();
   await expectDateErrorRail(false);
   await expect(dateGroup).not.toHaveAttribute("aria-invalid");
   for (const field of [date, time])
@@ -3201,6 +3216,19 @@ test("event editor shows native number and URL errors without submitting", async
   await spots.fill("8");
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
   expect(requests).toEqual([]);
+  await fillDateInput(form, "startsAt", pastStarts[0]);
+  await page.route("**/api/v1/events/action", (route) =>
+    route.fulfill({
+      status: 503,
+      json: { message: "Submission reached the server." },
+    }),
+  );
+  await dialog.getByRole("button", { name: "Create event" }).click();
+  await expect(form.locator("[data-form-message]")).toHaveText(
+    "Submission reached the server.",
+  );
+  expect(requests).toHaveLength(1);
+  await expect(warning).toBeVisible();
   await page.keyboard.press("Escape");
   await page
     .locator('[data-live-event="local-fixture-event-orientation"]')
@@ -3243,8 +3271,15 @@ test("event editor shows native number and URL errors without submitting", async
   );
   await fillDateInput(editForm, "startsAt", pastStarts[0]);
   await editForm.getByLabel("Meeting point", { exact: true }).focus();
-  await expect(editDateGroup).toHaveAttribute("aria-invalid", "true");
+  await expect(editDateGroup.locator("[data-date-past-warning]")).toBeVisible();
+  expect(
+    await editForm.evaluate((element: HTMLFormElement) =>
+      element.checkValidity(),
+    ),
+  ).toBe(true);
+  await expect(editDateGroup).not.toHaveAttribute("aria-invalid");
   await editForm.evaluate((element: HTMLFormElement) => element.reset());
+  await expect(editDateGroup.locator("[data-date-past-warning]")).toBeHidden();
   await expect(editDateGroup).not.toHaveAttribute("aria-invalid");
   await expect(editDateGroup.locator('[aria-invalid="true"]')).toHaveCount(0);
   for (const input of [editDate, editTime]) {
