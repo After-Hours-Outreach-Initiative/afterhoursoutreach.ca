@@ -777,6 +777,18 @@ test("this-and-future updates booked materialized occurrences with stable IDs, p
     events[2].updatedAt,
   );
   const exceptional = await findEvent(db, events[2].id);
+  // The empty first occurrence still affects later bookings. Individual
+  // exceptions receive cancellation mail, but not future-template edit mail.
+  const eligibility = await all(series.id);
+  const first = eligibility.find((event) => event.id === events[0].id)!;
+  assert.equal(first.confirmed, 0);
+  assert.equal(first.signedUp, 0);
+  assert.equal(first.futureConfirmed, 2);
+  assert.equal(first.futureEditableConfirmed, 1);
+  const exception = eligibility.find((event) => event.id === events[2].id)!;
+  assert.equal(exception.confirmed, 1);
+  assert.equal(exception.futureConfirmed, 1);
+  assert.equal(exception.futureEditableConfirmed, 0);
   const distantDate = addCalendarDays(data.firstDate, 70);
   const distant = await materializePatrolOccurrence(
     db,
@@ -921,6 +933,7 @@ test("bulk capacity violations roll back template, event/audit changes, notifica
   const events = await all(series.id);
   await changeSignup(db, alice, events[1].id, "join");
   await changeSignup(db, bob, events[1].id, "join");
+  const bookedEvents = await all(series.id);
   const old = await findPatrolSeries(db, organizer, series.id);
   const audits = await count("event_audit");
   await assert.rejects(
@@ -936,13 +949,7 @@ test("bulk capacity violations roll back template, event/audit changes, notifica
     status(409),
   );
   assert.deepEqual(await findPatrolSeries(db, organizer, series.id), old);
-  assert.deepEqual(
-    await all(series.id),
-    events.map((event, index) => ({
-      ...event,
-      confirmed: index === 1 ? 2 : 0,
-    })),
-  );
+  assert.deepEqual(await all(series.id), bookedEvents);
   assert.equal(await count("patrol_series_template"), 0);
   assert.equal(await count("event_audit"), audits);
   assert.equal(await count("event_notification"), 0);
