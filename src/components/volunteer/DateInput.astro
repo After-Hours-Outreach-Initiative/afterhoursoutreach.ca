@@ -1,7 +1,7 @@
 ---
 import FieldError from "@/components/FieldError.astro";
 import { dateParts, canonicalDate } from "@/data/date-input";
-import NativeDateInput from "./NativeDateInput.astro";
+import NativePickerInput from "./NativePickerInput.astro";
 
 interface Props {
   name: string;
@@ -93,7 +93,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
         ))}
       </div>
     ) : (
-      <NativeDateInput
+      <NativePickerInput
         id={id}
         aria-labelledby={`${id}-label`}
         aria-describedby={describedBy}
@@ -108,7 +108,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
     withTime && (
       <div class="volunteer-field">
         <label for={`${id}-time`}>Start time</label>
-        <input
+        <NativePickerInput
           id={`${id}-time`}
           data-date-time-input
           type="time"

@@ -4,7 +4,7 @@ import { vancouverInput } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
 import DialogHeader from "@/components/DialogHeader.astro";
 import DateInput from "./DateInput.astro";
-import NativeDateInput from "./NativeDateInput.astro";
+import NativePickerInput from "./NativePickerInput.astro";
 interface Props {
   event?: EventRow;
   series?: PatrolSeriesRow;
@@ -122,7 +122,7 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
                   <label for={`${dialogId}-endDate`}>
                     Last recurring date (optional, inclusive)
                   </label>
-                  <NativeDateInput
+                  <NativePickerInput
                     id={`${dialogId}-endDate`}
                     name="endDate"
                     aria-describedby={`error-${dialogId}-endDate`}

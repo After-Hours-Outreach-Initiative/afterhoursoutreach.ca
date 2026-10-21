@@ -1,22 +1,22 @@
-export function syncNativeDateInput(input: HTMLInputElement) {
+const selector = "[data-native-date], [data-native-time]";
+
+export function syncNativePickerInput(input: HTMLInputElement) {
   input.toggleAttribute("data-empty", !input.value);
 }
 
 function sync(root: Document | HTMLElement) {
-  for (const input of root.querySelectorAll<HTMLInputElement>(
-    "[data-native-date]",
-  ))
-    syncNativeDateInput(input);
+  for (const input of root.querySelectorAll<HTMLInputElement>(selector))
+    syncNativePickerInput(input);
 }
 
-export function initNativeDateInputs() {
+export function initNativePickerInputs() {
   for (const type of ["input", "change"])
     document.addEventListener(type, (event) => {
       if (
         event.target instanceof HTMLInputElement &&
-        event.target.hasAttribute("data-native-date")
+        event.target.matches(selector)
       )
-        syncNativeDateInput(event.target);
+        syncNativePickerInput(event.target);
     });
 
   document.addEventListener("reset", (event) => {

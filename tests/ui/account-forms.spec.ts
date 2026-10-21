@@ -2853,26 +2853,43 @@ test("event editor shows native number and URL errors without submitting", async
     exact: true,
   });
   const date = dateGroup.locator("[data-native-date]");
-  const placeholder = dateGroup.locator(".volunteer-date-placeholder");
-  await expect(placeholder).toHaveText("Select a date");
-  await expect(placeholder).toBeVisible();
-  await expect(placeholder.locator("svg")).toBeVisible();
-  await expect(placeholder).toHaveAttribute("aria-hidden", "true");
-  await expect(placeholder).toHaveCSS("pointer-events", "none");
-  await date.click({ position: { x: 12, y: 12 } });
-  await expect(date).toBeFocused();
-  await date.fill("2030-01-01");
-  await date.blur();
-  await expect(placeholder).toBeHidden();
-  await form.evaluate((element: HTMLFormElement) => element.reset());
-  await expect(date).toHaveValue("");
-  await expect(placeholder).toBeVisible();
-  await date.fill("2030-01-01");
-  await date.fill("");
-  await date.blur();
-  await expect(placeholder).toBeVisible();
   const time = dateGroup.getByLabel("Start time");
   await expect(time).toHaveAttribute("type", "time");
+  for (const [input, value, text] of [
+    [date, "2030-01-01", "Select a date"],
+    [time, "20:00", "Select a time"],
+  ] as const) {
+    const placeholder = input.locator("+ .volunteer-picker-placeholder");
+    await expect(placeholder).toHaveText(text);
+    await expect(placeholder).toBeVisible();
+    await expect(placeholder).toHaveAttribute("aria-hidden", "true");
+    await expect(placeholder).toHaveCSS("pointer-events", "none");
+    const color = await input.evaluate(
+      (element) => getComputedStyle(element).color,
+    );
+    await expect(placeholder).toHaveCSS("color", color);
+    const icon = placeholder.locator("svg");
+    await expect(icon).toHaveAttribute("aria-hidden", "true");
+    const iconBox = (await icon.boundingBox())!;
+    const textBox = (await placeholder.locator("span").boundingBox())!;
+    expect(iconBox.x + iconBox.width).toBeLessThan(textBox.x);
+    await input.click({ position: { x: 12, y: 12 } });
+    await expect(input).toBeFocused();
+    await expect(placeholder).toBeHidden();
+    await input.press("ArrowUp");
+    await expect(placeholder).toBeHidden();
+    await input.fill(value);
+    await input.blur();
+    await expect(placeholder).toBeHidden();
+    await expect(input).toHaveCSS("color", color);
+    await form.evaluate((element: HTMLFormElement) => element.reset());
+    await expect(input).toHaveValue("");
+    await expect(placeholder).toBeVisible();
+    await input.fill(value);
+    await input.fill("");
+    await input.blur();
+    await expect(placeholder).toBeVisible();
+  }
   const expectDateFieldsToFit = async () => {
     const viewport = page.viewportSize()!;
     for (const width of [320, 375]) {
@@ -2913,6 +2930,19 @@ test("event editor shows native number and URL errors without submitting", async
   await expect(form.locator('[name="startsAt"]')).toHaveValue(
     "2030-01-01T20:00",
   );
+  await time.fill("");
+  await dialog.getByRole("button", { name: "Save event" }).click();
+  await expect(time).toBeFocused();
+  await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
+  expect(requests).toEqual([]);
+  await time.fill("20:00");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Add an event", exact: true }).click();
+  await expect(date).toHaveValue("2030-01-01");
+  await expect(time).toHaveValue("20:00");
+  await expect(
+    dateGroup.locator(".volunteer-picker-placeholder:visible"),
+  ).toHaveCount(0);
   await expectDateFieldsToFit();
   await form
     .getByLabel("Meeting point", { exact: true })
@@ -2937,6 +2967,29 @@ test("event editor shows native number and URL errors without submitting", async
   await map.fill("https://example.org/map");
   await expect(form.locator("[data-error]:visible")).toHaveCount(0);
   expect(requests).toEqual([]);
+  await page.keyboard.press("Escape");
+  await page
+    .locator('[data-live-event="local-fixture-event-orientation"]')
+    .getByRole("button", { name: "Edit", exact: true })
+    .click();
+  const edit = page.getByRole("dialog", { name: "Edit event", exact: true });
+  const editForm = edit.locator("[data-event-save]");
+  for (const input of [
+    editForm.locator('[data-date-input="startsAt"] [data-native-date]'),
+    editForm.getByLabel("Start time"),
+  ]) {
+    const saved = await input.inputValue();
+    expect(saved).not.toBe("");
+    await expect(input.locator("+ .volunteer-picker-placeholder")).toBeHidden();
+    await input.fill("");
+    await input.blur();
+    await expect(
+      input.locator("+ .volunteer-picker-placeholder"),
+    ).toBeVisible();
+    await editForm.evaluate((element: HTMLFormElement) => element.reset());
+    await expect(input).toHaveValue(saved);
+    await expect(input.locator("+ .volunteer-picker-placeholder")).toBeHidden();
+  }
 });
 
 test("failed profile saves keep unsaved changes retryable", async ({
