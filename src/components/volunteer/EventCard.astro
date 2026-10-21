@@ -53,7 +53,10 @@ const blocked =
 ---
 
 <li
-  class="volunteer-event-card"
+  class:list={[
+    "volunteer-event-card",
+    { "volunteer-event-self-service": !organizer },
+  ]}
   data-live-event={event.id}
   data-event-type="patrol"
   data-includes-orientation={String(Boolean(event.includesOrientation))}
