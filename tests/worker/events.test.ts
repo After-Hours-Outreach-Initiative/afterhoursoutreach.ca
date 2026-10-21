@@ -1337,15 +1337,23 @@ describe(
             name: "Create event",
             exact: true,
           });
+          const eventType = dialog.getByRole("group", {
+            name: "Event type",
+            exact: true,
+          });
+          await expect(eventType.getByRole("radio")).toHaveCount(2);
           await expect(
-            dialog.getByRole("combobox", { name: "Event type", exact: true }),
+            eventType.getByRole("radio", { name: "Patrol", exact: true }),
+          ).toBeChecked();
+          await expect(
+            eventType.getByRole("radio", { name: "Orientation", exact: true }),
           ).toBeEnabled();
           const visibilityChoices = dialog.getByRole("group", {
             name: "Public visibility",
             exact: true,
           });
           await expect(dialog.getByRole("switch")).toHaveCount(0);
-          await expect(dialog.getByRole("radio")).toHaveCount(2);
+          await expect(visibilityChoices.getByRole("radio")).toHaveCount(2);
           const visible = visibilityChoices.getByRole("radio", {
             name: "Visible",
             exact: true,
@@ -1404,7 +1412,7 @@ describe(
             ).toHaveValue("2031-04-12");
             await expect(editor.getByLabel("Start time")).toHaveValue("20:30");
             await expect(
-              editor.getByRole("combobox", { name: "Event type", exact: true }),
+              editor.locator('input[type="radio"][name="type"]'),
             ).toHaveCount(0);
             await expect(
               editor.locator(
