@@ -108,6 +108,12 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
     ).results;
     const booked = events[0].id;
     const empty = events[1].id;
+    await DB.prepare("UPDATE event SET meeting_point=? WHERE id=?")
+      .bind(
+        "Community centre north entrance, beside AfterHoursOutreachCommunityPatrolMeetingPoint",
+        empty,
+      )
+      .run();
     // Three completed medics, three orientees (including a first-time medic),
     // then only real green attendees. The crowded event exercises wrapping at 100.
     for (let index = 0; index < 100; index++) {
@@ -215,15 +221,41 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
     let publicName = "Renamed P.";
     for (const manage of [false, true]) {
       await setCookie(manage ? organizer.cookie : viewer.cookie);
-      for (const width of [1280, 375, 320]) {
+      for (const width of [1280, 1920, 800, 375, 320]) {
         await page.setViewportSize({ width, height: 900 });
         await page.goto(`${origin}${manage ? "/manage/events" : "/events"}`);
+        const list = page.locator("[data-event-list]");
+        const columns = (element: Element) =>
+          getComputedStyle(element)
+            .gridTemplateColumns.split(" ")
+            .filter((track) => parseFloat(track) > 0).length;
+        const expectedColumns = width >= 1280 ? 3 : width === 800 ? 2 : 1;
+        await expect(list).toHaveCSS("display", "grid");
+        await expect(list).toHaveCSS("align-items", "start");
+        expect(await list.evaluate(columns)).toBe(expectedColumns);
         if (manage)
+          await expect(list.locator(":scope > [data-series-card]")).toHaveCount(
+            1,
+          );
+        await list.evaluate((element) =>
+          window.scrollTo({
+            top: element.getBoundingClientRect().top + scrollY - 110,
+            behavior: "instant",
+          }),
+        );
+        await page.screenshot({
+          path: `/tmp/opencode/event-attendance/${manage ? "manage" : "events"}-grid-${width}.png`,
+        });
+        if (manage) {
           await page
             .locator(
               `[data-series-card="${seriesId}"] > details[data-series-occurrences] > summary`,
             )
             .click();
+          expect(
+            await page.locator("[data-series-event-list]").evaluate(columns),
+          ).toBe(1);
+        }
         const card = page.locator(`[data-live-event="${booked}"]`);
         const rosterSelector = manage
           ? ".volunteer-roster"
@@ -283,25 +315,30 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             const layout = bounds(".volunteer-event-layout");
             return {
               afterAttendance: action.top >= attendance.bottom,
-              attendanceBesideInfo: attendance.left >= details.right,
-              actionBesideAttendance: action.left >= attendance.right,
-              topOffset: action.top - layout.top,
+              attendanceAfterInfo: attendance.top >= details.bottom,
+              leftOffset: action.left - layout.left,
               rightOffset: action.right - layout.right,
               controlHeight: bounds(".volunteer-actions .btn").height,
+              controlWidth: bounds(".volunteer-actions .btn").width,
+              layoutWidth: layout.width,
             };
           });
-          expect(position.afterAttendance).toBe(width < 1024);
+          expect(position.afterAttendance).toBe(true);
+          expect(position.attendanceAfterInfo).toBe(true);
           expect(position.controlHeight).toBeGreaterThanOrEqual(44);
-          if (width >= 1024) {
-            expect(position.attendanceBesideInfo).toBe(true);
-            expect(position.actionBesideAttendance).toBe(true);
-            expect(Math.abs(position.topOffset)).toBeLessThan(1);
-            expect(Math.abs(position.rightOffset)).toBeLessThan(1);
-          }
+          expect(Math.abs(position.leftOffset)).toBeLessThan(1);
+          expect(Math.abs(position.rightOffset)).toBeLessThan(1);
+          expect(
+            Math.abs(position.controlWidth - position.layoutWidth),
+          ).toBeLessThan(1);
         };
         await expectActionPosition();
+        const bookedHeight = (await card.boundingBox())!.height;
         await emptyCard.locator(".event-avatar-description > summary").click();
         await expectActionPosition();
+        expect(
+          Math.abs((await card.boundingBox())!.height - bookedHeight),
+        ).toBeLessThan(1);
         if (manage) {
           await expect(emptyCard.locator("[data-live-signup]")).toHaveCount(0);
           await expect(
@@ -400,6 +437,15 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             () => document.documentElement.scrollWidth > innerWidth,
           ),
         ).toBe(false);
+        expect(
+          await page
+            .locator(".volunteer-event-list, .volunteer-event-card")
+            .evaluateAll((elements) =>
+              elements.some(
+                (element) => element.scrollWidth > element.clientWidth + 1,
+              ),
+            ),
+        ).toBe(false);
         for (const [state, focus] of [
           ["expanded-legend", emptyCard],
           ["roster", card],
@@ -409,6 +455,22 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             path: `/tmp/opencode/event-attendance/${manage ? "manage" : "events"}-${state}-${width}.png`,
             style: "header, [data-skip-to-main] { visibility: hidden; }",
           });
+        if (manage) {
+          await page.locator('[data-event-filter="recurring"]').click();
+          expect(await list.evaluate(columns)).toBe(1);
+          const series = list.locator(":scope > [data-series-card]");
+          expect(
+            Math.abs(
+              (await series.boundingBox())!.width -
+                (await list.boundingBox())!.width,
+            ),
+          ).toBeLessThan(1);
+          // A lone series fills the row; occurrences still use that container,
+          // not the viewport (at 800px there is only room for one nested track).
+          expect(
+            await series.locator("[data-series-event-list]").evaluate(columns),
+          ).toBe(width >= 1280 ? 3 : 1);
+        }
       }
     }
   } finally {

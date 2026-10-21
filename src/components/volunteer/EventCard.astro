@@ -192,7 +192,7 @@ const blocked =
 
 <style>
   .volunteer-event-card {
-    padding: 1.25rem;
+    padding: 1rem;
   }
   .volunteer-event-layout {
     display: grid;
@@ -204,6 +204,10 @@ const blocked =
     min-width: 0;
     overflow-wrap: anywhere;
   }
+  .volunteer-event-info h3 {
+    font-size: 1.25rem;
+    line-height: 1.4;
+  }
   .volunteer-event-info > p {
     margin: 0.25rem 0 0;
     line-height: 1.5;
@@ -214,28 +218,8 @@ const blocked =
   .volunteer-actions:empty {
     display: none;
   }
-  @media (width >= 64rem) {
-    .volunteer-event-layout {
-      grid-template-columns:
-        minmax(0, 1fr) minmax(0, 0.9fr)
-        minmax(8rem, max-content);
-      gap: 1.5rem;
-    }
-    .volunteer-actions {
-      justify-self: end;
-    }
-  }
-  @media (width < 40rem) {
-    .volunteer-event-card {
-      padding: 1rem;
-    }
-    .volunteer-event-info h3 {
-      font-size: 1.25rem;
-      line-height: 1.4;
-    }
-    .volunteer-actions > :is(form, .btn),
-    .volunteer-actions > form > .btn {
-      width: 100%;
-    }
+  .volunteer-actions > :is(form, .btn),
+  .volunteer-actions > form > .btn {
+    width: 100%;
   }
 </style>
