@@ -5,6 +5,46 @@ import {
   seriesEndAction,
   eventEmailPrompt,
 } from "../src/scripts/event-recurrence";
+import {
+  eventFilter,
+  matchesEventFilter,
+  groupManagementEvents,
+} from "../src/data/event-browser";
+import type { EventRow, PatrolSeriesRow } from "../src/server/db/events";
+
+test("management groups selected occurrences once per series, retaining one-offs and series without loaded occurrences", () => {
+  const event = (id: string, seriesId: string | null) =>
+    ({ id, seriesId }) as EventRow;
+  const series = ["first", "second", "empty"].map(
+    (id) => ({ id }) as PatrolSeriesRow,
+  );
+  const events = [
+    event("selected", "second"),
+    event("one-off", null),
+    event("next", "first"),
+    event("later", "second"),
+  ];
+  const grouped = groupManagementEvents(events, series);
+  expect(grouped).toEqual([
+    { kind: "series", series: series[1], events: [events[0], events[3]] },
+    { kind: "event", event: events[1] },
+    { kind: "series", series: series[0], events: [events[2]] },
+    { kind: "series", series: series[2], events: [] },
+  ]);
+  for (const filter of ["all", "orientation", "one-off", "recurring"]) {
+    expect(eventFilter(filter, true)).toBe(filter);
+    expect(eventFilter(filter, false)).toBe(
+      filter === "orientation" ? filter : "all",
+    );
+  }
+  expect(eventFilter("patrol", true)).toBe("all");
+  expect(matchesEventFilter("one-off", false, true)).toBe(true);
+  expect(matchesEventFilter("one-off", true, false)).toBe(false);
+  expect(matchesEventFilter("recurring", true, false)).toBe(true);
+  expect(matchesEventFilter("recurring", false, true)).toBe(false);
+  expect(matchesEventFilter("orientation", true, false)).toBe(false);
+  expect(matchesEventFilter("orientation", true, true)).toBe(true);
+});
 
 const values = (extra: Record<string, string> = {}) => {
   const result = new FormData();

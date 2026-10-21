@@ -3,6 +3,7 @@ import type { Actor } from "@/server/db/access";
 import type { EventRow, RosterRow, PatrolSeriesRow } from "@/server/db/events";
 import { signupBlockReason } from "@/server/db/policy";
 import { formatEventDate } from "@/data/event-time";
+import { matchesEventFilter } from "@/data/event-browser";
 import EventEditor from "./EventEditor.astro";
 import EventRoster from "./EventRoster.astro";
 
@@ -40,7 +41,11 @@ const blocked =
   data-live-event={event.id}
   data-event-type="patrol"
   data-includes-orientation={String(Boolean(event.includesOrientation))}
-  hidden={filter === "orientation" && !event.includesOrientation}
+  hidden={!matchesEventFilter(
+    filter,
+    Boolean(event.seriesId),
+    Boolean(event.includesOrientation),
+  )}
 >
   <div class="volunteer-event-top">
     <div>

@@ -1,0 +1,94 @@
+---
+import type { Actor } from "@/server/db/access";
+import type { EventRow, PatrolSeriesRow, RosterRow } from "@/server/db/events";
+import { matchesEventFilter } from "@/data/event-browser";
+import EventCard from "./EventCard.astro";
+import PatrolSeriesControls from "./PatrolSeriesControls.astro";
+
+interface Props {
+  series: PatrolSeriesRow;
+  events: EventRow[];
+  actor: Actor | null;
+  rosters: RosterRow[];
+  destinations: EventRow[];
+  filter: string;
+  selectedOccurrence: string | null;
+}
+const {
+  series,
+  events,
+  actor,
+  rosters,
+  destinations,
+  filter,
+  selectedOccurrence,
+} = Astro.props;
+const includesOrientation =
+  Boolean(series.includesOrientation) ||
+  events.some((event) => Boolean(event.includesOrientation));
+---
+
+<li
+  class="volunteer-event-card volunteer-series-card"
+  data-series-card={series.id}
+  data-includes-orientation={String(includesOrientation)}
+  hidden={!matchesEventFilter(filter, true, includesOrientation)}
+>
+  <div data-series-summary>
+    <h3>{series.meetingPoint}</h3>
+    <p>
+      Recurring series · Every {series.intervalWeeks}
+      {series.intervalWeeks === 1 ? "week" : "weeks"}
+    </p>
+    <p>
+      Original schedule from {series.firstDate} at {series.localTime} (Vancouver)
+    </p>
+    <p>
+      Original defaults: {
+        series.includesOrientation ? "Orientation + Patrol" : "Patrol"
+      }
+      {series.hidden || !series.open ? " · Public visibility off" : ""}
+    </p>
+    {
+      series.stoppedFrom ? (
+        <p class="volunteer-hidden">Stopped from {series.stoppedFrom}</p>
+      ) : series.endDate ? (
+        <p>Through {series.endDate}</p>
+      ) : null
+    }
+    <p class="volunteer-help">
+      Open occurrences for their current details, visibility, volunteer rosters
+      and editing. Individual exceptions and this-and-future edits can override
+      the original schedule.
+    </p>
+  </div>
+  <details
+    class="volunteer-series-occurrences"
+    data-series-occurrences
+    open={events.some((event) => event.id === selectedOccurrence)}
+  >
+    <summary data-series-occurrence-summary
+      >Occurrences ({events.length} loaded)</summary
+    >
+    <ul class="volunteer-event-list" data-series-event-list>
+      {
+        events.map((event) => (
+          <EventCard
+            event={event}
+            actor={actor}
+            organizer
+            roster={rosters.filter((person) => person.eventId === event.id)}
+            destinations={destinations}
+            filter="all"
+            series={series}
+          />
+        ))
+      }
+    </ul>
+    <p data-series-empty hidden={events.length !== 0}>
+      No occurrences loaded. Open a scheduled date in series settings to manage
+      it.
+    </p>
+  </details>
+  <PatrolSeriesControls series={series} />
+</li>

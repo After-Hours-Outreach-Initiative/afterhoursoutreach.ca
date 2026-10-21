@@ -11,7 +11,12 @@ import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
 import EventCard from "./EventCard.astro";
 import EventEditor from "./EventEditor.astro";
-import PatrolSeriesControls from "./PatrolSeriesControls.astro";
+import PatrolSeriesCard from "./PatrolSeriesCard.astro";
+import {
+  eventFilter,
+  matchesEventFilter,
+  groupManagementEvents,
+} from "@/data/event-browser";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
@@ -71,8 +76,27 @@ const destinations = events.filter(
     !event.cancelledAt,
 );
 // Legacy ?type=patrol now means all patrols, including those with orientation.
-const filter =
-  Astro.url.searchParams.get("type") === "orientation" ? "orientation" : "all";
+const filter = eventFilter(Astro.url.searchParams.get("type"), management);
+const managementItems = management ? groupManagementEvents(events, series) : [];
+const selectedOccurrence = Astro.url.searchParams.get("occurrence");
+const hasVisibleEvents = management
+  ? managementItems.some((item) =>
+      matchesEventFilter(
+        filter,
+        item.kind === "series",
+        item.kind === "series"
+          ? Boolean(item.series.includesOrientation) ||
+              item.events.some((event) => Boolean(event.includesOrientation))
+          : Boolean(item.event.includesOrientation),
+      ),
+    )
+  : events.some((event) =>
+      matchesEventFilter(
+        filter,
+        Boolean(event.seriesId),
+        Boolean(event.includesOrientation),
+      ),
+    );
 ---
 
 <AccountLayout
@@ -256,6 +280,12 @@ const filter =
           >
             {[
               ["all", "All events"],
+              ...(management
+                ? [
+                    ["one-off", "One-off events"],
+                    ["recurring", "Recurring series"],
+                  ]
+                : []),
               ["orientation", "Includes orientation"],
             ].map(([type, label]) => (
               <button
@@ -271,27 +301,52 @@ const filter =
             ))}
           </form>
           <ul class="volunteer-event-list" data-event-list>
-            {events.map((event) => (
-              <EventCard
-                event={event}
-                actor={actor}
-                organizer={management}
-                roster={rosters.filter((person) => person.eventId === event.id)}
-                destinations={destinations}
-                filter={filter}
-                series={series.find((item) => item.id === event.seriesId)}
-              />
-            ))}
+            {management
+              ? managementItems.map((item) =>
+                  item.kind === "series" ? (
+                    <PatrolSeriesCard
+                      series={item.series}
+                      events={item.events}
+                      actor={actor}
+                      rosters={rosters}
+                      destinations={destinations}
+                      filter={filter}
+                      selectedOccurrence={selectedOccurrence}
+                    />
+                  ) : (
+                    <EventCard
+                      event={item.event}
+                      actor={actor}
+                      organizer
+                      roster={rosters.filter(
+                        (person) => person.eventId === item.event.id,
+                      )}
+                      destinations={destinations}
+                      filter={filter}
+                    />
+                  ),
+                )
+              : events.map((event) => (
+                  <EventCard
+                    event={event}
+                    actor={actor}
+                    organizer={management}
+                    roster={rosters.filter(
+                      (person) => person.eventId === event.id,
+                    )}
+                    destinations={destinations}
+                    filter={filter}
+                    series={series.find((item) => item.id === event.seriesId)}
+                  />
+                ))}
           </ul>
           <p
             class="volunteer-notice"
             data-empty-events
             role="status"
-            hidden={events.some(
-              (event) => filter === "all" || Boolean(event.includesOrientation),
-            )}
+            hidden={hasVisibleEvents}
           >
-            {events.length
+            {events.length || series.length
               ? "No upcoming events match this filter. Check back soon."
               : "No upcoming events are scheduled. Check back soon."}
           </p>
@@ -300,7 +355,9 @@ const filter =
             data-event-limit
             hidden={events.length !== 100}
           >
-            Showing up to 100 events.
+            {management
+              ? "Showing up to 100 loaded occurrences and one-off events. Open any other recurring date from its series settings."
+              : "Showing up to 100 events."}
           </p>
         </section>
       )
@@ -309,7 +366,6 @@ const filter =
       management && (
         <>
           <EventEditor />
-          <PatrolSeriesControls series={series} />
           <VolunteerProfileDialog />
         </>
       )

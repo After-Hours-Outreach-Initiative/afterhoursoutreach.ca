@@ -239,6 +239,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     expect(selectedHtml).toContain(`data-live-event="${far.id}"`);
     expect(selectedHtml).toContain("Outside the volunteer signup window");
     expect(selectedHtml).toContain('value="future"');
+    expect(
+      selectedHtml.match(new RegExp(`data-series-card="${series.id}"`, "g")),
+    ).toHaveLength(1);
     // A series operation with no event_audit row of the exact operation ID is retryable.
     const auditOperation = await DB.prepare(
       "SELECT id FROM patrol_series_audit WHERE action='updated_future'",
@@ -282,7 +285,173 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     organizerPage.on("pageerror", (error) =>
       organizerErrors.push(error.message),
     );
+    await ok(
+      await action({
+        action: "save",
+        event: {
+          includesOrientation: false,
+          startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+          meetingPoint: "One-off management event",
+          meetingPointUrl: "",
+          spots: 3,
+          open: true,
+          hidden: false,
+        },
+      }),
+    );
+    const oneOffId = await DB.prepare(
+      "SELECT id FROM event WHERE meeting_point='One-off management event'",
+    ).first<string>("id");
+    const pastDate = addCalendarDays(firstDate, -365);
+    const emptySeries = { id: "ended-empty-series" };
+    await DB.prepare(
+      `INSERT INTO patrol_series
+      (id,first_date,local_time,interval_weeks,end_date,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES (?,?,'20:30',2,?,'Ended series without occurrences',3,?,0,0)`,
+    )
+      .bind(emptySeries.id, pastDate, pastDate, organizer.id)
+      .run();
     await organizerPage.goto(`${origin}/manage/events`);
+    const topLevel = organizerPage.locator("[data-event-list] > li");
+    const initialGroup = organizerPage.locator(
+      `[data-series-card="${series.id}"]`,
+    );
+    const emptyGroup = organizerPage.locator(
+      `[data-series-card="${emptySeries.id}"]`,
+    );
+    await expect(topLevel).toHaveCount(3);
+    await expect(
+      organizerPage.locator("[data-event-list] > [data-live-event]"),
+    ).toHaveAttribute("data-live-event", oneOffId!);
+    await expect(initialGroup).toHaveCount(1);
+    expect(
+      await initialGroup.locator("[data-live-event]").count(),
+    ).toBeGreaterThan(1);
+    await expect(emptyGroup.locator("[data-live-event]")).toHaveCount(0);
+    await expect(emptyGroup.locator("[data-live-series]")).toHaveCount(1);
+    await expect(
+      organizerPage.getByRole("heading", {
+        name: "Recurring patrols",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await organizerPage
+      .getByRole("button", { name: "One-off events", exact: true })
+      .click();
+    await expect(
+      organizerPage.locator("[data-event-list] > li:visible"),
+    ).toHaveCount(1);
+    await expect(initialGroup).toBeHidden();
+    await organizerPage.reload();
+    await expect(initialGroup).toBeHidden();
+    await organizerPage
+      .getByRole("button", { name: "Recurring series", exact: true })
+      .click();
+    await expect(
+      organizerPage.locator("[data-event-list] > li:visible"),
+    ).toHaveCount(2);
+    await expect(emptyGroup).toBeVisible();
+    await organizerPage.goBack();
+    await expect(initialGroup).toBeHidden();
+    await organizerPage
+      .getByRole("button", { name: "All events", exact: true })
+      .click();
+
+    // Settings and occurrence editors are independent: polling updates counts
+    // without discarding either draft or an expanded roster/occurrence list.
+    const originalManager = initialGroup.locator("[data-live-series]");
+    await originalManager.locator(":scope > summary").click();
+    const draftEnd = addCalendarDays(firstDate, 350);
+    await originalManager
+      .locator('[data-series-end] [name="endDate"]')
+      .fill(draftEnd);
+    await originalManager
+      .locator('[name="reason"]')
+      .fill("Unsaved series reason");
+    const oldVersion = await originalManager.getAttribute(
+      "data-series-version",
+    );
+    await initialGroup.locator("[data-series-occurrences] > summary").click();
+    const firstCard = initialGroup.locator(
+      `[data-live-event="${initial[0].id}"]`,
+    );
+    await firstCard.locator(".volunteer-roster > summary").click();
+    await firstCard.getByRole("button", { name: "Edit", exact: true }).click();
+    const draftEditor = firstCard.locator("dialog");
+    await draftEditor
+      .getByLabel("Meeting point", { exact: true })
+      .fill("Unsaved occurrence draft");
+    await ok(
+      await action({
+        action: "save-series",
+        id: series.id,
+        version: await currentVersion(),
+        series: { ...seriesInput, endDate: addCalendarDays(firstDate, 280) },
+      }),
+    );
+    await ok(
+      await action({ action: "cancel", id: initial[0].id }, volunteer.cookie),
+    );
+    await expect(firstCard.locator(".volunteer-spots")).toHaveText(
+      "3 spots left",
+      { timeout: 15_000 },
+    );
+    await expect(
+      draftEditor.getByLabel("Meeting point", { exact: true }),
+    ).toHaveValue("Unsaved occurrence draft");
+    await expect(
+      originalManager.locator('[data-series-end] [name="endDate"]'),
+    ).toHaveValue(draftEnd);
+    await expect(originalManager.locator('[name="reason"]')).toHaveValue(
+      "Unsaved series reason",
+    );
+    await expect(originalManager).toHaveAttribute(
+      "data-series-version",
+      oldVersion!,
+    );
+    await draftEditor
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
+    await expect(firstCard.locator(".volunteer-roster > summary")).toHaveText(
+      "Volunteers (0)",
+    );
+    await expect(firstCard.locator(".volunteer-roster")).toHaveAttribute(
+      "open",
+      "",
+    );
+    await expect(
+      initialGroup.locator("[data-series-occurrences]"),
+    ).toHaveAttribute("open", "");
+    await originalManager.locator(":scope > summary").click();
+    await expect(originalManager).toHaveAttribute(
+      "data-series-version",
+      String(await currentVersion()),
+    );
+    await ok(
+      await action({ action: "join", id: initial[0].id }, volunteer.cookie),
+    );
+    const occurrenceCount = await initialGroup
+      .locator("[data-live-event]")
+      .count();
+    await initialGroup.locator("[data-series-occurrences] > summary").focus();
+    await ok(
+      await action({
+        action: "materialize-occurrence",
+        id: series.id,
+        occurrenceDate: addCalendarDays(firstDate, 154),
+      }),
+    );
+    await expect(initialGroup.locator("[data-live-event]")).toHaveCount(
+      occurrenceCount + 1,
+      { timeout: 15_000 },
+    );
+    await expect(
+      initialGroup.locator("[data-series-occurrences] > summary"),
+    ).toBeFocused();
+    await expect(initialGroup).toHaveCount(1);
+    await organizerPage
+      .getByRole("button", { name: "Recurring series", exact: true })
+      .click();
     await organizerPage
       .getByRole("button", { name: "Create", exact: true })
       .click();
@@ -321,6 +490,20 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
         .first("includes_orientation"),
     ).toBe(1);
     const manager = organizerPage.locator(`[data-live-series="${uiSeries}"]`);
+    const uiGroup = organizerPage.locator(`[data-series-card="${uiSeries}"]`);
+    await expect(uiGroup).toHaveCount(1);
+    await expect(uiGroup).toBeVisible();
+    await expect(
+      organizerPage.locator("[data-event-list] > [data-live-event]"),
+    ).toBeHidden();
+    await organizerPage
+      .getByRole("button", { name: "Includes orientation", exact: true })
+      .click();
+    await expect(uiGroup).toBeVisible();
+    await expect(initialGroup).toBeHidden();
+    await organizerPage
+      .getByRole("button", { name: "Recurring series", exact: true })
+      .click();
     await manager.locator("summary").click();
     const uiDate = addCalendarDays(firstDate, 42);
     await manager
@@ -333,6 +516,14 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     const uiCard = organizerPage.locator(`[data-live-event="${uiId}"]`);
     const editor = uiCard.locator("dialog");
     await expect(editor).toBeVisible();
+    expect(new URL(organizerPage.url()).searchParams.get("type")).toBe(
+      "recurring",
+    );
+    expect(new URL(organizerPage.url()).searchParams.get("occurrence")).toBe(
+      uiId,
+    );
+    await expect(uiGroup.locator(`[data-live-event="${uiId}"]`)).toHaveCount(1);
+    await expect(uiGroup).toHaveCount(1);
     await expect(
       editor.getByRole("checkbox", {
         name: "Includes orientation",
@@ -406,6 +597,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(uiCard).toContainText("Cancelled");
+    await expect(uiGroup).toHaveCount(1);
     expect(
       await DB.prepare(
         "SELECT includes_orientation FROM patrol_series WHERE id=?",
@@ -453,6 +645,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       await DB.prepare("SELECT count(*) n FROM event_notification").first("n"),
     ).toBe(0);
     expect(organizerErrors).toEqual([]);
+    await organizerPage.reload();
+    await expect(uiCard).toBeVisible();
+    await expect(uiGroup).toHaveCount(1);
     // The same production script still initializes task4's extracted browser:
     // live searching must retain its approval filter and global queue count.
     const awaiting = await DB.prepare(
@@ -504,10 +699,12 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       page.locator(`[data-live-event="${initial[0].id}"]`),
     ).toHaveCount(0);
     expect(
-      await DB.prepare("SELECT status FROM signup WHERE event_id=?")
+      await DB.prepare(
+        "SELECT count(*) n FROM signup WHERE event_id=? AND status='confirmed'",
+      )
         .bind(initial[0].id)
-        .first("status"),
-    ).toBe("confirmed");
+        .first("n"),
+    ).toBe(1);
     expect(errors).toEqual([]);
 
     await ok(

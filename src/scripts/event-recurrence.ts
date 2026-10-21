@@ -171,35 +171,29 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
   }
 }
 
-/** Keep open series drafts, just like individual event editors. */
-export function syncSeriesControls(page: Document, element?: HTMLFormElement) {
-  const root = document.querySelector<HTMLElement>("[data-series-list]");
-  const next = page.querySelector<HTMLElement>("[data-series-list]");
-  if (!root || !next) return false;
-  let deferred = false;
-  for (const updated of next.querySelectorAll<HTMLDetailsElement>(
-    "[data-live-series]",
-  )) {
-    const current = [
-      ...root.querySelectorAll<HTMLDetailsElement>("[data-live-series]"),
-    ].find((item) => item.dataset.liveSeries === updated.dataset.liveSeries);
-    if (current?.dataset.seriesVersion === updated.dataset.seriesVersion)
-      continue;
-    if (
-      current &&
-      (current.open || current.querySelector('[data-submitting="true"]')) &&
-      !current.contains(element ?? null)
-    ) {
-      deferred = true;
-      continue;
-    }
-    const replacement = document.importNode(updated, true);
-    if (current) {
-      replacement.open = current.open;
-      current.replaceWith(replacement);
-    } else root.appendChild(replacement);
-  }
-  const empty = root.querySelector("p:not([class])");
-  if (root.querySelector("[data-live-series]")) empty?.remove();
-  return deferred;
+/** Reconcile only this card's settings; occurrences have independent live state. */
+export function syncSeriesControls(
+  card: HTMLElement,
+  updatedCard: HTMLElement,
+  element?: HTMLFormElement,
+) {
+  const current = card.querySelector<HTMLDetailsElement>("[data-live-series]")!;
+  const updated =
+    updatedCard.querySelector<HTMLDetailsElement>("[data-live-series]")!;
+  if (current.dataset.seriesVersion === updated.dataset.seriesVersion)
+    return false;
+  const savedSettings =
+    current.contains(element ?? null) &&
+    element?.matches("[data-series-end], [data-series-stop]");
+  if (
+    (current.open && !savedSettings) ||
+    [...current.querySelectorAll('[data-submitting="true"]')].some(
+      (form) => form !== element,
+    )
+  )
+    return true;
+  const replacement = document.importNode(updated, true);
+  replacement.open = current.open;
+  current.replaceWith(replacement);
+  return false;
 }

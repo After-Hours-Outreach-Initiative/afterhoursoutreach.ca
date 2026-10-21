@@ -1312,6 +1312,20 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-event-card h3 {
   @apply text-2xl;
 }
+.volunteer-series-occurrences,
+.volunteer-series-settings {
+  margin-top: 1.25rem;
+  border-top: 1px solid #3f3f46;
+  padding-top: 1rem;
+}
+.volunteer-series-occurrences > summary,
+.volunteer-series-settings > summary {
+  cursor: pointer;
+  color: #d4d4d8;
+}
+.volunteer-series-occurrences > .volunteer-event-list {
+  margin-top: 1rem;
+}
 .volunteer-event-card p {
   @apply text-base;
   color: #a1a1aa;
