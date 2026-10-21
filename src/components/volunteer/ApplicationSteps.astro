@@ -72,9 +72,7 @@ const reviewSections = sections.map((section) => {
         disabled
       >
         <legend class="sr-only">Review and submit application</legend>
-        <h2 data-application-step-heading tabindex="-1">
-          Review your application
-        </h2>
+        <h2 data-application-step-heading>Review your application</h2>
         <p>
           Review your answers, edit if needed, then accept the Code of Conduct
           and submit.
@@ -86,9 +84,7 @@ const reviewSections = sections.map((section) => {
           {reviewSections.map((section) => (
             <section aria-labelledby={`review-${section.key}`}>
               <div class="volunteer-profile-section-heading">
-                <h3 id={`review-${section.key}`} tabindex="-1">
-                  {section.heading}
-                </h3>
+                <h3 id={`review-${section.key}`}>{section.heading}</h3>
                 <button
                   type="button"
                   class="btn btn-outline"

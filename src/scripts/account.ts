@@ -14,6 +14,7 @@ import {
 } from "./application-review";
 import { initApplicationSections } from "./application-sections";
 import { initPageContents } from "./page-contents";
+import { focusAfterUpdate } from "./focus";
 import { initPhoneInputs } from "./phone-input";
 import { initDateInputs } from "./date-input";
 import {
@@ -435,10 +436,10 @@ form("[data-end-session]", async (element, values) => {
     document.activeElement === document.body;
   row.remove();
   if (restoreFocus)
-    (
+    focusAfterUpdate(
       sessions.querySelector<HTMLElement>("[data-end-session] button") ??
-      sessions.querySelector<HTMLElement>("h3")
-    )?.focus({ preventScroll: true });
+        sessions.querySelector<HTMLElement>("h3"),
+    );
 });
 
 form("[data-enable-factor]", async (element) => {
@@ -486,8 +487,7 @@ async function refreshFactorSettings(element: HTMLFormElement) {
     document.activeElement === document.body;
   element.closest("[data-factor-settings]")!.replaceWith(settings);
   document.querySelector("[data-account-sessions]")!.replaceWith(sessions);
-  if (restoreFocus)
-    settings.querySelector<HTMLElement>("h3")?.focus({ preventScroll: true });
+  if (restoreFocus) focusAfterUpdate(settings.querySelector<HTMLElement>("h3"));
   return settings;
 }
 

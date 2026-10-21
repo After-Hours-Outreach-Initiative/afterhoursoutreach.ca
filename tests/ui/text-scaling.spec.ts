@@ -61,7 +61,8 @@ async function expectSectionAtReadingEdge(
   root: number,
 ) {
   const heading = page.locator(`#${id}`);
-  await expect(heading).toBeFocused();
+  await expect(heading).not.toBeFocused();
+  await expect(heading).not.toHaveAttribute("tabindex");
   await expect
     .poll(() =>
       heading.evaluate((element) =>
@@ -82,8 +83,7 @@ async function expectSectionAtReadingEdge(
   );
   await expect(heading).toHaveCSS("scroll-margin-top", `${offset + root}px`);
 
-  // Real scrolling must select the same section as an anchor jump. This also
-  // waits beyond visit()'s immediate activation and tests the scheduled tracker.
+  // Real scrolling must select the same section as a native anchor jump.
   await heading.evaluate((element) => {
     const edge = Number.parseFloat(getComputedStyle(element).scrollMarginTop);
     scrollTo({
@@ -298,31 +298,22 @@ for (const root of [16, 20, 24]) {
       );
       await expectNoHorizontalOverflow(page);
 
-      // A short compact screen exercises the bottom/top gap constraints in
-      // actionsReadingEdge, not only the unchanged 75%-of-viewport branch.
+      // Native action fragments use the same scaled CSS margin as headings,
+      // even on a short compact screen.
       await page.setViewportSize({ width: 375, height: 250 });
       await chooseSection(contents, "application-review-and-discard");
       const actions = page.locator("#application-review-and-discard");
-      await expect(actions).toBeFocused();
+      await expect(actions).not.toBeFocused();
+      await expect(actions).not.toHaveAttribute("tabindex");
       await expect
         .poll(() =>
-          actions.evaluate((element, gap) => {
+          actions.evaluate((element) => {
             const bounds = element.getBoundingClientRect();
-            const flow = element.closest("[data-application-flow]")!;
-            const offset = Number.parseFloat(
-              getComputedStyle(flow).getPropertyValue(
-                "--contents-scroll-offset",
-              ),
+            const margin = Number.parseFloat(
+              getComputedStyle(element).scrollMarginTop,
             );
-            const edge = Math.max(
-              offset + gap + bounds.height / 2,
-              Math.min(
-                innerHeight * 0.75,
-                innerHeight - gap - bounds.height / 2,
-              ),
-            );
-            return Math.abs(bounds.top + bounds.height / 2 - edge);
-          }, root),
+            return Math.abs(bounds.top - margin);
+          }),
         )
         .toBeLessThanOrEqual(1);
       await expect(

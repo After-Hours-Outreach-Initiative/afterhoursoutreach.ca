@@ -6,6 +6,7 @@ import {
 } from "../data/application";
 import { clearFormMessage } from "./account-forms";
 import { readDateInputs } from "./date-input";
+import { focusAfterUpdate } from "./focus";
 
 // Review and submission share this payload. Omit inactive answers from the
 // outgoing copy without changing the draft controls used for back/edit navigation.
@@ -57,9 +58,11 @@ export function initApplicationReview(element: HTMLFormElement) {
   const originalTitle = document.title;
   let step: "questions" | "review" = "questions";
   let editTarget: string | undefined;
+  let reviewDepth = 0;
   const state = (next: typeof step) => ({
     ...history.state,
     applicationStep: next,
+    applicationReviewDepth: reviewDepth,
   });
   // Resumed drafts always return to the answers and require a fresh review.
   history.replaceState(state("questions"), "");
@@ -70,7 +73,7 @@ export function initApplicationReview(element: HTMLFormElement) {
     // especially when Edit targets a different section from the previous scroll.
     requestAnimationFrame(() => {
       if (!target || target.closest("[hidden]")) return;
-      target.focus({ preventScroll: true });
+      focusAfterUpdate(target);
       // A sticky disclosure's own position cannot return to the answers' start.
       const scrollTarget = target.closest("[data-application-contents]")
         ? questions
@@ -160,6 +163,7 @@ export function initApplicationReview(element: HTMLFormElement) {
     }
   };
   element.addEventListener("application-draft-restored", () => {
+    reviewDepth = 0;
     history.replaceState(state("questions"), "");
     display("questions", false);
   });
@@ -170,6 +174,7 @@ export function initApplicationReview(element: HTMLFormElement) {
       if (element.dataset.submitting) return;
       // Native constraint validation has already focused any invalid fields.
       render();
+      reviewDepth = 0;
       history.pushState(state("review"), "");
       display("review");
     } else if (event.submitter !== submitButton) {
@@ -188,6 +193,7 @@ export function initApplicationReview(element: HTMLFormElement) {
       )
         return;
       // If a hidden answer becomes invalid, return before native focus is attempted.
+      reviewDepth = 0;
       history.replaceState(state("questions"), "");
       display("questions", false);
     },
@@ -199,10 +205,21 @@ export function initApplicationReview(element: HTMLFormElement) {
     button.addEventListener("click", () => {
       if (element.dataset.submitting) return;
       editTarget = button.dataset.applicationEdit || undefined;
-      history.back();
+      // Native review fragments add entries too; return to the answers entry,
+      // not merely the previous fragment in the same review step.
+      history.go(-reviewDepth - 1);
     });
   }
   window.addEventListener("popstate", (event) => {
+    if (!event.state?.applicationStep) {
+      // Native fragment entries have no state. Record their current step without
+      // replacing the browser's scrolling or adding another history entry.
+      if (step === "review") reviewDepth++;
+      history.replaceState(state(step), "");
+      return;
+    }
+    reviewDepth = event.state.applicationReviewDepth ?? 0;
+    if (event.state.applicationStep === step) return;
     if (event.state?.applicationStep === "review") {
       // Forward must revalidate/rebuild any answers changed after going Back.
       display("questions", false);
@@ -210,6 +227,7 @@ export function initApplicationReview(element: HTMLFormElement) {
         render();
         display("review");
       } else {
+        reviewDepth = 0;
         history.replaceState(state("questions"), "");
         focus(
           questions.querySelector<HTMLElement>(

@@ -647,7 +647,7 @@ test("account contents navigate profile and settings sections on desktop and mob
       await page.locator(".site-header").click({ position: { x: 2, y: 2 } });
       await expect(menu).not.toHaveAttribute("open");
       await summary.press("Enter");
-      await page.locator("#account-profile-heading").focus();
+      await page.getByRole("button", { name: "Edit personal info" }).focus();
       await expect(menu).not.toHaveAttribute("open");
       // Crossing the sticky edge changes the label without changing sections.
       await page.evaluate(
@@ -708,7 +708,9 @@ test("account contents navigate profile and settings sections on desktop and mob
       await link.focus();
       await link.press("Enter");
       await expect(page).toHaveURL(new RegExp(`#${id}$`));
-      await expect(page.locator(`#${id}`)).toBeFocused();
+      await expect(page.locator(`#${id}`)).not.toBeFocused();
+      await expect(page.locator(`#${id}`)).not.toHaveAttribute("tabindex");
+      await expect(page.locator(`#${id}`)).toBeInViewport();
       await expect(
         contents.locator(`a[href="#${id}"][aria-current="location"]`),
       ).toHaveCount(2);
@@ -959,7 +961,7 @@ test("application shows all required errors and saves after they are corrected",
   await expect(sections.locator("details, summary, h3 svg")).toHaveCount(0);
   for (const section of await sections.all()) {
     const heading = section.getByRole("heading", { level: 3 });
-    await expect(heading).toHaveAttribute("tabindex", "-1");
+    await expect(heading).not.toHaveAttribute("tabindex");
     await expect(heading).toHaveAttribute("data-application-section");
     await expect(heading).toHaveCSS("font-weight", "700");
     await expect(heading).toHaveCSS(
@@ -1005,14 +1007,15 @@ test("application shows all required errors and saves after they are corrected",
   await contents
     .getByRole("link", { name: "Emergency contact", exact: true })
     .click();
-  await expect(emergencyHeading).toBeFocused();
+  await expect(emergencyHeading).not.toBeFocused();
+  await expect(emergencyHeading).toBeInViewport();
   await expect(
     contents.locator(
       'a[href="#application-emergency-contact"][aria-current="location"]',
     ),
   ).toHaveCount(2);
   await contents.getByRole("link", { name: "Overview", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+  await expect(page.locator("#application-overview")).toBeInViewport();
   await expect(emergencyContact.locator("input")).toHaveCount(3);
   await expect(
     form
@@ -3409,9 +3412,16 @@ test("session dividers stay between rows after removal and settings refresh", as
   await expect(
     sessions.getByRole("heading", { name: "Sessions" }),
   ).toBeFocused();
+  await expect(page.locator("#account-sessions-heading")).toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
 
   // Authenticator verification replaces the server-rendered Sessions fragment.
   await page.getByRole("button", { name: "Set up an authenticator" }).click();
+  await expect(page.locator("#account-sessions-heading")).not.toHaveAttribute(
+    "tabindex",
+  );
   const setup = page.locator("[data-confirm-factor]");
   await expect(setup).toBeVisible();
   const key = (await page.locator("[data-factor-key]").textContent())!;
@@ -3458,11 +3468,16 @@ test("authenticator setup and sign-in show native inline code errors", async ({
     loadingLabel: "Verifying…",
   });
   await expect(name).toHaveValue("Unsaved authenticator draft");
+  await expect(page.locator("#account-factor-heading")).toBeFocused();
   const contents = page.getByRole("navigation", { name: "Sections" });
   await contents
     .getByRole("link", { name: "Two-factor authentication", exact: true })
     .click();
-  await expect(page.locator("#account-factor-heading")).toBeFocused();
+  await expect(page.locator("#account-factor-heading")).not.toBeFocused();
+  await expect(page.locator("#account-factor-heading")).not.toHaveAttribute(
+    "tabindex",
+  );
+  await expect(page.locator("#account-factor-heading")).toBeInViewport();
   await expect(
     contents.locator(
       'a[href="#account-factor-heading"][aria-current="location"]',

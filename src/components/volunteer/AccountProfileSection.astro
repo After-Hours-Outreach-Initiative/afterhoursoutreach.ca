@@ -21,12 +21,7 @@ const sectionDescribedBy =
 {
   application ? (
     <section class="volunteer-application-section" aria-labelledby={id}>
-      <h3
-        id={id}
-        class="volunteer-profile-heading"
-        data-application-section
-        tabindex="-1"
-      >
+      <h3 id={id} class="volunteer-profile-heading" data-application-section>
         {heading}
       </h3>
       <fieldset
@@ -50,12 +45,7 @@ const sectionDescribedBy =
     >
       <legend class="sr-only">{heading}</legend>
       <div class="volunteer-profile-section-heading">
-        <h3
-          id={id}
-          class="volunteer-profile-heading"
-          data-contents-section
-          tabindex="-1"
-        >
+        <h3 id={id} class="volunteer-profile-heading" data-contents-section>
           {heading}
         </h3>
         <button

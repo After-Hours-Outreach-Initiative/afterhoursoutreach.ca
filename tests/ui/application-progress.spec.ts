@@ -78,18 +78,19 @@ async function expectActionsPosition(page: Page) {
   await expect
     .poll(async () => {
       const bounds = (await actions.boundingBox())!;
-      const height = page.viewportSize()!.height;
-      const center = Math.min(height * 0.75, height - 16 - bounds.height / 2);
-      return Math.abs(bounds.y + bounds.height / 2 - center);
+      const margin = await actions.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).scrollMarginTop),
+      );
+      return Math.round(bounds.y - margin);
     })
-    .toBeLessThanOrEqual(1);
+    .toBeGreaterThanOrEqual(0);
   const bounds = (await actions.boundingBox())!;
   const tracker = page.locator("[data-application-contents]");
   const menu = tracker.locator("[data-contents-menu]");
   const top = (await menu.isVisible())
     ? (await tracker.boundingBox())!.y + (await tracker.boundingBox())!.height
     : (await page.locator(".site-header").boundingBox())!.height;
-  expect(bounds.y).toBeGreaterThanOrEqual(top + 16);
+  expect(Math.round(bounds.y)).toBeGreaterThanOrEqual(top + 16);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(
     page.viewportSize()!.height - 16,
   );
@@ -203,7 +204,7 @@ for (const width of [390, 1280]) {
     ).toHaveCount(10);
     if (width < 1024) await menu.locator("summary").click();
     await tracker.getByRole("link", { name: "Overview", exact: true }).click();
-    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    await expect(page.locator("#application-overview")).toBeInViewport();
     await expectComplete(page, "personal-info", false);
     await expectComplete(page, "emergency-contact", false);
     await expectComplete(page, "team-interests", false);
@@ -281,17 +282,21 @@ for (const width of [390, 1280]) {
     await expectActionsPosition(page);
     await expect(
       page.getByRole("group", { name: "Review or discard" }),
-    ).toBeFocused();
+    ).not.toBeFocused();
     await expect(form.locator("[data-application-review-step]")).toBeHidden();
     await expect(form.locator("[data-error]:visible")).toHaveCount(0);
     expect(await page.evaluate(() => history.state.applicationStep)).toBe(
       "questions",
     );
     await page.goBack();
-    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    await expect(page.locator("#application-overview")).toBeInViewport();
     await page.goForward();
     await expectActionsPosition(page);
-    await page.evaluate(() => scrollBy({ top: -120, behavior: "instant" }));
+    await page
+      .locator("#application-about-volunteering")
+      .evaluate((heading) => {
+        heading.scrollIntoView({ behavior: "instant" });
+      });
     await expect(
       tracker.locator(
         '[href="#application-review-and-discard"][aria-current="location"]',
@@ -407,7 +412,12 @@ for (const width of [390, 1280]) {
     await tracker
       .getByRole("link", { name: "Emergency contact", exact: true })
       .click();
-    await expect(form.locator("#application-emergency-contact")).toBeFocused();
+    await expect(
+      form.locator("#application-emergency-contact"),
+    ).not.toBeFocused();
+    await expect(
+      form.locator("#application-emergency-contact"),
+    ).toBeInViewport();
     await expect(form.locator('[name="emergencyName"]')).toBeVisible();
     await expect(tracker.locator('[aria-current="location"]')).toHaveCount(2);
     if (width < 1024)
@@ -491,12 +501,30 @@ for (const width of [390, 1280]) {
     await reviewTracker
       .getByRole("link", { name: "Emergency contact", exact: true })
       .click();
-    await expect(form.locator("#review-emergency-contact")).toBeFocused();
+    await expect(form.locator("#review-emergency-contact")).not.toBeFocused();
     await expect(form.locator("#review-emergency-contact")).toBeInViewport();
+    await expect(
+      form.locator("[data-application-step-heading]"),
+    ).not.toHaveAttribute("tabindex");
     await expect(
       reviewTracker.locator('[aria-current="location"]'),
     ).toHaveCount(2);
     await expect(form.locator("[data-application-review-step]")).toBeVisible();
+    await expect(page).toHaveURL(/#review-emergency-contact$/);
+    if (width < 1024) await reviewTracker.locator("summary").click();
+    await reviewTracker
+      .getByRole("link", { name: "Team interests", exact: true })
+      .click();
+    await expect(page).toHaveURL(/#review-team-interests$/);
+    await expect(form.locator("#review-team-interests")).toBeInViewport();
+    await page.goBack();
+    await expect(page).toHaveURL(/#review-emergency-contact$/);
+    await expect(form.locator("[data-application-review-step]")).toBeVisible();
+    await expect(form.locator("#review-emergency-contact")).toBeInViewport();
+    await page.goForward();
+    await expect(page).toHaveURL(/#review-team-interests$/);
+    await expect(form.locator("[data-application-review-step]")).toBeVisible();
+    await expect(form.locator("#review-team-interests")).toBeInViewport();
     await form.getByRole("button", { name: "Back to answers" }).click();
     await expect(tracker).toBeVisible();
     await expect(
@@ -727,10 +755,12 @@ test("one compact mobile tracker keeps its reading edge and scrolls its viewport
     .click();
   await expect(reviewButton).toBeHidden();
   await expect(status).toBeHidden();
-  await expect(page.locator("#application-emergency-contact")).toBeFocused();
+  await expect(
+    page.locator("#application-emergency-contact"),
+  ).not.toBeFocused();
   await expect
     .poll(async () =>
-      // scrollIntoView rounds scroll positions while layout can be fractional.
+      // Native fragment scrolling rounds positions while layout can be fractional.
       Math.round(
         (await page.locator("#application-emergency-contact").boundingBox())!.y,
       ),
@@ -1050,7 +1080,9 @@ test("the mobile dropdown works from its normal position and Overview restores S
     .click();
   await expect(menu).not.toHaveAttribute("open");
   await expect.poll(async () => (await compact.boundingBox())!.y).toBe(0);
-  await expect(page.locator("#application-emergency-contact")).toBeFocused();
+  await expect(
+    page.locator("#application-emergency-contact"),
+  ).not.toBeFocused();
   const bar = (await compact.boundingBox())!;
   await expect
     .poll(async () =>
@@ -1064,7 +1096,7 @@ test("the mobile dropdown works from its normal position and Overview restores S
   await expect(summary).toHaveCSS("border-radius", "10px");
   await expect(menu).toHaveCSS("border-radius", "10px");
   await menu.getByRole("link", { name: "Overview", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+  await expect(page.locator("#application-overview")).toBeInViewport();
   await expect(summary).toHaveCSS("border-radius", "10px");
   await expect(menu).toHaveCSS("border-radius", "10px");
   await expect(menu).not.toHaveAttribute("open");
