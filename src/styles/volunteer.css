@@ -1604,6 +1604,20 @@ body:has([data-application], [data-account-contents-flow]) {
   .volunteer-fields {
     grid-template-columns: 1fr;
   }
+  .volunteer-event-self-service {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .volunteer-event-self-service .volunteer-event-top {
+    display: contents;
+  }
+  .volunteer-event-self-service .volunteer-actions {
+    /* Leave the second row for the complete attendance block. */
+    grid-row: 3;
+  }
+  .volunteer-event-self-service .volunteer-actions:not(:empty) {
+    margin-bottom: 1rem;
+  }
   .volunteer-event-top .volunteer-actions {
     width: 100%;
   }
