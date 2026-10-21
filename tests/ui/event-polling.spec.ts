@@ -114,7 +114,7 @@ test("other viewers see signups and cancellations through polling without losing
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
   await expect(
-    page.getByRole("button", { name: "Add an event", exact: true }),
+    page.getByRole("button", { name: "Create event", exact: true }),
   ).toBeVisible();
   const meetingPoint = `Live availability ${crypto.randomUUID()}`;
   const created = await page.request.post("/api/v1/events/action", {

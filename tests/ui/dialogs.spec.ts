@@ -53,9 +53,9 @@ test("application dialogs keep their chrome visible while only their body scroll
       page.getByRole("button", { name: "Development controls", exact: true }),
     ).toBeFocused();
 
-    const add = page.getByRole("button", { name: "Add an event", exact: true });
+    const add = page.getByRole("button", { name: "Create event", exact: true });
     await add.click();
-    const create = page.getByRole("dialog", { name: "Add an event" });
+    const create = page.getByRole("dialog", { name: "Create event" });
     await expectPinnedChrome(create);
     await expect(create.locator(".dialog-header h2")).toHaveCSS(
       "font-size",

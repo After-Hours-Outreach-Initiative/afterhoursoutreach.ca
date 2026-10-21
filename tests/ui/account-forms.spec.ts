@@ -2836,9 +2836,9 @@ test("event editor shows native number and URL errors without submitting", async
   await profiles
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("button", { name: "Add an event", exact: true }).click();
+  await page.getByRole("button", { name: "Create event", exact: true }).click();
   const dialog = page.getByRole("dialog", {
-    name: "Add an event",
+    name: "Create event",
     exact: true,
   });
   const form = dialog.locator("[data-event-save]");
@@ -2937,7 +2937,7 @@ test("event editor shows native number and URL errors without submitting", async
   expect(requests).toEqual([]);
   await time.fill("20:00");
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Add an event", exact: true }).click();
+  await page.getByRole("button", { name: "Create event", exact: true }).click();
   await expect(date).toHaveValue("2030-01-01");
   await expect(time).toHaveValue("20:00");
   await expect(
