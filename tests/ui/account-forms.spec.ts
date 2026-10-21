@@ -2165,12 +2165,16 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(save).toBeDisabled();
 });
 
-test("profile headings scale responsively and wrap beside their edit buttons", async ({
+test("account headings scale consistently and profile titles wrap beside their edit buttons", async ({
   page,
   baseURL,
 }) => {
   await createLocalAccount(page.request, baseURL!);
   await page.goto("/volunteer/account");
+  const headings = page.locator(
+    "[data-account-contents-body] > .volunteer-panel > h2",
+  );
+  await expect(headings).toHaveCount(3);
   const form = page.locator("[data-account-profile]");
   const rows = form.locator(".volunteer-profile-section-heading");
   await expect(rows).toHaveCount(4);
@@ -2178,10 +2182,12 @@ test("profile headings scale responsively and wrap beside their edit buttons", a
 
   for (const width of [320, 375, 640, 767, 768, 1024, 1280]) {
     await page.setViewportSize({ width, height: 812 });
-    await expect(page.locator("#account-profile-heading")).toHaveCSS(
-      "font-size",
-      width < 768 ? "20px" : "24px",
-    );
+    for (const heading of await headings.all()) {
+      await expect(heading).toHaveCSS(
+        "font-size",
+        width < 768 ? "20px" : "24px",
+      );
+    }
     for (const row of await rows.all()) {
       const heading = row.getByRole("heading", { level: 3 });
       const edit = row.getByRole("button");
