@@ -2817,9 +2817,7 @@ test("event editor shows native number and URL errors without submitting", async
   const day = dateGroup.getByRole("textbox", { name: "Day", exact: true });
   const time = dateGroup.getByLabel("Start time");
   await expect(time).toHaveAttribute("type", "time");
-  await expect(dateGroup).toContainText(
-    "Vancouver time, regardless of your device’s time zone.",
-  );
+  await expect(dialog).not.toContainText("Vancouver");
   for (const value of [
     "2030-02-30T20:00",
     // Historical transitions are stable across browser/runtime tzdata versions.

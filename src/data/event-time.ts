@@ -28,7 +28,7 @@ export function vancouverInput(instant: number) {
 
 export function vancouverInstant(input: string): string {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(input))
-    throw new Error("Choose a valid Vancouver date and time.");
+    throw new Error("Choose a valid date and time.");
   const naive = Date.parse(`${input}:00Z`);
   // Vancouver uses UTC−8/−7. Reject skipped or ambiguous DST wall times.
   const candidates = [7, 8]
@@ -38,7 +38,7 @@ export function vancouverInstant(input: string): string {
     );
   if (candidates.length !== 1)
     throw new Error(
-      "That Vancouver time is skipped or ambiguous at a daylight-saving change. Choose another time.",
+      "That time is skipped or ambiguous at a daylight-saving change. Choose another time.",
     );
   return new Date(candidates[0]).toISOString();
 }

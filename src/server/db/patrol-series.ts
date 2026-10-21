@@ -374,7 +374,7 @@ export async function savePatrolSeries(
     } catch {
       throw new RequestError(
         400,
-        "Choose a valid, unambiguous first Vancouver date and time.",
+        "Choose a valid, unambiguous first date and time.",
       );
     }
     if (first <= now)
