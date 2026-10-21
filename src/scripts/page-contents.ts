@@ -23,6 +23,7 @@ export function initPageContents(
   const review = contents.hasAttribute("data-application-review-contents");
   const application =
     contents.hasAttribute("data-application-contents") || review;
+  const idleHeading = contents.dataset.contentsIdleHeading;
   const links = [...contents.querySelectorAll<HTMLAnchorElement>("a")];
   // Both responsive lists share each section, so targets are measured and
   // observed once while all of their links stay in sync.
@@ -83,9 +84,14 @@ export function initPageContents(
   };
   const activate = (active: (typeof sections)[number]) => {
     const overview = application && active.hash === `#${topId}`;
-    current.textContent = overview
-      ? "Sections"
-      : (active.links[0].textContent?.trim() ?? "");
+    const heading =
+      idleHeading && !contents.hasAttribute("data-contents-stuck")
+        ? idleHeading
+        : overview
+          ? "Sections"
+          : (active.links[0].textContent?.trim() ?? "");
+    if (current.textContent !== heading) current.textContent = heading;
+    if (active.links[0].getAttribute("aria-current") === "location") return;
     for (const section of sections)
       for (const link of section.links) {
         if (section === active) link.setAttribute("aria-current", "location");
@@ -131,8 +137,8 @@ export function initPageContents(
         actionsReadingEdge(actionBounds.height) + 1
     )
       active = actions;
-    if (active && active.links[0].getAttribute("aria-current") !== "location")
-      activate(active);
+    // The compact label can change at the sticky edge within the same section.
+    if (active) activate(active);
   };
   const schedule = () => {
     if (!frame) frame = requestAnimationFrame(update);

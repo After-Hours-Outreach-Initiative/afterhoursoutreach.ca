@@ -344,7 +344,7 @@ for (const root of [16, 20, 24]) {
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.goto("/volunteer/account");
       const accountContents = page.getByRole("navigation", {
-        name: "On this page",
+        name: "Sections",
       });
       await chooseSection(accountContents, "account-profile-emergency-contact");
       await expectSectionAtReadingEdge(

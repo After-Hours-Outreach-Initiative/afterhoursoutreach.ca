@@ -392,9 +392,16 @@ for (const path of ["/apply", "/volunteer/account"]) {
       try {
         await page.goto(path, { waitUntil: "commit" });
         const contents = page.getByRole("navigation", {
-          name: path === "/apply" ? "Sections" : "On this page",
+          name: "Sections",
         });
         await expect(contents).toBeVisible();
+        await expect(
+          contents.locator(
+            width < 1024
+              ? "[data-contents-current]"
+              : ".volunteer-contents-sidebar h2",
+          ),
+        ).toHaveText("Sections");
         if (path === "/volunteer/account") {
           await expect(
             page.locator('[data-profile-answer="preferredName"] dd'),
@@ -438,8 +445,13 @@ for (const path of ["/apply", "/volunteer/account"]) {
             .locator(".volunteer-application-intro")
             .boundingBox();
           expect(initial!.y).toBe(intro!.y + intro!.height + 32);
-        } else if (width < 1024) {
-          expect(initial!.y).toBe(header!.y + header!.height + 32);
+        } else if (path === "/volunteer/account") {
+          const title = await page
+            .getByRole("heading", { name: "Account", exact: true })
+            .boundingBox();
+          expect(initial!.y).toBe(
+            title!.y + title!.height + (width < 1024 ? 24 : 16),
+          );
         } else {
           expect(initial!.y).toBe(header!.y + header!.height + 24);
         }
@@ -470,7 +482,7 @@ for (const path of ["/apply", "/volunteer/account"]) {
           );
           await expect
             .poll(async () => (await contents.boundingBox())!.y)
-            .toBe(initial!.y);
+            .toBe(header!.height + 24);
         }
       } finally {
         release();
@@ -559,7 +571,7 @@ test("account contents navigate profile and settings sections on desktop and mob
     // edge; a taller viewport clamps that native jump at the document bottom.
     await page.setViewportSize({ width, height: width < 1024 ? 812 : 768 });
     await page.goto("/volunteer/account");
-    const contents = page.getByRole("navigation", { name: "On this page" });
+    const contents = page.getByRole("navigation", { name: "Sections" });
     const menu = contents.locator("[data-contents-menu]");
     const summary = menu.locator("summary");
     const current = summary.locator("[data-contents-current]");
@@ -575,8 +587,8 @@ test("account contents navigate profile and settings sections on desktop and mob
       await expect(
         contents.locator(".volunteer-contents-sidebar"),
       ).toBeHidden();
-      await expect(summary).toHaveAccessibleName("On this page");
-      await expect(current).toHaveText("Your profile");
+      await expect(summary).toHaveAccessibleName("Sections");
+      await expect(current).toHaveText("Sections");
       await expect(summary.locator(":scope > :first-child")).toHaveClass(
         "volunteer-contents-icon",
       );
@@ -637,6 +649,21 @@ test("account contents navigate profile and settings sections on desktop and mob
       await summary.press("Enter");
       await page.locator("#account-profile-heading").focus();
       await expect(menu).not.toHaveAttribute("open");
+      // Crossing the sticky edge changes the label without changing sections.
+      await page.evaluate(
+        (top) => scrollTo({ top, behavior: "instant" }),
+        initial.y - headerHeight,
+      );
+      await expect(contents).toHaveAttribute("data-contents-stuck", "");
+      await expect(current).toHaveText("Your profile");
+      await expect(
+        contents.locator(
+          'a[href="#account-profile-heading"][aria-current="location"]',
+        ),
+      ).toHaveCount(2);
+      await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+      await expect(contents).not.toHaveAttribute("data-contents-stuck");
+      await expect(current).toHaveText("Sections");
     } else {
       await expect(menu).toBeHidden();
       await expect(
@@ -687,7 +714,7 @@ test("account contents navigate profile and settings sections on desktop and mob
       ).toHaveCount(2);
       if (width < 1024) {
         await expect(current).toHaveText(heading);
-        await expect(summary).toHaveAccessibleName("On this page");
+        await expect(summary).toHaveAccessibleName("Sections");
         await expect(menu).not.toHaveAttribute("open");
         await expect(contents).toHaveAttribute("data-contents-stuck", "");
         await expect(summary).toHaveCSS("border-radius", "10px");
@@ -719,7 +746,7 @@ test("account contents navigate profile and settings sections on desktop and mob
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBe(width);
       await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
-      await expect(current).toHaveText("Your profile");
+      await expect(current).toHaveText("Sections");
       await expect(contents).not.toHaveAttribute("data-contents-stuck");
       await expect(summary).toHaveCSS("border-radius", "10px");
     }
@@ -3338,7 +3365,7 @@ test("authenticator setup and sign-in show native inline code errors", async ({
     loadingLabel: "Verifying…",
   });
   await expect(name).toHaveValue("Unsaved authenticator draft");
-  const contents = page.getByRole("navigation", { name: "On this page" });
+  const contents = page.getByRole("navigation", { name: "Sections" });
   await contents
     .getByRole("link", { name: "Two-factor authentication", exact: true })
     .click();
