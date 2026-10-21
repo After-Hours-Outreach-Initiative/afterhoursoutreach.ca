@@ -4,6 +4,8 @@ import { vancouverInput } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
 import DialogHeader from "@/components/DialogHeader.astro";
 import RecurringIcon from "@/components/icons/RecurringIcon.astro";
+import MinusIcon from "@/components/icons/MinusIcon.astro";
+import PlusIcon from "@/components/icons/PlusIcon.astro";
 import DateInput from "./DateInput.astro";
 import NativePickerInput from "./NativePickerInput.astro";
 interface Props {
@@ -165,16 +167,39 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
         />
         <div class="volunteer-field">
           <label for={`${dialogId}-spots`}>Volunteer spots</label>
-          <input
-            id={`${dialogId}-spots`}
-            name="spots"
-            type="number"
-            min="1"
-            max="100"
-            aria-describedby={`error-${dialogId}-spots`}
-            required
-            value={event?.spots ?? 8}
-          />
+          <div class="volunteer-spots-stepper">
+            <button
+              class="btn btn-quiet"
+              type="button"
+              data-spots-step="-1"
+              aria-label="Decrease volunteer spots"
+              aria-controls={`${dialogId}-spots`}
+              disabled
+            >
+              <MinusIcon />
+            </button>
+            <input
+              id={`${dialogId}-spots`}
+              name="spots"
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              aria-describedby={`error-${dialogId}-spots`}
+              required
+              value={event?.spots ?? 8}
+            />
+            <button
+              class="btn btn-quiet"
+              type="button"
+              data-spots-step="1"
+              aria-label="Increase volunteer spots"
+              aria-controls={`${dialogId}-spots`}
+              disabled
+            >
+              <PlusIcon />
+            </button>
+          </div>
           <FieldError
             field={`${dialogId}-spots`}
             message="Enter a whole number from 1 to 100."

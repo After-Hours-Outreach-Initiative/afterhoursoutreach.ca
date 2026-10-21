@@ -153,11 +153,26 @@ test("application dialogs keep their chrome visible while only their body scroll
             "Please try again.",
           ),
         loadingLabel: "Saving…",
+        pending: async () => {
+          await expect(
+            create.getByRole("spinbutton", { name: "Volunteer spots" }),
+          ).toBeDisabled();
+          for (const name of [
+            "Decrease volunteer spots",
+            "Increase volunteer spots",
+          ])
+            await expect(create.getByRole("button", { name })).toBeDisabled();
+        },
       });
       await expect(
         create.getByRole("button", { name: "Save event" }),
       ).toBeEnabled();
       await expect(create.locator("[data-form-message]")).toBeInViewport();
+      for (const name of [
+        "Decrease volunteer spots",
+        "Increase volunteer spots",
+      ])
+        await expect(create.getByRole("button", { name })).toBeEnabled();
     }
     await page.keyboard.press("Escape");
     await expect(add).toBeFocused();
