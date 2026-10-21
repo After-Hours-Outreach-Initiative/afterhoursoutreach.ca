@@ -393,7 +393,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       await action({ action: "cancel", id: initial[0].id }, volunteer.cookie),
     );
     await expect(firstCard.locator(".volunteer-spots")).toHaveText(
-      "3 spots left",
+      "1 spots left",
       { timeout: 15_000 },
     );
     await expect(

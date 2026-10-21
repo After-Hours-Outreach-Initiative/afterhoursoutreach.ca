@@ -57,7 +57,7 @@ export function previewEventFixtures(now = Date.now()) {
       days: 7,
       time: "18:00",
       point: "Strathcona Community Centre",
-      spots: 2,
+      spots: 4,
     },
     {
       key: "closed-patrol",

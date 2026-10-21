@@ -40,7 +40,7 @@ beforeEach(() => {
     db.prepare(
       `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
       VALUES (?, ?, ?, 'Meeting point', ?, 'organizer', 0, 0)`,
-    ).run(type, type, Date.now() + 86_400_000, type === "orientation" ? 2 : 1);
+    ).run(type, type, Date.now() + 86_400_000, type === "orientation" ? 4 : 3);
   }
 });
 
@@ -87,7 +87,7 @@ test("first-orientation cap covers inserts, reactivation and reassignment but al
 
 test("patrol approval or recorded completion lifts the cap; existing excess bookings are preserved", () => {
   // Leave room for a completed volunteer as well as the reserved first-timer places.
-  db.exec("UPDATE event SET spots=3 WHERE id='orientation'");
+  db.exec("UPDATE event SET spots=5 WHERE id='orientation'");
   anotherOrientation();
   approve("alice");
   signUp("first", "orientation", "alice");
@@ -142,13 +142,168 @@ function capacityPeople(prefix: string, count: number, completed = false) {
   });
 }
 
+test("medic and orientee reservations are exclusive, dynamic and freed by cancellation", () => {
+  db.exec("UPDATE event SET spots=6 WHERE id='orientation'");
+  const medics = capacityPeople("medic", 3, true);
+  const newbies = capacityPeople("new-medic", 3);
+  const general = capacityPeople("general", 3, true);
+  for (const id of [...medics, ...newbies])
+    db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
+      id,
+    );
+  // These medics have no completion and occupy ONLY the two orientee places.
+  for (const id of newbies.slice(0, 2)) signUp(id, "orientation", id);
+  for (const id of general.slice(0, 2)) signUp(id, "orientation", id);
+  for (const id of [newbies[2], general[2]])
+    assert.throws(
+      () => signUp(id, "orientation", id),
+      /signup_places_reserved/,
+    );
+  for (const id of medics.slice(0, 2)) signUp(id, "orientation", id);
+  assert.throws(
+    () =>
+      db
+        .prepare("UPDATE signup SET user_id=? WHERE id=?")
+        .run(general[2], medics[0]),
+    /signup_places_reserved/,
+  );
+  assert.equal(
+    db.prepare("SELECT user_id FROM signup WHERE id=?").get(medics[0])?.user_id,
+    medics[0],
+  );
+  db.prepare("UPDATE signup SET status='cancelled' WHERE id=?").run(medics[0]);
+  assert.throws(
+    () => signUp(general[2], "orientation", general[2]),
+    /signup_places_reserved/,
+  );
+  db.prepare("UPDATE signup SET status='confirmed' WHERE id=?").run(medics[0]);
+  db.prepare("UPDATE signup SET status='cancelled' WHERE id=?").run(newbies[0]);
+  assert.throws(
+    () => signUp(medics[2], "orientation", medics[2]),
+    /signup_places_reserved/,
+  );
+  db.prepare("UPDATE signup SET status='confirmed' WHERE id=?").run(newbies[0]);
+  // Extra medics AND extra orientees can share capacity beyond the reserved four.
+  db.exec("UPDATE event SET spots=8 WHERE id='orientation'");
+  signUp(medics[2], "orientation", medics[2]);
+  signUp(newbies[2], "orientation", newbies[2]);
+  assert.equal(
+    db.prepare("SELECT count(*) n FROM signup WHERE status='confirmed'").get()
+      ?.n,
+    8,
+  );
+});
+
+test("medic team alone or completion without patrol approval cannot fill a medic reservation", () => {
+  const medics = capacityPeople("medic", 2, true);
+  for (const id of medics)
+    db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
+      id,
+    );
+  signUp("alice", "orientation", "alice");
+  signUp("bob", "orientation", "bob");
+  db.prepare(
+    "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id=?",
+  ).run(medics[0]);
+  assert.throws(
+    () => signUp(medics[0], "orientation", medics[0]),
+    /signup_places_reserved/,
+  );
+  approve(medics[0]);
+  db.prepare(
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
+  ).run(medics[0]);
+  assert.throws(
+    () => signUp(medics[0], "orientation", medics[0]),
+    /signup_not_eligible/,
+  );
+  db.prepare(
+    "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+  ).run(medics[0]);
+  for (const id of medics) signUp(id, "orientation", id);
+});
+
+test("minimum capacities apply to raw event, series and template inserts and edits", () => {
+  for (const orientation of [0, 1]) {
+    const minimum = orientation ? 4 : 2;
+    for (const spots of [1, minimum - 1]) {
+      assert.throws(
+        () =>
+          db
+            .prepare(
+              `INSERT INTO event
+        (id,type,includes_orientation,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+        VALUES ('invalid','patrol',?,0,'Point',?,'organizer',0,0)`,
+            )
+            .run(orientation, spots),
+        /event_minimum_capacity/,
+      );
+      assert.throws(
+        () =>
+          db
+            .prepare(
+              `INSERT INTO patrol_series
+        (id,first_date,local_time,interval_weeks,meeting_point,spots,includes_orientation,created_by,created_at,updated_at)
+        VALUES ('invalid','2030-01-01','20:30',1,'Point',?,?,'organizer',0,0)`,
+            )
+            .run(spots, orientation),
+        /event_minimum_capacity/,
+      );
+    }
+    db.prepare(
+      `INSERT INTO patrol_series
+      (id,first_date,local_time,interval_weeks,meeting_point,spots,includes_orientation,created_by,created_at,updated_at)
+      VALUES (?,'2030-01-01','20:30',1,'Point',?,?,'organizer',0,0)`,
+    ).run(`series-${orientation}`, minimum, orientation);
+    assert.throws(
+      () =>
+        db
+          .prepare("UPDATE patrol_series SET spots=? WHERE id=?")
+          .run(minimum - 1, `series-${orientation}`),
+      /event_minimum_capacity/,
+    );
+    assert.throws(
+      () =>
+        db
+          .prepare(
+            `INSERT INTO patrol_series_template
+      (id,series_id,effective_date,local_time,meeting_point,spots,open,hidden,includes_orientation)
+      VALUES ('invalid',?,'2030-01-01','20:30','Point',?,1,0,?)`,
+          )
+          .run(`series-${orientation}`, minimum - 1, orientation),
+      /event_minimum_capacity/,
+    );
+    db.prepare(
+      `INSERT INTO patrol_series_template
+      (id,series_id,effective_date,local_time,meeting_point,spots,open,hidden,includes_orientation)
+      VALUES (?,?,'2030-01-01','20:30','Point',?,1,0,?)`,
+    ).run(
+      `template-${orientation}`,
+      `series-${orientation}`,
+      minimum,
+      orientation,
+    );
+    assert.throws(
+      () =>
+        db
+          .prepare("UPDATE patrol_series_template SET spots=? WHERE id=?")
+          .run(minimum - 1, `template-${orientation}`),
+      /event_minimum_capacity/,
+    );
+  }
+});
+
 test("orientation patrol reserves two total-capacity places without requiring two bookings", () => {
   db.exec("UPDATE event SET spots=8,includes_orientation=1 WHERE id='patrol'");
   const completed = capacityPeople("completed", 7, true);
+  for (const id of completed.slice(0, 2))
+    db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
+      id,
+    );
   for (const id of completed.slice(0, 6)) signUp(id, "patrol", id);
   assert.throws(
     () => signUp(completed[6], "patrol", completed[6]),
-    /orientation_places_reserved/,
+    /signup_places_reserved/,
   );
   assert.equal(
     db.prepare("SELECT open FROM event WHERE id='patrol'").get()?.open,
@@ -164,7 +319,7 @@ test("orientation patrol reserves two total-capacity places without requiring tw
   // One first-timer neither blocks nor cancels the patrol; the other place stays reserved.
   assert.throws(
     () => signUp(completed[6], "patrol", completed[6]),
-    /orientation_places_reserved/,
+    /signup_places_reserved/,
   );
   signUp(firstTimers[1], "patrol", firstTimers[1]);
   assert.throws(
@@ -213,16 +368,20 @@ test("four first-timers maximum also guards reactivation, moves and attendee rea
 test("orientation toggles and capacity edits reject incompatible bookings and preserve history", () => {
   assert.throws(
     () => db.exec("UPDATE event SET includes_orientation=1 WHERE id='patrol'"),
-    /orientation_minimum_capacity/,
+    /event_minimum_capacity|orientation_edit_conflict/,
   );
   assert.throws(
     () =>
       db.exec(`INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
     SELECT 'invalid-orientation','orientation',starts_at,meeting_point,1,created_by,created_at,updated_at FROM event WHERE id='patrol'`),
-    /orientation_minimum_capacity/,
+    /event_minimum_capacity/,
   );
   db.exec("UPDATE event SET spots=8 WHERE id='patrol'");
   const completed = capacityPeople("completed", 7, true);
+  for (const id of completed.slice(0, 2))
+    db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
+      id,
+    );
   for (const id of completed) signUp(id, "patrol", id);
   assert.throws(
     () => db.exec("UPDATE event SET includes_orientation=1 WHERE id='patrol'"),
@@ -318,6 +477,13 @@ test("only an organizer can be recorded as the approver", () => {
 });
 
 test("last spot cannot be overbooked, including by reactivation or moving", () => {
+  const medics = capacityPeople("medic", 2, true);
+  for (const id of medics) {
+    db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
+      id,
+    );
+    signUp(id, "orientation", id);
+  }
   const reserved = capacityPeople("reserved", 1)[0];
   signUp("reserved", "orientation", reserved);
   signUp("first", "orientation", "alice");
@@ -340,7 +506,7 @@ test("last spot cannot be overbooked, including by reactivation or moving", () =
 });
 
 test("duplicate confirmed signup is rejected, cancelled signup permits a new one", () => {
-  db.exec("UPDATE event SET spots = 3 WHERE id = 'orientation'");
+  db.exec("UPDATE event SET spots = 5 WHERE id = 'orientation'");
   signUp("first", "orientation", "alice");
   assert.throws(() => signUp("duplicate", "orientation", "alice"), /UNIQUE/);
   db.exec("UPDATE signup SET status = 'cancelled' WHERE id = 'first'");
@@ -387,12 +553,12 @@ test("inactive accounts, missing applications, closed, hidden, cancelled and sta
 });
 
 test("capacity cannot shrink below existing signups", () => {
-  db.exec("UPDATE event SET spots = 2 WHERE id = 'orientation'");
+  db.exec("UPDATE event SET spots = 4 WHERE id = 'orientation'");
   signUp("first", "orientation", "alice");
   signUp("second", "orientation", "bob");
   assert.throws(
     () => db.exec("UPDATE event SET spots = 1 WHERE id = 'orientation'"),
-    /capacity_below_signups|orientation_minimum_capacity/,
+    /capacity_below_signups|event_minimum_capacity|orientation_edit_conflict/,
   );
 });
 

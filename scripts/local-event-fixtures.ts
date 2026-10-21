@@ -60,7 +60,8 @@ export function localEventFixtures(now = Date.now()) {
       type: "patrol",
       startsAt: date(12),
       point: school,
-      spots: 1,
+      // One booked general place plus two outstanding medic reservations.
+      spots: 3,
       map,
     },
     {

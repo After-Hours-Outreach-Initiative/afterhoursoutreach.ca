@@ -149,6 +149,11 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     : focused?.matches("[data-live-series] > summary")
       ? "[data-live-series] > summary"
       : null;
+  const focusedEventSummary = [
+    ".volunteer-roster > summary",
+    ".public-event-roster > summary",
+    ".event-avatar-description > summary",
+  ].find((selector) => focused?.matches(selector));
   const dialog = element?.closest<HTMLDialogElement>("dialog");
   const restoreFocus = Boolean(
     element
@@ -253,12 +258,17 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       ) {
         const replacement = document.importNode(updated, true);
         renderedCards.set(replacement, updated.outerHTML);
-        const roster =
-          replacement.querySelector<HTMLDetailsElement>(".volunteer-roster");
-        if (roster)
-          roster.open =
-            card?.querySelector<HTMLDetailsElement>(".volunteer-roster")
-              ?.open ?? false;
+        for (const selector of [
+          ".volunteer-roster",
+          ".public-event-roster",
+          ".event-avatar-description",
+        ]) {
+          const details =
+            replacement.querySelector<HTMLDetailsElement>(selector);
+          if (details)
+            details.open =
+              card?.querySelector<HTMLDetailsElement>(selector)?.open ?? false;
+        }
         if (card) {
           if (position === card) position = replacement;
           card.replaceWith(replacement);
@@ -316,11 +326,13 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
               : "[data-show-dialog]"
             : !element && focusedSeriesSummary
               ? focusedSeriesSummary
-              : !element &&
-                  focused instanceof HTMLElement &&
-                  focused.dataset.showDialog
-                ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
-                : ".volunteer-roster summary";
+              : !element && focusedEventSummary
+                ? focusedEventSummary
+                : !element &&
+                    focused instanceof HTMLElement &&
+                    focused.dataset.showDialog
+                  ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+                  : ".volunteer-roster summary";
     (card && !card.hidden
       ? card.querySelector<HTMLElement>(selector)
       : null
