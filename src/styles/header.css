@@ -202,6 +202,7 @@
   @apply text-xl;
   display: flex;
   align-items: center;
+  gap: 0.75rem;
   min-height: 3rem;
   width: 100%;
   padding: 1rem 0;
@@ -210,10 +211,16 @@
   line-height: 1.5;
   text-align: left;
 }
-.header-mobile-link:hover,
-.header-mobile-link[aria-current] {
+.header-mobile-link:hover {
   color: white;
   background: #171a20;
+}
+.header-mobile-arrow {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: #a1a1aa;
 }
 .header-mobile-children {
   margin-left: 1.25rem;
@@ -229,6 +236,9 @@
   margin-top: 2rem;
   line-height: 1.5;
 }
+.header-mobile-panel [data-header-discord] .header-mobile-arrow {
+  color: inherit;
+}
 .header-mobile-account {
   margin: 3rem 0 1rem;
 }
@@ -236,6 +246,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  padding-right: 1rem;
 }
 .header-mobile-account .header-account-icon {
   align-self: flex-start;
@@ -249,6 +260,7 @@
 .header-mobile-account .header-account-card a:not(.header-account-identity),
 .header-mobile-account .header-account-card button {
   @apply text-lg;
+  gap: 0.75rem;
   min-height: 3.5rem;
   padding: 0.75rem 1rem;
   line-height: inherit;
