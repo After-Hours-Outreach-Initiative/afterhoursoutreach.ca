@@ -346,9 +346,11 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
       class="btn btn-primary"
       type="submit"
       form={`${dialogId}-save`}
-      data-loading-label="Saving…"
-      disabled>Save event</button
+      data-loading-label={event ? "Saving…" : "Creating…"}
+      disabled
     >
+      {event ? "Save event" : "Create event"}
+    </button>
     {
       event && (
         <button
