@@ -234,8 +234,9 @@ const filter =
                 Create event
               </button>
             ) : actor?.role === "organizer" ? (
-              <a class="btn btn-quiet" href="/manage/events">
-                Manage events →
+              <a class="btn btn-primary" href="/manage/events">
+                Manage events
+                <ArrowRightIcon class="btn-icon" />
               </a>
             ) : null}
           </div>
