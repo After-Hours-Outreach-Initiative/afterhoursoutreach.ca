@@ -2886,20 +2886,25 @@ test("event editor shows native number and URL errors without submitting", async
     exact: true,
   });
   const recurrence = form.locator("[data-recurrence-controls]");
-  const repeat = form.locator('[name="recurring"]');
-  const interval = form.locator('[name="intervalWeeks"]');
+  const recurring = form.getByLabel("Recurring patrol", {
+    exact: true,
+  });
+  const interval = form.getByLabel("Interval (weeks)", { exact: true });
   const endDate = form.locator('[name="endDate"]');
   await expect(eventType.getByRole("radio")).toHaveCount(2);
   await expect(patrol).toBeChecked();
-  await repeat.check();
+  await expect(
+    recurrence.locator(".volunteer-recurrence-label svg"),
+  ).toHaveAttribute("aria-hidden", "true");
+  await recurring.check();
   await interval.fill("3");
   await endDate.fill("2030-02-01");
   await patrol.focus();
   await patrol.press("ArrowRight");
   await expect(orientation).toBeChecked();
   await expect(recurrence).toBeHidden();
-  await expect(repeat).not.toBeChecked();
-  for (const input of [repeat, interval, endDate])
+  await expect(recurring).not.toBeChecked();
+  for (const input of [recurring, interval, endDate])
     await expect(input).toBeDisabled();
   expect(
     await form.evaluate((element: HTMLFormElement) => {
@@ -2911,7 +2916,7 @@ test("event editor shows native number and URL errors without submitting", async
   ).toEqual(["orientation", null, null, null]);
   await patrol.check();
   await expect(recurrence).toBeVisible();
-  await expect(repeat).not.toBeChecked();
+  await expect(recurring).not.toBeChecked();
   await expect(form.locator("[data-recurrence-fields]")).toBeHidden();
   await orientation.check();
   const requests: string[] = [];
@@ -2966,7 +2971,7 @@ test("event editor shows native number and URL errors without submitting", async
   await form.evaluate((element: HTMLFormElement) => element.reset());
   await expect(patrol).toBeChecked();
   await expect(recurrence).toBeVisible();
-  await expect(repeat).toBeEnabled();
+  await expect(recurring).toBeEnabled();
   await expect(interval).toHaveValue("1");
   await expect(endDate).toHaveValue("");
   await expect(interval).toBeDisabled();

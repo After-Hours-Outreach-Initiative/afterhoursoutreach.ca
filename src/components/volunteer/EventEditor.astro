@@ -3,6 +3,7 @@ import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
 import DialogHeader from "@/components/DialogHeader.astro";
+import RecurringIcon from "@/components/icons/RecurringIcon.astro";
 import DateInput from "./DateInput.astro";
 import NativePickerInput from "./NativePickerInput.astro";
 interface Props {
@@ -103,18 +104,24 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
         }
         {
           !event && (
-            <fieldset
+            <div
               class="volunteer-field volunteer-wide"
               data-recurrence-controls
             >
-              <legend>Repeat patrol</legend>
-              <label>
-                <input type="checkbox" name="recurring" /> Repeat every week or
-                every few weeks
+              <label class="volunteer-check volunteer-recurrence-toggle">
+                <input
+                  type="checkbox"
+                  name="recurring"
+                  aria-describedby={`${dialogId}-recurring-help`}
+                />
+                <span class="volunteer-recurrence-label">
+                  <RecurringIcon class="volunteer-recurrence-icon" />
+                  <span>Recurring patrol</span>
+                </span>
               </label>
               <div class="volunteer-fields" data-recurrence-fields hidden>
                 <label class="volunteer-field">
-                  Repeat every (weeks)
+                  Interval (weeks)
                   <input
                     name="intervalWeeks"
                     type="number"
@@ -140,10 +147,10 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
                   />
                 </div>
               </div>
-              <p class="volunteer-help">
+              <p class="volunteer-help" id={`${dialogId}-recurring-help`}>
                 Volunteers see the next 3 occurrences per series.
               </p>
-            </fieldset>
+            </div>
           )
         }
         <DateInput

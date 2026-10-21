@@ -955,7 +955,11 @@ body:has([data-application], [data-account-contents-flow]) {
   margin-bottom: 0.5rem;
   font-weight: normal;
 }
-.volunteer-event-type-options,
+.volunteer-event-type-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.25rem;
+}
 .volunteer-certification-options,
 .volunteer-training-options,
 .volunteer-referral-options {
@@ -965,6 +969,7 @@ body:has([data-application], [data-account-contents-flow]) {
   margin-block: 1rem;
 }
 .volunteer-event-type-options > label,
+.volunteer-recurrence-toggle,
 .volunteer-certification-options > label,
 .volunteer-training-options > label,
 .volunteer-referral-options > label {
@@ -973,6 +978,17 @@ body:has([data-application], [data-account-contents-flow]) {
   /* Pad the touch target evenly without moving controls off the first line. */
   padding-block: 0.625rem;
   cursor: pointer;
+}
+.volunteer-recurrence-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.volunteer-recurrence-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
 }
 .volunteer-training-divider {
   display: flex;
