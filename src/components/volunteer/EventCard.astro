@@ -51,10 +51,7 @@ const blocked =
 ---
 
 <li
-  class:list={[
-    "volunteer-event-card",
-    { "volunteer-event-self-service": !organizer },
-  ]}
+  class="volunteer-event-card"
   data-live-event={event.id}
   data-event-type="patrol"
   data-includes-orientation={String(Boolean(event.includesOrientation))}
@@ -64,8 +61,8 @@ const blocked =
     Boolean(event.includesOrientation),
   )}
 >
-  <div class="volunteer-event-top">
-    <div>
+  <div class="volunteer-event-layout">
+    <div class="volunteer-event-info">
       {
         event.cancelledAt ? (
           <p class="volunteer-hidden">Cancelled</p>
@@ -123,6 +120,7 @@ const blocked =
       }
       {!organizer && !event.signedUp && actor && blocked && <p>{blocked}</p>}
     </div>
+    <EventAttendance event={event} />
     <div class="volunteer-actions">
       {
         organizer ? null : event.signedUp && future ? (
@@ -170,7 +168,6 @@ const blocked =
       }
     </div>
   </div>
-  <EventAttendance event={event} />
   {
     !organizer && publicRoster && publicRoster.length > 0 && (
       <PublicEventRoster roster={publicRoster} />
@@ -192,3 +189,53 @@ const blocked =
     )
   }
 </li>
+
+<style>
+  .volunteer-event-card {
+    padding: 1.25rem;
+  }
+  .volunteer-event-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+  }
+  .volunteer-event-info {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .volunteer-event-info > p {
+    margin: 0.25rem 0 0;
+    line-height: 1.5;
+  }
+  .volunteer-event-info > .volunteer-hidden {
+    margin: 0 0 0.5rem;
+  }
+  .volunteer-actions:empty {
+    display: none;
+  }
+  @media (width >= 64rem) {
+    .volunteer-event-layout {
+      grid-template-columns:
+        minmax(0, 1fr) minmax(0, 0.9fr)
+        minmax(8rem, max-content);
+      gap: 1.5rem;
+    }
+    .volunteer-actions {
+      justify-self: end;
+    }
+  }
+  @media (width < 40rem) {
+    .volunteer-event-card {
+      padding: 1rem;
+    }
+    .volunteer-event-info h3 {
+      font-size: 1.25rem;
+      line-height: 1.4;
+    }
+    .volunteer-actions > :is(form, .btn),
+    .volunteer-actions > form > .btn {
+      width: 100%;
+    }
+  }
+</style>

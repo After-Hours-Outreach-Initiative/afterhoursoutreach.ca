@@ -1,6 +1,7 @@
 @reference "./tailwind.css";
 
 .volunteer-portal {
+  --attendee-avatar-width: 1.375rem;
   --volunteer-border: 1px solid #3f3f46;
   --volunteer-check-size: 1.375rem;
   --volunteer-check-gap: 0.625rem;
@@ -1370,13 +1371,16 @@ body:has([data-application], [data-account-contents-flow]) {
   margin: 0 0 0.75rem;
 }
 .volunteer-roster {
-  margin-top: 1.25rem;
+  margin-top: 0.5rem;
   border-top: 1px solid #27272a;
-  padding-top: 1rem;
+  padding-top: 0.5rem;
 }
 .volunteer-roster summary {
   cursor: pointer;
   color: #d4d4d8;
+  min-height: 2.75rem;
+  width: fit-content;
+  align-content: center;
 }
 .volunteer-roster li {
   display: flex;
@@ -1601,22 +1605,11 @@ body:has([data-application], [data-account-contents-flow]) {
   .volunteer-event-card {
     padding: 1.25rem;
   }
+  .volunteer-series-card {
+    padding: 0.75rem;
+  }
   .volunteer-fields {
     grid-template-columns: 1fr;
-  }
-  .volunteer-event-self-service {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .volunteer-event-self-service .volunteer-event-top {
-    display: contents;
-  }
-  .volunteer-event-self-service .volunteer-actions {
-    /* Leave the second row for the complete attendance block. */
-    grid-row: 3;
-  }
-  .volunteer-event-self-service .volunteer-actions:not(:empty) {
-    margin-bottom: 1rem;
   }
   .volunteer-event-top .volunteer-actions {
     width: 100%;
