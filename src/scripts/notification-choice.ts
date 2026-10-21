@@ -1,3 +1,5 @@
+import { createDialogHeader } from "./dialog";
+
 let nextChoiceId = 0;
 
 const descriptions: Record<string, string> = {
@@ -19,20 +21,24 @@ const descriptions: Record<string, string> = {
 /** Consent is collected before the write so skipped emails are never queued. */
 export function chooseNotification(kind: string): Promise<boolean | null> {
   const dialog = document.createElement("dialog");
-  dialog.className = "dialog-pop volunteer-dialog";
+  dialog.className = "dialog-pop dialog-frame volunteer-dialog";
   const heading = document.createElement("h2");
   heading.id = `notification-choice-${++nextChoiceId}`;
   heading.textContent = "Send an email?";
   dialog.setAttribute("aria-labelledby", heading.id);
+  const { header, close } = createDialogHeader(heading);
+  close.addEventListener("click", () => dialog.close());
+  const content = document.createElement("div");
+  content.className = "dialog-body";
   const description = document.createElement("p");
   description.id = `${heading.id}-description`;
   dialog.setAttribute("aria-describedby", description.id);
-  description.className = "volunteer-help mt-6";
+  description.className = "volunteer-help";
   description.textContent =
     descriptions[kind] ??
     "You can email the affected volunteers about this change.";
   const actions = document.createElement("div");
-  actions.className = "volunteer-actions mt-6";
+  actions.className = "dialog-footer";
   for (const [value, label, variant] of [
     ["skip", "Save without email", "btn-primary"],
     ["send", "Save and send email", "btn-outline"],
@@ -46,8 +52,8 @@ export function chooseNotification(kind: string): Promise<boolean | null> {
     button.addEventListener("click", () => dialog.close(value));
     actions.appendChild(button);
   }
-  for (const child of [heading, description, actions])
-    dialog.appendChild(child);
+  content.appendChild(description);
+  for (const child of [header, content, actions]) dialog.appendChild(child);
   // Keep site styles and native dialog focus handling, including inside another modal.
   (document.querySelector(".volunteer-portal") ?? document.body).appendChild(
     dialog,

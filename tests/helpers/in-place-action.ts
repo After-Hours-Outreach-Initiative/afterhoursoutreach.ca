@@ -61,9 +61,15 @@ export async function inPlaceAction(
         .click();
     }
     await expect(options.form).toHaveAttribute("aria-busy", "true");
-    const loading = options.form
-      .locator('button[aria-busy="true"], [data-action-loading]:visible')
-      .first();
+    const formId = await options.form.getAttribute("id");
+    let loading = options.form.locator(
+      'button[aria-busy="true"], [data-action-loading]:visible',
+    );
+    if (formId)
+      loading = loading.or(
+        page.locator(`button[form="${formId}"][aria-busy="true"]`),
+      );
+    loading = loading.first();
     await expect(loading).toBeVisible();
     await expect(loading).toHaveText(options.loadingLabel);
     await expect.poll(() => submissions).toBe(1);

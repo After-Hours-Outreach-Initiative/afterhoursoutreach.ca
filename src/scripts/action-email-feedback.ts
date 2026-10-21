@@ -1,3 +1,5 @@
+import { createDialogHeader } from "./dialog";
+
 export interface EmailActionResult {
   message?: string;
   retryOperation?: string;
@@ -32,25 +34,24 @@ export function showActionEmailFeedback(
   initial: EmailActionResult,
 ) {
   const dialog = document.createElement("dialog");
-  dialog.className = "dialog-pop volunteer-dialog";
+  dialog.className = "dialog-pop dialog-frame volunteer-dialog";
   dialog.dataset.actionEmailFeedback = "";
   const heading = document.createElement("h2");
   heading.id = `action-email-result-${++nextResultId}`;
   heading.textContent = title;
   dialog.setAttribute("aria-labelledby", heading.id);
+  const { header, close } = createDialogHeader(heading);
+  const content = document.createElement("div");
+  content.className = "dialog-body";
   const message = document.createElement("p");
   message.className = "volunteer-notice";
   message.setAttribute("role", "status");
   const actions = document.createElement("div");
-  actions.className = "volunteer-actions mt-6";
+  actions.className = "dialog-footer";
   const retry = document.createElement("button");
   retry.type = "button";
   retry.className = "btn btn-outline";
   retry.textContent = "Retry email only";
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "btn btn-primary";
-  close.textContent = "Close";
   let result = initial;
   const render = () => {
     message.textContent = result.message ?? "Change saved.";
@@ -59,6 +60,7 @@ export function showActionEmailFeedback(
       result.retryOperation || result.expired ? "alert" : "status",
     );
     retry.hidden = !result.retryOperation;
+    actions.hidden = !result.retryOperation;
   };
   render();
   retry.addEventListener("click", async () => {
@@ -99,8 +101,8 @@ export function showActionEmailFeedback(
   });
   dialog.addEventListener("close", () => dialog.remove(), { once: true });
   actions.appendChild(retry);
-  actions.appendChild(close);
-  for (const child of [heading, message, actions]) dialog.appendChild(child);
+  content.appendChild(message);
+  for (const child of [header, content, actions]) dialog.appendChild(child);
   (document.querySelector(".volunteer-portal") ?? document.body).appendChild(
     dialog,
   );

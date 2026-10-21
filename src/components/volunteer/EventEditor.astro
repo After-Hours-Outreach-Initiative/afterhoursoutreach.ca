@@ -2,6 +2,7 @@
 import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
+import DialogHeader from "@/components/DialogHeader.astro";
 import DateInput from "./DateInput.astro";
 import NativeDateInput from "./NativeDateInput.astro";
 interface Props {
@@ -14,297 +15,310 @@ const publicVisibility = Boolean(event?.open && !event.hidden);
 ---
 
 <dialog
-  class="dialog-pop volunteer-dialog"
+  class="dialog-pop dialog-frame volunteer-dialog"
   id={dialogId}
   aria-labelledby={`${dialogId}-heading`}
 >
-  <div class="volunteer-section-heading">
-    <h2 id={`${dialogId}-heading`}>{event ? "Edit event" : "Add an event"}</h2>
-    <button class="btn btn-quiet" data-dismiss-dialog type="button"
-      >Close</button
+  <DialogHeader
+    id={`${dialogId}-heading`}
+    title={event ? "Edit event" : "Add an event"}
+  />
+  <div class="dialog-body">
+    <form
+      id={`${dialogId}-save`}
+      class="volunteer-form"
+      data-event-save
+      data-email-prompt={event && event.confirmed > 0 ? "event" : undefined}
+      data-future-email-prompt={event && event.futureEditableConfirmed > 0
+        ? "series"
+        : undefined}
+      action="/api/v1/events/action"
+      method="post"
     >
-  </div>
-  <form
-    class="volunteer-form"
-    data-event-save
-    data-email-prompt={event && event.confirmed > 0 ? "event" : undefined}
-    data-future-email-prompt={event && event.futureEditableConfirmed > 0
-      ? "series"
-      : undefined}
-    action="/api/v1/events/action"
-    method="post"
-  >
-    {
-      event && (
-        <>
-          <input type="hidden" name="id" value={event.id} />
-          <input type="hidden" name="version" value={event.updatedAt} />
-        </>
-      )
-    }
-    <div class="volunteer-fields">
       {
-        event?.seriesId && series && (
+        event && (
           <>
-            <input type="hidden" name="seriesId" value={series.id} />
-            <input
-              type="hidden"
-              name="seriesVersion"
-              value={series.updatedAt}
-            />
-            <input
-              type="hidden"
-              name="occurrenceDate"
-              value={event.occurrenceDate!}
-            />
-            <label class="volunteer-field volunteer-wide">
-              Apply changes to
-              <select name="scope">
-                <option value="occurrence">Only this occurrence</option>
-                <option value="future">This and future occurrences</option>
-              </select>
-              <span class="volunteer-help">
-                Future edits keep bookings and individual exceptions unchanged.
-                Dates retain their original recurring identity; the date shift
-                may be up to 366 days earlier or later.
-              </span>
-            </label>
+            <input type="hidden" name="id" value={event.id} />
+            <input type="hidden" name="version" value={event.updatedAt} />
           </>
         )
       }
-      {
-        event ? (
-          <div class="volunteer-field volunteer-wide" data-event-type-readonly>
-            <span>Event type</span>
-            <span class="volunteer-readonly-value">
-              {event.type === "patrol" ? "Patrol" : "Orientation"}
-            </span>
-            <input type="hidden" name="type" value={event.type} />
-          </div>
-        ) : (
-          <label class="volunteer-field volunteer-wide">
-            Event type
-            <select name="type">
-              <option value="patrol">Patrol</option>
-              <option value="orientation">Orientation</option>
-            </select>
-          </label>
-        )
-      }
-      {
-        !event && (
-          <fieldset
-            class="volunteer-field volunteer-wide"
-            data-recurrence-controls
-          >
-            <legend>Repeat patrol</legend>
-            <label>
-              <input type="checkbox" name="recurring" /> Repeat every week or
-              every few weeks
-            </label>
-            <div class="volunteer-fields" data-recurrence-fields hidden>
-              <label class="volunteer-field">
-                Repeat every (weeks)
-                <input
-                  name="intervalWeeks"
-                  type="number"
-                  min="1"
-                  max="52"
-                  value="1"
-                  disabled
-                />
+      <div class="volunteer-fields">
+        {
+          event?.seriesId && series && (
+            <>
+              <input type="hidden" name="seriesId" value={series.id} />
+              <input
+                type="hidden"
+                name="seriesVersion"
+                value={series.updatedAt}
+              />
+              <input
+                type="hidden"
+                name="occurrenceDate"
+                value={event.occurrenceDate!}
+              />
+              <label class="volunteer-field volunteer-wide">
+                Apply changes to
+                <select name="scope">
+                  <option value="occurrence">Only this occurrence</option>
+                  <option value="future">This and future occurrences</option>
+                </select>
+                <span class="volunteer-help">
+                  Future edits keep bookings and individual exceptions
+                  unchanged. Dates retain their original recurring identity; the
+                  date shift may be up to 366 days earlier or later.
+                </span>
               </label>
-              <div class="volunteer-field">
-                <label for={`${dialogId}-endDate`}>
-                  Last recurring date (optional, inclusive)
-                </label>
-                <NativeDateInput
-                  id={`${dialogId}-endDate`}
-                  name="endDate"
-                  aria-describedby={`error-${dialogId}-endDate`}
-                  disabled
-                />
-                <FieldError
-                  field={`${dialogId}-endDate`}
-                  message="Choose a valid last recurring date on or after the start date."
-                />
-              </div>
+            </>
+          )
+        }
+        {
+          event ? (
+            <div
+              class="volunteer-field volunteer-wide"
+              data-event-type-readonly
+            >
+              <span>Event type</span>
+              <span class="volunteer-readonly-value">
+                {event.type === "patrol" ? "Patrol" : "Orientation"}
+              </span>
+              <input type="hidden" name="type" value={event.type} />
             </div>
-            <p class="volunteer-help">
-              Volunteers see the next 3 occurrences per series.
-            </p>
-          </fieldset>
-        )
-      }
-      <DateInput
-        name="startsAt"
-        id={`${dialogId}-startsAt`}
-        errorField={`${dialogId}-startsAt`}
-        label="Start date"
-        value={event ? vancouverInput(event.startsAt) : ""}
-        withTime
-        futureOnly
-      />
-      <div class="volunteer-field">
-        <label for={`${dialogId}-spots`}>Volunteer spots</label>
-        <input
-          id={`${dialogId}-spots`}
-          name="spots"
-          type="number"
-          min="1"
-          max="100"
-          aria-describedby={`error-${dialogId}-spots`}
-          required
-          value={event?.spots ?? 8}
+          ) : (
+            <label class="volunteer-field volunteer-wide">
+              Event type
+              <select name="type">
+                <option value="patrol">Patrol</option>
+                <option value="orientation">Orientation</option>
+              </select>
+            </label>
+          )
+        }
+        {
+          !event && (
+            <fieldset
+              class="volunteer-field volunteer-wide"
+              data-recurrence-controls
+            >
+              <legend>Repeat patrol</legend>
+              <label>
+                <input type="checkbox" name="recurring" /> Repeat every week or
+                every few weeks
+              </label>
+              <div class="volunteer-fields" data-recurrence-fields hidden>
+                <label class="volunteer-field">
+                  Repeat every (weeks)
+                  <input
+                    name="intervalWeeks"
+                    type="number"
+                    min="1"
+                    max="52"
+                    value="1"
+                    disabled
+                  />
+                </label>
+                <div class="volunteer-field">
+                  <label for={`${dialogId}-endDate`}>
+                    Last recurring date (optional, inclusive)
+                  </label>
+                  <NativeDateInput
+                    id={`${dialogId}-endDate`}
+                    name="endDate"
+                    aria-describedby={`error-${dialogId}-endDate`}
+                    disabled
+                  />
+                  <FieldError
+                    field={`${dialogId}-endDate`}
+                    message="Choose a valid last recurring date on or after the start date."
+                  />
+                </div>
+              </div>
+              <p class="volunteer-help">
+                Volunteers see the next 3 occurrences per series.
+              </p>
+            </fieldset>
+          )
+        }
+        <DateInput
+          name="startsAt"
+          id={`${dialogId}-startsAt`}
+          errorField={`${dialogId}-startsAt`}
+          label="Start date"
+          value={event ? vancouverInput(event.startsAt) : ""}
+          withTime
+          futureOnly
         />
-        <FieldError
-          field={`${dialogId}-spots`}
-          message="Enter a whole number from 1 to 100."
-        />
-      </div>
-      <div class="volunteer-field">
-        <label for={`${dialogId}-meetingPoint`}>Meeting point</label>
-        <input
-          id={`${dialogId}-meetingPoint`}
-          name="meetingPoint"
-          aria-describedby={`error-${dialogId}-meetingPoint`}
-          required
-          pattern={String.raw`.*\S.*`}
-          maxlength="500"
-          value={event?.meetingPoint}
-        />
-        <FieldError
-          field={`${dialogId}-meetingPoint`}
-          message="Enter a meeting point (up to 500 characters)."
-        />
-      </div>
-      <div class="volunteer-field">
-        <label for={`${dialogId}-meetingPointUrl`}>Map link (optional)</label>
-        <input
-          id={`${dialogId}-meetingPointUrl`}
-          type="url"
-          name="meetingPointUrl"
-          aria-describedby={`error-${dialogId}-meetingPointUrl`}
-          maxlength="2048"
-          value={event?.meetingPointUrl ?? ""}
-          placeholder="https://"
-        />
-        <FieldError
-          field={`${dialogId}-meetingPointUrl`}
-          message="Enter a valid map URL (up to 2048 characters)."
-        />
-      </div>
-      <fieldset class="volunteer-state-field volunteer-wide">
-        <legend>Public visibility</legend>
-        <div class="volunteer-state-selector">
-          <label class="volunteer-state-option volunteer-state-positive">
-            <input
-              class="sr-only"
-              type="radio"
-              name="publicVisibility"
-              value="true"
-              checked={publicVisibility}
-            />
-            <span>Visible</span>
-          </label>
-          <label class="volunteer-state-option volunteer-state-negative">
-            <input
-              class="sr-only"
-              type="radio"
-              name="publicVisibility"
-              value="false"
-              checked={!publicVisibility}
-            />
-            <span>Hidden</span>
-          </label>
+        <div class="volunteer-field">
+          <label for={`${dialogId}-spots`}>Volunteer spots</label>
+          <input
+            id={`${dialogId}-spots`}
+            name="spots"
+            type="number"
+            min="1"
+            max="100"
+            aria-describedby={`error-${dialogId}-spots`}
+            required
+            value={event?.spots ?? 8}
+          />
+          <FieldError
+            field={`${dialogId}-spots`}
+            message="Enter a whole number from 1 to 100."
+          />
         </div>
-      </fieldset>
-    </div>
-    <p data-form-message role="status" hidden></p>
-    <noscript
-      ><p>
-        Enable JavaScript to edit event dates and save this event.
-      </p></noscript
-    >
+        <div class="volunteer-field">
+          <label for={`${dialogId}-meetingPoint`}>Meeting point</label>
+          <input
+            id={`${dialogId}-meetingPoint`}
+            name="meetingPoint"
+            aria-describedby={`error-${dialogId}-meetingPoint`}
+            required
+            pattern={String.raw`.*\S.*`}
+            maxlength="500"
+            value={event?.meetingPoint}
+          />
+          <FieldError
+            field={`${dialogId}-meetingPoint`}
+            message="Enter a meeting point (up to 500 characters)."
+          />
+        </div>
+        <div class="volunteer-field">
+          <label for={`${dialogId}-meetingPointUrl`}>Map link (optional)</label>
+          <input
+            id={`${dialogId}-meetingPointUrl`}
+            type="url"
+            name="meetingPointUrl"
+            aria-describedby={`error-${dialogId}-meetingPointUrl`}
+            maxlength="2048"
+            value={event?.meetingPointUrl ?? ""}
+            placeholder="https://"
+          />
+          <FieldError
+            field={`${dialogId}-meetingPointUrl`}
+            message="Enter a valid map URL (up to 2048 characters)."
+          />
+        </div>
+        <fieldset class="volunteer-state-field volunteer-wide">
+          <legend>Public visibility</legend>
+          <div class="volunteer-state-selector">
+            <label class="volunteer-state-option volunteer-state-positive">
+              <input
+                class="sr-only"
+                type="radio"
+                name="publicVisibility"
+                value="true"
+                checked={publicVisibility}
+              />
+              <span>Visible</span>
+            </label>
+            <label class="volunteer-state-option volunteer-state-negative">
+              <input
+                class="sr-only"
+                type="radio"
+                name="publicVisibility"
+                value="false"
+                checked={!publicVisibility}
+              />
+              <span>Hidden</span>
+            </label>
+          </div>
+        </fieldset>
+      </div>
+      <p data-form-message role="status" hidden></p>
+      <noscript
+        ><p>
+          Enable JavaScript to edit event dates and save this event.
+        </p></noscript
+      >
+    </form>
+    {
+      event && (
+        <form
+          id={`${dialogId}-cancel`}
+          class="volunteer-form volunteer-danger"
+          data-event-cancel
+          data-email-prompt={event.confirmed > 0 ? "event-cancel" : undefined}
+          data-future-email-prompt={
+            event.futureConfirmed > 0 ? "series-cancel" : undefined
+          }
+          action="/api/v1/events/action"
+          method="post"
+        >
+          <h3>Cancel event</h3>
+          <input type="hidden" name="id" value={event.id} />
+          <input type="hidden" name="version" value={event.updatedAt} />
+          {series && (
+            <>
+              <input type="hidden" name="seriesId" value={series.id} />
+              <input
+                type="hidden"
+                name="seriesVersion"
+                value={series.updatedAt}
+              />
+              <input
+                type="hidden"
+                name="occurrenceDate"
+                value={event.occurrenceDate!}
+              />
+              <label class="volunteer-field">
+                Cancel
+                <select name="scope">
+                  <option value="occurrence">Only this occurrence</option>
+                  <option value="future">
+                    This and future occurrences (stop recurrence)
+                  </option>
+                </select>
+              </label>
+              <p class="volunteer-help">
+                Cancelling future occurrences also cancels their bookings,
+                including individual exceptions. Past attendance and
+                cancellation history are kept.
+              </p>
+            </>
+          )}
+          <div
+            class="volunteer-field"
+            data-event-cancel-reason
+            hidden={event.confirmed === 0}
+          >
+            <label for={`${dialogId}-reason`}>Reason (optional)</label>
+            <textarea
+              id={`${dialogId}-reason`}
+              name="reason"
+              aria-describedby={`error-${dialogId}-reason`}
+              maxlength="1000"
+              rows="3"
+              disabled={event.confirmed === 0}
+            />
+            <FieldError
+              field={`${dialogId}-reason`}
+              message="Keep the reason to 1000 characters or fewer."
+            />
+          </div>
+          <p data-form-message role="status" hidden />
+        </form>
+      )
+    }
+  </div>
+  <div class="dialog-footer">
     <button
       class="btn btn-primary"
       type="submit"
+      form={`${dialogId}-save`}
       data-loading-label="Saving…"
       disabled>Save event</button
     >
-  </form>
-  {
-    event && (
-      <form
-        class="volunteer-form volunteer-danger"
-        data-event-cancel
-        data-email-prompt={event.confirmed > 0 ? "event-cancel" : undefined}
-        data-future-email-prompt={
-          event.futureConfirmed > 0 ? "series-cancel" : undefined
-        }
-        action="/api/v1/events/action"
-        method="post"
-      >
-        <h3>Cancel event</h3>
-        <input type="hidden" name="id" value={event.id} />
-        <input type="hidden" name="version" value={event.updatedAt} />
-        {series && (
-          <>
-            <input type="hidden" name="seriesId" value={series.id} />
-            <input
-              type="hidden"
-              name="seriesVersion"
-              value={series.updatedAt}
-            />
-            <input
-              type="hidden"
-              name="occurrenceDate"
-              value={event.occurrenceDate!}
-            />
-            <label class="volunteer-field">
-              Cancel
-              <select name="scope">
-                <option value="occurrence">Only this occurrence</option>
-                <option value="future">
-                  This and future occurrences (stop recurrence)
-                </option>
-              </select>
-            </label>
-            <p class="volunteer-help">
-              Cancelling future occurrences also cancels their bookings,
-              including individual exceptions. Past attendance and cancellation
-              history are kept.
-            </p>
-          </>
-        )}
-        <div
-          class="volunteer-field"
-          data-event-cancel-reason
-          hidden={event.confirmed === 0}
-        >
-          <label for={`${dialogId}-reason`}>Reason (optional)</label>
-          <textarea
-            id={`${dialogId}-reason`}
-            name="reason"
-            aria-describedby={`error-${dialogId}-reason`}
-            maxlength="1000"
-            rows="3"
-            disabled={event.confirmed === 0}
-          />
-          <FieldError
-            field={`${dialogId}-reason`}
-            message="Keep the reason to 1000 characters or fewer."
-          />
-        </div>
-        <p data-form-message role="status" hidden />
+    {
+      event && (
         <button
           class="btn btn-red"
           type="submit"
+          form={`${dialogId}-cancel`}
           data-loading-label="Cancelling…"
         >
           Cancel event
         </button>
-      </form>
-    )
-  }
+      )
+    }
+  </div>
 </dialog>

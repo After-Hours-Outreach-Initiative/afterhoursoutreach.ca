@@ -1299,36 +1299,11 @@ body:has([data-application], [data-account-contents-flow]) {
   @apply text-sm/[inherit];
   color: #a1a1aa;
 }
-.volunteer-dialog {
-  margin: auto;
-  width: min(45rem, calc(100% - 2rem));
-  max-height: calc(100dvh - 3rem);
-  overflow-y: auto;
-  border: 1px solid #52525b;
-  border-radius: 0.75rem;
-  padding: 1.75rem;
-  background: #0c0d10;
-  color: white;
-}
-.volunteer-dialog::backdrop {
-  background: #000b;
-}
 .volunteer-profile-dialog {
-  height: min(50rem, calc(100dvh - 3rem));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
-.volunteer-profile-dialog[open] {
-  display: flex;
-  flex-direction: column;
-}
-.volunteer-profile-dialog > .volunteer-section-heading {
-  flex-shrink: 0;
+  height: min(50rem, calc(100dvh - 2rem));
 }
 .volunteer-profile-dialog > [data-profile-dialog-content] {
   position: relative;
-  flex: 1 0 auto;
 }
 .volunteer-profile-loading {
   position: absolute;
@@ -1527,8 +1502,7 @@ body:has([data-application], [data-account-contents-flow]) {
     height: 1.125rem;
   }
   .volunteer-panel,
-  .volunteer-event-card,
-  .volunteer-dialog {
+  .volunteer-event-card {
     padding: 1.25rem;
   }
   .volunteer-fields {

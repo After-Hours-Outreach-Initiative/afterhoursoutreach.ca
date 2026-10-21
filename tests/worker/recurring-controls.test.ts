@@ -379,7 +379,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .click();
     const cancelForm = uiFirstCard.locator("[data-event-cancel]");
     await cancelForm.locator('[name="scope"]').selectOption("future");
-    await cancelForm
+    await uiFirstCard
       .getByRole("button", { name: "Cancel event", exact: true })
       .click();
     await expect(
