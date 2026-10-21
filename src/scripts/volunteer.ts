@@ -1,4 +1,5 @@
 import { vancouverInstant } from "../data/event-time";
+import { eventFilter, matchesEventFilter } from "../data/event-browser";
 import { actionFragment, loadActionPage } from "./action-page";
 import { chooseNotification } from "./notification-choice";
 import { initDateInputs, readDateInputs } from "./date-input";
@@ -52,11 +53,16 @@ for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
 initEventDates(document);
 
 function applyEventFilter(root: HTMLElement, type: string) {
-  const selected = type === "orientation" ? "orientation" : "all";
+  const selected = eventFilter(type, root.dataset.eventView === "manage");
   let visible = 0;
-  for (const card of root.querySelectorAll<HTMLElement>("[data-live-event]")) {
-    card.hidden =
-      selected === "orientation" && card.dataset.includesOrientation !== "true";
+  for (const card of root.querySelectorAll<HTMLElement>(
+    "[data-event-list] > [data-live-event], [data-event-list] > [data-series-card]",
+  )) {
+    card.hidden = !matchesEventFilter(
+      selected,
+      Boolean(card.dataset.seriesCard),
+      card.dataset.includesOrientation === "true",
+    );
     if (!card.hidden) visible++;
   }
   for (const button of root.querySelectorAll<HTMLButtonElement>(
@@ -120,14 +126,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     document.dispatchEvent(new Event("account-content-updated"));
     return;
   }
-  deferredEventRefresh = syncSeriesControls(page, element);
   const list = root.querySelector<HTMLElement>("[data-event-list]")!;
-  const previous = new Map(
-    [...list.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
-      card.dataset.liveEvent!,
-      card,
-    ]),
-  );
   const focused = document.activeElement;
   const focusedCard =
     focused instanceof HTMLElement
@@ -136,83 +135,149 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   const eventId =
     element?.closest<HTMLElement>("[data-live-event]")?.dataset.liveEvent ??
     focusedCard?.dataset.liveEvent;
+  const focusedSeries =
+    focused instanceof HTMLElement
+      ? focused.closest<HTMLElement>("[data-series-card]")
+      : null;
+  const seriesId =
+    element?.closest<HTMLElement>("[data-series-card]")?.dataset.seriesCard ??
+    focusedSeries?.dataset.seriesCard;
+  const focusedSeriesSummary = focused?.matches(
+    "[data-series-occurrences] > summary",
+  )
+    ? "[data-series-occurrences] > summary"
+    : focused?.matches("[data-live-series] > summary")
+      ? "[data-live-series] > summary"
+      : null;
   const dialog = element?.closest<HTMLDialogElement>("dialog");
   const restoreFocus = Boolean(
     element
       ? element.contains(focused) ||
           dialog?.contains(focused) ||
           focused === document.body
-      : focusedCard,
+      : focusedCard || focusedSeries,
   );
   dialog?.close();
   let added: HTMLElement | undefined;
-  let position = list.firstElementChild;
-  for (const updated of refreshed.querySelectorAll<HTMLElement>(
-    "[data-live-event]",
-  )) {
-    const id = updated.dataset.liveEvent!;
-    let card = previous.get(id);
-    previous.delete(id);
-    // Don't discard an unrelated editor's draft or another action in flight.
-    const protectedCard =
-      card &&
-      (card.querySelector("dialog[open]") ||
-        [
-          ...card.querySelectorAll<HTMLFormElement>(
-            'form[data-submitting="true"]',
-          ),
-        ].some((form) => form !== element));
-    if (
-      card &&
-      protectedCard &&
-      renderedCards.get(card) !== updated.outerHTML
-    ) {
-      deferredEventRefresh = true;
-      // A live count must not overwrite an open editor or an in-flight signup.
-      const availability = card.querySelector("[data-event-availability]");
-      const nextAvailability = updated.querySelector(
-        "[data-event-availability]",
-      );
-      if (availability && nextAvailability)
-        availability.replaceWith(document.importNode(nextAvailability, true));
-      // Signup counts can change while an editor is open. Refresh only email
-      // eligibility; leave the organizer's fields, reason and scope draft intact.
-      for (const selector of ["[data-event-save]", "[data-event-cancel]"]) {
-        const form = card.querySelector(selector);
-        const nextForm = updated.querySelector(selector);
-        if (!form || !nextForm) continue;
-        for (const attribute of [
-          "data-email-prompt",
-          "data-future-email-prompt",
-        ]) {
-          const value = nextForm.getAttribute(attribute);
-          if (value === null) form.removeAttribute(attribute);
-          else form.setAttribute(attribute, value);
+  const protectedEvent = (card: HTMLElement) =>
+    Boolean(
+      card.querySelector("dialog[open]") ||
+      [
+        ...card.querySelectorAll<HTMLFormElement>(
+          'form[data-submitting="true"]',
+        ),
+      ].some((form) => form !== element),
+    );
+  const key = (card: HTMLElement) =>
+    card.dataset.seriesCard
+      ? `series:${card.dataset.seriesCard}`
+      : `event:${card.dataset.liveEvent}`;
+  const syncList = (list: HTMLElement, nextList: HTMLElement) => {
+    const previous = new Map(
+      [...list.children]
+        .filter((card): card is HTMLElement => card instanceof HTMLElement)
+        .map((card) => [key(card), card]),
+    );
+    let position = list.firstElementChild;
+    for (const updated of nextList.children) {
+      if (!(updated instanceof HTMLElement)) continue;
+      const id = key(updated);
+      let card = previous.get(id);
+      previous.delete(id);
+      if (updated.dataset.seriesCard) {
+        if (!card) {
+          card = document.importNode(updated, true);
+          for (const occurrence of card.querySelectorAll<HTMLElement>(
+            "[data-live-event]",
+          ))
+            renderedCards.set(occurrence, occurrence.outerHTML);
+          added ??= card;
+        } else {
+          card.dataset.includesOrientation =
+            updated.dataset.includesOrientation;
+          for (const selector of [
+            "[data-series-summary]",
+            "[data-series-occurrence-summary]",
+            "[data-series-empty]",
+          ]) {
+            const current = card.querySelector(selector)!;
+            const next = updated.querySelector(selector)!;
+            if (current.outerHTML !== next.outerHTML)
+              current.replaceWith(document.importNode(next, true));
+          }
+          deferredEventRefresh =
+            syncSeriesControls(card, updated, element) || deferredEventRefresh;
+          syncList(
+            card.querySelector("[data-series-event-list]")!,
+            updated.querySelector("[data-series-event-list]")!,
+          );
+        }
+        if (card !== position) list.insertBefore(card, position);
+        position = card.nextElementSibling;
+        continue;
+      }
+      // Don't discard an unrelated editor's draft or another action in flight.
+      const protectedCard = card && protectedEvent(card);
+      if (
+        card &&
+        protectedCard &&
+        renderedCards.get(card) !== updated.outerHTML
+      ) {
+        deferredEventRefresh = true;
+        // A live count must not overwrite an open editor or an in-flight signup.
+        const availability = card.querySelector("[data-event-availability]");
+        const nextAvailability = updated.querySelector(
+          "[data-event-availability]",
+        );
+        if (availability && nextAvailability)
+          availability.replaceWith(document.importNode(nextAvailability, true));
+        // Signup counts can change while an editor is open. Refresh only email
+        // eligibility; leave the organizer's fields, reason and scope draft intact.
+        for (const selector of ["[data-event-save]", "[data-event-cancel]"]) {
+          const form = card.querySelector(selector);
+          const nextForm = updated.querySelector(selector);
+          if (!form || !nextForm) continue;
+          for (const attribute of [
+            "data-email-prompt",
+            "data-future-email-prompt",
+          ]) {
+            const value = nextForm.getAttribute(attribute);
+            if (value === null) form.removeAttribute(attribute);
+            else form.setAttribute(attribute, value);
+          }
         }
       }
+      if (
+        !card ||
+        (!protectedCard && renderedCards.get(card) !== updated.outerHTML)
+      ) {
+        const replacement = document.importNode(updated, true);
+        renderedCards.set(replacement, updated.outerHTML);
+        const roster =
+          replacement.querySelector<HTMLDetailsElement>(".volunteer-roster");
+        if (roster)
+          roster.open =
+            card?.querySelector<HTMLDetailsElement>(".volunteer-roster")
+              ?.open ?? false;
+        if (card) {
+          if (position === card) position = replacement;
+          card.replaceWith(replacement);
+        } else added ??= replacement;
+        card = replacement;
+      }
+      if (card !== position) list.insertBefore(card, position);
+      position = card.nextElementSibling;
     }
-    if (
-      !card ||
-      (!protectedCard && renderedCards.get(card) !== updated.outerHTML)
-    ) {
-      const replacement = document.importNode(updated, true);
-      renderedCards.set(replacement, updated.outerHTML);
-      const roster =
-        replacement.querySelector<HTMLDetailsElement>(".volunteer-roster");
-      if (roster)
-        roster.open =
-          card?.querySelector<HTMLDetailsElement>(".volunteer-roster")?.open ??
-          false;
-      if (card) {
-        if (position === card) position = replacement;
-        card.replaceWith(replacement);
-      } else added ??= replacement;
-      card = replacement;
+    for (const card of previous.values()) {
+      if (
+        protectedEvent(card) ||
+        card.querySelector("[data-live-series][open]")
+      )
+        deferredEventRefresh = true;
+      else card.remove();
     }
-    if (card !== position) list.insertBefore(card, position);
-    position = card.nextElementSibling;
-  }
-  for (const card of previous.values()) card.remove();
+  };
+  syncList(list, refreshed.querySelector("[data-event-list]")!);
   for (const selector of ["[data-empty-events]", "[data-event-limit]"]) {
     const target = root.querySelector(selector);
     if (target) target.replaceWith(actionFragment(page, selector));
@@ -229,18 +294,33 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       ? [...list.querySelectorAll<HTMLElement>("[data-live-event]")].find(
           (card) => card.dataset.liveEvent === eventId,
         )
-      : added;
+      : seriesId
+        ? [...list.querySelectorAll<HTMLElement>("[data-series-card]")].find(
+            (card) => card.dataset.seriesCard === seriesId,
+          )
+        : added;
+    const seriesForm = [
+      "data-series-end",
+      "data-series-stop",
+      "data-series-occurrence",
+    ].find((attribute) => element?.hasAttribute(attribute));
     const selector =
       element?.matches("[data-live-signup]") ||
       (!element && focused?.closest("[data-live-signup]"))
         ? '[data-live-signup] button[type="submit"]'
-        : element?.matches("[data-event-save]")
-          ? "[data-show-dialog]"
-          : !element &&
-              focused instanceof HTMLElement &&
-              focused.dataset.showDialog
-            ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
-            : ".volunteer-roster summary";
+        : seriesForm
+          ? `[${seriesForm}] button[type="submit"]`
+          : element?.matches("[data-event-save]")
+            ? card?.dataset.seriesCard
+              ? "[data-series-occurrences] > summary"
+              : "[data-show-dialog]"
+            : !element && focusedSeriesSummary
+              ? focusedSeriesSummary
+              : !element &&
+                  focused instanceof HTMLElement &&
+                  focused.dataset.showDialog
+                ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+                : ".volunteer-roster summary";
     (card && !card.hidden
       ? card.querySelector<HTMLElement>(selector)
       : null
@@ -679,13 +759,16 @@ form(
     const id = `patrol:${value("seriesId")}:${value("occurrenceDate")}`;
     const url = new URL(location.href);
     url.searchParams.set("occurrence", id);
-    url.searchParams.delete("type");
     const page = await loadActionPage(url.href);
     history.replaceState(null, "", url);
     syncEvents(page, element);
     const card = [
       ...document.querySelectorAll<HTMLElement>("[data-live-event]"),
     ].find((item) => item.dataset.liveEvent === id);
+    const occurrences = card?.closest<HTMLDetailsElement>(
+      "[data-series-occurrences]",
+    );
+    if (occurrences) occurrences.open = true;
     card?.scrollIntoView({ block: "nearest" });
     card?.querySelector<HTMLButtonElement>("[data-show-dialog]")?.click();
   },
