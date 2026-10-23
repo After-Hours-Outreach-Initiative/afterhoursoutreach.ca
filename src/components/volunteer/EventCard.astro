@@ -175,6 +175,7 @@ const blocked =
 
 <style>
   .volunteer-event-card {
+    container: event-card / inline-size;
     padding: 1rem;
     scroll-margin-top: calc(
       var(--site-header-rendered-height, var(--site-header-height, 6rem)) + 1rem
@@ -227,5 +228,15 @@ const blocked =
   .volunteer-actions > :is(form, .btn),
   .volunteer-actions > form > .btn {
     width: 100%;
+  }
+  @container event-card (min-width: 32rem) {
+    .volunteer-event-layout:has(> .volunteer-actions:not(:empty)) {
+      grid-template-columns: minmax(0, 1fr) 10rem;
+      column-gap: 1.5rem;
+    }
+    .volunteer-actions {
+      grid-column: 2;
+      grid-row: 1 / 3;
+    }
   }
 </style>
