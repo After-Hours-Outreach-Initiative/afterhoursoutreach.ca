@@ -41,11 +41,13 @@ Never use this config to deploy a Worker or repoint Preview scripts to productio
       and local `.dev.vars` do not establish deployed configuration.
 - [ ] Resend operator verifies `afterhoursoutreach.ca`, SPF/DKIM, enabled sending,
       and approved key/domain restrictions for **both**
-      `accounts@afterhoursoutreach.ca` and `noreply@afterhoursoutreach.ca`.
+      `accounts@afterhoursoutreach.ca` and `info@afterhoursoutreach.ca`.
       Read-only `GET /domains` using the available local send-only key was denied
       (401 `restricted_api_key`); it is not proof of a production key or sender.
       Use authorized read access/dashboard; do not broaden the send key or send
       test mail before approval.
+      Already-frozen delivery payloads keep their original sender for idempotent
+      retries; do not rewrite queued payloads or replace their keys to change senders.
 - [ ] Confirm the actual fixed recipients and monitored delivery follow-up:
       `ivan.zheng@afterhoursoutreach.ca`, `info@afterhoursoutreach.ca`, and
       `molina.dewilde@afterhoursoutreach.ca`. These supersede older Tudor/`molina.@`
@@ -136,7 +138,7 @@ Never use this config to deploy a Worker or repoint Preview scripts to productio
 5. After separate approval for controlled real-account/real-inbox checks, verify
    mobile/desktop sign-in mail from `accounts@`, code/link expiry and reuse rejection,
    denied organizer access, draft resume/cross-device conflicts, submit/retry without
-   duplicate mail, delivery from `noreply@` to all three fixed inboxes, organizer
+   duplicate mail, delivery from `info@` to all three fixed inboxes, organizer
    approval, orientation booking/cancellation and recurring patrol/signup-window
    behavior. Observe hourly retries/medic delivery safely without forced duplicate
    sends. Monitor quota/backlog/expired unresolved intents and actual inboxes; do

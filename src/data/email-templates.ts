@@ -8,7 +8,7 @@ export interface EmailContent {
 
 export const emailSenders = {
   accounts: "After Hours Outreach <accounts@afterhoursoutreach.ca>",
-  notifications: "After Hours Outreach <noreply@afterhoursoutreach.ca>",
+  notifications: "After Hours Outreach <info@afterhoursoutreach.ca>",
 } as const;
 
 export interface SignInEmailInput {

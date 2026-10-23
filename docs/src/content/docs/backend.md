@@ -198,9 +198,8 @@ has to say so. See [privacy.md](/privacy/).
 
 ## Email
 
-Sent through Resend's API from `noreply@afterhoursoutreach.ca` (TODO: Resend
-recommends
-[not using no-reply](https://resend.com/docs/dashboard/emails/deliverability-insights#don%E2%80%99t-use-%E2%80%9Cno-reply%E2%80%9D)).
+Notifications are sent through Resend's API from `info@afterhoursoutreach.ca`.
+Sign-in and email-change messages use `accounts@afterhoursoutreach.ca`.
 Emails include "Questions? Ask us on Discord" and a link to the Discord server.
 
 The Resend free plan allows 3,000 emails a month and 100 a day. The sign in
