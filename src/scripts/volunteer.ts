@@ -159,7 +159,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   const focusedEventSummary = [
     ".volunteer-roster > summary",
     ".public-event-roster > summary",
-    ".event-avatar-description > summary",
   ].find((selector) => focused?.matches(selector));
   const dialog = element?.closest<HTMLDialogElement>("dialog");
   const restoreFocus = Boolean(
@@ -265,11 +264,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       ) {
         const replacement = document.importNode(updated, true);
         renderedCards.set(replacement, updated.outerHTML);
-        for (const selector of [
-          ".volunteer-roster",
-          ".public-event-roster",
-          ".event-avatar-description",
-        ]) {
+        for (const selector of [".volunteer-roster", ".public-event-roster"]) {
           const details =
             replacement.querySelector<HTMLDetailsElement>(selector);
           if (details)
