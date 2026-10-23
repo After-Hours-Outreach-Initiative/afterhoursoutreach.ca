@@ -30,6 +30,41 @@ const event: EmailEvent = {
   meetingPoint: "Sample volunteer's meeting point",
 };
 
+test("subjects omit the organization name already shown by the sender", () => {
+  const messages = [
+    signInEmailContent({ code: "123456", url: "", purpose: "change-email" }),
+    accessRegistrationCancelledEmail(event.meetingPoint, true),
+    volunteerAccessEmail(
+      { active: true, applicationApproved: true, patrolApproved: true },
+      false,
+    ),
+    roleChangedEmail("organizer"),
+    eventChangedEmail(event, true),
+    eventCancelledEmail(event, ""),
+    registrationChangedEmail(event, event, ""),
+    registrationChangedEmail(event, null, ""),
+    patrolSeriesShortenedEmail(),
+    patrolSeriesChangedEmail(),
+    patrolSeriesStoppedEmail(""),
+  ];
+  assert.deepEqual(
+    messages.map(({ subject }) => subject),
+    [
+      "Confirm your email change",
+      "Your event registration was cancelled",
+      "Your volunteer access changed",
+      "Your account role changed",
+      "Your event changed",
+      "Your event was cancelled",
+      "Your event registration was moved",
+      "Your event registration was removed",
+      "Your event was cancelled",
+      "Your patrol changed",
+      "Your patrol was cancelled",
+    ],
+  );
+});
+
 test("sign-in formatting preserves the URL fragment and escapes HTML values", () => {
   const url = `${origin}/volunteer/verify?next=events&sample=1#sample-fragment`;
   const content = signInEmailContent({ code: "<123&\"'>", url });
@@ -67,7 +102,7 @@ test("approval and access messages retain the existing next-step branches", () =
           assert.equal(
             content.subject,
             !approvalChanged
-              ? "Your After Hours Outreach volunteer access changed"
+              ? "Your volunteer access changed"
               : applicationApproved
                 ? "Your volunteer application is approved"
                 : "Your volunteer application approval was revoked",

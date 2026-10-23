@@ -848,7 +848,7 @@ describe(
       test("deactivation silently cancels future spots and last organizer cannot be removed", async () => {
         await ok(await status(alice.id, false, false));
         const notifications = await DB.prepare(
-          "SELECT count(*) AS n FROM event_notification WHERE user_id=? AND subject='Your After Hours Outreach event registration was cancelled' AND body LIKE '%volunteer access changed%'",
+          "SELECT count(*) AS n FROM event_notification WHERE user_id=? AND subject='Your event registration was cancelled' AND body LIKE '%volunteer access changed%'",
         )
           .bind(alice.id)
           .first<{ n: number }>();

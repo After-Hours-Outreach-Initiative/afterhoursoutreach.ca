@@ -1054,7 +1054,7 @@ test("revoking patrol approval preserves orientation bookings but cancels regula
   assert.equal(
     await db
       .prepare(
-        "SELECT count(*) n FROM event_notification WHERE subject='Your After Hours Outreach event registration was cancelled'",
+        "SELECT count(*) n FROM event_notification WHERE subject='Your event registration was cancelled'",
       )
       .first("n"),
     1,

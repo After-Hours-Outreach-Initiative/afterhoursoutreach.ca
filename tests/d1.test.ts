@@ -518,10 +518,7 @@ test("application queue counts all submitted unapproved applications independent
     )
       .bind(accessChange.operation)
       .first<{ subject: string; body: string; recipient: string }>();
-    assert.equal(
-      email?.subject,
-      "Your After Hours Outreach volunteer access changed",
-    );
+    assert.equal(email?.subject, "Your volunteer access changed");
     assert.equal(email?.recipient, "pending-02@example.org");
     assert.match(email!.body, guidance);
     assert.doesNotMatch(
