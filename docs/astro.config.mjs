@@ -57,6 +57,7 @@ export default defineConfig({
           items: [
             { label: "Accounts", slug: "accounts" },
             { label: "Events", slug: "events" },
+            { label: "Email previews", slug: "emails" },
           ],
         },
         {

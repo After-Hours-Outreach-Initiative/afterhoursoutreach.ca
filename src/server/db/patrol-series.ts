@@ -1,5 +1,11 @@
 import { z } from "zod";
 import {
+  patrolSeriesChangedEmail,
+  patrolSeriesShortenedEmail,
+  patrolSeriesStoppedEmail,
+  type EmailContent,
+} from "../../data/email-templates";
+import {
   addCalendarDays,
   vancouverInput,
   vancouverInstant,
@@ -463,6 +469,7 @@ export async function savePatrolSeries(
         ),
     ];
     if (old && data.endDate !== null) {
+      const email = patrolSeriesShortenedEmail();
       // Capture exactly the affected rows before mutation; the series operation
       // authorizes every following audit, notification, and cancellation.
       statements.push(
@@ -477,13 +484,19 @@ export async function savePatrolSeries(
         db
           .prepare(
             `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-          SELECT lower(hex(randomblob(16))), ?, s.user_id, 'Your After Hours Outreach event was cancelled',
-            'An organizer ended this patrol series before your scheduled occurrence. Your registration was cancelled.', ?, u.email
+          SELECT lower(hex(randomblob(16))), ?, s.user_id, ?, ?, ?, u.email
           FROM signup s JOIN user u ON u.id = s.user_id AND u.email_verified = 1
           WHERE s.status = 'confirmed' AND ? = 1
             AND EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || s.event_id)`,
           )
-          .bind(operation, now, Number(notify), operation),
+          .bind(
+            operation,
+            email.subject,
+            email.text,
+            now,
+            Number(notify),
+            operation,
+          ),
         db
           .prepare(
             `UPDATE event SET cancelled_at = ?, open = 0, hidden = 1,
@@ -741,8 +754,7 @@ export async function updatePatrolSeriesFrom(
         operation,
         now,
         notify,
-        "Your After Hours Outreach patrol changed",
-        "An organizer changed this and future patrols. Your existing registration is still reserved. Check the volunteer page for your updated patrol date, time and meeting point.",
+        patrolSeriesChangedEmail(),
       ),
     ]);
     if (!results[0].meta.changes)
@@ -766,8 +778,7 @@ function seriesNotifications(
   operation: string,
   now: number,
   notify: boolean,
-  subject: string,
-  body: string,
+  content: EmailContent,
 ) {
   return db
     .prepare(
@@ -776,7 +787,14 @@ function seriesNotifications(
     JOIN user u ON u.id = s.user_id AND u.email_verified = 1 WHERE s.status = 'confirmed' AND ? = 1
       AND EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || s.event_id)`,
     )
-    .bind(operation, subject, body, now, Number(notify), operation);
+    .bind(
+      operation,
+      content.subject,
+      content.text,
+      now,
+      Number(notify),
+      operation,
+    );
 }
 
 /** Stop is exclusive and permanent, even when a later end-date edit extends a series. */
@@ -829,8 +847,7 @@ export async function stopPatrolSeries(
       operation,
       now,
       notify,
-      "Your After Hours Outreach patrol was cancelled",
-      `An organizer stopped this patrol series. Your registration was cancelled.${reason ? `\nReason: ${reason}` : ""}`,
+      patrolSeriesStoppedEmail(reason),
     ),
     db
       .prepare(

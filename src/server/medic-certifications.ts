@@ -1,4 +1,5 @@
 import type { AuthBindings } from "./auth";
+import { emailSenders, medicCertificationEmail } from "../data/email-templates";
 import { emailPolicy } from "./db/policy";
 import { takeEmailBudget } from "./db/rate-limits";
 import {
@@ -15,19 +16,10 @@ export const medicDeliveryCron = "30 * * * *";
 const batchSize = 5;
 
 function deliveryPayload(row: MedicNotification, origin: string) {
-  const warning = row.kind === "warning";
   return JSON.stringify({
-    from: "After Hours Outreach <noreply@afterhoursoutreach.ca>",
+    from: emailSenders.notifications,
     to: [row.email],
-    subject: warning
-      ? "Your medic certification is expiring soon"
-      : "Your medic certification has expired",
-    text: `${
-      warning
-        ? `Your volunteer profile lists a medic certification expiry date of ${row.expiry}, within the next 30 days. It remains valid through that date. Please arrange renewal.`
-        : `The medic certification expiry date on your volunteer profile was ${row.expiry}. It is now expired. Please renew before volunteering as a medic.`
-    }
-\nIf you have renewed or this date is incorrect, update the certification expiry date in your account: ${origin}/volunteer/account`,
+    ...medicCertificationEmail(row.kind, row.expiry, origin),
   });
 }
 

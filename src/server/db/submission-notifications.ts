@@ -1,4 +1,9 @@
 import type { AuthBindings } from "../auth";
+import {
+  applicationSubmittedTemplate,
+  emailSenders,
+} from "../../data/email-templates";
+import { emailTextSql } from "./email-text";
 import type { ProfileSaveOptions } from "./profiles";
 import { emailPolicy } from "./policy";
 import { hashAuthValue } from "./rate-limits";
@@ -36,18 +41,21 @@ export function submissionNotificationStatements(
           (id,operation_id,user_id,recipient,mode,payload,status,next_attempt_at,created_at)
         SELECT ?,?,user_id,?,?,
           CASE WHEN ?='preview' THEN NULL ELSE json_object(
-            'from','After Hours Outreach <noreply@afterhoursoutreach.ca>',
+            'from',?,
             'to',json_array(?),
-            'subject','New volunteer application submitted',
-            'text','Applicant: ' || replace(replace(coalesce(
-              nullif(trim(json_extract(submitted_application,'$.answers.preferredName')),''),
-              trim(json_extract(submitted_application,'$.answers.firstName') || ' ' ||
-                CASE WHEN json_extract(submitted_application,'$.answers.middleNames') != ''
-                  THEN json_extract(submitted_application,'$.answers.middleNames') || ' ' ELSE '' END ||
-                json_extract(submitted_application,'$.answers.lastName'))
-            ),char(13),' '),char(10),' ') ||
-              char(10) || 'Submitted: ' || json_extract(submitted_application,'$.submittedAt') ||
-              char(10) || 'Organizer review (authorized organizer sign-in required): ' || ?
+            'subject',?,
+            'text',${emailTextSql(applicationSubmittedTemplate.text, {
+              applicant: `replace(replace(coalesce(
+                nullif(trim(json_extract(submitted_application,'$.answers.preferredName')),''),
+                trim(json_extract(submitted_application,'$.answers.firstName') || ' ' ||
+                  CASE WHEN json_extract(submitted_application,'$.answers.middleNames') != ''
+                    THEN json_extract(submitted_application,'$.answers.middleNames') || ' ' ELSE '' END ||
+                  json_extract(submitted_application,'$.answers.lastName'))
+              ),char(13),' '),char(10),' ')`,
+              submittedAt:
+                "json_extract(submitted_application,'$.submittedAt')",
+              reviewUrl: "?",
+            })}
           ) END,?,registered_at,registered_at
         FROM profile WHERE user_id=? AND submitted_application IS NOT NULL AND ${writeGuard}`,
       ).bind(
@@ -56,7 +64,9 @@ export function submissionNotificationStatements(
         recipient,
         mode,
         mode,
+        emailSenders.notifications,
         recipient,
+        applicationSubmittedTemplate.subject,
         // Not a capability URL; the existing route enforces organizer access.
         `https://afterhoursoutreach.ca/manage/volunteers/${encodeURIComponent(userId)}`,
         mode === "preview" ? "suppressed" : "pending",

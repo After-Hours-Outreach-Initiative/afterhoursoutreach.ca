@@ -1,5 +1,11 @@
 import { z } from "zod";
 import {
+  accessRegistrationCancelledTemplate,
+  roleChangedEmail,
+  volunteerAccessEmail,
+} from "../../data/email-templates";
+import { emailTextSql } from "./email-text";
+import {
   requireOrganizer,
   writePermission,
   permissionValues,
@@ -241,27 +247,10 @@ export async function setVolunteerStatus(
   ].filter(Boolean);
   if (!fields.length)
     return { operation: crypto.randomUUID(), message: "No access changes." };
-  const applicationApprovalChanged = fields.includes("applicationApproved");
-  const notificationSubject = applicationApprovalChanged
-    ? applicationApproved
-      ? "Your volunteer application is approved"
-      : "Your volunteer application approval was revoked"
-    : "Your After Hours Outreach volunteer access changed";
-  const nextStep = !active
-    ? "Your volunteer account is currently inactive. Please contact an organizer before registering for events."
-    : !applicationApproved
-      ? "Sign in using the events link below to review your application steps on the Volunteer page."
-      : patrolApproved
-        ? "Sign in using the events link below to browse upcoming patrols and register for an available spot."
-        : 'Sign in using the events link below. If Naloxone 101 completion is not yet confirmed, return to the Volunteer page, complete the course if needed, and confirm completion only after finishing it. Once completion is confirmed, choose an "Orientation + Patrol" event to register for an available spot. You’ll need separate organizer approval for patrols without orientation.';
-  let notificationBody = `Volunteer account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting organizer approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. ${nextStep} Orientation attendance does not automatically grant patrol approval.`;
-  if (applicationApprovalChanged) {
-    if (applicationApproved) {
-      notificationBody = `Your volunteer application is approved! Thanks for joining us and supporting our community.\n\n${nextStep}`;
-    } else {
-      notificationBody = `Your volunteer application is awaiting organizer approval again. ${nextStep} Check Your account for any changes to your registrations, or contact an organizer if you have questions.`;
-    }
-  }
+  const email = volunteerAccessEmail(
+    { active, applicationApproved, patrolApproved },
+    fields.includes("applicationApproved"),
+  );
   const operation = crypto.randomUUID();
   const now = Math.max(Date.now(), version + 1);
   try {
@@ -314,8 +303,10 @@ export async function setVolunteerStatus(
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
           SELECT lower(hex(randomblob(16))), ?, s.user_id,
-            'Your After Hours Outreach event registration was cancelled',
-            'Your registration for a patrol' || CASE WHEN ${includesOrientationSql()} THEN ' (includes orientation)' ELSE '' END || ' at ' || e.meeting_point || ' was cancelled because your volunteer access changed. Check Your account or contact an organizer.', ?, u.email
+            ?, ${emailTextSql(accessRegistrationCancelledTemplate.text, {
+              orientation: `CASE WHEN ${includesOrientationSql()} THEN ' (includes orientation)' ELSE '' END`,
+              meetingPoint: "e.meeting_point",
+            })}, ?, u.email
           FROM signup s
           JOIN event e ON e.id = s.event_id
           JOIN user u ON u.id=s.user_id AND u.email_verified=1
@@ -328,6 +319,7 @@ export async function setVolunteerStatus(
         )
         .bind(
           operation,
+          accessRegistrationCancelledTemplate.subject,
           now,
           userId,
           now,
@@ -368,8 +360,8 @@ export async function setVolunteerStatus(
           crypto.randomUUID(),
           operation,
           userId,
-          notificationSubject,
-          notificationBody,
+          email.subject,
+          email.text,
           now,
           userId,
           operation,
@@ -413,6 +405,7 @@ export async function setRole(
   if (!target) throw new RequestError(404, "Volunteer applicant not found.");
   if (target.role === role)
     return { operation: crypto.randomUUID(), message: "Role is unchanged." };
+  const email = roleChangedEmail(role);
   if (
     role === "organizer" &&
     (!target.verified || !target.active || !target.applicationApproved)
@@ -461,14 +454,15 @@ export async function setRole(
       db
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-          SELECT ?, ?, ?, 'Your After Hours Outreach account role changed', ?, ?, email FROM user
+          SELECT ?, ?, ?, ?, ?, ?, email FROM user
           WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
           crypto.randomUUID(),
           operation,
           userId,
-          `Your role is now ${role}. Sign in again to continue.`,
+          email.subject,
+          email.text,
           now,
           userId,
           operation,

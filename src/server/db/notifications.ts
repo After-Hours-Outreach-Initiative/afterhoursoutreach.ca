@@ -1,3 +1,8 @@
+import {
+  emailSenders,
+  eventNotificationEmail,
+} from "../../data/email-templates";
+
 // Stay inside Resend's 24-hour idempotency lifetime, including after a timeout.
 export const notificationRetryHours = 23;
 const retryWindowMs = notificationRetryHours * 60 * 60 * 1000;
@@ -75,10 +80,12 @@ export async function createNotificationBatch(
   const ids = JSON.stringify(emails.map((email) => email.id));
   const payload = JSON.stringify(
     emails.map((email) => ({
-      from: "After Hours Outreach <noreply@afterhoursoutreach.ca>",
+      from: emailSenders.notifications,
       to: [email.to],
-      subject: email.subject,
-      text: `${email.body}\n\nEvents: ${origin}/events`,
+      ...eventNotificationEmail(
+        { subject: email.subject, text: email.body },
+        origin,
+      ),
     })),
   );
   const results = await db.batch([

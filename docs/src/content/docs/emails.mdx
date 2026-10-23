@@ -1,0 +1,24 @@
+---
+title: Email previews
+description: Preview every application email and its variants using fictional sample data.
+tableOfContents: false
+---
+
+import EmailPreviews from "../../components/EmailPreviews";
+
+Browse every email the application can send, including approval, access, event,
+patrol series, and medic reminder variants. The previews use the same message
+formatting as delivery, with fictional recipients and inactive example links.
+Nothing is sent, and no database, application server, or credentials are needed.
+
+Only the sign-in email currently includes HTML. All other messages are plain text;
+the gallery preserves that distinction rather than inventing HTML designs.
+
+<EmailPreviews client:load />
+
+<noscript>
+  Enable JavaScript to select other emails, examples, and preview formats.
+</noscript>
+
+Volunteer self-service registrations and cancellations, event creation, and
+orientation completion do not send emails, so they have no previews here.
