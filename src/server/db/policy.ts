@@ -99,6 +99,16 @@ export function signupBlockReason(
   if (!volunteer.active) return "Your volunteer account is inactive.";
   if (!volunteer.applicationApproved && volunteer.role !== "organizer")
     return "Your application is awaiting organizer approval.";
+  return eventSignupBlockReason(volunteer, event, confirmed, now);
+}
+
+/** Event feedback for viewers already admitted by canViewEvents; not authorization. */
+export function eventSignupBlockReason(
+  volunteer: Pick<SignupVolunteer, "patrolApproved">,
+  event: SignupEvent,
+  confirmed: number,
+  now = new Date(),
+): string | null {
   if (!event.open) return "This event is closed.";
   if (!Number.isFinite(event.startsAt.getTime()) || event.startsAt <= now)
     return "Registration closes when the event starts.";

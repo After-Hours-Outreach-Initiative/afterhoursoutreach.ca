@@ -243,7 +243,7 @@ const hasVisibleEvents = management
       )
     }
     {
-      eventAccess && (
+      eventAccess && actor && (
         <section class="volunteer-events" aria-labelledby="events-heading">
           <div class="volunteer-section-heading">
             <div>
@@ -262,7 +262,7 @@ const hasVisibleEvents = management
                 <PlusIcon class="btn-icon" />
                 Create
               </button>
-            ) : actor?.role === "organizer" ? (
+            ) : actor.role === "organizer" ? (
               <a class="btn btn-primary" href="/manage/events">
                 Manage events
                 <ArrowRightIcon class="btn-icon" />
