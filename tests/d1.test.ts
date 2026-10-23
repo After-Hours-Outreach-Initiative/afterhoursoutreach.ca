@@ -44,6 +44,7 @@ import {
   queueMedicCertificationNotifications,
 } from "../src/server/db/medic-certifications";
 import { processMedicCertificationNotifications } from "../src/server/medic-certifications";
+import { deliverNotifications } from "../src/server/events/notifications";
 import {
   createDisposableAccount,
   deleteLocalAccount,
@@ -437,13 +438,46 @@ test("application queue counts all submitted unapproved applications independent
     await env.DB.prepare("SELECT action FROM audit_log").first("action"),
     "profile_viewed",
   );
-  await setVolunteerStatus(env.DB, actor, {
+  const approval = await setVolunteerStatus(env.DB, actor, {
     userId: "pending-02",
     version: 0,
     active: true,
     applicationApproved: true,
     patrolApproved: false,
+    notify: true,
   });
+  await deliverNotifications(
+    {
+      ...env,
+      APP_ENV: "local",
+      AUTH_BASE_URL: "https://afterhoursoutreach.ca",
+    },
+    approval.operation,
+  );
+  const payload = await env.DB.prepare(
+    "SELECT payload FROM event_notification_batch WHERE operation_id=?",
+  )
+    .bind(approval.operation)
+    .first<string>("payload");
+  const approvalEmails = JSON.parse(payload!) as {
+    subject: string;
+    text: string;
+  }[];
+  assert.equal(approvalEmails.length, 1);
+  assert.equal(
+    approvalEmails[0].subject,
+    "Your volunteer application is approved",
+  );
+  assert.match(approvalEmails[0].text, /Thanks for joining us/);
+  assert.match(approvalEmails[0].text, /patrol marked "Includes orientation"/);
+  assert.match(
+    approvalEmails[0].text,
+    /separate organizer approval for patrols without orientation/,
+  );
+  assert.match(
+    approvalEmails[0].text,
+    /Events: https:\/\/afterhoursoutreach\.ca\/events$/,
+  );
   const after = await listVolunteers(
     env.DB,
     actor,
@@ -460,13 +494,24 @@ test("application queue counts all submitted unapproved applications independent
   );
   const version = (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
     .updatedAt;
-  await setVolunteerStatus(env.DB, actor, {
+  const revocation = await setVolunteerStatus(env.DB, actor, {
     userId: "pending-02",
     version,
     active: true,
     applicationApproved: false,
     patrolApproved: false,
+    notify: true,
   });
+  const revokedEmail = await env.DB.prepare(
+    "SELECT subject, body FROM event_notification WHERE operation_id=?",
+  )
+    .bind(revocation.operation)
+    .first<{ subject: string; body: string }>();
+  assert.equal(
+    revokedEmail?.subject,
+    "Your volunteer application approval was revoked",
+  );
+  assert.match(revokedEmail!.body, /awaiting organizer approval again/);
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting"))
       .awaitingApprovalCount,

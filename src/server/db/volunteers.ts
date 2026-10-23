@@ -237,6 +237,26 @@ export async function setVolunteerStatus(
   ].filter(Boolean);
   if (!fields.length)
     return { operation: crypto.randomUUID(), message: "No access changes." };
+  const applicationApprovalChanged = fields.includes("applicationApproved");
+  const notificationSubject = applicationApprovalChanged
+    ? applicationApproved
+      ? "Your volunteer application is approved"
+      : "Your volunteer application approval was revoked"
+    : "Your After Hours Outreach volunteer access changed";
+  let notificationBody = `Volunteer account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting organizer approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. Sign in to view your events. Orientation attendance does not automatically grant patrol approval.`;
+  if (applicationApprovalChanged) {
+    if (applicationApproved) {
+      const nextStep = !active
+        ? "Your volunteer account is currently inactive. Please contact an organizer before registering for events."
+        : patrolApproved
+          ? "Sign in using the events link below to browse upcoming patrols and register for an available spot."
+          : 'Sign in using the events link below and choose a patrol marked "Includes orientation" to register for an available spot. You’ll need separate organizer approval for patrols without orientation.';
+      notificationBody = `Your volunteer application is approved! Thanks for joining us and supporting our community.\n\n${nextStep}`;
+    } else {
+      notificationBody =
+        "Your volunteer application is awaiting organizer approval again. Please contact an organizer if you have questions about this change, and check your events for any changes to your registrations.";
+    }
+  }
   const operation = crypto.randomUUID();
   const now = Math.max(Date.now(), version + 1);
   try {
@@ -336,14 +356,15 @@ export async function setVolunteerStatus(
       db
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-          SELECT ?, ?, ?, 'Your After Hours Outreach volunteer access changed', ?, ?, email FROM user
+          SELECT ?, ?, ?, ?, ?, ?, email FROM user
           WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
           crypto.randomUUID(),
           operation,
           userId,
-          `Volunteer account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting organizer approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. Sign in to view your events. Orientation attendance does not automatically grant patrol approval.`,
+          notificationSubject,
+          notificationBody,
           now,
           userId,
           operation,
