@@ -514,6 +514,10 @@ for (const keepLocal of [true, false]) {
       await expect(link).toHaveAttribute("data-conflicted", "true");
       await expect(link).toHaveAccessibleDescription("Conflicting answers");
     }
+    await expect(page.locator(".volunteer-contents-progress-check")).toHaveCSS(
+      "visibility",
+      "hidden",
+    );
     if (!keepLocal)
       await page.locator("[data-contents-menu] summary").first().click();
     const visibleLink = links.filter({ visible: true });
