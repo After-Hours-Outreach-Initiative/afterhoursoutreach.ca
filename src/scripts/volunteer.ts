@@ -111,6 +111,34 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   // Reuse server rendering for authoritative capacity, eligibility, rosters,
   // destination options and optimistic edit versions.
   const refreshed = actionFragment(page, "[data-event-browser]");
+  // Approval and course completion can change the canonical portal destination.
+  // Keep the existing menus/listeners and polling state while adopting server UI.
+  if (/^\/(?:events|volunteer)\/?$/.test(location.pathname)) {
+    const nextLink = page.querySelector<HTMLAnchorElement>(
+      "[data-volunteer-nav]",
+    );
+    if (nextLink) {
+      for (const link of document.querySelectorAll<HTMLAnchorElement>(
+        "[data-volunteer-nav]",
+      )) {
+        link.setAttribute("href", nextLink.getAttribute("href")!);
+        link.querySelector("[data-volunteer-nav-label]")!.textContent =
+          nextLink.querySelector("[data-volunteer-nav-label]")!.textContent;
+        if (nextLink.hasAttribute("aria-current"))
+          link.setAttribute("aria-current", "page");
+        else link.removeAttribute("aria-current");
+      }
+    }
+    const heading = document.querySelector("[data-portal-heading]");
+    if (heading && page.querySelector("[data-portal-heading]"))
+      heading.replaceWith(actionFragment(page, "[data-portal-heading]"));
+    document.title = page.title;
+    if (refreshed.dataset.eventPath) {
+      const url = new URL(location.href);
+      url.pathname = refreshed.dataset.eventPath;
+      if (url.href !== location.href) history.replaceState(null, "", url);
+    }
+  }
   root.dataset.applicationAwaitingApproval =
     refreshed.dataset.applicationAwaitingApproval;
   deferredEventRefresh = false;
@@ -395,6 +423,11 @@ async function refreshVolunteer(element: HTMLFormElement) {
 }
 
 let pendingRefresh = Promise.resolve();
+
+document.addEventListener("application-progress-updated", (event) => {
+  if (event instanceof CustomEvent && event.detail instanceof Document)
+    syncEvents(event.detail);
+});
 
 const eventBrowser = document.querySelector<HTMLElement>(
   "[data-event-browser]",

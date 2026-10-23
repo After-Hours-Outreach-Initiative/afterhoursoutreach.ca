@@ -19,11 +19,12 @@ interface NavigationLink {
 export function siteNavigation(
   signedIn: boolean,
   organizer = false,
+  eventAccess = false,
 ): NavigationLink[] {
   return navLinks.flatMap((link) =>
     signedIn && link.href === "/volunteer"
       ? [
-          { label: "Events", href: "/events" },
+          eventAccess ? { label: "Events", href: "/events" } : link,
           ...(organizer
             ? [
                 {

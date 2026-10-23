@@ -567,11 +567,22 @@ test("View as can choose a D1 account without an application without changing it
   await page.goto("/volunteer");
   const portal = page.locator("[data-event-browser]");
   await expect(
-    portal.getByRole("heading", { name: "Welcome to After Hours Outreach" }),
+    page.getByRole("heading", { name: "Welcome", exact: true, level: 1 }),
   ).toBeVisible();
   await expect(
+    page.getByText("Welcome to After Hours Outreach", { exact: true }),
+  ).toHaveCount(0);
+  await expect(portal.locator("[data-application-tracker]")).toBeVisible();
+  await expect(
+    portal
+      .locator("[data-application-tracker]")
+      .locator("xpath=preceding-sibling::*[1]"),
+  ).toHaveText(
+    "Thanks for your interest in volunteering. Please complete the steps below to complete your application.",
+  );
+  await expect(
     portal.getByRole("link", {
-      name: "Please complete your Volunteer Application",
+      name: "Complete application form",
     }),
   ).toHaveAttribute("href", "/apply");
   const discord = portal.getByRole("link", { name: "Join Discord" });
@@ -582,6 +593,15 @@ test("View as can choose a D1 account without an application without changing it
       "[data-application-pending], [data-live-event], [data-event-list], [data-event-save], [data-event-notifications]",
     ),
   ).toHaveCount(0);
+  const navigation = page.locator('header a[href="/volunteer"]');
+  await expect(navigation).toHaveCount(2);
+  await expect(navigation).toHaveText(["Volunteer", "Volunteer"]);
+  await page.goto("/events?type=orientation&occurrence=example");
+  await expect(page).toHaveURL(
+    /\/volunteer\?type=orientation&occurrence=example$/,
+  );
+  await page.getByRole("link", { name: "Complete application form" }).click();
+  await expect(page).toHaveURL(/\/apply$/);
 });
 
 test("account navigation and profile controls are usable on desktop and mobile", async ({

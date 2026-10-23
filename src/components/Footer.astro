@@ -12,9 +12,10 @@ import { organization } from "@/data/organization";
 interface Props {
   signedIn: boolean;
   organizer?: boolean;
+  eventAccess?: boolean;
 }
-const { signedIn, organizer = false } = Astro.props;
-const links = siteNavigation(signedIn, organizer);
+const { signedIn, organizer = false, eventAccess = false } = Astro.props;
+const links = siteNavigation(signedIn, organizer, eventAccess);
 ---
 
 <footer class="bg-black text-white" id="contact">
@@ -105,8 +106,16 @@ const links = siteNavigation(signedIn, organizer);
       >
         {
           links.map((link) => (
-            <a class="hover:text-white" href={link.href}>
-              {link.label}
+            <a
+              class="hover:text-white"
+              href={link.href}
+              data-volunteer-nav={
+                link.href === "/volunteer" || link.href === "/events"
+                  ? ""
+                  : undefined
+              }
+            >
+              <span data-volunteer-nav-label>{link.label}</span>
             </a>
           ))
         }

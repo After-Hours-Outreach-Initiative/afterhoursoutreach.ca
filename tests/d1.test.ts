@@ -151,6 +151,7 @@ async function draftActor(id = "draft-volunteer"): Promise<Actor> {
     twoFactorEnabled: false,
     twoFactorVerified: false,
     applicationSubmitted: false,
+    applicationComplete: false,
     active: false,
     applicationApproved: false,
     patrolApproved: false,
@@ -1031,7 +1032,23 @@ test("orientees only see orientation events and rosters; patrol approval and org
   )
     .bind(actor.id)
     .run();
-  const orientee = { ...actor, patrolApproved: false };
+  const incompleteOrientee = { ...actor, patrolApproved: false };
+  assert.deepEqual(await listEvents(env.DB, incompleteOrientee), []);
+  await assert.rejects(
+    changeSignup(env.DB, incompleteOrientee, "included-orientation", "join"),
+    statusError(403),
+  );
+  await env.DB.prepare(
+    "UPDATE profile SET naloxone_completed_at=0 WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
+  const orientee = {
+    ...incompleteOrientee,
+    applicationComplete: isApplicationComplete(
+      await loadApplicationProgress(env.DB, actor.id),
+    ),
+  };
   const expected = ["included-orientation", "legacy-orientation"];
   for (const view of ["volunteer", "manage"] as const) {
     const events = await listEvents(env.DB, orientee, "regular-patrol", view);

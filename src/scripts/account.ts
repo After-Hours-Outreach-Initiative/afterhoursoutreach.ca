@@ -318,7 +318,11 @@ form("[data-naloxone-confirm]", async (element, values) => {
     element.querySelector<HTMLButtonElement>('button[type="submit"]')!.hidden =
       true;
     message(element, result.message!, "success");
-    syncApplicationProgress(await loadActionPage());
+    const page = await loadActionPage();
+    syncApplicationProgress(page);
+    document.dispatchEvent(
+      new CustomEvent("application-progress-updated", { detail: page }),
+    );
   } finally {
     checkbox.disabled = saved;
   }

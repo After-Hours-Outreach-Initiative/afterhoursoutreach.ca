@@ -4,11 +4,14 @@ import "@/styles/account.css";
 import "@/styles/volunteer.css";
 import CodeIcon from "@/components/icons/CodeIcon.astro";
 import DialogHeader from "@/components/DialogHeader.astro";
+import { env } from "cloudflare:workers";
+import { loadAccountNavigation } from "@/server/account-navigation";
 interface Props {
   title: string;
   description: string;
   signedIn?: boolean;
   organizer?: boolean;
+  eventAccess?: boolean;
   name?: string;
   greetingName?: string;
   email?: string;
@@ -19,11 +22,17 @@ const {
   description,
   signedIn = false,
   organizer = false,
+  eventAccess,
   name,
   greetingName,
   email,
   publicSpacing = false,
 } = Astro.props;
+// Account forms also need the same authoritative navigation as public pages.
+const account =
+  signedIn && eventAccess === undefined
+    ? await loadAccountNavigation(env, Astro.request, Astro.response.headers)
+    : { signedIn, organizer, eventAccess, name, greetingName, email };
 ---
 
 <Layout
@@ -31,7 +40,7 @@ const {
   description={description}
   noindex
   privatePage
-  account={{ signedIn, organizer, name, greetingName, email }}
+  account={account}
 >
   <section class="volunteer-portal bg-black" data-account-layout>
     <div

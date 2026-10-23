@@ -31,7 +31,6 @@ import {
 } from "@/server/db/application-progress";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
-import WarningIcon from "@/components/icons/WarningIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import { social } from "@/data/site";
 import "@/styles/volunteer.css";
@@ -42,11 +41,6 @@ interface Props {
 }
 const { manage = false } = Astro.props;
 const { actor, email, greetingName } = Astro.props.account;
-const title = manage
-  ? "Manage events"
-  : !actor && Astro.url.pathname.replace(/\/$/, "") === "/volunteer"
-    ? "Volunteer"
-    : "Events";
 let organizer = false;
 try {
   requireOrganizer(actor);
@@ -68,6 +62,17 @@ const showApplicationProgress =
 const applicationProgress = showApplicationProgress
   ? await loadApplicationProgress(env.DB, actor.id)
   : null;
+const incompleteApplication =
+  applicationProgress && !isApplicationComplete(applicationProgress);
+const title = manage
+  ? "Manage events"
+  : incompleteApplication &&
+      actor?.role !== "organizer" &&
+      !actor?.patrolApproved
+    ? "Welcome"
+    : !actor && Astro.url.pathname.replace(/\/$/, "") === "/volunteer"
+      ? "Volunteer"
+      : "Events";
 const rosters =
   management && actor
     ? await listRosters(
@@ -129,6 +134,7 @@ const hasVisibleEvents = management
   description="Volunteer with After Hours Outreach Initiative, doing evening street outreach in Vancouver's Downtown Eastside."
   signedIn={Boolean(actor)}
   organizer={actor?.role === "organizer"}
+  eventAccess={eventAccess}
   name={actor?.name}
   greetingName={greetingName}
   email={email}
@@ -138,6 +144,7 @@ const hasVisibleEvents = management
     {
       !manage && (
         <h1
+          data-portal-heading
           class:list={[
             "max-w-4xl",
             {
@@ -165,6 +172,11 @@ const hasVisibleEvents = management
     data-event-view={manage ? "manage" : "volunteer"}
     data-event-version={eventVersion}
     data-event-access={String(eventAccess)}
+    data-event-path={manage
+      ? "/manage/events"
+      : eventAccess
+        ? "/events"
+        : "/volunteer"}
     data-application-awaiting-approval={String(
       Boolean(
         actor?.applicationSubmitted &&
@@ -177,36 +189,7 @@ const hasVisibleEvents = management
     {
       !actor ? (
         <SignInPanel returnTo={`/events${Astro.url.search}`} />
-      ) : !actor.applicationSubmitted ? (
-        <section class="volunteer-panel">
-          <h2>Welcome to After Hours Outreach</h2>
-          <p>
-            Thanks for your interest in volunteering. First submit your
-            application form and Code of Conduct, then complete Naloxone 101 and
-            confirm it on your account. An organizer will review your
-            application. Once approved, you can view upcoming events and sign up
-            for an orientation.
-          </p>
-          <a class="volunteer-application-warning" href="/apply">
-            <WarningIcon class="volunteer-warning-icon" />
-            <span class="volunteer-application-warning-text">
-              Please complete your Volunteer Application
-            </span>
-            <svg
-              class="volunteer-application-warning-arrow"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M5 12h14m-6-6 6 6-6 6" />
-            </svg>
-          </a>
-        </section>
-      ) : !actor.active ? (
+      ) : actor.applicationSubmitted && !actor.active ? (
         <p class="volunteer-notice" role="status">
           Your volunteer account is inactive. Contact an organizer to restore
           access.
@@ -214,16 +197,22 @@ const hasVisibleEvents = management
       ) : null
     }
     {
-      applicationProgress &&
-        !isApplicationComplete(applicationProgress) &&
-        actor && (
+      applicationProgress && incompleteApplication && actor && (
+        <>
+          {title === "Welcome" && (
+            <p class="mt-6 max-w-3xl text-zinc-300">
+              Thanks for your interest in volunteering. Please complete the
+              steps below to complete your application.
+            </p>
+          )}
           <ApplicationProgress
             progress={applicationProgress}
             userId={actor.id}
             idPrefix="events"
             {email}
           />
-        )
+        </>
+      )
     }
     {
       !eventAccess && (

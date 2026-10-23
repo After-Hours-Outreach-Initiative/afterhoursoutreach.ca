@@ -22,7 +22,15 @@ export async function loadActionPage(
         next.pathname === "/volunteer/sign-in"
       )
         location.assign(next.href);
-      throw new Error("Unexpected redirect");
+      // Portal refreshes may follow a new canonical route after completion or
+      // approval changes. The event browser synchronizes its URL and navigation.
+      const previous = new URL(url, location.origin);
+      const portalRedirect =
+        next.origin === location.origin &&
+        /^\/(?:events|volunteer)\/?$/.test(previous.pathname) &&
+        /^\/(?:events|volunteer)\/?$/.test(next.pathname) &&
+        previous.pathname !== next.pathname;
+      if (!portalRedirect) throw new Error("Unexpected redirect");
     }
     if (response.status === 401 || response.status === 403)
       location.assign("/events");

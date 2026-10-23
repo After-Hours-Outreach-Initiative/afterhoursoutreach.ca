@@ -9,6 +9,7 @@ import { createDatabase } from ".";
 import { profile, volunteerStatus } from "./schema";
 import { accountGreeting } from "../../data/account-navigation";
 import { RequestError, requireSameOrigin } from "../http";
+import { isApplicationComplete } from "./application-progress";
 
 export async function accountContext(
   bindings: AuthBindings,
@@ -38,7 +39,12 @@ export async function accountContext(
   });
   const application = await db.query.profile.findFirst({
     where: eq(profile.user_id, person.id),
-    columns: { first_name: true, preferred_name: true },
+    columns: {
+      first_name: true,
+      preferred_name: true,
+      registered_at: true,
+      naloxone_completed_at: true,
+    },
   });
   return {
     actor: {
@@ -49,6 +55,12 @@ export async function accountContext(
       twoFactorEnabled: person.twoFactorEnabled,
       twoFactorVerified: current.session.twoFactorVerified,
       applicationSubmitted: Boolean(application),
+      applicationComplete: isApplicationComplete({
+        submittedAt: application?.registered_at?.getTime() ?? null,
+        naloxoneCompletedAt:
+          application?.naloxone_completed_at?.getTime() ?? null,
+        applicationApproved: status?.registration_approved ?? false,
+      }),
       active: status?.active ?? false,
       applicationApproved: status?.registration_approved ?? false,
       patrolApproved: status?.patrol_approved ?? false,
@@ -94,15 +106,25 @@ export function requireVolunteer(actor: Actor | null): asserts actor is Actor {
       403,
       "Your application is awaiting organizer approval.",
     );
+  if (
+    !actor.applicationComplete &&
+    !actor.patrolApproved &&
+    actor.role !== "organizer"
+  )
+    throw new RequestError(403, "Complete Naloxone 101 before viewing events.");
   if (actor.twoFactorEnabled && !actor.twoFactorVerified)
     throw new RequestError(403, "Sign in with your authenticator to continue.");
 }
 export function canViewEvents(actor: Actor | null): boolean {
-  // Organizers must retain access to review applications, including after migration.
+  // Preserve existing patrol-approved volunteers and organizers, including legacy
+  // accounts without a self-reported course date. New orientees need all milestones.
   return Boolean(
     actor?.applicationSubmitted &&
     actor.active &&
     (actor.applicationApproved || actor.role === "organizer") &&
+    (actor.applicationComplete ||
+      actor.patrolApproved ||
+      actor.role === "organizer") &&
     (!actor.twoFactorEnabled || actor.twoFactorVerified),
   );
 }

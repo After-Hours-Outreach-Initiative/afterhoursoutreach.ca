@@ -4,6 +4,7 @@ export interface AccountNavigation {
   greetingName: string;
   email: string;
   organizer: boolean;
+  eventAccess: boolean;
 }
 
 export function accountGreeting(
