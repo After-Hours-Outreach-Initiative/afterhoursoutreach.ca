@@ -225,11 +225,6 @@ test("other viewers see signups and cancellations through polling without losing
   // Creating the event in a different request must also update this viewer.
   await expect(organizerCard).toBeVisible({ timeout: 15_000 });
   const eventId = await organizerCard.getAttribute("data-live-event");
-  const reserved = await page.request.post("/api/v1/events/action", {
-    headers: { origin: baseURL! },
-    data: { action: "join", id: eventId },
-  });
-  expect(reserved.status(), await reserved.text()).toBe(200);
   const visitorContext = await browser.newContext();
   const viewerContext = await browser.newContext();
   const attendeeContext = await browser.newContext();
@@ -257,10 +252,22 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       visitor.locator("[data-live-event], [data-event-list]"),
     ).toHaveCount(0);
+    // A numeric false signup flag must not render an extra zero before the count.
+    for (const current of [page, viewer, attendee]) {
+      const availability = card(current).locator("[data-event-availability]");
+      await expect(availability).toHaveText("0 of 4 spots taken");
+      await expect(availability).toHaveAttribute("aria-live", "polite");
+      await expect(availability).toHaveAttribute("aria-atomic", "true");
+    }
+    const reserved = await page.request.post("/api/v1/events/action", {
+      headers: { origin: baseURL! },
+      data: { action: "join", id: eventId },
+    });
+    expect(reserved.status(), await reserved.text()).toBe(200);
     for (const current of [viewer, attendee]) {
       await expect(
         card(current).locator("[data-event-availability]"),
-      ).toHaveText("1 of 4 spots taken");
+      ).toHaveText("1 of 4 spots taken", { timeout: 15_000 });
       await expect(
         card(current).getByRole("button", { name: "Register", exact: true }),
       ).toHaveClass("btn btn-green");
@@ -295,6 +302,9 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       card(attendee).getByText("Registered", { exact: true }),
     ).toBeVisible();
+    await expect(
+      card(attendee).locator("[data-event-availability]"),
+    ).toHaveText("Registered · 2 of 4 spots taken");
     await expect(
       card(attendee).getByRole("button", { name: "Unregister", exact: true }),
     ).toBeEnabled();
@@ -353,6 +363,9 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       card(attendee).getByText("Registered", { exact: true }),
     ).toHaveCount(0);
+    await expect(
+      card(attendee).locator("[data-event-availability]"),
+    ).toHaveText("1 of 4 spots taken");
     await expect(
       card(attendee).getByRole("button", { name: "Register", exact: true }),
     ).toBeEnabled();
