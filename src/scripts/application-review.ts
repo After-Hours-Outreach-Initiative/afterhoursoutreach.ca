@@ -81,6 +81,16 @@ export function initApplicationReview(element: HTMLFormElement) {
       scrollTarget.scrollIntoView({ block: "start" });
     });
   };
+  const focusConflict = () => {
+    const target = [
+      ...questions.querySelectorAll<HTMLButtonElement>(
+        "[data-draft-conflict] button",
+      ),
+    ].find((button) => !button.closest("[hidden]"));
+    if (!target) return false;
+    focus(target);
+    return true;
+  };
   const display = (next: typeof step, moveFocus = true) => {
     step = next;
     questions.hidden = next !== "questions";
@@ -167,12 +177,21 @@ export function initApplicationReview(element: HTMLFormElement) {
     history.replaceState(state("questions"), "");
     display("questions", false);
   });
+  element.addEventListener("application-draft-conflicts-changed", () => {
+    if (step !== "review" || !questions.querySelector("[data-draft-conflict]"))
+      return;
+    reviewDepth = 0;
+    history.replaceState(state("questions"), "");
+    display("questions", false);
+    focusConflict();
+  });
   element.addEventListener("submit", (event) => {
     if (step === "questions") {
       event.preventDefault();
       event.stopPropagation();
       if (element.dataset.submitting) return;
       // Native constraint validation has already focused any invalid fields.
+      if (focusConflict()) return;
       render();
       reviewDepth = 0;
       history.pushState(state("review"), "");
@@ -223,17 +242,16 @@ export function initApplicationReview(element: HTMLFormElement) {
     if (event.state?.applicationStep === "review") {
       // Forward must revalidate/rebuild any answers changed after going Back.
       display("questions", false);
-      if (element.reportValidity()) {
+      if (element.reportValidity() && !focusConflict()) {
         render();
         display("review");
       } else {
         reviewDepth = 0;
         history.replaceState(state("questions"), "");
-        focus(
-          questions.querySelector<HTMLElement>(
-            "input:invalid, textarea:invalid",
-          ),
+        const invalid = questions.querySelector<HTMLElement>(
+          "input:invalid, textarea:invalid",
         );
+        if (invalid) focus(invalid);
       }
     } else if (step === "review") display("questions");
   });

@@ -444,12 +444,29 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-contents a[aria-current="location"] {
   color: #c7d2fe;
 }
-.volunteer-contents-completion-icon {
+.volunteer-contents-section-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-left: 0.625rem;
+}
+.volunteer-contents-completion-icon,
+.volunteer-contents-conflict-icon {
   width: 1.125rem;
   height: 1.125rem;
   flex-shrink: 0;
-  margin-left: 0.625rem;
   color: #a1a1aa;
+}
+.volunteer-contents-conflict-icon {
+  display: none;
+  color: #facc15;
+}
+[data-application-progress-link][data-conflicted="true"]
+  .volunteer-contents-completion-icon {
+  display: none;
+}
+[data-application-progress-link][data-conflicted="true"]
+  .volunteer-contents-conflict-icon {
+  display: block;
 }
 .volunteer-contents-completion-icon path {
   visibility: hidden;
@@ -1512,6 +1529,17 @@ body:has([data-application], [data-account-contents-flow]) {
   display: none;
   @apply text-sm;
   line-height: 1.6;
+}
+.volunteer-answer-conflict {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid #facc15;
+  border-radius: 0.5rem;
+  overflow-wrap: anywhere;
+  @apply text-sm;
+}
+.volunteer-answer-conflict p:first-child {
+  color: #facc15;
 }
 .volunteer-field:has(:user-invalid) > [data-error],
 .volunteer-date-input:has([aria-invalid="true"]) > [data-error],
