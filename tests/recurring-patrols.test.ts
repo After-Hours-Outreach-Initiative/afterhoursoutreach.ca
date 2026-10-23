@@ -1203,6 +1203,13 @@ test("orientation settings persist on series, future templates and individual ex
   );
   await ensurePatrolOccurrences(db);
   assert.equal((await findEvent(db, current.id)).includesOrientation, 1);
+  assert.deepEqual(
+    (await listEvents(db, { ...bob, patrolApproved: false }))
+      .map((event) => event.id)
+      .sort(),
+    [events[0].id, current.id].sort(),
+  );
+  assert.equal((await listEvents(db, alice)).length, 3);
   // Storage keeps the immutable recurring patrol identity, not a mutually exclusive type.
   assert.equal(
     await db

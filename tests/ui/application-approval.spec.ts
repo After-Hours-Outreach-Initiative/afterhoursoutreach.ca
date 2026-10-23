@@ -31,9 +31,12 @@ test("pending applications poll every minute, then approval restores five-second
     const tracker = portal.locator("[data-application-tracker]");
     const formStep = tracker.locator('[data-application-progress-step="form"]');
     const review = tracker.locator('[data-application-progress-step="review"]');
-    const orientationStep = tracker.locator(
-      '[data-application-progress-step="orientation"]',
-    );
+    await expect(
+      tracker.locator("[data-application-progress-step]"),
+    ).toHaveCount(3);
+    await expect(
+      tracker.locator('[data-application-progress-step="orientation"]'),
+    ).toHaveCount(0);
     await expect(portal).toHaveAttribute(
       "data-application-awaiting-approval",
       "true",
@@ -127,7 +130,10 @@ test("pending applications poll every minute, then approval restores five-second
     );
     await expect(review).toHaveAttribute("data-state", "complete");
     await expect(review.locator("summary time")).toHaveCount(1);
-    await expect(orientationStep).toHaveAttribute("open");
+    await expect(tracker.locator('[aria-current="step"]')).toHaveCount(0);
+    await expect(
+      volunteer.locator('[data-live-event][data-includes-orientation="false"]'),
+    ).toHaveCount(0);
     await expect(discord).toHaveCount(0);
     await volunteer.clock.runFor(4_999);
     expect(checks).toBe(2);
@@ -146,14 +152,11 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(
       orientation.getByRole("button", { name: "Unregister", exact: true }),
     ).toBeVisible();
-    await expect(orientationStep).toHaveAttribute("data-state", "complete");
-    await expect(orientationStep).not.toHaveAttribute("open");
-    await expect(orientationStep.locator("summary time")).toHaveCount(1);
+    await expect(tracker.locator('[aria-current="step"]')).toHaveCount(0);
     await orientation
       .getByRole("button", { name: "Unregister", exact: true })
       .click();
-    await expect(orientationStep).toHaveAttribute("data-state", "current");
-    await expect(orientationStep).toHaveAttribute("open");
+    await expect(tracker.locator('[aria-current="step"]')).toHaveCount(0);
     expect(
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),
     ).toBe(200);
