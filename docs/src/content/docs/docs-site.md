@@ -43,6 +43,24 @@ contents. The sidebar's **Historical benchmarks** group is collapsed by default.
 Pagefind requires a production build, so search is disabled for this dev-server
 reader; there is no custom search service.
 
+## Email previews
+
+[Email previews](/emails/) is a read-only gallery of all outgoing application
+emails. Search by message content or workflow, filter by category, then select an
+email and an example. The sign-in email also offers rendered HTML, HTML source,
+and desktop/mobile widths; other messages show their actual plain-text format.
+
+Examples use fictional recipients and non-deliverable `.invalid` links. Opening
+the gallery never sends email or reads a database, credentials, or real users.
+HTML is isolated in a sandboxed frame with network resources and links disabled.
+This is a browser preview, not a substitute for checking real email-client rendering.
+
+Message formatting lives in `src/data/email-templates.ts` and is shared with
+application delivery, including the templates composed inside atomic SQL writes.
+Edit that source to change an email, not the preview component. When adding a new
+email type or content branch, add a fictional example in
+`docs/src/email-previews/catalog.ts` so it is discoverable in the gallery.
+
 ## Edit the documentation
 
 The canonical documentation source is `docs/src/content/docs/`. Edit the Markdown or MDX

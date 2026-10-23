@@ -1,5 +1,11 @@
 import { z } from "zod";
 import {
+  eventCancelledEmail,
+  eventChangedEmail,
+  registrationChangedEmail,
+  type EmailContent,
+} from "../../data/email-templates";
+import {
   publicAttendeeName,
   type AttendeeCategory,
 } from "../../data/event-roster";
@@ -128,19 +134,7 @@ const eventColumns = `
   e.spots, e.open, e.hidden,
   e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
 
-export function eventDescription(
-  event: Pick<EventRow, "type" | "startsAt" | "meetingPoint"> &
-    Partial<Pick<EventRow, "includesOrientation">>,
-) {
-  return `Patrol${(event.includesOrientation ?? event.type === "orientation") ? " (includes orientation)" : ""}: ${new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "America/Vancouver",
-      dateStyle: "full",
-      timeStyle: "short",
-    },
-  ).format(new Date(event.startsAt))}\nMeeting point: ${event.meetingPoint}`;
-}
+export { eventDescription } from "../../data/email-templates";
 
 // Completion does not grant patrol approval. Organizers and patrol-approved
 // volunteers retain full visibility, including legacy approvals without attendance.
@@ -283,8 +277,7 @@ function notifyRoster(
   db: Env["DB"],
   operation: string,
   eventId: string,
-  subject: string,
-  body: string,
+  content: EmailContent,
   notify: boolean,
 ) {
   return db
@@ -299,8 +292,8 @@ function notifyRoster(
     )
     .bind(
       operation,
-      subject,
-      body,
+      content.subject,
+      content.text,
       Date.now(),
       eventId,
       operation,
@@ -420,8 +413,15 @@ export async function saveEvent(
           db,
           operation,
           id,
-          "Your After Hours Outreach event changed",
-          `${eventDescription({ ...old, includesOrientation: Number(data.includesOrientation), startsAt, meetingPoint: data.meetingPoint })}\n\n${data.open ? "Registration is open." : "Registration is closed. Your existing spot is still reserved."}`,
+          eventChangedEmail(
+            {
+              ...old,
+              includesOrientation: Number(data.includesOrientation),
+              startsAt,
+              meetingPoint: data.meetingPoint,
+            },
+            data.open,
+          ),
           notify,
         ),
       ]);
@@ -471,14 +471,7 @@ export async function cancelEvent(
         ...permissionValues(actor),
       ),
     eventAudit(db, operation, id, actor.id, "cancelled", ["cancelledAt"]),
-    notifyRoster(
-      db,
-      operation,
-      id,
-      "Your After Hours Outreach event was cancelled",
-      `${eventDescription(old)}\n\nThis event was cancelled.${reason ? `\nReason: ${reason}` : ""}`,
-      notify,
-    ),
+    notifyRoster(db, operation, id, eventCancelledEmail(old, reason), notify),
     db
       .prepare(
         `UPDATE signup
@@ -688,6 +681,7 @@ export async function manageSignup(
   if (destination === row.eventId)
     throw new RequestError(400, "Choose a different event.");
   const next = destination ? await findEvent(db, destination) : null;
+  const email = registrationChangedEmail(old, next, reason);
   const operation = crypto.randomUUID();
   const now = Date.now();
   try {
@@ -735,10 +729,8 @@ export async function manageSignup(
           crypto.randomUUID(),
           operation,
           row.userId,
-          next
-            ? "Your After Hours Outreach event registration was moved"
-            : "Your After Hours Outreach event registration was removed",
-          `${eventDescription(old)}\n\n${next ? `An organizer moved your registration to:\n${eventDescription(next)}` : "An organizer removed your registration."}${reason ? `\nReason: ${reason}` : ""}`,
+          email.subject,
+          email.text,
           now,
           row.userId,
           operation,
