@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { social } from "../../src/data/site";
 import {
+  approveLocalApplication,
   createLocalAccount,
   openLocalAccountSwitcher,
 } from "../helpers/local-account";
@@ -128,9 +129,12 @@ test("pending applications poll every minute, then approval restores five-second
       "data-application-awaiting-approval",
       "false",
     );
-    await expect(review).toHaveAttribute("data-state", "complete");
-    await expect(review.locator("summary time")).toHaveCount(1);
-    await expect(tracker.locator('[aria-current="step"]')).toHaveCount(0);
+    await expect(tracker).toHaveCount(0);
+    await expect(
+      portal.locator(
+        '.application-progress, #events-application-heading, [href="#events-application-heading"]',
+      ),
+    ).toHaveCount(0);
     await expect(
       volunteer.locator('[data-live-event][data-includes-orientation="false"]'),
     ).toHaveCount(0);
@@ -152,11 +156,11 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(
       orientation.getByRole("button", { name: "Unregister", exact: true }),
     ).toBeVisible();
-    await expect(tracker.locator('[aria-current="step"]')).toHaveCount(0);
+    await expect(tracker).toHaveCount(0);
     await orientation
       .getByRole("button", { name: "Unregister", exact: true })
       .click();
-    await expect(tracker.locator('[aria-current="step"]')).toHaveCount(0);
+    await expect(tracker).toHaveCount(0);
     expect(
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),
     ).toBe(200);
@@ -193,6 +197,71 @@ test("pending applications poll every minute, then approval restores five-second
     expect(
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),
     ).toBe(403);
+  } finally {
+    await volunteerContext.close();
+  }
+});
+
+test("approved applicants keep progress until naloxone confirmation, then retain completed account info", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  test.skip(
+    !baseURL?.startsWith("http://localhost:"),
+    "Local D1 development only",
+  );
+  const volunteerContext = await browser.newContext();
+  try {
+    const volunteer = await volunteerContext.newPage();
+    const account = await createLocalAccount(volunteer.request, baseURL!);
+    await page.goto("/volunteer");
+    await (
+      await openLocalAccountSwitcher(page)
+    )
+      .locator('[data-switch-user="local-fixture-user-robin"]')
+      .click();
+    await expect(
+      page.getByRole("link", { name: "Manage events", exact: true }),
+    ).toBeVisible();
+    await approveLocalApplication(page.request, baseURL!, account.id);
+
+    await volunteer.goto(`${baseURL}/events`);
+    const tracker = volunteer.locator("[data-application-tracker]");
+    await expect(tracker).toBeVisible();
+    await expect(
+      tracker.locator('[data-application-progress-step="naloxone"]'),
+    ).toHaveAttribute("data-state", "current");
+    await expect(volunteer.locator("[data-event-list]")).toBeVisible();
+    await tracker.locator("[data-naloxone-confirm] input").check();
+    await tracker
+      .getByRole("button", { name: "Confirm completion", exact: true })
+      .click();
+    await expect(tracker).toHaveCount(0);
+    await expect(volunteer.locator("[data-event-list]")).toBeVisible();
+    await expect(
+      volunteer.locator(
+        '.application-progress, #events-application-heading, [href="#events-application-heading"]',
+      ),
+    ).toHaveCount(0);
+    await volunteer.reload();
+    await expect(tracker).toHaveCount(0);
+    await expect(volunteer.locator("[data-event-list]")).toBeVisible();
+
+    await volunteer.goto(`${baseURL}/volunteer/account`);
+    await expect(
+      volunteer.locator("#submitted-application-heading"),
+    ).toBeVisible();
+    const completedInfo = volunteer.locator(
+      'section[aria-labelledby="submitted-application-heading"]',
+    );
+    await expect(
+      completedInfo.locator("[data-submitted-application]"),
+    ).toBeVisible();
+    await expect(completedInfo).toContainText(
+      "Naloxone 101 completion (self-reported)",
+    );
+    await expect(completedInfo).toContainText("Application approved");
   } finally {
     await volunteerContext.close();
   }
