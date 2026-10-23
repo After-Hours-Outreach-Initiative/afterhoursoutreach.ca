@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { inPlaceAction } from "../helpers/in-place-action";
 import {
   approveLocalApplication,
   createLocalAccount,
@@ -56,6 +57,11 @@ test("empty volunteer rosters stay accessible and stable through first/last sign
   try {
     const viewer = await viewerContext.newPage();
     const account = await createLocalAccount(viewer.request, baseURL!);
+    const completed = await viewer.request.post("/api/v1/account/naloxone", {
+      headers: { origin: baseURL! },
+      data: { userId: account.id, completed: true },
+    });
+    expect(completed.status(), await completed.text()).toBe(200);
     await approveLocalApplication(page.request, baseURL!, account.id);
     await viewer.goto("/events");
     const cards = [page, viewer].map((current) =>
@@ -145,18 +151,36 @@ test("empty volunteer rosters stay accessible and stable through first/last sign
     }
     // Form submissions use the same server-rendered empty state as live polling.
     const publicCard = cards[1];
-    await publicCard
-      .getByRole("button", { name: "Register", exact: true })
-      .click();
-    await expect(roster(publicCard).locator("summary")).toHaveText(
-      "Volunteers (1)",
-    );
-    await publicCard
-      .getByRole("button", { name: "Unregister", exact: true })
-      .click();
-    await expect(roster(publicCard).locator("summary")).toHaveText(
-      "Volunteers (0)",
-    );
+    for (const joining of [true, false]) {
+      const button = publicCard.locator("[data-live-signup] button");
+      await inPlaceAction(viewer, {
+        endpoint: "/api/v1/events/action",
+        form: publicCard.locator("[data-live-signup]"),
+        trigger: () => button.click(),
+        loadingLabel: joining ? "Registering…" : "Unregistering…",
+        pending: async () => {
+          for (const width of [1280, 768, 375, 320]) {
+            await viewer.setViewportSize({ width, height: 900 });
+            expect(
+              await button.evaluate((element) => {
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                return {
+                  lines: range.getClientRects().length,
+                  buttonOverflow: element.scrollWidth > element.clientWidth,
+                  pageOverflow:
+                    document.documentElement.scrollWidth > innerWidth,
+                };
+              }),
+            ).toEqual({ lines: 1, buttonOverflow: false, pageOverflow: false });
+          }
+        },
+        updated: () =>
+          expect(roster(publicCard).locator("summary")).toHaveText(
+            `Volunteers (${joining ? 1 : 0})`,
+          ),
+      });
+    }
     await expect(
       publicCard.locator(".event-avatar-row .attendee-avatar"),
     ).toHaveCount(0);
