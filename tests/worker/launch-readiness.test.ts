@@ -165,6 +165,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
     const { browser, page, useCookie } = await browserWithSession(owner.cookie);
     try {
       let contentType = "";
+      await page.clock.install();
       await page.route(
         "**/api/v1/auth/email-otp/send-verification-otp**",
         async (route) => {
@@ -174,9 +175,12 @@ describe("launch readiness regressions", { concurrent: false }, () => {
       );
       await page.goto(`${origin}/events`);
       await browserExpect(
-        page.locator("[data-application-pending]"),
+        page.locator(
+          '[data-application-awaiting-approval="true"] [data-application-tracker]',
+        ),
       ).toBeVisible();
       useCookie("");
+      await page.clock.runFor(60_000);
       const request = page.locator("[data-email-request]");
       await browserExpect(request).toBeVisible({ timeout: 10_000 });
       await request

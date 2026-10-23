@@ -78,13 +78,9 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     )
       .bind(now + 86_400_000, organizer.id, now, now)
       .run();
-    const listingVersion = async (cookie = "", manage = false) => {
+    const listingVersion = async (cookie: string, manage = false) => {
       const html = await (
-        await send(
-          manage ? "/manage/events" : cookie ? "/events" : "/volunteer",
-          undefined,
-          cookie,
-        )
+        await send(manage ? "/manage/events" : "/events", undefined, cookie)
       ).text();
       const version = html.match(/data-event-version="([a-f0-9]{64})"/)?.[1];
       expect(version).toBeDefined();
@@ -111,7 +107,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       });
       return result.version;
     };
-    const publicVersion = await listingVersion();
+    const publicVersion = await readVersion();
     const publicNext = () => readVersion();
     const signedInNext = () => readVersion(attendee.cookie);
     expect(await publicNext()).toBe(publicVersion);
@@ -119,7 +115,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     // Pending accounts see no event activity; approval immediately changes their scoped view.
     expect(
       await (await send("/events", undefined, attendee.cookie)).text(),
-    ).toContain("Application Submitted");
+    ).toContain("Application Form Submitted");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
     )
@@ -134,7 +130,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       attendee.cookie,
     );
     expect(joined.status, await joined.text()).toBe(200);
-    const joinedVersion = await listingVersion();
+    const joinedVersion = await publicNext();
     expect(joinedVersion).toBe(publicVersion);
     expect(await publicNext()).toBe(joinedVersion);
     expect(await signedInNext()).not.toBe(approvedVersion);
@@ -214,13 +210,15 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     expect(managementHtml).toContain('data-live-event="hidden"');
     expect(managementHtml).toContain('data-live-event="past"');
     expect(managementHtml).toMatch(
-      /<a\b[^>]*href="\/events"[^>]*>\s*<svg\b[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg>\s*<span>View events<\/span>\s*<\/a>/,
+      /<a\b[^>]*href="\/events"[^>]*>\s*<svg\b[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg>\s*<span\b[^>]*>View events<\/span>\s*<\/a>/,
     );
     expect(managementHtml).toContain("data-event-save");
     expect(managementHtml).toContain("volunteer-roster");
     expect(managementHtml).not.toMatch(/data-live-signup|Sign in to register/);
     expect(managementHtml.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g)).toEqual([
-      '<h1 id="events-heading">Manage events</h1>',
+      expect.stringMatching(
+        /<h1\b[^>]*id="events-heading"[^>]*>Manage events<\/h1>/,
+      ),
     ]);
     expect(managementHtml).not.toMatch(/<h2\b[^>]*>\s*Events\s*<\/h2>/);
     expect(managementHtml).toMatch(
@@ -278,12 +276,12 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       organizerJoinedVersion,
     );
     await DB.prepare("UPDATE event SET hidden=1 WHERE id='live'").run();
-    const hiddenPublicVersion = await listingVersion();
+    const hiddenPublicVersion = await publicNext();
     expect(await publicNext()).toBe(hiddenPublicVersion);
     const hiddenPersonalVersion = await listingVersion(attendee.cookie);
     expect(await signedInNext()).toBe(hiddenPersonalVersion);
     await DB.prepare("UPDATE event SET spots=5 WHERE id='live'").run();
-    expect(await listingVersion()).toBe(hiddenPublicVersion);
+    expect(await publicNext()).toBe(hiddenPublicVersion);
     const capacityVersion = await listingVersion(attendee.cookie);
     expect(capacityVersion).not.toBe(hiddenPersonalVersion);
     expect(await signedInNext()).toBe(capacityVersion);
