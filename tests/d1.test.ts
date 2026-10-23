@@ -152,6 +152,7 @@ async function draftActor(id = "draft-volunteer"): Promise<Actor> {
     twoFactorVerified: false,
     applicationSubmitted: false,
     applicationComplete: false,
+    naloxoneCompleted: false,
     active: false,
     applicationApproved: false,
     patrolApproved: false,

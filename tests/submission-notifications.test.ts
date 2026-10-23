@@ -207,6 +207,7 @@ beforeEach(async () => {
     twoFactorVerified: false,
     applicationSubmitted: false,
     applicationComplete: false,
+    naloxoneCompleted: false,
     active: false,
     applicationApproved: false,
     patrolApproved: false,

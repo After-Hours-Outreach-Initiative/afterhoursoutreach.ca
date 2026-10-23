@@ -65,6 +65,7 @@ test("event access uses all three application milestones, not orientation attend
     applicationSubmitted: true,
     applicationApproved: true,
     applicationComplete: true,
+    naloxoneCompleted: true,
     active: true,
     patrolApproved: false,
     twoFactorEnabled: false,
