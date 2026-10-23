@@ -1,13 +1,84 @@
 import { eventCalendar, type CalendarEvent } from "../data/event-calendar";
 import { addCalendarDays } from "../data/event-time";
 
-const highlightTimers = new WeakMap<HTMLElement, number>();
+const selections = new WeakMap<
+  HTMLElement,
+  { card: HTMLElement; cancel: () => void }
+>();
 const renderedDays = new WeakMap<HTMLElement, string>();
+
+function clearSelection(root: HTMLElement) {
+  selections.get(root)?.cancel();
+}
+
+/** Let the selected event settle below the header before starting its highlight. */
+function highlightEvent(root: HTMLElement, card: HTMLElement) {
+  clearSelection(root);
+  const controller = new AbortController();
+  let frame = 0;
+  let timer: number | undefined;
+  const cancel = () => {
+    cancelAnimationFrame(frame);
+    window.clearTimeout(timer);
+    controller.abort();
+    card.removeAttribute("data-calendar-highlight");
+    selections.delete(root);
+  };
+  selections.set(root, { card, cancel });
+  // Manual navigation or a new selection must not leave a delayed highlight.
+  for (const type of ["wheel", "touchstart", "pointerdown", "keydown"])
+    window.addEventListener(
+      type,
+      () => {
+        if (frame) cancel();
+      },
+      { passive: true, capture: true, signal: controller.signal },
+    );
+
+  const deadline = performance.now() + 3000;
+  let previousTop: number | undefined;
+  let settledFrames = 0;
+  const waitForEvent = () => {
+    if (!root.contains(card) || card.hidden || performance.now() > deadline) {
+      cancel();
+      return;
+    }
+    const bounds = card.getBoundingClientRect();
+    const header = document.querySelector<HTMLElement>(".site-header");
+    const readingEdge = Math.max(
+      0,
+      header?.getBoundingClientRect().bottom ?? 0,
+    );
+    const visible =
+      bounds.top >= readingEdge - 1 &&
+      Math.min(bounds.bottom, innerHeight) - bounds.top >=
+        Math.min(bounds.height, innerHeight - readingEdge, 64) - 1;
+    settledFrames =
+      previousTop !== undefined && Math.abs(bounds.top - previousTop) < 0.5
+        ? settledFrames + 1
+        : 0;
+    previousTop = bounds.top;
+    if (visible && settledFrames >= 2) {
+      frame = 0;
+      card.setAttribute("data-calendar-highlight", "");
+      timer = window.setTimeout(cancel, 1600);
+    } else frame = requestAnimationFrame(waitForEvent);
+  };
+  frame = requestAnimationFrame(waitForEvent);
+}
 
 /** Read the actual cards after filtering/reconciliation, not a second event feed. */
 export function syncEventCalendar(root: HTMLElement, start?: string) {
   const calendar = root.querySelector<HTMLElement>("[data-event-calendar]");
   if (!calendar) return;
+  const selected = selections.get(root)?.card;
+  if (
+    selected &&
+    (selected.hidden ||
+      !root.contains(selected) ||
+      location.hash !== `#${selected.id}`)
+  )
+    clearSelection(root);
   const events: CalendarEvent[] = [];
   for (const card of root.querySelectorAll<HTMLElement>(
     "[data-event-list] > [data-live-event]",
@@ -90,8 +161,11 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
 
 export function handleEventCalendarClick(root: HTMLElement, event: MouseEvent) {
   if (!(event.target instanceof Element)) return;
+  if (event.target.closest("[data-event-filter]")) clearSelection(root);
   const step = event.target.closest<HTMLButtonElement>("[data-calendar-step]");
   if (step) {
+    if (step.disabled) return;
+    clearSelection(root);
     const calendar = root.querySelector<HTMLElement>("[data-event-calendar]")!;
     const offset = step.dataset.calendarStep === "previous" ? -35 : 35;
     const start =
@@ -118,23 +192,12 @@ export function handleEventCalendarClick(root: HTMLElement, event: MouseEvent) {
   if (!card || card.hidden) return;
   event.preventDefault();
   // Keep filter/occurrence query parameters and native back/forward navigation.
-  history.pushState(null, "", link.hash);
+  if (location.hash !== link.hash) history.pushState(null, "", link.hash);
   card.focus({ preventScroll: true });
+  highlightEvent(root, card);
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   card.scrollIntoView({
     behavior: reduced ? "instant" : "smooth",
     block: "start",
   });
-  card.removeAttribute("data-calendar-highlight");
-  // Restart the short highlight if the same event is selected again.
-  void card.offsetWidth;
-  card.setAttribute("data-calendar-highlight", "");
-  window.clearTimeout(highlightTimers.get(card));
-  highlightTimers.set(
-    card,
-    window.setTimeout(
-      () => card.removeAttribute("data-calendar-highlight"),
-      1600,
-    ),
-  );
 }

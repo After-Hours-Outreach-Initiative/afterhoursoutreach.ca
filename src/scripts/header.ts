@@ -7,8 +7,9 @@ const desktop = matchMedia("(min-width: 64rem)");
 
 // Wrapped branding can make the header taller than its responsive minimum.
 // Keep the panel's height allowance separate so the header can shrink again.
+// Share the measurement with sticky content and event anchor offsets as well.
 new ResizeObserver(() => {
-  header.style.setProperty(
+  document.documentElement.style.setProperty(
     "--site-header-rendered-height",
     `${header.getBoundingClientRect().height}px`,
   );
