@@ -120,9 +120,6 @@ body:has([data-application], [data-account-contents-flow]) {
   /* Clear the sticky site header on anchor jumps. */
   scroll-margin-top: 7rem;
 }
-.volunteer-introduction .volunteer-signin-panel {
-  margin: 2.5rem 0 0;
-}
 .volunteer-signin-panel .volunteer-form {
   max-width: none;
 }
