@@ -384,11 +384,19 @@ describe(
           const listing = await (
             await ok(await send("/events", undefined, person.cookie))
           ).text();
-          assert.match(listing, /You can register/);
-          assert.match(listing, /You can’t register/);
-          assert.match(
-            listing,
-            /Organizer approval is required to register for patrols/,
+          assert.doesNotMatch(listing, /You can(?:’t)? register/);
+          const card = (id: string) =>
+            listing.match(
+              new RegExp(`<li[^>]*data-live-event="${id}"[\\s\\S]*?</li>`),
+            )?.[0] ?? "";
+          assert.match(card(orientation.id), /class="btn btn-green"/);
+          assert.match(card(orientation.id), /value="join"/);
+          assert.doesNotMatch(card(patrol.id), /data-live-signup/);
+          assert.equal(
+            card(patrol.id).match(
+              /Organizer approval is required to register for patrols\./g,
+            )?.length,
+            1,
           );
           await ok(await join(patrol.id, person.cookie), 403);
           const audit = await DB.prepare(
@@ -1760,9 +1768,10 @@ describe(
               .getByRole("button", { name: "Register", exact: true })
               .waitFor(),
           );
-          await expect(card.locator(".volunteer-spots")).toHaveText(
-            "You can register",
-          );
+          await expect(card.locator(".volunteer-spots")).toHaveCount(0);
+          await expect(
+            card.getByRole("button", { name: "Register", exact: true }),
+          ).toHaveClass("btn btn-green");
           await expect(
             card.getByText("Registered", { exact: true }),
           ).toHaveCount(0);

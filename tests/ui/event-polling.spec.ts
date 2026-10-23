@@ -257,10 +257,15 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       visitor.locator("[data-live-event], [data-event-list]"),
     ).toHaveCount(0);
-    for (const current of [viewer, attendee])
-      await expect(card(current).locator(".volunteer-spots")).toHaveText(
-        "You can register",
-      );
+    for (const current of [viewer, attendee]) {
+      await expect(
+        card(current).locator("[data-event-availability]"),
+      ).toHaveText("1 of 4 spots taken");
+      await expect(
+        card(current).getByRole("button", { name: "Register", exact: true }),
+      ).toHaveClass("btn btn-green");
+      await expect(card(current)).not.toContainText(/You can(?:’t)? register/);
+    }
     await organizerCard
       .getByRole("button", { name: "Edit", exact: true })
       .click();
@@ -293,13 +298,17 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       card(attendee).getByRole("button", { name: "Unregister", exact: true }),
     ).toBeEnabled();
-    await expect(card(viewer).locator(".volunteer-spots")).toHaveText(
-      "You can’t register",
+    await expect(card(viewer).locator("[data-event-availability]")).toHaveText(
+      "2 of 4 spots taken",
       { timeout: 15_000 },
     );
-    await expect(card(viewer)).toContainText(
-      "The remaining places are reserved for approved medics or volunteers who have not completed orientation.",
-    );
+    await expect(
+      card(viewer).getByText(
+        "The remaining places are reserved for approved medics or volunteers who have not completed orientation.",
+        { exact: true },
+      ),
+    ).toHaveCount(1);
+    await expect(card(viewer)).not.toContainText(/You can(?:’t)? register/);
     await expect(organizerCard.locator("[data-event-availability]")).toHaveText(
       "2 of 4 spots taken",
       { timeout: 15_000 },
@@ -352,13 +361,17 @@ test("other viewers see signups and cancellations through polling without losing
       Reflect.deleteProperty(document, "hidden");
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    await expect(card(viewer).locator(".volunteer-spots")).toHaveText(
-      "You can register",
+    await expect(card(viewer).locator("[data-event-availability]")).toHaveText(
+      "1 of 4 spots taken",
       { timeout: 15_000 },
     );
+    await expect(card(viewer)).not.toContainText(/You can(?:’t)? register/);
     await expect(
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toBeEnabled();
+    await expect(
+      card(viewer).getByRole("button", { name: "Register", exact: true }),
+    ).toHaveClass("btn btn-green");
     await expect(
       organizerCard.locator(".volunteer-roster > summary"),
     ).toHaveText("Volunteers (1)");
