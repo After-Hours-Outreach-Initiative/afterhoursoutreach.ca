@@ -1,9 +1,23 @@
 ---
+import { env } from "cloudflare:workers";
+import VolunteerPortal from "@/components/volunteer/VolunteerPortal.astro";
+import { accountContext, canViewEvents } from "@/server/db/access";
+import { forwardCookies } from "@/server/auth";
 export const prerender = false;
+const account = env.BETTER_AUTH_SECRET
+  ? await accountContext(env, Astro.request)
+  : null;
+if (account) forwardCookies(account.headers, Astro.response.headers);
 const signInUrl = new URL(Astro.url);
 signInUrl.pathname = "/volunteer/sign-in";
 // Keep legacy event deep links while sharing the complete sign-in experience.
 if (!signInUrl.searchParams.has("returnTo"))
   signInUrl.searchParams.set("returnTo", `/events${Astro.url.search}`);
-return Astro.rewrite(signInUrl);
+if (!account?.actor) return Astro.rewrite(signInUrl);
+if (account.actor.twoFactorEnabled && !account.actor.twoFactorVerified)
+  return Astro.redirect(signInUrl.pathname + signInUrl.search);
+if (canViewEvents(account.actor))
+  return Astro.redirect(`/events${Astro.url.search}`);
 ---
+
+<VolunteerPortal {account} />

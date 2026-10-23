@@ -13,6 +13,7 @@ import "@/styles/header.css";
 interface Props {
   signedIn: boolean;
   organizer?: boolean;
+  eventAccess?: boolean;
   name?: string;
   greetingName?: string;
   email?: string;
@@ -20,6 +21,7 @@ interface Props {
 const {
   signedIn,
   organizer = false,
+  eventAccess = false,
   name,
   greetingName = accountGreeting(undefined, name),
   email,
@@ -29,7 +31,7 @@ const current = pathname.replace(/\/$/, "");
 const isCurrent = (href: string) =>
   current === href ||
   (href === "/manage/volunteers" && current.startsWith(`${href}/`));
-const links = siteNavigation(signedIn, organizer);
+const links = siteNavigation(signedIn, organizer, eventAccess);
 const accountPage = current === "/volunteer/account" || current === "/apply";
 ---
 
@@ -93,9 +95,14 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
             <a
               class="header-link"
               href={link.href}
+              data-volunteer-nav={
+                link.href === "/volunteer" || link.href === "/events"
+                  ? ""
+                  : undefined
+              }
               aria-current={isCurrent(link.href) ? "page" : undefined}
             >
-              {link.label}
+              <span data-volunteer-nav-label>{link.label}</span>
             </a>
           ),
         )
@@ -222,9 +229,14 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
                   <a
                     class="header-mobile-link"
                     href={link.href}
+                    data-volunteer-nav={
+                      link.href === "/volunteer" || link.href === "/events"
+                        ? ""
+                        : undefined
+                    }
                     aria-current={isCurrent(link.href) ? "page" : undefined}
                   >
-                    {link.label}
+                    <span data-volunteer-nav-label>{link.label}</span>
                     <ArrowRightIcon class="header-mobile-arrow" />
                   </a>
                 )}

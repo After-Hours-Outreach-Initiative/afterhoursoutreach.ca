@@ -10,7 +10,13 @@ export interface ApplicationProgress {
 }
 
 /** Application completion is separate from orientation booking and attendance. */
-export function isApplicationComplete(progress: ApplicationProgress): boolean {
+export function isApplicationComplete(
+  progress: Pick<
+    ApplicationProgress,
+    "submittedAt" | "naloxoneCompletedAt" | "applicationApproved"
+  > &
+    Partial<ApplicationProgress>,
+): boolean {
   return (
     progress.submittedAt !== null &&
     progress.naloxoneCompletedAt !== null &&

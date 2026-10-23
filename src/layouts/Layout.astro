@@ -74,7 +74,11 @@ const {
       <slot />
     </main>
 
-    <Footer signedIn={account.signedIn} organizer={account.organizer} />
+    <Footer
+      signedIn={account.signedIn}
+      organizer={account.organizer}
+      eventAccess={account.eventAccess}
+    />
   </body>
 </html>
 

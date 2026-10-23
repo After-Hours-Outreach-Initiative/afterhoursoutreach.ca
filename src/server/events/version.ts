@@ -30,6 +30,7 @@ export async function eventViewVersion(
       id: actor.id,
       role: actor.role,
       applicationSubmitted: actor.applicationSubmitted,
+      applicationComplete: actor.applicationComplete,
       active: actor.active,
       applicationApproved: actor.applicationApproved,
       patrolApproved: actor.patrolApproved,

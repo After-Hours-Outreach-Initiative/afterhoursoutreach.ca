@@ -45,6 +45,13 @@ test("pending applications poll every minute, then approval restores five-second
     const account = await createLocalAccount(volunteer.request, baseURL!);
     await volunteer.goto(`${baseURL}/volunteer`);
     await expect(
+      volunteer.getByRole("heading", { name: "Welcome", exact: true }),
+    ).toBeVisible();
+    await expect(volunteer.locator('header a[href="/volunteer"]')).toHaveText([
+      "Volunteer",
+      "Volunteer",
+    ]);
+    await expect(
       volunteer.locator('[data-application-progress-step="form"] > summary'),
     ).toBeVisible();
     await expect(
@@ -133,6 +140,9 @@ test("pending applications poll every minute, then approval restores five-second
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),
     ).toBe(403);
     await volunteer.goto(`${baseURL}/volunteer/account`);
+    await expect(volunteer.locator('header a[href="/volunteer"]')).toHaveCount(
+      2,
+    );
     await expect(
       volunteer
         .getByRole("status")
@@ -144,8 +154,12 @@ test("pending applications poll every minute, then approval restores five-second
     volunteer.on("requestfinished", (request) => {
       if (request.url().endsWith("/api/v1/events/version")) checks++;
     });
-    await volunteer.goto(`${baseURL}/volunteer`);
+    await volunteer.goto(`${baseURL}/volunteer?type=orientation`);
     await expect.poll(() => checks).toBe(1);
+    const documents: string[] = [];
+    volunteer.on("request", (request) => {
+      if (request.resourceType() === "document") documents.push(request.url());
+    });
 
     await page.goto("/volunteer");
     await (
@@ -177,6 +191,14 @@ test("pending applications poll every minute, then approval restores five-second
     );
     await volunteer.clock.runFor(1);
     await expect.poll(() => checks).toBe(2);
+    await expect(volunteer).toHaveURL(/\/events\?type=orientation$/);
+    await expect(volunteer.locator('header a[href="/events"]')).toHaveText([
+      "Events",
+      "Events",
+    ]);
+    await expect(volunteer.locator("[data-portal-heading]")).toHaveText(
+      "Events",
+    );
     await expect(volunteer.locator("[data-event-list]")).toBeVisible({
       timeout: 15_000,
     });
@@ -240,6 +262,15 @@ test("pending applications poll every minute, then approval restores five-second
     );
     await expect(review).toHaveAttribute("data-state", "current");
     await expect(review).toHaveAttribute("open");
+    await expect(volunteer).toHaveURL(/\/volunteer\?type=orientation$/);
+    await expect(volunteer.locator('header a[href="/volunteer"]')).toHaveText([
+      "Volunteer",
+      "Volunteer",
+    ]);
+    await expect(
+      volunteer.getByRole("heading", { name: "Welcome", exact: true }),
+    ).toBeVisible();
+    expect(documents).toEqual([]);
     await expect(
       volunteer.locator("[data-live-event], [data-event-list]"),
     ).toHaveCount(0);
@@ -282,6 +313,14 @@ test("approved applicants keep progress until naloxone confirmation, then retain
     await approveLocalApplication(page.request, baseURL!, account.id);
 
     await volunteer.goto(`${baseURL}/events`);
+    await expect(volunteer).toHaveURL(/\/volunteer$/);
+    await expect(volunteer.locator('header a[href="/volunteer"]')).toHaveText([
+      "Volunteer",
+      "Volunteer",
+    ]);
+    await expect(
+      volunteer.getByRole("heading", { name: "Welcome", exact: true }),
+    ).toBeVisible();
     const tracker = volunteer.locator("[data-application-tracker]");
     await expect(tracker).toBeVisible();
     await expectCompletedStep(
@@ -290,12 +329,17 @@ test("approved applicants keep progress until naloxone confirmation, then retain
     await expect(
       tracker.locator('[data-application-progress-step="naloxone"]'),
     ).toHaveAttribute("data-state", "current");
-    await expect(volunteer.locator("[data-event-list]")).toBeVisible();
+    await expect(volunteer.locator("[data-event-list]")).toHaveCount(0);
     await tracker.locator("[data-naloxone-confirm] input").check();
     await tracker
       .getByRole("button", { name: "Confirm completion", exact: true })
       .click();
     await expect(tracker).toHaveCount(0);
+    await expect(volunteer).toHaveURL(/\/events$/);
+    await expect(volunteer.locator('header a[href="/events"]')).toHaveText([
+      "Events",
+      "Events",
+    ]);
     await expect(volunteer.locator("[data-event-list]")).toBeVisible();
     await expect(
       volunteer.locator(

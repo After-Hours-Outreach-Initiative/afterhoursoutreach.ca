@@ -155,6 +155,7 @@ beforeEach(async () => {
       name: id,
       sessionId: `${id}-session`,
       applicationSubmitted: true,
+      applicationComplete: false,
       applicationApproved: true,
       patrolApproved: true,
       active: true,
