@@ -62,7 +62,7 @@ function signInHtml(email: SignInEmailInput) {
 export function signInEmailContent(email: SignInEmailInput): EmailContent {
   if (email.purpose === "change-email")
     return {
-      subject: "Confirm your After Hours Outreach email change",
+      subject: "Confirm your email change",
       text: `Enter this code in your account settings to confirm your new email address: ${email.code}\n\nThe code expires in ten minutes and can only be used once. Requesting a new code for this address replaces the previous code. Your email address will not change until you confirm it.\n\nIf you did not request this, ignore this email.`,
     };
   return {
@@ -80,7 +80,7 @@ export const applicationSubmittedTemplate = {
 } satisfies EmailContent;
 
 export const accessRegistrationCancelledTemplate = {
-  subject: "Your After Hours Outreach event registration was cancelled",
+  subject: "Your event registration was cancelled",
   text: "Your registration for a patrol{{orientation}} at {{meetingPoint}} was cancelled because your volunteer access changed. Check Your account or contact an organizer.",
 } satisfies EmailContent;
 
@@ -141,7 +141,7 @@ export function volunteerAccessEmail(
         : 'Sign in using the events link below. If Naloxone 101 completion is not yet confirmed, return to the Volunteer page, complete the course if needed, and confirm completion only after finishing it. Once completion is confirmed, choose an "Orientation + Patrol" event to register for an available spot. You’ll need separate organizer approval for patrols without orientation.';
   if (!applicationApprovalChanged)
     return {
-      subject: "Your After Hours Outreach volunteer access changed",
+      subject: "Your volunteer access changed",
       text: `Volunteer account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting organizer approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. ${nextStep} Orientation attendance does not automatically grant patrol approval.`,
     };
   if (!applicationApproved)
@@ -159,7 +159,7 @@ export function roleChangedEmail(
   role: "volunteer" | "organizer",
 ): EmailContent {
   return {
-    subject: "Your After Hours Outreach account role changed",
+    subject: "Your account role changed",
     text: `Your role is now ${role}. Sign in again to continue.`,
   };
 }
@@ -187,7 +187,7 @@ export function eventChangedEmail(
   open: boolean,
 ): EmailContent {
   return {
-    subject: "Your After Hours Outreach event changed",
+    subject: "Your event changed",
     text: `${eventDescription(event)}\n\n${open ? "Registration is open." : "Registration is closed. Your existing spot is still reserved."}`,
   };
 }
@@ -197,7 +197,7 @@ export function eventCancelledEmail(
   reason: string,
 ): EmailContent {
   return {
-    subject: "Your After Hours Outreach event was cancelled",
+    subject: "Your event was cancelled",
     text: `${eventDescription(event)}\n\nThis event was cancelled.${reason ? `\nReason: ${reason}` : ""}`,
   };
 }
@@ -209,29 +209,29 @@ export function registrationChangedEmail(
 ): EmailContent {
   return {
     subject: next
-      ? "Your After Hours Outreach event registration was moved"
-      : "Your After Hours Outreach event registration was removed",
+      ? "Your event registration was moved"
+      : "Your event registration was removed",
     text: `${eventDescription(previous)}\n\n${next ? `An organizer moved your registration to:\n${eventDescription(next)}` : "An organizer removed your registration."}${reason ? `\nReason: ${reason}` : ""}`,
   };
 }
 
 export function patrolSeriesShortenedEmail(): EmailContent {
   return {
-    subject: "Your After Hours Outreach event was cancelled",
+    subject: "Your event was cancelled",
     text: "An organizer ended this patrol series before your scheduled occurrence. Your registration was cancelled.",
   };
 }
 
 export function patrolSeriesChangedEmail(): EmailContent {
   return {
-    subject: "Your After Hours Outreach patrol changed",
+    subject: "Your patrol changed",
     text: "An organizer changed this and future patrols. Your existing registration is still reserved. Check the volunteer page for your updated patrol date, time and meeting point.",
   };
 }
 
 export function patrolSeriesStoppedEmail(reason: string): EmailContent {
   return {
-    subject: "Your After Hours Outreach patrol was cancelled",
+    subject: "Your patrol was cancelled",
     text: `An organizer stopped this patrol series. Your registration was cancelled.${reason ? `\nReason: ${reason}` : ""}`,
   };
 }

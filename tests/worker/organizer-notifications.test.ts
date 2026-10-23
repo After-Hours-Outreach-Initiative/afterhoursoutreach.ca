@@ -282,8 +282,7 @@ describe(
             assert.ok(
               notifications.some(
                 (mail) =>
-                  mail.subject ===
-                  `Your After Hours Outreach event registration was ${action}`,
+                  mail.subject === `Your event registration was ${action}`,
               ),
             );
           }
@@ -329,7 +328,7 @@ describe(
         organizer.cookie,
       );
       const mail = await DB.prepare(
-        "SELECT body FROM event_notification WHERE user_id=? AND subject='Your After Hours Outreach event changed' ORDER BY created_at DESC LIMIT 1",
+        "SELECT body FROM event_notification WHERE user_id=? AND subject='Your event changed' ORDER BY created_at DESC LIMIT 1",
       )
         .bind(volunteer.id)
         .first<{ body: string }>();

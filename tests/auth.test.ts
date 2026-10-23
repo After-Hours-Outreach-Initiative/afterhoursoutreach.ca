@@ -2414,10 +2414,7 @@ test("email-change messages contain a verification code rather than a sign-in li
     "production",
     async (_url, options) => {
       const body = JSON.parse(String(options?.body));
-      assert.equal(
-        body.subject,
-        "Confirm your After Hours Outreach email change",
-      );
+      assert.equal(body.subject, "Confirm your email change");
       assert.match(body.text, /account settings.*123456/);
       assert.doesNotMatch(body.text, /Sign in:|sign-in\/complete/);
       assert.equal(body.html, undefined);
