@@ -13,7 +13,8 @@ const { event, roster, future, destinations } = Astro.props;
 
 <details class="volunteer-roster">
   <summary>Volunteers ({roster.length})</summary>
-  <ul>
+  {roster.length === 0 && <p>No volunteers registered yet.</p>}
+  <ul hidden={roster.length === 0}>
     {
       roster.map((person) => (
         <li>

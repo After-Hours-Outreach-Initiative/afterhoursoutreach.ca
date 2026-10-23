@@ -264,9 +264,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           ? ".volunteer-roster"
           : ".public-event-roster";
         await expect(card.locator(rosterSelector)).toHaveCount(1);
-        await expect(card.locator(".event-row-label")).toHaveText([
-          "Volunteers",
-        ]);
+        await expect(card.locator(".event-row-label")).toHaveCount(0);
         await expect(card.locator(".event-attendance-row")).toHaveCount(1);
         await expect(card.locator(".event-avatar-row")).toHaveAttribute(
           "aria-label",
@@ -303,10 +301,10 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(card.locator(".event-orientee-box")).toHaveCount(0);
         const emptyCard = page.locator(`[data-live-event="${empty}"]`);
         const emptyRoster = emptyCard.locator(rosterSelector);
-        await expect(emptyRoster).toHaveCount(0);
-        await expect(emptyCard.locator(".event-row-label")).toHaveText([
-          "Volunteers",
-        ]);
+        await expect(emptyRoster.locator("summary")).toHaveText(
+          "Volunteers (0)",
+        );
+        await expect(emptyCard.locator(".event-row-label")).toHaveCount(0);
         await expect(
           emptyCard.locator(".event-attendance .attendee-avatar"),
         ).toHaveCount(0);
@@ -400,7 +398,16 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           await emptyRoster.locator("summary").click();
           await expectActionPosition();
           await setRegistration(false);
-          await expect(emptyRoster).toHaveCount(0, { timeout: 15_000 });
+          await expect(emptyRoster.locator("summary")).toHaveText(
+            "Volunteers (0)",
+            { timeout: 15_000 },
+          );
+          await expect(emptyRoster).toHaveAttribute("open", "");
+          await expect(
+            emptyRoster.getByText("No volunteers registered yet.", {
+              exact: true,
+            }),
+          ).toBeVisible();
           await expect(
             emptyCard.locator(".event-attendance .attendee-avatar"),
           ).toHaveCount(0);
