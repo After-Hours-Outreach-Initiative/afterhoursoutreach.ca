@@ -398,6 +398,10 @@ test("production acceptance is per-recipient, bounded, duplicate-safe under conc
     assert.equal(url, "https://api.resend.com/emails");
     assert.equal(init?.method, "POST");
     assert.equal(
+      JSON.parse(String(init?.body)).from,
+      "After Hours Outreach <info@afterhoursoutreach.ca>",
+    );
+    assert.equal(
       new Headers(init?.headers).get("User-Agent"),
       "afterhoursoutreach.ca/1.0",
     );

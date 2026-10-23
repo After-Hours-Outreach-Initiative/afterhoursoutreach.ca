@@ -21,7 +21,7 @@
   (no live auth URL/environment/D1), cron schedules empty. Desired source values
   are canonical `https://afterhoursoutreach.ca`, production environment and
   `0 16 * * *` / `30 * * * *`; **not** evidence of live configuration.
-  Resend domain/SPF/DKIM and both `accounts@`/`noreply@` senders remain unverified:
+  Resend domain/SPF/DKIM and both `accounts@`/`info@` senders remain unverified:
   local send-only key cannot read domains (401 `restricted_api_key`). No email sent.
 - `wrangler.jsonc` production placeholder, Preview bindings/config and historical
   migrations unchanged. No Worker deployment, secret write or Preview mutation.

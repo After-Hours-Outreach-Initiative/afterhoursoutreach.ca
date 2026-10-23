@@ -1626,7 +1626,10 @@ test("medic mail deduplicates concurrent runs and renewals; ambiguous retries fr
   assert.equal(calls, 1);
   assert.equal(payloads.size, 1);
   assert.match([...payloads.values()][0], /2026-11-14/);
-  assert.match([...payloads.values()][0], /noreply@afterhoursoutreach.ca/);
+  assert.equal(
+    JSON.parse([...payloads.values()][0]).from,
+    "After Hours Outreach <info@afterhoursoutreach.ca>",
+  );
 
   await env.DB.prepare(
     "UPDATE profile SET medical_certification_expiry='2026-11-13' WHERE user_id='medic'",

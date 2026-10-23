@@ -67,6 +67,10 @@ test("a successful batch sends more than five private messages in one bounded pr
     const payload = JSON.parse(String(init?.body));
     assert.equal(payload.length, 12);
     for (const email of payload) {
+      assert.equal(
+        email.from,
+        "After Hours Outreach <info@afterhoursoutreach.ca>",
+      );
       assert.equal(email.to.length, 1);
       assert.equal(email.cc, undefined);
       assert.equal(email.bcc, undefined);
