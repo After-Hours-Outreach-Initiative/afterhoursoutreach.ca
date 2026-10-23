@@ -16,12 +16,12 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
     <div
       class="event-avatar-row"
       role="group"
-      aria-label={`${medics} approved medics and ${volunteers} other volunteers registered; two medic places reserved`}
+      aria-label={`${medics} approved medics, ${volunteers} other volunteers and ${orientees} orientees registered`}
       tabindex="0"
     >
       {
-        Array.from({ length: Math.max(2, medics) }, (_, index) => (
-          <AttendeeAvatar category="medic" booked={index < medics} />
+        Array.from({ length: medics }, () => (
+          <AttendeeAvatar category="medic" />
         ))
       }
       {
@@ -29,30 +29,18 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
           <AttendeeAvatar category="volunteer" />
         ))
       }
+      {
+        Array.from({ length: orientees }, () => (
+          <AttendeeAvatar category="orientee" />
+        ))
+      }
     </div>
   </div>
-  {
-    Boolean(event.includesOrientation) && (
-      <div class="event-attendance-row">
-        <span class="event-row-label">Orientees</span>
-        <div
-          class="event-orientee-box"
-          role="group"
-          aria-label={`${orientees} orientees registered; two reserved places, maximum four`}
-        >
-          {Array.from({ length: Math.max(2, orientees) }, (_, index) => (
-            <AttendeeAvatar category="orientee" booked={index < orientees} />
-          ))}
-        </div>
-      </div>
-    )
-  }
   <details class="event-avatar-description">
     <summary>About these places</summary>
     <p>
-      Filled people are registered; outlines are reserved places. Red: approved
-      medics with completed orientation (two reserved, extra medics welcome).
-      Green: other volunteers.
+      Each person shown is registered. Red: approved medics with completed
+      orientation (two reserved, extra medics welcome). Green: other volunteers.
     </p>
     {
       Boolean(event.includesOrientation) && (
@@ -79,9 +67,6 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
     align-items: start;
     gap: 0.5rem;
   }
-  .event-attendance-row + .event-attendance-row {
-    margin-top: 0.25rem;
-  }
   .event-avatar-row {
     display: flex;
     flex-wrap: nowrap;
@@ -93,15 +78,6 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
     overflow-x: auto;
     scrollbar-color: #52525b transparent;
     scrollbar-width: thin;
-  }
-  .event-orientee-box {
-    display: grid;
-    grid-template-columns: repeat(4, var(--attendee-avatar-width));
-    gap: 0.25rem;
-    width: fit-content;
-    border: 1px solid rgb(96 165 250 / 50%);
-    border-radius: 0.375rem;
-    padding: 0.1875rem;
   }
   .event-avatar-description {
     color: var(--color-zinc-300, #d4d4d8);
