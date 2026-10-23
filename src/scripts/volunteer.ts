@@ -59,16 +59,24 @@ initEventDates(document);
 
 function applyEventFilter(root: HTMLElement, type: string) {
   const selected = eventFilter(type, root.dataset.eventView === "manage");
-  let visible = 0;
-  for (const card of root.querySelectorAll<HTMLElement>(
-    "[data-event-list] > [data-live-event], [data-event-list] > [data-series-card]",
-  )) {
-    card.hidden = !matchesEventFilter(
-      selected,
-      Boolean(card.dataset.seriesCard),
-      card.dataset.includesOrientation === "true",
-    );
-    if (!card.hidden) visible++;
+  for (const [listSelector, emptySelector] of [
+    ["[data-event-list]", "[data-empty-events]"],
+    ["[data-past-event-list]", "[data-empty-past-events]"],
+  ]) {
+    let visible = 0;
+    const list = root.querySelector(listSelector);
+    for (const card of list?.querySelectorAll<HTMLElement>(
+      ":scope > [data-live-event], :scope > [data-series-card]",
+    ) ?? []) {
+      card.hidden = !matchesEventFilter(
+        selected,
+        Boolean(card.dataset.seriesCard),
+        card.dataset.includesOrientation === "true",
+      );
+      if (!card.hidden) visible++;
+    }
+    const empty = root.querySelector<HTMLElement>(emptySelector);
+    if (empty) empty.hidden = visible !== 0;
   }
   for (const button of root.querySelectorAll<HTMLButtonElement>(
     "[data-event-filter]",
@@ -77,8 +85,6 @@ function applyEventFilter(root: HTMLElement, type: string) {
       "aria-pressed",
       String(button.dataset.eventFilter === selected),
     );
-  const empty = root.querySelector<HTMLElement>("[data-empty-events]");
-  if (empty) empty.hidden = visible !== 0;
   syncEventCalendar(root);
 }
 
@@ -353,7 +359,17 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     }
   };
   syncList(list, refreshed.querySelector("[data-event-list]")!);
-  for (const selector of ["[data-empty-events]", "[data-event-limit]"]) {
+  const pastList = root.querySelector<HTMLElement>("[data-past-event-list]");
+  const nextPastList = refreshed.querySelector<HTMLElement>(
+    "[data-past-event-list]",
+  );
+  if (pastList && nextPastList) syncList(pastList, nextPastList);
+  for (const selector of [
+    "[data-empty-events]",
+    "[data-event-limit]",
+    "[data-empty-past-events]",
+    "[data-past-event-limit]",
+  ]) {
     const target = root.querySelector(selector);
     if (target) target.replaceWith(actionFragment(page, selector));
   }
@@ -366,7 +382,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   if (element?.matches("[data-event-save]") && !eventId) element.reset();
   if (restoreFocus && (element || !focused?.isConnected)) {
     const card = eventId
-      ? [...list.querySelectorAll<HTMLElement>("[data-live-event]")].find(
+      ? [...root.querySelectorAll<HTMLElement>("[data-live-event]")].find(
           (card) => card.dataset.liveEvent === eventId,
         )
       : seriesId

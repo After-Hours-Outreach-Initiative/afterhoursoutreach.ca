@@ -28,6 +28,9 @@ export const GET: APIRoute = async ({ request }) => {
       params.get("occurrence") ?? undefined,
       manage ? "manage" : "volunteer",
     );
+    const pastEvents = manage
+      ? []
+      : await listEvents(env.DB, actor, undefined, "past");
     const series = manage && actor ? await listPatrolSeries(env.DB, actor) : [];
     const rosters =
       manage && actor
@@ -38,7 +41,7 @@ export const GET: APIRoute = async ({ request }) => {
           )
         : [];
     const version = await eventViewVersion(
-      events,
+      [...events, ...pastEvents],
       actor,
       rosters,
       Date.now(),
