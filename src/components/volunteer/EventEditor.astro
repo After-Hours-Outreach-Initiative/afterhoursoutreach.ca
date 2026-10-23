@@ -1,20 +1,14 @@
 ---
 import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
-import { vancouverInput } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
 import DialogHeader from "@/components/DialogHeader.astro";
-import RecurringIcon from "@/components/icons/RecurringIcon.astro";
-import MinusIcon from "@/components/icons/MinusIcon.astro";
-import PlusIcon from "@/components/icons/PlusIcon.astro";
-import DateInput from "./DateInput.astro";
-import NativePickerInput from "./NativePickerInput.astro";
+import EventFields from "./EventFields.astro";
 interface Props {
   event?: EventRow;
   series?: PatrolSeriesRow;
 }
 const { event, series } = Astro.props;
 const dialogId = `event-editor-${event?.id ?? "new"}`;
-const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
 ---
 
 <dialog
@@ -76,185 +70,7 @@ const publicVisibility = event ? Boolean(event.open && !event.hidden) : true;
             </>
           )
         }
-        <div class="volunteer-field volunteer-wide">
-          <label class="volunteer-check">
-            <input
-              type="checkbox"
-              name="includesOrientation"
-              checked={Boolean(event?.includesOrientation)}
-              aria-describedby={`${dialogId}-orientation-help`}
-            />
-            <span>Includes orientation</span>
-          </label>
-          <p class="volunteer-help" id={`${dialogId}-orientation-help`}>
-            Orientation places count toward total capacity: reserve two for
-            volunteers without completed orientation, with a maximum of four.
-            Fewer than two orientation registrations do not cancel the patrol.
-            Existing bookings must remain eligible.
-          </p>
-        </div>
-        <DateInput
-          name="startsAt"
-          id={`${dialogId}-startsAt`}
-          errorField={`${dialogId}-startsAt`}
-          label="Start date"
-          value={event ? vancouverInput(event.startsAt) : ""}
-          withTime
-          defaultTime="21:00"
-          warnPast
-        />
-        {
-          !event && (
-            <div
-              class="volunteer-field volunteer-wide"
-              data-recurrence-controls
-            >
-              <label class="volunteer-check volunteer-recurrence-toggle">
-                <input
-                  type="checkbox"
-                  name="recurring"
-                  aria-describedby={`${dialogId}-recurring-help`}
-                />
-                <span class="volunteer-recurrence-label">
-                  <RecurringIcon class="volunteer-recurrence-icon" />
-                  <span>Recurring patrol</span>
-                </span>
-              </label>
-              <div class="volunteer-fields" data-recurrence-fields hidden>
-                <label class="volunteer-field">
-                  Interval (weeks)
-                  <input
-                    name="intervalWeeks"
-                    type="number"
-                    min="1"
-                    max="52"
-                    value="1"
-                    disabled
-                  />
-                </label>
-                <div class="volunteer-field">
-                  <label for={`${dialogId}-endDate`}>
-                    Last recurring date (optional, inclusive)
-                  </label>
-                  <NativePickerInput
-                    id={`${dialogId}-endDate`}
-                    name="endDate"
-                    aria-describedby={`error-${dialogId}-endDate`}
-                    disabled
-                  />
-                  <FieldError
-                    field={`${dialogId}-endDate`}
-                    message="Choose a valid last recurring date on or after the start date."
-                  />
-                </div>
-              </div>
-              <p class="volunteer-help" id={`${dialogId}-recurring-help`}>
-                Volunteers see the next 3 occurrences per series.
-              </p>
-            </div>
-          )
-        }
-        <div class="volunteer-field">
-          <label for={`${dialogId}-spots`}>Volunteer spots</label>
-          <div class="volunteer-spots-stepper">
-            <button
-              class="btn btn-quiet"
-              type="button"
-              data-spots-step="-1"
-              aria-label="Decrease volunteer spots"
-              aria-controls={`${dialogId}-spots`}
-              disabled
-            >
-              <MinusIcon />
-            </button>
-            <input
-              id={`${dialogId}-spots`}
-              name="spots"
-              type="number"
-              min={event?.includesOrientation ? "4" : "2"}
-              max="100"
-              step="1"
-              aria-describedby={`error-${dialogId}-spots`}
-              required
-              value={event?.spots ?? 8}
-            />
-            <button
-              class="btn btn-quiet"
-              type="button"
-              data-spots-step="1"
-              aria-label="Increase volunteer spots"
-              aria-controls={`${dialogId}-spots`}
-              disabled
-            >
-              <PlusIcon />
-            </button>
-          </div>
-          <FieldError
-            field={`${dialogId}-spots`}
-            message={event?.includesOrientation
-              ? "Enter a whole number from 4 to 100 for a patrol that includes orientation."
-              : "Enter a whole number from 2 to 100."}
-          />
-        </div>
-        <div class="volunteer-field">
-          <label for={`${dialogId}-meetingPoint`}>Meeting point</label>
-          <input
-            id={`${dialogId}-meetingPoint`}
-            name="meetingPoint"
-            aria-describedby={`error-${dialogId}-meetingPoint`}
-            required
-            pattern={String.raw`.*\S.*`}
-            maxlength="500"
-            value={event ? event.meetingPoint : "Lord Strathcona Elementary"}
-          />
-          <FieldError
-            field={`${dialogId}-meetingPoint`}
-            message="Enter a meeting point (up to 500 characters)."
-          />
-        </div>
-        <div class="volunteer-field">
-          <label for={`${dialogId}-meetingPointUrl`}>Map link (optional)</label>
-          <input
-            id={`${dialogId}-meetingPointUrl`}
-            type="url"
-            name="meetingPointUrl"
-            aria-describedby={`error-${dialogId}-meetingPointUrl`}
-            maxlength="2048"
-            value={event
-              ? (event.meetingPointUrl ?? "")
-              : "https://maps.app.goo.gl/4ommJyZFCRJRGf9F9"}
-            placeholder="https://"
-          />
-          <FieldError
-            field={`${dialogId}-meetingPointUrl`}
-            message="Enter a valid map URL (up to 2048 characters)."
-          />
-        </div>
-        <fieldset class="volunteer-state-field volunteer-wide">
-          <legend>Public visibility</legend>
-          <div class="volunteer-state-selector">
-            <label class="volunteer-state-option volunteer-state-positive">
-              <input
-                class="sr-only"
-                type="radio"
-                name="publicVisibility"
-                value="true"
-                checked={publicVisibility}
-              />
-              <span>Visible</span>
-            </label>
-            <label class="volunteer-state-option volunteer-state-negative">
-              <input
-                class="sr-only"
-                type="radio"
-                name="publicVisibility"
-                value="false"
-                checked={!publicVisibility}
-              />
-              <span>Hidden</span>
-            </label>
-          </div>
-        </fieldset>
+        <EventFields id={dialogId} {event} />
       </div>
       <p data-form-message role="status" hidden></p>
       <noscript

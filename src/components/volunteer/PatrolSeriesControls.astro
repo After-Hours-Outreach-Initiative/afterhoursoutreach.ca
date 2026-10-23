@@ -1,102 +1,51 @@
 ---
 import type { PatrolSeriesRow } from "@/server/db/events";
-import NativePickerInput from "./NativePickerInput.astro";
+import EventFields from "./EventFields.astro";
 interface Props {
   series: PatrolSeriesRow;
 }
-const { series: item } = Astro.props;
+const { series } = Astro.props;
 ---
 
 <details
   class="volunteer-series-settings"
-  data-live-series={item.id}
-  data-series-version={item.updatedAt}
+  data-live-series={series.id}
+  data-series-version={series.updatedAt}
 >
-  <summary>Series settings</summary>
-  <p class="volunteer-help">
-    Manage any scheduled date, including beyond the volunteers’ next three
-    occurrences. The original first date and weekly interval define stable
-    occurrence IDs. To change the cadence, stop the series and create another.
-  </p>
+  <summary>Whole series settings</summary>
   <form
     class="volunteer-form"
-    data-series-occurrence
-    action="/api/v1/events/action"
-    method="post"
-  >
-    <input type="hidden" name="seriesId" value={item.id} />
-    <label class="volunteer-field">
-      Scheduled date to manage
-      <NativePickerInput name="occurrenceDate" min={item.firstDate} required />
-    </label>
-    <p class="volunteer-help">
-      Choose an original scheduled date, not the rescheduled date of an
-      individual exception. Open it to edit or cancel only that occurrence, or
-      this and future occurrences. Existing past and cancelled occurrences can
-      also be opened after the series ends.
-    </p>
-    <button class="btn btn-outline" type="submit" data-loading-label="Opening…">
-      Open occurrence
-    </button>
-    <p data-form-message role="status" hidden></p>
-  </form>
-  <form
-    class="volunteer-form"
-    data-series-end
+    data-series-save
     data-email-prompt="series-cancel"
     action="/api/v1/events/action"
     method="post"
   >
-    <input type="hidden" name="seriesId" value={item.id} />
-    <input type="hidden" name="version" value={item.updatedAt} />
-    <input type="hidden" name="series" value={JSON.stringify(item)} />
-    <label class="volunteer-field">
-      Last recurring date (optional, inclusive)
-      <NativePickerInput
-        name="endDate"
-        min={item.firstDate}
-        value={item.endDate ?? ""}
-      />
-    </label>
-    <p class="volunteer-help">
-      Shortening cancels future occurrences and bookings after this nominal
-      date, including individual exceptions. Extending never restores cancelled
-      occurrences or restarts a stopped series.
-    </p>
-    <button class="btn btn-outline" type="submit" data-loading-label="Saving…">
-      Save end date
-    </button>
+    <input type="hidden" name="seriesId" value={series.id} />
+    <input type="hidden" name="version" value={series.updatedAt} />
+    <div class="volunteer-fields">
+      <EventFields id={`series-${series.id}`} {series} />
+    </div>
+    <button
+      class="btn btn-outline"
+      type="submit"
+      data-loading-label="Saving…"
+      disabled>Save series defaults</button
+    >
     <p data-form-message role="status" hidden></p>
   </form>
   <form
     class="volunteer-form volunteer-danger"
-    data-series-stop
+    data-event-delete="series"
     data-email-prompt="series-cancel"
     action="/api/v1/events/action"
     method="post"
   >
-    <input type="hidden" name="seriesId" value={item.id} />
-    <input type="hidden" name="version" value={item.updatedAt} />
-    <label class="volunteer-field">
-      Stop from scheduled date
-      <NativePickerInput
-        name="occurrenceDate"
-        min={item.firstDate}
-        max={item.endDate ?? undefined}
-        required
-      />
-    </label>
-    <label class="volunteer-field">
-      Reason (optional)
-      <textarea name="reason" maxlength="1000" rows="2"></textarea>
-    </label>
-    <p class="volunteer-help">
-      Permanently stop this and future occurrences. Their bookings are
-      cancelled; previous occurrences and history stay intact.
-    </p>
-    <button class="btn btn-red" type="submit" data-loading-label="Stopping…">
-      Stop recurrence
-    </button>
+    <input type="hidden" name="action" value="delete-series" />
+    <input type="hidden" name="id" value={series.id} />
+    <input type="hidden" name="version" value={series.updatedAt} />
+    <button class="btn btn-red" type="submit" data-loading-label="Deleting…"
+      >Delete series</button
+    >
     <p data-form-message role="status" hidden></p>
   </form>
 </details>

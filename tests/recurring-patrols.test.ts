@@ -10,6 +10,9 @@ import {
 import type { Actor } from "../src/server/db/access";
 import {
   cancelEvent,
+  deleteEvent,
+  deletePatrolSeries,
+  listPatrolSeries,
   changeSignup,
   ensurePatrolOccurrences,
   findEvent,
@@ -534,6 +537,178 @@ test("cancellation advances the window, cancels only that roster, and is a perma
     events[0].id,
   );
   assert.ok((await findEvent(db, events[0].id)).cancelledAt);
+});
+
+test("deleting one occurrence is versioned, cancels only its bookings, and cannot regenerate it", async () => {
+  const series = await savePatrolSeries(db, organizer, input());
+  const unrelated = await savePatrolSeries(db, organizer, input());
+  const [first, second] = await all(series.id);
+  await changeSignup(db, alice, first.id, "join");
+  await changeSignup(db, alice, second.id, "join");
+  const unrelatedRows = await all(unrelated.id);
+  await assert.rejects(
+    deleteEvent(db, alice, first.id, first.updatedAt),
+    status(403),
+  );
+  await assert.rejects(
+    deleteEvent(db, organizer, first.id, first.updatedAt + 1),
+    status(409),
+  );
+  const result = await deleteEvent(
+    db,
+    organizer,
+    first.id,
+    first.updatedAt,
+    true,
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE event_id=?")
+      .bind(first.id)
+      .first("status"),
+    "cancelled",
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE event_id=?")
+      .bind(second.id)
+      .first("status"),
+    "confirmed",
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT count(*) n FROM event_notification WHERE operation_id=?")
+      .bind(result.operation)
+      .first("n"),
+    1,
+  );
+  await ensurePatrolOccurrences(db);
+  assert.equal(
+    (await all(series.id)).some((event) => event.id === first.id),
+    false,
+  );
+  assert.equal(
+    (await all(series.id)).filter((event) => !event.cancelledAt).length,
+    3,
+  );
+  assert.deepEqual(await all(unrelated.id), unrelatedRows);
+  await assert.rejects(
+    materializePatrolOccurrence(
+      db,
+      organizer,
+      series.id,
+      first.occurrenceDate!,
+    ),
+    status(409),
+  );
+  // Already-cancelled occurrences can also be removed without changing their tombstone.
+  await cancelEvent(db, organizer, second.id, second.updatedAt, "");
+  const cancelled = await findEvent(db, second.id);
+  await deleteEvent(db, organizer, second.id, cancelled.updatedAt);
+  assert.equal(
+    await db
+      .prepare("SELECT cancelled_at FROM event WHERE id=?")
+      .bind(second.id)
+      .first("cancelled_at"),
+    cancelled.cancelledAt,
+  );
+});
+
+test("deleting past events and entire series preserves attendance and unrelated data", async () => {
+  const series = await savePatrolSeries(db, organizer, {
+    ...input(),
+    includesOrientation: true,
+  });
+  const [past, future] = await all(series.id);
+  await changeSignup(db, alice, past.id, "join");
+  await changeSignup(db, alice, future.id, "join");
+  await db
+    .prepare("UPDATE event SET starts_at=0 WHERE id=?")
+    .bind(past.id)
+    .run();
+  await completeOrientation(db, organizer, alice.id, past.id);
+  const attendance = (
+    await db.prepare("SELECT * FROM orientation_completion").all()
+  ).results;
+  await deleteEvent(db, organizer, past.id, past.updatedAt);
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE event_id=?")
+      .bind(past.id)
+      .first("status"),
+    "confirmed",
+  );
+  await saveEvent(db, organizer, {
+    type: "patrol",
+    startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+    meetingPoint: "Unrelated one-off",
+    meetingPointUrl: "",
+    spots: 8,
+    open: true,
+    hidden: false,
+  });
+  const oneOff = await db
+    .prepare("SELECT * FROM event WHERE series_id IS NULL")
+    .first();
+  const old = await findPatrolSeries(db, organizer, series.id);
+  const occurrenceCount = await db
+    .prepare("SELECT count(*) n FROM event WHERE series_id=?")
+    .bind(series.id)
+    .first("n");
+  await assert.rejects(
+    deletePatrolSeries(db, organizer, series.id, old.updatedAt + 1),
+    status(409),
+  );
+  await deletePatrolSeries(db, organizer, series.id, old.updatedAt);
+  await ensurePatrolOccurrences(db);
+  assert.equal((await listPatrolSeries(db, organizer)).length, 0);
+  assert.equal((await all(series.id)).length, 0);
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE event_id=?")
+      .bind(future.id)
+      .first("status"),
+    "cancelled",
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE event_id=?")
+      .bind(past.id)
+      .first("status"),
+    "confirmed",
+  );
+  assert.deepEqual(
+    (await db.prepare("SELECT * FROM orientation_completion").all()).results,
+    attendance,
+  );
+  assert.deepEqual(
+    await db.prepare("SELECT * FROM event WHERE series_id IS NULL").first(),
+    oneOff,
+  );
+  assert.equal(await count("user"), 3);
+  assert.equal(
+    await db
+      .prepare("SELECT count(*) n FROM event WHERE series_id=?")
+      .bind(series.id)
+      .first("n"),
+    occurrenceCount,
+  );
+  await assert.rejects(
+    materializePatrolOccurrence(
+      db,
+      organizer,
+      series.id,
+      future.occurrenceDate!,
+    ),
+    status(404),
+  );
+  await deleteEvent(
+    db,
+    organizer,
+    String(oneOff!.id),
+    Number(oneOff!.updated_at),
+  );
+  assert.equal((await listEvents(db, organizer)).length, 0);
 });
 
 test("start/cancel eligibility uses the live clock; the frontier fails closed for sparse distant rows before maintenance", async () => {

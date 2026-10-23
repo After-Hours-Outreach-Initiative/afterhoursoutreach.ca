@@ -149,7 +149,10 @@ export async function findPatrolSeries(
 ) {
   requireOrganizer(actor);
   const row = await db
-    .prepare(`SELECT ${seriesColumns} FROM patrol_series WHERE id = ?`)
+    .prepare(
+      `SELECT ${seriesColumns} FROM patrol_series WHERE id = ?
+      AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = patrol_series.id AND a.action = 'deleted')`,
+    )
     .bind(id)
     .first<PatrolSeriesRow>();
   if (!row) throw new RequestError(404, "Patrol series not found.");
@@ -161,7 +164,9 @@ export async function listPatrolSeries(db: Env["DB"], actor: Actor) {
   return (
     await db
       .prepare(
-        `SELECT ${seriesColumns} FROM patrol_series ORDER BY first_date, id`,
+        `SELECT ${seriesColumns} FROM patrol_series
+        WHERE NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = patrol_series.id AND a.action = 'deleted')
+        ORDER BY first_date, id`,
       )
       .all<PatrolSeriesRow>()
   ).results;
@@ -308,7 +313,9 @@ export async function ensurePatrolOccurrences(
   const seriesRows = (
     await db
       .prepare(
-        `SELECT ${seriesColumns} FROM patrol_series${seriesId ? " WHERE id = ?" : ""}`,
+        `SELECT ${seriesColumns} FROM patrol_series WHERE
+        NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = patrol_series.id AND a.action = 'deleted')
+        ${seriesId ? " AND id = ?" : ""}`,
       )
       .bind(...(seriesId ? [seriesId] : []))
       .all<PatrolSeriesRow>()
@@ -539,10 +546,15 @@ export async function materializePatrolOccurrence(
   // Existing snapshots remain addressable after stopping/shortening, including
   // cancellations and past history. This path never recreates an occurrence.
   const existing = await db
-    .prepare(`SELECT id FROM event WHERE series_id = ? AND occurrence_date = ?`)
+    .prepare(
+      `SELECT id, EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = event.id AND a.action = 'deleted') AS deleted
+      FROM event WHERE series_id = ? AND occurrence_date = ?`,
+    )
     .bind(seriesId, occurrenceDate)
-    .first<{ id: string }>();
+    .first<{ id: string; deleted: number }>();
   if (existing) {
+    if (existing.deleted)
+      throw new RequestError(409, "This occurrence was deleted.");
     const result = await db
       .prepare(
         `UPDATE patrol_series SET generation_until = generation_until
@@ -555,7 +567,7 @@ export async function materializePatrolOccurrence(
         409,
         "This series or your organizer authorization changed. Reload the page.",
       );
-    return existing;
+    return { id: existing.id };
   }
   requireScheduledDate(series, occurrenceDate);
   const templates = await readTemplates(db, seriesId);
@@ -807,6 +819,40 @@ export async function stopPatrolSeries(
   reason = "",
   notify = false,
 ) {
+  return stopSeries(db, actor, id, date, version, reason, notify, "stopped");
+}
+
+/** Deleting a series stops all future dates, retaining snapshots and dependants. */
+export async function deletePatrolSeries(
+  db: Env["DB"],
+  actor: Actor,
+  id: string,
+  version: number,
+  notify = false,
+) {
+  const series = await findPatrolSeries(db, actor, id);
+  return stopSeries(
+    db,
+    actor,
+    id,
+    series.firstDate,
+    version,
+    "",
+    notify,
+    "deleted",
+  );
+}
+
+async function stopSeries(
+  db: Env["DB"],
+  actor: Actor,
+  id: string,
+  date: string,
+  version: number,
+  reason: string,
+  notify: boolean,
+  action: "stopped" | "deleted",
+) {
   requireOrganizer(actor);
   if (reason.length > 1000)
     throw new RequestError(400, "Keep the reason to 1000 characters or fewer.");
@@ -831,9 +877,9 @@ export async function stopPatrolSeries(
     db
       .prepare(
         `INSERT INTO patrol_series_audit (id,series_id,actor_id,action,changed_fields,created_at)
-      SELECT ?,?,?,'stopped','["stoppedFrom"]',? WHERE changes() = 1`,
+       SELECT ?,?,?,?,'["stoppedFrom"]',? WHERE changes() = 1`,
       )
-      .bind(operation, id, actor.id, now),
+      .bind(operation, id, actor.id, action, now),
     db
       .prepare(
         `INSERT INTO event_audit (id,event_id,actor_id,action,changed_fields,created_at)
@@ -871,7 +917,9 @@ export async function stopPatrolSeries(
   return {
     operation,
     message:
-      "Recurrence stopped. Future occurrences and their registrations were cancelled; history was kept.",
+      action === "deleted"
+        ? "Series deleted. Future bookings were cancelled; registration and attendance history was kept."
+        : "Recurrence stopped. Future occurrences and their registrations were cancelled; history was kept.",
   };
 }
 

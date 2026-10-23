@@ -8,7 +8,7 @@ import {
   dateParts,
   type DateParts,
 } from "../data/date-input";
-import { vancouverInstant } from "../data/event-time";
+import { parseTimeInput, vancouverInstant } from "../data/event-time";
 import { syncNativePickerInput } from "./native-picker-input";
 
 const parts = ["day", "month", "year"] as const;
@@ -37,7 +37,7 @@ function sync(group: HTMLFieldSetElement) {
         year: fields.year.value,
       };
   const date = canonicalDate(value);
-  const time = fields.time?.value;
+  const time = fields.time ? parseTimeInput(fields.time.value) : "";
   fields.canonical.value =
     date && (!fields.time || /^\d{2}:\d{2}$/.test(time!))
       ? `${date}${fields.time ? `T${time}` : ""}`
@@ -143,7 +143,8 @@ export function initDateInputs(root: Document | HTMLElement) {
         if (withTime) group.removeAttribute("aria-invalid");
         let error = "";
         if (!date.readOnly && date.value && time) {
-          if (!time.value) error = "Enter a start time.";
+          if (!parseTimeInput(time.value))
+            error = "Enter a start time with AM or PM, such as 9:00 PM.";
           else if (date.validity.valid && time.validity.valid) {
             try {
               checkTime();

@@ -48,6 +48,7 @@ export {
   patrolTemplateFor,
   updatePatrolSeriesFrom,
   stopPatrolSeries,
+  deletePatrolSeries,
   type PatrolSeriesRow,
 } from "./patrol-series";
 
@@ -194,10 +195,12 @@ export async function listEvents(
         )
     )) AS orientationSignupBlocked
     FROM event e`;
+  const notDeleted = `NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
+    AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')`;
   const statement = organizer
     ? db
         .prepare(
-          `${select}
+          `${select} WHERE ${notDeleted}
         ORDER BY
           (e.id = ?) DESC,
           (e.starts_at > ${nowMsSql}) DESC,
@@ -216,7 +219,7 @@ export async function listEvents(
     : db
         .prepare(
           `${select}
-        WHERE e.starts_at > ${nowMsSql}
+        WHERE ${notDeleted} AND e.starts_at > ${nowMsSql}
           AND e.cancelled_at IS NULL
           AND ${volunteerEventVisibilitySql(actor)}
           AND ${recurringSignupWindowSql()}
@@ -244,7 +247,11 @@ export async function listEvents(
 }
 export async function findEvent(db: Env["DB"], id: string) {
   const row = await db
-    .prepare(`SELECT ${eventColumns} FROM event e WHERE e.id = ?`)
+    .prepare(
+      `SELECT ${eventColumns} FROM event e WHERE e.id = ?
+      AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
+      AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')`,
+    )
     .bind(id)
     .first<EventRow>();
   if (!row) throw new RequestError(404, "Event not found.");
@@ -491,6 +498,66 @@ export async function cancelEvent(
   return {
     operation,
     message: "Event cancelled. Existing registrations were cancelled too.",
+  };
+}
+
+/** Remove from listings without cascading through attendance, signups or audits.
+ * Recurring rows remain permanent tombstones so generation cannot recreate them.
+ * Only future bookings are cancelled; historical attendance stays unchanged. */
+export async function deleteEvent(
+  db: Env["DB"],
+  actor: Actor,
+  id: string,
+  version: number,
+  notify = false,
+) {
+  requireOrganizer(actor);
+  const old = await findEvent(db, id);
+  const now = Date.now();
+  const operation = crypto.randomUUID();
+  const results = await db.batch([
+    db
+      .prepare(
+        `UPDATE event SET
+      cancelled_at = CASE WHEN starts_at > ${nowMsSql} THEN coalesce(cancelled_at, ?) ELSE cancelled_at END,
+      open = CASE WHEN starts_at > ${nowMsSql} THEN 0 ELSE open END,
+      hidden = CASE WHEN starts_at > ${nowMsSql} THEN 1 ELSE hidden END,
+      updated_at = ?
+      WHERE id = ? AND updated_at = ? AND ${writePermission(true)}`,
+      )
+      .bind(
+        now,
+        Math.max(now, old.updatedAt + 1),
+        id,
+        version,
+        ...permissionValues(actor),
+      ),
+    eventAudit(db, operation, id, actor.id, "deleted"),
+    notifyRoster(
+      db,
+      operation,
+      id,
+      eventCancelledEmail(old, ""),
+      notify && old.startsAt > now && !old.cancelledAt,
+    ),
+    db
+      .prepare(
+        `UPDATE signup SET status = 'cancelled', updated_at = ?
+      WHERE event_id = ? AND status = 'confirmed'
+        AND EXISTS(SELECT 1 FROM event e WHERE e.id = signup.event_id AND e.starts_at > ${nowMsSql})
+        AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
+      )
+      .bind(now, id, operation),
+  ]);
+  if (!results[0].meta.changes)
+    throw new RequestError(
+      409,
+      "This event or your organizer authorization changed. Reload the page.",
+    );
+  if (old.seriesId) await ensurePatrolOccurrences(db, old.seriesId);
+  return {
+    operation,
+    message: "Event deleted. Registration and attendance history was kept.",
   };
 }
 

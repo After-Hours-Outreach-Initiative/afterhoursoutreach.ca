@@ -2929,8 +2929,8 @@ test("event editor shows native number and URL errors without submitting invalid
       .toBe(`3px solid ${invalid ? "rgb(248, 113, 113)" : "rgba(0, 0, 0, 0)"}`);
   };
   await expectDateErrorRail(false);
-  await expect(time).toHaveAttribute("type", "time");
-  await expect(time).toHaveValue("21:00");
+  await expect(time).toHaveAttribute("type", "text");
+  await expect(time).toHaveValue("9:00 PM");
   await expect(time).not.toHaveAttribute("data-empty");
   await expect(time.locator("+ .volunteer-picker-placeholder")).toHaveCount(0);
   const placeholder = date.locator("+ .volunteer-picker-placeholder");
@@ -2973,10 +2973,10 @@ test("event editor shows native number and URL errors without submitting invalid
   await expect(form.locator('[name="startsAt"]')).toHaveValue(
     "2030-01-01T21:00",
   );
-  await time.fill("20:00");
+  await time.fill("8:00 PM");
   await form.evaluate((element: HTMLFormElement) => element.reset());
   await expect(date).toHaveValue("");
-  await expect(time).toHaveValue("21:00");
+  await expect(time).toHaveValue("9:00 PM");
   await expect(form.locator('[name="startsAt"]')).toHaveValue("");
   const expectDateFieldsToFit = async () => {
     const viewport = page.viewportSize()!;
@@ -3028,7 +3028,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await page.clock.setFixedTime(new Date("2026-07-03T03:30:00Z"));
   await fillDateInput(form, "startsAt", "2026-07-02T20:29");
   await expect(warning).toBeVisible();
-  await time.fill("20:31");
+  await time.fill("8:31 PM");
   await expect(warning).toBeHidden();
   await page.clock.setFixedTime(new Date());
   for (const value of [
@@ -3071,11 +3071,11 @@ test("event editor shows native number and URL errors without submitting invalid
   await expectDateErrorRail(false);
   await expect(date).not.toHaveAttribute("aria-invalid");
   expect(requests).toEqual([]);
-  await time.fill("20:00");
+  await time.fill("8:00 PM");
   await page.keyboard.press("Escape");
   await page.locator('[data-show-dialog="event-editor-new"]').click();
   await expect(date).toHaveValue("2030-01-01");
-  await expect(time).toHaveValue("20:00");
+  await expect(time).toHaveValue("8:00 PM");
   await expect(
     dateGroup.locator(".volunteer-picker-placeholder:visible"),
   ).toHaveCount(0);
@@ -3250,7 +3250,7 @@ test("event editor shows native number and URL errors without submitting invalid
   const editDateGroup = editForm.locator('[data-date-input="startsAt"]');
   const editDate = editDateGroup.locator("[data-native-date]");
   const editTime = editForm.getByLabel("Start time");
-  await expect(editTime).toHaveValue("18:00");
+  await expect(editTime).toHaveValue("6:00 PM");
   await expect(editTime.locator("+ .volunteer-picker-placeholder")).toHaveCount(
     0,
   );
@@ -3279,7 +3279,7 @@ test("event editor shows native number and URL errors without submitting invalid
     await editForm.evaluate((element: HTMLFormElement) => element.reset());
     await expect(input).toHaveValue(saved);
   }
-  await expect(editTime).toHaveValue("18:00");
+  await expect(editTime).toHaveValue("6:00 PM");
   await expect(
     editDate.locator("+ .volunteer-picker-placeholder"),
   ).toBeHidden();

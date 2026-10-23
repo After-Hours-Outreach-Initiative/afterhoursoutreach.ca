@@ -237,7 +237,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       )
     ).text();
     expect(selectedHtml).toContain(`data-live-event="${far.id}"`);
-    expect(selectedHtml).toContain("Outside the volunteer signup window");
+    expect(selectedHtml).not.toContain("nominal date");
     expect(selectedHtml).not.toMatch(
       /data-live-signup|You can register|You can’t register|Registration is available only/,
     );
@@ -327,6 +327,25 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       organizerPage.locator("[data-event-list] > [data-live-event]"),
     ).toHaveAttribute("data-live-event", oneOffId!);
     await expect(initialGroup).toHaveCount(1);
+    const weekday = new Intl.DateTimeFormat("en-CA", {
+      weekday: "long",
+      timeZone: "UTC",
+    }).format(new Date(`${firstDate}T00:00:00Z`));
+    await expect(initialGroup.locator("[data-series-summary] h3")).toHaveText(
+      `Every 2 weeks on ${weekday}`,
+    );
+    await expect(
+      initialGroup.locator("[data-series-summary] > p").first(),
+    ).toHaveText("Patrol");
+    await expect(initialGroup.locator("[data-series-summary]")).toContainText(
+      "Starting on",
+    );
+    await expect(initialGroup.locator("[data-series-summary]")).toContainText(
+      "8:30 PM",
+    );
+    await expect(
+      initialGroup.locator("[data-series-summary]"),
+    ).not.toContainText("Original defaults");
     expect(
       await initialGroup.locator("[data-live-event]").count(),
     ).toBeGreaterThan(1);
@@ -366,11 +385,11 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await originalManager.locator(":scope > summary").click();
     const draftEnd = addCalendarDays(firstDate, 350);
     await originalManager
-      .locator('[data-series-end] [name="endDate"]')
+      .locator('[data-series-save] [name="endDate"]')
       .fill(draftEnd);
     await originalManager
-      .locator('[name="reason"]')
-      .fill("Unsaved series reason");
+      .locator('[name="meetingPoint"]')
+      .fill("Unsaved series meeting point");
     const oldVersion = await originalManager.getAttribute(
       "data-series-version",
     );
@@ -403,10 +422,10 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       draftEditor.getByLabel("Meeting point", { exact: true }),
     ).toHaveValue("Unsaved occurrence draft");
     await expect(
-      originalManager.locator('[data-series-end] [name="endDate"]'),
+      originalManager.locator('[data-series-save] [name="endDate"]'),
     ).toHaveValue(draftEnd);
-    await expect(originalManager.locator('[name="reason"]')).toHaveValue(
-      "Unsaved series reason",
+    await expect(originalManager.locator('[name="meetingPoint"]')).toHaveValue(
+      "Unsaved series meeting point",
     );
     await expect(originalManager).toHaveAttribute(
       "data-series-version",
@@ -508,11 +527,19 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .getByRole("button", { name: "Recurring series", exact: true })
       .click();
     await manager.locator("summary").click();
+    await expect(manager.locator('[name="recurring"]')).toHaveCount(0);
+    await expect(manager.getByLabel("Start time (fixed)")).toHaveValue(
+      "8:30 PM",
+    );
+    await expect(
+      manager.getByLabel("Interval in weeks (fixed)"),
+    ).toHaveAttribute("readonly", "");
+    await uiGroup.locator("[data-series-occurrences] > summary").click();
     const uiDate = addCalendarDays(firstDate, 42);
-    await manager
+    await uiGroup
       .locator('[data-series-occurrence] [name="occurrenceDate"]')
       .fill(uiDate);
-    await manager
+    await uiGroup
       .getByRole("button", { name: "Open occurrence", exact: true })
       .click();
     const uiId = `patrol:${uiSeries}:${uiDate}`;
@@ -533,7 +560,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
         exact: true,
       }),
     ).toBeChecked();
-    await expect(uiCard).toContainText("Outside the volunteer signup window");
+    await expect(uiCard).not.toContainText("nominal date");
     await expect(
       uiCard.getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
@@ -591,10 +618,10 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     );
     await manager.locator("summary").click();
     await manager
-      .locator('[data-series-end] [name="endDate"]')
+      .locator('[data-series-save] [name="endDate"]')
       .fill(addCalendarDays(firstDate, 28));
     await manager
-      .getByRole("button", { name: "Save end date", exact: true })
+      .getByRole("button", { name: "Save series defaults", exact: true })
       .click();
     await organizerPage
       .getByRole("button", { name: "Save without email", exact: true })
@@ -609,17 +636,17 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
         .first("includes_orientation"),
     ).toBe(1);
     // Existing cancellation history remains accessible beyond the shortened end.
-    await manager
+    await uiGroup
       .locator('[data-series-occurrence] [name="occurrenceDate"]')
       .fill(uiDate);
-    await manager
+    await uiGroup
       .getByRole("button", { name: "Open occurrence", exact: true })
       .click();
     await expect(
       uiCard.getByRole("button", { name: "Edit", exact: true }),
     ).toHaveCount(0);
     await expect(
-      manager.getByRole("button", { name: "Open occurrence", exact: true }),
+      uiGroup.getByRole("button", { name: "Open occurrence", exact: true }),
     ).toBeEnabled();
     const uiFirstCard = organizerPage.locator(
       `[data-live-event="patrol:${uiSeries}:${firstDate}"]`,
@@ -650,6 +677,44 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     expect(organizerErrors).toEqual([]);
     await organizerPage.reload();
     await expect(uiCard).toBeVisible();
+    await expect(uiGroup).toHaveCount(1);
+    // Cancelled dates remain removable, without deleting the other occurrences.
+    await uiCard
+      .getByRole("button", { name: "Delete occurrence", exact: true })
+      .click();
+    const confirmation = organizerPage.getByRole("dialog", {
+      name: "Delete occurrence?",
+      exact: true,
+    });
+    await confirmation
+      .getByRole("button", { name: "Keep", exact: true })
+      .click();
+    await expect(uiCard).toBeVisible();
+    await uiCard
+      .getByRole("button", { name: "Delete occurrence", exact: true })
+      .click();
+    await confirmation
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+    await expect(uiCard).toHaveCount(0);
+    await expect(uiGroup).toHaveCount(1);
+    expect(
+      await DB.prepare("SELECT count(*) n FROM event WHERE id=?")
+        .bind(uiId)
+        .first("n"),
+    ).toBe(1);
+    await emptyGroup.locator("[data-live-series] > summary").click();
+    await emptyGroup
+      .getByRole("button", { name: "Delete series", exact: true })
+      .click();
+    await organizerPage
+      .getByRole("dialog", { name: "Delete series?", exact: true })
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+    await organizerPage
+      .getByRole("button", { name: "Save without email", exact: true })
+      .click();
+    await expect(emptyGroup).toHaveCount(0);
     await expect(uiGroup).toHaveCount(1);
     // The same production script still initializes task4's extracted browser:
     // live searching must retain its approval filter and global queue count.

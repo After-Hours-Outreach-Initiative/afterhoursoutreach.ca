@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import {
   recurringSaveAction,
   recurringCancelAction,
-  seriesEndAction,
+  seriesSaveAction,
   eventEmailPrompt,
 } from "../src/scripts/event-recurrence";
 import {
@@ -135,26 +135,16 @@ test("this-and-future edits use nominal identities and series versions, not occu
     "event-cancel",
   );
 });
-test("end-date updates send only the established series contract and preserve visibility flags", () => {
+test("series settings send the create-event fields without a recurring checkbox", () => {
   const data = values({
     seriesId: "series",
     version: "9",
     endDate: "",
-    series: JSON.stringify({
-      firstDate: "2026-11-03",
-      localTime: "20:30",
-      intervalWeeks: 2,
-      meetingPoint: "Meeting point",
-      meetingPointUrl: null,
-      spots: 8,
-      open: 0,
-      hidden: 0,
-      includesOrientation: 1,
-      stoppedFrom: "2026-12-01",
-      updatedAt: 9,
-    }),
+    intervalWeeks: "2",
+    includesOrientation: "on",
+    publicVisibility: "false",
   });
-  expect(seriesEndAction(data)).toEqual({
+  expect(seriesSaveAction(data)).toEqual({
     action: "save-series",
     id: "series",
     version: 9,
@@ -167,7 +157,7 @@ test("end-date updates send only the established series contract and preserve vi
       meetingPointUrl: "",
       spots: 8,
       open: false,
-      hidden: false,
+      hidden: true,
       includesOrientation: true,
     },
   });
