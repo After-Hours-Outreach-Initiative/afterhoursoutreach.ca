@@ -370,7 +370,12 @@ test("edits made during a pending save are backed up immediately and saved after
   ).toBe("Latest version");
   release();
   await expect.poll(() => requests).toBe(2);
-  await expectSaveTime(page);
+  await expect(localApplicationSaveIndicator(page)).toHaveAttribute(
+    "data-save-state",
+    "pending",
+  );
+  await expect(localApplicationSaveIndicator(page)).toHaveText("");
+  await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
   expect(
     (await (await page.request.get(endpoint)).json()).draft.answers.firstName,
   ).toBe("First version");

@@ -144,7 +144,7 @@ for (const [layout, viewport] of [
     const saveIndicator = localApplicationSaveIndicator(page);
     if (layout === "mobile") {
       await expect(saveIndicator).toBeHidden();
-      await expect(tracker.getByRole("status")).toHaveCount(0);
+      await expect(tracker.getByRole("status")).toHaveCount(1);
       await tracker.locator("summary").click();
     }
     await expect(saveIndicator).toHaveAttribute("data-save-state", "idle");
@@ -153,7 +153,9 @@ for (const [layout, viewport] of [
     await expect(saveIndicator).toHaveAttribute("role", "status");
     await expect(saveIndicator).toHaveAttribute("aria-live", "polite");
     await expect(page.locator("[data-draft-save-indicator]")).toHaveCount(3);
-    await expect(tracker.getByRole("status")).toHaveCount(1);
+    await expect(tracker.getByRole("status")).toHaveCount(
+      layout === "mobile" ? 2 : 1,
+    );
     expect(
       await page
         .locator("[data-application-draft-actions] [data-draft-save-indicator]")
@@ -213,6 +215,81 @@ for (const [layout, viewport] of [
     });
   });
 }
+
+test("compact save confirmation appears left of progress only after account saving succeeds", async ({
+  page,
+  baseURL,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await createLocalAccount(page.request, baseURL!, false);
+  let releaseFirst!: () => void;
+  const firstSave = new Promise<void>((resolve) => (releaseFirst = resolve));
+  let releaseFailed!: () => void;
+  const failedSave = new Promise<void>((resolve) => (releaseFailed = resolve));
+  let requests = 0;
+  await page.route("**/api/v1/account/application-draft", async (route) => {
+    if (route.request().method() === "PUT") {
+      const attempt = ++requests;
+      if (attempt === 1) await firstSave;
+      if (attempt === 2) {
+        await failedSave;
+        await route.fulfill({ status: 503, body: "Save unavailable" });
+        return;
+      }
+    }
+    await route.continue();
+  });
+  try {
+    await page.goto("/apply");
+    const confirmation = page.locator("[data-draft-save-summary]");
+    const icon = confirmation.locator("svg");
+    const menu = page.locator(
+      "[data-application-contents] [data-contents-menu]",
+    );
+    await expect(confirmation).toHaveAttribute("data-save-state", "idle");
+    await expect(confirmation).toHaveAttribute("role", "status");
+    await expect(confirmation).toHaveAttribute("aria-live", "polite");
+    await expect(icon).toBeHidden();
+
+    await page.locator('[name="firstName"]').fill("Saved answer");
+    await expect(confirmation).toHaveAttribute("data-save-state", "pending");
+    await expect.poll(() => requests).toBe(1);
+    await expect(icon).toBeHidden();
+    releaseFirst();
+    await expect(confirmation).toHaveAttribute("data-save-state", "saved");
+    await expect(confirmation).toHaveText(/^Last saved at /);
+    await expect(icon).toBeVisible();
+    await expect(icon).toHaveAttribute("aria-hidden", "true");
+    await expect(menu).not.toHaveAttribute("open");
+    expect(
+      await confirmation.evaluate((element) => {
+        const progress = element.nextElementSibling!;
+        const bounds = element.getBoundingClientRect();
+        const progressBounds = progress.getBoundingClientRect();
+        return (
+          progress.hasAttribute("data-application-progress") &&
+          bounds.right <= progressBounds.left &&
+          bounds.top < progressBounds.bottom &&
+          bounds.bottom > progressBounds.top
+        );
+      }),
+    ).toBe(true);
+
+    await page.locator('[name="firstName"]').fill("Newer answer");
+    await expect(confirmation).toHaveAttribute("data-save-state", "pending");
+    await expect(icon).toBeHidden();
+    await expect.poll(() => requests).toBe(2);
+    releaseFailed();
+    await expect(confirmation).toHaveAttribute("data-save-state", "error");
+    await expect(confirmation).toHaveText("Couldn’t save to your account");
+    await expect(icon).toBeHidden();
+    await expect(confirmation).toHaveAttribute("data-save-state", "saved");
+    await expect(icon).toBeVisible();
+  } finally {
+    releaseFirst();
+    releaseFailed();
+  }
+});
 
 test("autosave message is present before answers without JavaScript", async ({
   browser,
@@ -306,6 +383,7 @@ test("autosave message is present before answers without JavaScript", async ({
         .locator("[data-draft-save-indicator]")
         .all())
         await expect(indicator).toBeHidden();
+      await expect(page.locator("[data-draft-save-summary]")).toBeHidden();
     }
     await expect(page.locator('[name="firstName"]')).toHaveValue("");
     await expect(localApplicationReviewButton(page, "bottom")).toBeDisabled();

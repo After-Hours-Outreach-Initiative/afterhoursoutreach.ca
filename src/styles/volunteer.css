@@ -344,6 +344,24 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-contents-menu[open] .volunteer-contents-chevron {
   transform: rotate(180deg);
 }
+.volunteer-contents-save-status {
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  color: #a1a1aa;
+}
+.volunteer-contents-save-status[data-save-state="initializing"] {
+  visibility: hidden;
+}
+.volunteer-contents-save-status svg {
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+}
+.volunteer-contents-save-status[data-save-state="saved"] svg {
+  visibility: visible;
+}
 .volunteer-contents-progress {
   display: inline-flex;
   width: 1.75rem;

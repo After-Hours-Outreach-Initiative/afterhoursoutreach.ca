@@ -174,7 +174,9 @@ export function initApplicationDraft(element: HTMLFormElement) {
   if (!userId || !element.hasAttribute("data-application")) return;
   const flow = element.closest("[data-application-flow]")!;
   const saveIndicators = [
-    ...flow.querySelectorAll<HTMLElement>("[data-draft-save-indicator]"),
+    ...flow.querySelectorAll<HTMLElement>(
+      "[data-draft-save-indicator], [data-draft-save-summary]",
+    ),
   ].map((indicator) => ({
     indicator,
     message: indicator.querySelector<HTMLElement>("[data-draft-save-message]")!,
@@ -358,6 +360,10 @@ export function initApplicationDraft(element: HTMLFormElement) {
       saveMessage = unsaved
         ? "Couldn’t save to your account"
         : "Couldn’t check save status";
+    } else if (inFlight || unsaved) {
+      // An earlier save does not confirm the latest pending answers.
+      saveState = "pending";
+      saveMessage = "";
     } else if (revision && savedAt !== null) {
       saveState = "saved";
       const savedDate = new Date(savedAt);
@@ -371,9 +377,6 @@ export function initApplicationDraft(element: HTMLFormElement) {
       const midnight = new Date(now);
       midnight.setHours(24, 0, 0, 0);
       dateTimer = setTimeout(renderStatus, midnight.getTime() - now.getTime());
-    } else if (inFlight || unsaved) {
-      saveState = "pending";
-      saveMessage = "";
     }
     for (const { indicator, message } of saveIndicators) {
       indicator.dataset.saveState = saveState;
