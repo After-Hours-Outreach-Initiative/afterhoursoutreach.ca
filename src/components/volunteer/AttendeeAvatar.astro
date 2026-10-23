@@ -2,18 +2,13 @@
 import type { AttendeeCategory } from "@/data/event-roster";
 interface Props {
   category: AttendeeCategory;
-  booked?: boolean;
 }
-const { category, booked = true } = Astro.props;
-const label = `${category === "medic" ? "Approved medic" : category === "orientee" ? "Orientee" : "Volunteer"}: ${booked ? "registered" : "reserved place available"}`;
+const { category } = Astro.props;
+const label = `${category === "medic" ? "Approved medic" : category === "orientee" ? "Orientee" : "Volunteer"}: registered`;
 ---
 
 <span
-  class:list={[
-    "attendee-avatar",
-    `attendee-${category}`,
-    { "attendee-booked": booked },
-  ]}
+  class:list={["attendee-avatar", `attendee-${category}`]}
   role="img"
   aria-label={label}
   title={label}
@@ -41,9 +36,6 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
   svg {
     width: 100%;
     height: 100%;
-    fill: none;
-  }
-  .attendee-booked svg {
     fill: currentColor;
   }
   .attendee-medic {

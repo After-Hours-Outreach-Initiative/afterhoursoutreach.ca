@@ -261,32 +261,45 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           ? ".volunteer-roster"
           : ".public-event-roster";
         await expect(card.locator(rosterSelector)).toHaveCount(1);
-        for (const label of ["Volunteers", "Orientees"]) {
-          await expect(
-            card.locator(".event-row-label", { hasText: label }),
-          ).toBeVisible();
-        }
+        await expect(card.locator(".event-row-label")).toHaveText([
+          "Volunteers",
+        ]);
+        await expect(card.locator(".event-attendance-row")).toHaveCount(1);
+        await expect(card.locator(".event-avatar-row")).toHaveAttribute(
+          "aria-label",
+          "3 approved medics, 2 other volunteers and 3 orientees registered",
+        );
         await expect(
-          card.locator(".event-avatar-row .attendee-medic.attendee-booked"),
+          card.locator(".event-avatar-row .attendee-avatar"),
+        ).toHaveCount(8);
+        await expect(
+          card.locator(".event-avatar-row .attendee-medic"),
         ).toHaveCount(3);
         await expect(
-          card.locator(".event-avatar-row .attendee-volunteer.attendee-booked"),
+          card.locator(".event-avatar-row .attendee-volunteer"),
         ).toHaveCount(2);
         await expect(
-          card.locator(
-            ".event-orientee-box .attendee-orientee.attendee-booked",
-          ),
+          card.locator(".event-avatar-row .attendee-orientee"),
         ).toHaveCount(3);
+        for (const [category, color] of [
+          ["medic", "rgb(248, 113, 113)"],
+          ["volunteer", "rgb(74, 222, 128)"],
+          ["orientee", "rgb(96, 165, 250)"],
+        ]) {
+          await expect(
+            card.locator(`.event-avatar-row .attendee-${category} svg`).first(),
+          ).toHaveCSS("fill", color);
+        }
+        await expect(card.locator(".event-orientee-box")).toHaveCount(0);
         const emptyCard = page.locator(`[data-live-event="${empty}"]`);
         const emptyRoster = emptyCard.locator(rosterSelector);
         await expect(emptyRoster).toHaveCount(0);
+        await expect(emptyCard.locator(".event-row-label")).toHaveText([
+          "Volunteers",
+        ]);
         await expect(
-          emptyCard.locator(".attendee-medic:not(.attendee-booked)"),
-        ).toHaveCount(2);
-        await expect(
-          emptyCard.locator(".attendee-orientee:not(.attendee-booked)"),
-        ).toHaveCount(2);
-        await expect(emptyCard.locator(".attendee-volunteer")).toHaveCount(0);
+          emptyCard.locator(".event-attendance .attendee-avatar"),
+        ).toHaveCount(0);
         for (const [state, focus] of [
           ["filled", card],
           ["empty", emptyCard],
@@ -376,6 +389,9 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             "Volunteers (1)",
             { timeout: 15_000 },
           );
+          await expect(
+            emptyCard.locator(".event-avatar-row .attendee-avatar"),
+          ).toHaveCount(1);
           await expect(emptyRoster).not.toHaveAttribute("open");
           await emptyRoster.locator("summary").click();
           await expectActionPosition();
@@ -385,15 +401,12 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             emptyCard.locator(".event-avatar-description"),
           ).toHaveAttribute("open", "");
           await expect(
-            emptyCard.locator(".attendee-medic:not(.attendee-booked)"),
-          ).toHaveCount(2);
-          await expect(
-            emptyCard.locator(".attendee-orientee:not(.attendee-booked)"),
-          ).toHaveCount(2);
+            emptyCard.locator(".event-attendance .attendee-avatar"),
+          ).toHaveCount(0);
         }
         const crowded = page.locator('[data-live-event="crowded"]');
         await expect(
-          crowded.locator(".event-attendance .attendee-booked"),
+          crowded.locator(".event-avatar-row .attendee-avatar"),
         ).toHaveCount(100);
         expect(
           await crowded.locator(".event-avatar-row").evaluate((element) => ({
