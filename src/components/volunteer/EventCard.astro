@@ -91,23 +91,9 @@ const blocked =
       </p>
       <p data-event-availability aria-live="polite" aria-atomic="true">
         {
-          !organizer && (
+          !organizer && event.signedUp && (
             <>
-              <span
-                class:list={[
-                  "volunteer-spots",
-                  {
-                    "volunteer-spots-full": !event.signedUp && Boolean(blocked),
-                  },
-                ]}
-              >
-                {event.signedUp
-                  ? "Registered"
-                  : blocked
-                    ? "You can’t register"
-                    : "You can register"}
-              </span>{" "}
-              ·{" "}
+              <span class="volunteer-spots">Registered</span> ·{" "}
             </>
           )
         }
