@@ -76,7 +76,10 @@ const blocked =
         ) : null
       }
       <h3>{formatEventDate(event.startsAt)}</h3>
-      <p>{event.includesOrientation ? "Orientation + Patrol" : "Patrol"}</p>
+      <p>
+        {!future && "Past event · "}
+        {event.includesOrientation ? "Orientation + Patrol" : "Patrol"}
+      </p>
       <p>
         Meeting at{" "}
         {
@@ -93,18 +96,25 @@ const blocked =
         {
           !organizer && Boolean(event.signedUp) && (
             <>
-              <span class="volunteer-spots">Registered</span> ·{" "}
+              <span class:list={{ "volunteer-spots": future }}>
+                {future ? "Registered" : "You registered"}
+              </span>{" "}
+              ·{" "}
             </>
           )
         }
-        {event.confirmed} of {event.spots} spots taken
+        {
+          future
+            ? `${event.confirmed} of ${event.spots} spots taken`
+            : `${event.confirmed} ${event.confirmed === 1 ? "registration" : "registrations"}`
+        }
       </p>
-      {!organizer && !event.signedUp && blocked && <p>{blocked}</p>}
+      {!organizer && future && !event.signedUp && blocked && <p>{blocked}</p>}
     </div>
-    <EventAttendance event={event} />
+    {(future || organizer) && <EventAttendance event={event} />}
     <div class="volunteer-actions">
       {
-        organizer ? null : event.signedUp && future ? (
+        organizer || !future ? null : event.signedUp ? (
           <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="cancel" />
@@ -171,7 +181,7 @@ const blocked =
       }
     </div>
   </div>
-  {!organizer && <PublicEventRoster roster={publicRoster ?? []} />}
+  {!organizer && future && <PublicEventRoster roster={publicRoster ?? []} />}
   {
     organizer && (
       <EventRoster

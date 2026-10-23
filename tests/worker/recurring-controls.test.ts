@@ -764,8 +764,18 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       timeout: 15_000,
     });
     await expect(
-      page.locator(`[data-live-event="${initial[0].id}"]`),
+      page.locator(`[data-event-list] [data-live-event="${initial[0].id}"]`),
     ).toHaveCount(0);
+    const pastCard = page.locator(
+      `[data-past-event-list] [data-live-event="${initial[0].id}"]`,
+    );
+    await expect(pastCard).toBeVisible();
+    await expect(pastCard).toContainText("You registered");
+    await expect(pastCard.locator("[data-live-signup]")).toHaveCount(0);
+    await page.locator('[data-event-filter="orientation"]').click();
+    await expect(pastCard).toBeHidden();
+    await page.locator('[data-event-filter="all"]').click();
+    await expect(pastCard).toBeVisible();
     expect(
       await DB.prepare(
         "SELECT count(*) n FROM signup WHERE event_id=? AND status='confirmed'",

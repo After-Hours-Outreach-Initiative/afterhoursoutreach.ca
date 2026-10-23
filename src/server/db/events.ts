@@ -149,10 +149,12 @@ export async function listEvents(
   db: Env["DB"],
   actor: Actor | null,
   selectedOccurrence?: string,
-  view: "manage" | "volunteer" = "manage",
+  view: "manage" | "volunteer" | "past" = "manage",
 ) {
   if (!canViewEvents(actor)) return [];
-  await ensurePatrolOccurrences(db);
+  // History keeps volunteer visibility rules, but not the future signup window.
+  const past = view === "past";
+  if (!past) await ensurePatrolOccurrences(db);
   const organizer = Boolean(
     view === "manage" &&
     actor?.role === "organizer" &&
@@ -219,17 +221,17 @@ export async function listEvents(
     : db
         .prepare(
           `${select}
-        WHERE ${notDeleted} AND e.starts_at > ${nowMsSql}
+        WHERE ${notDeleted} AND e.starts_at ${past ? "<=" : ">"} ${nowMsSql}
           AND e.cancelled_at IS NULL
           AND ${volunteerEventVisibilitySql(actor)}
-          AND ${recurringSignupWindowSql()}
+          AND ${past ? "1" : recurringSignupWindowSql()}
           AND (e.series_id IS NULL OR e.hidden = 0)
           AND ((e.series_id IS NOT NULL AND e.hidden = 0)
             OR (e.open = 1 AND e.hidden = 0) OR EXISTS(
             SELECT 1 FROM signup
             WHERE event_id = e.id AND user_id = ? AND status = 'confirmed'
           ))
-        ORDER BY e.starts_at ASC
+        ORDER BY e.starts_at ${past ? "DESC, e.id ASC" : "ASC"}
         LIMIT 100`,
         )
         .bind(

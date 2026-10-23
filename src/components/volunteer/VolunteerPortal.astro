@@ -46,6 +46,9 @@ const events = await listEvents(
   Astro.url.searchParams.get("occurrence") ?? undefined,
   manage ? "manage" : "volunteer",
 );
+const pastEvents = manage
+  ? []
+  : await listEvents(env.DB, actor, undefined, "past");
 const series = manage ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
 const showApplicationProgress =
@@ -80,7 +83,7 @@ const publicRoster =
       )
     : undefined;
 const eventVersion = await eventViewVersion(
-  events,
+  [...events, ...pastEvents],
   actor,
   rosters,
   Date.now(),
@@ -117,6 +120,13 @@ const hasVisibleEvents = manage
         Boolean(event.includesOrientation),
       ),
     );
+const hasVisiblePastEvents = pastEvents.some((event) =>
+  matchesEventFilter(
+    filter,
+    Boolean(event.seriesId),
+    Boolean(event.includesOrientation),
+  ),
+);
 ---
 
 <AccountLayout
@@ -370,6 +380,44 @@ const hasVisibleEvents = manage
               </p>
             </div>
           </div>
+        </section>
+      )
+    }
+    {
+      eventAccess && !manage && (
+        <section class="volunteer-events" aria-labelledby="past-events-heading">
+          <div class="volunteer-section-heading">
+            <h2 id="past-events-heading">Past events</h2>
+          </div>
+          <ul class="volunteer-event-list" data-past-event-list>
+            {pastEvents.map((event) => (
+              <EventCard
+                event={event}
+                actor={actor}
+                organizer={false}
+                roster={[]}
+                destinations={[]}
+                filter={filter}
+              />
+            ))}
+          </ul>
+          <p
+            class="volunteer-notice"
+            data-empty-past-events
+            role="status"
+            hidden={hasVisiblePastEvents}
+          >
+            {pastEvents.length
+              ? "No past events match this filter."
+              : "No past events yet."}
+          </p>
+          <p
+            class="volunteer-help"
+            data-past-event-limit
+            hidden={pastEvents.length !== 100}
+          >
+            Showing the 100 most recent past events.
+          </p>
         </section>
       )
     }

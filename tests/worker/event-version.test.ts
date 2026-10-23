@@ -80,7 +80,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       .run();
     const listingVersion = async (cookie: string, manage = false) => {
       const html = await (
-        await send(manage ? "/manage/events" : "/events", undefined, cookie)
+        await send(manage ? "/manage/events" : "/volunteer", undefined, cookie)
       ).text();
       const version = html.match(/data-event-version="([a-f0-9]{64})"/)?.[1];
       expect(version).toBeDefined();
@@ -114,10 +114,15 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     expect(await signedInNext()).toBe(await listingVersion(attendee.cookie));
     // Pending accounts see no event activity; approval immediately changes their scoped view.
     expect(
-      await (await send("/events", undefined, attendee.cookie)).text(),
+      await (await send("/volunteer", undefined, attendee.cookie)).text(),
     ).toContain("Application Form Submitted");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+    )
+      .bind(attendee.id)
+      .run();
+    await DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=0 WHERE user_id=?",
     )
       .bind(attendee.id)
       .run();
@@ -177,15 +182,20 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     await DB.prepare(
       `INSERT INTO event
       (id,type,starts_at,meeting_point,spots,hidden,created_by,created_at,updated_at)
-      VALUES ('hidden','patrol',?,'Private meeting point',3,1,?,?,?),
-             ('past','patrol',?,'Past meeting point',3,0,?,?,?)`,
+      VALUES ('hidden','orientation',?,'Private meeting point',4,1,?,?,?),
+             ('past','patrol',?,'Past meeting point',3,0,?,?,?),
+             ('past-orientation','orientation',?,'Past orientation point',4,0,?,?,?)`,
     )
       .bind(
-        now + 86_400_000,
+        now - 500,
         organizer.id,
         now,
         now,
         now - 1000,
+        organizer.id,
+        now,
+        now,
+        now - 2000,
         organizer.id,
         now,
         now,
@@ -201,9 +211,36 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
           : />\s*Register\s*<\/button>/,
       );
       expect(html).not.toMatch(
-        /data-live-event="(?:hidden|past)"|data-event-save|data-live-series|data-manage-signup|volunteer-roster|Renamed attendee/,
+        /data-live-event="hidden"|data-event-save|data-live-series|data-manage-signup|volunteer-roster|Renamed attendee/,
       );
+      const history = html.match(
+        /<section\b[^>]*aria-labelledby="past-events-heading"[\s\S]*?<\/section>/,
+      )?.[0];
+      expect(history).toBeDefined();
+      expect(html.indexOf(history!)).toBeGreaterThan(
+        html.indexOf('data-live-event="live"'),
+      );
+      expect(
+        [...history!.matchAll(/data-live-event="([^"]+)"/g)].map(
+          (match) => match[1],
+        ),
+      ).toEqual(
+        cookie === attendee.cookie
+          ? ["past-orientation"]
+          : ["past", "past-orientation"],
+      );
+      expect(history).toContain("Past event");
+      expect(history).not.toMatch(
+        /data-live-signup|spots taken|public-event-roster|event-attendance/,
+      );
+      expect(await readVersion(cookie)).toBe(await listingVersion(cookie));
     }
+    const pastSignup = await send(
+      "/api/v1/events/action",
+      { action: "join", id: "past-orientation" },
+      attendee.cookie,
+    );
+    expect(pastSignup.status, await pastSignup.text()).toBe(409);
     const managementHtml = await (
       await send("/manage/events", undefined, organizerCookie)
     ).text();
