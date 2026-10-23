@@ -1,0 +1,72 @@
+---
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+
+interface Props {
+  userId: string;
+  completedAt: number | null;
+  idPrefix: string;
+}
+const { userId, completedAt, idPrefix } = Astro.props;
+---
+
+<section
+  class="volunteer-panel"
+  aria-labelledby={`${idPrefix}-heading`}
+  data-naloxone-step
+>
+  <h2 id={`${idPrefix}-heading`} data-contents-section>
+    Step 2: Complete Naloxone 101
+  </h2>
+  <p>
+    After submitting your application form and Code of Conduct, take Naloxone
+    101, then confirm completion below. You can return to this step on your
+    account page.
+  </p>
+  <a
+    class="btn btn-outline mt-6"
+    href="https://towardtheheart.com/naloxone-course"
+    target="_blank"
+    rel="noreferrer"
+  >
+    Take Naloxone 101
+    <ArrowRightIcon class="btn-icon" />
+    <span class="sr-only">(opens in a new tab)</span>
+  </a>
+  <form
+    class="volunteer-form mt-6"
+    data-naloxone-confirm
+    data-naloxone-user-id={userId}
+    action="/api/v1/account/naloxone"
+    method="post"
+  >
+    <label class="volunteer-check">
+      <input
+        type="checkbox"
+        name="completed"
+        value="true"
+        required
+        checked={completedAt !== null}
+        disabled={completedAt !== null}
+      />
+      <span>I confirm I have completed Naloxone 101.</span>
+    </label>
+    <p class="volunteer-help">
+      This is a self-reported confirmation, not verified certification. No
+      certificate upload is needed.
+    </p>
+    <p
+      data-form-message
+      role="status"
+      aria-live="polite"
+      hidden={completedAt === null}
+    >
+      Completion saved to your account (self-reported, not certified).
+    </p>
+    <button
+      class="btn btn-primary"
+      type="submit"
+      data-loading-label="Saving…"
+      hidden={completedAt !== null}>Confirm completion</button
+    >
+  </form>
+</section>

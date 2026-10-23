@@ -9,7 +9,10 @@ import {
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
 import { volunteerListReturnUrl } from "@/data/volunteer-list";
-import { applicationDisplayName } from "@/data/application";
+import {
+  applicationDisplayName,
+  formatApplicationSubmittedTime,
+} from "@/data/application";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
@@ -71,6 +74,20 @@ if (!profile || !person)
         }
       </p>
       <VolunteerControls person={person} />
+      <div class="account-profile-summary mt-8" data-naloxone-review>
+        <dl>
+          <div>
+            <dt>Naloxone 101 (self-reported, not certified)</dt>
+            <dd>
+              {
+                profile.naloxoneCompletedAt === null
+                  ? "Completion not confirmed"
+                  : `Completion confirmed ${formatApplicationSubmittedTime(new Date(profile.naloxoneCompletedAt).toISOString())}`
+              }
+            </dd>
+          </div>
+        </dl>
+      </div>
       <ApplicationSummary {...profile} idPrefix="volunteer" />
     </div>
   </section>

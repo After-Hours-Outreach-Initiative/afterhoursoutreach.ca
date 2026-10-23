@@ -15,6 +15,8 @@ import {
 import { certificationOptions, trainingOptions } from "../src/data/application";
 import { viewVolunteerProfile } from "../src/server/db/volunteers";
 import { accountContext } from "../src/server/db/access";
+import { loadNaloxoneCompletion } from "../src/server/db/naloxone";
+import { POST as confirmNaloxone } from "../src/pages/api/v1/account/naloxone";
 import {
   hashAuthValue,
   limitEmailRequests,
@@ -28,6 +30,7 @@ import {
 } from "../src/server/db/notifications";
 import {
   loadProfile,
+  loadSubmittedApplication,
   profileSchema,
   saveProfile as writeProfile,
 } from "../src/server/db/profiles";
@@ -134,6 +137,68 @@ const answers = {
   otherTraining: "",
   medicalConditions: "Sample private answer",
 };
+
+test("Naloxone confirmation persists for its owner without changing the submitted application", async () => {
+  bindings = { ...bindings, BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET };
+  auth = createAuth(bindings, "192.0.2.1", {
+    sendEmail: async (email) => {
+      outbox.push(email);
+    },
+  });
+  const { cookie } = await signIn();
+  const context = () =>
+    accountContext(env, new Request(origin, { headers: { cookie } }));
+  const actor = (await context()).actor!;
+  const invoke = (input: object, sessionCookie = cookie) =>
+    confirmNaloxone({
+      request: new Request(`${origin}/api/v1/account/naloxone`, {
+        method: "POST",
+        headers: {
+          origin,
+          "content-type": "application/json",
+          cookie: sessionCookie,
+        },
+        body: JSON.stringify(input),
+      }),
+    } as Parameters<typeof confirmNaloxone>[0]);
+  const confirmation = { userId: actor.id, completed: true };
+  assert.equal((await invoke(confirmation, "")).status, 401);
+  assert.equal(
+    (await invoke({ ...confirmation, userId: "someone-else" })).status,
+    403,
+  );
+  assert.equal((await invoke(confirmation)).status, 409); // Application comes first.
+  await saveProfile(env.DB, actor.id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
+  const original = await loadSubmittedApplication(env.DB, actor.id);
+  assert.equal(await loadNaloxoneCompletion(env.DB, actor.id), null);
+
+  const response = await invoke(confirmation);
+  assert.equal(response.status, 200);
+  const saved = (await response.json()) as { completedAt: number };
+  assert.ok(saved.completedAt > 0);
+  assert.equal(
+    await loadNaloxoneCompletion(env.DB, actor.id),
+    saved.completedAt,
+  );
+  const retry = await invoke(confirmation);
+  assert.equal(retry.status, 200);
+  assert.deepEqual(await retry.json(), saved);
+  assert.deepEqual(await loadSubmittedApplication(env.DB, actor.id), original);
+
+  // Reuse this account to exercise the organizer's separate review projection.
+  await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+    .bind(actor.id)
+    .run();
+  const organizer = (await context()).actor!;
+  assert.equal(
+    (await viewVolunteerProfile(env.DB, organizer, actor.id))
+      ?.naloxoneCompletedAt,
+    saved.completedAt,
+  );
+});
 
 test("simulated sign-in email preserves provider quota while hosted requests still enforce it", async () => {
   const start = Math.floor(Date.now() / 86_400_000) * 86_400_000;

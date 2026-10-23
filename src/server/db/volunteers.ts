@@ -126,7 +126,8 @@ export async function viewVolunteerProfile(
           coalesce(medical_conditions, '') AS medicalConditions,
           u.email, p.registered_at AS submittedAt,
           p.code_of_conduct_version AS codeOfConductVersion,
-          p.code_of_conduct_accepted_at AS codeOfConductAcceptedAt
+          p.code_of_conduct_accepted_at AS codeOfConductAcceptedAt,
+          p.naloxone_completed_at AS naloxoneCompletedAt
         FROM profile p JOIN user u ON u.id = p.user_id
         WHERE p.user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
       )
@@ -150,6 +151,7 @@ export async function viewVolunteerProfile(
         submittedAt: number;
         codeOfConductVersion: string | null;
         codeOfConductAcceptedAt: number | null;
+        naloxoneCompletedAt: number | null;
       })
     | undefined;
   if (!row) return null;
@@ -158,6 +160,7 @@ export async function viewVolunteerProfile(
     submittedAt,
     codeOfConductVersion,
     codeOfConductAcceptedAt,
+    naloxoneCompletedAt,
     ...answers
   } = row;
   const sources = row.heardAboutUsSources
@@ -176,6 +179,7 @@ export async function viewVolunteerProfile(
     } satisfies ApplicationAnswers,
     email,
     submittedAt: new Date(submittedAt).toISOString(),
+    naloxoneCompletedAt,
     codeOfConductVersion,
     codeOfConductAcceptedAt:
       codeOfConductAcceptedAt === null

@@ -181,6 +181,8 @@ export const profile = sqliteTable("profile", {
   code_of_conduct_accepted_at: timestamp(),
   // Insert-only submission snapshot. Null means the original was not captured.
   submitted_application: text({ mode: "json" }).$type<SubmittedApplication>(),
+  // Separate, owner-reported course confirmation, never inferred from legacy training.
+  naloxone_completed_at: timestamp(),
   // Legacy SQL name: when the volunteer application was submitted.
   registered_at: timestamp().notNull(),
   updated_at: timestamp().notNull(),

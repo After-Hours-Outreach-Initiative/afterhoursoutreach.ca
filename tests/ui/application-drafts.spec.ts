@@ -663,7 +663,7 @@ test("switching accounts never restores or autosaves another account's answers",
   ).toBe("Stale tab changes");
 });
 
-test("resuming requires a fresh review and consent; submission clears both draft copies", async ({
+test("resuming requires fresh consent; submission clears drafts and course confirmation persists on the account", async ({
   page,
   baseURL,
 }) => {
@@ -711,6 +711,45 @@ test("resuming requires a fresh review and consent; submission clears both draft
   const result = await (await page.request.get(endpoint)).json();
   expect(result.draft).toBe(null);
   expect(result.submitted).toBe(true);
+  await expect(
+    page.getByRole("heading", { name: "Application Submitted", exact: true }),
+  ).toBeVisible();
+  const course = page.locator("[data-naloxone-step]");
+  const checkbox = course.getByRole("checkbox", {
+    name: "I confirm I have completed Naloxone 101.",
+  });
+  await expect(course.getByRole("heading")).toHaveText(
+    "Step 2: Complete Naloxone 101",
+  );
+  await expect(
+    course.getByRole("link", { name: "Take Naloxone 101" }),
+  ).toHaveAttribute("href", "https://towardtheheart.com/naloxone-course");
+  await expect(checkbox).not.toBeChecked();
+  await page.reload();
+  await expect(checkbox).not.toBeChecked();
+  // A return to the account must offer the step even before it is completed.
+  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(checkbox).not.toBeChecked();
+  await checkbox.check();
+  await course
+    .getByRole("button", { name: "Confirm completion", exact: true })
+    .click();
+  await expect(course.getByRole("status")).toHaveText(
+    "Completion saved to your account (self-reported, not certified).",
+  );
+  await expect(checkbox).toBeChecked();
+  await expect(checkbox).toBeDisabled();
+  await page.reload();
+  await expect(checkbox).toBeChecked();
+  await expect(checkbox).toBeDisabled();
+  await expect(page.locator("[data-submitted-application]")).not.toContainText(
+    "Naloxone 101",
+  );
+  await page.goto("/events");
+  await expect(checkbox).toBeChecked();
+  await expect(
+    course.getByRole("button", { name: "Confirm completion", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("signing out removes synced browser drafts but retains the account draft", async ({
