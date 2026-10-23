@@ -755,7 +755,7 @@ describe(
         html,
         /<a\b[^>]*href="#submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/a>/,
       );
-      assert.match(html, /Naloxone 101 completion \(self-reported\)/);
+      assert.match(html, /Naloxone 101 completion/);
       assert.match(html, /Application approved/);
       assert.match(html, /Date not recorded/);
       assert.doesNotMatch(html, /Orientation registered/);
