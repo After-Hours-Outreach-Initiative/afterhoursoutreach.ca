@@ -177,7 +177,11 @@ test("Naloxone confirmation persists for its owner without changing the submitte
 
   const response = await invoke(confirmation);
   assert.equal(response.status, 200);
-  const saved = (await response.json()) as { completedAt: number };
+  const saved = (await response.json()) as {
+    completedAt: number;
+    message: string;
+  };
+  assert.equal(saved.message, "Naloxone 101 completed.");
   assert.ok(saved.completedAt > 0);
   assert.equal(
     await loadNaloxoneCompletion(env.DB, actor.id),
@@ -186,6 +190,23 @@ test("Naloxone confirmation persists for its owner without changing the submitte
   const retry = await invoke(confirmation);
   assert.equal(retry.status, 200);
   assert.deepEqual(await retry.json(), saved);
+  assert.equal(
+    (await invoke({ ...confirmation, completed: false })).status,
+    400,
+  );
+  assert.equal(
+    await loadNaloxoneCompletion(env.DB, actor.id),
+    saved.completedAt,
+  );
+  assert.equal(
+    await env.DB.prepare(
+      `SELECT count(*) AS count FROM audit_log
+       WHERE subject_id=? AND changed_fields='["naloxoneCompletedAt"]'`,
+    )
+      .bind(actor.id)
+      .first("count"),
+    1,
+  );
   assert.deepEqual(await loadSubmittedApplication(env.DB, actor.id), original);
 
   // Reuse this account to exercise the organizer's separate review projection.
