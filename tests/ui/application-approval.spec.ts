@@ -11,6 +11,9 @@ async function expectCompletedStep(step: Locator) {
   const summary = step.locator(":scope > summary");
   const marker = summary.locator(".application-progress-marker");
   await expect(marker).toHaveText("");
+  await expect(marker).toHaveCSS("border-radius", "50%");
+  await expect(marker).toHaveCSS("border-top-width", "1px");
+  await expect(marker).toHaveCSS("border-top-style", "solid");
   await expect(marker.locator("svg")).toHaveAttribute("aria-hidden", "true");
   await expect(marker.locator("path")).toHaveAttribute("d", "m5 12 4 4L19 6");
   await expect(
@@ -26,7 +29,7 @@ async function expectCompletedStep(step: Locator) {
   await expect(status).toHaveCSS("font-size", "14px");
   await expect(summary.locator(".application-progress-title")).toHaveCSS(
     "font-size",
-    "16px",
+    "18px",
   );
 }
 
@@ -83,6 +86,23 @@ test("pending applications poll every minute, then approval restores five-second
     );
     await expect(review.locator(".application-progress-number")).toHaveText(
       "3",
+    );
+    for (const title of await tracker
+      .locator(".application-progress-title")
+      .all()) {
+      await expect(title).toHaveCSS("font-size", "18px");
+    }
+    const courseLink = naloxone.getByRole("link", {
+      name: "Take Naloxone 101",
+    });
+    await expect(courseLink).toHaveAttribute("target", "_blank");
+    await expect(courseLink.locator("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    await expect(courseLink.locator("path")).toHaveAttribute(
+      "d",
+      "M7 17 17 7M7 7h10v10",
     );
     await expect(naloxone.locator(".application-progress-status")).toHaveCount(
       0,
