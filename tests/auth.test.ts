@@ -177,7 +177,11 @@ test("Naloxone confirmation persists for its owner without changing the submitte
 
   const response = await invoke(confirmation);
   assert.equal(response.status, 200);
-  const saved = (await response.json()) as { completedAt: number };
+  const saved = (await response.json()) as {
+    completedAt: number;
+    message: string;
+  };
+  assert.equal(saved.message, "Completion saved to your account.");
   assert.ok(saved.completedAt > 0);
   assert.equal(
     await loadNaloxoneCompletion(env.DB, actor.id),

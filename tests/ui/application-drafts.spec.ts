@@ -718,8 +718,9 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   const checkbox = course.getByRole("checkbox", {
     name: "I confirm I have completed Naloxone 101.",
   });
-  await expect(course.getByRole("heading")).toHaveText(
-    "Step 2: Complete Naloxone 101",
+  await expect(course.getByRole("heading")).toHaveCount(0);
+  await expect(course).not.toContainText(
+    /self-reported|not certified|certificate upload/i,
   );
   await expect(
     course.getByRole("link", { name: "Take Naloxone 101" }),
@@ -760,6 +761,9 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await courseStep.locator("summary").click();
   await expect(checkbox).toBeChecked();
   await expect(checkbox).toBeDisabled();
+  await expect(course.locator("[data-form-message]")).toHaveText(
+    "Completion saved to your account.",
+  );
   await expect(
     course.getByRole("button", { name: "Confirm completion", exact: true }),
   ).toBeHidden();

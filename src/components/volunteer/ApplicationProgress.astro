@@ -150,7 +150,6 @@ const currentStep = steps.findIndex((step) => !step.completed);
                   <NaloxoneCourseStep
                     {userId}
                     completedAt={progress.naloxoneCompletedAt}
-                    idPrefix={`${idPrefix}-naloxone`}
                   />
                 ) : (
                   <p>

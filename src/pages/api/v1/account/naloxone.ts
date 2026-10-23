@@ -32,8 +32,7 @@ export const POST: APIRoute = async ({ request }) => {
     const response = Response.json(
       {
         ...result,
-        message:
-          "Completion saved to your account (self-reported, not certified).",
+        message: "Completion saved to your account.",
       },
       { headers: { "Cache-Control": "no-store" } },
     );
