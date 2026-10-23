@@ -947,8 +947,6 @@ test("application progress uses milestone dates, not patrol approval or unrelate
     naloxoneCompletedAt: null,
     applicationApproved: false,
     applicationApprovedAt: null,
-    orientationSignedUpAt: null,
-    orientationCompletedAt: null,
   });
   await saveProfile(env.DB, actor.id, {
     ...completeAnswers(),
@@ -979,59 +977,32 @@ test("application progress uses milestone dates, not patrol approval or unrelate
     isApplicationComplete({ ...undated, applicationApproved: false }),
     false,
   );
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+  await env.DB.prepare(
+    `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
       VALUES ('application-approval', ?, ?, 'approval_changed', '["applicationApproved"]', 2000),
         ('patrol-approval', ?, ?, 'approval_changed', '["patrolApproved"]', 3000)`,
-    ).bind(actor.id, actor.id, actor.id, actor.id),
-    env.DB.prepare(
-      `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
-      VALUES ('progress-orientation', 'orientation', ?, 'Meeting point', 4, ?, 0, 0)`,
-    ).bind(Date.now() + 86_400_000, actor.id),
-    env.DB.prepare(
-      `INSERT INTO signup (id, event_id, user_id, created_at, updated_at)
-      VALUES ('progress-signup', 'progress-orientation', ?, 4000, 5000)`,
-    ).bind(actor.id),
-  ]);
-  const booked = await loadApplicationProgress(env.DB, actor.id);
-  assert.equal(booked.applicationApprovedAt, 2000);
-  assert.equal(booked.orientationSignedUpAt, 4000);
-  assert.equal(isApplicationComplete(booked), true);
-  assert.equal(isApplicationComplete({ ...booked, submittedAt: null }), false);
+  )
+    .bind(actor.id, actor.id, actor.id, actor.id)
+    .run();
+  const dated = await loadApplicationProgress(env.DB, actor.id);
+  assert.equal(dated.applicationApprovedAt, 2000);
+  assert.equal(isApplicationComplete(dated), true);
+  assert.equal(isApplicationComplete({ ...dated, submittedAt: null }), false);
   assert.equal(
-    isApplicationComplete({ ...booked, naloxoneCompletedAt: null }),
+    isApplicationComplete({ ...dated, naloxoneCompletedAt: null }),
     false,
   );
-  assert.equal(
-    isApplicationComplete({ ...booked, applicationApprovedAt: null }),
-    true,
-  );
   await env.DB.prepare(
-    "UPDATE signup SET status='cancelled' WHERE id='progress-signup'",
-  ).run();
-  const cancelled = await loadApplicationProgress(env.DB, actor.id);
-  assert.equal(cancelled.orientationSignedUpAt, null);
-  assert.equal(isApplicationComplete(cancelled), true);
-  await env.DB.batch([
-    env.DB.prepare(
-      "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
-    ).bind(actor.id),
-    env.DB.prepare(
-      "UPDATE event SET starts_at=1000 WHERE id='progress-orientation'",
-    ),
-    env.DB.prepare(
-      `INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
-      VALUES ('progress-completion', ?, 'progress-orientation', ?, 6000)`,
-    ).bind(actor.id, actor.id),
-  ]);
-  const completed = await loadApplicationProgress(env.DB, actor.id);
-  assert.equal(completed.applicationApproved, false);
-  assert.equal(completed.applicationApprovedAt, null);
-  assert.equal(completed.orientationCompletedAt, 1000);
-  assert.equal(isApplicationComplete(completed), false);
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
+  const revoked = await loadApplicationProgress(env.DB, actor.id);
+  assert.equal(revoked.applicationApproved, false);
+  assert.equal(revoked.applicationApprovedAt, null);
+  assert.equal(isApplicationComplete(revoked), false);
   assert.equal(
-    isApplicationComplete({ ...completed, applicationApproved: true }),
+    isApplicationComplete({ ...revoked, applicationApproved: true }),
     true,
   );
 });
