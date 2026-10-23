@@ -51,22 +51,27 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
         date.className = "event-calendar-day";
         date.textContent = String(day.day);
         if (!day.events.length) cell.appendChild(date);
+        const extraEvents = document.createElement("div");
+        extraEvents.className = "event-calendar-extra-events";
         for (const [index, event] of day.events.entries()) {
           const link = document.createElement("a");
           link.href = `#event-${event.id}`;
           link.dataset.calendarEvent = event.id;
           link.setAttribute("aria-label", event.description);
-          link.title = event.description;
+          link.title = event.label;
           if (index === 0) {
             date.classList.add("event-calendar-circle");
             link.appendChild(date);
+            cell.appendChild(link);
+          } else {
+            const dot = document.createElement("span");
+            dot.className = "event-calendar-dot";
+            dot.setAttribute("aria-hidden", "true");
+            link.appendChild(dot);
+            extraEvents.appendChild(link);
           }
-          const time = document.createElement("span");
-          time.className = "event-calendar-time";
-          time.textContent = event.time;
-          link.appendChild(time);
-          cell.appendChild(link);
         }
+        if (extraEvents.childElementCount) cell.appendChild(extraEvents);
         row.appendChild(cell);
       }
       return row;
