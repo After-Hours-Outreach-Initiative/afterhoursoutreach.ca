@@ -6,7 +6,7 @@ import type {
   PublicRosterRow,
   PatrolSeriesRow,
 } from "@/server/db/events";
-import { signupBlockReason } from "@/server/db/policy";
+import { eventSignupBlockReason } from "@/server/db/policy";
 import { formatEventDate } from "@/data/event-time";
 import { matchesEventFilter } from "@/data/event-browser";
 import EventEditor from "./EventEditor.astro";
@@ -16,7 +16,8 @@ import PublicEventRoster from "./PublicEventRoster.astro";
 
 interface Props {
   event: EventRow;
-  actor: Actor | null;
+  // The caller must gate access with canViewEvents.
+  actor: Actor;
   organizer: boolean;
   roster: RosterRow[];
   destinations: EventRow[];
@@ -38,7 +39,7 @@ const future = event.startsAt > Date.now();
 const blocked =
   future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
     ? "Registration is available only for the next three patrol occurrences in this series."
-    : signupBlockReason(
+    : eventSignupBlockReason(
         actor,
         {
           ...event,
@@ -122,7 +123,7 @@ const blocked =
           </p>
         )
       }
-      {!organizer && !event.signedUp && actor && blocked && <p>{blocked}</p>}
+      {!organizer && !event.signedUp && blocked && <p>{blocked}</p>}
     </div>
     <EventAttendance event={event} />
     <div class="volunteer-actions">
@@ -140,10 +141,6 @@ const blocked =
             </button>
             <p data-form-message role="status" hidden />
           </form>
-        ) : !actor ? (
-          <a class="btn btn-outline" href="#volunteer-signin">
-            Sign in to register
-          </a>
         ) : !blocked ? (
           <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
