@@ -26,6 +26,7 @@ import {
   saveProfile,
 } from "../src/server/db/profiles";
 import { codeOfConductVersion } from "../src/data/code-of-conduct";
+import { loadApplicationProgress } from "../src/server/db/application-progress";
 import type { Actor } from "../src/server/db/access";
 import {
   applicationDraftAnswersSchema,
@@ -878,6 +879,83 @@ test("durable first-submission intent failures roll back answers and side effect
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
     0,
   );
+});
+
+test("application progress uses milestone dates, not patrol approval or unrelated updates", async () => {
+  const actor = await draftActor();
+  assert.deepEqual(await loadApplicationProgress(env.DB, actor.id), {
+    submittedAt: null,
+    naloxoneCompletedAt: null,
+    applicationApproved: false,
+    applicationApprovedAt: null,
+    orientationSignedUpAt: null,
+    orientationCompletedAt: null,
+  });
+  await saveProfile(env.DB, actor.id, {
+    ...completeAnswers(),
+    codeOfConductAccepted: true,
+  });
+  const submission = await loadSubmittedApplication(env.DB, actor.id);
+  assert.ok(submission);
+  const confirmedAt = Date.now();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?").bind(
+      actor.id,
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",
+    ).bind(confirmedAt, actor.id),
+    env.DB.prepare(
+      `UPDATE volunteer_status SET registration_approved=1, patrol_approved=1,
+        approved_by=?, approved_at=1234, updated_at=5678 WHERE user_id=?`,
+    ).bind(actor.id, actor.id),
+  ]);
+  const undated = await loadApplicationProgress(env.DB, actor.id);
+  assert.equal(undated.submittedAt, Date.parse(submission.submittedAt));
+  assert.equal(undated.naloxoneCompletedAt, confirmedAt);
+  assert.equal(undated.applicationApproved, true);
+  assert.equal(undated.applicationApprovedAt, null);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+      VALUES ('application-approval', ?, ?, 'approval_changed', '["applicationApproved"]', 2000),
+        ('patrol-approval', ?, ?, 'approval_changed', '["patrolApproved"]', 3000)`,
+    ).bind(actor.id, actor.id, actor.id, actor.id),
+    env.DB.prepare(
+      `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
+      VALUES ('progress-orientation', 'orientation', ?, 'Meeting point', 4, ?, 0, 0)`,
+    ).bind(Date.now() + 86_400_000, actor.id),
+    env.DB.prepare(
+      `INSERT INTO signup (id, event_id, user_id, created_at, updated_at)
+      VALUES ('progress-signup', 'progress-orientation', ?, 4000, 5000)`,
+    ).bind(actor.id),
+  ]);
+  const booked = await loadApplicationProgress(env.DB, actor.id);
+  assert.equal(booked.applicationApprovedAt, 2000);
+  assert.equal(booked.orientationSignedUpAt, 4000);
+  await env.DB.prepare(
+    "UPDATE signup SET status='cancelled' WHERE id='progress-signup'",
+  ).run();
+  assert.equal(
+    (await loadApplicationProgress(env.DB, actor.id)).orientationSignedUpAt,
+    null,
+  );
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
+    ).bind(actor.id),
+    env.DB.prepare(
+      "UPDATE event SET starts_at=1000 WHERE id='progress-orientation'",
+    ),
+    env.DB.prepare(
+      `INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
+      VALUES ('progress-completion', ?, 'progress-orientation', ?, 6000)`,
+    ).bind(actor.id, actor.id),
+  ]);
+  const completed = await loadApplicationProgress(env.DB, actor.id);
+  assert.equal(completed.applicationApproved, false);
+  assert.equal(completed.applicationApprovedAt, null);
+  assert.equal(completed.orientationCompletedAt, 1000);
 });
 
 test("first completed orientation uses the earliest attended event, not when attendance was recorded", async () => {
