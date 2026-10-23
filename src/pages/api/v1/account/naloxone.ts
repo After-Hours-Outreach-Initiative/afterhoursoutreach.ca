@@ -32,7 +32,8 @@ export const POST: APIRoute = async ({ request }) => {
     const response = Response.json(
       {
         ...result,
-        message: "Naloxone 101 completed.",
+        message:
+          "Completion saved to your account (self-reported, not certified).",
       },
       { headers: { "Cache-Control": "no-store" } },
     );

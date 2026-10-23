@@ -314,27 +314,11 @@ form("[data-naloxone-confirm]", async (element, values) => {
       completed: values.get("completed") === "true",
     });
     saved = true;
-    const row = element.closest<HTMLElement>("[data-naloxone-step]")!;
-    const status = row.querySelector<HTMLElement>("[data-naloxone-status]")!;
-    status.textContent = result.message!;
-    const restoreFocus = element.contains(document.activeElement);
-    // A saved confirmation no longer has a form or any required controls, even
-    // if the follow-up tracker refresh fails.
-    element.hidden = true;
-    row.replaceChildren(status);
-    if (restoreFocus) focusAfterUpdate(status);
-    try {
-      syncApplicationProgress(await loadActionPage());
-      const completedRow = document.getElementById(row.id);
-      const application = completedRow?.closest("details");
-      if (application) application.open = true;
-      if (restoreFocus)
-        focusAfterUpdate(
-          completedRow?.querySelector("[data-naloxone-status]") ?? null,
-        );
-    } catch (error) {
-      status.textContent = `${result.message} ${accountErrorMessage(error)}`;
-    }
+    checkbox.checked = true;
+    element.querySelector<HTMLButtonElement>('button[type="submit"]')!.hidden =
+      true;
+    message(element, result.message!, "success");
+    syncApplicationProgress(await loadActionPage());
   } finally {
     checkbox.disabled = saved;
   }

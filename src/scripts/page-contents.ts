@@ -166,30 +166,21 @@ export function initPageContents(
     // The browser owns fragment scrolling, focus and history restoration.
     refresh();
   };
-  // In-content reminders must reveal the same collapsed parents as navigation
-  // links, including repeated jumps to the current hash and refreshed markup.
-  flow.addEventListener("click", (event) => {
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey
-    )
-      return;
-    const link =
-      event.target instanceof Element
-        ? event.target.closest<HTMLAnchorElement>("a[href]")
-        : null;
-    if (
-      link &&
-      link.origin === location.origin &&
-      link.pathname === location.pathname &&
-      link.search === location.search
-    )
-      revealSection(link.hash);
-  });
+  for (const { links } of sections) {
+    for (const link of links)
+      link.addEventListener("click", (event) => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey
+        )
+          return;
+        revealSection(link.hash);
+      });
+  }
   flow.addEventListener("toggle", refresh, true);
   document.addEventListener("click", (event) => {
     if (event.target instanceof Node && !contents.contains(event.target))
