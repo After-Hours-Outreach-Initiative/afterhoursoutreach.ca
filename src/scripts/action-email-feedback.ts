@@ -14,14 +14,30 @@ export async function simulateActionEmail(result: EmailActionResult) {
     const { chooseEmailOutcome } =
       await import("../dev/scripts/local-email-dialog");
     const outcome = await chooseEmailOutcome(result.localNotifications, true);
+    if (outcome === "success") return true;
     result.message = `${result.message ?? "Change saved."} ${
-      outcome === "success"
-        ? "Local email simulation succeeded. No real email was sent."
-        : outcome === "failure"
-          ? "The change is saved, but the local email simulation failed. No real email was sent."
-          : "The change is saved. Local email simulation was dismissed. No real email was sent."
+      outcome === "failure"
+        ? "The change is saved, but the local email simulation failed. No real email was sent."
+        : "The change is saved. Local email simulation was dismissed. No real email was sent."
     }`;
+    return false;
   }
+  return true;
+}
+
+export function actionEmailNeedsFeedback(
+  result: EmailActionResult,
+  simulationSucceeded: boolean,
+) {
+  return (
+    !simulationSucceeded ||
+    Boolean(
+      result.pending ||
+      result.expired ||
+      result.unconfirmed ||
+      result.retryOperation,
+    )
+  );
 }
 
 let nextResultId = 0;
@@ -83,8 +99,10 @@ export function showActionEmailFeedback(
       const updated: EmailActionResult = await response.json();
       if (!response.ok)
         throw new Error(updated.message || "Email retry is unavailable.");
-      await simulateActionEmail(updated);
+      const simulationSucceeded = await simulateActionEmail(updated);
       result = updated;
+      if (!actionEmailNeedsFeedback(result, simulationSucceeded))
+        dialog.close();
     } catch (error) {
       result.message = `The change remains saved. ${error instanceof Error ? error.message : "Email delivery could not be confirmed."} Do not repeat the saved change.`;
     } finally {
