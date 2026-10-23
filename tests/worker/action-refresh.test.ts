@@ -2,18 +2,21 @@ import { existsSync } from "node:fs";
 import { test } from "vitest";
 import { chromium, expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
+import { createSignInOTP } from "../helpers/email-otp";
+import { sampleAnswers } from "../helpers/local-account";
+import { profileWriteBody } from "../helpers/profile-write";
 
 for (const failFirst of [false, true]) {
   test(`overlapping signup refreshes stay ordered${failFirst ? " after a failed refresh" : ""}`, async () => {
     const origin = "https://afterhoursoutreach.ca";
+    const secret = "action-refresh-test-secret-12345678901234567890";
     const server = createTestHarness({
       workers: [
         {
           configPath: "dist/server/wrangler.json",
           vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
           secrets: {
-            BETTER_AUTH_SECRET:
-              "action-refresh-test-secret-12345678901234567890",
+            BETTER_AUTH_SECRET: secret,
             RESEND_API_KEY: "",
           },
         },
@@ -28,12 +31,50 @@ for (const failFirst of [false, true]) {
       await server.listen();
       const worker = server.getWorker<Env>();
       await worker.applyD1Migrations("DB");
+      const { DB } = await worker.getEnv();
+      const signedIn = await worker.fetch(
+        `${origin}/api/v1/auth/sign-in/email-otp`,
+        {
+          method: "POST",
+          headers: { origin, "content-type": "application/json" },
+          body: JSON.stringify(
+            await createSignInOTP(DB, secret, "refresh@example.org"),
+          ),
+        },
+      );
+      expect(signedIn.status).toBe(200);
+      const { user } = (await signedIn.json()) as { user: { id: string } };
+      const cookie = signedIn.headers
+        .getSetCookie()
+        .filter((value) => !value.includes("Max-Age=0"))
+        .map((value) => value.split(";")[0])
+        .join("; ");
+      const saved = await worker.fetch(`${origin}/api/v1/account/profile`, {
+        method: "POST",
+        headers: { origin, cookie, "content-type": "application/json" },
+        body: JSON.stringify(
+          await profileWriteBody(
+            (path) =>
+              worker.fetch(`${origin}${path}`, { headers: { origin, cookie } }),
+            { ...sampleAnswers, codeOfConductAccepted: true },
+          ),
+        ),
+      });
+      expect(saved.status).toBe(200);
+      await DB.batch([
+        DB.prepare(
+          "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",
+        ).bind(Date.now(), user.id),
+        DB.prepare(
+          "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+        ).bind(user.id),
+      ]);
       const page = await browser.newPage();
       await page.route("**/*", async (route) => {
         const request = route.request();
         if (!request.url().startsWith(origin)) return route.abort();
         const response = await worker.fetch(request.url(), {
-          headers: await request.allHeaders(),
+          headers: { ...(await request.allHeaders()), cookie },
         });
         await route.fulfill({
           status: response.status,
@@ -67,7 +108,7 @@ for (const failFirst of [false, true]) {
       <p data-event-limit hidden></p>
     </section>`;
       // Exercise the production client script with an isolated database and controlled responses.
-      await page.goto(`${origin}/volunteer`);
+      await page.goto(`${origin}/events`);
       await expect(page.locator("[data-event-browser]")).toBeVisible();
       await page.evaluate((html) => {
         const parsed = new DOMParser().parseFromString(html, "text/html");
@@ -93,7 +134,7 @@ for (const failFirst of [false, true]) {
       let refreshes = 0;
       let pending = 0;
       let maxPending = 0;
-      await page.route("**/volunteer", async (route) => {
+      await page.route("**/events", async (route) => {
         const body = listing();
         const index = ++refreshes;
         maxPending = Math.max(maxPending, ++pending);

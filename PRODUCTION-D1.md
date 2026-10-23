@@ -4,6 +4,29 @@ Prepared 2026-10-20. **No production Worker connection/deployment is authorized
 by this preparation.** The detailed checklist is also at the top of locally
 Git-excluded `TODO.md`; this tracked handoff preserves the operational instructions.
 
+## Launch configuration update — 2026-10-23
+
+- The source `wrangler.jsonc` now names the dedicated production database below.
+  `remote: false` remains set and every Preview setting is unchanged. This is
+  local configuration preparation, **not a live Worker connection or deployment**.
+- The site owner approved the public policy effective October 23 and a manual-first
+  retention/request process at `info@afterhoursoutreach.ca`. Automated retention
+  remains deferred; the Privacy officer must carry out the published manual rules.
+- Provider checks combined read-only metadata/documentation with the owner's
+  confirmations: Workers Free, Resend Free, no email open/click tracking, Resend
+  dashboard access limited to the owner, and agreement/access reviews completed.
+- The database verification below is the October 20 snapshot, not proof that the
+  newer migrations are live. The repository now has 19 migrations through `0018`.
+  The October 23 read-only ledger check still returned only `0000`–`0014`;
+  `0015_patrol_orientation_capacity.sql`, `0016_orientation_minimum_capacity.sql`,
+  `0017_medic_orientee_reservations.sql`, and `0018_naloxone_course_confirmation.sql`
+  remain outstanding. Apply them only with approval.
+- The October 23 production secret-name check returned `[]`; neither required
+  secret is deployed. No secret values were read or written.
+- Production secrets, sender verification, cron installation, first-organizer
+  provisioning and real-account/inbox acceptance remain cutover work. No live
+  migration, deployment, secret write, email send or data deletion was performed.
+
 ## Prepared target
 
 | Resource                        | Value                                                                 |
@@ -15,12 +38,14 @@ Git-excluded `TODO.md`; this tracked handoff preserves the operational instructi
 | Migration-only config / binding | `wrangler.production-migrations.jsonc` / `PRODUCTION_DB`              |
 | Unchanged Preview D1            | `afterhoursoutreach-staging` / `4412ad44-0ca9-4ebd-8f08-78bb1092bc0d` |
 
-All 15 historical/generated migrations through
-`0014_patrol_submission_integration.sql` are applied. Remote ledger matches
-the journal; no pending migrations, foreign keys enabled, no violations,
-`quick_check=ok`. All 23 application tables are empty; their schema, 28 named
-indexes and 24 triggers match a full local migration replay. No data seeded.
-The production binding in `wrangler.jsonc` is **still its placeholder**.
+On October 20, all 15 historical/generated migrations through
+`0014_patrol_submission_integration.sql` were applied. The remote ledger matched
+the journal then; there were no pending migrations, foreign keys were enabled,
+there were no violations, and `quick_check=ok`. All 23 application tables were
+empty; their schema, 28 named indexes and 24 triggers matched a full local
+migration replay. No data was seeded.
+The source production binding now uses this database; the live Worker has not
+been connected by this preparation.
 
 The migration-only config has no entrypoint/assets and refuses deployment.
 `pnpm db:migrate:production` validates history and the pinned account/database,
@@ -29,12 +54,11 @@ Never use this config to deploy a Worker or repoint Preview scripts to productio
 
 ## Open launch gates
 
-- [ ] Explicit human privacy and cutover approval. Complete the human blockers
-      in `LAUNCH-READINESS.md`: notices before autosave, sensitive/emergency-contact/
-      birth-date collection, policy effective date and responsible role, retention,
-      access/correction/deletion/complaint processes, monitored contacts, provider
-      locations/agreements, logs/traces/backups and inbox handling. A draft policy
-      or passing Preview tests do not approve collection.
+- [ ] Explicit human approval for the live production cutover. The policy,
+      collection choices, responsible privacy role and manual-first retention/request
+      process are approved as recorded above; automatic cleanup remains deferred.
+      Confirm the operational responsibilities in `LAUNCH-READINESS.md` are assigned.
+      Policy approval and passing local/Preview tests are not deployment approval.
 - [ ] Production secrets: read-only secret list and settings bindings were both
       empty. Neither `BETTER_AUTH_SECRET` nor `RESEND_API_KEY`, canonical
       `AUTH_BASE_URL` nor production `APP_ENV` was present live. Source declarations
@@ -59,8 +83,8 @@ Never use this config to deploy a Worker or repoint Preview scripts to productio
 - [ ] Name database/recovery owner and backup approver; approve access, recovery
       objectives, export storage/retention if required, deletion implications and
       incident procedure. Read-only Time Travel bookmark retrieval works on the
-      production backend; no restore/drill was performed. Actual plan/history
-      entitlement remains unverified: 7 days on Free / 30 on Paid per docs.
+      production backend; no restore/drill was performed. The owner confirmed Workers
+      Free: the documented recovery window is 7 days, not the Paid plan's 30 days.
       Restore overwrites D1 and cancels queries; Worker rollback does not undo
       data changes. A recovery drill requires separate approval.
 - [ ] Confirm residency expectations before real collection: primary WNAM,
@@ -89,9 +113,9 @@ Never use this config to deploy a Worker or repoint Preview scripts to productio
    bookmarks expire. No restore is authorized here. Future schema changes use
    `pnpm db:generate` / `pnpm db:check`; never edit historical SQL or import Preview data.
 
-2. **Human edit:** replace only the top-level production D1 entry in
-   `wrangler.jsonc` with the following and remove its obsolete placeholder comment.
-   Preserve all Preview settings. `remote: false` protects local development;
+2. **Verify the prepared source configuration:** the top-level production D1
+   entry in `wrangler.jsonc` must match the following. Do not repoint it to the
+   shared Preview database. `remote: false` protects local development;
    it does not disable the binding when deployed.
 
    ```json

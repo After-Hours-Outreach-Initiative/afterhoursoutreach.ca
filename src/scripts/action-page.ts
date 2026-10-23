@@ -35,7 +35,19 @@ export async function loadActionPage(
     if (response.status === 401 || response.status === 403)
       location.assign("/events");
     if (!response.ok) throw new Error("Refresh failed");
-    return new DOMParser().parseFromString(await response.text(), "text/html");
+    const page = new DOMParser().parseFromString(
+      await response.text(),
+      "text/html",
+    );
+    // /volunteer rewrites to sign-in with HTTP 200 after a session expires.
+    // Navigate instead of leaving stale private content behind on a failed refresh.
+    if (page.querySelector("[data-email-request]")) {
+      const signIn = new URL("/volunteer/sign-in", location.origin);
+      signIn.searchParams.set("returnTo", location.pathname + location.search);
+      location.assign(signIn.href);
+      throw new Error("Sign-in required");
+    }
+    return page;
   } catch {
     throw new Error(savedRefreshError);
   }

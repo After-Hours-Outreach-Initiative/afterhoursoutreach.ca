@@ -97,7 +97,7 @@ for (const [layout, viewport] of [
           .evaluate((element) => getComputedStyle(element).fontSize);
         await expect(
           page.getByText(
-            "Your application progress is automatically saved to your account.",
+            "Your answers are saved to your account and this browser as you fill them in. See our privacy policy.",
             { exact: true },
           ),
         ).toHaveCSS("font-size", listFontSize);
@@ -133,7 +133,7 @@ for (const [layout, viewport] of [
     await page.goto("/apply");
 
     const notice = page.getByText(
-      "Your application progress is automatically saved to your account.",
+      "Your answers are saved to your account and this browser as you fill them in. See our privacy policy.",
       { exact: true },
     );
     await expect(notice).toBeVisible();
@@ -305,7 +305,7 @@ test("autosave message is present before answers without JavaScript", async ({
     const page = await context.newPage();
     await page.goto("/apply");
     const notice = page.getByText(
-      "Your application progress is automatically saved to your account.",
+      "Your answers are saved to your account and this browser as you fill them in. See our privacy policy.",
       { exact: true },
     );
     await expect(notice).toBeVisible();
