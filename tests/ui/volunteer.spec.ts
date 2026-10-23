@@ -626,7 +626,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await menu.getByRole("link", { name: "Account", exact: true }).click();
     await expect(page).toHaveURL(/\/volunteer\/account$/);
     await expect(
-      page.getByRole("heading", { name: "Your account", exact: true }),
+      page.getByRole("heading", { name: "Account", level: 1, exact: true }),
     ).toBeVisible();
     const form = page.locator("[data-account-profile]");
     await expect(form.locator("[data-profile-editor]")).toBeVisible();
@@ -653,7 +653,10 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(name).toHaveValue(sampleAnswers.preferredName);
     await expect(name).toBeEditable();
     for (const heading of await form.getByRole("heading", { level: 3 }).all()) {
-      await expect(heading).toHaveCSS("font-size", "24px");
+      await expect(heading).toHaveCSS(
+        "font-size",
+        width < 768 ? "18px" : "20px",
+      );
       await expect(heading).toHaveCSS("font-weight", "700");
       await expect(heading.locator("..")).toHaveCSS(
         "border-bottom-width",
@@ -793,9 +796,9 @@ test("account navigation and profile controls are usable on desktop and mobile",
       .getByRole("navigation", {
         name: width < 1024 ? "Mobile navigation" : "Primary navigation",
       })
-      .getByRole("link", { name: "Events", exact: true })
+      .getByRole("link", { name: "Volunteer", exact: true })
       .click();
-    await expect(page).toHaveURL(/\/events\/?$/);
+    await expect(page).toHaveURL(/\/volunteer\/?$/);
   }
   await page
     .getByRole("button", { name: "Open navigation", exact: true })
