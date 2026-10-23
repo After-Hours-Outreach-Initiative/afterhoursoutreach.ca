@@ -23,40 +23,19 @@ const weekdays = [
   data-event-calendar
   data-calendar-start={calendar.start}
 >
-  <div class="event-calendar-heading">
-    <h3 id="calendar-range" data-calendar-range aria-live="polite">
-      {calendar.range}
-    </h3>
-    <div class="event-calendar-controls" data-calendar-controls hidden>
-      <button
-        type="button"
-        data-calendar-step="previous"
-        aria-label="Previous five weeks"
-        disabled={!calendar.previous}
-      >
-        <ArrowRightIcon class="size-5 rotate-180" />
-      </button>
-      <button type="button" data-calendar-step="today">Today</button>
-      <button
-        type="button"
-        data-calendar-step="next"
-        aria-label="Next five weeks"
-        disabled={!calendar.next}
-      >
-        <ArrowRightIcon class="size-5" />
-      </button>
-    </div>
-  </div>
   <p id="calendar-help" class="sr-only">
     Circled dates link to events. Dots link to more events that day.
   </p>
-  <table aria-labelledby="calendar-range" aria-describedby="calendar-help">
+  <table aria-describedby="calendar-help">
+    <caption class="sr-only" data-calendar-range aria-live="polite">
+      {calendar.range}
+    </caption>
     <thead>
       <tr
         >{
           weekdays.map((day) => (
-            <th scope="col">
-              <abbr title={day}>{day.slice(0, 3)}</abbr>
+            <th scope="col" aria-label={day}>
+              <abbr title={day}>{day.slice(0, 1)}</abbr>
             </th>
           ))
         }</tr
@@ -111,4 +90,23 @@ const weekdays = [
       }
     </tbody>
   </table>
+  <div class="event-calendar-controls" data-calendar-controls hidden>
+    <button
+      type="button"
+      data-calendar-step="previous"
+      aria-label="Previous five weeks"
+      disabled={!calendar.previous}
+    >
+      <ArrowRightIcon class="size-5 rotate-180" />
+    </button>
+    <button type="button" data-calendar-step="today">Today</button>
+    <button
+      type="button"
+      data-calendar-step="next"
+      aria-label="Next five weeks"
+      disabled={!calendar.next}
+    >
+      <ArrowRightIcon class="size-5" />
+    </button>
+  </div>
 </div>

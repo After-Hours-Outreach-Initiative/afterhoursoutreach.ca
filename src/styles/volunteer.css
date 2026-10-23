@@ -14,7 +14,11 @@
 }
 /* `overflow-x: hidden` traps sticky descendants in a non-scrolling ancestor.
    Clip still prevents horizontal overflow without trapping contents navigation. */
-body:has([data-application], [data-account-contents-flow]) {
+body:has(
+  [data-application],
+  [data-account-contents-flow],
+  [data-event-calendar]
+) {
   overflow-x: clip;
 }
 .volunteer-wrap {

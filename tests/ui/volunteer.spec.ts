@@ -222,6 +222,29 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   const card = (id: string) => page.locator(`[data-live-event="${id}"]`);
   await expect(calendar.locator("tbody tr")).toHaveCount(5);
   await expect(calendar.locator("td")).toHaveCount(35);
+  await expect(calendar.locator("th")).toHaveText([
+    "S",
+    "M",
+    "T",
+    "W",
+    "T",
+    "F",
+    "S",
+  ]);
+  await expect(
+    calendar.getByRole("columnheader", { name: "Thursday", exact: true }),
+  ).toHaveCount(1);
+  await expect(calendar.getByRole("heading")).toHaveCount(0);
+  await expect(calendar).toHaveCSS("position", "sticky");
+  expect(
+    await calendar.evaluate(
+      (element) =>
+        element
+          .querySelector("[data-calendar-controls]")!
+          .getBoundingClientRect().top >=
+        element.querySelector("table")!.getBoundingClientRect().bottom,
+    ),
+  ).toBe(true);
   await expect(
     calendar.locator(`[data-calendar-date="${date}"] a`),
   ).toHaveCount(2);
@@ -234,6 +257,16 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   await expect(
     calendar.locator("td:not(:has(a))").first().locator("a"),
   ).toHaveCount(0);
+  await card(orientation.id).evaluate((element: HTMLElement) => {
+    element.addEventListener("animationstart", (event) => {
+      if (event.target !== element) return;
+      const bounds = element.getBoundingClientRect();
+      const header = document.querySelector("header")!.getBoundingClientRect();
+      element.dataset.highlightStartedInView = String(
+        bounds.top >= header.bottom - 1 && bounds.top < innerHeight,
+      );
+    });
+  });
   await link(orientation.id).focus();
   await page.keyboard.press("Enter");
   await expect(card(orientation.id)).toBeFocused();
@@ -247,6 +280,18 @@ test("event calendar links visible cards, reaches later weeks, and survives live
       (element) => getComputedStyle(element).animationName,
     ),
   ).not.toBe("none");
+  await expect(card(orientation.id)).toHaveAttribute(
+    "data-highlight-started-in-view",
+    "true",
+  );
+  expect(
+    await calendar.evaluate((element) => {
+      const gap =
+        element.getBoundingClientRect().top -
+        document.querySelector("header")!.getBoundingClientRect().bottom;
+      return gap;
+    }),
+  ).toBeGreaterThanOrEqual(15);
   await expect(page).toHaveURL(
     new RegExp(`occurrence=${orientation.id}#event-${orientation.id}$`),
   );
@@ -279,6 +324,12 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   for (const width of [375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(calendar).toHaveCSS("position", "static");
+    const [calendarBounds, resultsBounds] = await Promise.all([
+      calendar.boundingBox(),
+      page.locator(".volunteer-event-results").boundingBox(),
+    ]);
+    expect(calendarBounds!.width).toBeCloseTo(resultsBounds!.width, 0);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,
@@ -292,14 +343,23 @@ test("event calendar links visible cards, reaches later weeks, and survives live
         (element) => getComputedStyle(element).animationName,
       ),
     ).toBe("none");
-    expect(
-      await card(orientation.id).evaluate(
-        (element) => getComputedStyle(element).outlineStyle,
-      ),
-    ).toBe("solid");
+    await expect(card(orientation.id)).toHaveCSS("outline-style", "solid");
   }
 
-  await calendar.getByRole("button", { name: "Next five weeks" }).click();
+  // Paging changes only the calendar, even when it is above the viewport.
+  expect(
+    await calendar.evaluate((element) => {
+      const before = scrollY;
+      element
+        .querySelector<HTMLButtonElement>('[data-calendar-step="next"]')!
+        .click();
+      return scrollY - before;
+    }),
+  ).toBe(0);
+  await expect(card(orientation.id)).not.toHaveAttribute(
+    "data-calendar-highlight",
+    "",
+  );
   await expect(link(distant.id)).toBeVisible();
   const start = await calendar.getAttribute("data-calendar-start");
   const version = async () => {
