@@ -8,7 +8,7 @@ import {
 
 async function expectCompletedStep(step: Locator) {
   await expect(step).toHaveAttribute("data-state", "complete");
-  const summary = step.locator("summary");
+  const summary = step.locator(":scope > summary");
   const marker = summary.locator(".application-progress-marker");
   await expect(marker).toHaveText("");
   await expect(marker.locator("svg")).toHaveAttribute("aria-hidden", "true");
@@ -101,7 +101,7 @@ test("pending applications poll every minute, then approval restores five-second
     const formToggle = formStep.locator(".application-progress-toggle");
     await expect(formToggle).toHaveCSS("transform", "none");
     await expect(formStep).not.toHaveAttribute("open");
-    await expect(formStep.locator("summary")).toContainText(
+    await expect(formStep.locator(":scope > summary")).toContainText(
       "Application Form Submitted",
     );
     await expect(formStep.locator("summary svg").first()).toHaveAttribute(
@@ -111,17 +111,14 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(review.locator("p")).toHaveText(
       `An organizer will review your application. We'll email you at ${account.email} to let you know whether it's approved and what to do next.`,
     );
-    await formStep.locator("summary").click();
+    await formStep.locator(":scope > summary").click();
     await expect(formToggle).toHaveCSS(
       "transform",
       "matrix(-1, 0, 0, -1, 0, 0)",
     );
     await expect(
-      formStep.getByRole("link", {
-        name: "View submitted application",
-        exact: true,
-      }),
-    ).toHaveAttribute("href", "/volunteer/account");
+      formStep.locator("[data-submitted-application] summary"),
+    ).toHaveText("View submitted application");
     await volunteer.locator("[data-naloxone-confirm] input").check();
     await volunteer
       .getByRole("button", { name: "Confirm completion", exact: true })

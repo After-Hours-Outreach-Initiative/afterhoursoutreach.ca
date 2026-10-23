@@ -25,6 +25,8 @@ import {
 } from "@/data/event-browser";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import ApplicationProgress from "./ApplicationProgress.astro";
+import SubmittedApplication from "./SubmittedApplication.astro";
+import { loadSubmittedApplication } from "@/server/db/profiles";
 import {
   isApplicationComplete,
   loadApplicationProgress,
@@ -64,6 +66,10 @@ const applicationProgress = showApplicationProgress
   : null;
 const incompleteApplication =
   applicationProgress && !isApplicationComplete(applicationProgress);
+const submission =
+  incompleteApplication && applicationProgress.submittedAt !== null && actor
+    ? await loadSubmittedApplication(env.DB, actor.id)
+    : null;
 const title = manage
   ? "Manage events"
   : incompleteApplication &&
@@ -210,7 +216,18 @@ const hasVisibleEvents = management
             userId={actor.id}
             idPrefix="events"
             {email}
-          />
+          >
+            <Fragment slot="application">
+              {submission ? (
+                <SubmittedApplication submission={submission} embedded />
+              ) : (
+                <p class="text-base">
+                  Your application form was submitted. The original submitted
+                  answers were not captured for this account.
+                </p>
+              )}
+            </Fragment>
+          </ApplicationProgress>
         </>
       )
     }
