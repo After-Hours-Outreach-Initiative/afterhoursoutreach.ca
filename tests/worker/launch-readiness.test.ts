@@ -173,7 +173,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
           await route.fulfill({ json: { success: true } });
         },
       );
-      await page.goto(`${origin}/events`);
+      await page.goto(`${origin}/volunteer`);
       await browserExpect(
         page.locator(
           '[data-application-awaiting-approval="true"] [data-application-tracker]',
@@ -192,7 +192,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
       await browserExpect.poll(() => contentType).toContain("application/json");
       await browserExpect(page.locator("[data-email-code]")).toBeVisible();
       await browserExpect(page).toHaveURL(
-        `${origin}/volunteer/sign-in?returnTo=%2Fevents`,
+        `${origin}/volunteer/sign-in?returnTo=%2Fvolunteer`,
       );
     } finally {
       await browser.close();
@@ -200,6 +200,14 @@ describe("launch readiness regressions", { concurrent: false }, () => {
   });
 
   test("the built Worker renders concurrent authenticated requests without empty pages", async () => {
+    await DB.batch([
+      DB.prepare(
+        "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",
+      ).bind(Date.now(), owner.id),
+      DB.prepare(
+        "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+      ).bind(owner.id),
+    ]);
     const paths = [
       "/",
       "/about",

@@ -1301,12 +1301,17 @@ test("orientation settings persist on series, future templates and individual ex
       "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id='bob'",
     )
     .run();
-  await changeSignup(
-    db,
-    { ...bob, patrolApproved: false },
-    events[1].id,
-    "join",
-  );
+  await db
+    .prepare("UPDATE profile SET naloxone_completed_at=? WHERE user_id=?")
+    .bind(Date.now(), bob.id)
+    .run();
+  const orientee = {
+    ...bob,
+    patrolApproved: false,
+    naloxoneCompleted: true,
+    applicationComplete: true,
+  };
+  await changeSignup(db, orientee, events[1].id, "join");
   const individual = {
     startsAt: new Date(events[1].startsAt).toISOString(),
     meetingPoint: data.meetingPoint,
@@ -1338,12 +1343,7 @@ test("orientation settings persist on series, future templates and individual ex
   assert.deepEqual(await all(series.id), booked);
   assert.equal(await count("patrol_series_template"), 0);
   assert.equal(await count("event_notification"), 0);
-  await changeSignup(
-    db,
-    { ...bob, patrolApproved: false },
-    events[1].id,
-    "cancel",
-  );
+  await changeSignup(db, orientee, events[1].id, "cancel");
   await updatePatrolSeriesFrom(
     db,
     organizer,
@@ -1381,9 +1381,7 @@ test("orientation settings persist on series, future templates and individual ex
   await ensurePatrolOccurrences(db);
   assert.equal((await findEvent(db, current.id)).includesOrientation, 1);
   assert.deepEqual(
-    (await listEvents(db, { ...bob, patrolApproved: false }))
-      .map((event) => event.id)
-      .sort(),
+    (await listEvents(db, orientee)).map((event) => event.id).sort(),
     [events[0].id, current.id].sort(),
   );
   assert.equal((await listEvents(db, alice)).length, 3);

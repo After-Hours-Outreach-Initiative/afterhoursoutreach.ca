@@ -4,11 +4,16 @@
   "account_id": "76222ab803494dc84947546283e1a63a",
   "preview_urls": true,
   "compatibility_date": "2026-08-16",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "main": "./src/worker.ts",
   "triggers": {
     // Daily discovery at 08:00 PST / 09:00 PDT, plus bounded hourly delivery/retries.
-    "crons": ["0 16 * * *", "30 * * * *"],
+    "crons": [
+      "0 16 * * *",
+      "30 * * * *"
+    ],
   },
   "assets": {
     "directory": "./dist",
@@ -17,9 +22,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "afterhoursoutreach",
-      // Replace with the production D1 ID before deploying; local builds use SQLite.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "afterhoursoutreach-production",
+      "database_id": "ca19de7e-de80-41a5-827a-7130c34ea3da",
       "migrations_dir": "drizzle",
       "remote": false,
     },
@@ -30,7 +34,10 @@
   },
   // Secret values are configured separately for each deployment target.
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET", "RESEND_API_KEY"],
+    "required": [
+      "BETTER_AUTH_SECRET",
+      "RESEND_API_KEY"
+    ],
   },
   "observability": {
     "enabled": true,

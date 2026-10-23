@@ -609,20 +609,15 @@ describe(
 
     test("application and edits round-trip through the real API", async () => {
       const beforeApplication = await send("/events", undefined, cookie);
-      assert.equal(beforeApplication.status, 200);
-      const prompt = await beforeApplication.text();
-      assert.match(prompt, /volunteer-application-warning/);
-      assert.match(prompt, /volunteer-warning-icon/);
-      assert.match(prompt, /volunteer-application-warning-arrow/);
-      assert.match(prompt, /Please complete your Volunteer Application/);
-      assert.match(
-        prompt,
-        /<a\b[^>]*class="volunteer-application-warning"[^>]*href="\/apply"/,
-      );
-      assert.doesNotMatch(
-        prompt,
-        /Continue application|Complete your profile before registering for events\./,
-      );
+      assert.equal(beforeApplication.status, 302);
+      assert.equal(beforeApplication.headers.get("location"), "/volunteer");
+      const applicationPortal = await send("/volunteer", undefined, cookie);
+      assert.equal(applicationPortal.status, 200);
+      const prompt = await applicationPortal.text();
+      assert.match(prompt, /data-application-tracker/);
+      assert.match(prompt, /href="\/apply"/);
+      assert.match(prompt, /Complete application form/);
+      assert.doesNotMatch(prompt, /data-event-list/);
       for (const input of [
         answers,
         { ...answers, codeOfConductAccepted: false },
@@ -650,10 +645,13 @@ describe(
       );
       assert.equal(response.status, 200, await response.clone().text());
       const submittedPortal = await send("/events", undefined, cookie);
-      assert.equal(submittedPortal.status, 200);
-      assert.doesNotMatch(
-        await submittedPortal.text(),
-        /volunteer-application-warning/,
+      assert.equal(submittedPortal.status, 302);
+      assert.equal(submittedPortal.headers.get("location"), "/volunteer");
+      const submittedProgress = await send("/volunteer", undefined, cookie);
+      assert.equal(submittedProgress.status, 200);
+      assert.match(
+        await submittedProgress.text(),
+        /Application Form Submitted/,
       );
       const acknowledgement = await DB.prepare(
         "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
@@ -1274,7 +1272,7 @@ describe(
         }
         await page.goto(`${origin}/volunteer/account`);
         await page
-          .getByRole("heading", { name: "Your account", exact: true })
+          .getByRole("heading", { name: "Account", exact: true })
           .waitFor();
         await expect(
           page.locator(
@@ -1577,12 +1575,19 @@ describe(
         await newPage
           .getByRole("button", { name: "Submit application" })
           .click();
+        // The local Worker fetch follows the pending-applicant redirect before
+        // fulfilling this intercepted navigation. API tests assert its Location.
         await expect(newPage).toHaveURL(`${origin}/events`);
-        await newPage
-          .getByRole("link", { name: "View Account", exact: true })
+        await expect(
+          newPage.locator("[data-application-tracker]"),
+        ).toBeVisible();
+        const newAccountMenu = newPage.locator("[data-account-menu]");
+        await newAccountMenu.locator("summary").click();
+        await newAccountMenu
+          .getByRole("link", { name: "Account", exact: true })
           .click();
         await newPage
-          .getByRole("heading", { name: "Your account", exact: true })
+          .getByRole("heading", { name: "Account", exact: true })
           .waitFor();
         assert.equal(
           await newPage.locator('[name="preferredName"]').inputValue(),

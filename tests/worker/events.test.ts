@@ -336,10 +336,10 @@ describe(
         );
       });
 
-      test("application approval gates listings and orientations independently of patrol approval", async () => {
+      test("application approval and Naloxone completion gate orientations independently of patrol approval", async () => {
         for (const person of [alice, bob]) {
           const page = await ok(
-            await send("/events", undefined, person.cookie),
+            await send("/volunteer", undefined, person.cookie),
           );
           const html = await page.text();
           assert.match(html, /Application Form Submitted/);
@@ -377,6 +377,12 @@ describe(
             ),
             409,
           );
+          await DB.prepare(
+            "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",
+          )
+            .bind(Date.now(), person.id)
+            .run();
+          await ok(await send("/api/v1/events", undefined, person.cookie), 403);
           await ok(await status(person.id, true, false));
           const events = await ok(
             await send("/api/v1/events", undefined, person.cookie),
@@ -392,13 +398,7 @@ describe(
             )?.[0] ?? "";
           assert.match(card(orientation.id), /class="btn btn-green"/);
           assert.match(card(orientation.id), /value="join"/);
-          assert.doesNotMatch(card(patrol.id), /data-live-signup/);
-          assert.equal(
-            card(patrol.id).match(
-              /Organizer approval is required to register for patrols\./g,
-            )?.length,
-            1,
-          );
+          assert.equal(card(patrol.id), "");
           await ok(await join(patrol.id, person.cookie), 403);
           const audit = await DB.prepare(
             "SELECT changed_fields FROM audit_log WHERE subject_id=? AND action='approval_changed'",
@@ -1500,7 +1500,7 @@ describe(
           await page.locator('[data-show-dialog="event-editor-new"]').click();
           await expect(
             dialog.getByLabel("Meeting point", { exact: true }),
-          ).toHaveValue("");
+          ).toHaveValue("Lord Strathcona Elementary");
           await expect(visible).toBeChecked();
           await visibilityChoices.getByText("Visible", { exact: true }).click();
           await fillDateInput(dialog, "startsAt", "2031-04-13T20:30");

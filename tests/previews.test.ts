@@ -36,7 +36,14 @@ test("the default environment does not use preview resources", () => {
   const config = readConfig({ config: configPath });
   assert.equal(config.name, "afterhoursoutreach-ca");
   assert.equal(config.vars.AUTH_BASE_URL, "https://afterhoursoutreach.ca");
-  assert.equal(config.d1_databases[0].database_name, "afterhoursoutreach");
+  assert.equal(
+    config.d1_databases[0].database_name,
+    "afterhoursoutreach-production",
+  );
+  assert.equal(
+    config.d1_databases[0].database_id,
+    "ca19de7e-de80-41a5-827a-7130c34ea3da",
+  );
   assert.equal(config.vars.APP_ENV, "production");
   assert.equal(config.d1_databases[0].remote, false);
   assert.notEqual(
