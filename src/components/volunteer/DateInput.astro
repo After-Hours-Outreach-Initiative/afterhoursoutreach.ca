@@ -1,5 +1,6 @@
 ---
 import FieldError from "@/components/FieldError.astro";
+import WarningIcon from "@/components/icons/WarningIcon.astro";
 import { dateParts, canonicalDate } from "@/data/date-input";
 import NativePickerInput from "./NativePickerInput.astro";
 
@@ -145,7 +146,8 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
         role="status"
         hidden
       >
-        The start date and time are in the past.
+        <WarningIcon class="volunteer-warning-icon" />
+        <span>The start date and time are in the past.</span>
       </p>
     )
   }

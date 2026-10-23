@@ -393,19 +393,14 @@ export async function savePatrolSeries(
       "A series' first date, local time and interval cannot change. Create a new series instead.",
     );
   if (!old) {
-    let first: number;
     try {
-      first = Date.parse(
-        vancouverInstant(`${data.firstDate}T${data.localTime}`),
-      );
+      vancouverInstant(`${data.firstDate}T${data.localTime}`);
     } catch {
       throw new RequestError(
         400,
         "Choose a valid, unambiguous first date and time.",
       );
     }
-    if (first <= now)
-      throw new RequestError(400, "Choose a future first patrol date.");
   }
   id ??= crypto.randomUUID();
   const values = [
