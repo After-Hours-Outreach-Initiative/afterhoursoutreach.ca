@@ -37,6 +37,7 @@ test("view versions detect capacity, signups, visibility and access changes with
     role: "volunteer",
     applicationSubmitted: true,
     applicationComplete: true,
+    naloxoneCompleted: true,
     applicationApproved: true,
     active: true,
     patrolApproved: false,
@@ -108,6 +109,20 @@ test("view versions detect capacity, signups, visibility and access changes with
   expect(
     await eventViewVersion([], { ...actor, applicationComplete: false }),
   ).not.toBe(await eventViewVersion([], actor));
+  const pendingApplicant = {
+    ...actor,
+    applicationApproved: false,
+    applicationComplete: false,
+    naloxoneCompleted: false,
+  };
+  const pendingVersion = await eventViewVersion([], pendingApplicant);
+  expect(pendingVersion).toMatch(/^[a-f0-9]{64}$/);
+  expect(
+    await eventViewVersion([], {
+      ...pendingApplicant,
+      naloxoneCompleted: true,
+    }),
+  ).not.toBe(pendingVersion);
   expect(
     await eventViewVersion([event], { ...actor, sessionId: "renewed" }),
   ).toBe(original);

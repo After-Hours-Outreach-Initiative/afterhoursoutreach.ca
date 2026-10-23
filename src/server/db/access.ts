@@ -61,6 +61,7 @@ export async function accountContext(
           application?.naloxone_completed_at?.getTime() ?? null,
         applicationApproved: status?.registration_approved ?? false,
       }),
+      naloxoneCompleted: Boolean(application?.naloxone_completed_at),
       active: status?.active ?? false,
       applicationApproved: status?.registration_approved ?? false,
       patrolApproved: status?.patrol_approved ?? false,

@@ -31,6 +31,7 @@ export async function eventViewVersion(
       role: actor.role,
       applicationSubmitted: actor.applicationSubmitted,
       applicationComplete: actor.applicationComplete,
+      naloxoneCompleted: actor.naloxoneCompleted,
       active: actor.active,
       applicationApproved: actor.applicationApproved,
       patrolApproved: actor.patrolApproved,
