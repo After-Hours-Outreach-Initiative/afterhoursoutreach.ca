@@ -1523,7 +1523,7 @@ describe(
             exact: true,
           });
           await filters
-            .getByRole("button", { name: "Includes orientation", exact: true })
+            .getByRole("button", { name: "Orientations", exact: true })
             .click();
           assert.equal(
             await page
@@ -1534,14 +1534,14 @@ describe(
             0,
           );
           await filters
-            .getByRole("button", { name: "All events", exact: true })
+            .getByRole("button", { name: "All", exact: true })
             .click();
           assert.equal(
             await page.locator("[data-live-event][hidden]").count(),
             0,
           );
           await filters
-            .getByRole("button", { name: "All events", exact: true })
+            .getByRole("button", { name: "All", exact: true })
             .click();
           assert.equal(
             await page.evaluate(
@@ -1600,7 +1600,7 @@ describe(
             exact: true,
           });
           await volunteerFilters
-            .getByRole("button", { name: "All events", exact: true })
+            .getByRole("button", { name: "All", exact: true })
             .click();
           await changeSpot("join", () =>
             card.getByText("Registered", { exact: true }).waitFor(),
@@ -1613,11 +1613,11 @@ describe(
           ).toBeFocused();
           await expect(page).toHaveURL(/\/events$/);
           await volunteerFilters
-            .getByRole("button", { name: "Includes orientation", exact: true })
+            .getByRole("button", { name: "Orientations", exact: true })
             .click();
           await expect(card).toBeHidden();
           await volunteerFilters
-            .getByRole("button", { name: "All events", exact: true })
+            .getByRole("button", { name: "All", exact: true })
             .click();
           await expect(card).toBeVisible();
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
@@ -1803,7 +1803,7 @@ describe(
           await changeSpot("cancel", () => card.waitFor({ state: "detached" }));
           await expect(
             volunteerFilters.getByRole("button", {
-              name: "All events",
+              name: "All",
               exact: true,
             }),
           ).toBeFocused();

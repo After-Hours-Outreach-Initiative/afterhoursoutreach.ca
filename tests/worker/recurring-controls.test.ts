@@ -357,7 +357,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await organizerPage.goBack();
     await expect(initialGroup).toBeHidden();
     await organizerPage
-      .getByRole("button", { name: "All events", exact: true })
+      .getByRole("button", { name: "All", exact: true })
       .click();
 
     // Settings and occurrence editors are independent: polling updates counts
@@ -500,7 +500,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       organizerPage.locator("[data-event-list] > [data-live-event]"),
     ).toBeHidden();
     await organizerPage
-      .getByRole("button", { name: "Includes orientation", exact: true })
+      .getByRole("button", { name: "Orientations", exact: true })
       .click();
     await expect(uiGroup).toBeVisible();
     await expect(initialGroup).toBeHidden();
