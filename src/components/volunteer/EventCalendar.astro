@@ -35,7 +35,9 @@ const weekdays = [
         >{
           weekdays.map((day) => (
             <th scope="col" aria-label={day}>
-              <abbr title={day}>{day.slice(0, 1)}</abbr>
+              <abbr class="font-bold text-white" title={day}>
+                {day.slice(0, 1)}
+              </abbr>
             </th>
           ))
         }</tr
