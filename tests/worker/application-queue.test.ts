@@ -64,6 +64,9 @@ test("organizers review submitted applications with a global queue count and per
         ).bind(id, pendingIds.includes(id) ? 0 : 1),
       ]);
     }
+    await DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='approved'",
+    ).run();
     const submittedAt = "2026-09-15T18:30:00.000Z";
     await DB.prepare(
       "UPDATE profile SET registered_at=?, code_of_conduct_version='2026-09-01', code_of_conduct_accepted_at=? WHERE user_id='applicant-50'",

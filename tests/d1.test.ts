@@ -1071,6 +1071,8 @@ test("orientees only see orientation events and rosters; patrol approval and org
     .run();
   const orientee = {
     ...incompleteOrientee,
+    naloxoneCompleted: true,
+    naloxoneCompletedAt: 0,
     applicationComplete: isApplicationComplete(
       await loadApplicationProgress(env.DB, actor.id),
     ),
@@ -1167,6 +1169,9 @@ test("concurrent first-orientation signups reserve one booking; cancellation and
   const actor = {
     ...(await draftActor("orientation-volunteer")),
     applicationSubmitted: true,
+    applicationComplete: true,
+    naloxoneCompleted: true,
+    naloxoneCompletedAt: 0,
     applicationApproved: true,
     active: true,
   };
@@ -1176,8 +1181,8 @@ test("concurrent first-orientation signups reserve one booking; cancellation and
       `INSERT INTO profile (
       user_id, preferred_name, phone, birth_date, emergency_contact_name,
       emergency_contact_phone, emergency_contact_relationship, heard_about_us,
-      motivation, teams, medical_certification, training_experience, registered_at, updated_at
-    ) VALUES (?, 'Volunteer', '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', '[]', 'None', 'None', 0, 0)`,
+      motivation, teams, medical_certification, training_experience, registered_at, naloxone_completed_at, updated_at
+    ) VALUES (?, 'Volunteer', '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', '[]', 'None', 'None', 0, 0, 0)`,
     ).bind(actor.id),
     env.DB.prepare(
       "INSERT INTO volunteer_status (user_id, registration_approved, updated_at) VALUES (?, 1, 0)",
