@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { formatTimeInput } from "../../src/data/event-time";
 
 export async function fillDateInput(
   scope: Page | Locator,
@@ -15,5 +16,5 @@ export async function fillDateInput(
       await group.locator(`[data-date-part="${part}"]`).fill(answer ?? "");
   }
   if (time !== undefined)
-    await group.locator("[data-date-time-input]").fill(time);
+    await group.locator("[data-date-time-input]").fill(formatTimeInput(time));
 }

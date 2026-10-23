@@ -56,23 +56,18 @@ export function recurringCancelAction(values: FormData) {
     : null;
 }
 
-export function seriesEndAction(values: FormData) {
-  const item = JSON.parse(str(values, "series"));
+export function seriesSaveAction(values: FormData) {
+  const start = str(values, "startsAt");
   return {
     action: "save-series",
     id: str(values, "seriesId"),
     version: Number(values.get("version")),
     series: {
-      firstDate: item.firstDate,
-      localTime: item.localTime,
-      intervalWeeks: item.intervalWeeks,
+      ...eventFields(values),
+      firstDate: start.slice(0, 10),
+      localTime: start.slice(11, 16),
+      intervalWeeks: Number(values.get("intervalWeeks")),
       endDate: str(values, "endDate") || null,
-      meetingPoint: item.meetingPoint,
-      meetingPointUrl: item.meetingPointUrl ?? "",
-      spots: item.spots,
-      includesOrientation: Boolean(item.includesOrientation),
-      open: Boolean(item.open),
-      hidden: Boolean(item.hidden),
     },
   };
 }
@@ -117,7 +112,7 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     update();
   }
   for (const form of root.querySelectorAll<HTMLFormElement>(
-    "[data-event-save]",
+    "[data-event-save], [data-series-save]",
   )) {
     if (form.dataset.submitting) continue;
     const orientation = form.querySelector<HTMLInputElement>(
@@ -184,7 +179,7 @@ export function syncSeriesControls(
     return false;
   const savedSettings =
     current.contains(element ?? null) &&
-    element?.matches("[data-series-end], [data-series-stop]");
+    element?.matches("[data-series-save], [data-event-delete]");
   if (
     (current.open && !savedSettings) ||
     [...current.querySelectorAll('[data-submitting="true"]')].some(

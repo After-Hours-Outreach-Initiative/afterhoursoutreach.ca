@@ -5,12 +5,13 @@ import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
 import { chooseNotification } from "./notification-choice";
+import { confirmEventDeletion } from "./event-deletion";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
   initRecurrenceControls,
   recurringSaveAction,
   recurringCancelAction,
-  seriesEndAction,
+  seriesSaveAction,
   syncSeriesControls,
   eventEmailPrompt,
 } from "./event-recurrence";
@@ -38,7 +39,7 @@ function initEventDates(root: Document | HTMLElement) {
   initDateInputs(root);
   initRecurrenceControls(root);
   for (const form of root.querySelectorAll<HTMLFormElement>(
-    "[data-event-save]:not([data-submitting])",
+    "[data-event-save]:not([data-submitting]), [data-series-save]:not([data-submitting])",
   )) {
     const button = submitButton(form);
     if (button) button.disabled = false;
@@ -301,7 +302,11 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           availability.replaceWith(document.importNode(nextAvailability, true));
         // Signup counts can change while an editor is open. Refresh only email
         // eligibility; leave the organizer's fields, reason and scope draft intact.
-        for (const selector of ["[data-event-save]", "[data-event-cancel]"]) {
+        for (const selector of [
+          "[data-event-save]",
+          "[data-event-cancel]",
+          "[data-event-delete]",
+        ]) {
           const form = card.querySelector(selector);
           const nextForm = updated.querySelector(selector);
           if (!form || !nextForm) continue;
@@ -340,7 +345,8 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     for (const card of previous.values()) {
       if (
         protectedEvent(card) ||
-        card.querySelector("[data-live-series][open]")
+        (card.querySelector("[data-live-series][open]") &&
+          !card.contains(element ?? null))
       )
         deferredEventRefresh = true;
       else card.remove();
@@ -368,11 +374,9 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
             (card) => card.dataset.seriesCard === seriesId,
           )
         : added;
-    const seriesForm = [
-      "data-series-end",
-      "data-series-stop",
-      "data-series-occurrence",
-    ].find((attribute) => element?.hasAttribute(attribute));
+    const seriesForm = ["data-series-save", "data-series-occurrence"].find(
+      (attribute) => element?.hasAttribute(attribute),
+    );
     const selector =
       element?.matches("[data-live-signup]") ||
       (!element && focused?.closest("[data-live-signup]"))
@@ -631,7 +635,7 @@ function form(
       element.closest<HTMLElement>("[data-volunteer-controls], dialog") ??
       element;
     if (scope.dataset.submitting) return;
-    if (element.matches("[data-event-save]")) {
+    if (element.matches("[data-event-save], [data-series-save]")) {
       initEventDates(element);
       readDateInputs(element);
       if (!element.reportValidity()) return;
@@ -651,17 +655,19 @@ function form(
     const loading = element.querySelector<HTMLElement>("[data-action-loading]");
     const label = button?.textContent;
     const loadingLabel = loading?.textContent;
-    const resultTitle = element.matches("[data-series-end], [data-series-stop]")
-      ? "Patrol series saved"
-      : element.matches("[data-event-save]")
-        ? "Event saved"
-        : element.matches("[data-event-cancel]")
-          ? "Event cancelled"
-          : element.matches("[data-manage-signup]")
-            ? "Registration changed"
-            : element.matches("[data-organizer-role]")
-              ? "Account role saved"
-              : "Volunteer access saved";
+    const resultTitle = element.matches("[data-event-delete]")
+      ? "Deleted"
+      : element.matches("[data-series-save]")
+        ? "Patrol series saved"
+        : element.matches("[data-event-save]")
+          ? "Event saved"
+          : element.matches("[data-event-cancel]")
+            ? "Event cancelled"
+            : element.matches("[data-manage-signup]")
+              ? "Registration changed"
+              : element.matches("[data-organizer-role]")
+                ? "Account role saved"
+                : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -669,6 +675,11 @@ function form(
     }
     let saved = false;
     try {
+      if (
+        element.matches("[data-event-delete]") &&
+        !(await confirmEventDeletion(element.dataset.eventDelete ?? "event"))
+      )
+        return;
       let notify: boolean | undefined;
       const prompt = eventEmailPrompt(
         values,
@@ -820,13 +831,11 @@ form(
       reason: str(v, "reason"),
     },
 );
-form("[data-series-end]", "/api/v1/events/action", seriesEndAction);
-form("[data-series-stop]", "/api/v1/events/action", (v) => ({
-  action: "stop-series",
-  id: str(v, "seriesId"),
+form("[data-series-save]", "/api/v1/events/action", seriesSaveAction);
+form("[data-event-delete]", "/api/v1/events/action", (v) => ({
+  action: str(v, "action"),
+  id: str(v, "id"),
   version: Number(v.get("version")),
-  occurrenceDate: str(v, "occurrenceDate"),
-  reason: str(v, "reason"),
 }));
 form(
   "[data-series-occurrence]",

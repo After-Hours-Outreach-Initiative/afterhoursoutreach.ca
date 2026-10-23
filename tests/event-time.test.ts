@@ -1,6 +1,30 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { vancouverInput, vancouverInstant } from "../src/data/event-time";
+import {
+  formatEventDate,
+  formatTimeInput,
+  parseTimeInput,
+  vancouverInput,
+  vancouverInstant,
+} from "../src/data/event-time";
+
+test("event times explicitly use AM/PM and round-trip noon, midnight and minutes", () => {
+  for (const [canonical, display] of [
+    ["00:00", "12:00 AM"],
+    ["12:00", "12:00 PM"],
+    ["20:31", "8:31 PM"],
+  ]) {
+    assert.equal(formatTimeInput(canonical), display);
+    assert.equal(parseTimeInput(display), canonical);
+  }
+  assert.equal(parseTimeInput(" 08:31 pm "), "20:31");
+  for (const value of ["20:31", "0:00 AM", "13:00 PM", "9:60 PM", ""])
+    assert.equal(parseTimeInput(value), "");
+  assert.match(
+    formatEventDate(Date.parse("2030-07-03T03:30:00Z")),
+    /8:30\s*p\.?m\.?/i,
+  );
+});
 
 test("event calendar inputs always use Vancouver time", () => {
   assert.equal(

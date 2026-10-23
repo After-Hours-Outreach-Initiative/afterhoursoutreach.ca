@@ -99,16 +99,6 @@ const blocked =
         }
         {event.confirmed} of {event.spots} spots taken
       </p>
-      {
-        organizer && series && (
-          <p class="volunteer-help">
-            Recurring patrol · nominal date {event.occurrenceDate}
-            {!event.inSignupWindow && !event.cancelledAt && future
-              ? " · Outside the volunteer signup window"
-              : ""}
-          </p>
-        )
-      }
       {!organizer && !event.signedUp && blocked && <p>{blocked}</p>}
     </div>
     <EventAttendance event={event} />
@@ -151,6 +141,32 @@ const blocked =
           >
             Edit
           </button>
+        )
+      }
+      {
+        organizer && (
+          <form
+            data-event-delete={event.seriesId ? "occurrence" : "event"}
+            data-email-prompt={
+              future && !event.cancelledAt && event.confirmed > 0
+                ? "event-cancel"
+                : undefined
+            }
+            action="/api/v1/events/action"
+            method="post"
+          >
+            <input type="hidden" name="action" value="delete-event" />
+            <input type="hidden" name="id" value={event.id} />
+            <input type="hidden" name="version" value={event.updatedAt} />
+            <button
+              class="btn btn-quiet"
+              type="submit"
+              data-loading-label="Deleting…"
+            >
+              {event.seriesId ? "Delete occurrence" : "Delete"}
+            </button>
+            <p data-form-message role="status" hidden />
+          </form>
         )
       }
     </div>

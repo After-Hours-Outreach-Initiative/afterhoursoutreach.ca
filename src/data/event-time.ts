@@ -7,7 +7,23 @@ export function formatEventDate(instant: number) {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   }).format(new Date(instant));
+}
+
+/** Display and accept explicit AM/PM, independent of the browser's clock locale. */
+export function formatTimeInput(time: string) {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return "";
+  const hour = Number(time.slice(0, 2));
+  return `${hour % 12 || 12}:${time.slice(3)} ${hour < 12 ? "AM" : "PM"}`;
+}
+
+export function parseTimeInput(value: string) {
+  const match = /^(0?[1-9]|1[0-2]):([0-5]\d)\s*([ap])m$/i.exec(value.trim());
+  if (!match) return "";
+  const hour =
+    (Number(match[1]) % 12) + (match[3].toLowerCase() === "p" ? 12 : 0);
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
 }
 
 /** Calendar inputs always mean America/Vancouver, never the device time zone. */

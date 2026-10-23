@@ -8,6 +8,8 @@ import { readJson, RequestError, errorResponse } from "@/server/http";
 import {
   saveEvent,
   cancelEvent,
+  deleteEvent,
+  deletePatrolSeries,
   changeSignup,
   manageSignup,
   eventSchema,
@@ -24,6 +26,12 @@ import { orientationCapacityMessage } from "@/server/db/policy";
 const id = z.string().min(1).max(200);
 const reason = z.string().trim().max(1000).default("");
 const inputSchema = z.discriminatedUnion("action", [
+  z.strictObject({
+    action: z.enum(["delete-event", "delete-series"]),
+    id,
+    version: z.number().int().nonnegative(),
+    notify: z.boolean().default(false),
+  }),
   z.strictObject({
     action: z.literal("save-series"),
     id: id.optional(),
@@ -106,6 +114,24 @@ export const POST: APIRoute = async ({ request }) => {
     );
     let result: { operation?: string; message: string; id?: string };
     switch (input.action) {
+      case "delete-event":
+        result = await deleteEvent(
+          env.DB,
+          actor,
+          input.id,
+          input.version,
+          input.notify,
+        );
+        break;
+      case "delete-series":
+        result = await deletePatrolSeries(
+          env.DB,
+          actor,
+          input.id,
+          input.version,
+          input.notify,
+        );
+        break;
       case "save-series":
         result = await savePatrolSeries(
           env.DB,

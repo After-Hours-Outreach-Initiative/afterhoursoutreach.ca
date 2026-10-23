@@ -3,6 +3,7 @@ import FieldError from "@/components/FieldError.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
 import { dateParts, canonicalDate } from "@/data/date-input";
 import NativePickerInput from "./NativePickerInput.astro";
+import { formatTimeInput } from "@/data/event-time";
 
 interface Props {
   name: string;
@@ -17,6 +18,7 @@ interface Props {
   defaultTime?: string;
   warnPast?: boolean;
   errorField?: string;
+  readonly?: boolean;
 }
 const {
   name,
@@ -31,6 +33,7 @@ const {
   defaultTime = "",
   warnPast = false,
   errorField = name,
+  readonly = false,
 } = Astro.props;
 const parts = dateParts(withTime ? value.split("T")[0] : value);
 const date = canonicalDate(parts);
@@ -102,7 +105,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
         aria-describedby={describedBy}
         value={date}
         required={required && active}
-        readonly={!active}
+        readonly={!active || readonly}
         autocomplete="off"
       />
     )
@@ -111,7 +114,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
     withTime && (
       <div class="volunteer-field">
         <label for={`${id}-time`}>
-          Start time
+          {readonly ? "Start time (fixed)" : "Start time"}
           {required && (
             <span class="volunteer-required" aria-hidden="true">
               {" "}
@@ -122,8 +125,10 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
         <input
           id={`${id}-time`}
           data-date-time-input
-          type="time"
-          value={time}
+          type="text"
+          value={formatTimeInput(time)}
+          placeholder="9:00 PM"
+          readonly={!active || readonly}
           required={required && active}
           aria-describedby={describedBy}
         />
