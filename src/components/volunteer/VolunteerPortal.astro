@@ -23,6 +23,8 @@ import {
   groupManagementEvents,
 } from "@/data/event-browser";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
+import NaloxoneCourseStep from "./NaloxoneCourseStep.astro";
+import { loadNaloxoneCompletion } from "@/server/db/naloxone";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
@@ -57,6 +59,13 @@ const events = await listEvents(
 const management = manage && organizer;
 const series = management && actor ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
+const showNaloxoneStep =
+  !manage &&
+  actor?.applicationSubmitted &&
+  (!actor.twoFactorEnabled || actor.twoFactorVerified);
+const naloxoneCompletedAt = showNaloxoneStep
+  ? await loadNaloxoneCompletion(env.DB, actor.id)
+  : null;
 const rosters =
   management && actor
     ? await listRosters(
@@ -179,9 +188,11 @@ const hasVisibleEvents = management
         <section class="volunteer-panel">
           <h2>Welcome to After Hours Outreach</h2>
           <p>
-            Thanks for your interest in volunteering. Complete your application
-            so an organizer can review it. Once approved, you can view upcoming
-            events and sign up for an orientation.
+            Thanks for your interest in volunteering. First submit your
+            application form and Code of Conduct, then complete Naloxone 101 and
+            confirm it on your account. An organizer will review your
+            application. Once approved, you can view upcoming events and sign up
+            for an orientation.
           </p>
           <a class="volunteer-application-warning" href="/apply">
             <WarningIcon class="volunteer-warning-icon" />
@@ -231,6 +242,7 @@ const hasVisibleEvents = management
             <strong>{email}</strong> to let you know whether it's approved and
             what to do next.
           </p>
+          <p>Step 1: Application form submitted.</p>
           <p>You can see your submitted application on the account page.</p>
           <a class="btn btn-outline mt-6" href="/volunteer/account">
             View Account
@@ -238,6 +250,15 @@ const hasVisibleEvents = management
           </a>
         </section>
       ) : null
+    }
+    {
+      showNaloxoneStep && (
+        <NaloxoneCourseStep
+          userId={actor.id}
+          completedAt={naloxoneCompletedAt}
+          idPrefix="events-naloxone"
+        />
+      )
     }
     {
       !eventAccess && (

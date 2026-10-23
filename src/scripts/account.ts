@@ -302,6 +302,26 @@ form("[data-account-profile]", async (element, values) => {
   return result.answers;
 });
 
+form("[data-naloxone-confirm]", async (element, values) => {
+  const checkbox =
+    element.querySelector<HTMLInputElement>('[name="completed"]')!;
+  checkbox.disabled = true;
+  let saved = false;
+  try {
+    const result = await post("/api/v1/account/naloxone", {
+      userId: element.dataset.naloxoneUserId,
+      completed: values.get("completed") === "true",
+    });
+    saved = true;
+    checkbox.checked = true;
+    element.querySelector<HTMLButtonElement>('button[type="submit"]')!.hidden =
+      true;
+    message(element, result.message!, "success");
+  } finally {
+    checkbox.disabled = saved;
+  }
+});
+
 function closeEmailEditor(settings: HTMLElement) {
   const restoreFocus =
     settings.contains(document.activeElement) ||

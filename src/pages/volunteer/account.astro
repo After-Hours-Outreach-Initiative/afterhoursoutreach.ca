@@ -5,6 +5,8 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
+import NaloxoneCourseStep from "@/components/volunteer/NaloxoneCourseStep.astro";
+import { loadNaloxoneCompletion } from "@/server/db/naloxone";
 import PageContents from "@/components/volunteer/PageContents.astro";
 import FieldError from "@/components/FieldError.astro";
 import { accountGreeting } from "@/data/account-navigation";
@@ -31,6 +33,7 @@ import {
 export const prerender = false;
 let values: ApplicationAnswers | null = null;
 let submission: Awaited<ReturnType<typeof loadSubmittedApplication>> = null;
+let naloxoneCompletedAt: number | null = null;
 let accountCreatedAt: Date | null = null;
 let firstOrientationAt: Date | null = null;
 const accountDate = new Intl.DateTimeFormat("en-CA", {
@@ -63,6 +66,7 @@ try {
   values = await loadProfile(env.DB, current.user.id);
   if (!values) return Astro.redirect("/apply");
   submission = await loadSubmittedApplication(env.DB, current.user.id);
+  naloxoneCompletedAt = await loadNaloxoneCompletion(env.DB, current.user.id);
   accountCreatedAt = current.user.createdAt;
   firstOrientationAt = await loadFirstCompletedOrientation(
     env.DB,
@@ -127,6 +131,7 @@ const contents = [
         },
       ]
     : []),
+  { id: "account-naloxone-heading", heading: "Naloxone 101" },
   { id: "account-settings-heading", heading: "Account settings" },
   { id: "account-email-heading", heading: "Email address", nested: true },
   {
@@ -200,6 +205,11 @@ const contents = [
         <AccountProfileForm values={values} userId={userId} />
       </section>
       <SubmittedApplication submission={submission} />
+      <NaloxoneCourseStep
+        userId={userId}
+        completedAt={naloxoneCompletedAt}
+        idPrefix="account-naloxone"
+      />
       <section class="volunteer-panel">
         <h2 id="account-settings-heading" data-contents-section>
           Account settings
