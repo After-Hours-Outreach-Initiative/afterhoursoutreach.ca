@@ -9,6 +9,17 @@ export interface ApplicationProgress {
   orientationCompletedAt: number | null;
 }
 
+/** Match the tracker's four milestones, including signup or recorded attendance. */
+export function isApplicationComplete(progress: ApplicationProgress): boolean {
+  return (
+    progress.submittedAt !== null &&
+    progress.naloxoneCompletedAt !== null &&
+    progress.applicationApproved &&
+    (progress.orientationSignedUpAt !== null ||
+      progress.orientationCompletedAt !== null)
+  );
+}
+
 export async function loadApplicationProgress(
   db: Env["DB"],
   userId: string,

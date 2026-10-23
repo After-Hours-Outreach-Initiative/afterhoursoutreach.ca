@@ -674,37 +674,11 @@ describe(
       assert.match(html, /Worker Test Volunteer/);
       assert.match(html, /aria-label="Volunteer account"/);
       assert.match(html, /Sample private answer/);
-      assert.match(
+      assert.doesNotMatch(
         html,
-        /<h2\b[^>]*id="submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/h2>/,
+        /submitted-application-heading|data-submitted-application|data-application-tracker|data-naloxone-confirm|account-naloxone-heading/,
       );
-      assert.match(
-        html,
-        /<a\b[^>]*href="#submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/a>/,
-      );
-      assert.doesNotMatch(html, /Submitted application/);
-      const snapshot = await DB.prepare(
-        "SELECT submitted_application FROM profile WHERE user_id=?",
-      )
-        .bind(current.user.id)
-        .first<string>("submitted_application");
-      assert.ok(snapshot);
-      const submission = JSON.parse(snapshot) as SubmittedApplication;
-      const timestamp = html.match(
-        /<p>\s*Submitted:\s*<time datetime="([^"]+)">\s*([^<]+?)\s*<\/time>\s*<\/p>/,
-      );
-      assert.ok(timestamp);
-      assert.equal(timestamp[1], submission.submittedAt);
-      assert.equal(
-        timestamp[2].replace(/\s+/g, " "),
-        new Date(submission.submittedAt)
-          .toLocaleString("en-CA", {
-            timeZone: "America/Vancouver",
-            timeZoneName: "short",
-          })
-          .replace(/\s+/g, " "),
-      );
-      assert.match(html, /Why do you want to volunteer\?/);
+      assert.doesNotMatch(html, /Why do you want to volunteer\?/);
       assert.doesNotMatch(
         html.match(/<form\b[^>]*data-account-profile[\s\S]*?<\/form>/)![0],
         /How did you find out about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
@@ -751,6 +725,74 @@ describe(
         ).status,
         403,
       );
+    });
+
+    test("account application information appears only when all tracker milestones are complete and stays read-only", async () => {
+      await DB.batch([
+        DB.prepare(
+          "UPDATE profile SET naloxone_completed_at=1000 WHERE user_id=?",
+        ).bind(current.user.id),
+        DB.prepare(
+          "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+        ).bind(current.user.id),
+        DB.prepare(
+          `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
+          VALUES ('account-complete-orientation', 'orientation', ?, 'Meeting point', 4, ?, 0, 0)`,
+        ).bind(Date.now() + 86_400_000, current.user.id),
+      ]);
+      const pending = await send("/volunteer/account", undefined, cookie);
+      assert.equal(pending.status, 200);
+      assert.doesNotMatch(
+        await pending.text(),
+        /submitted-application-heading|data-submitted-application|data-application-tracker|data-naloxone-confirm|account-naloxone-heading/,
+      );
+      await DB.prepare(
+        `INSERT INTO signup (id, event_id, user_id, created_at, updated_at)
+        VALUES ('account-complete-signup', 'account-complete-orientation', ?, 2000, 2000)`,
+      )
+        .bind(current.user.id)
+        .run();
+      const page = await send("/volunteer/account", undefined, cookie);
+      assert.equal(page.status, 200);
+      const html = await page.text();
+      assert.match(
+        html,
+        /<h2\b[^>]*id="submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/h2>/,
+      );
+      assert.match(
+        html,
+        /<a\b[^>]*href="#submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/a>/,
+      );
+      assert.match(html, /Naloxone 101 completion \(self-reported\)/);
+      assert.match(html, /Application approved/);
+      assert.match(html, /Date not recorded/);
+      assert.match(html, /Orientation registered/);
+      assert.doesNotMatch(
+        html,
+        /data-application-tracker|data-naloxone-confirm|account-naloxone-heading|Current step|Not started|Take Naloxone 101|View orientations/,
+      );
+      const snapshot = await DB.prepare(
+        "SELECT submitted_application FROM profile WHERE user_id=?",
+      )
+        .bind(current.user.id)
+        .first<string>("submitted_application");
+      assert.ok(snapshot);
+      const submission = JSON.parse(snapshot) as SubmittedApplication;
+      const timestamp = html.match(
+        /<p>\s*Submitted:\s*<time datetime="([^"]+)">\s*([^<]+?)\s*<\/time>\s*<\/p>/,
+      );
+      assert.ok(timestamp);
+      assert.equal(timestamp[1], submission.submittedAt);
+      assert.equal(
+        timestamp[2].replace(/\s+/g, " "),
+        new Date(submission.submittedAt)
+          .toLocaleString("en-CA", {
+            timeZone: "America/Vancouver",
+            timeZoneName: "short",
+          })
+          .replace(/\s+/g, " "),
+      );
+      assert.match(html, /Why do you want to volunteer\?/);
     });
 
     test("submitted applications stay private and legacy profile edits do not invent an original snapshot", async () => {
@@ -818,6 +860,35 @@ describe(
       assert.doesNotMatch(
         ownHTML,
         /Legacy motivation|Changed legacy name|Legacy private answer/,
+      );
+      await DB.batch([
+        DB.prepare(
+          "UPDATE profile SET naloxone_completed_at=0 WHERE user_id=?",
+        ).bind(legacy.user.id),
+        DB.prepare(
+          `INSERT INTO volunteer_status (user_id, active, registration_approved, updated_at)
+          VALUES (?, 1, 1, 0) ON CONFLICT(user_id) DO UPDATE SET registration_approved=1`,
+        ).bind(legacy.user.id),
+        DB.prepare(
+          `INSERT INTO signup (id, event_id, user_id, created_at, updated_at)
+          VALUES ('legacy-complete-signup', 'account-complete-orientation', ?, 0, 0)`,
+        ).bind(legacy.user.id),
+      ]);
+      const completedLegacy = await send(
+        "/volunteer/account",
+        undefined,
+        legacyCookie,
+      );
+      assert.equal(completedLegacy.status, 200);
+      const completedLegacyHTML = await completedLegacy.text();
+      assert.match(completedLegacyHTML, /submitted-application-heading/);
+      assert.match(
+        completedLegacyHTML,
+        /The original submitted answers were not captured for this account/,
+      );
+      assert.doesNotMatch(
+        completedLegacyHTML,
+        /data-submitted-application|View submitted application|data-application-tracker|data-naloxone-confirm/,
       );
     });
 

@@ -26,7 +26,10 @@ import {
   saveProfile,
 } from "../src/server/db/profiles";
 import { codeOfConductVersion } from "../src/data/code-of-conduct";
-import { loadApplicationProgress } from "../src/server/db/application-progress";
+import {
+  isApplicationComplete,
+  loadApplicationProgress,
+} from "../src/server/db/application-progress";
 import type { Actor } from "../src/server/db/access";
 import {
   applicationDraftAnswersSchema,
@@ -915,6 +918,7 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   assert.equal(undated.naloxoneCompletedAt, confirmedAt);
   assert.equal(undated.applicationApproved, true);
   assert.equal(undated.applicationApprovedAt, null);
+  assert.equal(isApplicationComplete(undated), false);
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
@@ -933,13 +937,22 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   const booked = await loadApplicationProgress(env.DB, actor.id);
   assert.equal(booked.applicationApprovedAt, 2000);
   assert.equal(booked.orientationSignedUpAt, 4000);
+  assert.equal(isApplicationComplete(booked), true);
+  assert.equal(isApplicationComplete({ ...booked, submittedAt: null }), false);
+  assert.equal(
+    isApplicationComplete({ ...booked, naloxoneCompletedAt: null }),
+    false,
+  );
+  assert.equal(
+    isApplicationComplete({ ...booked, applicationApprovedAt: null }),
+    true,
+  );
   await env.DB.prepare(
     "UPDATE signup SET status='cancelled' WHERE id='progress-signup'",
   ).run();
-  assert.equal(
-    (await loadApplicationProgress(env.DB, actor.id)).orientationSignedUpAt,
-    null,
-  );
+  const cancelled = await loadApplicationProgress(env.DB, actor.id);
+  assert.equal(cancelled.orientationSignedUpAt, null);
+  assert.equal(isApplicationComplete(cancelled), false);
   await env.DB.batch([
     env.DB.prepare(
       "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
@@ -956,6 +969,11 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   assert.equal(completed.applicationApproved, false);
   assert.equal(completed.applicationApprovedAt, null);
   assert.equal(completed.orientationCompletedAt, 1000);
+  assert.equal(isApplicationComplete(completed), false);
+  assert.equal(
+    isApplicationComplete({ ...completed, applicationApproved: true }),
+    true,
+  );
 });
 
 test("first completed orientation uses the earliest attended event, not when attendance was recorded", async () => {

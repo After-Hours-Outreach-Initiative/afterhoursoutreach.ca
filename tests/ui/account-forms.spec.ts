@@ -677,29 +677,14 @@ test("account contents navigate profile and settings sections on desktop and mob
         exact: true,
         includeHidden: true,
       }),
-    ).toHaveCount(2);
-    const submission = page.getByRole("region", {
-      name: "Volunteer Application",
-      exact: true,
-    });
+    ).toHaveCount(0);
     await expect(
-      submission.getByRole("heading", { name: "Volunteer Application" }),
-    ).toBeVisible();
-    const submitted = submission.locator("#submitted-application-heading + p");
-    const timestamp = submitted.locator("time");
-    await expect(timestamp).toBeVisible();
-    const submittedAt = await timestamp.getAttribute("datetime");
-    expect(submittedAt).toMatch(/^\d{4}-\d{2}-\d{2}T.+Z$/);
-    await expect(submitted).toHaveText(
-      `Submitted: ${new Date(submittedAt!).toLocaleString("en-CA", {
-        timeZone: "America/Vancouver",
-        timeZoneName: "short",
-      })}`,
-    );
-    await expect(submission.locator("details")).not.toHaveAttribute("open");
+      page.locator(
+        "#submitted-application-heading, [data-submitted-application], [data-application-tracker], [data-naloxone-confirm], #account-naloxone-heading",
+      ),
+    ).toHaveCount(0);
     for (const [id, heading] of [
       ["account-profile-emergency-contact", "Emergency contact"],
-      ["submitted-application-heading", "Volunteer Application"],
       ["account-sessions-heading", "Sessions"],
     ]) {
       if (width < 1024) await summary.click();
@@ -1526,18 +1511,22 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
   await expect(birthDate).toHaveCount(0);
-  const submission = page.locator("[data-submitted-application]");
-  await submission
-    .getByText("View submitted application", { exact: true })
-    .click();
-  await expect(submission.getByText(cutoff, { exact: true })).toBeVisible();
+  await expect(page.locator("[data-submitted-application]")).toHaveCount(0);
+  expect(
+    await form.evaluate(
+      (element) =>
+        JSON.parse(element.getAttribute("data-profile-baseline")!).birthDate,
+    ),
+  ).toBe(cutoff);
   expect(requests).toHaveLength(1);
   await page.reload();
   await expect(birthDate).toHaveCount(0);
-  await submission
-    .getByText("View submitted application", { exact: true })
-    .click();
-  await expect(submission.getByText(cutoff, { exact: true })).toBeVisible();
+  expect(
+    await form.evaluate(
+      (element) =>
+        JSON.parse(element.getAttribute("data-profile-baseline")!).birthDate,
+    ),
+  ).toBe(cutoff);
 });
 
 test("the application requires JavaScript and renders blank DOB format guidance", async ({
@@ -2344,23 +2333,18 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   });
   await form.evaluate((element: HTMLFormElement) => element.requestSubmit());
   expect(requests).toEqual([]);
-  const submission = page.locator("[data-submitted-application]");
-  await submission
-    .getByText("View submitted application", { exact: true })
-    .click();
-  for (const [field, label] of [
-    ["firstName", "First name"],
-    ["middleNames", "Middle name(s)"],
-    ["lastName", "Last name"],
-    ["birthDate", "Date of birth"],
+  await expect(page.locator("[data-submitted-application]")).toHaveCount(0);
+  const baseline = await form.evaluate((element) =>
+    JSON.parse(element.getAttribute("data-profile-baseline")!),
+  );
+  for (const field of [
+    "firstName",
+    "middleNames",
+    "lastName",
+    "birthDate",
   ] as const) {
     await expect(form.locator(`[name="${field}"]`)).toHaveCount(0);
-    await expect(
-      submission
-        .locator("dl > div")
-        .filter({ has: page.getByText(label, { exact: true }) })
-        .locator("dd"),
-    ).toHaveText(sampleAnswers[field]);
+    expect(baseline[field]).toBe(sampleAnswers[field]);
   }
   await expect(
     form.locator(

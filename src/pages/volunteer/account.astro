@@ -5,8 +5,10 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
-import ApplicationProgress from "@/components/volunteer/ApplicationProgress.astro";
-import { loadApplicationProgress } from "@/server/db/application-progress";
+import {
+  isApplicationComplete,
+  loadApplicationProgress,
+} from "@/server/db/application-progress";
 import PageContents from "@/components/volunteer/PageContents.astro";
 import FieldError from "@/components/FieldError.astro";
 import { accountGreeting } from "@/data/account-navigation";
@@ -116,6 +118,26 @@ try {
     status: 503,
   });
 }
+const applicationComplete = isApplicationComplete(applicationProgress);
+const completedMilestones = [
+  {
+    heading: "Naloxone 101 completion (self-reported)",
+    completedAt: applicationProgress.naloxoneCompletedAt,
+  },
+  {
+    heading: "Application approved",
+    completedAt: applicationProgress.applicationApprovedAt,
+  },
+  {
+    heading:
+      applicationProgress.orientationCompletedAt !== null
+        ? "Orientation completed"
+        : "Orientation registered",
+    completedAt:
+      applicationProgress.orientationCompletedAt ??
+      applicationProgress.orientationSignedUpAt,
+  },
+];
 const contents = [
   { id: "account-profile-heading", heading: "Your profile" },
   ...profileFormSections().map((section) => ({
@@ -123,11 +145,14 @@ const contents = [
     heading: section.heading,
     nested: true,
   })),
-  {
-    id: "submitted-application-heading",
-    heading: "Volunteer Application",
-  },
-  { id: "account-naloxone-heading", heading: "Naloxone 101" },
+  ...(applicationComplete
+    ? [
+        {
+          id: "submitted-application-heading",
+          heading: "Volunteer Application",
+        },
+      ]
+    : []),
   { id: "account-settings-heading", heading: "Account settings" },
   { id: "account-email-heading", heading: "Email address", nested: true },
   {
@@ -200,28 +225,48 @@ const contents = [
         </div>
         <AccountProfileForm values={values} userId={userId} />
       </section>
-      <ApplicationProgress
-        progress={applicationProgress}
-        userId={userId}
-        idPrefix="account"
-        headingId="submitted-application-heading"
-        {email}
-        eventAccess={active &&
-          (applicationProgress.applicationApproved || organizer)}
-      >
-        <Fragment slot="application">
-          {
-            submission ? (
+      {
+        applicationComplete && (
+          <section
+            class="volunteer-panel"
+            aria-labelledby="submitted-application-heading"
+          >
+            <h2 id="submitted-application-heading" data-contents-section>
+              Volunteer Application
+            </h2>
+            {submission ? (
               <SubmittedApplication submission={submission} embedded />
             ) : (
               <p>
                 Your application form was submitted. The original submitted
                 answers were not captured for this account.
               </p>
-            )
-          }
-        </Fragment>
-      </ApplicationProgress>
+            )}
+            <div class="account-profile-summary mt-6">
+              <dl>
+                {completedMilestones.map((milestone) => (
+                  <div>
+                    <dt>{milestone.heading}</dt>
+                    <dd>
+                      {milestone.completedAt !== null ? (
+                        <time
+                          datetime={new Date(
+                            milestone.completedAt,
+                          ).toISOString()}
+                        >
+                          {accountDate.format(milestone.completedAt)}
+                        </time>
+                      ) : (
+                        "Date not recorded"
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </section>
+        )
+      }
       <section class="volunteer-panel">
         <h2 id="account-settings-heading" data-contents-section>
           Account settings
