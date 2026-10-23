@@ -298,85 +298,91 @@ const hasVisibleEvents = management
               </button>
             ))}
           </form>
-          {!manage && (
-            <EventCalendar
-              events={events
-                .filter((event) =>
-                  matchesEventFilter(
-                    filter,
-                    Boolean(event.seriesId),
-                    Boolean(event.includesOrientation),
-                  ),
-                )
-                .map((event) => ({
-                  id: event.id,
-                  startsAt: event.startsAt,
-                  label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
-                }))}
-            />
-          )}
-          <ul class="volunteer-event-list" data-event-list>
-            {management
-              ? managementItems.map((item) =>
-                  item.kind === "series" ? (
-                    <PatrolSeriesCard
-                      series={item.series}
-                      events={item.events}
-                      actor={actor}
-                      rosters={rosters}
-                      destinations={destinations}
-                      filter={filter}
-                      selectedOccurrence={selectedOccurrence}
-                    />
-                  ) : (
-                    <EventCard
-                      event={item.event}
-                      actor={actor}
-                      organizer
-                      roster={rosters.filter(
-                        (person) => person.eventId === item.event.id,
-                      )}
-                      destinations={destinations}
-                      filter={filter}
-                    />
-                  ),
-                )
-              : events.map((event) => (
-                  <EventCard
-                    event={event}
-                    actor={actor}
-                    organizer={management}
-                    publicRoster={publicRoster?.people.filter(
-                      (person) => person.eventId === event.id,
-                    )}
-                    roster={rosters.filter(
-                      (person) => person.eventId === event.id,
-                    )}
-                    destinations={destinations}
-                    filter={filter}
-                    series={series.find((item) => item.id === event.seriesId)}
-                  />
-                ))}
-          </ul>
-          <p
-            class="volunteer-notice"
-            data-empty-events
-            role="status"
-            hidden={hasVisibleEvents}
-          >
-            {events.length || series.length
-              ? "No upcoming events match this filter. Check back soon."
-              : "No upcoming events are scheduled. Check back soon."}
-          </p>
-          <p
-            class="volunteer-help"
-            data-event-limit
-            hidden={events.length !== 100}
-          >
-            {management
-              ? "Showing up to 100 loaded occurrences and one-off events. Open any other recurring date from its series settings."
-              : "Showing up to 100 events."}
-          </p>
+          <div class:list={{ "volunteer-event-schedule": !manage }}>
+            {!manage && (
+              <EventCalendar
+                events={events
+                  .filter((event) =>
+                    matchesEventFilter(
+                      filter,
+                      Boolean(event.seriesId),
+                      Boolean(event.includesOrientation),
+                    ),
+                  )
+                  .map((event) => ({
+                    id: event.id,
+                    startsAt: event.startsAt,
+                    label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
+                  }))}
+              />
+            )}
+            <div class="volunteer-event-results">
+              <ul class="volunteer-event-list" data-event-list>
+                {management
+                  ? managementItems.map((item) =>
+                      item.kind === "series" ? (
+                        <PatrolSeriesCard
+                          series={item.series}
+                          events={item.events}
+                          actor={actor}
+                          rosters={rosters}
+                          destinations={destinations}
+                          filter={filter}
+                          selectedOccurrence={selectedOccurrence}
+                        />
+                      ) : (
+                        <EventCard
+                          event={item.event}
+                          actor={actor}
+                          organizer
+                          roster={rosters.filter(
+                            (person) => person.eventId === item.event.id,
+                          )}
+                          destinations={destinations}
+                          filter={filter}
+                        />
+                      ),
+                    )
+                  : events.map((event) => (
+                      <EventCard
+                        event={event}
+                        actor={actor}
+                        organizer={management}
+                        publicRoster={publicRoster?.people.filter(
+                          (person) => person.eventId === event.id,
+                        )}
+                        roster={rosters.filter(
+                          (person) => person.eventId === event.id,
+                        )}
+                        destinations={destinations}
+                        filter={filter}
+                        series={series.find(
+                          (item) => item.id === event.seriesId,
+                        )}
+                      />
+                    ))}
+              </ul>
+              <p
+                class="volunteer-notice"
+                data-empty-events
+                role="status"
+                hidden={hasVisibleEvents}
+              >
+                {events.length || series.length
+                  ? "No upcoming events match this filter. Check back soon."
+                  : "No upcoming events are scheduled. Check back soon."}
+              </p>
+              <p
+                class="volunteer-help"
+                data-event-limit
+                hidden={events.length !== 100}
+              >
+                {management
+                  ? "Showing up to 100 loaded occurrences and one-off events. Open any other recurring date from its series settings."
+                  : "Showing up to 100 events."}
+              </p>
+            </div>
+          </div>
         </section>
       )
     }
@@ -447,6 +453,19 @@ const hasVisibleEvents = management
 </script>
 
 <style>
+  .volunteer-event-schedule {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1.5rem;
+  }
+  .volunteer-event-results {
+    min-width: 0;
+  }
+  .volunteer-event-schedule > .volunteer-event-results {
+    /* Wrap based on actual content width, including any account navigation. */
+    flex: 1 1 26rem;
+  }
   .event-attendance-legend dl {
     display: grid;
     gap: 1.25rem;

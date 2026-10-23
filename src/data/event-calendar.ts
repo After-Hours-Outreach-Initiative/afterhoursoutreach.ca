@@ -23,11 +23,6 @@ export function eventCalendar(
     .map((event) => ({
       ...event,
       date: vancouverInput(event.startsAt).slice(0, 10),
-      time: new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Vancouver",
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(event.startsAt),
       description: `${formatEventDate(event.startsAt)} · ${event.label}`,
     }));
   const firstDate = dated[0]?.date ?? today;

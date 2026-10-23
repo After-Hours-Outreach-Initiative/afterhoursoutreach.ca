@@ -47,9 +47,8 @@ const weekdays = [
       </button>
     </div>
   </div>
-  <p id="calendar-help">
-    Circled dates have events. Select an event to jump to its details. Times are
-    in Vancouver.
+  <p id="calendar-help" class="sr-only">
+    Circled dates link to events. Dots link to more events that day.
   </p>
   <table aria-labelledby="calendar-range" aria-describedby="calendar-help">
     <thead>
@@ -73,21 +72,35 @@ const weekdays = [
                 aria-current={day.today ? "date" : undefined}
               >
                 {day.events.length ? (
-                  day.events.map((event, index) => (
+                  <>
                     <a
-                      href={`#event-${event.id}`}
-                      data-calendar-event={event.id}
-                      aria-label={event.description}
-                      title={event.description}
+                      href={`#event-${day.events[0].id}`}
+                      data-calendar-event={day.events[0].id}
+                      aria-label={day.events[0].description}
+                      title={day.events[0].label}
                     >
-                      {index === 0 && (
-                        <span class="event-calendar-day event-calendar-circle">
-                          {day.day}
-                        </span>
-                      )}
-                      <span class="event-calendar-time">{event.time}</span>
+                      <span class="event-calendar-day event-calendar-circle">
+                        {day.day}
+                      </span>
                     </a>
-                  ))
+                    {day.events.length > 1 && (
+                      <div class="event-calendar-extra-events">
+                        {day.events.slice(1).map((event) => (
+                          <a
+                            href={`#event-${event.id}`}
+                            data-calendar-event={event.id}
+                            aria-label={event.description}
+                            title={event.label}
+                          >
+                            <span
+                              class="event-calendar-dot"
+                              aria-hidden="true"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <span class="event-calendar-day">{day.day}</span>
                 )}
