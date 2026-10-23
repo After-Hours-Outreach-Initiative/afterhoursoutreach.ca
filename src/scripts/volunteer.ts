@@ -1,6 +1,7 @@
 import { vancouverInstant } from "../data/event-time";
 import { eventFilter, matchesEventFilter } from "../data/event-browser";
 import { actionFragment, loadActionPage } from "./action-page";
+import { syncApplicationProgress } from "./application-progress";
 import { chooseNotification } from "./notification-choice";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
@@ -127,6 +128,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     document.dispatchEvent(new Event("account-content-updated"));
     return;
   }
+  syncApplicationProgress(page);
   const list = root.querySelector<HTMLElement>("[data-event-list]")!;
   const focused = document.activeElement;
   const focusedCard =

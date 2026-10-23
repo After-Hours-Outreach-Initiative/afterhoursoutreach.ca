@@ -7,20 +7,23 @@ import ApplicationSummary from "./ApplicationSummary.astro";
 
 interface Props {
   submission: SubmittedApplication | null;
+  embedded?: boolean;
 }
-const { submission } = Astro.props;
+const { submission, embedded = false } = Astro.props;
 ---
 
 {
   submission && (
     <section
-      class="volunteer-panel"
-      aria-labelledby="submitted-application-heading"
+      class:list={{ "volunteer-panel": !embedded }}
+      aria-labelledby={embedded ? undefined : "submitted-application-heading"}
       data-submitted-application
     >
-      <h2 id="submitted-application-heading" data-contents-section>
-        Volunteer Application
-      </h2>
+      {!embedded && (
+        <h2 id="submitted-application-heading" data-contents-section>
+          Volunteer Application
+        </h2>
+      )}
       <p>
         Submitted:{" "}
         <time datetime={submission.submittedAt}>

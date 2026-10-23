@@ -5,8 +5,8 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
-import NaloxoneCourseStep from "@/components/volunteer/NaloxoneCourseStep.astro";
-import { loadNaloxoneCompletion } from "@/server/db/naloxone";
+import ApplicationProgress from "@/components/volunteer/ApplicationProgress.astro";
+import { loadApplicationProgress } from "@/server/db/application-progress";
 import PageContents from "@/components/volunteer/PageContents.astro";
 import FieldError from "@/components/FieldError.astro";
 import { accountGreeting } from "@/data/account-navigation";
@@ -33,7 +33,7 @@ import {
 export const prerender = false;
 let values: ApplicationAnswers | null = null;
 let submission: Awaited<ReturnType<typeof loadSubmittedApplication>> = null;
-let naloxoneCompletedAt: number | null = null;
+let applicationProgress: Awaited<ReturnType<typeof loadApplicationProgress>>;
 let accountCreatedAt: Date | null = null;
 let firstOrientationAt: Date | null = null;
 const accountDate = new Intl.DateTimeFormat("en-CA", {
@@ -66,7 +66,7 @@ try {
   values = await loadProfile(env.DB, current.user.id);
   if (!values) return Astro.redirect("/apply");
   submission = await loadSubmittedApplication(env.DB, current.user.id);
-  naloxoneCompletedAt = await loadNaloxoneCompletion(env.DB, current.user.id);
+  applicationProgress = await loadApplicationProgress(env.DB, current.user.id);
   accountCreatedAt = current.user.createdAt;
   firstOrientationAt = await loadFirstCompletedOrientation(
     env.DB,
@@ -123,14 +123,10 @@ const contents = [
     heading: section.heading,
     nested: true,
   })),
-  ...(submission
-    ? [
-        {
-          id: "submitted-application-heading",
-          heading: "Volunteer Application",
-        },
-      ]
-    : []),
+  {
+    id: "submitted-application-heading",
+    heading: "Volunteer Application",
+  },
   { id: "account-naloxone-heading", heading: "Naloxone 101" },
   { id: "account-settings-heading", heading: "Account settings" },
   { id: "account-email-heading", heading: "Email address", nested: true },
@@ -204,12 +200,28 @@ const contents = [
         </div>
         <AccountProfileForm values={values} userId={userId} />
       </section>
-      <SubmittedApplication submission={submission} />
-      <NaloxoneCourseStep
+      <ApplicationProgress
+        progress={applicationProgress}
         userId={userId}
-        completedAt={naloxoneCompletedAt}
-        idPrefix="account-naloxone"
-      />
+        idPrefix="account"
+        headingId="submitted-application-heading"
+        {email}
+        eventAccess={active &&
+          (applicationProgress.applicationApproved || organizer)}
+      >
+        <Fragment slot="application">
+          {
+            submission ? (
+              <SubmittedApplication submission={submission} embedded />
+            ) : (
+              <p>
+                Your application form was submitted. The original submitted
+                answers were not captured for this account.
+              </p>
+            )
+          }
+        </Fragment>
+      </ApplicationProgress>
       <section class="volunteer-panel">
         <h2 id="account-settings-heading" data-contents-section>
           Account settings

@@ -1,0 +1,289 @@
+---
+import type { ApplicationProgress } from "@/server/db/application-progress";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import CheckIcon from "@/components/icons/CheckIcon.astro";
+import NaloxoneCourseStep from "./NaloxoneCourseStep.astro";
+
+interface Props {
+  progress: ApplicationProgress;
+  userId: string;
+  idPrefix: string;
+  headingId?: string;
+  email: string;
+  eventAccess: boolean;
+}
+const {
+  progress,
+  userId,
+  idPrefix,
+  headingId = `${idPrefix}-application-heading`,
+  email,
+  eventAccess,
+} = Astro.props;
+const dateFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Vancouver",
+  dateStyle: "long",
+});
+const steps = [
+  {
+    key: "form",
+    title: "Application Form Submitted",
+    completed: progress.submittedAt !== null,
+    completedAt: progress.submittedAt,
+    dateLabel: "Completed",
+  },
+  {
+    key: "naloxone",
+    title: "Complete Naloxone 101",
+    completed: progress.naloxoneCompletedAt !== null,
+    completedAt: progress.naloxoneCompletedAt,
+    dateLabel: "Confirmed",
+  },
+  {
+    key: "review",
+    title: "Application review",
+    completed: progress.applicationApproved,
+    completedAt: progress.applicationApprovedAt,
+    dateLabel: "Approved",
+  },
+  {
+    key: "orientation",
+    title: "Sign up for orientation",
+    completed:
+      progress.orientationSignedUpAt !== null ||
+      progress.orientationCompletedAt !== null,
+    completedAt:
+      progress.orientationSignedUpAt ?? progress.orientationCompletedAt,
+    dateLabel:
+      progress.orientationSignedUpAt !== null
+        ? "Registered"
+        : "Orientation completed",
+  },
+];
+const currentStep = steps.findIndex((step) => !step.completed);
+---
+
+<section
+  class="volunteer-panel application-progress"
+  aria-labelledby={headingId}
+  data-application-tracker
+  data-progress-version={JSON.stringify(progress)}
+>
+  <h2 id={headingId} data-contents-section>Volunteer Application</h2>
+  <ol
+    class="application-progress-list"
+    role="list"
+    aria-label="Application progress"
+  >
+    {
+      steps.map((step, index) => (
+        <li aria-current={index === currentStep ? "step" : undefined}>
+          <details
+            data-application-progress-step={step.key}
+            data-state={
+              step.completed
+                ? "complete"
+                : index === currentStep
+                  ? "current"
+                  : "upcoming"
+            }
+            open={index === currentStep}
+          >
+            <summary>
+              <span class="application-progress-number" aria-hidden="true">
+                {index + 1}
+              </span>
+              <span class="application-progress-label">
+                <span class="application-progress-title">
+                  <span class="sr-only">Step {index + 1}: </span>
+                  {step.title}
+                  {step.completed && <CheckIcon class="size-5 shrink-0" />}
+                </span>
+                <span class="application-progress-status">
+                  {step.completed ? (
+                    <>
+                      {step.dateLabel}
+                      {" · "}
+                      {step.completedAt !== null ? (
+                        <time
+                          datetime={new Date(step.completedAt).toISOString()}
+                        >
+                          {dateFormat.format(step.completedAt)}
+                        </time>
+                      ) : (
+                        "Date not recorded"
+                      )}
+                    </>
+                  ) : index === currentStep ? (
+                    "Current step"
+                  ) : (
+                    "Not started"
+                  )}
+                </span>
+              </span>
+              <ArrowRightIcon class="application-progress-toggle size-5 shrink-0" />
+            </summary>
+            <div class="application-progress-content">
+              {step.key === "form" &&
+                (progress.submittedAt !== null ? (
+                  <slot name="application">
+                    <p>Your application form has been submitted.</p>
+                    <a class="btn btn-outline mt-4" href="/volunteer/account">
+                      View submitted application
+                      <ArrowRightIcon class="btn-icon" />
+                    </a>
+                  </slot>
+                ) : (
+                  <>
+                    <p>
+                      Complete the application form, accept the Code of Conduct,
+                      and submit.
+                    </p>
+                    <a class="btn btn-primary mt-4" href="/apply">
+                      Complete application form
+                      <ArrowRightIcon class="btn-icon" />
+                    </a>
+                  </>
+                ))}
+              {step.key === "naloxone" &&
+                (progress.submittedAt !== null ? (
+                  <NaloxoneCourseStep
+                    {userId}
+                    completedAt={progress.naloxoneCompletedAt}
+                    idPrefix={`${idPrefix}-naloxone`}
+                  />
+                ) : (
+                  <p>
+                    After submitting your form and Code of Conduct, take
+                    Naloxone 101 and confirm completion here.
+                  </p>
+                ))}
+              {step.key === "review" && (
+                <p>
+                  {progress.applicationApproved ? (
+                    "Your application has been approved. You can sign up for a patrol that includes orientation when your volunteer account is active."
+                  ) : (
+                    <>
+                      An organizer will review your application. We'll email you
+                      at <strong>{email}</strong> to let you know whether it's
+                      approved and what to do next.
+                    </>
+                  )}
+                </p>
+              )}
+              {step.key === "orientation" && (
+                <>
+                  <p>
+                    {progress.orientationCompletedAt !== null
+                      ? "You have completed an orientation. Patrols without orientation still require separate organizer approval."
+                      : progress.orientationSignedUpAt !== null
+                        ? "Your orientation registration is confirmed. You can review your event details on the events page."
+                        : "Once your application is approved, choose a patrol marked “Includes orientation” and register for an available spot."}
+                  </p>
+                  {eventAccess && (
+                    <a
+                      class="btn btn-outline mt-4"
+                      href="/events?type=orientation"
+                    >
+                      View orientations
+                      <ArrowRightIcon class="btn-icon" />
+                    </a>
+                  )}
+                </>
+              )}
+            </div>
+          </details>
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<style>
+  .application-progress-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding: 0;
+    list-style: none;
+  }
+  details {
+    border: 1px solid #3f3f46;
+    border-radius: 0.625rem;
+    background: #171a20;
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 0.625rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  .application-progress-number {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+  }
+  .application-progress-label {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .application-progress-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+  }
+  .application-progress-status {
+    display: block;
+    margin-top: 0.25rem;
+    color: #a1a1aa;
+    font-size: 0.875rem;
+  }
+  details[data-state="current"] {
+    border-color: var(--color-blue);
+    background: #16214a;
+  }
+  details[data-state="current"] .application-progress-number {
+    border-color: var(--color-blue);
+    background: var(--color-blue);
+    color: white;
+  }
+  details[data-state="current"] .application-progress-status {
+    color: #bfdbfe;
+  }
+  details[data-state="complete"] {
+    border-color: #365144;
+    background: #121d18;
+    color: #a3c2ad;
+  }
+  details[data-state="complete"] .application-progress-status {
+    color: #a3c2ad;
+  }
+  .application-progress-content {
+    padding: 0 1rem 1rem;
+    color: #d4d4d8;
+  }
+  .application-progress-content :global(.volunteer-panel) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  summary :global(.application-progress-toggle) {
+    transform: rotate(90deg);
+  }
+  details[open] > summary :global(.application-progress-toggle) {
+    transform: rotate(-90deg);
+  }
+</style>

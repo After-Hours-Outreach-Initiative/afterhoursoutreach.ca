@@ -15,6 +15,7 @@ import {
 import { initApplicationSections } from "./application-sections";
 import { initPageContents } from "./page-contents";
 import { focusAfterUpdate } from "./focus";
+import { syncApplicationProgress } from "./application-progress";
 import { initPhoneInputs } from "./phone-input";
 import { initDateInputs } from "./date-input";
 import {
@@ -317,6 +318,7 @@ form("[data-naloxone-confirm]", async (element, values) => {
     element.querySelector<HTMLButtonElement>('button[type="submit"]')!.hidden =
       true;
     message(element, result.message!, "success");
+    syncApplicationProgress(await loadActionPage());
   } finally {
     checkbox.disabled = saved;
   }
