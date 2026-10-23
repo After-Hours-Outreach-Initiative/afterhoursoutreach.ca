@@ -1,10 +1,6 @@
 ---
 import { env } from "cloudflare:workers";
-import {
-  accountContext,
-  canViewEvents,
-  requireOrganizer,
-} from "@/server/db/access";
+import { accountContext, canViewEvents } from "@/server/db/access";
 import {
   listEvents,
   listRosters,
@@ -13,7 +9,6 @@ import {
 } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
 import AccountLayout from "./AccountLayout.astro";
-import SignInPanel from "./SignInPanel.astro";
 import EventCard from "./EventCard.astro";
 import EventCalendar from "./EventCalendar.astro";
 import EventEditor from "./EventEditor.astro";
@@ -43,52 +38,41 @@ interface Props {
 }
 const { manage = false } = Astro.props;
 const { actor, email, greetingName } = Astro.props.account;
-let organizer = false;
-try {
-  requireOrganizer(actor);
-  organizer = true;
-} catch {
-  /* Organizer actions remain locked. */
-}
+// Callers authenticate first; the manage route also requires organizer access.
+if (!actor) throw new Error("VolunteerPortal requires a signed-in account.");
 const events = await listEvents(
   env.DB,
   actor,
   Astro.url.searchParams.get("occurrence") ?? undefined,
   manage ? "manage" : "volunteer",
 );
-const management = manage && organizer;
-const series = management && actor ? await listPatrolSeries(env.DB, actor) : [];
+const series = manage ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
 const showApplicationProgress =
-  !manage && actor && (!actor.twoFactorEnabled || actor.twoFactorVerified);
+  !manage && (!actor.twoFactorEnabled || actor.twoFactorVerified);
 const applicationProgress = showApplicationProgress
   ? await loadApplicationProgress(env.DB, actor.id)
   : null;
 const incompleteApplication =
   applicationProgress && !isApplicationComplete(applicationProgress);
 const submission =
-  incompleteApplication && applicationProgress.submittedAt !== null && actor
+  incompleteApplication && applicationProgress.submittedAt !== null
     ? await loadSubmittedApplication(env.DB, actor.id)
     : null;
 const title = manage
   ? "Manage events"
-  : incompleteApplication &&
-      actor?.role !== "organizer" &&
-      !actor?.patrolApproved
+  : incompleteApplication && actor.role !== "organizer" && !actor.patrolApproved
     ? "Welcome"
-    : !actor && Astro.url.pathname.replace(/\/$/, "") === "/volunteer"
-      ? "Volunteer"
-      : "Events";
-const rosters =
-  management && actor
-    ? await listRosters(
-        env.DB,
-        actor,
-        events.map((event) => event.id),
-      )
-    : [];
+    : "Events";
+const rosters = manage
+  ? await listRosters(
+      env.DB,
+      actor,
+      events.map((event) => event.id),
+    )
+  : [];
 const publicRoster =
-  !management && eventAccess && actor
+  !manage && eventAccess
     ? await listPublicRosters(
         env.DB,
         actor,
@@ -112,10 +96,10 @@ const destinations = events.filter(
     !event.cancelledAt,
 );
 // Legacy ?type=patrol now means all patrols, including those with orientation.
-const filter = eventFilter(Astro.url.searchParams.get("type"), management);
-const managementItems = management ? groupManagementEvents(events, series) : [];
+const filter = eventFilter(Astro.url.searchParams.get("type"), manage);
+const managementItems = manage ? groupManagementEvents(events, series) : [];
 const selectedOccurrence = Astro.url.searchParams.get("occurrence");
-const hasVisibleEvents = management
+const hasVisibleEvents = manage
   ? managementItems.some((item) =>
       matchesEventFilter(
         filter,
@@ -138,13 +122,12 @@ const hasVisibleEvents = management
 <AccountLayout
   title={title}
   description="Volunteer with After Hours Outreach Initiative, doing evening street outreach in Vancouver's Downtown Eastside."
-  signedIn={Boolean(actor)}
-  organizer={actor?.role === "organizer"}
+  signedIn
+  organizer={actor.role === "organizer"}
   eventAccess={eventAccess}
-  name={actor?.name}
+  name={actor.name}
   greetingName={greetingName}
   email={email}
-  publicSpacing={!actor}
 >
   <Fragment slot="heading">
     {
@@ -152,11 +135,9 @@ const hasVisibleEvents = management
         <h1
           data-portal-heading
           class:list={[
-            "max-w-4xl",
+            "max-w-4xl text-2xl md:text-4xl",
             {
               "sr-only": eventAccess,
-              "text-blue": !actor,
-              "text-2xl md:text-4xl": Boolean(actor),
             },
           ]}
         >
@@ -185,7 +166,7 @@ const hasVisibleEvents = management
         : "/volunteer"}
     data-application-awaiting-approval={String(
       Boolean(
-        actor?.applicationSubmitted &&
+        actor.applicationSubmitted &&
         actor.active &&
         !actor.applicationApproved &&
         actor.role !== "organizer",
@@ -193,17 +174,15 @@ const hasVisibleEvents = management
     )}
   >
     {
-      !actor ? (
-        <SignInPanel returnTo={`/events${Astro.url.search}`} />
-      ) : actor.applicationSubmitted && !actor.active ? (
+      actor.applicationSubmitted && !actor.active && (
         <p class="volunteer-notice" role="status">
           Your volunteer account is inactive. Contact an organizer to restore
           access.
         </p>
-      ) : null
+      )
     }
     {
-      applicationProgress && incompleteApplication && actor && (
+      applicationProgress && incompleteApplication && (
         <>
           {title === "Welcome" && (
             <p class="mt-6 max-w-3xl text-zinc-300">
@@ -252,16 +231,7 @@ const hasVisibleEvents = management
       )
     }
     {
-      manage && actor?.role === "organizer" && !organizer && (
-        <p class="volunteer-notice">
-          Organizer tools require an active application. If you enabled an
-          authenticator, finish signing in with it.{" "}
-          <a href="/volunteer/account">Go to Your account</a>.
-        </p>
-      )
-    }
-    {
-      eventAccess && actor && (
+      eventAccess && (
         <section class="volunteer-events" aria-labelledby="events-heading">
           <div class="volunteer-section-heading">
             <div>
@@ -271,7 +241,7 @@ const hasVisibleEvents = management
                 <h2 id="events-heading">Events</h2>
               )}
             </div>
-            {management ? (
+            {manage ? (
               <button
                 class="btn btn-primary"
                 data-show-dialog="event-editor-new"
@@ -295,7 +265,7 @@ const hasVisibleEvents = management
           >
             {[
               ["all", "All"],
-              ...(management
+              ...(manage
                 ? [
                     ["one-off", "One-off events"],
                     ["recurring", "Recurring series"],
@@ -335,7 +305,7 @@ const hasVisibleEvents = management
             )}
             <div class="volunteer-event-results">
               <ul class="volunteer-event-list" data-event-list>
-                {management
+                {manage
                   ? managementItems.map((item) =>
                       item.kind === "series" ? (
                         <PatrolSeriesCard
@@ -364,7 +334,7 @@ const hasVisibleEvents = management
                       <EventCard
                         event={event}
                         actor={actor}
-                        organizer={management}
+                        organizer={manage}
                         publicRoster={publicRoster?.people.filter(
                           (person) => person.eventId === event.id,
                         )}
@@ -394,7 +364,7 @@ const hasVisibleEvents = management
                 data-event-limit
                 hidden={events.length !== 100}
               >
-                {management
+                {manage
                   ? "Showing up to 100 loaded occurrences and one-off events. Open any other recurring date from its series settings."
                   : "Showing up to 100 events."}
               </p>
@@ -404,7 +374,7 @@ const hasVisibleEvents = management
       )
     }
     {
-      management && (
+      manage && (
         <>
           <EventEditor />
           <VolunteerProfileDialog />
