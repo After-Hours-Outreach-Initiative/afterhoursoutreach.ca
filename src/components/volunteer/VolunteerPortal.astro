@@ -15,7 +15,6 @@ import { eventViewVersion } from "@/server/events/version";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
 import EventCard from "./EventCard.astro";
-import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventCalendar from "./EventCalendar.astro";
 import EventEditor from "./EventEditor.astro";
 import PatrolSeriesCard from "./PatrolSeriesCard.astro";
@@ -394,53 +393,6 @@ const hasVisibleEvents = management
       )
     }
     {
-      eventAccess && actor && (
-        <section
-          class="volunteer-panel event-attendance-legend"
-          aria-labelledby="event-places-heading"
-        >
-          <h2 id="event-places-heading">About these places</h2>
-          <p>Each person shown on an event card is registered.</p>
-          <dl>
-            <div>
-              <dt>
-                <AttendeeAvatar category="medic" decorative />
-                Approved medics
-              </dt>
-              <dd>
-                Approved medics with completed orientation have two reserved
-                places on each patrol. Extra medics are welcome.
-              </dd>
-            </div>
-            <div>
-              <dt>
-                <AttendeeAvatar category="volunteer" decorative />
-                Other volunteers
-              </dt>
-              <dd>Other volunteers use the remaining unreserved places.</dd>
-            </div>
-            <div>
-              <dt>
-                <AttendeeAvatar category="orientee" decorative />
-                Orientees
-              </dt>
-              <dd>
-                On patrols that include orientation, two places are reserved for
-                orientees, with a maximum of four, including first-time medics.
-                There is no minimum orientee attendance.
-              </dd>
-            </div>
-          </dl>
-          <p>
-            Each person uses one place. Everyone shares total capacity without
-            using another category’s outstanding reservations. Orientee
-            reservations and limits apply only to patrols that include
-            orientation.
-          </p>
-        </section>
-      )
-    }
-    {
       management && (
         <>
           <EventEditor />
@@ -472,26 +424,5 @@ const hasVisibleEvents = management
   .volunteer-event-schedule > .volunteer-event-results {
     /* Wrap based on actual content width, including any account navigation. */
     flex: 1 1 26rem;
-  }
-  .event-attendance-legend dl {
-    display: grid;
-    gap: 1.25rem;
-    max-width: 65ch;
-  }
-  .event-attendance-legend dt {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-  }
-  .event-attendance-legend dd {
-    margin: 0.5rem 0 0 calc(var(--attendee-avatar-width) + 0.625rem);
-    color: var(--color-zinc-300, #d4d4d8);
-    line-height: 1.5;
-  }
-  .event-attendance-legend > p {
-    max-width: 65ch;
-  }
-  .event-attendance-legend > p:last-child {
-    margin-bottom: 0;
   }
 </style>

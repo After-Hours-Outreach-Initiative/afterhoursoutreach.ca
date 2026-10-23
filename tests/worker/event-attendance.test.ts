@@ -225,40 +225,9 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await page.setViewportSize({ width, height: 900 });
         await page.goto(`${origin}${manage ? "/manage/events" : "/events"}`);
         const list = page.locator("[data-event-list]");
-        const legend = page.getByRole("region", { name: "About these places" });
-        await expect(legend).toHaveCount(1);
-        await expect(list.getByText("About these places")).toHaveCount(0);
-        await expect(legend.locator("dt")).toHaveText([
-          "Approved medics",
-          "Other volunteers",
-          "Orientees",
-        ]);
-        for (const category of ["medic", "volunteer", "orientee"])
-          await expect(
-            legend.locator(`dt .attendee-${category}`),
-          ).toHaveAttribute("aria-hidden", "true");
-        await expect(legend).toContainText(
-          "two reserved places on each patrol",
-        );
-        await expect(legend).toContainText("Extra medics are welcome");
-        await expect(legend).toContainText(
-          "two places are reserved for orientees, with a maximum of four, including first-time medics",
-        );
-        await expect(legend).toContainText("no minimum orientee attendance");
-        await expect(legend).toContainText("Everyone shares total capacity");
-        await expect(legend).toContainText(
-          "Orientee reservations and limits apply only to patrols that include orientation",
-        );
-        expect(
-          await legend.evaluate((element) =>
-            Boolean(
-              document
-                .querySelector("[data-event-list]")!
-                .compareDocumentPosition(element) &
-              Node.DOCUMENT_POSITION_FOLLOWING,
-            ),
-          ),
-        ).toBe(true);
+        await expect(
+          page.getByRole("region", { name: "About these places" }),
+        ).toHaveCount(0);
         const columns = (element: Element) =>
           getComputedStyle(element)
             .gridTemplateColumns.split(" ")
