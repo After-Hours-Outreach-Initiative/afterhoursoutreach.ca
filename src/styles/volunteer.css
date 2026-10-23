@@ -1120,6 +1120,9 @@ body:has([data-application], [data-account-contents-flow]) {
   color: #a1a1aa;
 }
 .volunteer-portal p.volunteer-date-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
   color: #fcd34d;
 }
 .volunteer-notice {

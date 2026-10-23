@@ -728,7 +728,7 @@ test("existing capacity, approvals, sessions and standalone behavior remain enfo
   assert.equal(visible.filter((event) => event.seriesId).length, 3);
 });
 
-test("standalone events can be created or rescheduled into the past without reopening history or registration", async () => {
+test("patrols allow past creation dates and standalone rescheduling without reopening history or registration", async () => {
   const data = {
     includesOrientation: false,
     startsAt: new Date(Date.now() - 3_600_000).toISOString(),
@@ -766,12 +766,28 @@ test("standalone events can be created or rescheduled into the past without reop
     saveEvent(db, organizer, { ...data, startsAt: "invalid" }),
     status(400),
   );
+
+  const backdated = {
+    ...input(),
+    firstDate: addCalendarDays(tomorrow(), -28),
+    endDate: tomorrow(),
+  };
+  const series = await savePatrolSeries(db, organizer, backdated);
+  assert.equal(
+    (await findPatrolSeries(db, organizer, series.id)).firstDate,
+    backdated.firstDate,
+  );
+  assert.deepEqual(
+    (await all(series.id)).map((event) => event.occurrenceDate),
+    [backdated.endDate],
+  );
 });
 
 test("validation and authorization reject invalid recurrence input or stale organizer sessions", async () => {
   for (const extra of [
     { firstDate: "2026-02-30" },
-    { firstDate: "2025-01-01" },
+    { firstDate: "2026-03-08", localTime: "02:30" },
+    { firstDate: "2026-11-01", localTime: "01:30" },
     { intervalWeeks: 0 },
     { intervalWeeks: 53 },
     { localTime: "25:00" },
