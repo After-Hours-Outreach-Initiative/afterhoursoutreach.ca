@@ -164,24 +164,7 @@ const hasVisibleEvents = management
   >
     {
       !actor ? (
-        <div class="volunteer-introduction">
-          <p class="mt-8 max-w-3xl text-zinc-300">
-            Our volunteers are community advocates, people with lived experience
-            of recovery, first responders, healthcare workers, students heading
-            into healthcare, and people who simply wanted to help out at night.
-          </p>
-          <p class="mt-6 max-w-3xl text-zinc-300">
-            Patrols typically run Tuesdays and Thursdays, 8:30 PM to midnight.
-            How often we go out depends on how many volunteers are available and
-            what supplies we have on hand.
-          </p>
-          <p class="mt-6 max-w-3xl text-zinc-300">
-            Sign in or create an account below to apply or register for
-            volunteer events.
-          </p>
-
-          <SignInPanel returnTo={`/events${Astro.url.search}`} />
-        </div>
+        <SignInPanel returnTo={`/events${Astro.url.search}`} />
       ) : !actor.applicationSubmitted ? (
         <section class="volunteer-panel">
           <h2>Welcome to After Hours Outreach</h2>

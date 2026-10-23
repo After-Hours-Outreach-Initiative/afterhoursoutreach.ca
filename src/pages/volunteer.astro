@@ -1,13 +1,9 @@
 ---
-import VolunteerPortal from "@/components/volunteer/VolunteerPortal.astro";
-import { env } from "cloudflare:workers";
-import { accountContext } from "@/server/db/access";
-import { forwardCookies } from "@/server/auth";
 export const prerender = false;
-const account = await accountContext(env, Astro.request);
-forwardCookies(account.headers, Astro.response.headers);
-if (account.actor && Astro.request.method === "GET")
-  return Astro.redirect("/events" + Astro.url.search);
+const signInUrl = new URL(Astro.url);
+signInUrl.pathname = "/volunteer/sign-in";
+// Keep legacy event deep links while sharing the complete sign-in experience.
+if (!signInUrl.searchParams.has("returnTo"))
+  signInUrl.searchParams.set("returnTo", `/events${Astro.url.search}`);
+return Astro.rewrite(signInUrl);
 ---
-
-<VolunteerPortal {account} />
