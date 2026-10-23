@@ -229,9 +229,12 @@ const blocked =
   .volunteer-actions > form > .btn {
     width: 100%;
   }
+  .volunteer-actions > form > .btn {
+    white-space: nowrap;
+  }
   @container event-card (min-width: 32rem) {
     .volunteer-event-layout:has(> .volunteer-actions:not(:empty)) {
-      grid-template-columns: minmax(0, 1fr) 10rem;
+      grid-template-columns: minmax(0, 1fr) 12rem;
       column-gap: 1.5rem;
     }
     .volunteer-actions {
