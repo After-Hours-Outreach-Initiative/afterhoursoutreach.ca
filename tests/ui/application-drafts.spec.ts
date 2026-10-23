@@ -663,7 +663,7 @@ test("switching accounts never restores or autosaves another account's answers",
   ).toBe("Stale tab changes");
 });
 
-test("resuming requires fresh consent; submission clears drafts and course confirmation persists on events", async ({
+test("resuming requires fresh consent; submission clears drafts and course confirmation persists on Volunteer", async ({
   page,
   baseURL,
 }) => {
@@ -701,7 +701,7 @@ test("resuming requires fresh consent; submission clears drafts and course confi
     form.locator('[name="codeOfConductAccepted"]'),
   ).not.toBeChecked();
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/events$/);
+  await expect(page).toHaveURL(/\/volunteer$/);
   expect(
     await page.evaluate(
       (key) => localStorage.getItem(key),
@@ -728,13 +728,19 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(checkbox).not.toBeChecked();
   await page.reload();
   await expect(checkbox).not.toBeChecked();
-  // Incomplete application steps stay on events, not the account page.
+  // Submitted answers stay available inline while the application is incomplete.
   await page
     .locator('[data-application-progress-step="form"] > summary')
     .click();
-  await page
-    .getByRole("link", { name: "View submitted application", exact: true })
-    .click();
+  const submission = page.locator("[data-submitted-application]");
+  await submission.locator("summary").click();
+  await expect(
+    submission.getByText(sampleAnswers.motivation, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    submission.locator("input, textarea, select, button"),
+  ).toHaveCount(0);
+  await page.goto("/volunteer/account");
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await expect(
     page.locator(

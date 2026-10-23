@@ -115,10 +115,6 @@ const currentStep = steps.findIndex((step) => !step.completed);
                     <p class="text-base">
                       Your application form has been submitted.
                     </p>
-                    <a class="btn btn-outline mt-4" href="/volunteer/account">
-                      View submitted application
-                      <ArrowRightIcon class="btn-icon" />
-                    </a>
                   </slot>
                 ) : (
                   <>
@@ -240,6 +236,9 @@ const currentStep = steps.findIndex((step) => !step.completed);
   .application-progress-content {
     padding: 0 1rem 1rem;
     color: #d4d4d8;
+  }
+  .application-progress-content :global([data-submitted-application] > p) {
+    font-size: inherit;
   }
   .application-progress-content :global(.volunteer-panel) {
     margin: 0;
