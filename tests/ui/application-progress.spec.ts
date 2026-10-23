@@ -59,6 +59,9 @@ async function expectProgress(page: Page, completed: number) {
   await expect(progress).toHaveCSS("width", "28px");
   await expect(progress).toHaveCSS("height", "28px");
   await expect(progress.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  await expect(
+    progress.locator(".volunteer-contents-progress-check"),
+  ).toHaveCSS("visibility", completed === 5 ? "visible" : "hidden");
   const value = progress.locator("[data-application-progress-value]");
   await expect(value).toHaveAttribute("pathLength", "100");
   await expect(value).toHaveAttribute("stroke-dasharray", "100");

@@ -380,6 +380,13 @@ body:has([data-application], [data-account-contents-flow]) {
 .volunteer-contents-progress[data-complete="true"] {
   color: #4ade80;
 }
+.volunteer-contents-progress-check {
+  visibility: hidden;
+}
+.volunteer-contents-progress[data-complete="true"]
+  .volunteer-contents-progress-check {
+  visibility: visible;
+}
 .volunteer-contents-actions {
   display: flex;
   flex-direction: column;
