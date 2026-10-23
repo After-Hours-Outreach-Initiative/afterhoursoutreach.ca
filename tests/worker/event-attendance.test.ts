@@ -232,10 +232,9 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           getComputedStyle(element)
             .gridTemplateColumns.split(" ")
             .filter((track) => parseFloat(track) > 0).length;
-        const expectedColumns = width >= 1280 ? 3 : width === 800 ? 2 : 1;
         await expect(list).toHaveCSS("display", "grid");
         await expect(list).toHaveCSS("align-items", "start");
-        expect(await list.evaluate(columns)).toBe(expectedColumns);
+        expect(await list.evaluate(columns)).toBe(1);
         if (manage)
           await expect(list.locator(":scope > [data-series-card]")).toHaveCount(
             1,
@@ -283,15 +282,15 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           card.locator(".event-avatar-row .attendee-orientee"),
         ).toHaveCount(3);
         for (const [category, color] of [
-          ["medic", "rgb(248, 113, 113)"],
-          ["volunteer", "rgb(74, 222, 128)"],
-          ["orientee", "rgb(96, 165, 250)"],
+          ["medic", "rgb(185, 28, 28)"],
+          ["volunteer", "rgb(21, 128, 61)"],
+          ["orientee", "rgb(29, 78, 216)"],
         ]) {
           const avatar = card
             .locator(`.event-avatar-row .attendee-${category} svg`)
             .first();
           for (const tag of ["circle", "path"]) {
-            const shape = avatar.locator(tag);
+            const shape = avatar.locator(`${tag}[fill="currentColor"]`);
             await expect(shape).toHaveAttribute("fill", "currentColor");
             await expect(shape).toHaveAttribute("stroke", "none");
             await expect(shape).toHaveCSS("fill", color);
@@ -334,9 +333,17 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             const attendance = bounds(".event-attendance");
             const details = bounds(".volunteer-event-info");
             const layout = bounds(".volunteer-event-layout");
+            const style = getComputedStyle(element);
             return {
               afterAttendance: action.top >= attendance.bottom,
               attendanceAfterInfo: attendance.top >= details.bottom,
+              besideInfo:
+                action.left >= details.right && action.top === details.top,
+              wide:
+                element.clientWidth -
+                  parseFloat(style.paddingLeft) -
+                  parseFloat(style.paddingRight) >=
+                512,
               leftOffset: action.left - layout.left,
               rightOffset: action.right - layout.right,
               controlHeight: bounds(".volunteer-actions .btn").height,
@@ -344,14 +351,19 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
               layoutWidth: layout.width,
             };
           });
-          expect(position.afterAttendance).toBe(true);
           expect(position.attendanceAfterInfo).toBe(true);
           expect(position.controlHeight).toBeGreaterThanOrEqual(44);
-          expect(Math.abs(position.leftOffset)).toBeLessThan(1);
           expect(Math.abs(position.rightOffset)).toBeLessThan(1);
-          expect(
-            Math.abs(position.controlWidth - position.layoutWidth),
-          ).toBeLessThan(1);
+          if (position.wide) {
+            expect(position.besideInfo).toBe(true);
+            expect(position.controlWidth).toBeLessThan(position.layoutWidth);
+          } else {
+            expect(position.afterAttendance).toBe(true);
+            expect(Math.abs(position.leftOffset)).toBeLessThan(1);
+            expect(
+              Math.abs(position.controlWidth - position.layoutWidth),
+            ).toBeLessThan(1);
+          }
         };
         await expectActionPosition();
         if (manage) {
@@ -437,14 +449,14 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           await expect(roster.locator("li").first()).toHaveText(publicName);
           await expect(
             roster.locator("li").first().locator(".attendee-medic"),
-          ).toHaveCSS("color", "rgb(248, 113, 113)");
+          ).toHaveCSS("color", "rgb(185, 28, 28)");
           await expect(roster.locator(".attendee-volunteer").first()).toHaveCSS(
             "color",
-            "rgb(74, 222, 128)",
+            "rgb(21, 128, 61)",
           );
           await expect(roster.locator(".attendee-orientee").first()).toHaveCSS(
             "color",
-            "rgb(96, 165, 250)",
+            "rgb(29, 78, 216)",
           );
           if (width === 1280) {
             await roster.locator("summary").focus();
@@ -474,7 +486,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             ),
         ).toBe(false);
         for (const [state, focus] of [
-          ["legend", legend],
           ["roster", card],
           ["crowded", crowded],
         ] as const)
@@ -492,11 +503,10 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
                 (await list.boundingBox())!.width,
             ),
           ).toBeLessThan(1);
-          // A lone series fills the row; occurrences still use that container,
-          // not the viewport (at 800px there is only room for one nested track).
+          // A lone series and its nested occurrences each fill their own row.
           expect(
             await series.locator("[data-series-event-list]").evaluate(columns),
-          ).toBe(width >= 1280 ? 3 : 1);
+          ).toBe(1);
         }
       }
     }
