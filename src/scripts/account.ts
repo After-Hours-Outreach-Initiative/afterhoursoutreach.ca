@@ -319,10 +319,13 @@ form("[data-naloxone-confirm]", async (element, values) => {
       true;
     message(element, result.message!, "success");
     const page = await loadActionPage();
-    syncApplicationProgress(page);
-    document.dispatchEvent(
-      new CustomEvent("application-progress-updated", { detail: page }),
-    );
+    // The portal owns both progress and event-access transitions. Standalone
+    // account content can refresh progress without a second portal update.
+    if (document.querySelector("[data-event-browser]"))
+      document.dispatchEvent(
+        new CustomEvent("application-progress-updated", { detail: page }),
+      );
+    else syncApplicationProgress(page);
   } finally {
     checkbox.disabled = saved;
   }

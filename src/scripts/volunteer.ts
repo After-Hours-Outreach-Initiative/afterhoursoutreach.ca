@@ -3,6 +3,7 @@ import { eventFilter, matchesEventFilter } from "../data/event-browser";
 import { handleEventCalendarClick, syncEventCalendar } from "./event-calendar";
 import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
+import { focusAfterUpdate } from "./focus";
 import { chooseNotification } from "./notification-choice";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
@@ -143,6 +144,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     refreshed.dataset.applicationAwaitingApproval;
   deferredEventRefresh = false;
   if (root.dataset.eventAccess !== refreshed.dataset.eventAccess) {
+    const restoreFocus = root.contains(document.activeElement);
     root.replaceChildren(...refreshed.childNodes);
     root.dataset.eventAccess = refreshed.dataset.eventAccess;
     root.dataset.eventVersion = refreshed.dataset.eventVersion;
@@ -153,11 +155,36 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       new URL(location.href).searchParams.get("type") ?? "all",
     );
     initEventDates(root);
+    if (restoreFocus)
+      focusAfterUpdate(
+        root.querySelector('[aria-current="step"] summary, #events-heading') ??
+          document.querySelector("[data-portal-heading]"),
+      );
     document.dispatchEvent(new Event("account-content-updated"));
     return;
   }
   if (root.dataset.eventAccess !== "true") {
-    root.replaceChildren(...refreshed.childNodes);
+    const tracker = root.querySelector("[data-application-tracker]");
+    const nextTracker = refreshed.querySelector("[data-application-tracker]");
+    if (tracker && nextTracker) {
+      // Pending portal chrome (such as the inactive notice) is authoritative,
+      // but keep the tracker attached so unchanged controls never lose focus.
+      const children = [...refreshed.children];
+      for (const child of [...root.children])
+        if (
+          child !== tracker &&
+          !children.some((updated) => updated.outerHTML === child.outerHTML)
+        )
+          child.remove();
+      let position = root.firstElementChild;
+      for (const updated of children) {
+        if (updated === nextTracker) position = tracker.nextElementSibling;
+        else if (position?.outerHTML === updated.outerHTML)
+          position = position.nextElementSibling;
+        else root.insertBefore(document.importNode(updated, true), position);
+      }
+      syncApplicationProgress(page);
+    } else root.replaceChildren(...refreshed.childNodes);
     root.dataset.eventVersion = refreshed.dataset.eventVersion;
     document.dispatchEvent(new Event("account-content-updated"));
     return;
