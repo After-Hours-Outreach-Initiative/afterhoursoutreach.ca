@@ -1,4 +1,5 @@
 ---
+import CloudCheckIcon from "@/components/icons/CloudCheckIcon.astro";
 import DraftSaveStatus from "./DraftSaveStatus.astro";
 import PageContentsList from "./PageContentsList.astro";
 
@@ -60,41 +61,54 @@ const totalSections = entries.filter((entry) => entry.completable).length;
           </span>
           {
             application && !review && (
-              <span
-                class="volunteer-contents-progress"
-                data-application-progress
-                role="progressbar"
-                aria-label="Application progress"
-                aria-valuemin="0"
-                aria-valuemax={totalSections}
-                aria-valuenow="0"
-                aria-valuetext={`0 of ${totalSections} sections complete`}
-              >
-                <svg
-                  viewBox="0 0 28 28"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                  aria-hidden="true"
+              <>
+                <span
+                  class="volunteer-contents-save-status"
+                  data-draft-save-summary
+                  data-save-state="initializing"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
                 >
-                  <circle
-                    class="volunteer-contents-progress-track"
-                    cx="14"
-                    cy="14"
-                    r="11"
-                  />
-                  <circle
-                    data-application-progress-value
-                    cx="14"
-                    cy="14"
-                    r="11"
-                    pathLength="100"
-                    stroke-dasharray="100"
-                    stroke-dashoffset="100"
-                    transform="rotate(-90 14 14)"
-                  />
-                </svg>
-              </span>
+                  <CloudCheckIcon />
+                  <span class="sr-only" data-draft-save-message />
+                </span>
+                <span
+                  class="volunteer-contents-progress"
+                  data-application-progress
+                  role="progressbar"
+                  aria-label="Application progress"
+                  aria-valuemin="0"
+                  aria-valuemax={totalSections}
+                  aria-valuenow="0"
+                  aria-valuetext={`0 of ${totalSections} sections complete`}
+                >
+                  <svg
+                    viewBox="0 0 28 28"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      class="volunteer-contents-progress-track"
+                      cx="14"
+                      cy="14"
+                      r="11"
+                    />
+                    <circle
+                      data-application-progress-value
+                      cx="14"
+                      cy="14"
+                      r="11"
+                      pathLength="100"
+                      stroke-dasharray="100"
+                      stroke-dashoffset="100"
+                      transform="rotate(-90 14 14)"
+                    />
+                  </svg>
+                </span>
+              </>
             )
           }
           <svg
