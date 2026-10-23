@@ -36,25 +36,6 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
       }
     </div>
   </div>
-  <details class="event-avatar-description">
-    <summary>About these places</summary>
-    <p>
-      Each person shown is registered. Red: approved medics with completed
-      orientation (two reserved, extra medics welcome). Green: other volunteers.
-    </p>
-    {
-      Boolean(event.includesOrientation) && (
-        <p>
-          Blue: orientees, including first-time medics (two reserved, maximum
-          four). No minimum orientee attendance.
-        </p>
-      )
-    }
-    <p>
-      Each person uses one place. Everyone shares total capacity without using
-      another category’s outstanding reservations.
-    </p>
-  </details>
 </div>
 
 <style>
@@ -78,23 +59,6 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
     overflow-x: auto;
     scrollbar-color: #52525b transparent;
     scrollbar-width: thin;
-  }
-  .event-avatar-description {
-    color: var(--color-zinc-300, #d4d4d8);
-    font-size: 0.875rem;
-  }
-  summary {
-    cursor: pointer;
-    min-height: 2.75rem;
-    width: fit-content;
-    padding-block: 0.5rem;
-    align-content: center;
-  }
-  .event-avatar-description p {
-    margin-block: 0.5rem;
-    max-width: 65ch;
-    font-size: 0.875rem;
-    line-height: 1.5;
   }
   .event-row-label {
     padding-block: 0.25rem;

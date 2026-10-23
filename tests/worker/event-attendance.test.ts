@@ -225,6 +225,40 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await page.setViewportSize({ width, height: 900 });
         await page.goto(`${origin}${manage ? "/manage/events" : "/events"}`);
         const list = page.locator("[data-event-list]");
+        const legend = page.getByRole("region", { name: "About these places" });
+        await expect(legend).toHaveCount(1);
+        await expect(list.getByText("About these places")).toHaveCount(0);
+        await expect(legend.locator("dt")).toHaveText([
+          "Approved medics",
+          "Other volunteers",
+          "Orientees",
+        ]);
+        for (const category of ["medic", "volunteer", "orientee"])
+          await expect(
+            legend.locator(`dt .attendee-${category}`),
+          ).toHaveAttribute("aria-hidden", "true");
+        await expect(legend).toContainText(
+          "two reserved places on each patrol",
+        );
+        await expect(legend).toContainText("Extra medics are welcome");
+        await expect(legend).toContainText(
+          "two places are reserved for orientees, with a maximum of four, including first-time medics",
+        );
+        await expect(legend).toContainText("no minimum orientee attendance");
+        await expect(legend).toContainText("Everyone shares total capacity");
+        await expect(legend).toContainText(
+          "Orientee reservations and limits apply only to patrols that include orientation",
+        );
+        expect(
+          await legend.evaluate((element) =>
+            Boolean(
+              document
+                .querySelector("[data-event-list]")!
+                .compareDocumentPosition(element) &
+              Node.DOCUMENT_POSITION_FOLLOWING,
+            ),
+          ),
+        ).toBe(true);
         const columns = (element: Element) =>
           getComputedStyle(element)
             .gridTemplateColumns.split(" ")
@@ -353,12 +387,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           ).toBeLessThan(1);
         };
         await expectActionPosition();
-        const bookedHeight = (await card.boundingBox())!.height;
-        await emptyCard.locator(".event-avatar-description > summary").click();
-        await expectActionPosition();
-        expect(
-          Math.abs((await card.boundingBox())!.height - bookedHeight),
-        ).toBeLessThan(1);
         if (manage) {
           await expect(emptyCard.locator("[data-live-signup]")).toHaveCount(0);
           await expect(
@@ -405,9 +433,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           await setRegistration(false);
           await expect(emptyRoster).toHaveCount(0, { timeout: 15_000 });
           await expect(
-            emptyCard.locator(".event-avatar-description"),
-          ).toHaveAttribute("open", "");
-          await expect(
             emptyCard.locator(".event-attendance .attendee-avatar"),
           ).toHaveCount(0);
         }
@@ -446,7 +471,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             "rgb(96, 165, 250)",
           );
           if (width === 1280) {
-            await card.locator(".event-avatar-description > summary").click();
             await roster.locator("summary").focus();
             await DB.prepare(
               "UPDATE profile SET first_name='Live' WHERE user_id='avatar-attendee-0'",
@@ -456,9 +480,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
               timeout: 15_000,
             });
             await expect(roster).toHaveAttribute("open", "");
-            await expect(
-              card.locator(".event-avatar-description"),
-            ).toHaveAttribute("open", "");
             await expect(roster.locator("summary")).toBeFocused();
           }
         }
@@ -477,7 +498,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             ),
         ).toBe(false);
         for (const [state, focus] of [
-          ["expanded-legend", emptyCard],
+          ["legend", legend],
           ["roster", card],
           ["crowded", crowded],
         ] as const)
