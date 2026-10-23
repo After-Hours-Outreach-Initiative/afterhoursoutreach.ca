@@ -247,18 +247,19 @@ export async function setVolunteerStatus(
       ? "Your volunteer application is approved"
       : "Your volunteer application approval was revoked"
     : "Your After Hours Outreach volunteer access changed";
-  let notificationBody = `Volunteer account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting organizer approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. Sign in to view your events. Orientation attendance does not automatically grant patrol approval.`;
+  const nextStep = !active
+    ? "Your volunteer account is currently inactive. Please contact an organizer before registering for events."
+    : !applicationApproved
+      ? "Sign in using the events link below to review your application steps on the Volunteer page."
+      : patrolApproved
+        ? "Sign in using the events link below to browse upcoming patrols and register for an available spot."
+        : 'Sign in using the events link below. If Naloxone 101 completion is not yet confirmed, return to the Volunteer page, complete the course if needed, and confirm completion only after finishing it. Once completion is confirmed, choose an "Orientation + Patrol" event to register for an available spot. You’ll need separate organizer approval for patrols without orientation.';
+  let notificationBody = `Volunteer account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting organizer approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}. ${nextStep} Orientation attendance does not automatically grant patrol approval.`;
   if (applicationApprovalChanged) {
     if (applicationApproved) {
-      const nextStep = !active
-        ? "Your volunteer account is currently inactive. Please contact an organizer before registering for events."
-        : patrolApproved
-          ? "Sign in using the events link below to browse upcoming patrols and register for an available spot."
-          : 'Sign in using the events link below and choose a patrol marked "Includes orientation" to register for an available spot. You’ll need separate organizer approval for patrols without orientation.';
       notificationBody = `Your volunteer application is approved! Thanks for joining us and supporting our community.\n\n${nextStep}`;
     } else {
-      notificationBody =
-        "Your volunteer application is awaiting organizer approval again. Please contact an organizer if you have questions about this change, and check your events for any changes to your registrations.";
+      notificationBody = `Your volunteer application is awaiting organizer approval again. ${nextStep} Check Your account for any changes to your registrations, or contact an organizer if you have questions.`;
     }
   }
   const operation = crypto.randomUUID();
