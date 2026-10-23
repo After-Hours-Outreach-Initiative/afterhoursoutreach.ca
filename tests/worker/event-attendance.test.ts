@@ -115,7 +115,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
       )
       .run();
     // Three completed medics, three orientees (including a first-time medic),
-    // then only real green attendees. The crowded event exercises wrapping at 100.
+    // then only real green attendees. The crowded event exercises scrolling at 100.
     for (let index = 0; index < 100; index++) {
       const id = `avatar-attendee-${index}`;
       await DB.batch([
@@ -395,6 +395,16 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(
           crowded.locator(".event-attendance .attendee-booked"),
         ).toHaveCount(100);
+        expect(
+          await crowded.locator(".event-avatar-row").evaluate((element) => ({
+            rows: new Set(
+              [...element.children].map(
+                (avatar) => avatar.getBoundingClientRect().top,
+              ),
+            ).size,
+            scrollable: element.scrollWidth > element.clientWidth,
+          })),
+        ).toEqual({ rows: 1, scrollable: true });
         if (manage) {
           await card.locator(".volunteer-roster > summary").click();
           await expect(card.locator(".volunteer-roster li")).toHaveCount(8);
