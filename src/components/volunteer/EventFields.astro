@@ -26,16 +26,9 @@ const publicVisibility = settings
       type="checkbox"
       name="includesOrientation"
       checked={Boolean(settings?.includesOrientation)}
-      aria-describedby={`${id}-orientation-help`}
     />
     <span>Includes orientation</span>
   </label>
-  <p class="volunteer-help" id={`${id}-orientation-help`}>
-    Orientation places count toward total capacity: reserve two for volunteers
-    without completed orientation, with a maximum of four. Fewer than two
-    orientation registrations do not cancel the patrol. Existing bookings must
-    remain eligible.
-  </p>
 </div>
 <DateInput
   name="startsAt"
