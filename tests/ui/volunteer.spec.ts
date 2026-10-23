@@ -315,7 +315,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   await page.goForward();
   await expect(link(patrol.id)).toHaveCount(0);
 
-  for (const width of [375, 320]) {
+  for (const width of [768, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await expect(calendar).toHaveCSS("position", "static");
@@ -323,7 +323,17 @@ test("event calendar links visible cards, reaches later weeks, and survives live
       calendar.boundingBox(),
       page.locator(".volunteer-event-results").boundingBox(),
     ]);
-    expect(calendarBounds!.width).toBeCloseTo(resultsBounds!.width, 0);
+    expect(calendarBounds!.width).toBeCloseTo(
+      Math.min(352, resultsBounds!.width),
+      0,
+    );
+    expect(calendarBounds!.x + calendarBounds!.width / 2).toBeCloseTo(
+      resultsBounds!.x + resultsBounds!.width / 2,
+      0,
+    );
+    expect(calendarBounds!.y + calendarBounds!.height).toBeLessThan(
+      resultsBounds!.y,
+    );
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,
