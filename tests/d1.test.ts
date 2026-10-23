@@ -475,7 +475,15 @@ test("application queue counts all submitted unapproved applications independent
     "Your volunteer application is approved",
   );
   assert.match(approvalEmails[0].text, /Thanks for joining us/);
-  assert.match(approvalEmails[0].text, /patrol marked "Includes orientation"/);
+  assert.match(
+    approvalEmails[0].text,
+    /If Naloxone 101 completion is not yet confirmed, return to the Volunteer page, complete the course if needed, and confirm completion only after finishing it/,
+  );
+  assert.match(
+    approvalEmails[0].text,
+    /Once completion is confirmed, choose an "Orientation \+ Patrol" event/,
+  );
+  assert.doesNotMatch(approvalEmails[0].text, /Includes orientation/);
   assert.match(
     approvalEmails[0].text,
     /separate organizer approval for patrols without orientation/,
@@ -484,6 +492,46 @@ test("application queue counts all submitted unapproved applications independent
     approvalEmails[0].text,
     /Events: https:\/\/afterhoursoutreach\.ca\/events$/,
   );
+  for (const [active, patrolApproved, guidance] of [
+    [
+      false,
+      false,
+      /currently inactive.*contact an organizer before registering/,
+    ],
+    [true, true, /browse upcoming patrols and register for an available spot/],
+    [
+      true,
+      false,
+      /If Naloxone 101 completion is not yet confirmed.*Volunteer page.*only after finishing it.*Once completion is confirmed.*"Orientation \+ Patrol"/,
+    ],
+  ] as const) {
+    const current = (await listVolunteers(env.DB, actor, "pending-02")).rows[0];
+    const accessChange = await setVolunteerStatus(env.DB, actor, {
+      userId: current.id,
+      version: current.updatedAt,
+      active,
+      patrolApproved,
+      notify: true,
+    });
+    const email = await env.DB.prepare(
+      "SELECT subject, body, delivery_to AS recipient FROM event_notification WHERE operation_id=?",
+    )
+      .bind(accessChange.operation)
+      .first<{ subject: string; body: string; recipient: string }>();
+    assert.equal(
+      email?.subject,
+      "Your After Hours Outreach volunteer access changed",
+    );
+    assert.equal(email?.recipient, "pending-02@example.org");
+    assert.match(email!.body, guidance);
+    assert.doesNotMatch(
+      email!.body,
+      /Includes orientation|Sign in to view your events/,
+    );
+    // Patrol-approved legacy profiles need no new course confirmation.
+    if (patrolApproved)
+      assert.doesNotMatch(email!.body, /Naloxone|Volunteer page/);
+  }
   const after = await listVolunteers(
     env.DB,
     actor,
@@ -518,6 +566,12 @@ test("application queue counts all submitted unapproved applications independent
     "Your volunteer application approval was revoked",
   );
   assert.match(revokedEmail!.body, /awaiting organizer approval again/);
+  assert.match(revokedEmail!.body, /application steps on the Volunteer page/);
+  assert.match(revokedEmail!.body, /Check Your account for any changes/);
+  assert.doesNotMatch(
+    revokedEmail!.body,
+    /check your events|register for an available spot/,
+  );
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting"))
       .awaitingApprovalCount,
