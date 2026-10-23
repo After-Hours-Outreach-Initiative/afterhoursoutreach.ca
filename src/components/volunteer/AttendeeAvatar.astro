@@ -19,6 +19,15 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
     <circle cx="12" cy="6" r="3.5" fill="currentColor" stroke="none"></circle>
     <path d="M5 22v-5a7 7 0 0 1 14 0v5Z" fill="currentColor" stroke="none"
     ></path>
+    {
+      category === "medic" && (
+        <path
+          d="M10.75 12.25h2.5v2.5h2.5v2.5h-2.5v2.5h-2.5v-2.5h-2.5v-2.5h2.5Z"
+          fill="#fff"
+          stroke="none"
+        />
+      )
+    }
   </svg>
 </span>
 
@@ -34,12 +43,12 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
     height: 100%;
   }
   .attendee-medic {
-    color: #f87171;
+    color: #b91c1c;
   }
   .attendee-volunteer {
-    color: #4ade80;
+    color: #15803d;
   }
   .attendee-orientee {
-    color: #60a5fa;
+    color: #1d4ed8;
   }
 </style>
