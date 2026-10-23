@@ -2,6 +2,7 @@
 import type { ApplicationProgress } from "@/server/db/application-progress";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import CheckIcon from "@/components/icons/CheckIcon.astro";
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
 import NaloxoneCourseStep from "./NaloxoneCourseStep.astro";
 
 interface Props {
@@ -20,7 +21,9 @@ const {
 } = Astro.props;
 const dateFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Vancouver",
-  dateStyle: "long",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
 });
 const steps = [
   {
@@ -28,28 +31,25 @@ const steps = [
     title: "Application Form Submitted",
     completed: progress.submittedAt !== null,
     completedAt: progress.submittedAt,
-    dateLabel: "Completed",
   },
   {
     key: "naloxone",
     title: "Complete Naloxone 101",
     completed: progress.naloxoneCompletedAt !== null,
     completedAt: progress.naloxoneCompletedAt,
-    dateLabel: "Confirmed",
   },
   {
     key: "review",
     title: "Application review",
     completed: progress.applicationApproved,
     completedAt: progress.applicationApprovedAt,
-    dateLabel: "Approved",
   },
 ];
 const currentStep = steps.findIndex((step) => !step.completed);
 ---
 
 <section
-  class="volunteer-panel application-progress"
+  class="volunteer-panel application-progress text-base"
   aria-labelledby={headingId}
   data-application-tracker
   data-progress-version={JSON.stringify(steps)}
@@ -75,44 +75,46 @@ const currentStep = steps.findIndex((step) => !step.completed);
             open={index === currentStep}
           >
             <summary>
-              <span class="application-progress-number" aria-hidden="true">
-                {index + 1}
+              <span
+                class:list={[
+                  "application-progress-marker",
+                  { "application-progress-number": !step.completed },
+                ]}
+                aria-hidden="true"
+              >
+                {step.completed ? <CheckIcon class="size-6" /> : index + 1}
               </span>
               <span class="application-progress-label">
                 <span class="application-progress-title">
                   <span class="sr-only">Step {index + 1}: </span>
                   {step.title}
-                  {step.completed && <CheckIcon class="size-5 shrink-0" />}
                 </span>
-                <span class="application-progress-status">
-                  {step.completed ? (
-                    <>
-                      {step.dateLabel}
-                      {" · "}
-                      {step.completedAt !== null ? (
-                        <time
-                          datetime={new Date(step.completedAt).toISOString()}
-                        >
-                          {dateFormat.format(step.completedAt)}
-                        </time>
-                      ) : (
-                        "Date not recorded"
-                      )}
-                    </>
-                  ) : index === currentStep ? (
-                    "Current step"
-                  ) : (
-                    "Not started"
-                  )}
-                </span>
+                {step.completed ? (
+                  <span class="application-progress-status text-sm">
+                    Completed:{" "}
+                    {step.completedAt !== null ? (
+                      <time datetime={new Date(step.completedAt).toISOString()}>
+                        {dateFormat.format(step.completedAt)}
+                      </time>
+                    ) : (
+                      "Date not recorded"
+                    )}
+                  </span>
+                ) : step.key === "review" && progress.submittedAt !== null ? (
+                  <span class="application-progress-status text-sm">
+                    Pending approval
+                  </span>
+                ) : null}
               </span>
-              <ArrowRightIcon class="application-progress-toggle size-5 shrink-0" />
+              <ChevronDownIcon class="application-progress-toggle size-5 shrink-0" />
             </summary>
             <div class="application-progress-content">
               {step.key === "form" &&
                 (progress.submittedAt !== null ? (
                   <slot name="application">
-                    <p>Your application form has been submitted.</p>
+                    <p class="text-base">
+                      Your application form has been submitted.
+                    </p>
                     <a class="btn btn-outline mt-4" href="/volunteer/account">
                       View submitted application
                       <ArrowRightIcon class="btn-icon" />
@@ -120,7 +122,7 @@ const currentStep = steps.findIndex((step) => !step.completed);
                   </slot>
                 ) : (
                   <>
-                    <p>
+                    <p class="text-base">
                       Complete the application form, accept the Code of Conduct,
                       and submit.
                     </p>
@@ -137,13 +139,13 @@ const currentStep = steps.findIndex((step) => !step.completed);
                     completedAt={progress.naloxoneCompletedAt}
                   />
                 ) : (
-                  <p>
+                  <p class="text-base">
                     After submitting your form and Code of Conduct, take
                     Naloxone 101 and confirm completion here.
                   </p>
                 ))}
               {step.key === "review" && (
-                <p>
+                <p class="text-base">
                   {progress.applicationApproved ? (
                     "Your application has been approved. You can sign up for a patrol that includes orientation when your volunteer account is active."
                   ) : (
@@ -188,12 +190,14 @@ const currentStep = steps.findIndex((step) => !step.completed);
   summary::-webkit-details-marker {
     display: none;
   }
-  .application-progress-number {
+  .application-progress-marker {
     display: grid;
     place-items: center;
     flex-shrink: 0;
     width: 2rem;
     height: 2rem;
+  }
+  .application-progress-number {
     border: 1px solid currentColor;
     border-radius: 50%;
   }
@@ -212,7 +216,6 @@ const currentStep = steps.findIndex((step) => !step.completed);
     display: block;
     margin-top: 0.25rem;
     color: #a1a1aa;
-    font-size: 0.875rem;
   }
   details[data-state="current"] {
     border-color: var(--color-blue);
@@ -244,10 +247,7 @@ const currentStep = steps.findIndex((step) => !step.completed);
     border: 0;
     background: transparent;
   }
-  summary :global(.application-progress-toggle) {
-    transform: rotate(90deg);
-  }
   details[open] > summary :global(.application-progress-toggle) {
-    transform: rotate(-90deg);
+    transform: rotate(180deg);
   }
 </style>

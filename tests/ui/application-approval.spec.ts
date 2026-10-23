@@ -1,10 +1,34 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { social } from "../../src/data/site";
 import {
   approveLocalApplication,
   createLocalAccount,
   openLocalAccountSwitcher,
 } from "../helpers/local-account";
+
+async function expectCompletedStep(step: Locator) {
+  await expect(step).toHaveAttribute("data-state", "complete");
+  const summary = step.locator("summary");
+  const marker = summary.locator(".application-progress-marker");
+  await expect(marker).toHaveText("");
+  await expect(marker.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  await expect(marker.locator("path")).toHaveAttribute("d", "m5 12 4 4L19 6");
+  await expect(
+    summary.locator(
+      ".application-progress-number, .application-progress-title svg",
+    ),
+  ).toHaveCount(0);
+  const status = summary.locator(".application-progress-status");
+  await expect(status).toHaveText(
+    /^Completed: (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}$/,
+  );
+  await expect(status.locator("time")).toHaveAttribute("datetime", /T.*Z$/);
+  await expect(status).toHaveCSS("font-size", "14px");
+  await expect(summary.locator(".application-progress-title")).toHaveCSS(
+    "font-size",
+    "16px",
+  );
+}
 
 test("pending applications poll every minute, then approval restores five-second event checks", async ({
   page,
@@ -31,6 +55,9 @@ test("pending applications poll every minute, then approval restores five-second
     const portal = volunteer.locator("[data-event-browser]");
     const tracker = portal.locator("[data-application-tracker]");
     const formStep = tracker.locator('[data-application-progress-step="form"]');
+    const naloxone = tracker.locator(
+      '[data-application-progress-step="naloxone"]',
+    );
     const review = tracker.locator('[data-application-progress-step="review"]');
     await expect(
       tracker.locator("[data-application-progress-step]"),
@@ -42,7 +69,30 @@ test("pending applications poll every minute, then approval restores five-second
       "data-application-awaiting-approval",
       "true",
     );
-    await expect(formStep).toHaveAttribute("data-state", "complete");
+    await expectCompletedStep(formStep);
+    await expect(tracker).not.toContainText(/Current step|Not started/);
+    await expect(naloxone.locator(".application-progress-number")).toHaveText(
+      "2",
+    );
+    await expect(review.locator(".application-progress-number")).toHaveText(
+      "3",
+    );
+    await expect(naloxone.locator(".application-progress-status")).toHaveCount(
+      0,
+    );
+    await expect(review.locator(".application-progress-status")).toHaveText(
+      "Pending approval",
+    );
+    for (const paragraph of await tracker.locator("p").all()) {
+      await expect(paragraph).toHaveCSS("font-size", "16px");
+    }
+    for (const toggle of await tracker
+      .locator(".application-progress-toggle")
+      .all()) {
+      await expect(toggle.locator("path")).toHaveAttribute("d", "m6 9 6 6 6-6");
+    }
+    const formToggle = formStep.locator(".application-progress-toggle");
+    await expect(formToggle).toHaveCSS("transform", "none");
     await expect(formStep).not.toHaveAttribute("open");
     await expect(formStep.locator("summary")).toContainText(
       "Application Form Submitted",
@@ -55,6 +105,10 @@ test("pending applications poll every minute, then approval restores five-second
       `An organizer will review your application. We'll email you at ${account.email} to let you know whether it's approved and what to do next.`,
     );
     await formStep.locator("summary").click();
+    await expect(formToggle).toHaveCSS(
+      "transform",
+      "matrix(-1, 0, 0, -1, 0, 0)",
+    );
     await expect(
       formStep.getByRole("link", {
         name: "View submitted application",
@@ -66,6 +120,7 @@ test("pending applications poll every minute, then approval restores five-second
       .getByRole("button", { name: "Confirm completion", exact: true })
       .click();
     await expect(review).toHaveAttribute("open");
+    await expectCompletedStep(naloxone);
     await expect(
       portal.getByText(
         "Join our Discord for more information and to become more involved.",
@@ -229,6 +284,9 @@ test("approved applicants keep progress until naloxone confirmation, then retain
     await volunteer.goto(`${baseURL}/events`);
     const tracker = volunteer.locator("[data-application-tracker]");
     await expect(tracker).toBeVisible();
+    await expectCompletedStep(
+      tracker.locator('[data-application-progress-step="review"]'),
+    );
     await expect(
       tracker.locator('[data-application-progress-step="naloxone"]'),
     ).toHaveAttribute("data-state", "current");
