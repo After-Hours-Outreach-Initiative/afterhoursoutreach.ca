@@ -15,6 +15,7 @@ import { eventViewVersion } from "@/server/events/version";
 import AccountLayout from "./AccountLayout.astro";
 import SignInPanel from "./SignInPanel.astro";
 import EventCard from "./EventCard.astro";
+import EventCalendar from "./EventCalendar.astro";
 import EventEditor from "./EventEditor.astro";
 import PatrolSeriesCard from "./PatrolSeriesCard.astro";
 import {
@@ -296,6 +297,23 @@ const hasVisibleEvents = management
               </button>
             ))}
           </form>
+          {!manage && (
+            <EventCalendar
+              events={events
+                .filter((event) =>
+                  matchesEventFilter(
+                    filter,
+                    Boolean(event.seriesId),
+                    Boolean(event.includesOrientation),
+                  ),
+                )
+                .map((event) => ({
+                  id: event.id,
+                  startsAt: event.startsAt,
+                  label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
+                }))}
+            />
+          )}
           <ul class="volunteer-event-list" data-event-list>
             {management
               ? managementItems.map((item) =>

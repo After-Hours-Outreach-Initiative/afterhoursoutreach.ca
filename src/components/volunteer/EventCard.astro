@@ -51,8 +51,12 @@ const blocked =
 ---
 
 <li
+  id={`event-${event.id}`}
   class="volunteer-event-card"
+  tabindex="-1"
   data-live-event={event.id}
+  data-event-start={event.startsAt}
+  data-event-label={`${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`}
   data-event-type="patrol"
   data-includes-orientation={String(Boolean(event.includesOrientation))}
   hidden={!matchesEventFilter(
@@ -193,6 +197,29 @@ const blocked =
 <style>
   .volunteer-event-card {
     padding: 1rem;
+    scroll-margin-top: calc(
+      var(--site-header-rendered-height, var(--site-header-height, 6rem)) + 1rem
+    );
+  }
+  .volunteer-event-card[data-calendar-highlight] {
+    animation: event-highlight 1.5s ease-out;
+  }
+  @keyframes event-highlight {
+    from {
+      border-color: #a5b4fc;
+      box-shadow: 0 0 0 4px #818cf880;
+    }
+    to {
+      border-color: #3f3f46;
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .volunteer-event-card[data-calendar-highlight] {
+      animation: none;
+      outline: 3px solid #a5b4fc;
+      outline-offset: 3px;
+    }
   }
   .volunteer-event-layout {
     display: grid;

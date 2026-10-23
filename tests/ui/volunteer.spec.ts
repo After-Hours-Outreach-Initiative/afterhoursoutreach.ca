@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { formatEventDate } from "../../src/data/event-time";
+import {
+  addCalendarDays,
+  formatEventDate,
+  vancouverInput,
+  vancouverInstant,
+} from "../../src/data/event-time";
 import { social } from "../../src/data/site";
 import {
   createLocalAccount,
@@ -156,6 +161,196 @@ test("event filters include orientation without excluding other patrols, preserv
     .getByRole("button", { name: "All events", exact: true })
     .click();
   await expectFilter("all");
+});
+
+test("event calendar links visible cards, reaches later weeks, and survives live event changes", async ({
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(45_000);
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("[data-event-calendar]")).toHaveCount(0);
+  const today = vancouverInput(Date.now()).slice(0, 10);
+  const date = addCalendarDays(today, 2);
+  const makeEvent = async (
+    day: string,
+    time: string,
+    includesOrientation: boolean,
+  ) => {
+    const event = {
+      includesOrientation,
+      startsAt: vancouverInstant(`${day}T${time}`),
+      meetingPoint: `Calendar ${crypto.randomUUID()}`,
+      meetingPointUrl: "",
+      spots: 10,
+      open: true,
+      hidden: false,
+    };
+    const response = await page.request.post("/api/v1/events/action", {
+      headers: { origin: baseURL! },
+      data: { action: "save", event },
+    });
+    expect(response.status(), await response.text()).toBe(200);
+    const listed = await page.request.get("/api/v1/events");
+    const { events } = await listed.json();
+    const created = events.find(
+      (item: { meetingPoint: string }) =>
+        item.meetingPoint === event.meetingPoint,
+    );
+    expect(created).toBeDefined();
+    return { id: created.id as string, event };
+  };
+  const patrol = await makeEvent(date, "18:00", false);
+  const orientation = await makeEvent(date, "19:00", true);
+  const distant = await makeEvent(addCalendarDays(today, 49), "20:00", true);
+  await page.goto(`/events?occurrence=${orientation.id}`);
+  const documents: string[] = [];
+  page.on("request", (request) => {
+    if (request.resourceType() === "document") documents.push(request.url());
+  });
+  const calendar = page.locator("[data-event-calendar]");
+  const link = (id: string) =>
+    calendar.locator(`[data-calendar-event="${id}"]`);
+  const card = (id: string) => page.locator(`[data-live-event="${id}"]`);
+  await expect(calendar.locator("tbody tr")).toHaveCount(5);
+  await expect(calendar.locator("td")).toHaveCount(35);
+  await expect(
+    calendar.locator(`[data-calendar-date="${date}"] a`),
+  ).toHaveCount(2);
+  await expect(
+    calendar.locator(`[data-calendar-date="${date}"] .event-calendar-circle`),
+  ).toHaveCount(1);
+  await expect(link(patrol.id)).toHaveAccessibleName(
+    new RegExp(patrol.event.meetingPoint),
+  );
+  await expect(
+    calendar.locator("td:not(:has(a))").first().locator("a"),
+  ).toHaveCount(0);
+  await link(orientation.id).focus();
+  await page.keyboard.press("Enter");
+  await expect(card(orientation.id)).toBeFocused();
+  await expect(card(orientation.id)).toBeInViewport();
+  await expect(card(orientation.id)).toHaveAttribute(
+    "data-calendar-highlight",
+    "",
+  );
+  expect(
+    await card(orientation.id).evaluate(
+      (element) => getComputedStyle(element).animationName,
+    ),
+  ).not.toBe("none");
+  await expect(page).toHaveURL(
+    new RegExp(`occurrence=${orientation.id}#event-${orientation.id}$`),
+  );
+  await expect(card(orientation.id)).not.toHaveAttribute(
+    "data-calendar-highlight",
+    "",
+  );
+
+  await page
+    .getByRole("button", { name: "Includes orientation", exact: true })
+    .click();
+  await expect(link(patrol.id)).toHaveCount(0);
+  await expect(link(orientation.id)).toBeVisible();
+  // Every date/event link must still target a real, visible card after filtering.
+  expect(
+    await calendar.locator("a").evaluateAll((links) =>
+      links.every((link) => {
+        const card = document.getElementById(
+          (link as HTMLAnchorElement).hash.slice(1),
+        );
+        return card && !card.hidden;
+      }),
+    ),
+  ).toBe(true);
+  await page.goBack();
+  await expect(link(patrol.id)).toBeVisible();
+  await page.goForward();
+  await expect(link(patrol.id)).toHaveCount(0);
+
+  for (const width of [375, 320]) {
+    await page.setViewportSize({ width, height: 812 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+    await link(orientation.id).click();
+    await expect(card(orientation.id)).toBeFocused();
+    await expect(card(orientation.id)).toBeInViewport();
+    expect(
+      await card(orientation.id).evaluate(
+        (element) => getComputedStyle(element).animationName,
+      ),
+    ).toBe("none");
+    expect(
+      await card(orientation.id).evaluate(
+        (element) => getComputedStyle(element).outlineStyle,
+      ),
+    ).toBe("solid");
+  }
+
+  await calendar.getByRole("button", { name: "Next five weeks" }).click();
+  await expect(link(distant.id)).toBeVisible();
+  const start = await calendar.getAttribute("data-calendar-start");
+  const version = async () => {
+    const response = await page.request.get(
+      `/manage/events?occurrence=${distant.id}`,
+    );
+    expect(response.ok()).toBe(true);
+    const value = (await response.text()).match(
+      new RegExp(
+        `data-live-event="${distant.id}"[\\s\\S]*?name="version" value="(\\d+)"`,
+      ),
+    )?.[1];
+    expect(value).toBeDefined();
+    return Number(value);
+  };
+  const movedDate = addCalendarDays(today, 50);
+  const moved = {
+    ...distant.event,
+    startsAt: vancouverInstant(`${movedDate}T20:00`),
+  };
+  await link(distant.id).focus();
+  const updated = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: {
+      action: "save",
+      id: distant.id,
+      version: await version(),
+      event: moved,
+    },
+  });
+  expect(updated.status(), await updated.text()).toBe(200);
+  await expect(
+    calendar.locator(
+      `[data-calendar-date="${movedDate}"] [data-calendar-event="${distant.id}"]`,
+    ),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(link(distant.id)).toBeFocused();
+  await expect(calendar).toHaveAttribute("data-calendar-start", start!);
+  const cancelled = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: { action: "cancel-event", id: distant.id, version: await version() },
+  });
+  expect(cancelled.status(), await cancelled.text()).toBe(200);
+  await expect(card(distant.id)).toHaveCount(0, { timeout: 15_000 });
+  await expect(link(distant.id)).toHaveCount(0);
+  await expect(page).toHaveURL(
+    new RegExp(
+      `occurrence=${orientation.id}&type=orientation#event-${orientation.id}$`,
+    ),
+  );
+  expect(documents).toEqual([]);
 });
 
 test("View as has a button for every seeded profile and supports keyboard switching on mobile", async ({

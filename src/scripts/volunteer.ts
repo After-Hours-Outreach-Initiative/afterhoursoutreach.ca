@@ -1,5 +1,6 @@
 import { vancouverInstant } from "../data/event-time";
 import { eventFilter, matchesEventFilter } from "../data/event-browser";
+import { handleEventCalendarClick, syncEventCalendar } from "./event-calendar";
 import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
 import { chooseNotification } from "./notification-choice";
@@ -76,13 +77,16 @@ function applyEventFilter(root: HTMLElement, type: string) {
     );
   const empty = root.querySelector<HTMLElement>("[data-empty-events]");
   if (empty) empty.hidden = visible !== 0;
+  syncEventCalendar(root);
 }
 
 document
   .querySelectorAll<HTMLElement>("[data-event-browser]")
   .forEach((root) => {
     const applyFilter = (type: string) => applyEventFilter(root, type);
+    syncEventCalendar(root);
     root.addEventListener("click", (event) => {
+      handleEventCalendarClick(root, event);
       if (!(event.target instanceof Element)) return;
       const button = event.target.closest<HTMLButtonElement>(
         "[data-event-filter]",
@@ -337,7 +341,9 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
                   ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
                   : ".volunteer-roster summary";
     (card && !card.hidden
-      ? card.querySelector<HTMLElement>(selector)
+      ? !element && focused === focusedCard
+        ? card
+        : card.querySelector<HTMLElement>(selector)
       : null
     )?.focus({ preventScroll: true });
     if (document.activeElement === document.body)
