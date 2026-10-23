@@ -116,10 +116,6 @@ test("organizers review submitted applications with a global queue count and per
       assert.equal((await get(path, volunteerCookie)).status, 403);
     for (const [oldPath, destination] of [
       [
-        "/volunteer?type=orientation&occurrence=a%2Fb",
-        "/events?type=orientation&occurrence=a%2Fb",
-      ],
-      [
         "/volunteer/volunteers?approval=awaiting&q=applicant&offset=50",
         listPath,
       ],
@@ -131,20 +127,14 @@ test("organizers review submitted applications with a global queue count and per
       ["/volunteers/applicant-50", "/manage/volunteers/applicant-50"],
     ]) {
       const legacy = await get(oldPath);
-      assert.equal(
-        legacy.status,
-        oldPath.startsWith("/volunteer?") ? 302 : 301,
-      );
+      assert.equal(legacy.status, 301);
       assert.equal(legacy.headers.get("location"), destination);
       assert.equal(legacy.headers.get("cache-control"), "no-store");
     }
     const eventPath = "/events?type=orientation&occurrence=a%2Fb";
     const introduction = await get("/volunteer?type=orientation", "");
     assert.equal(introduction.status, 200);
-    assert.match(
-      await introduction.text(),
-      /data-return-to="\/events\?type=orientation"/,
-    );
+    assert.match(await introduction.text(), /data-return-to="\/volunteer"/);
     const signedOutEvents = await get(eventPath, "");
     assert.equal(signedOutEvents.status, 302);
     assert.equal(
@@ -155,6 +145,24 @@ test("organizers review submitted applications with a global queue count and per
       eventPath,
     );
     for (const auth of [cookie, volunteerCookie]) {
+      const signIn = await get(
+        "/volunteer/sign-in?returnTo=%2Fmanage%2Fevents",
+        auth,
+      );
+      assert.equal(signIn.status, 302);
+      assert.equal(signIn.headers.get("location"), "/volunteer");
+      const landing = await get(
+        "/volunteer?type=orientation&occurrence=a%2Fb",
+        auth,
+      );
+      assert.equal(landing.status, 200);
+      const landingHtml = await landing.text();
+      assert.match(landingHtml, /data-event-path="\/volunteer"/);
+      assert.match(landingHtml, /data-event-access="true"/);
+      assert.equal(
+        landingHtml.includes('href="/manage/events"'),
+        auth === cookie,
+      );
       const events = await get("/events", auth);
       assert.equal(events.status, 200);
       assert.equal(events.headers.get("cache-control"), "no-store");

@@ -12,14 +12,14 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { z } from "zod";
 import { createDatabase } from "../db";
 import * as schema from "../db/schema";
-import { RequestError, safeReturnTo } from "../http";
+import { RequestError } from "../http";
+import { signInDestination } from "../../data/account-navigation";
 import {
   cleanupAuthRecords,
   limitEmailRequests,
   limitEmailVerification,
   takeRateLimit,
 } from "../db/rate-limits";
-import { hasApplied } from "../db/profiles";
 import {
   markSessionSecondFactorVerified,
   revokeOtherAccountSessions,
@@ -109,13 +109,6 @@ function authError(error: unknown): never {
   throw error;
 }
 
-function signInReturnTo(query: Record<string, unknown> | undefined) {
-  const value = query?.returnTo;
-  return safeReturnTo(
-    typeof value === "string" && value.length <= 1024 ? value : undefined,
-  );
-}
-
 /** Construct with the current request's D1 binding, never a module singleton. */
 export function createAuth(
   bindings: AuthBindings,
@@ -175,7 +168,7 @@ export function createAuth(
           email,
           otp,
           activation: link.nonce,
-          returnTo: signInReturnTo(ctx?.query),
+          returnTo: signInDestination,
         }).toString();
       try {
         const localEmail = await services.sendEmail({
@@ -251,25 +244,10 @@ export function createAuth(
             const token =
               ctx.context.newSession?.session.token ?? result.data.token;
             await markSessionSecondFactorVerified(bindings.DB, token);
-            const cookie = ctx.context.createAuthCookie("sign_in_return");
-            const value = await ctx.getSignedCookie(
-              cookie.name,
-              ctx.context.secret,
-            );
-            expireCookie(ctx, cookie);
-            let next = "/volunteer/account";
-            if (value) {
-              try {
-                const redirect = z
-                  .object({ userId: z.string(), next: z.string() })
-                  .parse(JSON.parse(value));
-                if (redirect.userId === result.data.user.id)
-                  next = safeReturnTo(redirect.next);
-              } catch {
-                // A stale or malformed redirect cookie never affects sign-in.
-              }
-            }
-            return ctx.json({ ...result.data, next });
+            // Clear return cookies from older sign-in flows, but never use them
+            // to choose a different landing page after verifying the factor.
+            expireCookie(ctx, ctx.context.createAuthCookie("sign_in_return"));
+            return ctx.json({ ...result.data, next: signInDestination });
           }),
         },
       ],
@@ -584,27 +562,9 @@ export function createAuth(
         if (!current || !result.success) return;
         if (ctx.headers?.has("x-email-link-activation"))
           expireCookie(ctx, ctx.context.createAuthCookie("email_link"));
-        const applicationSubmitted = await hasApplied(
-          bindings.DB,
-          current.user.id,
-        );
-        const next = applicationSubmitted
-          ? signInReturnTo(ctx.query)
-          : "/apply";
-        // This hook runs before the two-factor plugin replaces the session
-        // with a pending challenge for accounts that opted into an authenticator.
-        if (current.user.twoFactorEnabled) {
-          const cookie = ctx.context.createAuthCookie("sign_in_return", {
-            maxAge: 600,
-          });
-          await ctx.setSignedCookie(
-            cookie.name,
-            JSON.stringify({ userId: current.user.id, next }),
-            ctx.context.secret,
-            cookie.attributes,
-          );
-        }
-        return ctx.json({ ...result.data, next });
+        // The two-factor plugin still replaces this response with a challenge
+        // for enrolled accounts. Every completed sign-in shares one destination.
+        return ctx.json({ ...result.data, next: signInDestination });
       }),
     },
     plugins: [

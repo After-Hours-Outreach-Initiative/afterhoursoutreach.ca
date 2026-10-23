@@ -8,7 +8,7 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import { safeReturnTo } from "@/server/http";
+import { signInDestination } from "@/data/account-navigation";
 export const prerender = false;
 if (env.BETTER_AUTH_SECRET) {
   try {
@@ -21,21 +21,16 @@ if (env.BETTER_AUTH_SECRET) {
       current?.user.emailVerified &&
       (!current.user.twoFactorEnabled || current.session.twoFactorVerified)
     )
-      return Astro.redirect(
-        safeReturnTo(Astro.url.searchParams.get("returnTo") ?? undefined),
-      );
+      return Astro.redirect(signInDestination);
   } catch {
     return new Response("Sign-in is temporarily unavailable.", { status: 503 });
   }
 }
-const returnTo = safeReturnTo(
-  Astro.url.searchParams.get("returnTo") ?? undefined,
-);
 ---
 
 <AccountLayout
   title="Sign in"
   description="Sign in or create your volunteer account with an email link or code."
 >
-  <SignInPanel returnTo={returnTo} />
+  <SignInPanel />
 </AccountLayout>

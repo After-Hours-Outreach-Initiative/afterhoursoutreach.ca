@@ -1,13 +1,9 @@
 ---
 import { env } from "cloudflare:workers";
-import { safeReturnTo } from "@/server/http";
+import { signInDestination } from "@/data/account-navigation";
 import SecondFactorForm from "./SecondFactorForm.astro";
 import EmailCodeForm from "./EmailCodeForm.astro";
 import FieldError from "@/components/FieldError.astro";
-interface Props {
-  returnTo?: string;
-}
-const returnTo = safeReturnTo(Astro.props.returnTo);
 const localTesting = Boolean(import.meta.env.DEV);
 const ready = Boolean(
   env.BETTER_AUTH_SECRET && (localTesting || env.RESEND_API_KEY),
@@ -26,7 +22,7 @@ const ready = Boolean(
   }
   <form
     data-email-request
-    data-return-to={returnTo}
+    data-return-to={signInDestination}
     class="volunteer-form"
     action="/api/v1/auth/email-otp/send-verification-otp"
     method="post"

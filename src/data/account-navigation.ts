@@ -1,3 +1,5 @@
+export const signInDestination = "/volunteer";
+
 export interface AccountNavigation {
   signedIn: boolean;
   name: string;

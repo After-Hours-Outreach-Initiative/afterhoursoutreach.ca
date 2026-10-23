@@ -5,7 +5,7 @@ import {
   emailCodeErrorMessage,
   showFormMessage as message,
 } from "./account-forms";
-import { safeReturnTo } from "../server/http";
+import { signInDestination } from "../data/account-navigation";
 import type { SignInEmail } from "../server/auth/services";
 
 const resendCooldownMs = 30_000;
@@ -41,7 +41,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
     const ready = requestButton ? !requestButton.disabled : true;
     const requestLabel = requestButton?.textContent ?? "";
     let email = "";
-    let returnTo = safeReturnTo(request?.dataset.returnTo);
+    const returnTo = signInDestination;
     let busy = false;
     let sending = false;
     let resendAt = 0;
@@ -250,7 +250,6 @@ export function initEmailSignIn(finish: (result: object) => void) {
       email = (values.get("email") ?? "").trim().toLowerCase();
       proof = values.get("otp");
       const activation = values.get("activation");
-      returnTo = safeReturnTo(values.get("returnTo") ?? undefined);
       const address = link.querySelector<HTMLElement>("[data-sign-in-email]");
       if (address) address.textContent = email;
       const fallback = panel.querySelector<HTMLAnchorElement>(
