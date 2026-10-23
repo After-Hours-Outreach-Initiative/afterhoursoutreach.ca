@@ -286,9 +286,16 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           ["volunteer", "rgb(74, 222, 128)"],
           ["orientee", "rgb(96, 165, 250)"],
         ]) {
-          await expect(
-            card.locator(`.event-avatar-row .attendee-${category} svg`).first(),
-          ).toHaveCSS("fill", color);
+          const avatar = card
+            .locator(`.event-avatar-row .attendee-${category} svg`)
+            .first();
+          for (const tag of ["circle", "path"]) {
+            const shape = avatar.locator(tag);
+            await expect(shape).toHaveAttribute("fill", "currentColor");
+            await expect(shape).toHaveAttribute("stroke", "none");
+            await expect(shape).toHaveCSS("fill", color);
+            await expect(shape).toHaveCSS("stroke", "none");
+          }
         }
         await expect(card.locator(".event-orientee-box")).toHaveCount(0);
         const emptyCard = page.locator(`[data-live-event="${empty}"]`);
