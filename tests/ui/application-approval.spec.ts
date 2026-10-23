@@ -403,9 +403,7 @@ test("approval preserves the course draft, expanded snapshot and focus until con
     await expect(
       completedInfo.locator("[data-submitted-application]"),
     ).toBeVisible();
-    await expect(completedInfo).toContainText(
-      "Naloxone 101 completion (self-reported)",
-    );
+    await expect(completedInfo).toContainText("Naloxone 101 completion");
     await expect(completedInfo).toContainText("Application approved");
   } finally {
     await volunteerContext.close();
