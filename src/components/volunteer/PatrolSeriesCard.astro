@@ -58,7 +58,7 @@ const date = new Intl.DateTimeFormat("en-CA", {
       {series.hidden || !series.open ? " · Public visibility off" : ""}
     </p>
     <p>Starting on {date}</p>
-    <p>{formatTimeInput(series.localTime)} (Vancouver)</p>
+    <p>{formatTimeInput(series.localTime)}</p>
     <p>
       Meeting at {
         series.meetingPointUrl ? (
