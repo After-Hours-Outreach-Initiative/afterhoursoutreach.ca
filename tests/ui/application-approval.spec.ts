@@ -20,9 +20,7 @@ test("pending applications poll every minute, then approval restores five-second
     const account = await createLocalAccount(volunteer.request, baseURL!);
     await volunteer.goto(`${baseURL}/volunteer`);
     await expect(
-      volunteer.getByRole("heading", {
-        name: "Application Submitted",
-      }),
+      volunteer.locator('[data-application-progress-step="form"] > summary'),
     ).toBeVisible();
     await expect(
       volunteer.locator(
@@ -30,23 +28,40 @@ test("pending applications poll every minute, then approval restores five-second
       ),
     ).toHaveCount(0);
     const portal = volunteer.locator("[data-event-browser]");
-    const pending = portal.locator("[data-application-pending]");
-    await expect(pending.locator("p").first()).toHaveText(
-      `We'll review your application and email you at ${account.email} to let you know whether it's approved and what to do next.`,
+    const tracker = portal.locator("[data-application-tracker]");
+    const formStep = tracker.locator('[data-application-progress-step="form"]');
+    const review = tracker.locator('[data-application-progress-step="review"]');
+    const orientationStep = tracker.locator(
+      '[data-application-progress-step="orientation"]',
     );
-    await expect(pending.locator("strong")).toHaveText(account.email);
-    await expect(pending.locator("h2 svg")).toHaveAttribute(
+    await expect(portal).toHaveAttribute(
+      "data-application-awaiting-approval",
+      "true",
+    );
+    await expect(formStep).toHaveAttribute("data-state", "complete");
+    await expect(formStep).not.toHaveAttribute("open");
+    await expect(formStep.locator("summary")).toContainText(
+      "Application Form Submitted",
+    );
+    await expect(formStep.locator("summary svg").first()).toHaveAttribute(
       "aria-hidden",
       "true",
     );
+    await expect(review.locator("p")).toHaveText(
+      `An organizer will review your application. We'll email you at ${account.email} to let you know whether it's approved and what to do next.`,
+    );
+    await formStep.locator("summary").click();
     await expect(
-      portal.getByText(
-        "You can see your submitted application on the account page.",
-      ),
-    ).toBeVisible();
-    await expect(
-      portal.getByRole("link", { name: "View Account", exact: true }),
+      formStep.getByRole("link", {
+        name: "View submitted application",
+        exact: true,
+      }),
     ).toHaveAttribute("href", "/volunteer/account");
+    await volunteer.locator("[data-naloxone-confirm] input").check();
+    await volunteer
+      .getByRole("button", { name: "Confirm completion", exact: true })
+      .click();
+    await expect(review).toHaveAttribute("open");
     await expect(
       portal.getByText(
         "Join our Discord for more information and to become more involved.",
@@ -97,15 +112,22 @@ test("pending applications poll every minute, then approval restores five-second
     ).toBeEnabled();
     await volunteer.clock.runFor(59_999);
     expect(checks).toBe(1);
-    await expect(pending).toBeVisible();
+    await expect(portal).toHaveAttribute(
+      "data-application-awaiting-approval",
+      "true",
+    );
     await volunteer.clock.runFor(1);
     await expect.poll(() => checks).toBe(2);
     await expect(volunteer.locator("[data-event-list]")).toBeVisible({
       timeout: 15_000,
     });
-    await expect(volunteer.locator("[data-application-pending]")).toHaveCount(
-      0,
+    await expect(portal).toHaveAttribute(
+      "data-application-awaiting-approval",
+      "false",
     );
+    await expect(review).toHaveAttribute("data-state", "complete");
+    await expect(review.locator("summary time")).toHaveCount(1);
+    await expect(orientationStep).toHaveAttribute("open");
     await expect(discord).toHaveCount(0);
     await volunteer.clock.runFor(4_999);
     expect(checks).toBe(2);
@@ -122,8 +144,16 @@ test("pending applications poll every minute, then approval restores five-second
       .getByRole("button", { name: "Register", exact: true })
       .click();
     await expect(
-      orientation.getByText("Registered", { exact: true }),
+      orientation.getByRole("button", { name: "Unregister", exact: true }),
     ).toBeVisible();
+    await expect(orientationStep).toHaveAttribute("data-state", "complete");
+    await expect(orientationStep).not.toHaveAttribute("open");
+    await expect(orientationStep.locator("summary time")).toHaveCount(1);
+    await orientation
+      .getByRole("button", { name: "Unregister", exact: true })
+      .click();
+    await expect(orientationStep).toHaveAttribute("data-state", "current");
+    await expect(orientationStep).toHaveAttribute("open");
     expect(
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),
     ).toBe(200);
@@ -141,11 +171,13 @@ test("pending applications poll every minute, then approval restores five-second
       page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeEnabled();
     await volunteer.clock.runFor(5_000);
-    await expect(
-      volunteer.getByRole("heading", {
-        name: "Application Submitted",
-      }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(portal).toHaveAttribute(
+      "data-application-awaiting-approval",
+      "true",
+      { timeout: 15_000 },
+    );
+    await expect(review).toHaveAttribute("data-state", "current");
+    await expect(review).toHaveAttribute("open");
     await expect(
       volunteer.locator("[data-live-event], [data-event-list]"),
     ).toHaveCount(0);

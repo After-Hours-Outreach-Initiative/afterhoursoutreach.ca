@@ -163,6 +163,14 @@ const hasVisibleEvents = management
     data-event-view={manage ? "manage" : "volunteer"}
     data-event-version={eventVersion}
     data-event-access={String(eventAccess)}
+    data-application-awaiting-approval={String(
+      Boolean(
+        actor?.applicationSubmitted &&
+        actor.active &&
+        !actor.applicationApproved &&
+        actor.role !== "organizer",
+      ),
+    )}
   >
     {
       !actor ? (

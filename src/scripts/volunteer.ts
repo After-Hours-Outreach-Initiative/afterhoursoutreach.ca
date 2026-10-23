@@ -111,6 +111,8 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   // Reuse server rendering for authoritative capacity, eligibility, rosters,
   // destination options and optimistic edit versions.
   const refreshed = actionFragment(page, "[data-event-browser]");
+  root.dataset.applicationAwaitingApproval =
+    refreshed.dataset.applicationAwaitingApproval;
   deferredEventRefresh = false;
   if (root.dataset.eventAccess !== refreshed.dataset.eventAccess) {
     root.replaceChildren(...refreshed.childNodes);
@@ -469,9 +471,10 @@ if (eventBrowser) {
   };
   refreshDeferredEvents = () => refreshLiveEvents(true);
   const syncPollingInterval = () => {
-    const interval = eventBrowser.querySelector("[data-application-pending]")
-      ? 60_000
-      : 5_000;
+    const interval =
+      eventBrowser.dataset.applicationAwaitingApproval === "true"
+        ? 60_000
+        : 5_000;
     if (timer !== undefined && pollInterval === interval) return;
     window.clearInterval(timer);
     pollInterval = interval;

@@ -712,8 +712,8 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   expect(result.draft).toBe(null);
   expect(result.submitted).toBe(true);
   await expect(
-    page.getByRole("heading", { name: "Application Submitted", exact: true }),
-  ).toBeVisible();
+    page.locator('[data-application-progress-step="form"] > summary'),
+  ).toContainText("Application Form Submitted");
   const course = page.locator("[data-naloxone-step]");
   const checkbox = course.getByRole("checkbox", {
     name: "I confirm I have completed Naloxone 101.",
@@ -728,28 +728,47 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await page.reload();
   await expect(checkbox).not.toBeChecked();
   // A return to the account must offer the step even before it is completed.
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await page
+    .locator('[data-application-progress-step="form"] > summary')
+    .click();
+  await page
+    .getByRole("link", { name: "View submitted application", exact: true })
+    .click();
   await expect(checkbox).not.toBeChecked();
   await checkbox.check();
   await course
     .getByRole("button", { name: "Confirm completion", exact: true })
     .click();
-  await expect(course.getByRole("status")).toHaveText(
-    "Completion saved to your account (self-reported, not certified).",
+  const courseStep = page.locator(
+    '[data-application-progress-step="naloxone"]',
   );
+  await expect(courseStep).toHaveAttribute("data-state", "complete");
+  await expect(courseStep).not.toHaveAttribute("open");
+  const contents = page.getByRole("navigation", { name: "Sections" });
+  if (await contents.locator("[data-contents-menu]").isVisible())
+    await contents.locator("[data-contents-menu] > summary").click();
+  await contents
+    .getByRole("link", { name: "Naloxone 101", exact: true })
+    .filter({ visible: true })
+    .click();
+  await expect(courseStep).toHaveAttribute("open");
+  await expect(page.locator("#account-naloxone-heading")).toBeInViewport();
   await expect(checkbox).toBeChecked();
   await expect(checkbox).toBeDisabled();
   await page.reload();
+  await expect(courseStep).toHaveAttribute("open");
   await expect(checkbox).toBeChecked();
   await expect(checkbox).toBeDisabled();
   await expect(page.locator("[data-submitted-application]")).not.toContainText(
     "Naloxone 101",
   );
   await page.goto("/events");
+  await expect(courseStep).not.toHaveAttribute("open");
+  await courseStep.locator("summary").click();
   await expect(checkbox).toBeChecked();
   await expect(
     course.getByRole("button", { name: "Confirm completion", exact: true }),
-  ).toHaveCount(0);
+  ).toBeHidden();
 });
 
 test("signing out removes synced browser drafts but retains the account draft", async ({
