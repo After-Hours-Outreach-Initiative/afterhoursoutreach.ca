@@ -330,7 +330,7 @@ test("other viewers see signups and cancellations through polling without losing
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
     await expect(
-      viewer.getByRole("button", { name: "Includes orientation", exact: true }),
+      viewer.getByRole("button", { name: "Orientations", exact: true }),
     ).toBeFocused();
     expect(failedRefreshes).toBeGreaterThanOrEqual(2);
     await viewer.unroute("**/events?type=orientation");

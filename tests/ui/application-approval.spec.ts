@@ -221,7 +221,7 @@ test("pending applications poll every minute, then approval restores five-second
     await volunteer.clock.runFor(1);
     await expect.poll(() => checks).toBe(3);
     await volunteer
-      .getByRole("button", { name: "Includes orientation", exact: true })
+      .getByRole("button", { name: "Orientations", exact: true })
       .click();
     await expect(volunteer).toHaveURL(/\?type=orientation$/);
     const orientation = volunteer

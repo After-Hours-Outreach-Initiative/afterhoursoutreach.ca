@@ -138,28 +138,24 @@ test("event filters include orientation without excluding other patrols, preserv
     );
   }
   await filters
-    .getByRole("button", { name: "Includes orientation", exact: true })
+    .getByRole("button", { name: "Orientations", exact: true })
     .click();
   await expect(
-    filters.getByRole("button", { name: "Includes orientation", exact: true }),
+    filters.getByRole("button", { name: "Orientations", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   await expect(page).toHaveURL(/\?type=orientation$/);
-  await filters
-    .getByRole("button", { name: "All events", exact: true })
-    .click();
+  await filters.getByRole("button", { name: "All", exact: true }).click();
   await expectFilter("all");
   await page.goBack();
   await expect(
-    filters.getByRole("button", { name: "Includes orientation", exact: true }),
+    filters.getByRole("button", { name: "Orientations", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   expect(documents).toEqual([]);
   await page.reload();
   await expectFilter("orientation");
-  await filters
-    .getByRole("button", { name: "All events", exact: true })
-    .click();
+  await filters.getByRole("button", { name: "All", exact: true }).click();
   await expectFilter("all");
 });
 
@@ -300,9 +296,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
     "",
   );
 
-  await page
-    .getByRole("button", { name: "Includes orientation", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Orientations", exact: true }).click();
   await expect(link(patrol.id)).toHaveCount(0);
   await expect(link(orientation.id)).toBeVisible();
   // Every date/event link must still target a real, visible card after filtering.

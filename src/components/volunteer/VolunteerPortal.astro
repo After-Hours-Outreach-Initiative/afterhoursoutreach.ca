@@ -277,14 +277,14 @@ const hasVisibleEvents = management
             aria-label="Filter events"
           >
             {[
-              ["all", "All events"],
+              ["all", "All"],
               ...(management
                 ? [
                     ["one-off", "One-off events"],
                     ["recurring", "Recurring series"],
                   ]
                 : []),
-              ["orientation", "Includes orientation"],
+              ["orientation", "Orientations"],
             ].map(([type, label]) => (
               <button
                 class="volunteer-filter"
