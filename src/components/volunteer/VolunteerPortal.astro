@@ -25,7 +25,10 @@ import {
 } from "@/data/event-browser";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import ApplicationProgress from "./ApplicationProgress.astro";
-import { loadApplicationProgress } from "@/server/db/application-progress";
+import {
+  isApplicationComplete,
+  loadApplicationProgress,
+} from "@/server/db/application-progress";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
@@ -211,14 +214,16 @@ const hasVisibleEvents = management
       ) : null
     }
     {
-      applicationProgress && actor && (
-        <ApplicationProgress
-          progress={applicationProgress}
-          userId={actor.id}
-          idPrefix="events"
-          {email}
-        />
-      )
+      applicationProgress &&
+        !isApplicationComplete(applicationProgress) &&
+        actor && (
+          <ApplicationProgress
+            progress={applicationProgress}
+            userId={actor.id}
+            idPrefix="events"
+            {email}
+          />
+        )
     }
     {
       !eventAccess && (
