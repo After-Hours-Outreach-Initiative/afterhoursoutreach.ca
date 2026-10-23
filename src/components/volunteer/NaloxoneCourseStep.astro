@@ -4,19 +4,11 @@ import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 interface Props {
   userId: string;
   completedAt: number | null;
-  idPrefix: string;
 }
-const { userId, completedAt, idPrefix } = Astro.props;
+const { userId, completedAt } = Astro.props;
 ---
 
-<section
-  class="volunteer-panel"
-  aria-labelledby={`${idPrefix}-heading`}
-  data-naloxone-step
->
-  <h2 id={`${idPrefix}-heading`} data-contents-section>
-    Step 2: Complete Naloxone 101
-  </h2>
+<section class="volunteer-panel" aria-label="Naloxone 101" data-naloxone-step>
   <p>
     After submitting your application form and Code of Conduct, take Naloxone
     101, then confirm completion below. You can return to this step on your
@@ -50,17 +42,13 @@ const { userId, completedAt, idPrefix } = Astro.props;
       />
       <span>I confirm I have completed Naloxone 101.</span>
     </label>
-    <p class="volunteer-help">
-      This is a self-reported confirmation, not verified certification. No
-      certificate upload is needed.
-    </p>
     <p
       data-form-message
       role="status"
       aria-live="polite"
       hidden={completedAt === null}
     >
-      Completion saved to your account (self-reported, not certified).
+      Completion saved to your account.
     </p>
     <button
       class="btn btn-primary"
