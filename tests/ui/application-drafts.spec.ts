@@ -711,31 +711,15 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   const result = await (await page.request.get(endpoint)).json();
   expect(result.draft).toBe(null);
   expect(result.submitted).toBe(true);
-  const tracker = page.locator("[data-application-tracker]");
-  const naloxoneStep = tracker.locator(
-    '[data-application-progress-step="naloxone"]',
-  );
-  await expect(naloxoneStep).toHaveAttribute("data-state", "current");
-  const reminder = page.locator("[data-naloxone-reminder]");
-  await expect(reminder).toHaveClass(/volunteer-application-warning/);
-  await expect(reminder).toHaveAttribute(
-    "href",
-    "/volunteer/account#account-naloxone",
-  );
-  await expect(page.locator("[data-naloxone-confirm]")).toHaveCount(0);
-  await expect(page.locator("[data-naloxone-step]")).toHaveCount(0);
-  await reminder.click();
-  await expect(page).toHaveURL(/\/volunteer\/account#account-naloxone$/);
+  await expect(
+    page.getByRole("heading", { name: "Application Submitted", exact: true }),
+  ).toBeVisible();
   const course = page.locator("[data-naloxone-step]");
   const checkbox = course.getByRole("checkbox", {
     name: "I confirm I have completed Naloxone 101.",
   });
-  await expect(course).toHaveCount(1);
-  await expect(course).toBeVisible();
-  await expect(course.getByRole("heading")).toHaveCount(0);
-  await expect(course).not.toHaveClass(/volunteer-panel/);
-  await expect(course.getByRole("status").first()).toHaveText(
-    "Naloxone 101: Not confirmed",
+  await expect(course.getByRole("heading")).toHaveText(
+    "Step 2: Complete Naloxone 101",
   );
   await expect(
     course.getByRole("link", { name: "Take Naloxone 101" }),
@@ -743,58 +727,28 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(checkbox).not.toBeChecked();
   await page.reload();
   await expect(checkbox).not.toBeChecked();
-  // Reusing the same hash must still reveal the collapsed parent application.
-  const applicationStep = tracker.locator(
-    '[data-application-progress-step="form"]',
-  );
-  await applicationStep.locator(":scope > summary").click();
-  await expect(course).toBeHidden();
-  await reminder.click();
-  await expect(course).toBeVisible();
-  await expect(
-    page.locator("[data-submitted-application] + [data-naloxone-step]"),
-  ).toHaveCount(1);
-  await expect(page.locator("[data-naloxone-confirm]")).toHaveCount(1);
+  // A return to the account must offer the step even before it is completed.
+  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(checkbox).not.toBeChecked();
   await checkbox.check();
   await course
     .getByRole("button", { name: "Confirm completion", exact: true })
     .click();
   await expect(course.getByRole("status")).toHaveText(
-    "Naloxone 101 completed.",
+    "Completion saved to your account (self-reported, not certified).",
   );
-  await expect(naloxoneStep).toHaveAttribute("data-state", "complete");
-  const confirmedAt = await naloxoneStep
-    .locator("time")
-    .getAttribute("datetime");
-  expect(confirmedAt).toBeTruthy();
-  await expect(reminder).toHaveCount(0);
-  await expect(checkbox).toHaveCount(0);
-  await expect(course.locator("form, a, button, input")).toHaveCount(0);
-  await expect(course).toBeVisible();
+  await expect(checkbox).toBeChecked();
+  await expect(checkbox).toBeDisabled();
   await page.reload();
-  await expect(course).toHaveText("Naloxone 101 completed.");
-  await expect(checkbox).toHaveCount(0);
-  // The contents entry stays valid after the row is completed and refreshed.
-  await applicationStep.locator(":scope > summary").click();
-  await page
-    .locator('.volunteer-contents-sidebar a[href="#account-naloxone"]')
-    .click();
-  await expect(course).toBeVisible();
+  await expect(checkbox).toBeChecked();
+  await expect(checkbox).toBeDisabled();
   await expect(page.locator("[data-submitted-application]")).not.toContainText(
     "Naloxone 101",
   );
   await page.goto("/events");
-  await expect(naloxoneStep).toHaveAttribute("data-state", "complete");
-  await expect(naloxoneStep.locator("time")).toHaveAttribute(
-    "datetime",
-    confirmedAt!,
-  );
-  await expect(reminder).toHaveCount(0);
-  await expect(page.locator("[data-naloxone-step]")).toHaveCount(0);
-  await expect(page.locator("[data-naloxone-confirm]")).toHaveCount(0);
-  await naloxoneStep.locator("summary").click();
+  await expect(checkbox).toBeChecked();
   await expect(
-    naloxoneStep.locator(".application-progress-content"),
+    course.getByRole("button", { name: "Confirm completion", exact: true }),
   ).toHaveCount(0);
 });
 

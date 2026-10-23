@@ -222,6 +222,7 @@ const hasVisibleEvents = management
       applicationProgress && actor && (
         <ApplicationProgress
           progress={applicationProgress}
+          userId={actor.id}
           idPrefix="events"
           {email}
           {eventAccess}
