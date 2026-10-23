@@ -2,11 +2,10 @@
 import type { ApplicationProgress } from "@/server/db/application-progress";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import CheckIcon from "@/components/icons/CheckIcon.astro";
-import NaloxoneCourseStep from "./NaloxoneCourseStep.astro";
+import WarningIcon from "@/components/icons/WarningIcon.astro";
 
 interface Props {
   progress: ApplicationProgress;
-  userId: string;
   idPrefix: string;
   headingId?: string;
   email: string;
@@ -14,7 +13,6 @@ interface Props {
 }
 const {
   progress,
-  userId,
   idPrefix,
   headingId = `${idPrefix}-application-heading`,
   email,
@@ -123,75 +121,77 @@ const currentStep = steps.findIndex((step) => !step.completed);
               </span>
               <ArrowRightIcon class="application-progress-toggle size-5 shrink-0" />
             </summary>
-            <div class="application-progress-content">
-              {step.key === "form" &&
-                (progress.submittedAt !== null ? (
-                  <slot name="application">
-                    <p>Your application form has been submitted.</p>
-                    <a class="btn btn-outline mt-4" href="/volunteer/account">
-                      View submitted application
-                      <ArrowRightIcon class="btn-icon" />
-                    </a>
-                  </slot>
-                ) : (
-                  <>
-                    <p>
-                      Complete the application form, accept the Code of Conduct,
-                      and submit.
-                    </p>
-                    <a class="btn btn-primary mt-4" href="/apply">
-                      Complete application form
-                      <ArrowRightIcon class="btn-icon" />
-                    </a>
-                  </>
-                ))}
-              {step.key === "naloxone" &&
-                (progress.submittedAt !== null ? (
-                  <NaloxoneCourseStep
-                    {userId}
-                    completedAt={progress.naloxoneCompletedAt}
-                    idPrefix={`${idPrefix}-naloxone`}
-                  />
-                ) : (
-                  <p>
-                    After submitting your form and Code of Conduct, take
-                    Naloxone 101 and confirm completion here.
-                  </p>
-                ))}
-              {step.key === "review" && (
-                <p>
-                  {progress.applicationApproved ? (
-                    "Your application has been approved. You can sign up for a patrol that includes orientation when your volunteer account is active."
+            {(step.key !== "naloxone" || !step.completed) && (
+              <div class="application-progress-content">
+                {step.key === "form" &&
+                  (progress.submittedAt !== null ? (
+                    <slot name="application">
+                      <p>Your application form has been submitted.</p>
+                      <a class="btn btn-outline mt-4" href="/volunteer/account">
+                        View submitted application
+                        <ArrowRightIcon class="btn-icon" />
+                      </a>
+                    </slot>
                   ) : (
                     <>
-                      An organizer will review your application. We'll email you
-                      at <strong>{email}</strong> to let you know whether it's
-                      approved and what to do next.
+                      <p>
+                        Complete the application form, accept the Code of
+                        Conduct, and submit.
+                      </p>
+                      <a class="btn btn-primary mt-4" href="/apply">
+                        Complete application form
+                        <ArrowRightIcon class="btn-icon" />
+                      </a>
                     </>
-                  )}
-                </p>
-              )}
-              {step.key === "orientation" && (
-                <>
+                  ))}
+                {step.key === "naloxone" && (
+                  <a
+                    class="volunteer-application-warning"
+                    href="/volunteer/account#account-naloxone"
+                    data-naloxone-reminder
+                  >
+                    <WarningIcon class="volunteer-warning-icon" />
+                    <span class="volunteer-application-warning-text">
+                      Confirm Naloxone 101 completion on your account
+                    </span>
+                    <ArrowRightIcon class="volunteer-application-warning-arrow" />
+                  </a>
+                )}
+                {step.key === "review" && (
                   <p>
-                    {progress.orientationCompletedAt !== null
-                      ? "You have completed an orientation. Patrols without orientation still require separate organizer approval."
-                      : progress.orientationSignedUpAt !== null
-                        ? "Your orientation registration is confirmed. You can review your event details on the events page."
-                        : "Once your application is approved, choose a patrol marked “Includes orientation” and register for an available spot."}
+                    {progress.applicationApproved ? (
+                      "Your application has been approved. You can sign up for a patrol that includes orientation when your volunteer account is active."
+                    ) : (
+                      <>
+                        An organizer will review your application. We'll email
+                        you at <strong>{email}</strong> to let you know whether
+                        it's approved and what to do next.
+                      </>
+                    )}
                   </p>
-                  {eventAccess && (
-                    <a
-                      class="btn btn-outline mt-4"
-                      href="/events?type=orientation"
-                    >
-                      View orientations
-                      <ArrowRightIcon class="btn-icon" />
-                    </a>
-                  )}
-                </>
-              )}
-            </div>
+                )}
+                {step.key === "orientation" && (
+                  <>
+                    <p>
+                      {progress.orientationCompletedAt !== null
+                        ? "You have completed an orientation. Patrols without orientation still require separate organizer approval."
+                        : progress.orientationSignedUpAt !== null
+                          ? "Your orientation registration is confirmed. You can review your event details on the events page."
+                          : "Once your application is approved, choose a patrol marked “Includes orientation” and register for an available spot."}
+                    </p>
+                    {eventAccess && (
+                      <a
+                        class="btn btn-outline mt-4"
+                        href="/events?type=orientation"
+                      >
+                        View orientations
+                        <ArrowRightIcon class="btn-icon" />
+                      </a>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </details>
         </li>
       ))

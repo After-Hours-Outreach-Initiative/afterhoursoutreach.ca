@@ -6,6 +6,7 @@ import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro"
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
 import ApplicationProgress from "@/components/volunteer/ApplicationProgress.astro";
+import NaloxoneCourseStep from "@/components/volunteer/NaloxoneCourseStep.astro";
 import { loadApplicationProgress } from "@/server/db/application-progress";
 import PageContents from "@/components/volunteer/PageContents.astro";
 import FieldError from "@/components/FieldError.astro";
@@ -127,7 +128,7 @@ const contents = [
     id: "submitted-application-heading",
     heading: "Volunteer Application",
   },
-  { id: "account-naloxone-heading", heading: "Naloxone 101" },
+  { id: "account-naloxone", heading: "Naloxone 101", nested: true },
   { id: "account-settings-heading", heading: "Account settings" },
   { id: "account-email-heading", heading: "Email address", nested: true },
   {
@@ -202,7 +203,6 @@ const contents = [
       </section>
       <ApplicationProgress
         progress={applicationProgress}
-        userId={userId}
         idPrefix="account"
         headingId="submitted-application-heading"
         {email}
@@ -220,6 +220,11 @@ const contents = [
               </p>
             )
           }
+          <NaloxoneCourseStep
+            {userId}
+            completedAt={applicationProgress.naloxoneCompletedAt}
+            idPrefix="account-naloxone"
+          />
         </Fragment>
       </ApplicationProgress>
       <section class="volunteer-panel">
