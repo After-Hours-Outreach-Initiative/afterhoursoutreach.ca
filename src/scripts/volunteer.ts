@@ -17,6 +17,7 @@ import {
   syncVolunteerBrowser,
 } from "./volunteer-browser";
 import {
+  actionEmailNeedsFeedback,
   showActionEmailFeedback,
   simulateActionEmail,
   type EmailActionResult,
@@ -643,13 +644,17 @@ function form(
       if (!response.ok)
         throw new Error(result.message || "The change could not be saved.");
       saved = true;
-      await simulateActionEmail(result);
+      const simulationSucceeded = await simulateActionEmail(result);
+      const emailNeedsFeedback = actionEmailNeedsFeedback(
+        result,
+        simulationSucceeded,
+      );
       if (notify && message) {
-        message.textContent = result.message ?? "Change saved.";
-        message.setAttribute(
-          "role",
-          result.retryOperation || result.expired ? "alert" : "status",
-        );
+        message.hidden = !emailNeedsFeedback;
+        message.textContent = emailNeedsFeedback
+          ? (result.message ?? "Email delivery could not be confirmed.")
+          : "";
+        message.setAttribute("role", emailNeedsFeedback ? "alert" : "status");
       }
       // Writes may run concurrently, but each refresh must fetch and apply after
       // the previous one. Otherwise a slower, older response can undo newer UI.
@@ -662,7 +667,7 @@ function form(
         refreshFailed = true;
         result.message = `${result.message ?? "Change saved."} The view could not be refreshed; reload to see the saved change.`;
       }
-      if (notify || refreshFailed)
+      if (emailNeedsFeedback || refreshFailed)
         showActionEmailFeedback(resultTitle, endpoint, result);
     } catch (error) {
       // Failed automatic toggles must not look like committed settings.

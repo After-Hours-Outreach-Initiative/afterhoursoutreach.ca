@@ -152,13 +152,8 @@ export async function deliverNotifications(
 export function notificationNotice(
   delivery: Awaited<ReturnType<typeof deliverNotifications>>,
 ) {
+  // Successful delivery is silent; only problems need email-specific feedback.
   const parts: string[] = [];
-  if (delivery.sent)
-    parts.push(
-      delivery.simulated
-        ? `${delivery.sent} email${delivery.sent === 1 ? "" : "s"} simulated locally; no real email was sent.`
-        : `${delivery.sent} email${delivery.sent === 1 ? "" : "s"} accepted by the email provider (inbox delivery is not confirmed).`,
-    );
   if (delivery.pending) {
     if (delivery.unconfirmed)
       parts.push(
@@ -176,8 +171,6 @@ export function notificationNotice(
     parts.push(
       `${delivery.expired} email${delivery.expired === 1 ? " is" : "s are"} no longer safe to retry. Contact the recipients directly.`,
     );
-  if (!delivery.sent && !delivery.pending && !delivery.expired)
-    parts.push("No emails were needed for this change.");
   return parts.join(" ");
 }
 
@@ -199,7 +192,9 @@ export async function actionEmailResult(
     const delivery = await deliverNotifications(bindings, result.operation);
     return {
       ...delivery,
-      message: `${result.message} ${notificationNotice(delivery)}`,
+      message: [result.message, notificationNotice(delivery)]
+        .filter(Boolean)
+        .join(" "),
       ...(delivery.pending ? { retryOperation: result.operation } : {}),
     };
   } catch {

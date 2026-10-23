@@ -81,7 +81,20 @@ test("a successful batch sends more than five private messages in one bounded pr
   assert.equal(provider.mock.calls.length, 1);
   assert.equal(timeout.mock.calls[0][0], 10_000);
   assert.equal(await budgetCount(), 12);
-  assert.match(notificationNotice(result), /accepted by the email provider/);
+  assert.equal(notificationNotice(result), "");
+  const feedback = await actionEmailResult(
+    bindings(),
+    { operation, message: "Event saved." },
+    true,
+  );
+  assert.equal(feedback.message, "Event saved.");
+  assert.equal(feedback.retryOperation, undefined);
+  const empty = await actionEmailResult(
+    bindings(),
+    { operation: crypto.randomUUID(), message: "Event saved." },
+    true,
+  );
+  assert.equal(empty.message, "Event saved.");
   await deliverNotifications(bindings(), operation, provider);
   assert.equal(provider.mock.calls.length, 1);
 });
@@ -95,6 +108,9 @@ test("quota sends the available emails, counts messages rather than calls, and n
   assert.equal(result.sent, 5);
   assert.equal(result.pending, 7);
   assert.equal(result.limited, true);
+  assert.match(notificationNotice(result), /7 emails could not be sent/);
+  assert.match(notificationNotice(result), /Retry email only/);
+  assert.doesNotMatch(notificationNotice(result), /accepted|inbox delivery/);
   assert.equal(await budgetCount(), 80);
   assert.equal(provider.mock.calls.length, 1);
   assert.equal(
@@ -113,6 +129,7 @@ test("quota sends the available emails, counts messages rather than calls, and n
   const retry = await deliverNotifications(bindings(), operation, provider);
   assert.equal(retry.sent, 12);
   assert.equal(retry.pending, 0);
+  assert.equal(notificationNotice(retry), "");
   assert.equal(JSON.parse(String(provider.mock.calls[1][1]?.body)).length, 7);
   assert.equal(await budgetCount(), 7);
 });
@@ -239,6 +256,7 @@ test("a partial multi-batch failure retries only the unsuccessful batch; local s
   );
   assert.equal(simulated.sent, 205);
   assert.equal(simulated.simulated, 205);
+  assert.equal(notificationNotice(simulated), "");
   assert.equal(blocked.mock.calls.length, 0);
   assert.equal(await budgetCount(), 0);
   const sizes = (

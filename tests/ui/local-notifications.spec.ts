@@ -79,7 +79,12 @@ test("local approval notifications work without crypto.randomUUID", async ({
   page.on("request", (request) => {
     if (request.resourceType() === "document") documents.push(request.url());
   });
-  for (const approve of [true, false]) {
+  for (const [index, outcome] of [
+    "success",
+    "failure",
+    "dismissed",
+  ].entries()) {
+    const approve = index !== 1;
     await profileDialog
       .getByRole("button", {
         name: approve ? "Approve for patrols" : "Revoke patrol approval",
@@ -91,7 +96,7 @@ test("local approval notifications work without crypto.randomUUID", async ({
       exact: true,
     });
     await expect(choiceDialog).toBeVisible();
-    expect(submissions).toHaveLength(approve ? 0 : 1);
+    expect(submissions).toHaveLength(index);
     await choiceDialog
       .getByRole("button", { name: "Save and send email", exact: true })
       .click();
@@ -105,9 +110,12 @@ test("local approval notifications work without crypto.randomUUID", async ({
     );
     await emailDialog
       .getByRole("button", {
-        name: approve
-          ? "Simulate successful delivery"
-          : "Simulate delivery failure",
+        name:
+          outcome === "success"
+            ? "Simulate successful delivery"
+            : outcome === "failure"
+              ? "Simulate delivery failure"
+              : "Close email test",
       })
       .click();
     await expect(
@@ -122,12 +130,15 @@ test("local approval notifications work without crypto.randomUUID", async ({
       name: "Volunteer access saved",
       exact: true,
     });
-    await expect(result).toContainText(
-      approve
-        ? "Local email simulation succeeded"
-        : "The change is saved, but the local email simulation failed",
-    );
-    await result.getByRole("button", { name: "Close", exact: true }).click();
+    if (outcome === "success") await expect(result).toHaveCount(0);
+    else {
+      await expect(result).toContainText(
+        outcome === "failure"
+          ? "The change is saved, but the local email simulation failed"
+          : "Local email simulation was dismissed",
+      );
+      await result.getByRole("button", { name: "Close", exact: true }).click();
+    }
   }
   expect(submissions).toEqual([
     {
@@ -146,6 +157,15 @@ test("local approval notifications work without crypto.randomUUID", async ({
       active: true,
       applicationApproved: true,
       patrolApproved: false,
+      notify: true,
+    },
+    {
+      action: "status",
+      userId: "test-patrol",
+      version: 3,
+      active: true,
+      applicationApproved: true,
+      patrolApproved: true,
       notify: true,
     },
   ]);
