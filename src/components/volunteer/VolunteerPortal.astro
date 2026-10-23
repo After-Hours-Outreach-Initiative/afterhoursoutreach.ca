@@ -126,7 +126,16 @@ const hasVisibleEvents = management
   <Fragment slot="heading">
     {
       !manage && (
-        <h1 class:list={["max-w-4xl text-blue", { "sr-only": eventAccess }]}>
+        <h1
+          class:list={[
+            "max-w-4xl",
+            {
+              "sr-only": eventAccess,
+              "text-blue": !actor,
+              "text-2xl md:text-4xl": Boolean(actor),
+            },
+          ]}
+        >
           {title}
         </h1>
       )
