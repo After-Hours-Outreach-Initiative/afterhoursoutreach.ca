@@ -133,6 +133,7 @@ test("draft offline merges retain local input and unresolved conflicts survive r
     route.request().method() === "PUT" ? route.abort() : route.continue(),
   );
   await page.locator('[name="phone"]').fill("604-555-0122");
+  await page.locator('[name="teams"][value="outreach"]').check();
   const state = await (await page.request.get(endpoint)).json();
   const changed = await page.request.put(endpoint, {
     headers: { origin: baseURL! },
@@ -142,22 +143,61 @@ test("draft offline merges retain local input and unresolved conflicts survive r
       revision: state.draft.revision,
       generation: state.generation,
       baseline: state.draft.answers,
-      answers: { ...state.draft.answers, phone: "604-555-0133" },
+      answers: {
+        ...state.draft.answers,
+        phone: "604-555-0133",
+        teams: ["outreach", "medic"],
+        certifications: ["other"],
+        certificationExpiry: "2030-01-01",
+        experience: "Account medical training",
+      },
     },
   });
   expect(changed.ok(), await changed.text()).toBe(true);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.locator("[data-draft-conflict]")).toBeVisible();
+  const conflict = page.locator('[data-draft-conflict="phone"]');
+  await expect(conflict).toBeVisible();
   await page.reload();
-  await expect(page.locator("[data-draft-conflict]")).toBeVisible();
+  await expect(conflict).toBeVisible();
   await expect(page.locator('[name="phone"]')).toHaveValue("604-555-0122");
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await expect(page.locator("[data-draft-conflict]")).toBeVisible();
+  await expect(conflict).toBeVisible();
+  for (const section of [
+    "personal-info",
+    "team-interests",
+    "training-and-safety",
+  ])
+    for (const link of await page
+      .locator(
+        `[data-application-progress-link][href="#application-${section}"]`,
+      )
+      .all())
+      await expect(link).toHaveAttribute("data-conflicted", "true");
+  await expect(page.locator("[data-medic-certifications]")).toBeHidden();
+  const medicalConflict = page.locator(
+    '[data-draft-conflict="certifications"]',
+  );
+  await expect(medicalConflict).toBeVisible();
   await page.unroute(`**${endpoint}`);
   await page
-    .getByRole("button", { name: "Use account answers", exact: true })
+    .getByRole("button", { name: "Use account answers for phone", exact: true })
     .click();
   await expect(page.locator('[name="phone"]')).toHaveValue("604-555-0133");
+  await expect(medicalConflict).toBeVisible();
+  await medicalConflict
+    .getByRole("button", {
+      name: "Use account answers for certifications",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator("[data-draft-conflict]")).toHaveCount(0);
+  await expect(page.locator('[name="teams"][value="medic"]')).toBeChecked();
+  await expect(
+    page.locator('[name="certifications"][value="other"]'),
+  ).toBeChecked();
+  await expect(page.locator('[name="experience"]')).toHaveValue(
+    "Account medical training",
+  );
 });
 
 test("a lost first-submission response preserves input and retries cannot replace the profile", async ({

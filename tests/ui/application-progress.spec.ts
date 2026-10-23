@@ -24,7 +24,7 @@ async function expectComplete(page: Page, section: string, complete: boolean) {
     await expect(link).toHaveAccessibleDescription(
       complete ? "Complete" : "Incomplete",
     );
-    const icon = link.locator("svg");
+    const icon = link.locator(".volunteer-contents-completion-icon");
     await expect(icon).toHaveAttribute("viewBox", "0 0 24 24");
     await expect(icon).toHaveAttribute("aria-hidden", "true");
     await expect(icon).toHaveAttribute("stroke-width", "2");
@@ -260,7 +260,9 @@ for (const width of [390, 1280]) {
     const teamInterests = tracker.locator(
       `${width < 1024 ? "[data-contents-menu]" : ".volunteer-contents-sidebar"} [href="#application-team-interests"]`,
     );
-    const checkmark = teamInterests.locator("svg");
+    const checkmark = teamInterests.locator(
+      ".volunteer-contents-completion-icon",
+    );
     await expect(checkmark).toHaveCSS("color", "rgb(161, 161, 170)");
     await expect(checkmark).toHaveCSS("visibility", "visible");
     await expect(checkmark).toHaveCSS("border-width", "0px");
@@ -271,7 +273,7 @@ for (const width of [390, 1280]) {
     ).toBe("Team interests");
     await expect(
       tracker.locator(
-        '.volunteer-contents-sidebar [href="#application-personal-info"] svg',
+        '.volunteer-contents-sidebar [href="#application-personal-info"] .volunteer-contents-completion-icon',
       ),
     ).toHaveCSS("visibility", "visible");
 

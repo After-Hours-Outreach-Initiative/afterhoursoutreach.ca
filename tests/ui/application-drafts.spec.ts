@@ -429,14 +429,39 @@ for (const keepLocal of [true, false]) {
     baseURL,
   }) => {
     const { id } = await createLocalAccount(page.request, baseURL!, false);
+    const localBirthDate = keepLocal ? "1991-05-23" : '["23","",""]';
+    const accountBirthDate = keepLocal ? "1992-04-19" : '["","4","19"]';
+    if (keepLocal) {
+      const {
+        heardAboutUs: _referral,
+        certification: _certification,
+        ...answers
+      } = sampleAnswers;
+      const seeded = await page.request.put(endpoint, {
+        headers: { origin: baseURL! },
+        data: { userId: id, version: 1, revision: null, answers },
+      });
+      expect(seeded.ok(), await seeded.text()).toBe(true);
+    }
     await page.goto("/apply");
     await page.locator('[name="firstName"]').fill("Original draft");
     await expectDraftSaved(page, { firstName: "Original draft" });
+    if (!keepLocal) await page.setViewportSize({ width: 390, height: 844 });
+    if (keepLocal) {
+      await reviewLocalApplication(page);
+      await expect(
+        page.locator("[data-application-review-step]"),
+      ).toBeVisible();
+      await page.goBack();
+      await expect(page.locator("[data-application-review-step]")).toBeHidden();
+    }
     await page.route(`**${endpoint}`, (route) =>
       route.request().method() === "PUT" ? route.abort() : route.continue(),
     );
     await page.locator('[name="firstName"]').fill("Local changes");
-    await page.locator('[data-birth-date-part="day"]').fill("23");
+    if (keepLocal)
+      await fillApplicationField(page, "birthDate", localBirthDate);
+    else await page.locator('[data-birth-date-part="day"]').fill("23");
     const { draft } = await (await page.request.get(endpoint)).json();
     const remote = await page.request.put(endpoint, {
       headers: { origin: baseURL! },
@@ -447,7 +472,7 @@ for (const keepLocal of [true, false]) {
         answers: {
           ...draft.answers,
           firstName: "Other device",
-          birthDate: '["","4","19"]',
+          birthDate: accountBirthDate,
         },
       },
     });
@@ -456,7 +481,76 @@ for (const keepLocal of [true, false]) {
     await expect(page.locator('[name="firstName"]')).toHaveValue(
       "Local changes",
     );
-    await expect(page.locator("[data-draft-conflict]")).toBeVisible();
+    const nameConflict = page.locator('[data-draft-conflict="firstName"]');
+    const dateConflict = page.locator('[data-draft-conflict="birthDate"]');
+    await expect(nameConflict).toBeVisible();
+    await expect(dateConflict).toBeVisible();
+    await expect(
+      page
+        .locator('[name="firstName"]')
+        .locator("..")
+        .locator("[data-draft-conflict]"),
+    ).toHaveCount(1);
+    await expect(
+      page.locator('[data-date-input="birthDate"] [data-draft-conflict]'),
+    ).toHaveCount(1);
+    await expect(
+      page.locator('[name="firstName"]'),
+    ).toHaveAccessibleDescription(/Conflicting answers/);
+    await expect(
+      page.locator('[data-birth-date-part="day"]'),
+    ).toHaveAccessibleDescription(/Conflicting answers/);
+    expect(
+      await page.locator("[id]").evaluateAll((elements) => {
+        const ids = elements.map((element) => element.id);
+        return ids.length === new Set(ids).size;
+      }),
+    ).toBe(true);
+    const links = page.locator(
+      '[data-application-progress-link][href="#application-personal-info"]',
+    );
+    for (const link of await links.all()) {
+      await expect(link).toHaveAttribute("data-complete", "false");
+      await expect(link).toHaveAttribute("data-conflicted", "true");
+      await expect(link).toHaveAccessibleDescription("Conflicting answers");
+    }
+    if (!keepLocal)
+      await page.locator("[data-contents-menu] summary").first().click();
+    const visibleLink = links.filter({ visible: true });
+    await expect(
+      visibleLink.locator(".volunteer-contents-completion-icon"),
+    ).toBeHidden();
+    await expect(
+      visibleLink.locator(".volunteer-contents-conflict-icon"),
+    ).toBeVisible();
+    await expect(
+      visibleLink.locator(".volunteer-contents-conflict-icon"),
+    ).toHaveCSS("color", "rgb(250, 204, 21)");
+    if (!keepLocal)
+      await page.locator("[data-contents-menu] summary").first().click();
+    if (keepLocal) {
+      expect(
+        await page
+          .locator(formSelector)
+          .evaluate((form: HTMLFormElement) => form.checkValidity()),
+      ).toBe(true);
+      await localApplicationReviewButton(page, "bottom").click();
+      await expect(page.locator("[data-application-review-step]")).toBeHidden();
+      await expect(
+        nameConflict.getByRole("button", {
+          name: "Keep my answers for first name",
+          exact: true,
+        }),
+      ).toBeFocused();
+      await page.goForward();
+      await expect(page.locator("[data-application-review-step]")).toBeHidden();
+      await expect(
+        nameConflict.getByRole("button", {
+          name: "Keep my answers for first name",
+          exact: true,
+        }),
+      ).toBeFocused();
+    }
     await expect(localApplicationSaveIndicator(page)).toHaveText(
       "Choose which answers to keep",
     );
@@ -466,31 +560,45 @@ for (const keepLocal of [true, false]) {
     await page.unroute(`**${endpoint}`);
     // Legal name and date of birth are separate conflicts, not a whole-form
     // overwrite choice. Resolve each explicitly.
-    for (let choice = 0; choice < 2; choice++)
+    for (const field of ["first name", "birth date"])
       await page
         .getByRole("button", {
-          name: keepLocal ? "Keep my answers" : "Use account answers",
+          name: `${keepLocal ? "Keep my answers" : "Use account answers"} for ${field}`,
           exact: true,
         })
-        .first()
         .click();
-    await expect(page.locator("[data-draft-conflict]")).toBeHidden();
+    await expect(page.locator("[data-draft-conflict]")).toHaveCount(0);
+    await expect(
+      page.locator('[name="firstName"]'),
+    ).not.toHaveAccessibleDescription(/Conflicting answers/);
+    for (const link of await links.all()) {
+      await expect(link).toHaveAttribute("data-conflicted", "false");
+      await expect(link).toHaveAttribute("data-complete", String(keepLocal));
+    }
     await expect(page.locator('[name="firstName"]')).toHaveValue(
       keepLocal ? "Local changes" : "Other device",
     );
+    if (!keepLocal)
+      await page.locator("[data-contents-menu] summary").first().click();
     await expectDraftSaved(page, {
       firstName: keepLocal ? "Local changes" : "Other device",
-      birthDate: keepLocal ? '["23","",""]' : '["","4","19"]',
+      birthDate: keepLocal ? localBirthDate : accountBirthDate,
     });
     await expect(page.locator('[data-birth-date-part="day"]')).toHaveValue(
       keepLocal ? "23" : "",
     );
     await expect(page.locator('[data-birth-date-part="month"]')).toHaveValue(
-      keepLocal ? "" : "4",
+      keepLocal ? "05" : "4",
     );
     await expect(page.locator('[data-birth-date-part="year"]')).toHaveValue(
-      keepLocal ? "" : "19",
+      keepLocal ? "1991" : "19",
     );
+    if (keepLocal) {
+      await reviewLocalApplication(page);
+      await expect(
+        page.locator("[data-application-review-step]"),
+      ).toBeVisible();
+    }
   });
 }
 

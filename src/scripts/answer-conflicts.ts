@@ -6,12 +6,16 @@ export function renderAnswerConflicts<T extends object>(
   local: T,
   latest: T,
   choose: (fields: (keyof T & string)[], source: "local" | "account") => void,
+  field?: keyof T & string,
 ) {
   container.replaceChildren();
   for (const fields of groups) {
     const section = document.createElement("div");
+    const label = answerLabel(field ? [field] : fields);
+    section.setAttribute("role", "group");
+    section.setAttribute("aria-label", `Conflicting answers for ${label}`);
     const heading = document.createElement("p");
-    heading.textContent = `Choose answers for ${answerLabel(fields)}:`;
+    heading.textContent = `${field ? "Sync conflict. " : ""}Choose answers for ${answerLabel(fields)}:`;
     section.appendChild(heading);
     for (const [source, answers, label] of [
       ["local", local, "Keep my answers"],
@@ -23,6 +27,11 @@ export function renderAnswerConflicts<T extends object>(
       button.type = "button";
       button.className = "btn btn-quiet mt-2";
       button.textContent = label;
+      if (field)
+        button.setAttribute(
+          "aria-label",
+          `${label} for ${answerLabel([field])}`,
+        );
       button.addEventListener("click", () => choose(fields, source));
       section.appendChild(detail);
       section.appendChild(button);

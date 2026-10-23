@@ -34,28 +34,37 @@ export function initApplicationSections(element: HTMLFormElement) {
     for (const link of links) {
       const section = document.getElementById(link.hash.slice(1));
       if (!section) continue;
-      const fields = section
-        .closest(".volunteer-application-section")
-        ?.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
-          "input, textarea",
-        );
+      const container = section.closest(".volunteer-application-section");
+      const fields = container?.querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement
+      >("input, textarea");
       if (!fields) continue;
       // Reading validity never fires `invalid` or focuses a section.
       // Conditional controls opt out through the form's existing validators;
       // sections with no requirements are done.
-      const complete = [...fields].every(
-        (field) =>
-          !field.willValidate ||
-          (field.validity.valid &&
-            (!field.required || Boolean(field.value.trim()))),
+      const conflicted = Boolean(
+        container?.querySelector("[data-draft-conflicted]"),
       );
+      const complete =
+        !conflicted &&
+        [...fields].every(
+          (field) =>
+            !field.willValidate ||
+            (field.validity.valid &&
+              (!field.required || Boolean(field.value.trim()))),
+        );
       // Only completable entries carry progress links; deduplicate responsive copies.
       sections.set(section.id, complete);
       link.dataset.complete = String(complete);
+      link.dataset.conflicted = String(conflicted);
       const status = link.parentElement?.querySelector<HTMLElement>(
         "[data-application-completion-status]",
       );
-      const message = complete ? "Complete" : "Incomplete";
+      const message = conflicted
+        ? "Conflicting answers"
+        : complete
+          ? "Complete"
+          : "Incomplete";
       if (status && status.textContent?.trim() !== message)
         status.textContent = message;
     }
@@ -79,6 +88,7 @@ export function initApplicationSections(element: HTMLFormElement) {
   element.addEventListener("input", update);
   element.addEventListener("change", update);
   element.addEventListener("application-draft-restored", update);
+  element.addEventListener("application-draft-conflicts-changed", update);
   element.addEventListener("reset", () => queueMicrotask(update));
   update();
 }

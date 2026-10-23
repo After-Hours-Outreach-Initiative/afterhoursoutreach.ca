@@ -15,7 +15,7 @@ import {
 } from "../data/application-draft";
 import { restoreDateInputs, readDateInputs } from "./date-input";
 import { mergeAnswers } from "../data/answer-merge";
-import { renderAnswerConflicts } from "./answer-conflicts";
+import { initApplicationConflicts } from "./application-conflicts";
 
 const endpoint = "/api/v1/account/application-draft";
 const emptyAnswers = () => applicationDraftAnswersSchema.parse({});
@@ -193,9 +193,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     "[data-draft-status-panel]",
   )!;
   const retry = element.querySelector<HTMLButtonElement>("[data-draft-retry]")!;
-  const conflictPanel = element.querySelector<HTMLElement>(
-    "[data-draft-conflict]",
-  )!;
+  const renderConflicts = initApplicationConflicts(element);
   const initial = applicationDraftSchema
     .nullable()
     .parse(JSON.parse(element.dataset.applicationDraft ?? "null"));
@@ -299,44 +297,41 @@ export function initApplicationDraft(element: HTMLFormElement) {
     clearTimeout(dateTimer);
     dateTimer = undefined;
     const unsaved = dirty();
-    conflictPanel.hidden = !conflict;
-    if (conflict)
-      renderAnswerConflicts(
-        conflictPanel,
-        conflict.fields,
-        readDraftAnswers(element),
-        conflict.draft?.answers ?? emptyAnswers(),
-        (fields, source) => {
-          if (!conflict) return;
-          const remote = conflict.draft?.answers ?? emptyAnswers();
-          if (source === "account") {
-            const answers = readDraftAnswers(element);
-            for (const field of fields)
-              Object.assign(answers, { [field]: remote[field] });
-            restore(answers);
-          } else {
-            const consent = element.querySelector<HTMLInputElement>(
-              '[name="codeOfConductAccepted"]',
-            );
-            if (consent) consent.checked = false;
-          }
-          // Persist the explicit decision's new baseline, but retain original
-          // baselines for unresolved groups across refreshes and offline reloads.
-          savedAnswers = { ...savedAnswers };
+    renderConflicts(
+      conflict?.fields ?? [],
+      readDraftAnswers(element),
+      conflict?.draft?.answers ?? emptyAnswers(),
+      (fields, source) => {
+        if (!conflict) return;
+        const remote = conflict.draft?.answers ?? emptyAnswers();
+        if (source === "account") {
+          const answers = readDraftAnswers(element);
           for (const field of fields)
-            Object.assign(savedAnswers, { [field]: remote[field] });
-          conflict.fields = conflict.fields.filter((group) => group !== fields);
-          if (!conflict.fields.length) {
-            revision = conflict.draft?.revision ?? null;
-            savedAnswers = remote;
-            savedAt = conflict.draft?.updatedAt ?? null;
-            conflict = undefined;
-          }
-          persist();
-          renderStatus();
-          schedule(0);
-        },
-      );
+            Object.assign(answers, { [field]: remote[field] });
+          restore(answers);
+        } else {
+          const consent = element.querySelector<HTMLInputElement>(
+            '[name="codeOfConductAccepted"]',
+          );
+          if (consent) consent.checked = false;
+        }
+        // Persist the explicit decision's new baseline, but retain original
+        // baselines for unresolved groups across refreshes and offline reloads.
+        savedAnswers = { ...savedAnswers };
+        for (const field of fields)
+          Object.assign(savedAnswers, { [field]: remote[field] });
+        conflict.fields = conflict.fields.filter((group) => group !== fields);
+        if (!conflict.fields.length) {
+          revision = conflict.draft?.revision ?? null;
+          savedAnswers = remote;
+          savedAt = conflict.draft?.updatedAt ?? null;
+          conflict = undefined;
+        }
+        persist();
+        renderStatus();
+        schedule(0);
+      },
+    );
     retry.hidden = !failure || Boolean(conflict) || stopped;
     const backupWarning =
       !localAvailable && unsaved
@@ -345,7 +340,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
     const message = [failure, backupWarning].filter(Boolean).join(" ");
     status.textContent = message;
     status.hidden = !message;
-    statusPanel.hidden = !message && !conflict;
+    statusPanel.hidden = !message;
 
     let saveState = "idle";
     let saveMessage = "";
