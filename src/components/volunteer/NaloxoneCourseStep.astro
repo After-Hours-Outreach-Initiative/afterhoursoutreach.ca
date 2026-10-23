@@ -9,7 +9,7 @@ const { userId, completedAt } = Astro.props;
 ---
 
 <section class="volunteer-panel" aria-label="Naloxone 101" data-naloxone-step>
-  <p>
+  <p class="text-base">
     After submitting your application form and Code of Conduct, take Naloxone
     101, then confirm completion below. You can return to this step on your
     account page.
@@ -43,6 +43,7 @@ const { userId, completedAt } = Astro.props;
       <span>I confirm I have completed Naloxone 101.</span>
     </label>
     <p
+      class="text-base"
       data-form-message
       role="status"
       aria-live="polite"
