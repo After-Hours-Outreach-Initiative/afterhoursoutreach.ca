@@ -663,7 +663,7 @@ test("switching accounts never restores or autosaves another account's answers",
   ).toBe("Stale tab changes");
 });
 
-test("resuming requires fresh consent; submission clears drafts and course confirmation persists on the account", async ({
+test("resuming requires fresh consent; submission clears drafts and course confirmation persists on events", async ({
   page,
   baseURL,
 }) => {
@@ -727,13 +727,20 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(checkbox).not.toBeChecked();
   await page.reload();
   await expect(checkbox).not.toBeChecked();
-  // A return to the account must offer the step even before it is completed.
+  // Incomplete application steps stay on events, not the account page.
   await page
     .locator('[data-application-progress-step="form"] > summary')
     .click();
   await page
     .getByRole("link", { name: "View submitted application", exact: true })
     .click();
+  await expect(page).toHaveURL(/\/volunteer\/account$/);
+  await expect(
+    page.locator(
+      "#submitted-application-heading, [data-submitted-application], [data-application-tracker], [data-naloxone-confirm], #account-naloxone-heading",
+    ),
+  ).toHaveCount(0);
+  await page.goto("/events");
   await expect(checkbox).not.toBeChecked();
   await checkbox.check();
   await course
@@ -744,28 +751,15 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   );
   await expect(courseStep).toHaveAttribute("data-state", "complete");
   await expect(courseStep).not.toHaveAttribute("open");
-  const contents = page.getByRole("navigation", { name: "Sections" });
-  if (await contents.locator("[data-contents-menu]").isVisible())
-    await contents.locator("[data-contents-menu] > summary").click();
-  await contents
-    .getByRole("link", { name: "Naloxone 101", exact: true })
-    .filter({ visible: true })
-    .click();
-  await expect(courseStep).toHaveAttribute("open");
-  await expect(page.locator("#account-naloxone-heading")).toBeInViewport();
-  await expect(checkbox).toBeChecked();
-  await expect(checkbox).toBeDisabled();
-  await page.reload();
-  await expect(courseStep).toHaveAttribute("open");
-  await expect(checkbox).toBeChecked();
-  await expect(checkbox).toBeDisabled();
-  await expect(page.locator("[data-submitted-application]")).not.toContainText(
-    "Naloxone 101",
-  );
+  await page.goto("/volunteer/account");
+  await expect(
+    page.locator("#submitted-application-heading, [data-naloxone-confirm]"),
+  ).toHaveCount(0);
   await page.goto("/events");
   await expect(courseStep).not.toHaveAttribute("open");
   await courseStep.locator("summary").click();
   await expect(checkbox).toBeChecked();
+  await expect(checkbox).toBeDisabled();
   await expect(
     course.getByRole("button", { name: "Confirm completion", exact: true }),
   ).toBeHidden();
