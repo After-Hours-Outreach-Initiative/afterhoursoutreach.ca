@@ -918,7 +918,11 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   assert.equal(undated.naloxoneCompletedAt, confirmedAt);
   assert.equal(undated.applicationApproved, true);
   assert.equal(undated.applicationApprovedAt, null);
-  assert.equal(isApplicationComplete(undated), false);
+  assert.equal(isApplicationComplete(undated), true);
+  assert.equal(
+    isApplicationComplete({ ...undated, applicationApproved: false }),
+    false,
+  );
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
@@ -952,7 +956,7 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   ).run();
   const cancelled = await loadApplicationProgress(env.DB, actor.id);
   assert.equal(cancelled.orientationSignedUpAt, null);
-  assert.equal(isApplicationComplete(cancelled), false);
+  assert.equal(isApplicationComplete(cancelled), true);
   await env.DB.batch([
     env.DB.prepare(
       "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
@@ -973,6 +977,108 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   assert.equal(
     isApplicationComplete({ ...completed, applicationApproved: true }),
     true,
+  );
+});
+
+test("orientees only see orientation events and rosters; patrol approval and organizers retain full access", async () => {
+  const organizer = await draftActor("visibility-organizer");
+  const actor = {
+    ...(await draftActor("visibility-volunteer")),
+    applicationSubmitted: true,
+    applicationApproved: true,
+    active: true,
+    patrolApproved: true,
+  };
+  await saveProfile(env.DB, actor.id, {
+    ...completeAnswers(),
+    codeOfConductAccepted: true,
+  });
+  await env.DB.batch([
+    env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?").bind(
+      organizer.id,
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET registration_approved=1, patrol_approved=1, approved_by=?, approved_at=0 WHERE user_id=?",
+    ).bind(organizer.id, actor.id),
+  ]);
+  const fixtures = [
+    ["legacy-orientation", "orientation", null],
+    ["included-orientation", "patrol", 1],
+    ["excluded-orientation", "orientation", 0],
+    ["regular-patrol", "patrol", 0],
+  ] as const;
+  const ids = fixtures.map(([id]) => id);
+  await env.DB.batch(
+    fixtures.map(([id, type, includesOrientation]) =>
+      env.DB.prepare(
+        `INSERT INTO event (id, type, includes_orientation, starts_at, meeting_point, spots, created_by, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'Meeting point', 8, ?, 0, 0)`,
+      ).bind(
+        id,
+        type,
+        includesOrientation,
+        Date.now() + 86_400_000,
+        organizer.id,
+      ),
+    ),
+  );
+  for (const id of ids) await changeSignup(env.DB, actor, id, "join");
+  assert.equal((await listEvents(env.DB, actor)).length, 4);
+  assert.equal((await listPublicRosters(env.DB, actor, ids)).people.length, 4);
+
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
+  const orientee = { ...actor, patrolApproved: false };
+  const expected = ["included-orientation", "legacy-orientation"];
+  for (const view of ["volunteer", "manage"] as const) {
+    const events = await listEvents(env.DB, orientee, "regular-patrol", view);
+    assert.deepEqual(events.map((row) => row.id).sort(), expected);
+  }
+  // Supplying known IDs (or having an existing booking) must not bypass visibility.
+  assert.deepEqual(
+    (await listPublicRosters(env.DB, orientee, ids)).people
+      .map((row) => row.eventId)
+      .sort(),
+    expected,
+  );
+  await changeSignup(env.DB, orientee, "regular-patrol", "cancel");
+  await assert.rejects(
+    changeSignup(env.DB, orientee, "regular-patrol", "join"),
+    statusError(403),
+  );
+  await env.DB.prepare(
+    "INSERT INTO orientation_completion VALUES ('visibility-completion', ?, 'legacy-orientation', ?, 0)",
+  )
+    .bind(actor.id, organizer.id)
+    .run();
+  assert.deepEqual(
+    (await listEvents(env.DB, orientee)).map((row) => row.id).sort(),
+    expected,
+  );
+  await env.DB.batch([
+    env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?").bind(
+      actor.id,
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
+    ).bind(actor.id),
+  ]);
+  const manager = {
+    ...orientee,
+    role: "organizer" as const,
+    applicationApproved: false,
+  };
+  for (const view of ["volunteer", "manage"] as const)
+    assert.equal(
+      (await listEvents(env.DB, manager, undefined, view)).length,
+      4,
+    );
+  assert.equal(
+    (await listPublicRosters(env.DB, manager, ids)).people.length,
+    3,
   );
 });
 

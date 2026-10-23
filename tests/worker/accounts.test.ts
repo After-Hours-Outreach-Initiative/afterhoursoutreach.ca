@@ -727,19 +727,12 @@ describe(
       );
     });
 
-    test("account application information appears only when all tracker milestones are complete and stays read-only", async () => {
-      await DB.batch([
-        DB.prepare(
-          "UPDATE profile SET naloxone_completed_at=1000 WHERE user_id=?",
-        ).bind(current.user.id),
-        DB.prepare(
-          "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
-        ).bind(current.user.id),
-        DB.prepare(
-          `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
-          VALUES ('account-complete-orientation', 'orientation', ?, 'Meeting point', 4, ?, 0, 0)`,
-        ).bind(Date.now() + 86_400_000, current.user.id),
-      ]);
+    test("account application information appears after the three application milestones without orientation signup and stays read-only", async () => {
+      await DB.prepare(
+        "UPDATE profile SET naloxone_completed_at=1000 WHERE user_id=?",
+      )
+        .bind(current.user.id)
+        .run();
       const pending = await send("/volunteer/account", undefined, cookie);
       assert.equal(pending.status, 200);
       assert.doesNotMatch(
@@ -747,8 +740,7 @@ describe(
         /submitted-application-heading|data-submitted-application|data-application-tracker|data-naloxone-confirm|account-naloxone-heading/,
       );
       await DB.prepare(
-        `INSERT INTO signup (id, event_id, user_id, created_at, updated_at)
-        VALUES ('account-complete-signup', 'account-complete-orientation', ?, 2000, 2000)`,
+        "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
       )
         .bind(current.user.id)
         .run();
@@ -766,7 +758,7 @@ describe(
       assert.match(html, /Naloxone 101 completion \(self-reported\)/);
       assert.match(html, /Application approved/);
       assert.match(html, /Date not recorded/);
-      assert.match(html, /Orientation registered/);
+      assert.doesNotMatch(html, /Orientation registered/);
       assert.doesNotMatch(
         html,
         /data-application-tracker|data-naloxone-confirm|account-naloxone-heading|Current step|Not started|Take Naloxone 101|View orientations/,
@@ -868,10 +860,6 @@ describe(
         DB.prepare(
           `INSERT INTO volunteer_status (user_id, active, registration_approved, updated_at)
           VALUES (?, 1, 1, 0) ON CONFLICT(user_id) DO UPDATE SET registration_approved=1`,
-        ).bind(legacy.user.id),
-        DB.prepare(
-          `INSERT INTO signup (id, event_id, user_id, created_at, updated_at)
-          VALUES ('legacy-complete-signup', 'account-complete-orientation', ?, 0, 0)`,
         ).bind(legacy.user.id),
       ]);
       const completedLegacy = await send(

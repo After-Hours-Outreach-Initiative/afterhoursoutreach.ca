@@ -10,7 +10,6 @@ interface Props {
   idPrefix: string;
   headingId?: string;
   email: string;
-  eventAccess: boolean;
 }
 const {
   progress,
@@ -18,7 +17,6 @@ const {
   idPrefix,
   headingId = `${idPrefix}-application-heading`,
   email,
-  eventAccess,
 } = Astro.props;
 const dateFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Vancouver",
@@ -46,19 +44,6 @@ const steps = [
     completedAt: progress.applicationApprovedAt,
     dateLabel: "Approved",
   },
-  {
-    key: "orientation",
-    title: "Sign up for orientation",
-    completed:
-      progress.orientationSignedUpAt !== null ||
-      progress.orientationCompletedAt !== null,
-    completedAt:
-      progress.orientationSignedUpAt ?? progress.orientationCompletedAt,
-    dateLabel:
-      progress.orientationSignedUpAt !== null
-        ? "Registered"
-        : "Orientation completed",
-  },
 ];
 const currentStep = steps.findIndex((step) => !step.completed);
 ---
@@ -67,7 +52,7 @@ const currentStep = steps.findIndex((step) => !step.completed);
   class="volunteer-panel application-progress"
   aria-labelledby={headingId}
   data-application-tracker
-  data-progress-version={JSON.stringify(progress)}
+  data-progress-version={JSON.stringify(steps)}
 >
   <h2 id={headingId} data-contents-section>Volunteer Application</h2>
   <ol
@@ -169,26 +154,6 @@ const currentStep = steps.findIndex((step) => !step.completed);
                     </>
                   )}
                 </p>
-              )}
-              {step.key === "orientation" && (
-                <>
-                  <p>
-                    {progress.orientationCompletedAt !== null
-                      ? "You have completed an orientation. Patrols without orientation still require separate organizer approval."
-                      : progress.orientationSignedUpAt !== null
-                        ? "Your orientation registration is confirmed. You can review your event details on the events page."
-                        : "Once your application is approved, choose a patrol marked “Includes orientation” and register for an available spot."}
-                  </p>
-                  {eventAccess && (
-                    <a
-                      class="btn btn-outline mt-4"
-                      href="/events?type=orientation"
-                    >
-                      View orientations
-                      <ArrowRightIcon class="btn-icon" />
-                    </a>
-                  )}
-                </>
               )}
             </div>
           </details>

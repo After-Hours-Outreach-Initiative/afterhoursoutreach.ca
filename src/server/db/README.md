@@ -43,6 +43,10 @@ Volunteer application terminology does not rename deployed storage:
   audit field names and queued notification text remain historical records; they are
   not rewritten. Event registration records describe event spots, not applications.
 
+An application is complete after form submission, Naloxone 101 confirmation and
+application approval. Orientation signup and attendance are tracked separately;
+neither is an application-completion milestone or a substitute for patrol approval.
+
 `profile.preferred_name` historically stored a combined full-or-preferred-name
 answer. The name-component migration adds nullable `first_name`, `middle_names`,
 and `last_name`, without modifying existing answers. New applications require
@@ -124,6 +128,12 @@ templates, versions, audits and notifications too. Existing historical excess
 bookings are not removed; completion/status changes never silently cancel spots.
 Approval and completion remain independent, and all existing access, visibility,
 session and application-readiness checks still apply.
+
+Event lists and public rosters restrict volunteers without patrol approval to
+events that include orientation, including legacy and recurring events. This is
+enforced in both queries, not by browser filters or supplied event IDs. Organizers
+and patrol-approved volunteers retain full event visibility under the existing
+open/hidden/time-window rules, even without recorded orientation attendance.
 
 `listEvents` includes effective `includesOrientation`, `orientationConfirmed`
 (confirmed volunteers without any completion), `medicConfirmed` (approved,

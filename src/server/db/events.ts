@@ -141,6 +141,15 @@ export function eventDescription(
     },
   ).format(new Date(event.startsAt))}\nMeeting point: ${event.meetingPoint}`;
 }
+
+// Completion does not grant patrol approval. Organizers and patrol-approved
+// volunteers retain full visibility, including legacy approvals without attendance.
+function volunteerEventVisibilitySql(actor: Actor | null) {
+  return actor?.role === "organizer" || actor?.patrolApproved
+    ? "1"
+    : includesOrientationSql();
+}
+
 export async function listEvents(
   db: Env["DB"],
   actor: Actor | null,
@@ -215,6 +224,7 @@ export async function listEvents(
           `${select}
         WHERE e.starts_at > ${nowMsSql}
           AND e.cancelled_at IS NULL
+          AND ${volunteerEventVisibilitySql(actor)}
           AND ${recurringSignupWindowSql()}
           AND (e.series_id IS NULL OR e.hidden = 0)
           AND ((e.series_id IS NOT NULL AND e.hidden = 0)
@@ -581,6 +591,7 @@ export async function listPublicRosters(
     JOIN profile p ON p.user_id = s.user_id JOIN user u ON u.id = s.user_id
      WHERE s.status = 'confirmed' AND e.id IN (SELECT value FROM json_each(?))
       AND e.starts_at > ${nowMsSql} AND e.cancelled_at IS NULL
+      AND ${volunteerEventVisibilitySql(actor)}
       AND ${recurringSignupWindowSql()}
       AND (e.series_id IS NULL OR e.hidden = 0)
       AND ((e.series_id IS NOT NULL AND e.hidden = 0) OR (e.open = 1 AND e.hidden = 0)

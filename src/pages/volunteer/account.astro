@@ -128,15 +128,6 @@ const completedMilestones = [
     heading: "Application approved",
     completedAt: applicationProgress.applicationApprovedAt,
   },
-  {
-    heading:
-      applicationProgress.orientationCompletedAt !== null
-        ? "Orientation completed"
-        : "Orientation registered",
-    completedAt:
-      applicationProgress.orientationCompletedAt ??
-      applicationProgress.orientationSignedUpAt,
-  },
 ];
 const contents = [
   { id: "account-profile-heading", heading: "Your profile" },
