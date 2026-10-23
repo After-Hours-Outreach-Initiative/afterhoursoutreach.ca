@@ -162,7 +162,7 @@ const hasVisibleEvents = manage
     data-event-path={manage
       ? "/manage/events"
       : eventAccess
-        ? "/events"
+        ? Astro.url.pathname
         : "/volunteer"}
     data-application-awaiting-approval={String(
       Boolean(

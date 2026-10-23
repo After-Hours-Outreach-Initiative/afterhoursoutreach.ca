@@ -1147,7 +1147,7 @@ describe(
       );
     });
 
-    test("sign-in pages request no third-party scripts or frames", async () => {
+    test("sign-in pages stay first-party and completed links land on /volunteer", async () => {
       const browser = await chromium.launch({
         executablePath:
           process.env.CHROMIUM_PATH ??
@@ -1166,7 +1166,9 @@ describe(
           const request = route.request();
           if (!request.url().startsWith(origin)) return route.abort();
           const response = await worker.fetch(request.url(), {
+            method: request.method(),
             headers: await request.allHeaders(),
+            body: request.postData() ?? undefined,
           });
           await route.fulfill({
             status: response.status,
@@ -1194,6 +1196,21 @@ describe(
             ),
           ["email"],
         );
+        const proof = await createSignInOTP(
+          DB,
+          secret,
+          "link-landing-volunteer@example.org",
+        );
+        const fragment = new URLSearchParams({
+          ...proof,
+          returnTo: "/manage/events",
+        });
+        await page.goto(`${origin}/volunteer/sign-in/complete#${fragment}`);
+        await expect(page.getByLabel("Six-digit code")).toBeVisible();
+        await page.getByLabel("Six-digit code").fill(proof.otp);
+        await page.getByRole("button", { name: "Sign in with code" }).click();
+        await expect(page).toHaveURL(`${origin}/volunteer`);
+        await expect(page.locator("[data-application-tracker]")).toBeVisible();
         assert.deepEqual(external, []);
         assert.deepEqual(errors, []);
         await page.close();
@@ -1457,6 +1474,10 @@ describe(
         await newPage.getByLabel("Six-digit code").fill(proof.otp);
         await newPage
           .getByRole("button", { name: "Sign in with code" })
+          .click();
+        await expect(newPage).toHaveURL(`${origin}/volunteer`);
+        await newPage
+          .getByRole("link", { name: "Complete application form", exact: true })
           .click();
         await newPage
           .getByRole("heading", {
@@ -1740,7 +1761,7 @@ describe(
       assert.equal(verified.status, 200, await verified.clone().text());
       assert.equal(
         ((await verified.clone().json()) as { next: string }).next,
-        "/volunteer/account?tab=factor",
+        "/volunteer",
       );
       const verifiedCookie = verified.headers
         .getSetCookie()

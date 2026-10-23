@@ -438,7 +438,10 @@ test("auth uses the configured site origin or request URL without trusting forwa
 
 test("real passwordless sign-in creates a verified volunteer and a host-only secure session", async () => {
   const { response, cookie, challenge } = await signIn("Volunteer@Example.org");
-  assert.equal(((await response.json()) as { next: string }).next, "/apply");
+  assert.equal(
+    ((await response.json()) as { next: string }).next,
+    "/volunteer",
+  );
   const header = response.headers.get("set-cookie")!;
   assert.match(header, /HttpOnly/i);
   assert.match(header, /Secure/i);
@@ -457,6 +460,7 @@ test("real passwordless sign-in creates a verified volunteer and a host-only sec
   const proof = new URLSearchParams(new URL(challenge.url).hash.slice(1));
   assert.equal(proof.get("otp"), challenge.code);
   assert.equal(proof.get("email"), challenge.email);
+  assert.equal(proof.get("returnTo"), "/volunteer");
   assert.equal(new URL(challenge.url).search, "");
   assert.equal(
     (
@@ -468,6 +472,61 @@ test("real passwordless sign-in creates a verified volunteer and a host-only sec
     400,
   );
 });
+
+test.each([
+  { role: "volunteer", submitted: false, approved: false, active: true },
+  { role: "volunteer", submitted: true, approved: false, active: true },
+  { role: "volunteer", submitted: true, approved: true, active: true },
+  { role: "volunteer", submitted: true, approved: true, active: false },
+  { role: "organizer", submitted: true, approved: true, active: true },
+])(
+  "sign-in always lands on /volunteer for $role ($submitted, $approved, $active)",
+  async ({ role, submitted, approved, active }) => {
+    const email = "redirect@example.org";
+    const initial = await signIn(email);
+    const current = await auth.api.getSession({
+      headers: new Headers({ cookie: initial.cookie }),
+    });
+    const id = current!.user.id;
+    if (submitted)
+      await saveProfile(bindings.DB, id, {
+        ...answers,
+        codeOfConductAccepted: true,
+      });
+    await bindings.DB.prepare(
+      "INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at) VALUES ('approver', 'Organizer', 'approver@example.org', 1, 'organizer', 0, 0)",
+    ).run();
+    await bindings.DB.prepare("UPDATE user SET role=? WHERE id=?")
+      .bind(role, id)
+      .run();
+    if (submitted)
+      await bindings.DB.prepare(
+        "UPDATE volunteer_status SET registration_approved=?, active=?, approved_by='approver' WHERE user_id=?",
+      )
+        .bind(Number(approved), Number(active), id)
+        .run();
+    for (const returnTo of [
+      undefined,
+      "/manage/events",
+      "https://evil.example",
+    ]) {
+      const proof = await createSignInOTP(
+        bindings.DB,
+        bindings.BETTER_AUTH_SECRET!,
+        email,
+      );
+      const response = await request(
+        `/sign-in/email-otp${returnTo ? `?${new URLSearchParams({ returnTo })}` : ""}`,
+        proof,
+      );
+      assert.equal(response.status, 200, await response.clone().text());
+      assert.equal(
+        ((await response.json()) as { next: string }).next,
+        "/volunteer",
+      );
+    }
+  },
+);
 
 test("link and code redemption race produces exactly one successful result", async () => {
   const proof = await createSignInOTP(
@@ -488,10 +547,13 @@ test("link and code redemption race produces exactly one successful result", asy
 
 test("automatic email links require an unexpired signed requesting-browser binding before touching the OTP", async () => {
   const email = "browser-bound@example.org";
-  const sent = await request("/email-otp/send-verification-otp", {
-    email,
-    type: "sign-in",
-  });
+  const sent = await request(
+    "/email-otp/send-verification-otp?returnTo=%2Fmanage%2Fevents",
+    {
+      email,
+      type: "sign-in",
+    },
+  );
   assert.equal(sent.status, 200);
   const cookie = cookies(sent);
   assert.match(cookie, /aho\.email_link/);
@@ -502,6 +564,10 @@ test("automatic email links require an unexpired signed requesting-browser bindi
   assert.match(header, /Max-Age=600/i);
   assert.doesNotMatch(header, /Domain=/i);
   const challenge = outbox.at(-1)!;
+  assert.equal(
+    new URLSearchParams(new URL(challenge.url).hash.slice(1)).get("returnTo"),
+    "/volunteer",
+  );
   const activation = new URLSearchParams(
     new URL(challenge.url).hash.slice(1),
   ).get("activation")!;
@@ -553,7 +619,10 @@ test("automatic email links require an unexpired signed requesting-browser bindi
   );
   const signedIn = await activate(cookie);
   assert.equal(signedIn.status, 200, await signedIn.clone().text());
-  assert.equal(((await signedIn.json()) as { next: string }).next, "/apply");
+  assert.equal(
+    ((await signedIn.json()) as { next: string }).next,
+    "/volunteer",
+  );
   assert.match(signedIn.headers.get("set-cookie")!, /email_link=.*Max-Age=0/);
   assert.equal((await activate(cookie)).status, 400);
 });
@@ -1087,7 +1156,7 @@ test("application/editing persists all answers, keeps approval, and audits only 
   );
   assert.equal(
     ((await response.json()) as { next: string }).next,
-    "/volunteer/account?tab=profile",
+    "/volunteer",
   );
 });
 
@@ -2166,7 +2235,7 @@ test("passwordless two-factor enrollment and login cannot bypass the authenticat
   assert.equal(verified.status, 200, await verified.clone().text());
   assert.equal(
     ((await verified.clone().json()) as { next: string }).next,
-    "/volunteer/account?tab=sample",
+    "/volunteer",
   );
   const verifiedCookie = cookies(verified);
   const session = await auth.api.getSession({

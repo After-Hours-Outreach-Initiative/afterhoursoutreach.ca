@@ -7,7 +7,7 @@ import {
   profileIdentityFields,
   type ApplicationAnswers,
 } from "../data/application";
-import { accountGreeting } from "../data/account-navigation";
+import { accountGreeting, signInDestination } from "../data/account-navigation";
 import {
   applicationSubmissionValues,
   initApplicationReview,
@@ -169,12 +169,7 @@ function finish(result: object) {
   // The client plugin has already displayed the challenge. Do not navigate away.
   if ("twoFactorRedirect" in result && result.twoFactorRedirect === true)
     return;
-  // `next` is added by our application/return-to hooks, not a built-in field.
-  location.assign(
-    "next" in result && typeof result.next === "string"
-      ? result.next
-      : "/volunteer/account",
-  );
+  location.assign(signInDestination);
 }
 
 const pendingFactor = new URLSearchParams(location.search).has("second-factor");

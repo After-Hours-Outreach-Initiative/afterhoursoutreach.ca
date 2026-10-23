@@ -267,7 +267,7 @@ test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async
   ).toContainText("Invalid");
   await page.getByLabel("Six-digit code").fill(code);
   await page.getByRole("button", { name: "Sign in with code" }).click();
-  await expect(page).toHaveURL(/\/apply/);
+  await expect(page).toHaveURL(/\/volunteer$/);
   await expect(
     page.getByRole("navigation", { name: "Volunteer account" }),
   ).toBeVisible();
@@ -319,7 +319,7 @@ test("local D1 email links are one-use and sign-in pages have no third-party req
     await scanner.close();
   }
   await link.click();
-  await expect(page).toHaveURL(/\/apply/);
+  await expect(page).toHaveURL(/\/volunteer$/);
   expect(new URL(page.url()).hash).toBe("");
   const replay = await request.post("/api/v1/auth/sign-in/email-otp", {
     headers: { origin: url.origin },

@@ -121,7 +121,7 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
     Array(2).fill({
       email: "first@example.org",
       type: "sign-in",
-      returnTo: "/volunteer/events?from=resend",
+      returnTo: "/volunteer",
     }),
   );
 });
@@ -257,7 +257,7 @@ for (const errorCode of ["OTP_EXPIRED", "INVALID_OTP"]) {
     await page.route(verifyEndpoint, async (route) => {
       proofs.push(route.request().postDataJSON());
       expect(new URL(route.request().url()).searchParams.get("returnTo")).toBe(
-        "/volunteer/events?from=resend",
+        "/volunteer",
       );
       await route.fulfill(
         verified
@@ -313,7 +313,7 @@ for (const errorCode of ["OTP_EXPIRED", "INVALID_OTP"]) {
     await page.route(verifyEndpoint, async (route) => {
       proofs.push(route.request().postDataJSON());
       expect(new URL(route.request().url()).searchParams.get("returnTo")).toBe(
-        "/volunteer/events?from=resend",
+        "/volunteer",
       );
       await route.fulfill(
         verified
@@ -334,7 +334,7 @@ for (const errorCode of ["OTP_EXPIRED", "INVALID_OTP"]) {
         type: "sign-in",
       });
       expect(new URL(route.request().url()).searchParams.get("returnTo")).toBe(
-        "/volunteer/events?from=resend",
+        "/volunteer",
       );
       await route.fulfill({ json: { success: true } });
     });
@@ -366,7 +366,7 @@ for (const errorCode of ["OTP_EXPIRED", "INVALID_OTP"]) {
     verified = true;
     await code.locator('[name="code"]').fill("654321");
     await code.getByRole("button", { name: "Sign in with code" }).click();
-    await expect(page).toHaveURL(/\/volunteer\/events\?from=resend$/);
+    await expect(page).toHaveURL(/\/volunteer$/);
     expect(proofs).toEqual([
       { email: "link@example.org", otp: "123456" },
       { email: "link@example.org", otp: "654321" },
@@ -420,7 +420,7 @@ test("local email previews also work after resend, including wrong and valid cod
     dialog.getByRole("link", { name: "Open local sign-in link" }),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "Use valid code" }).click();
-  await expect(page).toHaveURL(/\/volunteer\/events\?from=resend$/);
+  await expect(page).toHaveURL(/\/volunteer$/);
   expect(proofs).toEqual([
     { email: "resend@example.org", otp: "000000" },
     { email: "resend@example.org", otp: "654321" },
@@ -484,7 +484,7 @@ test("a consumed local-D1 link resends successfully after the real 30-second coo
   );
   await expect(resend).toBeDisabled();
   await preview.getByRole("button", { name: "Use valid code" }).click();
-  await expect(page).toHaveURL(/\/apply$/);
+  await expect(page).toHaveURL(/\/volunteer$/);
 });
 
 test("a transient automatic link failure stays retryable and blocks resend during verification", async ({
@@ -550,11 +550,9 @@ test("incomplete links recover with their email when available and sanitize the 
     "incomplete@example.org",
   );
   await expect(code.locator("[data-resend-code]")).toBeEnabled();
-  await expect(code).toHaveAttribute("data-return-to", "/volunteer/account");
+  await expect(code).toHaveAttribute("data-return-to", "/volunteer");
   await page.getByRole("link", { name: "Use a different email" }).click();
-  await expect(page).toHaveURL(
-    /\/volunteer\/sign-in\?returnTo=%2Fvolunteer%2Faccount$/,
-  );
+  await expect(page).toHaveURL(/\/volunteer\/sign-in\?returnTo=%2Fvolunteer$/);
   await expect(
     page.getByRole("textbox", { name: "Email", exact: true }),
   ).toHaveValue("");
@@ -570,9 +568,6 @@ test("incomplete links recover with their email when available and sanitize the 
   ).toBeHidden();
   await expect(
     page.getByRole("link", { name: "Request a new email" }),
-  ).toHaveAttribute(
-    "href",
-    "/volunteer/sign-in?returnTo=%2Fvolunteer%2Fevents",
-  );
+  ).toHaveAttribute("href", "/volunteer/sign-in?returnTo=%2Fvolunteer");
   await expect(page).toHaveURL(/\/volunteer\/sign-in\/complete$/);
 });
