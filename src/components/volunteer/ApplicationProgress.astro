@@ -85,7 +85,7 @@ const currentStep = steps.findIndex((step) => !step.completed);
                 {step.completed ? <CheckIcon class="size-6" /> : index + 1}
               </span>
               <span class="application-progress-label">
-                <span class="application-progress-title">
+                <span class="application-progress-title text-lg">
                   <span class="sr-only">Step {index + 1}: </span>
                   {step.title}
                 </span>
@@ -192,8 +192,6 @@ const currentStep = steps.findIndex((step) => !step.completed);
     flex-shrink: 0;
     width: 2rem;
     height: 2rem;
-  }
-  .application-progress-number {
     border: 1px solid currentColor;
     border-radius: 50%;
   }
