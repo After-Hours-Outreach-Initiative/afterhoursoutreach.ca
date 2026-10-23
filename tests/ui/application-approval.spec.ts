@@ -119,12 +119,22 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(
       formStep.locator("[data-submitted-application] summary"),
     ).toHaveText("View submitted application");
+    const submittedApplication = formStep.locator(
+      "[data-submitted-application]",
+    );
+    await submittedApplication.locator("summary").click();
     await volunteer.locator("[data-naloxone-confirm] input").check();
     await volunteer
       .getByRole("button", { name: "Confirm completion", exact: true })
       .click();
     await expect(review).toHaveAttribute("open");
     await expectCompletedStep(naloxone);
+    await expect(formStep).toHaveAttribute("open");
+    await expect(submittedApplication.locator("details")).toHaveAttribute(
+      "open",
+    );
+    await expect(naloxone.locator('[name="completed"]')).toBeChecked();
+    await expect(naloxone.locator('[name="completed"]')).toBeDisabled();
     await expect(
       portal.getByText(
         "Join our Discord for more information and to become more involved.",
@@ -285,7 +295,7 @@ test("pending applications poll every minute, then approval restores five-second
   }
 });
 
-test("approved applicants keep progress until naloxone confirmation, then retain completed account info", async ({
+test("approval preserves the course draft, expanded snapshot and focus until confirmation", async ({
   page,
   browser,
   baseURL,
@@ -298,18 +308,14 @@ test("approved applicants keep progress until naloxone confirmation, then retain
   try {
     const volunteer = await volunteerContext.newPage();
     const account = await createLocalAccount(volunteer.request, baseURL!);
-    await page.goto("/volunteer");
-    await (
-      await openLocalAccountSwitcher(page)
-    )
-      .locator('[data-switch-user="local-fixture-user-robin"]')
-      .click();
-    await expect(
-      page.getByRole("link", { name: "Manage events", exact: true }),
-    ).toBeVisible();
-    await approveLocalApplication(page.request, baseURL!, account.id);
-
+    await volunteer.clock.install();
+    await volunteer.clock.pauseAt(new Date());
+    let checks = 0;
+    volunteer.on("requestfinished", (request) => {
+      if (request.url().endsWith("/api/v1/events/version")) checks++;
+    });
     await volunteer.goto(`${baseURL}/events`);
+    await expect.poll(() => checks).toBe(1);
     await expect(volunteer).toHaveURL(/\/volunteer$/);
     await expect(volunteer.locator('header a[href="/volunteer"]')).toHaveText([
       "Volunteer",
@@ -320,14 +326,54 @@ test("approved applicants keep progress until naloxone confirmation, then retain
     ).toBeVisible();
     const tracker = volunteer.locator("[data-application-tracker]");
     await expect(tracker).toBeVisible();
+    const formStep = tracker.locator('[data-application-progress-step="form"]');
+    const naloxone = tracker.locator(
+      '[data-application-progress-step="naloxone"]',
+    );
+    const submittedApplication = formStep.locator(
+      "[data-submitted-application]",
+    );
+    await formStep.locator(":scope > summary").click();
+    await submittedApplication.locator("summary").click();
+    const checkbox = naloxone.locator('[name="completed"]');
+    await checkbox.check();
+    await checkbox.focus();
+
+    await page.goto("/volunteer");
+    await (
+      await openLocalAccountSwitcher(page)
+    )
+      .locator('[data-switch-user="local-fixture-user-robin"]')
+      .click();
+    await expect(
+      page.getByRole("link", { name: "Manage events", exact: true }),
+    ).toBeVisible();
+    await approveLocalApplication(page.request, baseURL!, account.id);
+    await volunteer.clock.runFor(60_000);
+    await expect.poll(() => checks).toBe(2);
     await expectCompletedStep(
       tracker.locator('[data-application-progress-step="review"]'),
     );
-    await expect(
-      tracker.locator('[data-application-progress-step="naloxone"]'),
-    ).toHaveAttribute("data-state", "current");
+    await expect(naloxone).toHaveAttribute("data-state", "current");
+    await expect(formStep).toHaveAttribute("open");
+    await expect(submittedApplication.locator("details")).toHaveAttribute(
+      "open",
+    );
+    await expect(submittedApplication).toContainText(account.name);
+    await expect(checkbox).toBeChecked();
+    await expect(checkbox).toBeEnabled();
+    await expect(checkbox).toBeFocused();
+    await expect(volunteer).toHaveURL(/\/volunteer$/);
     await expect(volunteer.locator("[data-event-list]")).toHaveCount(0);
-    await tracker.locator("[data-naloxone-confirm] input").check();
+    const courseSummary = naloxone.locator(":scope > summary");
+    await courseSummary.click();
+    await courseSummary.focus();
+    await volunteer.clock.runFor(5_000);
+    await expect.poll(() => checks).toBe(3);
+    await expect(naloxone).not.toHaveAttribute("open");
+    await expect(courseSummary).toBeFocused();
+    await expect(checkbox).toBeChecked();
+    await courseSummary.click();
     await tracker
       .getByRole("button", { name: "Confirm completion", exact: true })
       .click();
