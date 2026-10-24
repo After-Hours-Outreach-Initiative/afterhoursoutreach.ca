@@ -157,7 +157,7 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(naloxone.locator('[name="completed"]')).toBeDisabled();
     await expect(
       portal.getByText(
-        "Join our Discord for more information and to become more involved.",
+        "Join our Discord for the most up to date information.",
       ),
     ).toBeVisible();
     const discord = portal.getByRole("link", { name: "Join Discord" });
