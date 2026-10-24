@@ -1112,6 +1112,16 @@ describe(
           ).status,
           404,
         );
+        assert.equal(
+          (
+            await send(
+              "/api/v1/auth/dev/application-step",
+              { userId: before.user.id, step: "review" },
+              sessionCookie,
+            )
+          ).status,
+          404,
+        );
       }
       const after = (await (
         await send("/api/v1/auth/get-session", undefined, cookie)
@@ -1860,6 +1870,18 @@ test("a built Worker cannot enable account switching with local runtime vars", a
       },
     );
     assert.equal(deletion.status, 404);
+    const shortcut = await worker.fetch(
+      "http://localhost:4321/api/v1/auth/dev/application-step",
+      {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:4321",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ userId: "new-application", step: "review" }),
+      },
+    );
+    assert.equal(shortcut.status, 404);
   } finally {
     await server.close();
   }

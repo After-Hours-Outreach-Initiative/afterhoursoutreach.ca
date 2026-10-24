@@ -79,25 +79,89 @@ const account =
               />
               <div class="dialog-body">
                 <div class="volunteer-form">
-                  <div class="account-profile-switcher">
-                    <p id="development-account-label">View as</p>
-                    <div
-                      class="account-profile-buttons"
-                      data-view-as
-                      role="group"
-                      aria-labelledby="development-account-label"
-                      aria-busy="true"
-                    >
-                      <button
-                        class="btn btn-quiet account-profile-button"
-                        type="button"
-                        data-switch-user=""
-                        aria-pressed="false"
-                        disabled
+                  <div
+                    class="grid gap-6"
+                    data-view-as
+                    role="group"
+                    aria-label="View as"
+                    aria-busy="true"
+                  >
+                    <section class="account-profile-switcher">
+                      <h3 class="text-lg" id="development-states-heading">
+                        Account states
+                      </h3>
+                      <div
+                        class="account-profile-buttons"
+                        data-account-states
+                        role="group"
+                        aria-labelledby="development-states-heading"
                       >
-                        Visitor
-                      </button>
-                    </div>
+                        <button
+                          class="btn btn-quiet account-profile-button"
+                          type="button"
+                          data-switch-user=""
+                          aria-pressed="false"
+                          disabled
+                        >
+                          Visitor
+                        </button>
+                      </div>
+                    </section>
+                    <section class="account-profile-switcher border-t border-zinc-700 pt-6">
+                      <h3 class="text-lg" id="development-steps-heading">
+                        Application steps
+                      </h3>
+                      <p class="volunteer-help" data-step-account>
+                        Choose an account to use these shortcuts.
+                      </p>
+                      <p
+                        class="volunteer-help"
+                        id="development-steps-description"
+                      >
+                        Step 1 submits fictional sample answers.
+                        Already-submitted answers are never replaced. No emails
+                        are sent.
+                      </p>
+                      <div
+                        class="grid gap-2"
+                        role="group"
+                        aria-labelledby="development-steps-heading"
+                      >
+                        {[
+                          ["form", "1. Submit sample application"],
+                          ["naloxone", "2. Complete Naloxone 101"],
+                          ["review", "3. Approve application"],
+                        ].map(([step, label]) => (
+                          <button
+                            class="btn btn-quiet flex-wrap justify-between text-left"
+                            type="button"
+                            data-application-step={step}
+                            aria-describedby="development-steps-description"
+                            disabled
+                          >
+                            <span>{label}</span>
+                            <span
+                              class="account-profile-detail"
+                              data-step-status
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                    <section class="account-profile-switcher border-t border-zinc-700 pt-6">
+                      <h3 class="text-lg" id="development-accounts-heading">
+                        Existing accounts
+                      </h3>
+                      <div
+                        class="account-profile-buttons"
+                        data-existing-accounts
+                        role="group"
+                        aria-labelledby="development-accounts-heading"
+                      />
+                      <p class="volunteer-help" data-empty-accounts hidden>
+                        No saved accounts yet.
+                      </p>
+                    </section>
                   </div>
                   <p data-switch-message role="status" hidden />
                 </div>

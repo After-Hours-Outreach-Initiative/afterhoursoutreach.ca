@@ -49,6 +49,74 @@ test("Alt+Z toggles the DEV panel and restores focus without changing form input
   await expect(trigger).toBeFocused();
 });
 
+test("DEV panel separates states from saved accounts and completes each application step", async ({
+  page,
+  baseURL,
+}) => {
+  const endpoint = "/api/v1/auth/dev/application-step";
+  const post = (userId: string, step: string, origin = baseURL!) =>
+    page.request.post(endpoint, {
+      headers: { origin },
+      data: { userId, step },
+    });
+  expect((await post("visitor", "form")).status()).toBe(401);
+  const profiles = await openLocalAccountSwitcher(page);
+  const states = profiles.getByRole("group", {
+    name: "Account states",
+    exact: true,
+  });
+  const accounts = profiles.getByRole("group", {
+    name: "Existing accounts",
+    exact: true,
+  });
+  await expect(
+    states.locator('[data-switch-user="new-application"]'),
+  ).toBeVisible();
+  await expect(
+    accounts.locator('[data-switch-user="local-fixture-user-robin"]'),
+  ).toBeVisible();
+  await expect(
+    states.locator('[data-switch-user^="local-fixture-user-"]'),
+  ).toHaveCount(0);
+  await expect(
+    profiles.locator('[data-application-step="form"]'),
+  ).toBeDisabled();
+  await states.locator('[data-switch-user="new-application"]').click();
+  await expect(page).toHaveURL(/\/apply$/);
+  const { user } = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  expect(
+    (await post(user.id, "form", "https://unrelated.example.org")).status(),
+  ).toBe(403);
+  expect((await post("another-account", "form")).status()).toBe(409);
+
+  for (const [index, step] of ["form", "naloxone", "review"].entries()) {
+    const panel = await openLocalAccountSwitcher(page);
+    const button = panel.locator(`[data-application-step="${step}"]`);
+    await expect(button).toBeEnabled();
+    if (index === 0)
+      await expect(
+        panel.locator('[data-application-step="naloxone"]'),
+      ).toBeDisabled();
+    if (index < 2)
+      await expect(
+        panel.locator('[data-application-step="review"]'),
+      ).toBeDisabled();
+    await button.click();
+    await expect(page).toHaveURL(/\/volunteer$/);
+    const refreshed = await openLocalAccountSwitcher(page);
+    await expect(
+      refreshed.locator(`[data-application-step="${step}"]`),
+    ).toBeDisabled();
+    await expect(
+      refreshed.locator(`[data-application-step="${step}"] [data-step-status]`),
+    ).toHaveText("Completed");
+    await page.keyboard.press("Alt+KeyZ");
+  }
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+});
+
 test("Not applied always starts blank; submitted local accounts persist and can be deleted", async ({
   page,
   baseURL,

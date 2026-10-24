@@ -13,6 +13,7 @@ import { asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "../../server/db";
 import { profile, user } from "../../server/db/schema";
+import { loadApplicationProgress } from "../../server/db/application-progress";
 import { RequestError, safeReturnTo } from "../../server/http";
 import type { AuthBindings } from "../../server/auth";
 import { newApplicationPersona } from "../accounts";
@@ -60,6 +61,9 @@ export function developmentAccounts(bindings: AuthBindings) {
             users: rows.slice(0, 100),
             next: rows.length > 100 ? rows[99].id : null,
             currentUserId: current?.user.id ?? null,
+            applicationProgress: current
+              ? await loadApplicationProgress(bindings.DB, current.user.id)
+              : null,
           });
         },
       ),
@@ -128,6 +132,62 @@ export function developmentAccounts(bindings: AuthBindings) {
           )
             next = "/events";
           return ctx.json({ next });
+        },
+      ),
+      developmentApplicationStep: createAuthEndpoint(
+        "/dev/application-step",
+        {
+          method: "POST",
+          requireHeaders: true,
+          body: z.strictObject({
+            userId: z.string().min(1).max(200),
+            step: z.enum(["form", "naloxone", "review"]),
+          }),
+        },
+        async (ctx) => {
+          requireLocal(ctx.request);
+          // Load after auth initialization: these helpers use the normal auth
+          // context and must not introduce a cycle in the development plugin.
+          const { accountContext } = await import("../../server/db/access");
+          const { completeLocalApplicationStep } =
+            await import("./application-steps");
+          try {
+            const { actor } = await accountContext(
+              bindings,
+              ctx.request!,
+              true,
+            );
+            if (!actor) throw new RequestError(401, "Choose an account first.");
+            if (actor.twoFactorEnabled && !actor.twoFactorVerified)
+              throw new RequestError(
+                403,
+                "Sign in with your authenticator first.",
+              );
+            if (actor.id !== ctx.body.userId)
+              throw new RequestError(
+                409,
+                "Your account changed. Reload before completing this step.",
+              );
+            await completeLocalApplicationStep(
+              bindings.DB,
+              actor,
+              ctx.body.step,
+            );
+            return ctx.json({ next: "/volunteer" });
+          } catch (error) {
+            if (error instanceof RequestError)
+              throw new APIError(
+                error.status === 401
+                  ? "UNAUTHORIZED"
+                  : error.status === 403
+                    ? "FORBIDDEN"
+                    : error.status === 409
+                      ? "CONFLICT"
+                      : "BAD_REQUEST",
+                { message: error.message },
+              );
+            throw error;
+          }
         },
       ),
       developmentDeleteUser: createAuthEndpoint(

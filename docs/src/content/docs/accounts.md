@@ -244,9 +244,11 @@ safe because TypeScript removes them.
 
 The development controls are available only in the local dev server. Built
 Worker tests check that `GET /api/v1/auth/dev/users`,
-`POST /api/v1/auth/dev/switch-user`, and `POST /api/v1/auth/dev/delete-user`
+`POST /api/v1/auth/dev/switch-user`, `POST /api/v1/auth/dev/delete-user`, and
+`POST /api/v1/auth/dev/application-step`
 return `404` in production and preview builds;
-local browser tests exercise account switching and simulated email delivery.
+local browser tests exercise account switching, application-step shortcuts, and
+simulated email delivery.
 Dev-tool assets must not be placed in `public/`, which is copied into builds.
 
 The Not applied choice creates a new disposable D1 identity on each selection;

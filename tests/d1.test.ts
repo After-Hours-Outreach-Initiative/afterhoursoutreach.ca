@@ -53,6 +53,7 @@ import {
   createDisposableAccount,
   deleteLocalAccount,
 } from "../src/dev/server/local-accounts";
+import { completeLocalApplicationStep } from "../src/dev/server/application-steps";
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -158,6 +159,54 @@ async function draftActor(id = "draft-volunteer"): Promise<Actor> {
     patrolApproved: false,
   };
 }
+
+test("development application shortcuts preserve snapshots and advance without emails or patrol approval", async () => {
+  const actor = await draftActor();
+  await assert.rejects(
+    completeLocalApplicationStep(env.DB, actor, "naloxone"),
+    statusError(409),
+  );
+  await completeLocalApplicationStep(env.DB, actor, "form");
+  const original = await loadSubmittedApplication(env.DB, actor.id);
+  assert.ok(original);
+  await assert.rejects(
+    completeLocalApplicationStep(env.DB, actor, "review"),
+    statusError(409),
+  );
+  await completeLocalApplicationStep(env.DB, actor, "naloxone");
+  await completeLocalApplicationStep(env.DB, actor, "review");
+  const progress = await loadApplicationProgress(env.DB, actor.id);
+  assert.ok(isApplicationComplete(progress));
+  assert.ok(progress.applicationApprovedAt);
+  const auditCount = await env.DB.prepare(
+    "SELECT count(*) FROM audit_log",
+  ).first("count(*)");
+  for (const step of ["form", "naloxone", "review"] as const)
+    await completeLocalApplicationStep(env.DB, actor, step);
+  assert.deepEqual(await loadApplicationProgress(env.DB, actor.id), progress);
+  assert.deepEqual(await loadSubmittedApplication(env.DB, actor.id), original);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
+    auditCount,
+  );
+  assert.deepEqual(
+    await env.DB.prepare(
+      `SELECT u.role, v.patrol_approved FROM user u
+       JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
+    )
+      .bind(actor.id)
+      .first(),
+    { role: "volunteer", patrol_approved: 0 },
+  );
+  for (const table of [
+    "event_notification",
+    "application_submission_notification",
+  ])
+    assert.equal(
+      await env.DB.prepare(`SELECT count(*) FROM ${table}`).first("count(*)"),
+      0,
+    );
+});
 
 test("concurrent D1 registrations preserve both reservations; cancellations and failed organizer moves are atomic", async () => {
   const organizer = {

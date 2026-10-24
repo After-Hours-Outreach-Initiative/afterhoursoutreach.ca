@@ -49,9 +49,10 @@ disposable D1 database; it never adds test accounts to this persistent dev datab
 See [testing.md](/testing/).
 
 On localhost or the dev server's LAN address, the shared account layout includes
-a **DEV panel** button. Press **Alt+Z** to open or close it. Its **View as** choices
-include every user in local D1, including accounts that have not finished their
-application. Choosing a saved user replaces only this browser's
+a **DEV panel** button. Press **Alt+Z** to open or close it. **Account states** holds
+Visitor, Not applied, and the seeded manual presets; **Existing accounts** lists
+the other saved local users, including unfinished applications. Choosing a saved
+user replaces only this browser's
 session; choosing Visitor signs out. Switching simulates a verified two-factor
 session for users with an enrolled authenticator, without changing their role,
 email verification, active status, profile, or patrol approval. Create new
@@ -74,6 +75,16 @@ sessions, and related volunteer
 records in one transaction. Existing database protections block deletion of the
 last active organizer and accounts referenced by organizer-owned records; an error
 is shown and no records are changed when deletion is blocked.
+
+**Application steps** has three shortcuts for the signed-in account: submit a
+sample application, complete Naloxone 101, and approve the application. Each
+button enables after its prerequisite and shows Completed afterward. Step 1 uses
+fictional seed answers and normal submission validation, never replaces an
+existing submission, and clears its draft. The shortcuts send no email and do
+not grant organizer or patrol approval. They update actual local records, not a
+visual override; choose Not applied to begin again without resetting an account.
+Signed-out requests, cross-origin requests, and requests for a different account
+are rejected. These endpoints are absent from deployed builds.
 
 For manual testing, run `pnpm db:seed:local` with the dev server running
 and local migrations applied. On a fresh local database, View as contains

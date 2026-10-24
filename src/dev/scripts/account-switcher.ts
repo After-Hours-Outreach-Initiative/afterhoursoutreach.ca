@@ -7,6 +7,7 @@ import {
   isManualAccountPreset,
   manualAccountPresetIds,
   newApplicationPersona,
+  type DevelopmentApplicationStep,
 } from "../accounts";
 
 // This module is loaded only in development; server imports are type-only.
@@ -20,6 +21,7 @@ const developmentAuthClient = createAuthClient({
         "/dev/users": "GET",
         "/dev/switch-user": "POST",
         "/dev/delete-user": "POST",
+        "/dev/application-step": "POST",
       },
     },
   ],
@@ -35,12 +37,42 @@ export async function initAccountSwitcher() {
     "dialog[data-account-switcher]",
   );
   const profiles = root?.querySelector<HTMLElement>("[data-view-as]");
+  const states = root?.querySelector<HTMLElement>("[data-account-states]");
+  const accounts = root?.querySelector<HTMLElement>("[data-existing-accounts]");
   const message = root?.querySelector<HTMLElement>("[data-switch-message]");
-  if (!root || !profiles || !message) return;
+  if (!root || !profiles || !states || !accounts || !message) return;
+  const emptyAccounts = root.querySelector<HTMLElement>(
+    "[data-empty-accounts]",
+  );
+  const stepAccount = root.querySelector<HTMLElement>("[data-step-account]");
+  const steps = root.querySelectorAll<HTMLButtonElement>(
+    "[data-application-step]",
+  );
   const createAccount = root.querySelector<HTMLAnchorElement>(
     "[data-create-account]",
   );
   let busy = true;
+  let currentUserId: string | null = null;
+  let progress: DevelopmentUsers["applicationProgress"] = null;
+  const updateSteps = () => {
+    const submitted = progress?.submittedAt != null;
+    const naloxone = progress?.naloxoneCompletedAt != null;
+    for (const button of steps) {
+      const step = button.dataset.applicationStep;
+      const completed =
+        step === "form"
+          ? submitted
+          : step === "naloxone"
+            ? naloxone
+            : Boolean(progress?.applicationApproved);
+      const available =
+        step === "form" ||
+        (step === "naloxone" ? submitted : submitted && naloxone);
+      button.disabled = busy || !currentUserId || !available || completed;
+      const status = button.querySelector<HTMLElement>("[data-step-status]");
+      if (status) status.textContent = completed ? "Completed" : "";
+    }
+  };
   const setBusy = (value: boolean) => {
     busy = value;
     profiles.setAttribute("aria-busy", String(value));
@@ -50,6 +82,7 @@ export async function initAccountSwitcher() {
       )
       .forEach((button) => (button.disabled = value));
     createAccount?.setAttribute("aria-disabled", String(value));
+    updateSteps();
   };
   setBusy(true);
   const trigger = document.querySelector<HTMLButtonElement>(
@@ -111,6 +144,22 @@ export async function initAccountSwitcher() {
       fail(error);
     }
   });
+  for (const button of steps)
+    button.addEventListener("click", async () => {
+      if (busy || button.disabled || !currentUserId) return;
+      setBusy(true);
+      message.hidden = true;
+      try {
+        const result = await developmentAuthClient.dev.applicationStep({
+          userId: currentUserId,
+          step: button.dataset.applicationStep as DevelopmentApplicationStep,
+        });
+        location.assign(result.next);
+      } catch (error) {
+        setBusy(false);
+        fail(error);
+      }
+    });
   profiles.addEventListener("click", async (event) => {
     const button =
       event.target instanceof Element
@@ -139,6 +188,8 @@ export async function initAccountSwitcher() {
           return;
         }
         button.closest("[data-local-account]")?.remove();
+        if (emptyAccounts)
+          emptyAccounts.hidden = accounts.childElementCount > 0;
         setBusy(false);
         profiles
           .querySelector<HTMLButtonElement>("[data-switch-user]")
@@ -167,7 +218,6 @@ export async function initAccountSwitcher() {
   try {
     const users: DevelopmentUser[] = [];
     let after: string | null = null;
-    let currentUserId: string | null = null;
     do {
       const result: DevelopmentUsers = await developmentAuthClient.dev.users({
         query: after ? { after } : {},
@@ -175,6 +225,7 @@ export async function initAccountSwitcher() {
       users.push(...result.users);
       after = result.next;
       currentUserId = result.currentUserId;
+      progress = result.applicationProgress;
     } while (after);
     const personaOrder = new Map(
       manualAccountPresetIds.map((id, index) => [id, index]),
@@ -199,7 +250,7 @@ export async function initAccountSwitcher() {
       button.appendChild(detail);
       return button;
     };
-    profiles.appendChild(
+    states.appendChild(
       profileButton(
         newApplicationPersona,
         "Not applied",
@@ -218,7 +269,7 @@ export async function initAccountSwitcher() {
         `${user.email}${user.role === "organizer" ? " · Organizer" : ""}`,
       );
       if (isManualAccountPreset(user.id)) {
-        profiles.appendChild(button);
+        states.appendChild(button);
         continue;
       }
       const row = document.createElement("div");
@@ -263,8 +314,12 @@ export async function initAccountSwitcher() {
       remove.appendChild(icon);
       row.appendChild(button);
       row.appendChild(remove);
-      profiles.appendChild(row);
+      accounts.appendChild(row);
     }
+    if (emptyAccounts) emptyAccounts.hidden = accounts.childElementCount > 0;
+    const current = users.find((user) => user.id === currentUserId);
+    if (stepAccount && current)
+      stepAccount.textContent = `Current account: ${current.name || current.email}`;
     profiles
       .querySelectorAll<HTMLButtonElement>("[data-switch-user]")
       .forEach((button) =>

@@ -1,6 +1,8 @@
 // A virtual choice, never the ID of a fixture or a saved application.
 export const newApplicationPersona = "new-application";
 
+export type DevelopmentApplicationStep = "form" | "naloxone" | "review";
+
 // Only these exact manual preset IDs are protected, regardless of name or role.
 export const manualAccountPresetIds: readonly string[] = [
   "local-account-user-applied",
