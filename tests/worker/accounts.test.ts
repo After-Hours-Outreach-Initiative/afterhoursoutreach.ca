@@ -679,10 +679,13 @@ describe(
         html,
         /submitted-application-heading|data-submitted-application|data-application-tracker|data-naloxone-confirm|account-naloxone-heading/,
       );
-      assert.doesNotMatch(html, /Why do you want to volunteer\?/);
+      assert.doesNotMatch(
+        html,
+        /Please tell us what motivates you volunteer with us\?/,
+      );
       assert.doesNotMatch(
         html.match(/<form\b[^>]*data-account-profile[\s\S]*?<\/form>/)![0],
-        /How did you find out about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
+        /How did you find out about us\?|Please tell us what motivates you volunteer with us\?|code-of-conduct-heading/,
       );
       assert.doesNotMatch(
         html,
@@ -785,7 +788,10 @@ describe(
           })
           .replace(/\s+/g, " "),
       );
-      assert.match(html, /Why do you want to volunteer\?/);
+      assert.match(
+        html,
+        /Please tell us what motivates you volunteer with us\?/,
+      );
     });
 
     test("submitted applications stay private and legacy profile edits do not invent an original snapshot", async () => {
