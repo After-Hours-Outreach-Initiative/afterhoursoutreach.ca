@@ -20,6 +20,7 @@ interface ReviewRow {
   name: string;
   label: string;
   condition?: string;
+  wide?: boolean;
 }
 const reviewSections = sections.map((section) => {
   let rows: ReviewRow[] = section.fields
@@ -32,19 +33,22 @@ const reviewSections = sections.map((section) => {
     .map((field) => ({
       name: field.name === "heardAboutUs" ? "heardAboutUsSources" : field.name,
       label: field.label + (field.required ? "" : " (optional)"),
+      wide: "multiline" in field || field.name === "heardAboutUs",
     }));
   if (section.key === "team-interests")
     rows = [
-      { name: "teams", label: "Which teams interest you?" },
+      { name: "teams", label: "Which teams interest you?", wide: true },
       {
         name: "certifications",
         label: certificationQuestion,
         condition: "medic",
+        wide: true,
       },
       {
         name: "experience",
         label: "Other training and experience",
         condition: "other-certification",
+        wide: true,
       },
       {
         name: "certificationExpiry",
@@ -54,17 +58,19 @@ const reviewSections = sections.map((section) => {
     ];
   if (section.key === "training-and-safety")
     rows = [
-      { name: "training", label: trainingQuestion },
+      { name: "training", label: trainingQuestion, wide: true },
       {
         name: "otherTraining",
         label: "Other relevant training",
         condition: "other-training",
+        wide: true,
       },
-      { name: "relevantExperience", label: experienceQuestion },
+      { name: "relevantExperience", label: experienceQuestion, wide: true },
       {
         name: "otherExperience",
         label: "Other relevant experience",
         condition: "other-experience",
+        wide: true,
       },
     ];
   if (section.key === "about-volunteering")
@@ -72,6 +78,7 @@ const reviewSections = sections.map((section) => {
       name: "heardAboutUsOther",
       label: "Other source",
       condition: "other-referral",
+      wide: true,
     });
   return { ...section, rows };
 });
@@ -98,7 +105,7 @@ const reviewSections = sections.map((section) => {
         <button type="button" data-application-edit class="btn btn-quiet">
           Back to answers
         </button>
-        <div class="volunteer-application-review">
+        <div class="volunteer-application-review account-profile-summary">
           {reviewSections.map((section) => (
             <section aria-labelledby={`review-${section.key}`}>
               <div class="volunteer-profile-section-heading">
@@ -125,6 +132,7 @@ const reviewSections = sections.map((section) => {
               <dl>
                 {section.rows.map((row) => (
                   <div
+                    class:list={{ "volunteer-wide": row.wide }}
                     data-review-condition={row.condition}
                     hidden={Boolean(row.condition)}
                   >

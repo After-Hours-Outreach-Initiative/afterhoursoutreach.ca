@@ -222,26 +222,6 @@ body:has(
 .volunteer-application-step > .btn {
   align-self: flex-start;
 }
-.volunteer-application-review,
-.volunteer-application-review dl {
-  display: grid;
-  gap: 1.5rem;
-  min-width: 0;
-}
-.volunteer-application-review dt {
-  margin-bottom: 0.375rem;
-  color: #a1a1aa;
-}
-.volunteer-application-review dd {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.volunteer-application-review ul {
-  padding-left: 1.5rem;
-  list-style: disc;
-  white-space: normal;
-}
 .volunteer-profile-section {
   min-width: 0;
   margin: 0;
