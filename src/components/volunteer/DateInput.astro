@@ -75,7 +75,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
       <div class="volunteer-date-parts">
         {(["year", "month", "day"] as const).map((part) => (
           <div class="volunteer-field">
-            <label for={`${id}-${part}`}>
+            <label for={`${id}-${part}`} class="sr-only">
               {part[0].toUpperCase() + part.slice(1)}
             </label>
             <input

@@ -1353,7 +1353,7 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
         name: "Date of birth (yyyy/mm/dd)",
         exact: true,
       });
-      await expect(birthDate.locator("label")).toHaveText([
+      await expect(birthDate.locator("label.sr-only")).toHaveText([
         "Year",
         "Month",
         "Day",
