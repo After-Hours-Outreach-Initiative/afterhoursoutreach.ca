@@ -35,7 +35,7 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
   .attendee-avatar {
     display: inline-flex;
     width: var(--attendee-avatar-width);
-    height: 1.5rem;
+    height: var(--attendee-avatar-height, 1.5rem);
     flex: 0 0 var(--attendee-avatar-width);
   }
   svg {

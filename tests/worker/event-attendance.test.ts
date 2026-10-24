@@ -272,6 +272,22 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(
           card.locator(".event-avatar-row .attendee-avatar"),
         ).toHaveCount(8);
+        const avatarLayout = await card.evaluate((element) => {
+          const avatar = element
+            .querySelector(".event-avatar-row .attendee-avatar")!
+            .getBoundingClientRect();
+          const info = element
+            .querySelector(".volunteer-event-info")!
+            .getBoundingClientRect();
+          return {
+            leftOffset: avatar.left - info.left,
+            width: avatar.width,
+            height: avatar.height,
+          };
+        });
+        expect(Math.abs(avatarLayout.leftOffset)).toBeLessThan(1);
+        expect(avatarLayout.width).toBe(28);
+        expect(avatarLayout.height).toBe(32);
         await expect(
           card.locator(".event-avatar-row .attendee-medic"),
         ).toHaveCount(3);
@@ -307,6 +323,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(
           emptyCard.locator(".event-attendance .attendee-avatar"),
         ).toHaveCount(0);
+        await expect(emptyCard.locator(".event-attendance")).toHaveCount(0);
         for (const [state, focus] of [
           ["filled", card],
           ["empty", emptyCard],
@@ -330,13 +347,17 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             const bounds = (selector: string) =>
               element.querySelector(selector)!.getBoundingClientRect();
             const action = bounds(".volunteer-actions");
-            const attendance = bounds(".event-attendance");
+            const attendance = element
+              .querySelector(".event-attendance")
+              ?.getBoundingClientRect();
             const details = bounds(".volunteer-event-info");
             const layout = bounds(".volunteer-event-layout");
             const style = getComputedStyle(element);
             return {
-              afterAttendance: action.top >= attendance.bottom,
-              attendanceAfterInfo: attendance.top >= details.bottom,
+              afterAttendance:
+                action.top >= (attendance?.bottom ?? details.bottom),
+              attendanceAfterInfo:
+                !attendance || attendance.top >= details.bottom,
               besideInfo:
                 action.left >= details.right && action.top === details.top,
               wide:
@@ -346,6 +367,13 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
                 512,
               leftOffset: action.left - layout.left,
               rightOffset: action.right - layout.right,
+              bottomOffset:
+                layout.bottom -
+                Math.max(
+                  details.bottom,
+                  action.bottom,
+                  attendance?.bottom ?? 0,
+                ),
               controlHeight: bounds(".volunteer-actions .btn").height,
               controlWidth: bounds(".volunteer-actions .btn").width,
               layoutWidth: layout.width,
@@ -354,6 +382,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           expect(position.attendanceAfterInfo).toBe(true);
           expect(position.controlHeight).toBeGreaterThanOrEqual(44);
           expect(Math.abs(position.rightOffset)).toBeLessThan(1);
+          expect(Math.abs(position.bottomOffset)).toBeLessThan(1);
           if (position.wide) {
             expect(position.besideInfo).toBe(true);
             expect(position.controlWidth).toBeLessThan(position.layoutWidth);
@@ -428,16 +457,18 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(
           crowded.locator(".event-avatar-row .attendee-avatar"),
         ).toHaveCount(100);
-        expect(
-          await crowded.locator(".event-avatar-row").evaluate((element) => ({
+        const crowdedLayout = await crowded
+          .locator(".event-avatar-row")
+          .evaluate((element) => ({
             rows: new Set(
               [...element.children].map(
                 (avatar) => avatar.getBoundingClientRect().top,
               ),
             ).size,
             scrollable: element.scrollWidth > element.clientWidth,
-          })),
-        ).toEqual({ rows: 1, scrollable: true });
+          }));
+        expect(crowdedLayout.rows).toBeGreaterThan(1);
+        expect(crowdedLayout.scrollable).toBe(false);
         if (manage) {
           await card.locator(".volunteer-roster > summary").click();
           await expect(card.locator(".volunteer-roster li")).toHaveCount(8);

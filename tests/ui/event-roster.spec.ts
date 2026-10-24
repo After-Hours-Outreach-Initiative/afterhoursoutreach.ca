@@ -6,7 +6,7 @@ import {
   openLocalAccountSwitcher,
 } from "../helpers/local-account";
 
-test("empty volunteer rosters stay accessible and stable through first/last signup updates", async ({
+test("empty volunteer rosters stay accessible and collapse avatar space through first/last signup updates", async ({
   page,
   browser,
   baseURL,
@@ -76,7 +76,9 @@ test("empty volunteer rosters stay accessible and stable through first/last sign
         const top = element.getBoundingClientRect().top;
         return {
           height: element.getBoundingClientRect().height,
-          rowHeight: bounds(".event-avatar-row").height,
+          rowHeight:
+            element.querySelector(".event-avatar-row")?.getBoundingClientRect()
+              .height ?? 0,
           actionTop: bounds(".volunteer-actions").top - top,
           summaryTop: bounds("details > summary").top - top,
         };
@@ -87,11 +89,12 @@ test("empty volunteer rosters stay accessible and stable through first/last sign
       await expect(
         card.locator(".event-avatar-row .attendee-avatar"),
       ).toHaveCount(0);
+      await expect(card.locator(".event-attendance")).toHaveCount(0);
       await expect(roster(card).locator("summary")).toHaveText(
         "Volunteers (0)",
       );
       const before = await geometry(card);
-      expect(before.rowHeight).toBeGreaterThanOrEqual(32);
+      expect(before.rowHeight).toBe(0);
       initial.push(before);
       const summary = roster(card).locator("summary");
       await summary.focus();
@@ -122,7 +125,10 @@ test("empty volunteer rosters stay accessible and stable through first/last sign
         card.locator(".event-avatar-row .attendee-avatar"),
       ).toHaveCount(1);
       await expect(roster(card)).not.toHaveAttribute("open");
-      expect(await geometry(card)).toEqual(initial[index]);
+      const registered = await geometry(card);
+      expect(registered.rowHeight).toBeGreaterThanOrEqual(32);
+      expect(registered.height).toBeGreaterThan(initial[index].height);
+      expect(registered.summaryTop).toBeGreaterThan(initial[index].summaryTop);
       await roster(card).locator("summary").focus();
       await roster(card).locator("summary").press("Enter");
       await expect(roster(card).locator("li")).toHaveCount(1);
