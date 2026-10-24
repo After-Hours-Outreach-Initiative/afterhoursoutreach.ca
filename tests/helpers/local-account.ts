@@ -63,6 +63,8 @@ export const sampleAnswers = {
   experience: "None",
   training: ["none"],
   otherTraining: "",
+  relevantExperience: ["none"],
+  otherExperience: "",
   medicalConditions: "Sample private answer",
 };
 

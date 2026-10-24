@@ -4,6 +4,8 @@ import {
   motivationWordLimitError,
   trainingRequiredError,
   trainingExclusiveError,
+  experienceRequiredError,
+  experienceExclusiveError,
   profileFormSections,
   type ApplicationAnswers,
 } from "../data/application";
@@ -168,66 +170,77 @@ export function initMedicCertifications(element: HTMLFormElement) {
 }
 
 export function initRelevantTraining(element: HTMLFormElement) {
-  const section = element.querySelector<HTMLElement>(
+  for (const section of element.querySelectorAll<HTMLElement>(
     "[data-relevant-training]",
-  );
-  const choices = [
-    ...(section?.querySelectorAll<HTMLInputElement>('[name="training"]') ?? []),
-  ];
-  const first = choices[0];
-  const other = choices.find((choice) => choice.value === "other");
-  const none = choices.find((choice) => choice.value === "none");
-  const feedback = section?.querySelector<HTMLElement>(
-    '[data-error="training"] span',
-  );
-  const details = element.querySelector<HTMLElement>(
-    "[data-other-relevant-training]",
-  );
-  const input = details?.querySelector<HTMLTextAreaElement>("textarea");
-  if (!section || !first || !other || !none || !details || !input) return;
-  const update = () => {
-    const selected = choices.filter((choice) => choice.checked);
-    const required =
-      section.dataset.trainingRequired !== "false" ||
-      // A legacy blank answer becomes required once an explicit answer is saved.
-      choices.some((choice) => choice.defaultChecked);
-    first.required = required && !selected.length;
-    const error =
-      none.checked && selected.length > 1
-        ? trainingExclusiveError
-        : first.required
-          ? trainingRequiredError
-          : "";
-    first.setCustomValidity(error);
-    if (feedback) feedback.textContent = error || trainingRequiredError;
-    details.hidden = !other.checked;
-    input.required = other.checked;
-    input.readOnly = !other.checked;
-    input.setCustomValidity(
-      other.checked && !input.value.trim()
-        ? "Describe your other relevant training or experience."
-        : "",
+  )) {
+    const name = section.dataset.relevantTraining!;
+    const experience = name === "relevantExperience";
+    const requiredError = experience
+      ? experienceRequiredError
+      : trainingRequiredError;
+    const exclusiveError = experience
+      ? experienceExclusiveError
+      : trainingExclusiveError;
+    const choices = [
+      ...section.querySelectorAll<HTMLInputElement>(`[name="${name}"]`),
+    ];
+    const first = choices[0];
+    const other = choices.find((choice) => choice.value === "other");
+    const none = choices.find((choice) => choice.value === "none");
+    const feedback = section?.querySelector<HTMLElement>(
+      `[data-error="${name}"] span`,
     );
-  };
-  const updateSelection = (event: Event) => {
-    const target = event.target;
-    if (
-      target instanceof HTMLInputElement &&
-      target.name === "training" &&
-      target.checked
-    ) {
-      if (target === none) {
-        for (const choice of choices)
-          if (choice !== none) choice.checked = false;
-      } else none.checked = false;
-    }
+    const details = section.querySelector<HTMLElement>(
+      experience
+        ? "[data-other-relevant-experience]"
+        : "[data-other-relevant-training]",
+    );
+    const input = details?.querySelector<HTMLTextAreaElement>("textarea");
+    if (!first || !other || !none || !details || !input) continue;
+    const update = () => {
+      const selected = choices.filter((choice) => choice.checked);
+      const required =
+        section.dataset.trainingRequired !== "false" ||
+        // A legacy blank answer becomes required once an explicit answer is saved.
+        choices.some((choice) => choice.defaultChecked);
+      first.required = required && !selected.length;
+      const error =
+        none.checked && selected.length > 1
+          ? exclusiveError
+          : first.required
+            ? requiredError
+            : "";
+      first.setCustomValidity(error);
+      if (feedback) feedback.textContent = error || requiredError;
+      details.hidden = !other.checked;
+      input.required = other.checked;
+      input.readOnly = !other.checked;
+      input.setCustomValidity(
+        other.checked && !input.value.trim()
+          ? `Describe your other relevant ${experience ? "experience" : "training"}.`
+          : "",
+      );
+    };
+    const updateSelection = (event: Event) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement &&
+        target.name === name &&
+        target.checked
+      ) {
+        if (target === none) {
+          for (const choice of choices)
+            if (choice !== none) choice.checked = false;
+        } else none.checked = false;
+      }
+      update();
+    };
+    // Resolve exclusivity before form-level listeners back up a checkbox input.
+    section.addEventListener("input", updateSelection);
+    section.addEventListener("change", updateSelection);
+    element.addEventListener("reset", () => queueMicrotask(update));
     update();
-  };
-  // Resolve exclusivity before form-level listeners back up a checkbox input.
-  section.addEventListener("input", updateSelection);
-  section.addEventListener("change", updateSelection);
-  element.addEventListener("reset", () => queueMicrotask(update));
-  update();
+  }
 }
 
 export function initReferralSources(element: HTMLFormElement) {
@@ -335,6 +348,7 @@ export function initAccountFormChanges(element: HTMLFormElement) {
       teams: values.getAll("teams").map(String),
       certifications: values.getAll("certifications").map(String),
       training: values.getAll("training").map(String),
+      relevantExperience: values.getAll("relevantExperience").map(String),
     };
     for (const section of profileFormSections()) {
       const summary = [...summaries].find(
@@ -492,7 +506,13 @@ export function initAccountFormChanges(element: HTMLFormElement) {
     for (const key of Object.keys(result) as (keyof ApplicationAnswers)[]) {
       if (
         Array.isArray(result[key]) &&
-        (data.has(key) || ["teams", "certifications", "training"].includes(key))
+        (data.has(key) ||
+          [
+            "teams",
+            "certifications",
+            "training",
+            "relevantExperience",
+          ].includes(key))
       )
         Object.assign(result, { [key]: data.getAll(key).map(String) });
       else if (data.has(key))

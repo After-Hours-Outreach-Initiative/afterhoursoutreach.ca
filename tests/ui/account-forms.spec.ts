@@ -1101,7 +1101,8 @@ test("application shows all required errors and saves after they are corrected",
     const id = await input.getAttribute("id");
     const name = await input.getAttribute("name");
     const label =
-      !name || ["heardAboutUsSources", "training"].includes(name)
+      !name ||
+      ["heardAboutUsSources", "training", "relevantExperience"].includes(name)
         ? input.locator("xpath=ancestor::fieldset[1]/legend")
         : form.locator(`label[for="${id}"]`);
     await expect(label.locator(".volunteer-required")).toHaveText("*");
@@ -1134,6 +1135,7 @@ test("application shows all required errors and saves after they are corrected",
     if (
       field === "heardAboutUsSources" ||
       field === "training" ||
+      field === "relevantExperience" ||
       field === "teams"
     ) {
       for (const source of value as string[])
@@ -1149,6 +1151,7 @@ test("application shows all required errors and saves after they are corrected",
         "experience",
         "training",
         "otherTraining",
+        "otherExperience",
       ].includes(field)
     )
       await fillApplicationField(form, field, String(value));
@@ -1440,6 +1443,7 @@ test("applications validate the birthday boundary and profiles keep the saved bi
     if (
       field === "heardAboutUsSources" ||
       field === "training" ||
+      field === "relevantExperience" ||
       field === "teams"
     ) {
       for (const source of value as string[])
@@ -1455,6 +1459,7 @@ test("applications validate the birthday boundary and profiles keep the saved bi
         "experience",
         "training",
         "otherTraining",
+        "otherExperience",
       ].includes(field)
     )
       await fillApplicationField(form, field, String(value));
@@ -1633,7 +1638,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     exact: true,
   });
   const none = training.getByRole("checkbox", {
-    name: "No relevant training or experience",
+    name: "No relevant training",
     exact: true,
   });
   const medic = form.getByLabel("Medic", { exact: true });
@@ -1704,6 +1709,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     if (
       field === "heardAboutUsSources" ||
       field === "training" ||
+      field === "relevantExperience" ||
       field === "teams"
     ) {
       for (const source of value as string[])
@@ -1719,6 +1725,7 @@ test("all teams can select multiple relevant training answers and add Other deta
         "experience",
         "training",
         "otherTraining",
+        "otherExperience",
       ].includes(field)
     )
       await fillApplicationField(form, field, String(value));
@@ -1735,7 +1742,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await none.check();
   await reviewLocalApplication(page);
   await expect(form.locator('[data-review-answer="training"]')).toHaveText(
-    "No relevant training or experience",
+    "No relevant training",
   );
   await form
     .getByRole("button", { name: "Back to answers", exact: true })
@@ -1840,7 +1847,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     form.locator('[data-profile-answers="training-and-safety"]'),
   ).toBeVisible();
   await expect(form.locator('[data-profile-answer="training"] dd')).toHaveText(
-    "No relevant training or experience",
+    "No relevant training",
   );
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await page.reload();
@@ -1904,6 +1911,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     if (
       field === "heardAboutUsSources" ||
       field === "training" ||
+      field === "relevantExperience" ||
       field === "teams"
     ) {
       for (const source of value as string[])
@@ -1919,6 +1927,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
         "experience",
         "training",
         "otherTraining",
+        "otherExperience",
       ].includes(field)
     )
       await fillApplicationField(form, field, String(value));
@@ -2362,14 +2371,13 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     await expect(answer("teams").getByRole("listitem")).toHaveText([
       "Outreach",
     ]);
-    await expect(answer("training")).toHaveText(
-      "No relevant training or experience",
-    );
+    await expect(answer("training")).toHaveText("No relevant training");
     for (const conditional of [
       "certifications",
       "certificationExpiry",
       "experience",
       "otherTraining",
+      "otherExperience",
     ])
       await expect(answer(conditional)).toBeHidden();
   };

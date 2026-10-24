@@ -227,7 +227,8 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                         !nameFieldNames.includes(field.name) &&
                         field.name !== "experience" &&
                         field.name !== "certificationExpiry" &&
-                        field.name !== "otherTraining",
+                        field.name !== "otherTraining" &&
+                        field.name !== "otherExperience",
                     )
                     .map((field) =>
                       field.name === "heardAboutUs" ? (
@@ -237,10 +238,22 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                       ),
                     )}
                   {section.key === "training-and-safety" && (
-                    <RelevantTraining
-                      values={values}
-                      required={application || Boolean(values?.training.length)}
-                    />
+                    <>
+                      <RelevantTraining
+                        values={values}
+                        required={
+                          application || Boolean(values?.training.length)
+                        }
+                      />
+                      <RelevantTraining
+                        values={values}
+                        experience
+                        required={
+                          application ||
+                          Boolean(values?.relevantExperience.length)
+                        }
+                      />
+                    </>
                   )}
                 </div>
               )}

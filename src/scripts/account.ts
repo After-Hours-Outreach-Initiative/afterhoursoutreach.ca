@@ -210,6 +210,7 @@ form("[data-account-profile]", async (element, values) => {
           key !== "teams" &&
           key !== "certifications" &&
           key !== "training" &&
+          key !== "relevantExperience" &&
           key !== "heardAboutUsSources" &&
           key !== "codeOfConductAccepted" &&
           (element.hasAttribute("data-application") ||
@@ -221,6 +222,7 @@ form("[data-account-profile]", async (element, values) => {
       teams: values.getAll("teams"),
       certifications: values.getAll("certifications"),
       training: values.getAll("training"),
+      relevantExperience: values.getAll("relevantExperience"),
       applicationUserId: element.dataset.profileUserId,
       intent: draft ? "submit" : "edit",
       ...(draft

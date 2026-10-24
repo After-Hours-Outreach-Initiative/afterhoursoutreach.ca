@@ -13,6 +13,7 @@ import {
 } from "./access";
 import {
   normalizeCertifications,
+  normalizeTrainingAnswers,
   type ApplicationAnswers,
 } from "../../data/application";
 import { RequestError } from "../http";
@@ -128,6 +129,7 @@ export async function viewVolunteerProfile(
           medical_certification AS certification, training_experience AS experience,
           medical_certifications AS certifications,
           relevant_training AS training, other_training AS otherTraining,
+          relevant_experience AS relevantExperience, other_experience AS otherExperience,
           coalesce(medical_certification_expiry, '') AS certificationExpiry,
           coalesce(medical_conditions, '') AS medicalConditions,
           u.email, p.registered_at AS submittedAt,
@@ -147,11 +149,16 @@ export async function viewVolunteerProfile(
   const row = results[1].results[0] as
     | (Omit<
         ApplicationAnswers,
-        "teams" | "certifications" | "training" | "heardAboutUsSources"
+        | "teams"
+        | "certifications"
+        | "training"
+        | "relevantExperience"
+        | "heardAboutUsSources"
       > & {
         teams: string;
         certifications: string;
         training: string;
+        relevantExperience: string | null;
         heardAboutUsSources: string | null;
         email: string;
         submittedAt: number;
@@ -181,7 +188,14 @@ export async function viewVolunteerProfile(
       certifications: normalizeCertifications(
         JSON.parse(row.certifications) as string[],
       ),
-      training: JSON.parse(row.training) as string[],
+      ...normalizeTrainingAnswers({
+        training: JSON.parse(row.training) as string[],
+        otherTraining: row.otherTraining,
+        relevantExperience: row.relevantExperience
+          ? (JSON.parse(row.relevantExperience) as string[])
+          : null,
+        otherExperience: row.otherExperience,
+      }),
     } satisfies ApplicationAnswers,
     email,
     submittedAt: new Date(submittedAt).toISOString(),

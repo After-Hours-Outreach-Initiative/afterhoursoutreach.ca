@@ -344,6 +344,8 @@ for (const width of [390, 1280]) {
     await support.uncheck();
     await expectComplete(page, "team-interests", true);
     await form.locator('[name="training"][value="none"]').check();
+    await expectComplete(page, "training-and-safety", false);
+    await form.locator('[name="relevantExperience"][value="none"]').check();
     await expectComplete(page, "training-and-safety", true);
 
     for (const [name, value] of Object.entries({

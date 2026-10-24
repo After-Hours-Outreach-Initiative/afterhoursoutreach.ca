@@ -716,6 +716,7 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   }
   await form.locator('[name="heardAboutUsSources"][value="internet"]').check();
   await form.locator('[name="training"][value="none"]').check();
+  await form.locator('[name="relevantExperience"][value="none"]').check();
   await form.locator('[name="teams"][value="outreach"]').check();
   await reviewLocalApplication(page);
   await form.locator('[name="codeOfConductAccepted"]').check();

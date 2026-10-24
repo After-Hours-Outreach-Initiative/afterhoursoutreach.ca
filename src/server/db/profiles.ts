@@ -10,6 +10,11 @@ import {
   trainingOptions,
   trainingRequiredError,
   trainingExclusiveError,
+  experienceOptions,
+  experienceRequiredError,
+  experienceExclusiveError,
+  normalizeTrainingAnswers,
+  otherTrainingMaxLength,
   applicationDisplayName,
   heardAboutUsOptions,
   heardAboutUsOtherMaxLength,
@@ -138,7 +143,22 @@ const profileAnswersSchema = z.strictObject({
         .filter((option) => values.includes(option.value))
         .map((option) => option.value),
     ),
-  otherTraining: z.string().trim().max(2000).default(""),
+  otherTraining: z.string().trim().max(otherTrainingMaxLength).default(""),
+  relevantExperience: z
+    .array(z.enum(experienceOptions.map((option) => option.value)))
+    .max(experienceOptions.length)
+    .refine((values) => new Set(values).size === values.length)
+    .refine(
+      (values) => !values.includes("none") || values.length === 1,
+      experienceExclusiveError,
+    )
+    .default([])
+    .transform((values) =>
+      experienceOptions
+        .filter((option) => values.includes(option.value))
+        .map((option) => option.value),
+    ),
+  otherExperience: z.string().trim().max(2000).default(""),
   certificationExpiry: z
     .string()
     .trim()
@@ -165,9 +185,12 @@ function validateTraining(
     | "certificationExpiry"
     | "training"
     | "otherTraining"
+    | "relevantExperience"
+    | "otherExperience"
   >,
   context: z.RefinementCtx,
   requireTraining = true,
+  requireExperience = true,
 ) {
   if (requireTraining && !answers.training.length)
     context.addIssue({
@@ -179,7 +202,19 @@ function validateTraining(
     context.addIssue({
       code: "custom",
       path: ["otherTraining"],
-      message: "Describe your other relevant training or experience.",
+      message: "Describe your other relevant training.",
+    });
+  if (requireExperience && !answers.relevantExperience.length)
+    context.addIssue({
+      code: "custom",
+      path: ["relevantExperience"],
+      message: experienceRequiredError,
+    });
+  if (answers.relevantExperience.includes("other") && !answers.otherExperience)
+    context.addIssue({
+      code: "custom",
+      path: ["otherExperience"],
+      message: "Describe your other relevant experience.",
     });
   if (!answers.teams.includes("medic")) return;
   if (answers.certifications.length !== 1)
@@ -275,8 +310,12 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
     certifications: normalizeCertifications(row.medical_certifications),
     certificationExpiry: row.medical_certification_expiry ?? "",
     experience: row.training_experience,
-    training: row.relevant_training,
-    otherTraining: row.other_training,
+    ...normalizeTrainingAnswers({
+      training: row.relevant_training,
+      otherTraining: row.other_training,
+      relevantExperience: row.relevant_experience,
+      otherExperience: row.other_experience,
+    }),
     medicalConditions: row.medical_conditions ?? "",
   } satisfies ApplicationAnswers;
 }
@@ -313,6 +352,34 @@ export async function saveProfile(
   input: unknown,
   options: ProfileSaveOptions = {},
 ): Promise<ProfileSaveResult> {
+  // Older open forms/baselines still use the combined question.
+  if (
+    input &&
+    typeof input === "object" &&
+    !Array.isArray(input) &&
+    "training" in input &&
+    Array.isArray(input.training) &&
+    input.training.every((value) => typeof value === "string") &&
+    new Set(input.training).size === input.training.length &&
+    !("relevantExperience" in input) &&
+    (!("otherTraining" in input) || typeof input.otherTraining === "string")
+  )
+    input = normalizeTrainingAnswers(
+      input as { training: string[]; otherTraining?: string },
+    );
+  let baseline = options.baseline;
+  if (baseline && baseline.relevantExperience === undefined) {
+    if (
+      !Array.isArray(baseline.training) ||
+      !baseline.training.every((value) => typeof value === "string") ||
+      typeof baseline.otherTraining !== "string"
+    )
+      throw new RequestError(
+        400,
+        "Reload this page before saving profile changes.",
+      );
+    baseline = normalizeTrainingAnswers(baseline);
+  }
   if (options.actor && options.actor.id !== userId)
     throw new RequestError(
       403,
@@ -369,6 +436,8 @@ export async function saveProfile(
             experience: old.experience,
             training: old.training,
             otherTraining: old.otherTraining,
+            relevantExperience: old.relevantExperience,
+            otherExperience: old.otherExperience,
             certificationExpiry: old.certificationExpiry,
             ...input,
             // Application-only answers cannot be replaced or block account edits.
@@ -380,13 +449,13 @@ export async function saveProfile(
         : input;
     if (
       old &&
-      options.baseline &&
+      baseline &&
       submittedInput &&
       typeof submittedInput === "object"
     ) {
       // The baseline is concurrency metadata, not a new source of profile data.
       for (const key of Object.keys(old) as (keyof ApplicationAnswers)[]) {
-        const value = options.baseline[key];
+        const value = baseline[key];
         if (
           Array.isArray(old[key])
             ? !Array.isArray(value) ||
@@ -422,7 +491,7 @@ export async function saveProfile(
       if (certifications.success) local.certifications = certifications.data;
       for (const key of immutableFields)
         Object.assign(local, { [key]: old[key] });
-      const merged = mergeAnswers(options.baseline, local, old);
+      const merged = mergeAnswers(baseline, local, old);
       if (merged.conflicts.length)
         throw new RequestError(
           409,
@@ -448,7 +517,12 @@ export async function saveProfile(
           })
           .superRefine((answers, context) =>
             // Leave unanswered legacy profiles editable without inventing an answer.
-            validateTraining(answers, context, old.training.length > 0),
+            validateTraining(
+              answers,
+              context,
+              old.training.length > 0,
+              old.relevantExperience.length > 0,
+            ),
           )
       : profileSchema;
     const parsed = schema.safeParse(submittedInput);
@@ -472,9 +546,15 @@ export async function saveProfile(
                   )
                 ? `Explain why you want to volunteer (${motivationMaxWords} words or fewer).`
                 : (parsed.error.issues.find((issue) =>
-                    ["teams", "training"].includes(String(issue.path[0])),
+                    [
+                      "teams",
+                      "training",
+                      "relevantExperience",
+                      "otherTraining",
+                      "otherExperience",
+                    ].includes(String(issue.path[0])),
                   )?.message ??
-                  "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training answers."),
+                  "Check the required fields, phone numbers, date of birth, team selection, medical certifications, and training and experience answers."),
       );
     const { codeOfConductAccepted, ...submitted } = parsed.data;
     if (!old && codeOfConductAccepted !== true)
@@ -523,6 +603,8 @@ export async function saveProfile(
       training_experience: answers.experience,
       relevant_training: answers.training,
       other_training: answers.otherTraining,
+      relevant_experience: answers.relevantExperience,
+      other_experience: answers.otherExperience,
       medical_conditions: answers.medicalConditions || null,
       updated_at: now,
     };

@@ -1102,6 +1102,7 @@ body:has(
 /* Keep the entire follow-up field in the option's text column. */
 .volunteer-certification-options > [data-other-training],
 .volunteer-training-options > [data-other-relevant-training],
+.volunteer-training-options > [data-other-relevant-experience],
 .volunteer-referral-sources > [data-other-referral] {
   margin-inline-start: calc(
     var(--volunteer-check-size) + var(--volunteer-check-gap)
@@ -1582,7 +1583,7 @@ body:has(
 .volunteer-team-options:has(input[name="teams"]:user-invalid) + [data-error],
 .volunteer-certifications:has(input[name="certifications"]:user-invalid)
   > [data-error],
-.volunteer-relevant-training:has(input[name="training"]:user-invalid)
+.volunteer-relevant-training:has(input[type="checkbox"]:user-invalid)
   > [data-error],
 .volunteer-referral-sources:has(input[name="heardAboutUsSources"]:user-invalid)
   > [data-error] {

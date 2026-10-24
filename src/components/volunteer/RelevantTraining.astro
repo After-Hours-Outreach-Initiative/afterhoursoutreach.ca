@@ -4,6 +4,9 @@ import {
   trainingOptions,
   trainingQuestion,
   trainingRequiredError,
+  experienceOptions,
+  experienceQuestion,
+  experienceRequiredError,
   type ApplicationAnswers,
 } from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
@@ -12,21 +15,29 @@ import FieldError from "@/components/FieldError.astro";
 interface Props {
   values?: ApplicationAnswers | null;
   required?: boolean;
+  experience?: boolean;
 }
-const { values, required = true } = Astro.props;
+const { values, required = true, experience = false } = Astro.props;
+const name = experience ? "relevantExperience" : "training";
+const otherName = experience ? "otherExperience" : "otherTraining";
+const options = experience ? experienceOptions : trainingOptions;
+const question = experience ? experienceQuestion : trainingQuestion;
+const requiredError = experience
+  ? experienceRequiredError
+  : trainingRequiredError;
 const otherTrainingField = applicationFields.find(
-  (field) => field.name === "otherTraining",
+  (field) => field.name === otherName,
 )!;
 ---
 
 <fieldset
   class="volunteer-relevant-training volunteer-wide"
-  data-relevant-training
+  data-relevant-training={name}
   data-training-required={required}
-  aria-describedby="help-training error-training"
+  aria-describedby={`error-${name}`}
 >
   <legend>
-    {trainingQuestion}
+    {question}
     {
       required && (
         <span class="volunteer-required" aria-hidden="true">
@@ -36,13 +47,9 @@ const otherTrainingField = applicationFields.find(
       )
     }
   </legend>
-  <p class="volunteer-help" id="help-training">
-    Select your relevant training and experience, or choose No relevant training
-    or experience on its own.
-  </p>
   <div class="volunteer-training-options volunteer-choice-options">
     {
-      trainingOptions.map((option, index) => (
+      options.map((option, index) => (
         <>
           {option.value === "none" && (
             <div class="volunteer-training-divider" aria-hidden="true">
@@ -52,11 +59,11 @@ const otherTrainingField = applicationFields.find(
           <label class="volunteer-check">
             <input
               type="checkbox"
-              name="training"
+              name={name}
               value={option.value}
-              checked={values?.training.includes(option.value)}
-              required={required && index === 0 && !values?.training.length}
-              aria-describedby="help-training error-training"
+              checked={values?.[name].includes(option.value)}
+              required={required && index === 0 && !values?.[name].length}
+              aria-describedby={`error-${name}`}
             />
             <span>{option.label}</span>
           </label>
@@ -64,7 +71,7 @@ const otherTrainingField = applicationFields.find(
             <AccountProfileField
               field={otherTrainingField}
               values={values}
-              active={values?.training.includes("other") ?? false}
+              active={values?.[name].includes("other") ?? false}
               hideLabel
             />
           )}
@@ -72,5 +79,5 @@ const otherTrainingField = applicationFields.find(
       ))
     }
   </div>
-  <FieldError field="training" message={trainingRequiredError} />
+  <FieldError field={name} message={requiredError} />
 </fieldset>

@@ -13,6 +13,8 @@ const optionalAnswers = {
   certificationExpiry: "",
   experience: "",
   otherTraining: "",
+  relevantExperience: ["none"],
+  otherExperience: "",
   medicalConditions: "",
 };
 
@@ -40,7 +42,8 @@ export function sampleProfileFixtures(
         motivation:
           "I want to help neighbours access practical support and build a welcoming, reliable evening outreach team.",
         teams: ["outreach", "non-patrol"],
-        training: ["naloxone-administration", "dtes-vulnerable-populations"],
+        training: ["naloxone-administration"],
+        relevantExperience: ["dtes-vulnerable-populations"],
       },
     },
     {
@@ -79,7 +82,8 @@ export function sampleProfileFixtures(
         teams: ["outreach", "medic"],
         certifications: ["emergency-medical-responder"],
         certificationExpiry,
-        training: ["naloxone-administration", "overdose-response"],
+        training: ["naloxone-administration"],
+        relevantExperience: ["overdose-response"],
       },
     },
     {
@@ -97,8 +101,9 @@ export function sampleProfileFixtures(
         motivation:
           "I want to support community-led outreach and help keep useful supplies available for people who need them.",
         teams: ["outreach", "non-patrol"],
-        training: ["nonprofit-fundraising", "other"],
-        otherTraining:
+        training: ["none"],
+        relevantExperience: ["nonprofit-fundraising", "other"],
+        otherExperience:
           "Two years coordinating donated supplies and inventory for a community pantry.",
       },
     },
@@ -118,7 +123,8 @@ export function sampleProfileFixtures(
         motivation:
           "I hope to offer steady, compassionate support and help connect neighbours with the supplies they request.",
         teams: ["outreach"],
-        training: ["mental-health-first-aid", "dtes-vulnerable-populations"],
+        training: ["mental-health-first-aid"],
+        relevantExperience: ["dtes-vulnerable-populations"],
       },
     },
     {
@@ -138,15 +144,10 @@ export function sampleProfileFixtures(
         teams: ["outreach", "medic"],
         certifications: ["advanced-first-aid"],
         certificationExpiry,
-        training: [
-          "naloxone-administration",
-          "naloxone-trainer",
-          "overdose-response",
-          "crisis-intervention",
-          "other",
-        ],
+        training: ["naloxone-administration", "crisis-intervention", "other"],
+        relevantExperience: ["overdose-response"],
         otherTraining:
-          "Completed a two-day nonviolent crisis intervention and de-escalation course; facilitated volunteer safety practice sessions.",
+          "Certified naloxone trainer. Completed a two-day nonviolent crisis intervention and de-escalation course; facilitated volunteer safety practice sessions.",
       },
     },
   ];
@@ -197,7 +198,7 @@ export function sampleProfileStatement(
     birth_date, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
     heard_about_us, heard_about_us_sources, heard_about_us_other, motivation, teams,
     medical_certification, medical_certifications, medical_certification_expiry,
-    training_experience, relevant_training, other_training, medical_conditions,
+    training_experience, relevant_training, other_training, relevant_experience, other_experience, medical_conditions,
     code_of_conduct_version, code_of_conduct_accepted_at, submitted_application, registered_at, updated_at
   ) SELECT u.id, ${quote(a.firstName)}, ${quote(a.middleNames)}, ${quote(a.lastName)},
     ${quote(a.preferredName)}, ${quote(a.pronouns)}, ${quote(a.phone)}, ${quote(a.birthDate)},
@@ -206,6 +207,7 @@ export function sampleProfileStatement(
     ${quote(a.motivation)}, ${quote(JSON.stringify(a.teams))}, ${quote(a.certification)},
     ${quote(JSON.stringify(a.certifications))}, ${a.certificationExpiry ? quote(a.certificationExpiry) : "NULL"},
     ${quote(a.experience)}, ${quote(JSON.stringify(a.training))}, ${quote(a.otherTraining)},
+    ${quote(JSON.stringify(a.relevantExperience))}, ${quote(a.otherExperience)},
     ${a.medicalConditions ? quote(a.medicalConditions) : "NULL"}, ${quote(codeOfConductVersion)},
     ${now}, ${quote(JSON.stringify(snapshot))}, ${now}, ${now}
   FROM user u WHERE u.id = ${quote(person.id)} AND u.email = ${quote(person.email)}

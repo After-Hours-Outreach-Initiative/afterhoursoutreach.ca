@@ -7,6 +7,8 @@ import {
   heardAboutUsOptions,
   heardAboutUsQuestion,
   trainingOptions,
+  experienceOptions,
+  normalizeTrainingAnswers,
   type ApplicationAnswers,
 } from "@/data/application";
 import AnswerValue from "./AnswerValue.astro";
@@ -20,13 +22,15 @@ interface Props {
   idPrefix?: string;
 }
 const {
-  answers,
+  answers: savedAnswers,
   email,
   submittedAt,
   codeOfConductVersion,
   codeOfConductAcceptedAt,
   idPrefix = "submitted",
 } = Astro.props;
+// Display old immutable snapshots without rewriting the accepted submission.
+const answers = normalizeTrainingAnswers(savedAnswers);
 const sections = [
   { key: "submission", heading: "Submission details" },
   { key: "personal-info", heading: "Personal info" },
@@ -100,8 +104,13 @@ const rows: {
     : []),
   {
     section: "training-and-safety",
-    label: "Relevant training and experience",
+    label: "Relevant training",
     value: choices(answers.training, trainingOptions),
+  },
+  {
+    section: "training-and-safety",
+    label: "Relevant experience",
+    value: choices(answers.relevantExperience, experienceOptions),
   },
   {
     section: "about-volunteering",

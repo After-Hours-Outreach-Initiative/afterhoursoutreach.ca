@@ -3,6 +3,7 @@ import {
   certificationOptions,
   heardAboutUsOptions,
   trainingOptions,
+  experienceOptions,
 } from "../data/application";
 import { clearFormMessage } from "./account-forms";
 import { readDateInputs } from "./date-input";
@@ -24,6 +25,8 @@ export function applicationSubmissionValues(
   }
   if (!values.getAll("training").includes("other"))
     values.set("otherTraining", "");
+  if (!values.getAll("relevantExperience").includes("other"))
+    values.set("otherExperience", "");
   if (!values.getAll("heardAboutUsSources").includes("other"))
     values.set("heardAboutUsOther", "");
   return values;
@@ -129,6 +132,7 @@ export function initApplicationReview(element: HTMLFormElement) {
       "other-certification":
         medic && values.getAll("certifications").includes("other"),
       "other-training": values.getAll("training").includes("other"),
+      "other-experience": values.getAll("relevantExperience").includes("other"),
       "other-referral": values.getAll("heardAboutUsSources").includes("other"),
     };
     for (const row of review.querySelectorAll<HTMLElement>(
@@ -140,6 +144,7 @@ export function initApplicationReview(element: HTMLFormElement) {
         teams: applicationTeamOptions,
         certifications: certificationOptions,
         training: trainingOptions,
+        relevantExperience: experienceOptions,
         heardAboutUsSources: heardAboutUsOptions,
       };
     for (const answer of review.querySelectorAll<HTMLElement>(

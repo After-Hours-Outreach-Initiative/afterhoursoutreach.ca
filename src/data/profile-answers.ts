@@ -3,6 +3,7 @@ import {
   certificationOptions,
   profileFormSections,
   trainingOptions,
+  experienceOptions,
   type ApplicationAnswers,
 } from "./application";
 
@@ -21,7 +22,7 @@ export function profileAnswerRows(
 ): ProfileAnswer[] {
   const medic = answers?.teams?.includes("medic") ?? false;
   const choices = (
-    name: "teams" | "certifications" | "training",
+    name: "teams" | "certifications" | "training" | "relevantExperience",
     label: string,
     options: readonly { value: string; label: string }[],
     hidden = false,
@@ -39,7 +40,12 @@ export function profileAnswerRows(
     return [choices("teams", "Teams", applicationTeamOptions)];
 
   const rows: ProfileAnswer[] = section.fields
-    .filter((field) => !["experience", "otherTraining"].includes(field.name))
+    .filter(
+      (field) =>
+        !["experience", "otherTraining", "otherExperience"].includes(
+          field.name,
+        ),
+    )
     .map((field) => ({
       name: field.name,
       label: field.label,
@@ -63,12 +69,20 @@ export function profileAnswerRows(
         wide: true,
       },
       ...rows,
-      choices("training", "Relevant training and experience", trainingOptions),
+      choices("training", "Relevant training", trainingOptions),
       {
         name: "otherTraining",
-        label: "Other relevant training or experience",
+        label: "Other relevant training",
         value: answers?.otherTraining ?? "",
         hidden: !answers?.training?.includes("other"),
+        wide: true,
+      },
+      choices("relevantExperience", "Relevant experience", experienceOptions),
+      {
+        name: "otherExperience",
+        label: "Other relevant experience",
+        value: answers?.otherExperience ?? "",
+        hidden: !answers?.relevantExperience?.includes("other"),
         wide: true,
       },
     ];

@@ -30,6 +30,8 @@ const answers = {
   certification: "None",
   experience: "None",
   training: ["none"],
+  relevantExperience: ["none"],
+  otherExperience: "",
   medicalConditions: "PRIVATE HEALTH ANSWER",
 };
 const cookies = (response: { headers: { getSetCookie(): string[] } }) =>

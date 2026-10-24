@@ -24,6 +24,8 @@ const answers = {
   certification: "None",
   experience: "None",
   training: ["none"],
+  relevantExperience: ["none"],
+  otherExperience: "",
   medicalConditions: "None",
 };
 

@@ -3,6 +3,7 @@ import {
   applicationFields,
   certificationQuestion,
   trainingQuestion,
+  experienceQuestion,
 } from "@/data/application";
 import CodeOfConduct from "./CodeOfConduct.astro";
 
@@ -22,7 +23,12 @@ interface ReviewRow {
 }
 const reviewSections = sections.map((section) => {
   let rows: ReviewRow[] = section.fields
-    .filter((field) => !["experience", "otherTraining"].includes(field.name))
+    .filter(
+      (field) =>
+        !["experience", "otherTraining", "otherExperience"].includes(
+          field.name,
+        ),
+    )
     .map((field) => ({
       name: field.name === "heardAboutUs" ? "heardAboutUsSources" : field.name,
       label: field.label + (field.required ? "" : " (optional)"),
@@ -51,8 +57,14 @@ const reviewSections = sections.map((section) => {
       { name: "training", label: trainingQuestion },
       {
         name: "otherTraining",
-        label: "Other relevant training or experience",
+        label: "Other relevant training",
         condition: "other-training",
+      },
+      { name: "relevantExperience", label: experienceQuestion },
+      {
+        name: "otherExperience",
+        label: "Other relevant experience",
+        condition: "other-experience",
       },
     ];
   if (section.key === "about-volunteering")

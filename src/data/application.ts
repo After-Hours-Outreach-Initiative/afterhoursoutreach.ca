@@ -24,6 +24,8 @@ export interface ApplicationAnswers {
   experience: string;
   training: string[];
   otherTraining: string;
+  relevantExperience: string[];
+  otherExperience: string;
   medicalConditions: string;
 }
 
@@ -121,22 +123,24 @@ export const certificationOptions = [
 ] as const;
 
 export const trainingQuestion =
-  "Do you have any of the following relevant training or experience? Select all that apply.";
+  "Do you have any of the following relevant training? Select all that apply.";
 export const trainingRequiredError =
-  "Select at least one option, including No relevant training or experience if none apply.";
+  "Select at least one option, including No relevant training if none apply.";
 export const trainingExclusiveError =
-  "Select No relevant training or experience on its own, or choose your relevant training and experience.";
+  "Select No relevant training on its own, or choose your relevant training.";
+export const experienceQuestion =
+  "Do you have any of the following relevant experience? Select all that apply.";
+export const experienceRequiredError =
+  "Select at least one option, including No relevant experience if none apply.";
+export const experienceExclusiveError =
+  "Select No relevant experience on its own, or choose your relevant experience.";
+// Leave room for the removed trainer option alongside a full legacy Other answer.
+export const otherTrainingMaxLength = 2048;
 
 export const trainingOptions = [
   {
     value: "naloxone-administration",
     label: "Naloxone administration training",
-  },
-  { value: "naloxone-trainer", label: "Certified naloxone trainer" },
-  {
-    value: "overdose-response",
-    label:
-      "Overdose response experience (naloxone, rescue breathing, CPR, etc.)",
   },
   {
     value: "basic-first-aid-cpr",
@@ -156,6 +160,16 @@ export const trainingOptions = [
     value: "mental-health-first-aid",
     label: "Mental Health First Aid or Psychological First Aid",
   },
+  { value: "other", label: "Other" },
+  { value: "none", label: "No relevant training" },
+] as const;
+
+export const experienceOptions = [
+  {
+    value: "overdose-response",
+    label:
+      "Overdose response experience (naloxone, rescue breathing, CPR, etc.)",
+  },
   {
     value: "lived-experience",
     label:
@@ -168,11 +182,57 @@ export const trainingOptions = [
   },
   {
     value: "nonprofit-fundraising",
-    label: "Nonprofit grant writing, fundraising, or donor relations",
+    label:
+      "Experience in non-profit grant writing, fundraising, or donor relations",
   },
   { value: "other", label: "Other" },
-  { value: "none", label: "No relevant training or experience" },
+  { value: "none", label: "No relevant experience" },
 ] as const;
+
+/** Split saved combined answers without guessing a negative answer for either question. */
+export function normalizeTrainingAnswers<
+  T extends {
+    training?: string[];
+    otherTraining?: string;
+    relevantExperience?: string[] | null;
+    otherExperience?: string;
+  },
+>(answers: T) {
+  if (answers.relevantExperience != null)
+    return {
+      ...answers,
+      training: answers.training ?? [],
+      otherTraining: answers.otherTraining ?? "",
+      relevantExperience: answers.relevantExperience,
+      otherExperience: answers.otherExperience ?? "",
+    };
+  const combined = answers.training ?? [];
+  const experienceValues: readonly string[] = experienceOptions
+    .filter((option) => !["other", "none"].includes(option.value))
+    .map((option) => option.value);
+  const training = combined.filter(
+    (value) =>
+      !experienceValues.includes(value) && value !== "naloxone-trainer",
+  );
+  // Combined Other text cannot be reliably classified; retain it under training.
+  let otherTraining = answers.otherTraining ?? "";
+  // The removed option remains an editable answer, not a selectable certification.
+  if (combined.includes("naloxone-trainer")) {
+    if (!training.includes("other")) training.push("other");
+    otherTraining = [otherTraining, "Certified naloxone trainer"]
+      .filter(Boolean)
+      .join("\n");
+  }
+  return {
+    ...answers,
+    training,
+    otherTraining,
+    relevantExperience: combined.filter(
+      (value) => experienceValues.includes(value) || value === "none",
+    ),
+    otherExperience: answers.otherExperience ?? "",
+  };
+}
 
 // Keep existing saved answers and older form submissions compatible.
 const legacyCertificationAliases = new Map<string, string>([
@@ -315,7 +375,14 @@ export const applicationFields = [
   {
     name: "otherTraining",
     section: "training-and-safety",
-    label: "Other relevant training or experience",
+    label: "Other relevant training",
+    required: true,
+    multiline: true,
+  },
+  {
+    name: "otherExperience",
+    section: "training-and-safety",
+    label: "Other relevant experience",
     required: true,
     multiline: true,
   },

@@ -50,6 +50,8 @@ const answers = {
   experience: "None",
   training: ["none"],
   otherTraining: "",
+  relevantExperience: ["none"],
+  otherExperience: "",
   medicalConditions: "Sample private answer",
 };
 
@@ -456,14 +458,15 @@ describe(
         {
           ...trainingAnswers,
           teams: ["outreach", "non-patrol"],
-          training: ["overdose-response", "lived-experience"],
+          training: ["none"],
+          relevantExperience: ["overdose-response", "lived-experience"],
           otherTraining: "",
         },
         trainingCookie,
       );
       assert.equal(edited.status, 200, await edited.clone().text());
       assert.equal(
-        (await savedProfile())?.relevant_training,
+        (await savedProfile())?.relevant_experience,
         JSON.stringify(["overdose-response", "lived-experience"]),
       );
       assert.equal((await savedProfile())?.other_training, "");

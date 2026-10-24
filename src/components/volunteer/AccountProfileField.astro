@@ -1,6 +1,7 @@
 ---
 import {
   applicationBirthDateError,
+  otherTrainingMaxLength,
   type applicationFields,
   type ApplicationAnswers,
 } from "@/data/application";
@@ -64,6 +65,9 @@ const message =
       ]}
       data-other-training={field.name === "experience" || undefined}
       data-other-relevant-training={field.name === "otherTraining" || undefined}
+      data-other-relevant-experience={
+        field.name === "otherExperience" || undefined
+      }
       data-certification-expiry={
         field.name === "certificationExpiry" || undefined
       }
@@ -92,7 +96,13 @@ const message =
           required={required && active && !readOnly}
           readonly={readOnly || !active}
           rows="3"
-          maxlength={motivation ? undefined : 2000}
+          maxlength={
+            motivation
+              ? undefined
+              : field.name === "otherTraining"
+                ? otherTrainingMaxLength
+                : 2000
+          }
           set:text={values?.[field.name] ?? ""}
         />
       ) : (
