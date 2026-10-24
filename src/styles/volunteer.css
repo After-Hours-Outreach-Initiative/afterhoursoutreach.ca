@@ -1381,7 +1381,8 @@ body:has(
   cursor: pointer;
   color: #d4d4d8;
 }
-.volunteer-series-occurrences > .volunteer-event-list {
+.volunteer-series-occurrences > .volunteer-event-list,
+.volunteer-series-settings > summary + .volunteer-form {
   margin-top: 1rem;
 }
 .volunteer-event-card p {
