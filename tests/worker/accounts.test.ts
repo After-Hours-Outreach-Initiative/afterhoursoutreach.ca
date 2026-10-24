@@ -1200,7 +1200,7 @@ describe(
         const response = await page.goto(`${origin}/volunteer/sign-in`);
         await expect(
           page.getByRole("button", {
-            name: "Development controls",
+            name: "DEV panel",
             exact: true,
           }),
         ).toHaveCount(0);

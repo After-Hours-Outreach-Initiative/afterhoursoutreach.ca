@@ -56,8 +56,9 @@ const account =
               class="fixed right-4 bottom-4 z-40 flex size-11 items-center justify-center rounded-lg border border-zinc-600 bg-ink text-amber-300 hover:border-white"
               type="button"
               data-open-account-switcher
-              aria-label="Development controls"
-              title="Development controls"
+              aria-label="DEV panel"
+              title="DEV panel (Alt+Z)"
+              aria-keyshortcuts="Alt+Z"
               aria-haspopup="dialog"
               aria-controls="development-account-dialog"
               aria-expanded="false"
@@ -72,8 +73,8 @@ const account =
             >
               <DialogHeader
                 id="development-account-dialog-heading"
-                title="Local development"
-                closeLabel="Close development controls"
+                title="DEV panel"
+                closeLabel="Close DEV panel"
                 closeAttributes={{ "data-close-account-switcher": "" }}
               />
               <div class="dialog-body">

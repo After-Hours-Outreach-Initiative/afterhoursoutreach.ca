@@ -19,11 +19,9 @@ export async function fillApplicationField(
 }
 
 export async function openLocalAccountSwitcher(page: Page) {
-  await page
-    .getByRole("button", { name: "Development controls", exact: true })
-    .click();
+  await page.getByRole("button", { name: "DEV panel", exact: true }).click();
   const dialog = page.getByRole("dialog", {
-    name: "Local development",
+    name: "DEV panel",
     exact: true,
   });
   await expect(dialog).toBeVisible();

@@ -269,7 +269,7 @@ for (const root of [16, 20, 24]) {
 
       await openLocalAccountSwitcher(page);
       const dialog = page.getByRole("dialog", {
-        name: "Local development",
+        name: "DEV panel",
         exact: true,
       });
       await expect(dialog.getByRole("heading")).toHaveCSS(
@@ -283,9 +283,7 @@ for (const root of [16, 20, 24]) {
       await expect(dialog).toHaveCSS("border-top-width", "1px");
       await expect(dialog).toBeInViewport({ ratio: 1 });
       await expectNoHorizontalOverflow(page);
-      await dialog
-        .getByRole("button", { name: "Close development controls" })
-        .click();
+      await dialog.getByRole("button", { name: "Close DEV panel" }).click();
       await expect(dialog).not.toBeVisible();
 
       await page.setViewportSize({ width: 375, height: 812 });

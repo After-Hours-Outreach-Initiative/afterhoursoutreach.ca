@@ -49,8 +49,9 @@ disposable D1 database; it never adds test accounts to this persistent dev datab
 See [testing.md](/testing/).
 
 On localhost or the dev server's LAN address, the shared account layout includes
-a **View as** button for every user in local D1, including accounts that have
-not finished their application. Choosing a saved user replaces only this browser's
+a **DEV panel** button. Press **Alt+Z** to open or close it. Its **View as** choices
+include every user in local D1, including accounts that have not finished their
+application. Choosing a saved user replaces only this browser's
 session; choosing Visitor signs out. Switching simulates a verified two-factor
 session for users with an enrolled authenticator, without changing their role,
 email verification, active status, profile, or patrol approval. Create new

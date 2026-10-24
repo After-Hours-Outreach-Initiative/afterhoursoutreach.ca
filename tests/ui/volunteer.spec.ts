@@ -449,7 +449,7 @@ test("View as has a button for every seeded profile and supports keyboard switch
       ),
     ).toBe(false);
     await page
-      .getByRole("button", { name: "Close development controls", exact: true })
+      .getByRole("button", { name: "Close DEV panel", exact: true })
       .click();
   }
   const profiles = await openLocalAccountSwitcher(page);

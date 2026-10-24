@@ -25,6 +25,30 @@ test.beforeEach(async ({ page, baseURL }) => {
   ).toBeVisible();
 });
 
+test("Alt+Z toggles the DEV panel and restores focus without changing form input", async ({
+  page,
+}) => {
+  const trigger = page.getByRole("button", { name: "DEV panel", exact: true });
+  const panel = page.getByRole("dialog", { name: "DEV panel", exact: true });
+  const email = page.getByRole("textbox", { name: "Email", exact: true });
+  await expect(trigger).toHaveAttribute("aria-keyshortcuts", "Alt+Z");
+  await email.fill("dev-panel@example.org");
+  await page.keyboard.press("Alt+KeyZ");
+  await expect(panel).toBeVisible();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Alt+KeyZ");
+  await expect(panel).toBeHidden();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(email).toBeFocused();
+  await expect(email).toHaveValue("dev-panel@example.org");
+
+  await trigger.click();
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Alt+KeyZ");
+  await expect(panel).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
 test("Not applied always starts blank; submitted local accounts persist and can be deleted", async ({
   page,
   baseURL,
@@ -128,9 +152,7 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   await expect(
     profiles.locator(`[data-switch-user="${second.id}"]`),
   ).toHaveAttribute("aria-pressed", "true");
-  await page
-    .getByRole("button", { name: "Close development controls" })
-    .click();
+  await page.getByRole("button", { name: "Close DEV panel" }).click();
 
   await choose("new-application");
   await expectBlank();

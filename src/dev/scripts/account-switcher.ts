@@ -55,9 +55,27 @@ export async function initAccountSwitcher() {
   const trigger = document.querySelector<HTMLButtonElement>(
     "[data-open-account-switcher]",
   );
-  trigger?.addEventListener("click", () => {
-    root.showModal();
-    trigger?.setAttribute("aria-expanded", "true");
+  const toggle = () => {
+    if (root.open) root.close();
+    else {
+      root.showModal();
+      trigger?.setAttribute("aria-expanded", "true");
+    }
+  };
+  trigger?.addEventListener("click", toggle);
+  document.addEventListener("keydown", (event) => {
+    if (
+      event.defaultPrevented ||
+      event.isComposing ||
+      !event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.code !== "KeyZ"
+    )
+      return;
+    event.preventDefault();
+    if (!event.repeat) toggle();
   });
   root
     .querySelector<HTMLButtonElement>("[data-close-account-switcher]")
