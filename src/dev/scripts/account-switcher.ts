@@ -22,6 +22,7 @@ const developmentAuthClient = createAuthClient({
         "/dev/switch-user": "POST",
         "/dev/delete-user": "POST",
         "/dev/application-step": "POST",
+        "/dev/seed-accounts": "POST",
       },
     },
   ],
@@ -50,6 +51,9 @@ export async function initAccountSwitcher() {
   );
   const createAccount = root.querySelector<HTMLAnchorElement>(
     "[data-create-account]",
+  );
+  const seedAccounts = root.querySelector<HTMLButtonElement>(
+    "[data-seed-accounts]",
   );
   let busy = true;
   let currentUserId: string | null = null;
@@ -82,6 +86,7 @@ export async function initAccountSwitcher() {
       )
       .forEach((button) => (button.disabled = value));
     createAccount?.setAttribute("aria-disabled", String(value));
+    if (seedAccounts) seedAccounts.disabled = value;
     updateSteps();
   };
   setBusy(true);
@@ -131,6 +136,23 @@ export async function initAccountSwitcher() {
     message.textContent = accountErrorMessage(error);
     message.hidden = false;
   };
+  seedAccounts?.addEventListener("click", async () => {
+    if (busy) return;
+    setBusy(true);
+    message.hidden = true;
+    seedAccounts.textContent = "Seeding…";
+    try {
+      const result = await developmentAuthClient.dev.seedAccounts({});
+      await refreshAccounts();
+      message.textContent = result.message;
+      message.hidden = false;
+    } catch (error) {
+      fail(error);
+    } finally {
+      seedAccounts.textContent = "Seed local accounts";
+      setBusy(false);
+    }
+  });
   createAccount?.addEventListener("click", async (event) => {
     event.preventDefault();
     if (busy) return;
@@ -215,7 +237,7 @@ export async function initAccountSwitcher() {
       fail(error);
     }
   });
-  try {
+  const refreshAccounts = async () => {
     const users: DevelopmentUser[] = [];
     let after: string | null = null;
     do {
@@ -250,6 +272,10 @@ export async function initAccountSwitcher() {
       button.appendChild(detail);
       return button;
     };
+    states
+      .querySelectorAll('[data-switch-user]:not([data-switch-user=""])')
+      .forEach((button) => button.remove());
+    accounts.replaceChildren();
     states.appendChild(
       profileButton(
         newApplicationPersona,
@@ -318,8 +344,10 @@ export async function initAccountSwitcher() {
     }
     if (emptyAccounts) emptyAccounts.hidden = accounts.childElementCount > 0;
     const current = users.find((user) => user.id === currentUserId);
-    if (stepAccount && current)
-      stepAccount.textContent = `Current account: ${current.name || current.email}`;
+    if (stepAccount)
+      stepAccount.textContent = current
+        ? `Current account: ${current.name || current.email}`
+        : "Choose an account to use these shortcuts.";
     profiles
       .querySelectorAll<HTMLButtonElement>("[data-switch-user]")
       .forEach((button) =>
@@ -328,9 +356,12 @@ export async function initAccountSwitcher() {
           String(button.dataset.switchUser === (currentUserId ?? "")),
         ),
       );
-    setBusy(false);
+  };
+  try {
+    await refreshAccounts();
   } catch (error) {
-    setBusy(false);
     fail(error);
+  } finally {
+    setBusy(false);
   }
 }

@@ -117,6 +117,73 @@ test("DEV panel separates states from saved accounts and completes each applicat
   await expect(page.locator("[data-event-list]")).toBeVisible();
 });
 
+test("DEV panel seeds presets in place without changing the current account or duplicating users", async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  const endpoint = "/api/v1/auth/dev/seed-accounts";
+  expect(
+    (
+      await page.request.post(endpoint, {
+        headers: { origin: "https://unrelated.example.org" },
+        data: {},
+      })
+    ).status(),
+  ).toBe(403);
+  const profiles = await openLocalAccountSwitcher(page);
+  await profiles.locator('[data-switch-user="new-application"]').click();
+  await expect(page).toHaveURL(/\/apply$/);
+  const original = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  await page.locator('[name="firstName"]').fill("Keep my draft");
+  await openLocalAccountSwitcher(page);
+  const seed = page.getByRole("button", {
+    name: "Seed local accounts",
+    exact: true,
+  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = page.waitForResponse((response) =>
+      response.url().endsWith(endpoint),
+    );
+    await seed.click();
+    expect(await (await response).headerValue("set-cookie")).toBeNull();
+    await expect(page.locator("[data-switch-message]")).toContainText(
+      "Existing records and edits were preserved",
+    );
+    await expect(profiles).toHaveAttribute("aria-busy", "false");
+    await expect(
+      profiles.locator('[data-switch-user^="local-account-user-"]'),
+    ).toHaveCount(5);
+    await expect(seed).toBeEnabled();
+  }
+  const current = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  expect(current.user.id).toBe(original.user.id);
+  expect(current.session.id).toBe(original.session.id);
+  await expect(page).toHaveURL(/\/apply$/);
+  await expect(page.locator('[name="firstName"]')).toHaveValue("Keep my draft");
+  await expect(
+    profiles
+      .getByRole("group", { name: "Account states", exact: true })
+      .locator('[data-switch-user="local-account-user-organizer"]'),
+  ).toBeVisible();
+  // Verify actual authenticator enrollment using a separate request cookie jar.
+  const switched = await request.post("/api/v1/auth/dev/switch-user", {
+    headers: { origin: baseURL! },
+    data: { userId: "local-account-user-organizer" },
+  });
+  expect(switched.ok()).toBe(true);
+  const organizer = await (
+    await request.get("/api/v1/auth/get-session")
+  ).json();
+  expect(organizer.user.twoFactorEnabled).toBe(true);
+  const accountPage = await (await request.get("/volunteer/account")).text();
+  expect(accountPage.match(/data-session-row/g)).toHaveLength(1);
+});
+
 test("Not applied always starts blank; submitted local accounts persist and can be deleted", async ({
   page,
   baseURL,

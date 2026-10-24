@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { createHmac } from "node:crypto";
 import { mkdir, mkdtemp, rmdir, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +10,7 @@ import {
   localAccountUserId,
 } from "./local-account-fixtures";
 import { fixtureUserId, localEventFixtures } from "./local-event-fixtures";
+import { localAuthenticatorCode } from "../src/dev/server/authenticator-code";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 // The browser-test harness selects its broader fixtures in a disposable copy.
@@ -33,23 +33,6 @@ if (
   throw new Error(
     "Seeding requires a loopback dev server and local D1 binding.",
   );
-
-function authenticatorCode(key: string) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  const bits = [...key.replace(/=+$/, "")]
-    .map((letter) => alphabet.indexOf(letter).toString(2).padStart(5, "0"))
-    .join("");
-  const secret = Buffer.from(
-    bits.match(/.{8}/g)!.map((byte) => parseInt(byte, 2)),
-  );
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
-  const digest = createHmac("sha1", secret).update(counter).digest();
-  return String(
-    (digest.readUInt32BE(digest[digest.length - 1] & 15) & 0x7fffffff) %
-      1_000_000,
-  ).padStart(6, "0");
-}
 
 const client = await request.newContext({
   baseURL: origin.origin,
@@ -129,7 +112,7 @@ try {
     });
     const key = new URL(setup.totpURI).searchParams.get("secret")!;
     await post("/api/v1/auth/two-factor/verify-totp", {
-      code: authenticatorCode(key),
+      code: localAuthenticatorCode(key),
     });
   }
   await post("/api/v1/auth/sign-out", {});

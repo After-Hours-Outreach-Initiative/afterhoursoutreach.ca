@@ -67,6 +67,32 @@ export function developmentAccounts(bindings: AuthBindings) {
           });
         },
       ),
+      developmentSeedAccounts: createAuthEndpoint(
+        "/dev/seed-accounts",
+        {
+          method: "POST",
+          requireHeaders: true,
+          body: z.strictObject({}),
+        },
+        async (ctx) => {
+          requireLocal(ctx.request);
+          const { seedLocalAccounts } = await import("./seed-accounts");
+          try {
+            await seedLocalAccounts(bindings);
+          } catch (error) {
+            throw new APIError("SERVICE_UNAVAILABLE", {
+              message:
+                error instanceof RequestError
+                  ? error.message
+                  : "Could not seed local accounts. Check local migrations and try again.",
+            });
+          }
+          return ctx.json({
+            message:
+              "Local preset accounts and sample events are ready. Existing records and edits were preserved.",
+          });
+        },
+      ),
       developmentSwitchUser: createAuthEndpoint(
         "/dev/switch-user",
         {

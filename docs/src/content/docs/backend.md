@@ -86,8 +86,12 @@ visual override; choose Not applied to begin again without resetting an account.
 Signed-out requests, cross-origin requests, and requests for a different account
 are rejected. These endpoints are absent from deployed builds.
 
-For manual testing, run `pnpm db:seed:local` with the dev server running
-and local migrations applied. On a fresh local database, View as contains
+For manual testing, click **Seed local accounts** in the DEV panel or run
+`pnpm db:seed:local` with the dev server running and local migrations applied.
+The button refreshes the panel in place without switching your account or
+changing its session. It uses the same fixtures as the command, enrolls the
+Organizer authenticator through the normal auth backend in an isolated temporary
+session, and sends no emails. On a fresh local database, View as contains
 **Visitor** (signed out), **Not applied** (always a fresh application), **Applied**
 (awaiting approval), **Accepted** (application approved, not patrol approved),
 **Inactive** (inactive, unapproved application), and **Organizer** (active organizer).

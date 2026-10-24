@@ -244,8 +244,8 @@ safe because TypeScript removes them.
 
 The development controls are available only in the local dev server. Built
 Worker tests check that `GET /api/v1/auth/dev/users`,
-`POST /api/v1/auth/dev/switch-user`, `POST /api/v1/auth/dev/delete-user`, and
-`POST /api/v1/auth/dev/application-step`
+`POST /api/v1/auth/dev/switch-user`, `POST /api/v1/auth/dev/delete-user`,
+`POST /api/v1/auth/dev/application-step`, and `POST /api/v1/auth/dev/seed-accounts`
 return `404` in production and preview builds;
 local browser tests exercise account switching, application-step shortcuts, and
 simulated email delivery.

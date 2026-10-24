@@ -1128,6 +1128,10 @@ describe(
       ).json()) as typeof current;
       assert.equal(after.user.id, before.user.id);
       assert.equal(after.session.id, before.session.id);
+      assert.equal(
+        (await send("/api/v1/auth/dev/seed-accounts", {}, cookie)).status,
+        404,
+      );
     });
 
     test("email-change endpoints enforce authentication, same-origin POSTs and fail closed without delivery", async () => {
@@ -1882,6 +1886,18 @@ test("a built Worker cannot enable account switching with local runtime vars", a
       },
     );
     assert.equal(shortcut.status, 404);
+    const seed = await worker.fetch(
+      "http://localhost:4321/api/v1/auth/dev/seed-accounts",
+      {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:4321",
+          "content-type": "application/json",
+        },
+        body: "{}",
+      },
+    );
+    assert.equal(seed.status, 404);
   } finally {
     await server.close();
   }
