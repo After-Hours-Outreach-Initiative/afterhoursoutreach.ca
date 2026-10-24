@@ -189,7 +189,7 @@ export async function startLocalTestServer(logs, { signal } = {}) {
         `Test development server did not become ready. See ${logs}.`,
       );
     const seeded = await command(
-      ["db:seed:local"],
+      ["db:seed:local", "--test-fixtures"],
       join(logs, "dev-seed.log"),
       directory,
       { LOCAL_BASE_URL: origin },

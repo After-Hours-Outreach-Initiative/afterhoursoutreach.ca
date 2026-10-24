@@ -13,10 +13,12 @@ import {
 import { fixtureUserId, localEventFixtures } from "./local-event-fixtures";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const accountsOnly =
-  process.argv.length === 3 && process.argv[2] === "--accounts";
-if (process.argv.length !== 2 && !accountsOnly)
-  throw new Error("Usage: pnpm db:seed:local [--accounts] (local only)");
+// The browser-test harness selects its broader fixtures in a disposable copy.
+// The normal command always seeds the small manual View as dataset.
+const testFixtures =
+  process.argv.length === 3 && process.argv[2] === "--test-fixtures";
+if (process.argv.length !== 2 && !testFixtures)
+  throw new Error("Usage: pnpm db:seed:local (local only)");
 const config: {
   vars?: Record<string, unknown>;
   d1_databases?: { binding: string; remote?: boolean }[];
@@ -65,9 +67,9 @@ try {
   const directory = await mkdtemp(join(temporaryRoot, "local-events-"));
   const file = join(directory, "fixtures.sql");
   try {
-    const fixtures = accountsOnly
-      ? localAccountFixtures()
-      : localEventFixtures();
+    const fixtures = testFixtures
+      ? localEventFixtures()
+      : localAccountFixtures();
     await writeFile(file, fixtures.join(";\n") + ";\n", {
       mode: 0o600,
     });
@@ -106,9 +108,9 @@ try {
     return result.json();
   };
   await post("/api/v1/auth/dev/switch-user", {
-    userId: accountsOnly
-      ? localAccountUserId("organizer")
-      : fixtureUserId("robin"),
+    userId: testFixtures
+      ? fixtureUserId("robin")
+      : localAccountUserId("organizer"),
   });
   const current = await (await client.get("/api/v1/auth/get-session")).json();
   if (!current?.user?.twoFactorEnabled) {
@@ -124,9 +126,9 @@ try {
   }
   await post("/api/v1/auth/sign-out", {});
   console.log(
-    accountsOnly
-      ? "Local D1 accounts are ready: Not applied, Applied, Accepted, Inactive, Organizer. Choose Visitor in View as to sign out."
-      : "Local D1 test events and sample accounts are ready. Choose Robin Vance in View as for organizer tools.",
+    testFixtures
+      ? "Local D1 test events and sample accounts are ready. Choose Robin Vance in View as for organizer tools."
+      : "Local D1 manual presets and events are ready: Not applied, Applied, Accepted, Inactive, Organizer. Choose Visitor in View as to sign out.",
   );
 } finally {
   await client.dispose();

@@ -33,7 +33,8 @@ test("the local seed refuses nonlocal targets and unknown arguments before any w
     ["--preview"],
     ["--production"],
     ["--unknown"],
-    ["--accounts", "--remote"],
+    ["--accounts"],
+    ["--test-fixtures", "--remote"],
   ]) {
     const result = spawnSync(
       process.execPath,

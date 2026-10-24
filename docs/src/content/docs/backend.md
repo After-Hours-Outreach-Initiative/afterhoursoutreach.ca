@@ -74,7 +74,7 @@ records in one transaction. Existing database protections block deletion of the
 last active organizer and accounts referenced by organizer-owned records; an error
 is shown and no records are changed when deletion is blocked.
 
-For manual testing, run `pnpm db:seed:local:accounts` with the dev server running
+For manual testing, run `pnpm db:seed:local` with the dev server running
 and local migrations applied. On a fresh local database, View as contains
 **Visitor** (signed out), **Not applied** (always a fresh application), **Applied**
 (awaiting approval), **Accepted** (application approved, not patrol approved),
@@ -87,12 +87,10 @@ The original Not applied fixture is preserved separately as **Original Not appli
 account** (or its submitted name if already completed); its application/draft is
 never reset when choosing the reusable Not applied option.
 
-Run `pnpm db:seed:local` to restore the broader automated-test fixtures:
-an orientation, an open patrol, a full patrol, a hidden/closed orientation, and
-a past orientation with attendance. Sample users are stored in D1 too; choose
-**Robin Vance** in View as for event and volunteer-management tools. Robin’s
-authenticator is enrolled through the real local auth backend. The command
-only targets local D1, preserves existing records and fixture edits, and never
+This is the only manual seed command. Automated browser tests use their broader
+event, signup, and attendance fixtures only in their own disposable database;
+you do not need to seed those manually. Existing accounts and events from older
+seed commands remain untouched. The manual seed only targets local D1 and never
 runs during a build or deployment. Dev UI has no privacy disclosures; storage
 details belong on `/privacy`.
 
