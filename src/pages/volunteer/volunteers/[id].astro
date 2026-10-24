@@ -1,0 +1,7 @@
+---
+export const prerender = false;
+return Astro.redirect(
+  `/manage/volunteers/${encodeURIComponent(Astro.params.id ?? "")}${Astro.url.search}`,
+  301,
+);
+---

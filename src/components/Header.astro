@@ -1,50 +1,118 @@
 ---
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import MoonIcon from "@/components/icons/MoonIcon.astro";
-import { navLinks, social } from "@/data/site";
+import AccountIcon from "@/components/icons/AccountIcon.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import MenuIcon from "@/components/icons/MenuIcon.svg";
+import CloseIcon from "@/components/icons/CloseIcon.svg";
+import HeaderAccountCard from "@/components/HeaderAccountCard.astro";
+import { siteNavigation, social } from "@/data/site";
+import { accountGreeting } from "@/data/account-navigation";
+import "@/styles/header.css";
 
+interface Props {
+  signedIn: boolean;
+  organizer?: boolean;
+  eventAccess?: boolean;
+  name?: string;
+  greetingName?: string;
+  email?: string;
+}
+const {
+  signedIn,
+  organizer = false,
+  eventAccess = false,
+  name,
+  greetingName = accountGreeting(undefined, name),
+  email,
+} = Astro.props;
 const { pathname } = Astro.url;
+const current = pathname.replace(/\/$/, "");
 const isCurrent = (href: string) =>
-  pathname === href || pathname === `${href}/`;
+  current === href ||
+  (href === "/manage/volunteers" && current.startsWith(`${href}/`));
+const links = siteNavigation(signedIn, organizer, eventAccess);
+const accountPage = current === "/volunteer/account" || current === "/apply";
 ---
 
-<header class="sticky top-0 z-50 bg-black text-white">
+<header class="site-header sticky top-0 z-50 bg-black text-white">
   <div
-    class="relative mx-auto flex min-h-22 w-full max-w-[1248px] items-center gap-10 px-6 max-sm:min-h-19 max-sm:px-4"
+    class="relative mx-auto flex w-full max-w-site items-center gap-6 px-6 py-3 max-lg:gap-3 max-sm:gap-2 max-sm:px-4"
   >
     <a
-      class="flex shrink-0 items-center gap-3.5"
+      class="flex min-w-0 items-center gap-3.5"
       href="/"
       aria-label="After Hours Outreach Initiative, home"
     >
       <MoonIcon
         class="size-12 shrink-0 fill-current text-blue max-sm:size-10"
       />
-      <span class="flex flex-col leading-tight">
+      <span class="flex min-w-0 flex-col leading-tight">
         <strong class="font-heading text-xl font-bold">After Hours</strong>
         <span class="text-base text-zinc-400">Outreach Initiative</span>
       </span>
     </a>
 
     <nav
-      class="ml-auto hidden items-center gap-8 lg:flex"
+      class="ml-auto hidden items-center gap-6 lg:flex"
       aria-label="Primary navigation"
     >
       {
-        navLinks.map((link) => (
-          <a
-            class="py-2.5 text-base font-medium text-zinc-300 transition-colors hover:text-white aria-[current=page]:text-white"
-            href={link.href}
-            aria-current={isCurrent(link.href) ? "page" : undefined}
-          >
-            {link.label}
-          </a>
-        ))
+        links.map((link) =>
+          link.children ? (
+            <details
+              class="header-menu"
+              data-header-menu
+              data-header-hover-menu
+            >
+              <summary class="header-link" role="button" aria-expanded="false">
+                {link.label}
+                <svg
+                  class="header-chevron"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
+              <ul class="header-dropdown header-manage-dropdown">
+                {link.children.map((child) => (
+                  <li>
+                    <a
+                      href={child.href}
+                      aria-current={isCurrent(child.href) ? "page" : undefined}
+                    >
+                      {child.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : (
+            <a
+              class="header-link"
+              href={link.href}
+              data-volunteer-nav={
+                link.href === "/volunteer" || link.href === "/events"
+                  ? ""
+                  : undefined
+              }
+              aria-current={isCurrent(link.href) ? "page" : undefined}
+            >
+              <span data-volunteer-nav-label>{link.label}</span>
+            </a>
+          ),
+        )
       }
     </nav>
 
     <a
       class="btn btn-primary max-lg:hidden"
+      data-header-discord
+      hidden={signedIn}
       href={social.discord}
       target="_blank"
       rel="noreferrer"
@@ -53,63 +121,162 @@ const isCurrent = (href: string) =>
       Join Discord
     </a>
 
-    <details class="mobile-nav group ml-auto lg:hidden">
-      <summary
-        class="flex size-12 cursor-pointer list-none flex-col items-center justify-center gap-2 rounded-lg"
-        aria-label="Open navigation"
+    <nav
+      class="hidden shrink-0 lg:block"
+      aria-label="Volunteer account"
+      data-header-account
+      hidden={!signedIn}
+    >
+      <details
+        class="header-menu"
+        data-header-menu
+        data-account-menu={signedIn ? "" : undefined}
       >
-        <span
-          class="h-0.5 w-7 bg-white transition-transform group-open:translate-y-2.5 group-open:rotate-45"
-        ></span>
-        <span class="h-0.5 w-7 bg-white transition-opacity group-open:opacity-0"
-        ></span>
-        <span
-          class="h-0.5 w-7 bg-white transition-transform group-open:-translate-y-2.5 group-open:-rotate-45"
-        ></span>
+        <summary
+          class="header-account-toggle"
+          role="button"
+          aria-label={greetingName === "Account"
+            ? "Account"
+            : `Account for ${greetingName}`}
+          aria-expanded="false"
+          data-current={accountPage ? "true" : undefined}
+        >
+          <span class="header-account-icon"
+            ><AccountIcon class="size-5 shrink-0" /></span
+          >
+          <span class="header-account-label" data-account-greeting
+            >{greetingName}</span
+          >
+          <svg
+            class="header-chevron"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </summary>
+        <HeaderAccountCard
+          class="header-dropdown header-account-dropdown"
+          {signedIn}
+          {name}
+          {email}
+          {accountPage}
+        />
+      </details>
+    </nav>
+
+    <details
+      class="mobile-nav group ml-auto shrink-0 lg:hidden"
+      data-header-menu
+    >
+      <summary
+        class="flex size-12 cursor-pointer list-none items-center justify-center rounded-lg"
+        aria-label="Open navigation"
+        role="button"
+        aria-expanded="false"
+      >
+        <MenuIcon class="size-8 group-open:hidden" />
+        <CloseIcon class="hidden size-8 group-open:block" />
       </summary>
       <nav
-        class="absolute inset-x-0 top-full flex w-full flex-col border-y border-zinc-600 bg-ink"
+        class="header-mobile-panel absolute inset-x-0 top-full w-full bg-black px-6 max-sm:px-4"
         aria-label="Mobile navigation"
       >
-        {
-          navLinks.map((link) => (
-            <a
-              class="border-b border-zinc-800 px-5 py-4 text-base"
-              href={link.href}
-              aria-current={isCurrent(link.href) ? "page" : undefined}
-            >
-              {link.label}
-            </a>
-          ))
-        }
+        <ul class="header-mobile-links" aria-label="Site pages">
+          {
+            links.map((link) => (
+              <li>
+                {link.children ? (
+                  <details class="header-menu" data-header-menu>
+                    <summary
+                      class="header-mobile-link"
+                      role="button"
+                      aria-expanded="false"
+                    >
+                      {link.label}
+                      <svg
+                        class="header-chevron header-mobile-arrow"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </summary>
+                    <ul class="header-mobile-children">
+                      {link.children.map((child) => (
+                        <li>
+                          <a
+                            class="header-mobile-link"
+                            href={child.href}
+                            aria-current={
+                              isCurrent(child.href) ? "page" : undefined
+                            }
+                          >
+                            {child.label}
+                            <ArrowRightIcon class="header-mobile-arrow" />
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : (
+                  <a
+                    class="header-mobile-link"
+                    href={link.href}
+                    data-volunteer-nav={
+                      link.href === "/volunteer" || link.href === "/events"
+                        ? ""
+                        : undefined
+                    }
+                    aria-current={isCurrent(link.href) ? "page" : undefined}
+                  >
+                    <span data-volunteer-nav-label>{link.label}</span>
+                    <ArrowRightIcon class="header-mobile-arrow" />
+                  </a>
+                )}
+              </li>
+            ))
+          }
+        </ul>
+        <section
+          class="header-mobile-account"
+          aria-label="Your account"
+          data-mobile-account
+          hidden={!signedIn}
+        >
+          <HeaderAccountCard
+            {signedIn}
+            {name}
+            {email}
+            {accountPage}
+            showIcon
+            showArrows
+          />
+        </section>
         <a
-          class="flex items-center gap-2.5 bg-blue px-5 py-4 text-base font-bold"
+          class="btn btn-primary"
+          data-header-discord
+          hidden={signedIn}
           href={social.discord}
           target="_blank"
           rel="noreferrer"
         >
           <DiscordIcon class="btn-icon fill-current" />
           Join Discord
+          <ArrowRightIcon class="header-mobile-arrow" />
         </a>
       </nav>
     </details>
   </div>
 </header>
+<div class="header-mobile-backdrop" aria-hidden="true"></div>
 
 <script>
-  const mobileNav = document.querySelector<HTMLDetailsElement>(".mobile-nav");
-  const mobileNavToggle = mobileNav?.querySelector("summary");
-
-  mobileNav?.addEventListener("toggle", () => {
-    mobileNavToggle?.setAttribute(
-      "aria-label",
-      mobileNav.open ? "Close navigation" : "Open navigation",
-    );
-  });
-
-  document.querySelectorAll(".mobile-nav a").forEach((link) => {
-    link.addEventListener("click", () =>
-      link.closest("details")?.removeAttribute("open"),
-    );
-  });
+  import "@/scripts/header";
 </script>

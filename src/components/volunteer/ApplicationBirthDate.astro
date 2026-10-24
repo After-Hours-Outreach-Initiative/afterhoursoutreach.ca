@@ -1,0 +1,20 @@
+---
+import DateInput from "./DateInput.astro";
+
+interface Props {
+  value: string;
+  help: string;
+  required: boolean;
+}
+const { value, help, required } = Astro.props;
+---
+
+<DateInput
+  name="birthDate"
+  id="birthDate"
+  label="Date of birth"
+  {value}
+  {help}
+  {required}
+  birthDate
+/>

@@ -1,0 +1,271 @@
+---
+import type { Actor } from "@/server/db/access";
+import type {
+  EventRow,
+  RosterRow,
+  PublicRosterRow,
+  PatrolSeriesRow,
+} from "@/server/db/events";
+import { eventSignupBlockReason } from "@/server/db/policy";
+import { formatEventDate } from "@/data/event-time";
+import { matchesEventFilter } from "@/data/event-browser";
+import EventEditor from "./EventEditor.astro";
+import EventRoster from "./EventRoster.astro";
+import EventAttendance from "./EventAttendance.astro";
+import PublicEventRoster from "./PublicEventRoster.astro";
+
+interface Props {
+  event: EventRow;
+  // The caller must gate access with canViewEvents.
+  actor: Actor;
+  organizer: boolean;
+  roster: RosterRow[];
+  destinations: EventRow[];
+  filter: string;
+  series?: PatrolSeriesRow;
+  publicRoster?: PublicRosterRow[];
+}
+const {
+  event,
+  actor,
+  organizer,
+  roster,
+  destinations,
+  filter,
+  series,
+  publicRoster,
+} = Astro.props;
+const future = event.startsAt > Date.now();
+const blocked =
+  future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
+    ? "Registration is available only for the next three patrol occurrences in this series."
+    : eventSignupBlockReason(
+        actor,
+        {
+          ...event,
+          startsAt: new Date(event.startsAt),
+          open: Boolean(event.open) && !event.hidden && !event.cancelledAt,
+          orientationSignupBlocked: Boolean(event.orientationSignupBlocked),
+        },
+        event.confirmed,
+      );
+---
+
+<li
+  id={`event-${event.id}`}
+  class="volunteer-event-card"
+  tabindex="-1"
+  data-live-event={event.id}
+  data-event-start={event.startsAt}
+  data-event-label={`${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`}
+  data-event-type="patrol"
+  data-includes-orientation={String(Boolean(event.includesOrientation))}
+  hidden={!matchesEventFilter(
+    filter,
+    Boolean(event.seriesId),
+    Boolean(event.includesOrientation),
+  )}
+>
+  <div class="volunteer-event-layout">
+    <div class="volunteer-event-info">
+      {
+        event.cancelledAt ? (
+          <p class="volunteer-hidden">Cancelled</p>
+        ) : event.hidden || !event.open ? (
+          <p class="volunteer-hidden">Public visibility off</p>
+        ) : null
+      }
+      <h3>{formatEventDate(event.startsAt)}</h3>
+      <p>
+        {!future && "Past event · "}
+        {event.includesOrientation ? "Orientation + Patrol" : "Patrol"}
+      </p>
+      <p>
+        Meeting at{" "}
+        {
+          event.meetingPointUrl ? (
+            <a href={event.meetingPointUrl} target="_blank" rel="noreferrer">
+              {event.meetingPoint}
+            </a>
+          ) : (
+            event.meetingPoint
+          )
+        }
+      </p>
+      <p data-event-availability aria-live="polite" aria-atomic="true">
+        {
+          !organizer && Boolean(event.signedUp) && (
+            <>
+              <span class:list={{ "volunteer-spots": future }}>
+                {future ? "Registered" : "You registered"}
+              </span>{" "}
+              ·{" "}
+            </>
+          )
+        }
+        {
+          future
+            ? `${event.confirmed} of ${event.spots} spots taken`
+            : `${event.confirmed} ${event.confirmed === 1 ? "registration" : "registrations"}`
+        }
+      </p>
+      {!organizer && future && !event.signedUp && blocked && <p>{blocked}</p>}
+    </div>
+    {(future || organizer) && <EventAttendance event={event} />}
+    <div class="volunteer-actions">
+      {
+        organizer || !future ? null : event.signedUp ? (
+          <form data-live-signup action="/api/v1/events/action" method="post">
+            <input name="id" type="hidden" value={event.id} />
+            <input name="action" type="hidden" value="cancel" />
+            <button
+              class="btn btn-red"
+              type="submit"
+              data-loading-label="Unregistering…"
+            >
+              Unregister
+            </button>
+            <p data-form-message role="status" hidden />
+          </form>
+        ) : !blocked ? (
+          <form data-live-signup action="/api/v1/events/action" method="post">
+            <input name="id" type="hidden" value={event.id} />
+            <input name="action" type="hidden" value="join" />
+            <button
+              class="btn btn-green"
+              type="submit"
+              data-loading-label="Registering…"
+            >
+              Register
+            </button>
+            <p data-form-message role="status" hidden />
+          </form>
+        ) : null
+      }
+      {
+        organizer && future && !event.cancelledAt && (
+          <button
+            class="btn btn-quiet"
+            type="button"
+            data-show-dialog={`event-editor-${event.id}`}
+          >
+            Edit
+          </button>
+        )
+      }
+      {
+        organizer && (
+          <form
+            data-event-delete={event.seriesId ? "occurrence" : "event"}
+            data-email-prompt={
+              future && !event.cancelledAt && event.confirmed > 0
+                ? "event-cancel"
+                : undefined
+            }
+            action="/api/v1/events/action"
+            method="post"
+          >
+            <input type="hidden" name="action" value="delete-event" />
+            <input type="hidden" name="id" value={event.id} />
+            <input type="hidden" name="version" value={event.updatedAt} />
+            <button
+              class="btn btn-quiet"
+              type="submit"
+              data-loading-label="Deleting…"
+            >
+              {event.seriesId ? "Delete occurrence" : "Delete"}
+            </button>
+            <p data-form-message role="status" hidden />
+          </form>
+        )
+      }
+    </div>
+  </div>
+  {!organizer && future && <PublicEventRoster roster={publicRoster ?? []} />}
+  {
+    organizer && (
+      <EventRoster
+        event={event}
+        roster={roster}
+        future={future}
+        destinations={destinations.filter((other) => other.id !== event.id)}
+      />
+    )
+  }
+  {
+    organizer && future && !event.cancelledAt && (
+      <EventEditor event={event} series={series} />
+    )
+  }
+</li>
+
+<style>
+  .volunteer-event-card {
+    container: event-card / inline-size;
+    padding: 1rem;
+    scroll-margin-top: calc(
+      var(--site-header-rendered-height, var(--site-header-height, 6rem)) + 1rem
+    );
+  }
+  .volunteer-event-card[data-calendar-highlight] {
+    animation: event-highlight 1.5s ease-out;
+  }
+  @keyframes event-highlight {
+    from {
+      border-color: #a5b4fc;
+      box-shadow: 0 0 0 4px #818cf880;
+    }
+    to {
+      border-color: #3f3f46;
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .volunteer-event-card[data-calendar-highlight] {
+      animation: none;
+      outline: 3px solid #a5b4fc;
+      outline-offset: 3px;
+    }
+  }
+  .volunteer-event-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+  }
+  .volunteer-event-info {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .volunteer-event-info h3 {
+    font-size: 1.25rem;
+    line-height: 1.4;
+  }
+  .volunteer-event-info > p {
+    margin: 0.25rem 0 0;
+    line-height: 1.5;
+  }
+  .volunteer-event-info > .volunteer-hidden {
+    margin: 0 0 0.5rem;
+  }
+  .volunteer-actions:empty {
+    display: none;
+  }
+  .volunteer-actions > :is(form, .btn),
+  .volunteer-actions > form > .btn {
+    width: 100%;
+  }
+  .volunteer-actions > form > .btn {
+    white-space: nowrap;
+  }
+  @container event-card (min-width: 32rem) {
+    .volunteer-event-layout:has(> .volunteer-actions:not(:empty)) {
+      grid-template-columns: minmax(0, 1fr) 12rem;
+      column-gap: 1.5rem;
+    }
+    .volunteer-actions {
+      grid-column: 2;
+      grid-row: 1 / 3;
+    }
+  }
+</style>

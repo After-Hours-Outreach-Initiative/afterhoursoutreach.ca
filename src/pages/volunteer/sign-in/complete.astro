@@ -1,0 +1,41 @@
+---
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import SecondFactorForm from "@/components/volunteer/SecondFactorForm.astro";
+import EmailCodeForm from "@/components/volunteer/EmailCodeForm.astro";
+export const prerender = false;
+---
+
+<AccountLayout
+  title="Complete sign-in"
+  description="Complete your email sign-in."
+>
+  <section class="volunteer-panel volunteer-signin-panel">
+    <form data-email-link class="volunteer-form" method="post">
+      <p>Sign-in link for <span data-sign-in-email></span>.</p>
+      <p data-form-message role="status" aria-live="polite" hidden></p>
+      <button type="submit" class="btn btn-primary" disabled hidden
+        >Try signing in again</button
+      >
+    </form>
+    <EmailCodeForm />
+    <SecondFactorForm />
+    <a
+      href="/volunteer/sign-in"
+      class="btn btn-outline mt-8"
+      data-request-new-email>Request a new email</a
+    >
+    <a
+      href="/volunteer/sign-in"
+      class="volunteer-email-reset"
+      data-use-different-email
+      hidden>Use a different email</a
+    >
+  </section>
+  <noscript
+    ><p class="mt-8">
+      Opening this page does not use your sign-in link. <a
+        href="/volunteer/sign-in">Open the sign-in page</a
+      > and enter the code from your email in a browser with JavaScript enabled.
+    </p></noscript
+  >
+</AccountLayout>

@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "account_id": "76222ab803494dc84947546283e1a63a",
+  // D1 administration only. Deliberately no Worker name, entrypoint or assets:
+  // this file must never be used to connect or deploy the production Worker.
+  "d1_databases": [
+    {
+      "binding": "PRODUCTION_DB",
+      "database_name": "afterhoursoutreach-production",
+      "database_id": "ca19de7e-de80-41a5-827a-7130c34ea3da",
+      "migrations_dir": "drizzle",
+    },
+  ],
+}

@@ -1,0 +1,162 @@
+---
+import type { VolunteerRow } from "@/server/db/volunteers";
+interface Props {
+  person: VolunteerRow;
+}
+const { person } = Astro.props;
+---
+
+<div class="volunteer-profile-controls" data-volunteer-controls>
+  <form
+    class="volunteer-form"
+    data-organizer-status
+    data-access-kind="application"
+    data-email-prompt="access"
+    action="/api/v1/organizer/action"
+    method="post"
+  >
+    <input type="hidden" name="userId" value={person.id} />
+    <input type="hidden" name="version" value={person.updatedAt} />
+    <input
+      type="checkbox"
+      name="active"
+      checked={Boolean(person.active)}
+      hidden
+    />
+    <input
+      type="checkbox"
+      name="patrolApproved"
+      checked={Boolean(person.patrolApproved)}
+      hidden
+    />
+    <input
+      type="checkbox"
+      name="applicationApproved"
+      checked={!person.applicationApproved}
+      hidden
+    />
+    <p data-form-message role="status" hidden></p>
+    <button
+      class:list={["btn", person.applicationApproved ? "btn-red" : "btn-green"]}
+      type="submit"
+      data-loading-label="Saving…"
+      >{
+        person.applicationApproved
+          ? "Revoke application approval"
+          : "Approve application"
+      }</button
+    >
+  </form>
+  <form
+    class="volunteer-form"
+    data-organizer-status
+    data-access-kind="patrol"
+    data-email-prompt="access"
+    action="/api/v1/organizer/action"
+    method="post"
+  >
+    <input type="hidden" name="userId" value={person.id} />
+    <input type="hidden" name="version" value={person.updatedAt} />
+    <input
+      type="checkbox"
+      name="applicationApproved"
+      checked={Boolean(person.applicationApproved)}
+      hidden
+    />
+    <input
+      type="checkbox"
+      name="active"
+      checked={Boolean(person.active)}
+      hidden
+    />
+    <input
+      type="checkbox"
+      name="patrolApproved"
+      checked={!person.patrolApproved}
+      hidden
+    />
+    <p data-form-message role="status" hidden></p>
+    <button
+      class:list={["btn", person.patrolApproved ? "btn-red" : "btn-green"]}
+      type="submit"
+      data-loading-label="Saving…"
+      >{
+        person.patrolApproved ? "Revoke patrol approval" : "Approve for patrols"
+      }</button
+    >
+  </form>
+  <form
+    class="volunteer-form"
+    data-organizer-status
+    data-access-kind="active"
+    data-submit-on-change
+    data-email-prompt="access"
+    action="/api/v1/organizer/action"
+    method="post"
+  >
+    <input type="hidden" name="userId" value={person.id} />
+    <input type="hidden" name="version" value={person.updatedAt} />
+    <input
+      type="checkbox"
+      name="applicationApproved"
+      checked={Boolean(person.applicationApproved)}
+      hidden
+    />
+    <input
+      type="checkbox"
+      name="patrolApproved"
+      checked={Boolean(person.patrolApproved)}
+      hidden
+    />
+    <label class="volunteer-check"
+      ><input
+        type="checkbox"
+        name="active"
+        checked={Boolean(person.active)}
+      />Active volunteer</label
+    >
+    <p data-form-message role="status" hidden></p>
+    <span
+      class="volunteer-control-loading"
+      data-action-loading
+      role="status"
+      hidden>Saving…</span
+    >
+    <noscript
+      ><button class="btn btn-quiet" type="submit">Save active status</button
+      ></noscript
+    >
+  </form>
+  <form
+    class="volunteer-form"
+    data-organizer-role
+    data-email-prompt="role"
+    data-submit-on-change
+    action="/api/v1/organizer/action"
+    method="post"
+  >
+    <input type="hidden" name="userId" value={person.id} />
+    <label class="volunteer-field"
+      >Account role
+      <select name="role">
+        <option value="volunteer" selected={person.role === "volunteer"}
+          >Volunteer</option
+        >
+        <option value="organizer" selected={person.role === "organizer"}
+          >Organizer</option
+        >
+      </select>
+    </label>
+    <p data-form-message role="status" hidden></p>
+    <span
+      class="volunteer-control-loading"
+      data-action-loading
+      role="status"
+      hidden>Saving…</span
+    >
+    <noscript
+      ><button class="btn btn-outline" type="submit">Save role</button
+      ></noscript
+    >
+  </form>
+</div>

@@ -2,20 +2,27 @@
 import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
-
-const upcomingEvents: { weekday: string; date: string; time: string }[] = [];
+import { env } from "cloudflare:workers";
+import { loadAccountNavigation } from "@/server/account-navigation";
+export const prerender = false;
+const account = await loadAccountNavigation(
+  env,
+  Astro.request,
+  Astro.response.headers,
+);
 ---
 
 <Layout
   title="After Hours Outreach Initiative"
   description="Volunteer-based evening street outreach providing practical care and overdose response in Vancouver's Downtown Eastside."
+  account={account}
 >
   <section class="bg-black text-white" id="top">
     <div
-      class="mx-auto grid min-h-[720px] w-full max-w-[1248px] items-center gap-12 px-6 max-sm:px-4 lg:grid-cols-[minmax(0,1fr)_420px]"
+      class="mx-auto grid min-h-[45rem] w-full max-w-site items-center gap-12 px-6 max-sm:px-4 lg:grid-cols-[minmax(0,1fr)_26.25rem]"
     >
       <div
-        class="flex w-full max-w-[760px] flex-col justify-center py-20 max-lg:pt-0"
+        class="flex w-full max-w-[47.5rem] flex-col justify-center py-20 max-lg:pt-0"
       >
         <h1>
           <span class="block text-blue">After Hours</span>
@@ -27,8 +34,12 @@ const upcomingEvents: { weekday: string; date: string; time: string }[] = [];
           Vancouver's Downtown Eastside.
         </p>
         <div class="mt-9 flex flex-wrap gap-3.5 max-sm:flex-col">
-          <a class="btn btn-primary" href="/volunteer">Volunteer with us</a>
-          <a class="btn btn-subtle" href="#events">See upcoming events</a>
+          <a
+            class="btn btn-primary"
+            href={account.signedIn ? "/events" : "/volunteer"}
+          >
+            {account.signedIn ? "View events" : "Volunteer with us"}
+          </a>
         </div>
       </div>
 
@@ -36,7 +47,7 @@ const upcomingEvents: { weekday: string; date: string; time: string }[] = [];
         class="relative flex items-center justify-center max-lg:order-first max-lg:pt-14"
       >
         <Image
-          class="w-full max-w-[420px] rounded-2xl object-cover"
+          class="w-full max-w-[26.25rem] rounded-2xl object-cover"
           src={outreachTeam}
           alt="Volunteers from After Hours Outreach Initiative standing together in front of a mural in the Downtown Eastside."
           widths={[420, 840]}
@@ -44,40 +55,6 @@ const upcomingEvents: { weekday: string; date: string; time: string }[] = [];
           loading="eager"
         />
       </div>
-    </div>
-  </section>
-
-  <section
-    class="scroll-mt-19 bg-black text-white lg:scroll-mt-22"
-    id="events"
-    aria-labelledby="events-heading"
-  >
-    <div
-      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
-    >
-      <h2 class="max-w-3xl" id="events-heading">Upcoming events</h2>
-
-      <p class="mt-6 max-w-3xl text-xl">
-        Starting in mid October, we plan to run one patrol every two weeks.
-      </p>
-
-      {
-        upcomingEvents.length > 0 && (
-          <ul class="mt-10 max-w-3xl border border-zinc-700 bg-ink">
-            {upcomingEvents.map((event) => (
-              <li class="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2 border-b border-zinc-800 px-6 py-5 last:border-b-0">
-                <h3>
-                  {event.date}
-                  <span class="ml-3 font-normal text-zinc-400">
-                    {event.weekday}
-                  </span>
-                </h3>
-                <span class="text-base text-zinc-300">{event.time}</span>
-              </li>
-            ))}
-          </ul>
-        )
-      }
     </div>
   </section>
 </Layout>

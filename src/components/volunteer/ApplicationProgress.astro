@@ -1,0 +1,250 @@
+---
+import type { ApplicationProgress } from "@/server/db/application-progress";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import CheckIcon from "@/components/icons/CheckIcon.astro";
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+import NaloxoneCourseStep from "./NaloxoneCourseStep.astro";
+
+interface Props {
+  progress: ApplicationProgress;
+  userId: string;
+  idPrefix: string;
+  headingId?: string;
+  email: string;
+}
+const {
+  progress,
+  userId,
+  idPrefix,
+  headingId = `${idPrefix}-application-heading`,
+  email,
+} = Astro.props;
+const dateFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Vancouver",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+const steps = [
+  {
+    key: "form",
+    title: "Application Form Submitted",
+    completed: progress.submittedAt !== null,
+    completedAt: progress.submittedAt,
+  },
+  {
+    key: "naloxone",
+    title: "Complete Naloxone 101",
+    completed: progress.naloxoneCompletedAt !== null,
+    completedAt: progress.naloxoneCompletedAt,
+  },
+  {
+    key: "review",
+    title: "Application review",
+    completed: progress.applicationApproved,
+    completedAt: progress.applicationApprovedAt,
+  },
+];
+const currentStep = steps.findIndex((step) => !step.completed);
+---
+
+<section
+  class="volunteer-panel application-progress text-base"
+  aria-labelledby={headingId}
+  data-application-tracker
+  data-progress-version={JSON.stringify(steps)}
+>
+  <h2 id={headingId} data-contents-section>Volunteer Application</h2>
+  <ol
+    class="application-progress-list"
+    role="list"
+    aria-label="Application progress"
+  >
+    {
+      steps.map((step, index) => (
+        <li aria-current={index === currentStep ? "step" : undefined}>
+          <details
+            data-application-progress-step={step.key}
+            data-state={
+              step.completed
+                ? "complete"
+                : index === currentStep
+                  ? "current"
+                  : "upcoming"
+            }
+            open={index === currentStep}
+          >
+            <summary>
+              <span
+                class:list={[
+                  "application-progress-marker",
+                  { "application-progress-number": !step.completed },
+                ]}
+                aria-hidden="true"
+              >
+                {step.completed ? <CheckIcon class="size-6" /> : index + 1}
+              </span>
+              <span class="application-progress-label">
+                <span class="application-progress-title text-lg">
+                  <span class="sr-only">Step {index + 1}: </span>
+                  {step.title}
+                </span>
+                {step.completed ? (
+                  <span class="application-progress-status text-sm">
+                    Completed:{" "}
+                    {step.completedAt !== null ? (
+                      <time datetime={new Date(step.completedAt).toISOString()}>
+                        {dateFormat.format(step.completedAt)}
+                      </time>
+                    ) : (
+                      "Date not recorded"
+                    )}
+                  </span>
+                ) : step.key === "review" && progress.submittedAt !== null ? (
+                  <span class="application-progress-status text-sm">
+                    Pending approval
+                  </span>
+                ) : null}
+              </span>
+              <ChevronDownIcon class="application-progress-toggle size-5 shrink-0" />
+            </summary>
+            <div class="application-progress-content">
+              {step.key === "form" &&
+                (progress.submittedAt !== null ? (
+                  <slot name="application">
+                    <p class="text-base">
+                      Your application form has been submitted.
+                    </p>
+                  </slot>
+                ) : (
+                  <>
+                    <p class="text-base">
+                      Complete the application form, accept the Code of Conduct,
+                      and submit.
+                    </p>
+                    <a class="btn btn-primary mt-4" href="/apply">
+                      Complete application form
+                      <ArrowRightIcon class="btn-icon" />
+                    </a>
+                  </>
+                ))}
+              {step.key === "naloxone" &&
+                (progress.submittedAt !== null ? (
+                  <NaloxoneCourseStep
+                    {userId}
+                    completedAt={progress.naloxoneCompletedAt}
+                  />
+                ) : (
+                  <p class="text-base">
+                    After submitting your form and Code of Conduct, take
+                    Naloxone 101 and confirm completion here.
+                  </p>
+                ))}
+              {step.key === "review" && (
+                <p class="text-base">
+                  {progress.applicationApproved ? (
+                    "Your application has been approved. You can sign up for a patrol that includes orientation when your volunteer account is active."
+                  ) : (
+                    <>
+                      An organizer will review your application. We'll email you
+                      at <strong>{email}</strong> to let you know whether it's
+                      approved and what to do next.
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
+          </details>
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<style>
+  .application-progress-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding: 0;
+    list-style: none;
+  }
+  details {
+    border: 1px solid #3f3f46;
+    border-radius: 0.625rem;
+    background: #171a20;
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 0.625rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  .application-progress-marker {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+  }
+  .application-progress-label {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .application-progress-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+  }
+  .application-progress-status {
+    display: block;
+    margin-top: 0.25rem;
+    color: #a1a1aa;
+  }
+  details[data-state="current"] {
+    border-color: var(--color-blue);
+    background: #16214a;
+  }
+  details[data-state="current"] .application-progress-number {
+    border-color: var(--color-blue);
+    background: var(--color-blue);
+    color: white;
+  }
+  details[data-state="current"] .application-progress-status {
+    color: #bfdbfe;
+  }
+  details[data-state="complete"] {
+    border-color: #365144;
+    background: #121d18;
+    color: #a3c2ad;
+  }
+  details[data-state="complete"] .application-progress-status {
+    color: #a3c2ad;
+  }
+  .application-progress-content {
+    padding: 0 1rem 1rem;
+    color: #d4d4d8;
+  }
+  .application-progress-content :global([data-submitted-application] > p) {
+    font-size: inherit;
+  }
+  .application-progress-content :global(.volunteer-panel) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  details[open] > summary :global(.application-progress-toggle) {
+    transform: rotate(180deg);
+  }
+</style>

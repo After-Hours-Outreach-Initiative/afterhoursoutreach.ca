@@ -1,0 +1,43 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { env } from "cloudflare:workers";
+import { loadAccountNavigation } from "@/server/account-navigation";
+
+export const prerender = false;
+Astro.response.status = 404;
+const account = await loadAccountNavigation(
+  env,
+  Astro.request,
+  Astro.response.headers,
+);
+---
+
+<Layout
+  title="Page not found (404) | After Hours Outreach Initiative"
+  description="This page could not be found. Return home or find out more about After Hours Outreach Initiative."
+  account={account}
+  noindex
+>
+  <section class="bg-black text-white" aria-labelledby="not-found-heading">
+    <div class="mx-auto w-full max-w-site px-6 py-24 max-sm:px-4 max-sm:py-18">
+      <h1 class="max-w-4xl text-blue" id="not-found-heading">
+        404: Page not found
+      </h1>
+      <p class="mt-6 max-w-2xl text-zinc-300">
+        <code class="rounded bg-panel-soft px-2 py-1 font-mono wrap-anywhere"
+          >{Astro.url.pathname}</code
+        >
+      </p>
+      <p class="mt-8 max-w-2xl text-zinc-300">
+        We couldn&rsquo;t find the page you&rsquo;re looking for. It may have
+        moved, or the address may be incorrect.
+      </p>
+      <nav
+        class="mt-9 flex flex-wrap gap-3.5 max-sm:flex-col"
+        aria-label="Find another page"
+      >
+        <a class="btn btn-primary" href="/">Back to home</a>
+      </nav>
+    </div>
+  </section>
+</Layout>

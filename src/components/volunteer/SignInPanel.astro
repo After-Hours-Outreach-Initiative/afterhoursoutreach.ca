@@ -1,0 +1,62 @@
+---
+import { env } from "cloudflare:workers";
+import { signInDestination } from "@/data/account-navigation";
+import SecondFactorForm from "./SecondFactorForm.astro";
+import EmailCodeForm from "./EmailCodeForm.astro";
+import FieldError from "@/components/FieldError.astro";
+const localTesting = Boolean(import.meta.env.DEV);
+const ready = Boolean(
+  env.BETTER_AUTH_SECRET && (localTesting || env.RESEND_API_KEY),
+);
+---
+
+<section class="volunteer-panel volunteer-signin-panel" id="volunteer-signin">
+  <h2>Sign in or create an account</h2>
+  <p>You'll need an account to volunteer with us.</p>
+  {
+    !ready && (
+      <p class="volunteer-notice" role="status">
+        Sign-in is not configured yet. Please check back later.
+      </p>
+    )
+  }
+  <form
+    data-email-request
+    data-return-to={signInDestination}
+    class="volunteer-form"
+    action="/api/v1/auth/email-otp/send-verification-otp"
+    method="post"
+  >
+    <div class="volunteer-field">
+      <label for="sign-in-email">Email</label>
+      <input
+        id="sign-in-email"
+        name="email"
+        type="email"
+        autocomplete="email"
+        placeholder="you@example.com"
+        maxlength="254"
+        aria-describedby="error-email"
+        required
+        disabled={!ready}
+      />
+      <FieldError field="email" message="Enter a valid email address." />
+    </div>
+    <p data-form-message role="status" aria-live="polite" hidden></p>
+    <button
+      type="submit"
+      class="btn btn-primary"
+      data-loading-label="Sending email…"
+      disabled={!ready}>Continue with Email</button
+    >
+  </form>
+  <EmailCodeForm />
+  <SecondFactorForm />
+  <a
+    href="/volunteer/sign-in"
+    class="volunteer-email-reset"
+    data-use-different-email
+    hidden>Use a different email</a
+  >
+  <noscript><p>JavaScript is required to sign in.</p></noscript>
+</section>

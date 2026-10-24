@@ -1,0 +1,64 @@
+---
+import {
+  certificationOptions,
+  certificationQuestion,
+  applicationFields,
+  type ApplicationAnswers,
+} from "@/data/application";
+import FieldError from "@/components/FieldError.astro";
+import AccountProfileField from "./AccountProfileField.astro";
+
+interface Props {
+  values?: ApplicationAnswers | null;
+  active: boolean;
+}
+const { values, active } = Astro.props;
+const selected =
+  values?.certifications.length === 1 ? values.certifications[0] : undefined;
+const otherTrainingField = applicationFields.find(
+  (field) => field.name === "experience",
+)!;
+---
+
+<fieldset
+  class="volunteer-certifications volunteer-wide"
+  data-medic-certifications
+  hidden={!active}
+  aria-describedby="error-certifications"
+>
+  <legend>
+    {certificationQuestion}
+    <span class="volunteer-required" aria-hidden="true"> *</span>
+  </legend>
+  <div class="volunteer-certification-options volunteer-choice-options">
+    {
+      certificationOptions.map((option) => (
+        <>
+          <label class="volunteer-check">
+            <input
+              type="radio"
+              name="certifications"
+              value={option.value}
+              checked={selected === option.value}
+              required={active}
+              aria-describedby="error-certifications"
+            />
+            <span>{option.label}</span>
+          </label>
+          {option.value === "other" && (
+            <AccountProfileField
+              field={otherTrainingField}
+              values={values}
+              active={active && selected === "other"}
+              hideLabel
+            />
+          )}
+        </>
+      ))
+    }
+  </div>
+  <FieldError
+    field="certifications"
+    message="Select your highest certification or licence."
+  />
+</fieldset>

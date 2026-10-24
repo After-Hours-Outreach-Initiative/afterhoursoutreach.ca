@@ -1,0 +1,40 @@
+---
+import FieldError from "@/components/FieldError.astro";
+---
+
+<form
+  data-email-code
+  class="volunteer-form"
+  action="/api/v1/auth/sign-in/email-otp"
+  method="post"
+  hidden
+>
+  <p>Check your email, then open the link or enter the six-digit code below.</p>
+  <input name="email" type="hidden" />
+  <div class="volunteer-field">
+    <label for="sign-in-code">
+      Six-digit code <span class="volunteer-required" aria-hidden="true">*</span
+      >
+    </label>
+    <input
+      id="sign-in-code"
+      name="code"
+      aria-describedby="error-email-code sign-in-code-help"
+      inputmode="numeric"
+      autocomplete="one-time-code"
+      pattern="[0-9]{6}"
+      maxlength="6"
+      required
+    />
+    <FieldError field="email-code" message="Enter a six-digit code." />
+  </div>
+  <p id="sign-in-code-help" class="volunteer-help">
+    Code or link expired or already used? Choose Resend code for a new email.
+    Only the latest code and link will work.
+  </p>
+  <p data-form-message role="status" aria-live="polite" hidden></p>
+  <button type="submit" class="btn btn-primary">Sign in with code</button>
+  <button type="button" class="btn btn-outline" data-resend-code disabled
+    >Resend code</button
+  >
+</form>

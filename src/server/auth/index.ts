@@ -1,0 +1,588 @@
+import { betterAuth, type BetterAuthPlugin } from "better-auth";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
+import { expireCookie } from "better-auth/cookies";
+import { constantTimeEqual } from "better-auth/crypto";
+import { emailOTP } from "better-auth/plugins/email-otp";
+import { twoFactor } from "better-auth/plugins/two-factor";
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { z } from "zod";
+import { createDatabase } from "../db";
+import * as schema from "../db/schema";
+import { RequestError } from "../http";
+import { signInDestination } from "../../data/account-navigation";
+import {
+  cleanupAuthRecords,
+  limitEmailRequests,
+  limitEmailVerification,
+  takeRateLimit,
+} from "../db/rate-limits";
+import {
+  markSessionSecondFactorVerified,
+  revokeOtherAccountSessions,
+} from "../db/sessions";
+import { sendSignInEmail, type SignInEmail } from "./services";
+
+// A build-time gate keeps the development plugin out of deployed Workers.
+// Direct .DEV access lets Vite replace the flag; the property check also keeps
+// this module importable in Node tests, which have no Vite environment object.
+const development = "env" in import.meta && import.meta.env.DEV;
+let developmentAccounts:
+  typeof import("../../dev/server/accounts").developmentAccounts | undefined;
+if ("env" in import.meta) {
+  if (import.meta.env.DEV) {
+    developmentAccounts = (await import("../../dev/server/accounts"))
+      .developmentAccounts;
+  }
+}
+
+export type AuthBindings = Pick<
+  Env,
+  "DB" | "APP_ENV" | "AUTH_BASE_URL" | "BETTER_AUTH_SECRET" | "RESEND_API_KEY"
+>;
+
+/** Never trust forwarded hosts or mutate the shared runtime bindings. */
+export function authBindingsForRequest(
+  bindings: AuthBindings,
+  request: Request,
+) {
+  const url = new URL(request.url);
+  const local = development;
+  // Pin hosted sign-in links to AUTH_BASE_URL when configured. Otherwise use
+  // the URL routed to this Worker, not Host or X-Forwarded-Host headers.
+  const origin =
+    local || !bindings.AUTH_BASE_URL
+      ? url.origin
+      : new URL(bindings.AUTH_BASE_URL).origin;
+  if ((!local && url.protocol !== "https:") || url.origin !== origin)
+    throw new RequestError(403, "This request does not match the site origin.");
+  return {
+    ...bindings,
+    AUTH_BASE_URL: origin,
+  };
+}
+
+// Dependency injection is for server-side tests, never a request or env bypass.
+interface AuthServices {
+  sendEmail: (email: SignInEmail) => Promise<void | SignInEmail>;
+}
+
+const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254));
+const requestSchema = z.strictObject({
+  email: emailSchema,
+  type: z.literal("sign-in"),
+});
+const verifySchema = z.strictObject({
+  email: emailSchema,
+  otp: z.string().regex(/^\d{6}$/),
+});
+const emailLinkSchema = z.object({
+  email: emailSchema,
+  nonce: z.uuid(),
+  expiresAt: z.number(),
+});
+const emailChangeRequestSchema = z.strictObject({ newEmail: emailSchema });
+const emailChangeSchema = emailChangeRequestSchema.extend({
+  otp: z.string().regex(/^\d{6}$/),
+});
+// Changing sign-in protection needs a recent sign-in as well as a current code.
+export const authenticatorFreshAge = 600;
+const enableFactorSchema = z.strictObject({ method: z.literal("totp") });
+const disableFactorSchema = z.strictObject({
+  code: z.string().regex(/^\d{6}$/),
+  confirm: z.literal(true),
+});
+const signInResultSchema = z.looseObject({
+  token: z.string(),
+  user: z.looseObject({ id: z.string() }),
+});
+
+function authError(error: unknown): never {
+  if (error instanceof RequestError)
+    throw new APIError(
+      error.status === 429 ? "TOO_MANY_REQUESTS" : "SERVICE_UNAVAILABLE",
+      { message: error.message },
+    );
+  throw error;
+}
+
+/** Construct with the current request's D1 binding, never a module singleton. */
+export function createAuth(
+  bindings: AuthBindings,
+  ip = "unknown",
+  overrides?: AuthServices,
+) {
+  if (!bindings.BETTER_AUTH_SECRET || bindings.BETTER_AUTH_SECRET.length < 32)
+    throw new RequestError(503, "Sign-in is not configured yet.");
+  const origin = new URL(bindings.AUTH_BASE_URL).origin;
+  const db = createDatabase(bindings.DB);
+  const services: AuthServices = overrides ?? {
+    sendEmail: (email) =>
+      sendSignInEmail(bindings.RESEND_API_KEY, email, bindings.APP_ENV),
+  };
+  // Simulated email must not exhaust the shared provider quota during local use.
+  // Per-address/IP limits and resend cooldowns still apply in development.
+  const consumeProviderBudget = !development && bindings.APP_ENV !== "local";
+  const limitFactorVerification = async (userId: string) => {
+    try {
+      // The plugin's per-account lockout only covers signed-out challenges.
+      await takeRateLimit(
+        bindings.DB,
+        bindings.BETTER_AUTH_SECRET,
+        `2fa-management:${userId}`,
+        5,
+        60_000,
+      );
+    } catch (error) {
+      authError(error);
+    }
+  };
+  // Request-scoped delivery feedback; never a shared outbox or public proof.
+  const emailDeliveries = new WeakMap<
+    object,
+    { localEmail?: SignInEmail } | { error: string }
+  >();
+  const emailLinks = new WeakMap<object, z.infer<typeof emailLinkSchema>>();
+  const emailSignIn = emailOTP({
+    expiresIn: 600,
+    allowedAttempts: 3,
+    storeOTP: "hashed",
+    changeEmail: { enabled: true },
+    async sendVerificationOTP({ email, otp, type }, ctx) {
+      const changing = type === "change-email";
+      const url = new URL(
+        changing ? "/volunteer/account" : "/volunteer/sign-in/complete",
+        origin,
+      );
+      const link = {
+        email,
+        nonce: crypto.randomUUID(),
+        expiresAt: Date.now() + 600_000,
+      };
+      // Fragments keep the email and OTP out of HTTP request URLs/referrers.
+      if (!changing)
+        url.hash = new URLSearchParams({
+          email,
+          otp,
+          activation: link.nonce,
+          returnTo: signInDestination,
+        }).toString();
+      try {
+        const localEmail = await services.sendEmail({
+          id: crypto.randomUUID(),
+          email,
+          code: otp,
+          url: url.href,
+          ...(changing && { purpose: "change-email" as const }),
+        });
+        // Only the browser requesting a successfully delivered email gets this
+        // binding. A scanner fetching the link (even with JS) cannot acquire it.
+        if (!changing && ctx) emailLinks.set(ctx.context, link);
+        if (development && localEmail && ctx)
+          emailDeliveries.set(ctx.context, { localEmail });
+      } catch (error) {
+        // Better Auth intentionally swallows delivery callback errors. Keep a
+        // sanitized outcome for the after hook so the form can still report failure.
+        if (ctx)
+          emailDeliveries.set(ctx.context, {
+            error:
+              error instanceof RequestError
+                ? error.message
+                : "We could not send the email. Try again later.",
+          });
+        // An undelivered code must not remain usable.
+        await ctx?.context.internalAdapter.deleteVerificationByIdentifier(
+          changing
+            ? `change-email-otp-${ctx?.context.session?.user.email.toLowerCase()}-${email}`
+            : `sign-in-otp-${email}`,
+        );
+        if (!ctx) authError(error);
+      }
+    },
+  });
+  const secondFactor = twoFactor({
+    allowPasswordless: true,
+    issuer: "After Hours Outreach",
+    schema: {
+      user: { fields: { twoFactorEnabled: "two_factor_enabled" } },
+      twoFactor: {
+        fields: {
+          userId: "user_id",
+          backupCodes: "backup_codes",
+          failedVerificationCount: "failed_verification_count",
+          lockedUntil: "locked_until",
+        },
+      },
+    },
+  });
+  // Better Auth does not gate passwordless sign-ins by default. Reuse its
+  // challenge/cookie/lockout handling, preserving its built-in sign-in routes.
+  // Fail closed if an upgrade changes the plugin's single challenge-hook contract.
+  const challengeHooks = secondFactor.hooks.after;
+  if (challengeHooks.length !== 1)
+    throw new Error("Review the Better Auth two-factor sign-in integration.");
+  secondFactor.hooks.after = challengeHooks.map((hook) => ({
+    ...hook,
+    matcher: (context) =>
+      context.path === "/sign-in/email-otp" || hook.matcher(context),
+  }));
+
+  const verificationMarker = {
+    id: "verified-second-factor",
+    hooks: {
+      after: [
+        {
+          matcher: (ctx) =>
+            ctx.path === "/two-factor/verify-totp" ||
+            ctx.path === "/two-factor/verify-backup-code",
+          handler: createAuthMiddleware(async (ctx) => {
+            const result = signInResultSchema.safeParse(ctx.context.returned);
+            if (!result.success) return;
+            const token =
+              ctx.context.newSession?.session.token ?? result.data.token;
+            await markSessionSecondFactorVerified(bindings.DB, token);
+            // Clear return cookies from older sign-in flows, but never use them
+            // to choose a different landing page after verifying the factor.
+            expireCookie(ctx, ctx.context.createAuthCookie("sign_in_return"));
+            return ctx.json({ ...result.data, next: signInDestination });
+          }),
+        },
+      ],
+    },
+  } satisfies BetterAuthPlugin;
+
+  return betterAuth({
+    appName: "After Hours Outreach",
+    baseURL: origin,
+    basePath: "/api/v1/auth",
+    secret: bindings.BETTER_AUTH_SECRET,
+    database: drizzleAdapter(db, {
+      provider: "sqlite",
+      schema,
+      transaction: false,
+    }),
+    trustedOrigins: [origin],
+    emailAndPassword: { enabled: false },
+    user: {
+      // Better Auth keeps its API field names; Drizzle uses the SQL names.
+      fields: {
+        emailVerified: "email_verified",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+      additionalFields: {
+        role: {
+          type: ["volunteer", "organizer"],
+          defaultValue: "volunteer",
+          input: false,
+        },
+      },
+    },
+    session: {
+      fields: {
+        userId: "user_id",
+        expiresAt: "expires_at",
+        ipAddress: "ip_address",
+        userAgent: "user_agent",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+      expiresIn: 30 * 86_400,
+      updateAge: 86_400,
+      cookieCache: { enabled: false },
+      additionalFields: {
+        twoFactorVerified: {
+          type: "boolean",
+          fieldName: "two_factor_verified",
+          defaultValue: false,
+          input: false,
+        },
+      },
+    },
+    account: {
+      fields: {
+        userId: "user_id",
+        accountId: "account_id",
+        providerId: "provider_id",
+        accessToken: "access_token",
+        refreshToken: "refresh_token",
+        idToken: "id_token",
+        accessTokenExpiresAt: "access_token_expires_at",
+        refreshTokenExpiresAt: "refresh_token_expires_at",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+    verification: {
+      fields: {
+        expiresAt: "expires_at",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+    advanced: {
+      useSecureCookies: origin.startsWith("https://"),
+      cookiePrefix: "aho",
+      defaultCookieAttributes: { httpOnly: true, sameSite: "lax", path: "/" },
+      ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
+    },
+    // The public route uses atomic D1 limits instead of isolate-local memory.
+    rateLimit: { enabled: false },
+    // Avoid Better Auth's default error logs exposing adapter values.
+    logger: { disabled: true },
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (
+          ctx.path === "/two-factor/enable" ||
+          ctx.path === "/two-factor/disable" ||
+          ctx.path === "/two-factor/verify-totp"
+        ) {
+          const removing = ctx.path === "/two-factor/disable";
+          const current = await getSessionFromCtx<
+            { twoFactorEnabled?: boolean },
+            { twoFactorVerified?: boolean }
+          >(ctx);
+          if (ctx.path === "/two-factor/verify-totp") {
+            // The regular verifier must not be a separate guessing oracle that
+            // bypasses the removal budget. Signed-out challenges retain the
+            // plugin's own lockout; initial enrollment has no active factor yet.
+            if (current?.user.twoFactorEnabled)
+              await limitFactorVerification(current.user.id);
+            return;
+          }
+          if (!current?.user.emailVerified)
+            throw new APIError("UNAUTHORIZED", {
+              message: "Sign in to manage your authenticator.",
+            });
+          if (
+            current.user.twoFactorEnabled &&
+            !current.session.twoFactorVerified
+          )
+            throw new APIError("FORBIDDEN", {
+              message: "Sign in with your authenticator before changing it.",
+            });
+          if (
+            Date.now() - current.session.createdAt.getTime() >=
+            authenticatorFreshAge * 1000
+          )
+            throw new APIError("FORBIDDEN", {
+              message:
+                "Sign in again to manage your authenticator (within ten minutes).",
+              code: "SESSION_NOT_FRESH",
+            });
+          if (!removing) {
+            if (!enableFactorSchema.safeParse(ctx.body).success)
+              throw new APIError("BAD_REQUEST", {
+                message: "Choose authenticator app setup.",
+              });
+            return;
+          }
+          if (!current.user.twoFactorEnabled)
+            throw new APIError("BAD_REQUEST", {
+              message: "Your authenticator is not enabled.",
+            });
+          await limitFactorVerification(current.user.id);
+          const parsed = disableFactorSchema.safeParse(ctx.body);
+          if (!parsed.success)
+            throw new APIError("BAD_REQUEST", {
+              message:
+                "Confirm removal and enter a current six-digit authenticator code.",
+            });
+          // Invoke the plugin's verifier directly: no alternate secret handling,
+          // backup-code fallback, or reusable client-side authorization flag.
+          await secondFactor.endpoints.verifyTOTP({
+            body: { code: parsed.data.code },
+            headers: ctx.headers,
+            context: ctx.context,
+          });
+          await revokeOtherAccountSessions(
+            bindings.DB,
+            current.user.id,
+            current.session.token,
+          );
+          // The built-in disable endpoint deletes the secret and backup codes
+          // and rotates the remaining session. Only expose it behind this guard.
+          return;
+        }
+        const requestingChange = ctx.path === "/email-otp/request-email-change";
+        const confirmingChange = ctx.path === "/email-otp/change-email";
+        if (requestingChange || confirmingChange) {
+          const parsed = (
+            requestingChange ? emailChangeRequestSchema : emailChangeSchema
+          ).safeParse(ctx.body);
+          if (!parsed.success)
+            throw new APIError("BAD_REQUEST", {
+              message: "Enter a valid new email address and verification code.",
+            });
+          const current = await getSessionFromCtx<
+            { twoFactorEnabled?: boolean },
+            { twoFactorVerified?: boolean }
+          >(ctx);
+          if (!current?.user.emailVerified)
+            throw new APIError("UNAUTHORIZED", {
+              message: "Sign in to change your email address.",
+            });
+          if (
+            current.user.twoFactorEnabled &&
+            !current.session.twoFactorVerified
+          )
+            throw new APIError("FORBIDDEN", {
+              message:
+                "Sign in with your authenticator to change your email address.",
+            });
+          const freshAge = ctx.context.sessionConfig.freshAge;
+          if (
+            freshAge !== 0 &&
+            Date.now() - current.session.createdAt.getTime() >= freshAge * 1000
+          )
+            throw new APIError("FORBIDDEN", {
+              message: "Sign in again to change your email address.",
+              code: "SESSION_NOT_FRESH",
+            });
+          if (parsed.data.newEmail === current.user.email.toLowerCase())
+            throw new APIError("BAD_REQUEST", {
+              message: "Enter a different email address.",
+            });
+          try {
+            if (requestingChange) {
+              await limitEmailRequests(
+                bindings.DB,
+                bindings.BETTER_AUTH_SECRET,
+                parsed.data.newEmail,
+                ip,
+                60_000,
+                consumeProviderBudget,
+              );
+              await cleanupAuthRecords(bindings.DB);
+            } else {
+              await limitEmailVerification(
+                bindings.DB,
+                bindings.BETTER_AUTH_SECRET,
+                parsed.data.newEmail,
+                ip,
+              );
+            }
+          } catch (error) {
+            authError(error);
+          }
+          return { context: { body: parsed.data } };
+        }
+        const sending = ctx.path === "/email-otp/send-verification-otp";
+        if (!sending && ctx.path !== "/sign-in/email-otp") return;
+        const parsed = (sending ? requestSchema : verifySchema).safeParse(
+          ctx.body,
+        );
+        if (!parsed.success)
+          throw new APIError("BAD_REQUEST", {
+            message: "Enter a valid email address and sign-in code.",
+          });
+        const activation = ctx.headers?.get("x-email-link-activation");
+        if (!sending && activation !== undefined && activation !== null) {
+          const cookie = ctx.context.createAuthCookie("email_link");
+          const value = await ctx.getSignedCookie(
+            cookie.name,
+            ctx.context.secret,
+          );
+          let link: z.infer<typeof emailLinkSchema> | undefined;
+          try {
+            link = emailLinkSchema.parse(JSON.parse(value || "null"));
+          } catch {
+            // Missing, forged or malformed browser bindings fail before the OTP
+            // verifier, without spending attempts or consuming the email code.
+          }
+          if (
+            !link ||
+            link.email !== parsed.data.email ||
+            link.expiresAt <= Date.now() ||
+            !constantTimeEqual(link.nonce, activation)
+          )
+            throw new APIError("FORBIDDEN", {
+              code: "EMAIL_LINK_BROWSER_REQUIRED",
+              message:
+                "Open this link in the browser where you requested it, or enter the code from your email below.",
+            });
+        }
+        try {
+          if (sending) {
+            await limitEmailRequests(
+              bindings.DB,
+              bindings.BETTER_AUTH_SECRET,
+              parsed.data.email,
+              ip,
+              30_000,
+              consumeProviderBudget,
+            );
+            await cleanupAuthRecords(bindings.DB);
+          } else {
+            await limitEmailVerification(
+              bindings.DB,
+              bindings.BETTER_AUTH_SECRET,
+              parsed.data.email,
+              ip,
+            );
+          }
+        } catch (error) {
+          authError(error);
+        }
+        return { context: { body: parsed.data } };
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        if (
+          ctx.path === "/email-otp/send-verification-otp" ||
+          ctx.path === "/email-otp/request-email-change"
+        ) {
+          const delivery = emailDeliveries.get(ctx.context);
+          if (delivery && "error" in delivery)
+            return Response.json({ message: delivery.error }, { status: 503 });
+          const link = emailLinks.get(ctx.context);
+          if (link) {
+            const cookie = ctx.context.createAuthCookie("email_link", {
+              maxAge: 600,
+            });
+            await ctx.setSignedCookie(
+              cookie.name,
+              JSON.stringify(link),
+              ctx.context.secret,
+              cookie.attributes,
+            );
+          }
+          if (development && delivery?.localEmail)
+            return ctx.json({
+              success: true,
+              localEmail: delivery.localEmail,
+            });
+          return;
+        }
+        if (ctx.path !== "/sign-in/email-otp") return;
+        const current = ctx.context.newSession;
+        const result = signInResultSchema.safeParse(ctx.context.returned);
+        if (!current || !result.success) return;
+        if (ctx.headers?.has("x-email-link-activation"))
+          expireCookie(ctx, ctx.context.createAuthCookie("email_link"));
+        // The two-factor plugin still replaces this response with a challenge
+        // for enrolled accounts. Every completed sign-in shares one destination.
+        return ctx.json({ ...result.data, next: signInDestination });
+      }),
+    },
+    plugins: [
+      emailSignIn,
+      secondFactor,
+      verificationMarker,
+      ...(developmentAccounts ? [developmentAccounts(bindings)] : []),
+    ],
+  });
+}
+
+export type AccountAuth = ReturnType<typeof createAuth>;
+
+export async function readAccountSession(auth: AccountAuth, request: Request) {
+  return auth.api.getSession({ headers: request.headers, returnHeaders: true });
+}
+
+export function forwardCookies(source: Headers, target: Headers) {
+  for (const cookie of source.getSetCookie())
+    target.append("Set-Cookie", cookie);
+}

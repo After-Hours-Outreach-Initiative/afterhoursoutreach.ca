@@ -1,0 +1,38 @@
+---
+import FieldError from "@/components/FieldError.astro";
+---
+
+<form
+  data-second-factor
+  class="volunteer-form"
+  action="/api/v1/auth/two-factor/verify-totp"
+  method="post"
+  hidden
+>
+  <p>Enter a code from your authenticator app to finish signing in.</p>
+  <div class="volunteer-field">
+    <label for="second-factor-code">
+      Authenticator or backup code <span
+        class="volunteer-required"
+        aria-hidden="true">*</span
+      >
+    </label>
+    <input
+      id="second-factor-code"
+      name="code"
+      aria-describedby="error-second-factor-code"
+      autocomplete="one-time-code"
+      maxlength="100"
+      required
+    />
+    <FieldError
+      field="second-factor-code"
+      message="Enter an authenticator or backup code."
+    />
+  </div>
+  <label class="volunteer-check"
+    ><input name="backup" type="checkbox" />Use a backup code</label
+  >
+  <p data-form-message role="status" aria-live="polite" hidden></p>
+  <button type="submit" class="btn btn-primary">Verify code</button>
+</form>

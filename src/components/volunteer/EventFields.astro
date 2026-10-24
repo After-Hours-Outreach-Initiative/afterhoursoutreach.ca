@@ -1,0 +1,200 @@
+---
+import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
+import { vancouverInput } from "@/data/event-time";
+import FieldError from "@/components/FieldError.astro";
+import RecurringIcon from "@/components/icons/RecurringIcon.astro";
+import MinusIcon from "@/components/icons/MinusIcon.astro";
+import PlusIcon from "@/components/icons/PlusIcon.astro";
+import DateInput from "./DateInput.astro";
+import NativePickerInput from "./NativePickerInput.astro";
+
+interface Props {
+  id: string;
+  event?: EventRow;
+  series?: PatrolSeriesRow;
+}
+const { id, event, series } = Astro.props;
+const settings = event ?? series;
+const publicVisibility = settings
+  ? Boolean(settings.open && !settings.hidden)
+  : true;
+---
+
+<div class="volunteer-field volunteer-wide">
+  <label class="volunteer-check">
+    <input
+      type="checkbox"
+      name="includesOrientation"
+      checked={Boolean(settings?.includesOrientation)}
+    />
+    <span>Includes orientation</span>
+  </label>
+</div>
+<DateInput
+  name="startsAt"
+  id={`${id}-startsAt`}
+  errorField={`${id}-startsAt`}
+  label={series ? "Start date (fixed)" : "Start date"}
+  value={event
+    ? vancouverInput(event.startsAt)
+    : series
+      ? `${series.firstDate}T${series.localTime}`
+      : ""}
+  withTime
+  defaultTime="21:00"
+  readonly={Boolean(series)}
+  warnPast={!series}
+/>
+{
+  !event && (
+    <div class="volunteer-field volunteer-wide" data-recurrence-controls>
+      {!series && (
+        <label class="volunteer-check volunteer-recurrence-toggle">
+          <input
+            type="checkbox"
+            name="recurring"
+            aria-describedby={`${id}-recurring-help`}
+          />
+          <span class="volunteer-recurrence-label">
+            <RecurringIcon class="volunteer-recurrence-icon" />
+            <span>Recurring patrol</span>
+          </span>
+        </label>
+      )}
+      <div class="volunteer-fields" data-recurrence-fields hidden={!series}>
+        <label class="volunteer-field">
+          {series ? "Interval in weeks (fixed)" : "Interval (weeks)"}
+          <input
+            name="intervalWeeks"
+            type="number"
+            min="1"
+            max="52"
+            value={series?.intervalWeeks ?? 1}
+            readonly={Boolean(series)}
+            disabled={!series}
+            required
+          />
+        </label>
+        <div class="volunteer-field">
+          <label for={`${id}-endDate`}>
+            Last recurring date (optional, inclusive)
+          </label>
+          <NativePickerInput
+            id={`${id}-endDate`}
+            name="endDate"
+            min={series?.firstDate}
+            value={series?.endDate ?? ""}
+            aria-describedby={`error-${id}-endDate`}
+            disabled={!series}
+          />
+          <FieldError
+            field={`${id}-endDate`}
+            message="Choose a valid last recurring date on or after the start date."
+          />
+        </div>
+      </div>
+      {!series && (
+        <p class="volunteer-help" id={`${id}-recurring-help`}>
+          Volunteers see the next 3 occurrences per series.
+        </p>
+      )}
+    </div>
+  )
+}
+<div class="volunteer-field">
+  <label for={`${id}-spots`}>Volunteer spots</label>
+  <div class="volunteer-spots-stepper">
+    <button
+      class="btn btn-quiet"
+      type="button"
+      data-spots-step="-1"
+      aria-label="Decrease volunteer spots"
+      aria-controls={`${id}-spots`}
+      disabled><MinusIcon /></button
+    >
+    <input
+      id={`${id}-spots`}
+      name="spots"
+      type="number"
+      min={settings?.includesOrientation ? "4" : "2"}
+      max="100"
+      step="1"
+      aria-describedby={`error-${id}-spots`}
+      required
+      value={settings?.spots ?? 8}
+    />
+    <button
+      class="btn btn-quiet"
+      type="button"
+      data-spots-step="1"
+      aria-label="Increase volunteer spots"
+      aria-controls={`${id}-spots`}
+      disabled><PlusIcon /></button
+    >
+  </div>
+  <FieldError
+    field={`${id}-spots`}
+    message={settings?.includesOrientation
+      ? "Enter a whole number from 4 to 100 for a patrol that includes orientation."
+      : "Enter a whole number from 2 to 100."}
+  />
+</div>
+<div class="volunteer-field">
+  <label for={`${id}-meetingPoint`}>Meeting point</label>
+  <input
+    id={`${id}-meetingPoint`}
+    name="meetingPoint"
+    aria-describedby={`error-${id}-meetingPoint`}
+    required
+    pattern={String.raw`.*\S.*`}
+    maxlength="500"
+    value={settings?.meetingPoint ?? "Lord Strathcona Elementary"}
+  />
+  <FieldError
+    field={`${id}-meetingPoint`}
+    message="Enter a meeting point (up to 500 characters)."
+  />
+</div>
+<div class="volunteer-field">
+  <label for={`${id}-meetingPointUrl`}>Map link (optional)</label>
+  <input
+    id={`${id}-meetingPointUrl`}
+    type="url"
+    name="meetingPointUrl"
+    aria-describedby={`error-${id}-meetingPointUrl`}
+    maxlength="2048"
+    value={settings
+      ? (settings.meetingPointUrl ?? "")
+      : "https://maps.app.goo.gl/4ommJyZFCRJRGf9F9"}
+    placeholder="https://"
+  />
+  <FieldError
+    field={`${id}-meetingPointUrl`}
+    message="Enter a valid map URL (up to 2048 characters)."
+  />
+</div>
+<fieldset class="volunteer-state-field volunteer-wide">
+  <legend>Public visibility</legend>
+  <div class="volunteer-state-selector">
+    <label class="volunteer-state-option volunteer-state-positive">
+      <input
+        class="sr-only"
+        type="radio"
+        name="publicVisibility"
+        value="true"
+        checked={publicVisibility}
+      />
+      <span>Visible</span>
+    </label>
+    <label class="volunteer-state-option volunteer-state-negative">
+      <input
+        class="sr-only"
+        type="radio"
+        name="publicVisibility"
+        value="false"
+        checked={!publicVisibility}
+      />
+      <span>Hidden</span>
+    </label>
+  </div>
+</fieldset>

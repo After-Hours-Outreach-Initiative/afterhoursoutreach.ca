@@ -1,8 +1,23 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { organization } from "@/data/organization";
+import { env } from "cloudflare:workers";
+import { loadAccountNavigation } from "@/server/account-navigation";
+export const prerender = false;
+const account = await loadAccountNavigation(
+  env,
+  Astro.request,
+  Astro.response.headers,
+);
 
-const directors = ["Ivan Z.", "Moli D.", "Ashe M.", "Kaycee G.", "Yoyo L.", "David A."];
+const directors = [
+  "Ivan Z.",
+  "Moli D.",
+  "Ashe M.",
+  "Kaycee G.",
+  "Yoyo L.",
+  "David A.",
+];
 
 const iconClass = "lucide btn-icon text-blue";
 
@@ -26,11 +41,10 @@ const documents = [
 <Layout
   title="About | After Hours Outreach Initiative"
   description="After Hours Outreach Initiative is a volunteer-run non-profit doing evening street outreach in Vancouver's Downtown Eastside."
+  account={account}
 >
   <section class="bg-black text-white" id="about">
-    <div
-      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
-    >
+    <div class="mx-auto w-full max-w-site px-6 py-24 max-sm:px-4 max-sm:py-18">
       <h1 class="max-w-4xl">
         <span class="text-blue">About</span>
       </h1>
@@ -57,25 +71,49 @@ const documents = [
 
   <section
     class="bg-black text-white"
+    id="volunteering"
+    aria-labelledby="volunteering-heading"
+  >
+    <div class="mx-auto w-full max-w-site px-6 py-24 max-sm:px-4 max-sm:py-18">
+      <h2 class="max-w-3xl" id="volunteering-heading">Volunteering</h2>
+      <p class="mt-8 max-w-3xl text-zinc-300">
+        Our volunteers are community advocates, people with lived experience of
+        recovery, first responders, healthcare workers, students heading into
+        healthcare, and people who simply wanted to help out at night.
+      </p>
+      <p class="mt-6 max-w-3xl text-zinc-300">
+        Patrols typically run Tuesdays and Thursdays, 8:30 PM to midnight. How
+        often we go out depends on how many volunteers are available and what
+        supplies we have on hand.
+      </p>
+      <p class="mt-6 max-w-3xl text-zinc-300">
+        <a
+          class="underline underline-offset-4 hover:text-white"
+          href="/volunteer">Sign in or create an account</a
+        > to apply or register for volunteer events.
+      </p>
+    </div>
+  </section>
+
+  <section
+    class="bg-black text-white"
     id="directors"
     aria-labelledby="directors-heading"
   >
-    <div
-      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
-    >
+    <div class="mx-auto w-full max-w-site px-6 py-24 max-sm:px-4 max-sm:py-18">
       <h2 class="max-w-3xl" id="directors-heading">Directors</h2>
 
-      <ul class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <ul class="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {
           directors.map((director) => (
-            <li class="flex items-center gap-5 border border-zinc-700 bg-ink p-6">
+            <li class="flex min-w-0 flex-wrap items-center gap-5 border border-zinc-700 bg-ink p-6">
               <span
                 class="flex size-14 shrink-0 items-center justify-center rounded-full bg-blue-deep font-heading text-xl font-bold text-blue"
                 aria-hidden="true"
               >
                 {director.charAt(0)}
               </span>
-              <h3>{director}</h3>
+              <h3 class="min-w-0 wrap-anywhere">{director}</h3>
             </li>
           ))
         }
@@ -88,9 +126,7 @@ const documents = [
     id="non-profit-information"
     aria-labelledby="non-profit-information-heading"
   >
-    <div
-      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
-    >
+    <div class="mx-auto w-full max-w-site px-6 py-24 max-sm:px-4 max-sm:py-18">
       <h2 class="max-w-3xl" id="non-profit-information-heading">
         Non-profit information
       </h2>
@@ -101,22 +137,34 @@ const documents = [
       </p>
 
       <table
-        class="mt-10 w-full max-w-3xl border border-zinc-700 text-left text-lg"
+        class="mt-10 w-full max-w-3xl border border-zinc-700 text-left text-lg max-sm:block"
+        role="table"
+        aria-labelledby="non-profit-information-heading"
       >
-        <tbody>
-          <tr class="border-b border-zinc-700">
-            <th class="p-6 align-top font-normal text-zinc-400" scope="row"
-              >Incorporation number</th
+        <tbody class="max-sm:block" role="rowgroup">
+          <tr class="border-b border-zinc-700 max-sm:block" role="row">
+            <th
+              class="p-6 align-top font-normal wrap-anywhere text-zinc-400 max-sm:block max-sm:pb-2"
+              role="rowheader"
+              scope="row">Incorporation number</th
             >
-            <td class="p-6 font-heading text-xl font-bold tracking-wide">
+            <td
+              class="p-6 font-heading text-xl font-bold tracking-wide wrap-anywhere max-sm:block max-sm:pt-0"
+              role="cell"
+            >
               {organization.incorporationNumber}
             </td>
           </tr>
-          <tr>
-            <th class="p-6 align-top font-normal text-zinc-400" scope="row"
-              >Business number</th
+          <tr class="max-sm:block" role="row">
+            <th
+              class="p-6 align-top font-normal wrap-anywhere text-zinc-400 max-sm:block max-sm:pb-2"
+              role="rowheader"
+              scope="row">Business number</th
             >
-            <td class="p-6 font-heading text-xl font-bold tracking-wide">
+            <td
+              class="p-6 font-heading text-xl font-bold tracking-wide wrap-anywhere max-sm:block max-sm:pt-0"
+              role="cell"
+            >
               {organization.businessNumber}
             </td>
           </tr>
@@ -129,25 +177,27 @@ const documents = [
     id="documents"
     aria-labelledby="documents-heading"
   >
-    <div
-      class="mx-auto w-full max-w-[1248px] px-6 py-24 max-sm:px-4 max-sm:py-18"
-    >
+    <div class="mx-auto w-full max-w-site px-6 py-24 max-sm:px-4 max-sm:py-18">
       <h2 class="max-w-3xl" id="documents-heading">Governing documents</h2>
 
-      <ul class="mt-10 grid gap-5">
+      <ul class="mt-10 grid grid-cols-1 gap-5">
         {
           documents.map((document) => (
-            <li class="border border-zinc-700 bg-ink">
-              <div class="flex flex-wrap items-center justify-between gap-x-8 gap-y-5 p-6">
-                <div>
-                  <h3>{document.name}</h3>
+            <li class="min-w-0 border border-zinc-700 bg-ink">
+              <div class="flex min-w-0 flex-wrap items-center justify-between gap-x-8 gap-y-5 p-6">
+                <div class="min-w-0 max-w-full">
+                  <h3 class="wrap-anywhere">{document.name}</h3>
                   <span class="mt-2 block text-base text-zinc-400">
                     {document.detail}
                   </span>
                 </div>
 
-                <span class="flex flex-wrap gap-3">
-                  <a class="btn btn-quiet" href={document.href} download>
+                <span class="flex min-w-0 max-w-full flex-wrap gap-3">
+                  <a
+                    class="btn btn-quiet min-w-0 max-w-full flex-wrap"
+                    href={document.href}
+                    download
+                  >
                     {/* lucide: download */}
                     <svg
                       class={iconClass}
@@ -161,10 +211,10 @@ const documents = [
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                       <path d="m7 10 5 5 5-5" />
                     </svg>
-                    Download
+                    <span class="min-w-0 wrap-anywhere">Download</span>
                   </a>
                   <a
-                    class="btn btn-quiet"
+                    class="btn btn-quiet min-w-0 max-w-full flex-wrap"
                     href={document.href}
                     target="_blank"
                     rel="noreferrer"
@@ -182,10 +232,10 @@ const documents = [
                       <path d="M10 14 21 3" />
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                     </svg>
-                    Open in new tab
+                    <span class="min-w-0 wrap-anywhere">Open in new tab</span>
                   </a>
                   <button
-                    class="btn btn-quiet document-toggle cursor-pointer"
+                    class="btn btn-quiet document-toggle min-w-0 max-w-full flex-wrap cursor-pointer"
                     type="button"
                     aria-controls={`document-${document.id}`}
                     aria-expanded="false"
@@ -206,20 +256,21 @@ const documents = [
                     </svg>
                     {/* lucide: eye-off */}
                     <svg
-                      class={`${iconClass} document-toggle-hide`}
+                      class={`${iconClass} document-toggle-hide hidden`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       stroke-width="2"
                       aria-hidden="true"
-                      hidden
                     >
                       <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
                       <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
                       <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
                       <path d="m2 2 20 20" />
                     </svg>
-                    <span class="document-toggle-label">View in page</span>
+                    <span class="document-toggle-label min-w-0 wrap-anywhere">
+                      View in page
+                    </span>
                   </button>
                 </span>
               </div>
@@ -266,10 +317,12 @@ const documents = [
             : (toggle.dataset.labelShow ?? "");
         }
 
-        toggle.querySelector<SVGElement>(".document-toggle-show")!.hidden =
-          open;
-        toggle.querySelector<SVGElement>(".document-toggle-hide")!.hidden =
-          !open;
+        toggle
+          .querySelector<SVGElement>(".document-toggle-show")!
+          .classList.toggle("hidden", open);
+        toggle
+          .querySelector<SVGElement>(".document-toggle-hide")!
+          .classList.toggle("hidden", !open);
 
         if (open && frame && !frame.src) {
           frame.src = frame.dataset.src ?? "";

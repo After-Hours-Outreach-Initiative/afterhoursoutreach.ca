@@ -1,0 +1,36 @@
+---
+import { env } from "cloudflare:workers";
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import SignInPanel from "@/components/volunteer/SignInPanel.astro";
+import {
+  authBindingsForRequest,
+  createAuth,
+  forwardCookies,
+  readAccountSession,
+} from "@/server/auth";
+import { signInDestination } from "@/data/account-navigation";
+export const prerender = false;
+if (env.BETTER_AUTH_SECRET) {
+  try {
+    const { response: current, headers } = await readAccountSession(
+      createAuth(authBindingsForRequest(env, Astro.request)),
+      Astro.request,
+    );
+    forwardCookies(headers, Astro.response.headers);
+    if (
+      current?.user.emailVerified &&
+      (!current.user.twoFactorEnabled || current.session.twoFactorVerified)
+    )
+      return Astro.redirect(signInDestination);
+  } catch {
+    return new Response("Sign-in is temporarily unavailable.", { status: 503 });
+  }
+}
+---
+
+<AccountLayout
+  title="Sign in"
+  description="Sign in or create your volunteer account with an email link or code."
+>
+  <SignInPanel />
+</AccountLayout>

@@ -1,0 +1,31 @@
+@reference "../../styles/tailwind.css";
+
+.local-email-dialog {
+  width: min(42.5rem, calc(100% - 2rem));
+}
+.local-email-dialog h3 {
+  @apply text-xl;
+}
+.local-email-dialog p {
+  margin-top: 1rem;
+}
+.local-email-dialog .dialog-body > p:first-child {
+  margin-top: 0;
+}
+.local-email-dialog article {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #3f3f46;
+}
+.local-email-dialog .local-email-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 37.5rem) {
+  .local-email-actions {
+    flex-direction: column;
+  }
+  .local-email-actions .btn {
+    width: 100%;
+  }
+}

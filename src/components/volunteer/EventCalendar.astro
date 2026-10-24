@@ -1,0 +1,114 @@
+---
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import { eventCalendar, type CalendarEvent } from "@/data/event-calendar";
+import "@/styles/event-calendar.css";
+
+interface Props {
+  events: CalendarEvent[];
+}
+const calendar = eventCalendar(Astro.props.events);
+const weekdays = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+---
+
+<div
+  class="event-calendar"
+  data-event-calendar
+  data-calendar-start={calendar.start}
+>
+  <p id="calendar-help" class="sr-only">
+    Circled dates link to events. Dots link to more events that day.
+  </p>
+  <table aria-describedby="calendar-help">
+    <caption class="sr-only" data-calendar-range aria-live="polite">
+      {calendar.range}
+    </caption>
+    <thead>
+      <tr
+        >{
+          weekdays.map((day) => (
+            <th scope="col" aria-label={day}>
+              <abbr class="font-bold text-white" title={day}>
+                {day.slice(0, 1)}
+              </abbr>
+            </th>
+          ))
+        }</tr
+      >
+    </thead>
+    <tbody data-calendar-days>
+      {
+        calendar.weeks.map((week) => (
+          <tr>
+            {week.map((day) => (
+              <td
+                data-calendar-date={day.date}
+                aria-current={day.today ? "date" : undefined}
+              >
+                {day.events.length ? (
+                  <>
+                    <a
+                      href={`#event-${day.events[0].id}`}
+                      data-calendar-event={day.events[0].id}
+                      aria-label={day.events[0].description}
+                      title={day.events[0].label}
+                    >
+                      <span class="event-calendar-day event-calendar-circle">
+                        {day.day}
+                      </span>
+                    </a>
+                    {day.events.length > 1 && (
+                      <div class="event-calendar-extra-events">
+                        {day.events.slice(1).map((event) => (
+                          <a
+                            href={`#event-${event.id}`}
+                            data-calendar-event={event.id}
+                            aria-label={event.description}
+                            title={event.label}
+                          >
+                            <span
+                              class="event-calendar-dot"
+                              aria-hidden="true"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <span class="event-calendar-day">{day.day}</span>
+                )}
+              </td>
+            ))}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+  <div class="event-calendar-controls" data-calendar-controls hidden>
+    <button
+      type="button"
+      data-calendar-step="previous"
+      aria-label="Previous five weeks"
+      disabled={!calendar.previous}
+    >
+      <ArrowRightIcon class="size-5 rotate-180" />
+    </button>
+    <button type="button" data-calendar-step="today">Today</button>
+    <button
+      type="button"
+      data-calendar-step="next"
+      aria-label="Next five weeks"
+      disabled={!calendar.next}
+    >
+      <ArrowRightIcon class="size-5" />
+    </button>
+  </div>
+</div>

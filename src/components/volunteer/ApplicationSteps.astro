@@ -1,0 +1,135 @@
+---
+import {
+  applicationFields,
+  certificationQuestion,
+  trainingQuestion,
+} from "@/data/application";
+import CodeOfConduct from "./CodeOfConduct.astro";
+
+interface Props {
+  application: boolean;
+  sections: {
+    key: string;
+    heading: string;
+    fields: (typeof applicationFields)[number][];
+  }[];
+}
+const { application, sections } = Astro.props;
+interface ReviewRow {
+  name: string;
+  label: string;
+  condition?: string;
+}
+const reviewSections = sections.map((section) => {
+  let rows: ReviewRow[] = section.fields
+    .filter((field) => !["experience", "otherTraining"].includes(field.name))
+    .map((field) => ({
+      name: field.name === "heardAboutUs" ? "heardAboutUsSources" : field.name,
+      label: field.label + (field.required ? "" : " (optional)"),
+    }));
+  if (section.key === "team-interests")
+    rows = [{ name: "teams", label: "Which teams interest you?" }];
+  if (section.key === "training-and-safety")
+    rows = [
+      {
+        name: "certifications",
+        label: certificationQuestion,
+        condition: "medic",
+      },
+      {
+        name: "experience",
+        label: "Other training and experience",
+        condition: "other-certification",
+      },
+      ...rows.map((row) => ({ ...row, condition: "medic" })),
+      { name: "training", label: trainingQuestion },
+      {
+        name: "otherTraining",
+        label: "Other relevant training or experience",
+        condition: "other-training",
+      },
+    ];
+  if (section.key === "about-volunteering")
+    rows.splice(1, 0, {
+      name: "heardAboutUsOther",
+      label: "Other source",
+      condition: "other-referral",
+    });
+  return { ...section, rows };
+});
+---
+
+{
+  application ? (
+    <>
+      <div data-application-questions class="volunteer-application-step">
+        <slot />
+      </div>
+      <fieldset
+        data-application-review-step
+        class="volunteer-application-step"
+        hidden
+        disabled
+      >
+        <legend class="sr-only">Review and submit application</legend>
+        <h2 data-application-step-heading>Review your application</h2>
+        <p>
+          Review your answers, edit if needed, then accept the Code of Conduct
+          and submit. After submission, your next step is Naloxone 101.
+        </p>
+        <button type="button" data-application-edit class="btn btn-quiet">
+          Back to answers
+        </button>
+        <div class="volunteer-application-review">
+          {reviewSections.map((section) => (
+            <section aria-labelledby={`review-${section.key}`}>
+              <div class="volunteer-profile-section-heading">
+                <h3 id={`review-${section.key}`}>{section.heading}</h3>
+                <button
+                  type="button"
+                  class="btn btn-outline"
+                  data-application-edit={`application-${section.key}`}
+                  aria-label={`Edit ${section.heading.toLowerCase()}`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="m16 3 5 5-12 12-6 1 1-6L16 3Z" />
+                    <path d="m13 6 5 5" />
+                  </svg>
+                  Edit
+                </button>
+              </div>
+              <dl>
+                {section.rows.map((row) => (
+                  <div
+                    data-review-condition={row.condition}
+                    hidden={Boolean(row.condition)}
+                  >
+                    <dt>{row.label}</dt>
+                    <dd data-review-answer={row.name}>Not provided</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+        </div>
+        <CodeOfConduct />
+        <button
+          type="submit"
+          data-application-submit
+          class="btn btn-primary"
+          data-loading-label="Submitting application…"
+        >
+          Submit application
+        </button>
+      </fieldset>
+    </>
+  ) : (
+    <slot />
+  )
+}

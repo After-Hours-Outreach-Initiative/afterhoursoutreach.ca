@@ -1,0 +1,139 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1791417001294,
+      "tag": "0000_database",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791491492368,
+      "tag": "0001_code_of_conduct",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791999893578,
+      "tag": "0002_registration_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792009774592,
+      "tag": "0003_medical_certifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792011599581,
+      "tag": "0004_certification_expiry",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792013468034,
+      "tag": "0005_relevant_training",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792015220143,
+      "tag": "0006_profile_name_components",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792015642060,
+      "tag": "0007_profile_referral_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792099026165,
+      "tag": "0008_application_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792130773937,
+      "tag": "0009_submitted_application",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792131222826,
+      "tag": "0010_first_orientation_signup_limit",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792133939144,
+      "tag": "0011_medic_certification_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792187391866,
+      "tag": "0012_draft_discard_generation",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1792524537178,
+      "tag": "0013_action_email_batches",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1792530400690,
+      "tag": "0014_patrol_submission_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1792561390137,
+      "tag": "0015_patrol_orientation_capacity",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1792562818472,
+      "tag": "0016_orientation_minimum_capacity",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1792573102763,
+      "tag": "0017_medic_orientee_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1792734450018,
+      "tag": "0018_naloxone_course_confirmation",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+---
+interface Props {
+  id: string;
+  heading: string;
+  description?: string;
+  application?: boolean;
+  describedBy?: string;
+}
+const {
+  id,
+  heading,
+  description,
+  application = false,
+  describedBy,
+} = Astro.props;
+const descriptionId = description ? `help-${id}` : undefined;
+const sectionDescribedBy =
+  [descriptionId, describedBy].filter(Boolean).join(" ") || undefined;
+---
+
+{
+  application ? (
+    <section class="volunteer-application-section" aria-labelledby={id}>
+      <h3 id={id} class="volunteer-profile-heading" data-application-section>
+        {heading}
+      </h3>
+      <fieldset
+        class="volunteer-profile-section"
+        aria-describedby={sectionDescribedBy}
+      >
+        <legend class="sr-only">{heading}</legend>
+        {description && (
+          <p class="volunteer-help" id={descriptionId}>
+            {description}
+          </p>
+        )}
+        <slot />
+      </fieldset>
+    </section>
+  ) : (
+    <fieldset
+      class="volunteer-profile-section"
+      aria-describedby={sectionDescribedBy}
+      data-profile-section
+    >
+      <legend class="sr-only">{heading}</legend>
+      <div class="volunteer-profile-section-heading">
+        <h3 id={id} class="volunteer-profile-heading" data-contents-section>
+          {heading}
+        </h3>
+        <button
+          type="button"
+          class="btn btn-outline"
+          data-profile-edit
+          aria-label={`Edit ${heading.toLowerCase()}`}
+          aria-controls={`${id}-fields`}
+          aria-expanded="false"
+          disabled
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="m16 3 5 5-12 12-6 1 1-6L16 3Z" />
+            <path d="m13 6 5 5" />
+          </svg>
+          Edit
+        </button>
+      </div>
+      {description && (
+        <p class="volunteer-help" id={descriptionId}>
+          {description}
+        </p>
+      )}
+      <slot />
+    </fieldset>
+  )
+}

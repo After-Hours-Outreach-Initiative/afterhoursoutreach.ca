@@ -1,0 +1,73 @@
+---
+import WarningIcon from "@/components/icons/WarningIcon.astro";
+
+interface Props {
+  entries: {
+    id: string;
+    heading: string;
+    nested?: boolean;
+    completable?: boolean;
+  }[];
+  application: boolean;
+  variant: "menu" | "sidebar";
+}
+const { entries, application, variant } = Astro.props;
+---
+
+<ol>
+  {
+    entries.map((section, index) => (
+      <li
+        class:list={{
+          "volunteer-contents-nested":
+            section.nested || (application && section.completable),
+        }}
+      >
+        <a
+          href={`#${section.id}`}
+          aria-current={index === 0 ? "location" : undefined}
+          aria-describedby={
+            application && section.completable
+              ? `contents-${variant}-${section.id}-status`
+              : undefined
+          }
+          data-application-progress-link={
+            (application && section.completable) || undefined
+          }
+          data-complete={
+            application && section.completable ? "false" : undefined
+          }
+        >
+          {section.heading}
+          {application && section.completable && (
+            <span class="volunteer-contents-section-status">
+              <svg
+                class="volunteer-contents-completion-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <WarningIcon class="volunteer-contents-conflict-icon" />
+            </span>
+          )}
+        </a>
+        {application && section.completable && (
+          <span
+            class="sr-only"
+            id={`contents-${variant}-${section.id}-status`}
+            data-application-completion-status
+          >
+            Incomplete
+          </span>
+        )}
+      </li>
+    ))
+  }
+</ol>

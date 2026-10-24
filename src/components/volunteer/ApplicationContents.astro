@@ -1,0 +1,34 @@
+---
+import PageContents from "./PageContents.astro";
+interface Props {
+  sections: { key: string; heading: string }[];
+}
+const { sections } = Astro.props;
+const entries = [
+  { id: "application-overview", heading: "Overview" },
+  ...sections.map((section) => ({
+    ...section,
+    id: `application-${section.key}`,
+    completable: true,
+  })),
+  {
+    id: "application-review-and-discard",
+    heading: "Review or discard",
+  },
+];
+---
+
+<PageContents entries={entries} application />
+<PageContents
+  entries={[
+    { id: "application-overview", heading: "Overview" },
+    ...sections.map((section) => ({
+      id: `review-${section.key}`,
+      heading: section.heading,
+      nested: true,
+    })),
+    { id: "code-of-conduct-heading", heading: "Code of Conduct" },
+  ]}
+  application
+  review
+/>

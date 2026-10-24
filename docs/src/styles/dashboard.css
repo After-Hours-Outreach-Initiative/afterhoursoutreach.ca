@@ -1,0 +1,358 @@
+.ops {
+  --ops-border: var(--sl-color-gray-5);
+  --ops-panel: var(--sl-color-gray-7, var(--sl-color-black));
+  color: var(--sl-color-white);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+.ops *,
+.ops-dialog * {
+  box-sizing: border-box;
+}
+.ops :is(h2, h3, h4, p, ul, dl),
+.ops-dialog :is(h2, h3, p, ul, dl) {
+  margin: 0 0 0.75rem;
+}
+.ops h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+.ops h3,
+.ops-dialog h3 {
+  font-size: 1.125rem;
+}
+.ops h4 {
+  font-size: 1rem;
+}
+.ops section > h3 {
+  margin-top: 1.5rem;
+}
+.ops-intro,
+.ops-muted {
+  color: var(--sl-color-gray-2);
+}
+.ops code {
+  overflow-wrap: anywhere;
+}
+.ops-toolbar,
+.ops-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.625rem;
+  margin-block: 0.75rem;
+}
+.ops-buttons {
+  align-items: center;
+}
+.ops :is(button, input, select),
+.ops-dialog :is(button, input) {
+  font: inherit;
+  color: inherit;
+}
+.ops label,
+.ops-dialog label {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.ops :is(input:not([type="checkbox"]), select),
+.ops-dialog input {
+  background: var(--sl-color-black);
+  border: 1px solid var(--ops-border, var(--sl-color-gray-5));
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  min-height: 2.75rem;
+  max-width: 100%;
+  min-width: 0;
+}
+.ops input[type="number"] {
+  width: 6rem;
+}
+.ops input[type="checkbox"] {
+  accent-color: var(--sl-color-text-accent);
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.ops .ops-check {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 0.5rem;
+}
+.ops button,
+.ops-dialog button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--sl-color-black);
+  border: 1px solid var(--ops-border, var(--sl-color-gray-5));
+  border-radius: 0.375rem;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.ops button:hover:not(:disabled),
+.ops-dialog button:hover:not(:disabled) {
+  background: var(--sl-color-gray-6);
+  border-color: var(--sl-color-gray-3);
+}
+.ops button:disabled,
+.ops-dialog button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.ops :is(button, input, select, summary):focus-visible,
+.ops-dialog :is(button, input):focus-visible {
+  outline: 2px solid var(--sl-color-text-accent);
+  outline-offset: 3px;
+}
+.ops button svg,
+.ops-database-heading svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+.ops-connection > label:first-child {
+  flex: 1 1 20rem;
+}
+.ops-connection select {
+  width: 100%;
+}
+.ops-notice {
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--ops-border, var(--sl-color-gray-4));
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-block: 1rem;
+  overflow-wrap: anywhere;
+}
+.ops-notice > :last-child {
+  margin-bottom: 0;
+}
+.ops-protected {
+  border-color: #a87925;
+  background: color-mix(in srgb, #c99222 9%, var(--sl-color-black));
+}
+.ops-danger {
+  border-color: #be5364;
+}
+.ops-success {
+  border-color: #428464;
+}
+.ops-text-danger {
+  color: #ed8796 !important;
+}
+[data-theme="light"] .ops-text-danger {
+  color: #a62639 !important;
+}
+.ops-database-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+.ops-database-heading span {
+  color: var(--sl-color-gray-2);
+}
+.ops-mono {
+  font-family: var(--sl-font-mono);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+.ops-protected .ops-toolbar label {
+  flex: 1 1 20rem;
+}
+.ops-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--ops-border);
+  margin-bottom: 1.5rem;
+}
+.ops-sections button[aria-pressed="true"] {
+  color: var(--sl-color-text-accent);
+  border-color: var(--sl-color-text-accent);
+  background: var(--sl-color-accent-low);
+}
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  align-items: start;
+  gap: 1rem;
+}
+.ops-panel {
+  padding: 1rem;
+  border: 1px solid var(--ops-border);
+  border-radius: 0.5rem;
+  min-width: 0;
+  margin-bottom: 1rem;
+  background: var(--ops-panel);
+  overflow-wrap: anywhere;
+}
+.ops-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+}
+.ops-stats > div {
+  border: 1px solid var(--ops-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+.ops-stats dt {
+  color: var(--sl-color-gray-2);
+}
+.ops-stats dd {
+  margin: 0;
+  font-size: 1.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.ops-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-block: 0.75rem;
+}
+.ops table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.875rem;
+}
+.ops :is(th, td) {
+  text-align: left;
+  padding: 0.625rem 0.75rem;
+  vertical-align: top;
+  border-bottom: 1px solid var(--ops-border);
+  overflow-wrap: anywhere;
+}
+.ops th {
+  color: var(--sl-color-gray-2);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.ops-user-flags {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 11rem;
+}
+.ops-user-actions {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 12rem;
+  margin-block: 0.5rem;
+}
+.ops summary {
+  min-height: 2.75rem;
+  align-content: center;
+  cursor: pointer;
+  width: fit-content;
+}
+.ops details > :not(summary) {
+  margin-top: 0.5rem;
+}
+.ops-roster {
+  list-style: none;
+  padding: 0;
+}
+.ops-roster li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--ops-border);
+}
+.ops-chip {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--ops-border);
+  border-radius: 1rem;
+  font-size: 0.875rem;
+}
+.ops progress {
+  accent-color: var(--sl-color-text-accent);
+  width: 100%;
+  height: 0.5rem;
+}
+.ops-impact > div,
+.ops-dialog .ops-impact > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(0, 2fr);
+  gap: 0.75rem;
+  padding-block: 0.375rem;
+  border-bottom: 1px solid var(--ops-border, var(--sl-color-gray-5));
+}
+.ops-impact dt {
+  color: var(--sl-color-gray-2);
+}
+.ops-impact dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ops-dialog {
+  color: var(--sl-color-white);
+  background: var(--sl-color-black);
+  border: 1px solid var(--sl-color-gray-4);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  width: min(40rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  font-size: 0.9375rem;
+  margin: auto;
+}
+.ops-dialog::backdrop {
+  background: #000a;
+}
+.ops-dialog h2 {
+  font-size: 1.5rem;
+}
+.ops-dialog ul {
+  padding-left: 1.5rem;
+}
+.ops-dialog input {
+  width: 100%;
+}
+.ops-dialog .ops-buttons {
+  justify-content: end;
+  margin-top: 1rem;
+}
+.ops-dialog .ops-button-primary {
+  color: var(--sl-color-text-invert);
+  background: var(--sl-color-text-accent);
+  border-color: transparent;
+}
+.ops-dialog .ops-button-danger {
+  color: white;
+  background: #a92e45;
+  border-color: transparent;
+}
+.ops-dialog .ops-button-danger:hover:not(:disabled) {
+  background: #8f263a;
+}
+.ops-dialog .ops-button-primary:hover:not(:disabled) {
+  background: var(--sl-color-accent-high);
+}
+@media (width < 40rem) {
+  .ops-connection > button {
+    flex: 1;
+  }
+  .ops-sections {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ops .ops-toolbar > label {
+    flex: 1 1 100%;
+  }
+  .ops-impact > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.125rem;
+  }
+  .ops-dialog {
+    padding: 1rem;
+  }
+}

@@ -1,0 +1,178 @@
+@reference "./tailwind.css";
+
+.account-profile-switcher {
+  display: grid;
+  gap: 0.75rem;
+}
+.account-profile-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+.account-profile-buttons .account-profile-button {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.75rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.account-profile-detail {
+  @apply text-sm/[inherit];
+  color: #a1a1aa;
+}
+.account-profile-button[aria-pressed="true"] {
+  border-color: #4169e1;
+  background: #16214a;
+  color: white;
+}
+.account-profile-delete {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+}
+.account-profile-button:focus-visible,
+.account-profile-delete:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 0.125rem;
+}
+.account-profile-button:disabled,
+.account-profile-delete:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+/* Like the application, navigation is placed by CSS before scripts run. The
+   spanning grid area lets it stay sticky for the entire account page. */
+[data-account-contents-flow] {
+  display: grid;
+  grid-template-rows: var(--contents-bar-height, 4.875rem) auto;
+}
+[data-account-contents-flow] > .volunteer-contents {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  margin: 0;
+  top: var(--contents-sticky-offset, var(--site-header-height));
+}
+[data-account-contents-body] {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+[data-account-contents-flow] [data-contents-section],
+[data-account-contents-flow] :is(input, select, textarea) {
+  scroll-margin-top: calc(
+    var(--contents-scroll-offset, calc(var(--site-header-height) + 4.875rem)) +
+      1rem
+  );
+}
+@media (width < 64rem) {
+  [data-account-contents-flow] .volunteer-contents-dropdown {
+    max-height: max(
+      0rem,
+      calc(
+        100dvh - var(--contents-sticky-offset, var(--site-header-height)) -
+          4.875rem
+      )
+    );
+  }
+}
+@media (min-width: 64rem) {
+  [data-account-contents-flow] {
+    grid-template-columns: minmax(0, 1fr) 13rem;
+    grid-template-rows: auto;
+    column-gap: 2rem;
+  }
+  [data-account-contents-flow] > .volunteer-contents {
+    grid-column: 2;
+    margin: -0.5rem 0 0;
+    top: calc(var(--site-header-height) + 1.5rem);
+  }
+  [data-account-contents-body] {
+    grid-row: 1;
+  }
+}
+/* Keep account panel headings one type-scale step above profile subsections. */
+[data-account-contents-body] > .volunteer-panel > h2 {
+  @apply text-xl md:text-2xl;
+}
+[data-profile-section] > .volunteer-profile-section-heading {
+  /* Wrap the title, not its edit action. */
+  flex-wrap: nowrap;
+}
+[data-profile-section] .volunteer-profile-heading {
+  flex: 1;
+  @apply text-lg md:text-xl;
+}
+.account-profile-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2rem;
+  min-width: 0;
+}
+.account-profile-summary dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  min-width: 0;
+}
+.account-profile-summary dl > div {
+  min-width: 0;
+}
+.account-profile-summary dt {
+  margin-bottom: 0.375rem;
+  font-weight: 400;
+  color: #a1a1aa;
+  overflow-wrap: anywhere;
+}
+.account-profile-summary dd {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.account-profile-summary ul {
+  padding-left: 1.5rem;
+  list-style: disc;
+  white-space: normal;
+}
+.account-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.account-sessions li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.account-sessions li:not(:last-child) {
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #3f3f46;
+}
+.account-sessions span {
+  display: block;
+}
+.account-sessions li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.volunteer-portal code {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+@media (width < 40rem) {
+  .account-profile-buttons,
+  .account-profile-summary dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

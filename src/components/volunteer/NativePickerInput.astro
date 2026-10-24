@@ -1,0 +1,26 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import CalendarIcon from "@/components/icons/CalendarIcon.astro";
+
+type Props = Omit<HTMLAttributes<"input">, "type">;
+const { value = "", ...attributes } = Astro.props;
+---
+
+<span class="volunteer-native-picker">
+  <input
+    {...attributes}
+    type="date"
+    value={value}
+    data-native-date
+    data-empty={!value || undefined}
+  />
+  <span class="volunteer-picker-placeholder" aria-hidden="true">
+    <CalendarIcon class="volunteer-picker-icon" />
+    <span>Select a date</span>
+  </span>
+</span>
+
+<script>
+  import { initNativePickerInputs } from "@/scripts/native-picker-input";
+  initNativePickerInputs();
+</script>

@@ -1,0 +1,32 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import OperationsDashboard from "../components/OperationsDashboard";
+import "../styles/dashboard.css";
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Operations dashboard",
+    description: "Local-only D1 administration and monitoring.",
+    tableOfContents: false,
+    prev: false,
+    next: false,
+    head: [
+      { tag: "meta", attrs: { name: "robots", content: "noindex, nofollow" } },
+    ],
+  }}
+>
+  <div class="not-content">
+    {
+      import.meta.env.DEV ? (
+        <OperationsDashboard client:load />
+      ) : (
+        <p>
+          The operations dashboard is available only in the local docs
+          development server. No administrative endpoints are included in this
+          build.
+        </p>
+      )
+    }
+  </div>
+</StarlightPage>

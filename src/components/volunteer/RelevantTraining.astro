@@ -1,0 +1,76 @@
+---
+import {
+  applicationFields,
+  trainingOptions,
+  trainingQuestion,
+  trainingRequiredError,
+  type ApplicationAnswers,
+} from "@/data/application";
+import AccountProfileField from "./AccountProfileField.astro";
+import FieldError from "@/components/FieldError.astro";
+
+interface Props {
+  values?: ApplicationAnswers | null;
+  required?: boolean;
+}
+const { values, required = true } = Astro.props;
+const otherTrainingField = applicationFields.find(
+  (field) => field.name === "otherTraining",
+)!;
+---
+
+<fieldset
+  class="volunteer-relevant-training volunteer-wide"
+  data-relevant-training
+  data-training-required={required}
+  aria-describedby="help-training error-training"
+>
+  <legend>
+    {trainingQuestion}
+    {
+      required && (
+        <span class="volunteer-required" aria-hidden="true">
+          {" "}
+          *
+        </span>
+      )
+    }
+  </legend>
+  <p class="volunteer-help" id="help-training">
+    Select your relevant training and experience, or choose No relevant training
+    or experience on its own.
+  </p>
+  <div class="volunteer-training-options volunteer-choice-options">
+    {
+      trainingOptions.map((option, index) => (
+        <>
+          {option.value === "none" && (
+            <div class="volunteer-training-divider" aria-hidden="true">
+              or
+            </div>
+          )}
+          <label class="volunteer-check">
+            <input
+              type="checkbox"
+              name="training"
+              value={option.value}
+              checked={values?.training.includes(option.value)}
+              required={required && index === 0 && !values?.training.length}
+              aria-describedby="help-training error-training"
+            />
+            <span>{option.label}</span>
+          </label>
+          {option.value === "other" && (
+            <AccountProfileField
+              field={otherTrainingField}
+              values={values}
+              active={values?.training.includes("other") ?? false}
+              hideLabel
+            />
+          )}
+        </>
+      ))
+    }
+  </div>
+  <FieldError field="training" message={trainingRequiredError} />
+</fieldset>

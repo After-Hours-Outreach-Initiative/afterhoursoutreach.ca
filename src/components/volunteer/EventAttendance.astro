@@ -1,0 +1,58 @@
+---
+import type { EventRow } from "@/server/db/events";
+import AttendeeAvatar from "./AttendeeAvatar.astro";
+interface Props {
+  event: EventRow;
+}
+const { event } = Astro.props;
+const medics = event.medicConfirmed;
+const orientees = event.includesOrientation ? event.orientationConfirmed : 0;
+const volunteers = Math.max(0, event.confirmed - medics - orientees);
+---
+
+<div class="event-attendance">
+  <div class="event-attendance-row">
+    <div
+      class="event-avatar-row"
+      role="group"
+      aria-label={`${medics} approved medics, ${volunteers} other volunteers and ${orientees} orientees registered`}
+      tabindex="0"
+    >
+      {
+        Array.from({ length: medics }, () => (
+          <AttendeeAvatar category="medic" />
+        ))
+      }
+      {
+        Array.from({ length: volunteers }, () => (
+          <AttendeeAvatar category="volunteer" />
+        ))
+      }
+      {
+        Array.from({ length: orientees }, () => (
+          <AttendeeAvatar category="orientee" />
+        ))
+      }
+    </div>
+  </div>
+</div>
+
+<style>
+  .event-attendance {
+    min-width: 0;
+  }
+  .event-avatar-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    min-width: 0;
+    /* Reserve avatars, padding and scrollbar space, including an empty row. */
+    height: 2.5rem;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-color: #52525b transparent;
+    scrollbar-width: thin;
+  }
+</style>

@@ -1,0 +1,378 @@
+-- Current database-enforced business rules. Edit this source, then run pnpm db:generate.
+-- Each trigger is one statement; the generator preserves it in a frozen migration.
+
+-- Advancing a discard generation and removing answers must be one atomic write.
+CREATE TRIGGER application_draft_discard_insert
+AFTER INSERT ON application_draft_generation
+BEGIN
+  DELETE FROM application_draft WHERE user_id = NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER application_draft_discard_update
+AFTER UPDATE OF generation ON application_draft_generation
+BEGIN
+  DELETE FROM application_draft WHERE user_id = NEW.user_id;
+END;
+--> statement-breakpoint
+
+-- Check eligibility and capacity inside SQLite so concurrent writes cannot overbook.
+CREATE TRIGGER signup_confirm_insert
+BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
+BEGIN
+  SELECT RAISE(ABORT, 'signup_not_eligible')
+  WHERE NOT EXISTS (
+    SELECT 1 FROM event e
+    JOIN volunteer_status v ON v.user_id = NEW.user_id
+    JOIN profile p ON p.user_id = v.user_id
+    WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1
+      AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
+      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+      AND (coalesce(e.includes_orientation, e.type = 'orientation') OR v.patrol_approved = 1)
+  );
+  SELECT RAISE(ABORT, 'event_full')
+  WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed')
+    >= (SELECT spots FROM event WHERE id = NEW.event_id);
+  -- First-time medics are ONLY orientees; each signup occupies one total place.
+  SELECT RAISE(ABORT, 'orientation_places_full')
+  WHERE EXISTS (SELECT 1 FROM event e WHERE e.id = NEW.event_id
+      AND coalesce(e.includes_orientation, e.type = 'orientation'))
+    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND (SELECT count(*) FROM signup s WHERE s.event_id = NEW.event_id AND s.status = 'confirmed'
+      AND NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) >= 4;
+  -- Count the candidate as well as existing bookings, then leave room for every
+  -- outstanding reservation. Extras of either category share the general pool.
+  SELECT RAISE(ABORT, 'signup_places_reserved')
+  FROM event e CROSS JOIN (
+    SELECT count(*) AS total,
+      coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+        WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
+          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS orientees
+    FROM (SELECT user_id FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed'
+      UNION ALL SELECT NEW.user_id) booked
+  ) counts
+  WHERE e.id = NEW.event_id AND counts.total + max(0, 2 - counts.medics)
+    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > e.spots;
+  -- Closed/hidden bookings still reserve a spot; past/cancelled events do not.
+  SELECT RAISE(ABORT, 'orientation_signup_limit')
+  WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
+    AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
+    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND EXISTS (
+      SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
+      WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
+        AND s.event_id != NEW.event_id
+        AND coalesce(e.includes_orientation, e.type = 'orientation') AND e.cancelled_at IS NULL
+        AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+    );
+END;
+--> statement-breakpoint
+
+-- Rank ALL future non-cancelled occurrences: closed, full and hidden ones still
+-- consume slots. The materialization frontier prevents a sparse/far-future row
+-- from becoming bookable when maintenance has not yet filled intervening dates.
+CREATE TRIGGER signup_recurring_window_insert
+BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
+    SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
+    WHERE e.id = NEW.event_id AND (
+      e.starts_at >= ps.generation_until OR
+      (SELECT count(*) FROM event preceding
+        WHERE preceding.series_id = e.series_id AND preceding.cancelled_at IS NULL
+          AND preceding.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+          AND (preceding.starts_at < e.starts_at OR
+            (preceding.starts_at = e.starts_at AND preceding.id < e.id))) >= 3
+    )
+  );
+END;
+--> statement-breakpoint
+CREATE TRIGGER signup_recurring_window_update
+BEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
+    SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
+    WHERE e.id = NEW.event_id AND (
+      e.starts_at >= ps.generation_until OR
+      (SELECT count(*) FROM event preceding
+        WHERE preceding.series_id = e.series_id AND preceding.cancelled_at IS NULL
+          AND preceding.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+          AND (preceding.starts_at < e.starts_at OR
+            (preceding.starts_at = e.starts_at AND preceding.id < e.id))) >= 3
+    )
+  );
+END;
+--> statement-breakpoint
+
+-- Occurrence identity and cancellation tombstones are permanent. An exception
+-- edits starts_at, never its nominal date; generation can only insert missing keys.
+CREATE TRIGGER recurring_occurrence_identity
+BEFORE UPDATE OF id, type, series_id, occurrence_date ON event
+WHEN (OLD.series_id IS NOT NULL OR NEW.series_id IS NOT NULL)
+  AND (NEW.id IS NOT OLD.id OR NEW.type IS NOT OLD.type
+    OR NEW.series_id IS NOT OLD.series_id OR NEW.occurrence_date IS NOT OLD.occurrence_date)
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_occurrence_identity');
+END;
+--> statement-breakpoint
+CREATE TRIGGER recurring_occurrence_no_delete
+BEFORE DELETE ON event WHEN OLD.series_id IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_occurrence_tombstone');
+END;
+--> statement-breakpoint
+CREATE TRIGGER recurring_occurrence_no_restore
+BEFORE UPDATE OF cancelled_at ON event
+WHEN OLD.series_id IS NOT NULL AND OLD.cancelled_at IS NOT NULL AND NEW.cancelled_at IS NOT OLD.cancelled_at
+BEGIN
+  SELECT RAISE(ABORT, 'recurring_occurrence_tombstone');
+END;
+--> statement-breakpoint
+CREATE TRIGGER recurring_occurrence_created
+AFTER INSERT ON event WHEN NEW.series_id IS NOT NULL
+BEGIN
+  INSERT INTO event_audit (id, event_id, actor_id, action, changed_fields, created_at)
+    VALUES (lower(hex(randomblob(16))), NEW.id, NEW.created_by,
+      'series_occurrence_created', '["seriesId","occurrenceDate"]', NEW.created_at);
+END;
+--> statement-breakpoint
+CREATE TRIGGER patrol_series_schedule_immutable
+BEFORE UPDATE OF id, first_date, local_time, interval_weeks, time_zone ON patrol_series
+WHEN NEW.id IS NOT OLD.id OR NEW.first_date IS NOT OLD.first_date OR NEW.local_time IS NOT OLD.local_time
+  OR NEW.interval_weeks IS NOT OLD.interval_weeks OR NEW.time_zone IS NOT OLD.time_zone
+BEGIN
+  SELECT RAISE(ABORT, 'patrol_series_schedule_immutable');
+END;
+--> statement-breakpoint
+CREATE TRIGGER signup_confirm_update
+BEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'
+BEGIN
+  SELECT RAISE(ABORT, 'signup_not_eligible')
+  WHERE NOT EXISTS (
+    SELECT 1 FROM event e
+    JOIN volunteer_status v ON v.user_id = NEW.user_id
+    JOIN profile p ON p.user_id = v.user_id
+    WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1
+      AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
+      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+      AND (coalesce(e.includes_orientation, e.type = 'orientation') OR v.patrol_approved = 1)
+  );
+  SELECT RAISE(ABORT, 'event_full')
+  WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id)
+    >= (SELECT spots FROM event WHERE id = NEW.event_id);
+  SELECT RAISE(ABORT, 'orientation_places_full')
+  WHERE EXISTS (SELECT 1 FROM event e WHERE e.id = NEW.event_id
+      AND coalesce(e.includes_orientation, e.type = 'orientation'))
+    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND (SELECT count(*) FROM signup s WHERE s.event_id = NEW.event_id AND s.status = 'confirmed' AND s.id != OLD.id
+      AND NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) >= 4;
+  SELECT RAISE(ABORT, 'signup_places_reserved')
+  FROM event e CROSS JOIN (
+    SELECT count(*) AS total,
+      coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+        WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
+          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS orientees
+    FROM (SELECT user_id FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id
+      UNION ALL SELECT NEW.user_id) booked
+  ) counts
+  WHERE e.id = NEW.event_id AND counts.total + max(0, 2 - counts.medics)
+    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > e.spots;
+  SELECT RAISE(ABORT, 'orientation_signup_limit')
+  WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
+    AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
+    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND EXISTS (
+      SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
+      WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
+        AND s.id != OLD.id AND s.event_id != NEW.event_id
+        AND coalesce(e.includes_orientation, e.type = 'orientation') AND e.cancelled_at IS NULL
+        AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+    );
+END;
+--> statement-breakpoint
+CREATE TRIGGER event_capacity_update
+BEFORE UPDATE OF spots ON event
+BEGIN
+  SELECT RAISE(ABORT, 'capacity_below_signups')
+  WHERE NEW.spots < (SELECT count(*) FROM signup WHERE event_id = OLD.id AND status = 'confirmed');
+END;
+--> statement-breakpoint
+
+-- Edits never discard bookings or completion history. Invalid individual and
+-- this-and-future changes fail in the same transaction as templates/audits.
+-- Additive guards leave historical one-place rows untouched. Cancellation and
+-- recurrence coverage maintenance do not require editing those legacy defaults.
+CREATE TRIGGER event_orientation_capacity_insert
+BEFORE INSERT ON event
+WHEN NEW.spots < CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN 4 ELSE 2 END
+BEGIN
+  SELECT RAISE(ABORT, 'event_minimum_capacity');
+END;
+--> statement-breakpoint
+CREATE TRIGGER event_orientation_capacity_update
+BEFORE UPDATE OF type, includes_orientation, spots, starts_at, meeting_point, meeting_point_url, open, hidden ON event
+WHEN NEW.cancelled_at IS NULL AND NEW.spots < CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN 4 ELSE 2 END
+BEGIN
+  SELECT RAISE(ABORT, 'event_minimum_capacity');
+END;
+--> statement-breakpoint
+CREATE TRIGGER patrol_series_orientation_capacity_insert
+BEFORE INSERT ON patrol_series WHEN NEW.spots < CASE WHEN NEW.includes_orientation = 1 THEN 4 ELSE 2 END
+BEGIN
+  SELECT RAISE(ABORT, 'event_minimum_capacity');
+END;
+--> statement-breakpoint
+CREATE TRIGGER patrol_series_orientation_capacity_update
+BEFORE UPDATE OF includes_orientation, spots, meeting_point, meeting_point_url, open, hidden, end_date ON patrol_series
+WHEN NEW.spots < CASE WHEN NEW.includes_orientation = 1 THEN 4 ELSE 2 END
+BEGIN
+  SELECT RAISE(ABORT, 'event_minimum_capacity');
+END;
+--> statement-breakpoint
+CREATE TRIGGER patrol_template_orientation_capacity_insert
+BEFORE INSERT ON patrol_series_template WHEN NEW.spots < CASE WHEN NEW.includes_orientation = 1 THEN 4 ELSE 2 END
+BEGIN
+  SELECT RAISE(ABORT, 'event_minimum_capacity');
+END;
+--> statement-breakpoint
+CREATE TRIGGER patrol_template_orientation_capacity_update
+BEFORE UPDATE ON patrol_series_template WHEN NEW.spots < CASE WHEN NEW.includes_orientation = 1 THEN 4 ELSE 2 END
+BEGIN
+  SELECT RAISE(ABORT, 'event_minimum_capacity');
+END;
+--> statement-breakpoint
+CREATE TRIGGER event_orientation_update
+BEFORE UPDATE OF type, includes_orientation, spots ON event
+WHEN NEW.spots IS NOT OLD.spots OR coalesce(NEW.includes_orientation, NEW.type = 'orientation')
+  IS NOT coalesce(OLD.includes_orientation, OLD.type = 'orientation')
+BEGIN
+  SELECT RAISE(ABORT, 'orientation_edit_conflict')
+  FROM (
+    SELECT count(*) AS total,
+      coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+        WHERE p.user_id = s.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
+          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)), 0) AS orientees
+    FROM signup s WHERE s.event_id = OLD.id AND s.status = 'confirmed'
+  ) counts
+  WHERE counts.total + max(0, 2 - counts.medics)
+      + CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > NEW.spots
+    OR (coalesce(NEW.includes_orientation, NEW.type = 'orientation') AND counts.orientees > 4);
+  SELECT RAISE(ABORT, 'orientation_edit_conflict')
+  WHERE NOT coalesce(NEW.includes_orientation, NEW.type = 'orientation')
+    AND coalesce(OLD.includes_orientation, OLD.type = 'orientation') AND (
+      EXISTS (SELECT 1 FROM signup s JOIN volunteer_status v ON v.user_id = s.user_id
+        WHERE s.event_id = OLD.id AND s.status = 'confirmed' AND v.patrol_approved = 0)
+      OR EXISTS (SELECT 1 FROM orientation_completion WHERE event_id = OLD.id)
+    );
+END;
+--> statement-breakpoint
+
+-- Completion is recorded separately from patrol approval.
+CREATE TRIGGER orientation_completion_insert
+BEFORE INSERT ON orientation_completion
+BEGIN
+  SELECT RAISE(ABORT, 'not_an_orientation')
+  WHERE NOT EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER orientation_completion_update
+BEFORE UPDATE OF event_id ON orientation_completion
+BEGIN
+  SELECT RAISE(ABORT, 'not_an_orientation')
+  WHERE NOT EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'));
+END;
+--> statement-breakpoint
+CREATE TRIGGER approval_organizer_insert
+BEFORE INSERT ON volunteer_status WHEN NEW.patrol_approved = 1
+BEGIN
+  SELECT RAISE(ABORT, 'approval_requires_organizer')
+  WHERE NOT EXISTS (SELECT 1 FROM user WHERE id = NEW.approved_by AND role = 'organizer');
+END;
+--> statement-breakpoint
+CREATE TRIGGER approval_organizer_update
+BEFORE UPDATE OF patrol_approved, approved_by ON volunteer_status WHEN NEW.patrol_approved = 1
+BEGIN
+  SELECT RAISE(ABORT, 'approval_requires_organizer')
+  WHERE NOT EXISTS (SELECT 1 FROM user WHERE id = NEW.approved_by AND role = 'organizer');
+END;
+--> statement-breakpoint
+
+-- Existing spots survive hiding/closing; new confirmed spots must be visible.
+CREATE TRIGGER signup_visible_insert BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
+BEGIN
+  SELECT RAISE(ABORT, 'signup_not_eligible') WHERE EXISTS (
+    SELECT 1 FROM event WHERE id = NEW.event_id AND (hidden = 1 OR cancelled_at IS NOT NULL)
+  );
+END;
+--> statement-breakpoint
+CREATE TRIGGER signup_visible_update BEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'
+BEGIN
+  SELECT RAISE(ABORT, 'signup_not_eligible') WHERE EXISTS (
+    SELECT 1 FROM event WHERE id = NEW.event_id AND (hidden = 1 OR cancelled_at IS NOT NULL)
+  );
+END;
+--> statement-breakpoint
+
+-- Preserve at least one active organizer.
+CREATE TRIGGER keep_last_organizer BEFORE UPDATE OF role ON user
+WHEN OLD.role = 'organizer' AND NEW.role != 'organizer'
+BEGIN
+  SELECT RAISE(ABORT, 'last_organizer') WHERE (SELECT count(*) FROM user WHERE role = 'organizer') <= 1;
+  SELECT RAISE(ABORT, 'last_organizer') WHERE NOT EXISTS (
+    SELECT 1 FROM user u JOIN volunteer_status v ON v.user_id=u.id
+    WHERE u.id != OLD.id AND u.role='organizer' AND v.active=1
+  );
+END;
+--> statement-breakpoint
+CREATE TRIGGER keep_last_active_organizer BEFORE UPDATE OF active ON volunteer_status
+WHEN OLD.active = 1 AND NEW.active = 0 AND EXISTS (SELECT 1 FROM user WHERE id = OLD.user_id AND role = 'organizer')
+BEGIN
+  SELECT RAISE(ABORT, 'last_organizer') WHERE (
+    SELECT count(*) FROM user u JOIN volunteer_status v ON v.user_id = u.id WHERE u.role = 'organizer' AND v.active = 1
+  ) <= 1;
+END;
+--> statement-breakpoint
+
+-- One-time organizer bootstrap: verified email and active registration, no mandatory 2FA.
+CREATE TRIGGER bootstrap_first_organizer BEFORE INSERT ON organizer_bootstrap
+BEGIN
+  SELECT RAISE(ABORT, 'organizer_already_exists') WHERE EXISTS (SELECT 1 FROM user WHERE role='organizer');
+  SELECT RAISE(ABORT, 'organizer_not_ready') WHERE NOT EXISTS (
+    SELECT 1 FROM user u JOIN profile p ON p.user_id=u.id JOIN volunteer_status v ON v.user_id=u.id
+    WHERE u.id=NEW.user_id AND u.email_verified=1 AND v.active=1
+  );
+END;
+--> statement-breakpoint
+CREATE TRIGGER bootstrap_first_organizer_apply AFTER INSERT ON organizer_bootstrap
+BEGIN
+  UPDATE user SET role='organizer',updated_at=NEW.created_at WHERE id=NEW.user_id;
+  INSERT INTO audit_log(id,actor_id,subject_id,action,changed_fields,created_at)
+    VALUES(lower(hex(randomblob(16))),NEW.user_id,NEW.user_id,'role_changed','["role"]',NEW.created_at);
+  DELETE FROM session WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+
+-- A missing legacy snapshot must stay missing; current answers are not originals.
+CREATE TRIGGER submitted_application_immutable
+BEFORE UPDATE OF submitted_application ON profile
+WHEN NEW.submitted_application IS NOT OLD.submitted_application
+BEGIN
+  SELECT RAISE(ABORT, 'submitted_application_immutable');
+END;
+--> statement-breakpoint
+
+-- Never rebuild a request or promote a preview/local intent into real mail.
+CREATE TRIGGER application_submission_notification_immutable
+BEFORE UPDATE OF id, operation_id, user_id, recipient, mode, payload, created_at ON application_submission_notification
+WHEN NEW.id IS NOT OLD.id OR NEW.operation_id IS NOT OLD.operation_id
+  OR NEW.user_id IS NOT OLD.user_id OR NEW.recipient IS NOT OLD.recipient
+  OR NEW.mode IS NOT OLD.mode OR NEW.payload IS NOT OLD.payload
+  OR NEW.created_at IS NOT OLD.created_at
+BEGIN
+  SELECT RAISE(ABORT, 'application_submission_notification_immutable');
+END;

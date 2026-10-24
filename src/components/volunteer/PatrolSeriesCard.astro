@@ -1,0 +1,129 @@
+---
+import type { Actor } from "@/server/db/access";
+import type { EventRow, PatrolSeriesRow, RosterRow } from "@/server/db/events";
+import { matchesEventFilter } from "@/data/event-browser";
+import EventCard from "./EventCard.astro";
+import PatrolSeriesControls from "./PatrolSeriesControls.astro";
+import NativePickerInput from "./NativePickerInput.astro";
+import { formatTimeInput } from "@/data/event-time";
+
+interface Props {
+  series: PatrolSeriesRow;
+  events: EventRow[];
+  actor: Actor;
+  rosters: RosterRow[];
+  destinations: EventRow[];
+  filter: string;
+  selectedOccurrence: string | null;
+}
+const {
+  series,
+  events,
+  actor,
+  rosters,
+  destinations,
+  filter,
+  selectedOccurrence,
+} = Astro.props;
+const includesOrientation =
+  Boolean(series.includesOrientation) ||
+  events.some((event) => Boolean(event.includesOrientation));
+const startDate = new Date(`${series.firstDate}T00:00:00Z`);
+const weekday = new Intl.DateTimeFormat("en-CA", {
+  weekday: "long",
+  timeZone: "UTC",
+}).format(startDate);
+const date = new Intl.DateTimeFormat("en-CA", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+}).format(startDate);
+---
+
+<li
+  class="volunteer-event-card volunteer-series-card"
+  data-series-card={series.id}
+  data-includes-orientation={String(includesOrientation)}
+  hidden={!matchesEventFilter(filter, true, includesOrientation)}
+>
+  <div data-series-summary>
+    <h3>
+      Every {
+        series.intervalWeeks === 1 ? "week" : `${series.intervalWeeks} weeks`
+      } on {weekday}
+    </h3>
+    <p>
+      {series.includesOrientation ? "Orientation + Patrol" : "Patrol"}
+      {series.hidden || !series.open ? " · Public visibility off" : ""}
+    </p>
+    <p>Starting on {date}</p>
+    <p>{formatTimeInput(series.localTime)}</p>
+    <p>
+      Meeting at {
+        series.meetingPointUrl ? (
+          <a href={series.meetingPointUrl} target="_blank" rel="noreferrer">
+            {series.meetingPoint}
+          </a>
+        ) : (
+          series.meetingPoint
+        )
+      }
+    </p>
+    {
+      series.stoppedFrom ? (
+        <p class="volunteer-hidden">Stopped from {series.stoppedFrom}</p>
+      ) : series.endDate ? (
+        <p>Through {series.endDate}</p>
+      ) : null
+    }
+  </div>
+  <details
+    class="volunteer-series-occurrences"
+    data-series-occurrences
+    open={events.some((event) => event.id === selectedOccurrence)}
+  >
+    <summary data-series-occurrence-summary
+      >Occurrences ({events.length} loaded)</summary
+    >
+    <ul class="volunteer-event-list" data-series-event-list>
+      {
+        events.map((event) => (
+          <EventCard
+            event={event}
+            actor={actor}
+            organizer
+            roster={rosters.filter((person) => person.eventId === event.id)}
+            destinations={destinations}
+            filter="all"
+            series={series}
+          />
+        ))
+      }
+    </ul>
+    <p data-series-empty hidden={events.length !== 0}>No occurrences loaded.</p>
+    <form
+      class="volunteer-form"
+      data-series-occurrence
+      action="/api/v1/events/action"
+      method="post"
+    >
+      <input type="hidden" name="seriesId" value={series.id} />
+      <label class="volunteer-field">
+        Scheduled date to manage
+        <NativePickerInput
+          name="occurrenceDate"
+          min={series.firstDate}
+          required
+        />
+      </label>
+      <button
+        class="btn btn-outline"
+        type="submit"
+        data-loading-label="Opening…">Open occurrence</button
+      >
+      <p data-form-message role="status" hidden></p>
+    </form>
+  </details>
+  <PatrolSeriesControls series={series} />
+</li>

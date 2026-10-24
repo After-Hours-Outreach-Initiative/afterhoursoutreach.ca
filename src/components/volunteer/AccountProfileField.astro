@@ -1,0 +1,128 @@
+---
+import {
+  applicationBirthDateError,
+  type applicationFields,
+  type ApplicationAnswers,
+} from "@/data/application";
+import FieldError from "@/components/FieldError.astro";
+import ApplicationBirthDate from "./ApplicationBirthDate.astro";
+import DateInput from "./DateInput.astro";
+
+interface Props {
+  field: (typeof applicationFields)[number];
+  values?: ApplicationAnswers | null;
+  active?: boolean;
+  hideLabel?: boolean;
+  required?: boolean;
+  readOnly?: boolean;
+}
+const {
+  field,
+  values,
+  active = true,
+  hideLabel = false,
+  required = field.required,
+  readOnly = false,
+} = Astro.props;
+const phone = field.name === "phone" || field.name === "emergencyPhone";
+const birthDate = field.name === "birthDate";
+const motivation = field.name === "motivation";
+const describedBy = `error-${field.name}${"help" in field && !readOnly ? ` help-${field.name}` : ""}`;
+const message =
+  field.name === "birthDate"
+    ? applicationBirthDateError
+    : field.name === "certificationExpiry"
+      ? "Enter a valid certification expiry date."
+      : phone
+        ? "Enter a valid phone number with at least 7 characters."
+        : required
+          ? "This field is required."
+          : `Keep this answer to ${"multiline" in field ? 2000 : 200} characters or fewer.`;
+---
+
+{
+  birthDate && !readOnly ? (
+    <ApplicationBirthDate
+      value={values?.birthDate ?? ""}
+      help={"help" in field ? field.help : ""}
+      required={required && active}
+    />
+  ) : field.name === "certificationExpiry" && !readOnly ? (
+    <DateInput
+      name={field.name}
+      id={`profile-${field.name}`}
+      label={field.label}
+      value={values?.[field.name] ?? ""}
+      {required}
+      {active}
+    />
+  ) : (
+    <div
+      class:list={[
+        "volunteer-field",
+        { "volunteer-wide": "multiline" in field },
+      ]}
+      data-other-training={field.name === "experience" || undefined}
+      data-other-relevant-training={field.name === "otherTraining" || undefined}
+      data-certification-expiry={
+        field.name === "certificationExpiry" || undefined
+      }
+      hidden={!active}
+    >
+      <label
+        for={`profile-${field.name}`}
+        class:list={{ "sr-only": hideLabel }}
+      >
+        {field.label}
+        {!readOnly &&
+          (required ? (
+            <span class="volunteer-required" aria-hidden="true">
+              {" "}
+              *
+            </span>
+          ) : (
+            <span class="volunteer-help"> (optional)</span>
+          ))}
+      </label>
+      {"multiline" in field ? (
+        <textarea
+          id={`profile-${field.name}`}
+          name={field.name}
+          aria-describedby={describedBy}
+          required={required && active && !readOnly}
+          readonly={readOnly || !active}
+          rows="3"
+          maxlength={motivation ? undefined : 2000}
+          set:text={values?.[field.name] ?? ""}
+        />
+      ) : (
+        <input
+          id={`profile-${field.name}`}
+          name={field.name}
+          aria-describedby={describedBy}
+          type={"type" in field ? field.type : "text"}
+          autocomplete={"autocomplete" in field ? field.autocomplete : "off"}
+          value={values?.[field.name] ?? ""}
+          required={required && active && !readOnly}
+          readonly={readOnly || !active}
+          pattern={
+            phone
+              ? String.raw`(?=.*\S)[\d+\(\).\s\-xX]{7,}`
+              : required
+                ? String.raw`.*\S.*`
+                : undefined
+          }
+          spellcheck={birthDate ? false : undefined}
+          minlength={phone ? "7" : undefined}
+          maxlength={phone ? "40" : "200"}
+        />
+      )}
+      {"help" in field && !readOnly && (
+        <span class="volunteer-help" id={`help-${field.name}`}>
+          {field.help}
+        </span>
+      )}
+      <FieldError field={field.name} message={message} />
+    </div>
+  )
+}

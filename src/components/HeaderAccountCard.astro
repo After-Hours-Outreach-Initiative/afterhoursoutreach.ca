@@ -1,0 +1,64 @@
+---
+import AccountIcon from "@/components/icons/AccountIcon.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+
+interface Props {
+  signedIn: boolean;
+  name?: string;
+  email?: string;
+  accountPage: boolean;
+  class?: string;
+  showIcon?: boolean;
+  showArrows?: boolean;
+}
+
+const {
+  signedIn,
+  name,
+  email,
+  accountPage,
+  class: className,
+  showIcon = false,
+  showArrows = false,
+} = Astro.props;
+---
+
+<div class:list={["header-account-card", className]}>
+  <a
+    class="header-account-identity"
+    href="/volunteer/account"
+    aria-current={accountPage ? "page" : undefined}
+  >
+    {
+      showIcon && (
+        <span class="header-account-icon">
+          <AccountIcon class="size-5 shrink-0" />
+        </span>
+      )
+    }
+    <div class="header-account-details">
+      <strong
+        class="header-account-name"
+        data-account-menu-name={signedIn ? "" : undefined}
+        >{name?.trim() || "Your account"}</strong
+      >
+      <p
+        class="header-account-email"
+        data-account-email={signedIn ? "" : undefined}
+      >
+        {email}
+      </p>
+    </div>
+    <ArrowRightIcon class="header-account-arrow" />
+  </a>
+  <hr class="header-account-divider" />
+  <a href="/volunteer/account" aria-current={accountPage ? "page" : undefined}>
+    Account
+    {showArrows && <ArrowRightIcon class="header-mobile-arrow" />}
+  </a>
+  <form data-sign-out action="/api/v1/auth/sign-out" method="post">
+    <button type="submit">Sign out</button>
+    <p class="header-account-message" data-form-message role="status" hidden>
+    </p>
+  </form>
+</div>

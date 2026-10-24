@@ -1,0 +1,176 @@
+---
+import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
+import FieldError from "@/components/FieldError.astro";
+import DialogHeader from "@/components/DialogHeader.astro";
+import EventFields from "./EventFields.astro";
+interface Props {
+  event?: EventRow;
+  series?: PatrolSeriesRow;
+}
+const { event, series } = Astro.props;
+const dialogId = `event-editor-${event?.id ?? "new"}`;
+---
+
+<dialog
+  class="dialog-pop dialog-frame volunteer-dialog"
+  id={dialogId}
+  aria-labelledby={`${dialogId}-heading`}
+>
+  <DialogHeader
+    id={`${dialogId}-heading`}
+    title={event ? "Edit event" : "Create event"}
+  />
+  <div class="dialog-body">
+    <form
+      id={`${dialogId}-save`}
+      class="volunteer-form"
+      data-event-save
+      data-email-prompt={event && event.confirmed > 0 ? "event" : undefined}
+      data-future-email-prompt={event && event.futureEditableConfirmed > 0
+        ? "series"
+        : undefined}
+      action="/api/v1/events/action"
+      method="post"
+    >
+      {
+        event && (
+          <>
+            <input type="hidden" name="id" value={event.id} />
+            <input type="hidden" name="version" value={event.updatedAt} />
+          </>
+        )
+      }
+      <div class="volunteer-fields">
+        {
+          event?.seriesId && series && (
+            <>
+              <input type="hidden" name="seriesId" value={series.id} />
+              <input
+                type="hidden"
+                name="seriesVersion"
+                value={series.updatedAt}
+              />
+              <input
+                type="hidden"
+                name="occurrenceDate"
+                value={event.occurrenceDate!}
+              />
+              <label class="volunteer-field volunteer-wide">
+                Apply changes to
+                <select name="scope">
+                  <option value="occurrence">Only this occurrence</option>
+                  <option value="future">This and future occurrences</option>
+                </select>
+                <span class="volunteer-help">
+                  Future edits keep bookings and individual exceptions
+                  unchanged. Dates retain their original recurring identity; the
+                  date shift may be up to 366 days earlier or later.
+                </span>
+              </label>
+            </>
+          )
+        }
+        <EventFields id={dialogId} {event} />
+      </div>
+      <p data-form-message role="status" hidden></p>
+      <noscript
+        ><p>
+          Enable JavaScript to edit event dates and save this event.
+        </p></noscript
+      >
+    </form>
+    {
+      event && (
+        <form
+          id={`${dialogId}-cancel`}
+          class="volunteer-form volunteer-danger"
+          data-event-cancel
+          data-email-prompt={event.confirmed > 0 ? "event-cancel" : undefined}
+          data-future-email-prompt={
+            event.futureConfirmed > 0 ? "series-cancel" : undefined
+          }
+          action="/api/v1/events/action"
+          method="post"
+        >
+          <h3 data-event-cancel-heading hidden={event.confirmed === 0}>
+            Cancel event
+          </h3>
+          <input type="hidden" name="id" value={event.id} />
+          <input type="hidden" name="version" value={event.updatedAt} />
+          {series && (
+            <>
+              <input type="hidden" name="seriesId" value={series.id} />
+              <input
+                type="hidden"
+                name="seriesVersion"
+                value={series.updatedAt}
+              />
+              <input
+                type="hidden"
+                name="occurrenceDate"
+                value={event.occurrenceDate!}
+              />
+              <label class="volunteer-field">
+                Cancel
+                <select name="scope">
+                  <option value="occurrence">Only this occurrence</option>
+                  <option value="future">
+                    This and future occurrences (stop recurrence)
+                  </option>
+                </select>
+              </label>
+              <p class="volunteer-help">
+                Cancelling future occurrences also cancels their bookings,
+                including individual exceptions. Past attendance and
+                cancellation history are kept.
+              </p>
+            </>
+          )}
+          <div
+            class="volunteer-field"
+            data-event-cancel-reason
+            hidden={event.confirmed === 0}
+          >
+            <label for={`${dialogId}-reason`}>Reason (optional)</label>
+            <textarea
+              id={`${dialogId}-reason`}
+              name="reason"
+              aria-describedby={`error-${dialogId}-reason`}
+              maxlength="1000"
+              rows="3"
+              disabled={event.confirmed === 0}
+            />
+            <FieldError
+              field={`${dialogId}-reason`}
+              message="Keep the reason to 1000 characters or fewer."
+            />
+          </div>
+          <p data-form-message role="status" hidden />
+        </form>
+      )
+    }
+  </div>
+  <div class="dialog-footer">
+    <button
+      class="btn btn-primary"
+      type="submit"
+      form={`${dialogId}-save`}
+      data-loading-label={event ? "Saving…" : "Creating…"}
+      disabled
+    >
+      {event ? "Save event" : "Create event"}
+    </button>
+    {
+      event && (
+        <button
+          class="btn btn-red"
+          type="submit"
+          form={`${dialogId}-cancel`}
+          data-loading-label="Cancelling…"
+        >
+          Cancel event
+        </button>
+      )
+    }
+  </div>
+</dialog>

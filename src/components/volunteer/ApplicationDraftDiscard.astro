@@ -1,0 +1,40 @@
+---
+import TrashIcon from "@/components/icons/TrashIcon.astro";
+import DraftSaveStatus from "./DraftSaveStatus.astro";
+
+// Browsers do not expose randomUUID on HTTP LAN addresses; generate it server-side.
+const discardId = crypto.randomUUID();
+---
+
+<div
+  class="volunteer-help"
+  data-application-draft-actions
+  data-draft-discard-id={discardId}
+>
+  <div
+    class="volunteer-actions"
+    id="application-review-and-discard"
+    data-contents-actions
+    role="group"
+    aria-label="Review or discard"
+  >
+    <button
+      type="submit"
+      form="volunteer-application"
+      data-application-review
+      class="btn btn-primary"
+      disabled
+    >
+      Review application
+    </button>
+    <button type="button" data-draft-discard class="btn btn-red" disabled>
+      <TrashIcon class="volunteer-draft-discard-icon" />
+      <span data-draft-discard-label>Discard application draft</span>
+    </button>
+  </div>
+  <DraftSaveStatus />
+  <p data-draft-discard-status role="status" aria-live="polite" hidden></p>
+  <a href="/apply" data-draft-new class="inline-block mt-2 underline" hidden>
+    Reload to start or check your draft
+  </a>
+</div>

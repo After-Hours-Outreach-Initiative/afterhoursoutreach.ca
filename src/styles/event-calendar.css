@@ -1,0 +1,122 @@
+.event-calendar {
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 22rem;
+  margin-inline: auto;
+  padding: 0.75rem;
+  border: 1px solid #3f3f46;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+@container event-schedule (min-width: 46rem) {
+  .event-calendar {
+    flex: 0 0 18.5rem;
+    max-width: 18.5rem;
+    margin-inline: 0;
+    position: sticky;
+    top: calc(
+      var(--site-header-rendered-height, var(--site-header-height, 6rem)) + 1rem
+    );
+  }
+}
+.event-calendar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.event-calendar-controls button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 1px solid #52525b;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  color: #e0e7ff;
+}
+.event-calendar-controls button:disabled {
+  opacity: 0.4;
+}
+.event-calendar-controls button:not(:disabled):hover {
+  background: var(--color-blue-deep);
+}
+.event-calendar table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: center;
+}
+.event-calendar th {
+  padding: 0.25rem 0;
+  color: #a1a1aa;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.event-calendar abbr {
+  text-decoration: none;
+}
+.event-calendar td {
+  height: auto;
+  padding: 0.125rem 0;
+  border-top: 1px solid #27272a;
+  vertical-align: top;
+  color: #a1a1aa;
+}
+.event-calendar td[aria-current="date"] {
+  background: #1e293b;
+  border-radius: 0.375rem;
+  color: white;
+}
+.event-calendar-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.event-calendar-circle {
+  border: 2px solid #a5b4fc;
+  border-radius: 50%;
+  background: var(--color-blue-deep);
+  color: white;
+}
+.event-calendar a {
+  display: flex;
+  min-width: 1.5rem;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  color: #c7d2fe;
+  text-decoration: none;
+}
+.event-calendar a:hover {
+  background: #223265;
+  color: white;
+}
+.event-calendar-extra-events {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.event-calendar-extra-events a {
+  width: 1.5rem;
+  min-height: 1.5rem;
+}
+.event-calendar-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+.event-calendar a:focus-visible,
+.event-calendar button:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 2px;
+}

@@ -1,0 +1,41 @@
+---
+import {
+  formatApplicationSubmittedTime,
+  type SubmittedApplication,
+} from "@/data/application";
+import ApplicationSummary from "./ApplicationSummary.astro";
+
+interface Props {
+  submission: SubmittedApplication | null;
+  embedded?: boolean;
+}
+const { submission, embedded = false } = Astro.props;
+---
+
+{
+  submission && (
+    <section
+      class:list={{ "volunteer-panel": !embedded }}
+      aria-labelledby={embedded ? undefined : "submitted-application-heading"}
+      data-submitted-application
+    >
+      {!embedded && (
+        <h2 id="submitted-application-heading" data-contents-section>
+          Volunteer Application
+        </h2>
+      )}
+      <p>
+        Submitted:{" "}
+        <time datetime={submission.submittedAt}>
+          {formatApplicationSubmittedTime(submission.submittedAt)}
+        </time>
+      </p>
+      <details class="mt-6">
+        <summary class="cursor-pointer text-indigo-300 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4">
+          View submitted application
+        </summary>
+        <ApplicationSummary {...submission} />
+      </details>
+    </section>
+  )
+}

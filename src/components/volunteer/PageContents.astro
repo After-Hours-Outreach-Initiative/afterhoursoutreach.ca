@@ -1,0 +1,184 @@
+---
+import CloudCheckIcon from "@/components/icons/CloudCheckIcon.astro";
+import DraftSaveStatus from "./DraftSaveStatus.astro";
+import PageContentsList from "./PageContentsList.astro";
+
+interface Props {
+  entries: {
+    id: string;
+    heading: string;
+    nested?: boolean;
+    completable?: boolean;
+  }[];
+  application?: boolean;
+  review?: boolean;
+  heading?: string;
+  /** Compact label while the navigation is not sticky. */
+  idleHeading?: string;
+}
+const {
+  entries,
+  application = false,
+  review = false,
+  heading = application ? "Sections" : "On this page",
+  idleHeading,
+} = Astro.props;
+const totalSections = entries.filter((entry) => entry.completable).length;
+---
+
+<nav
+  class:list={[
+    "volunteer-contents",
+    { "volunteer-application-contents": application },
+  ]}
+  data-page-contents
+  data-contents-idle-heading={idleHeading}
+  data-application-contents={(application && !review) || undefined}
+  data-application-review-contents={review || undefined}
+  hidden={review}
+  aria-label={heading}
+>
+  <div class="volunteer-contents-bar-slot">
+    <div class="volunteer-contents-bar" data-contents-bar>
+      <details class="volunteer-contents-menu" data-contents-menu>
+        <summary
+          data-application-step-heading={application || undefined}
+          aria-label={heading}
+        >
+          <svg
+            class="volunteer-contents-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"></path>
+          </svg>
+          <span class="volunteer-contents-current" data-contents-current>
+            {idleHeading ?? (application ? heading : entries[0]?.heading)}
+          </span>
+          {
+            application && !review && (
+              <>
+                <span
+                  class="volunteer-contents-save-status"
+                  data-draft-save-summary
+                  data-save-state="initializing"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  <CloudCheckIcon />
+                  <span class="sr-only" data-draft-save-message />
+                </span>
+                <span
+                  class="volunteer-contents-progress"
+                  data-application-progress
+                  role="progressbar"
+                  aria-label="Application progress"
+                  aria-valuemin="0"
+                  aria-valuemax={totalSections}
+                  aria-valuenow="0"
+                  aria-valuetext={`0 of ${totalSections} sections complete`}
+                >
+                  <svg
+                    viewBox="0 0 28 28"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      class="volunteer-contents-progress-track"
+                      cx="14"
+                      cy="14"
+                      r="11"
+                    />
+                    <circle
+                      data-application-progress-value
+                      cx="14"
+                      cy="14"
+                      r="11"
+                      pathLength="100"
+                      stroke-dasharray="100"
+                      stroke-dashoffset="100"
+                      transform="rotate(-90 14 14)"
+                    />
+                    <path
+                      class="volunteer-contents-progress-check"
+                      d="m11 14 2 2 4-4"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+              </>
+            )
+          }
+          <svg
+            class="volunteer-contents-chevron"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </summary>
+        <div class="volunteer-contents-dropdown-band">
+          <div class="volunteer-contents-dropdown" data-contents-dropdown>
+            <PageContentsList
+              entries={entries}
+              application={application}
+              variant="menu"
+            />
+            {
+              application && !review && (
+                <>
+                  <button
+                    type="submit"
+                    form="volunteer-application"
+                    data-application-review
+                    class="btn btn-primary"
+                    disabled
+                  >
+                    Review application
+                  </button>
+                  <DraftSaveStatus />
+                </>
+              )
+            }
+          </div>
+        </div>
+      </details>
+      {
+        application && !review && (
+          <div class="volunteer-contents-actions">
+            <button
+              type="submit"
+              form="volunteer-application"
+              data-application-review
+              class="btn btn-primary volunteer-application-review-sidebar"
+              disabled
+            >
+              Review application
+            </button>
+            <DraftSaveStatus />
+          </div>
+        )
+      }
+    </div>
+  </div>
+  <div class="volunteer-contents-sidebar">
+    <h2>{heading}</h2>
+    <PageContentsList
+      entries={entries}
+      application={application}
+      variant="sidebar"
+    />
+  </div>
+</nav>

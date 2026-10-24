@@ -2,17 +2,29 @@
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import FacebookIcon from "@/components/icons/FacebookIcon.astro";
 import LinkedInIcon from "@/components/icons/LinkedInIcon.astro";
-import { contactEmail, contactPhone, navLinks, social } from "@/data/site";
+import {
+  contactEmail,
+  contactPhone,
+  siteNavigation,
+  social,
+} from "@/data/site";
 import { organization } from "@/data/organization";
+interface Props {
+  signedIn: boolean;
+  organizer?: boolean;
+  eventAccess?: boolean;
+}
+const { signedIn, organizer = false, eventAccess = false } = Astro.props;
+const links = siteNavigation(signedIn, organizer, eventAccess);
 ---
 
 <footer class="bg-black text-white" id="contact">
   <div
-    class="mx-auto grid w-full max-w-[1248px] grid-cols-1 items-start gap-x-24 gap-y-12 px-6 py-14 max-sm:px-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto]"
+    class="mx-auto grid w-full max-w-site grid-cols-1 items-start gap-x-24 gap-y-12 px-6 py-14 max-sm:px-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto]"
   >
-    <div>
+    <div class="min-w-0">
       <a
-        class="flex shrink-0 items-center gap-4"
+        class="flex w-fit max-w-full flex-wrap items-center gap-4"
         href="/"
         aria-label="After Hours Outreach Initiative, home"
       >
@@ -27,7 +39,9 @@ import { organization } from "@/data/organization";
           loading="lazy"
           decoding="async"
         />
-        <span class="flex flex-col leading-tight whitespace-nowrap">
+        <span
+          class="flex min-w-0 max-w-full flex-col leading-tight wrap-anywhere"
+        >
           <strong class="font-heading text-xl leading-none font-bold"
             >After Hours</strong
           >
@@ -39,7 +53,81 @@ import { organization } from "@/data/organization";
 
       <nav
         class="mt-8 flex flex-col items-start gap-3 text-base text-zinc-300"
-        aria-label="Contact and social media"
+        aria-label="Contact"
+      >
+        <a
+          class="inline-flex min-w-0 max-w-full items-center gap-2.5 hover:text-white"
+          href={`mailto:${contactEmail}`}
+        >
+          {/* lucide: mail */}
+          <svg
+            class="lucide size-[1.25em] shrink-0 text-blue"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path>
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+          </svg>
+          <span class="min-w-0 wrap-anywhere">{contactEmail}</span></a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href={`tel:+1${contactPhone.replace(/\D/g, "")}`}
+        >
+          {/* lucide: phone */}
+          <svg
+            class="lucide size-[1.25em] shrink-0 text-blue"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path
+              d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"
+            ></path>
+          </svg>
+          {contactPhone}</a
+        >
+      </nav>
+    </div>
+
+    <div>
+      <h2 class="m-0 text-base text-white">Site</h2>
+
+      <nav
+        class="mt-4 flex flex-col items-start gap-3 text-base text-zinc-300"
+        aria-label="Footer navigation"
+      >
+        {
+          links.map((link) => (
+            <a
+              class="hover:text-white"
+              href={link.href}
+              data-volunteer-nav={
+                link.href === "/volunteer" || link.href === "/events"
+                  ? ""
+                  : undefined
+              }
+            >
+              <span data-volunteer-nav-label>{link.label}</span>
+            </a>
+          ))
+        }
+      </nav>
+    </div>
+
+    <div>
+      <h2 class="m-0 text-base text-white">Socials</h2>
+
+      <nav
+        class="mt-4 flex flex-col items-start gap-3 text-base text-zinc-300"
+        aria-label="Social media"
       >
         <a
           class="inline-flex items-center gap-2.5 hover:text-white"
@@ -89,92 +177,20 @@ import { organization } from "@/data/organization";
           <FacebookIcon class="size-[1.25em] shrink-0 fill-current text-blue" />
           Facebook</a
         >
-        <a
-          class="inline-flex items-center gap-2.5 hover:text-white"
-          href={`mailto:${contactEmail}`}
-        >
-          {/* lucide: mail */}
-          <svg
-            class="lucide size-[1.25em] shrink-0 text-blue"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
-          >
-            <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path>
-            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-          </svg>
-          {contactEmail}</a
-        >
-        <a
-          class="inline-flex items-center gap-2.5 hover:text-white"
-          href={`tel:+1${contactPhone.replace(/\D/g, "")}`}
-        >
-          {/* lucide: phone */}
-          <svg
-            class="lucide size-[1.25em] shrink-0 text-blue"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path
-              d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"
-            ></path>
-          </svg>
-          {contactPhone}</a
-        >
       </nav>
-    </div>
-
-    <div>
-      <h2 class="m-0 text-base text-white">Site</h2>
-
-      <nav
-        class="mt-4 flex flex-col items-start gap-3 text-base text-zinc-300"
-        aria-label="Footer navigation"
-      >
-        {
-          navLinks.map((link) => (
-            <a class="hover:text-white" href={link.href}>
-              {link.label}
-            </a>
-          ))
-        }
-      </nav>
-    </div>
-
-    <div>
-      <h2 class="m-0 text-base text-white">Non-profit information</h2>
-
-      <table class="mt-4 text-base leading-7">
-        <tbody>
-          <tr>
-            <th class="pr-6 text-left font-normal text-zinc-400" scope="row"
-              >Incorporation No.</th
-            >
-            <td class="text-zinc-300">{organization.incorporationNumber}</td>
-          </tr>
-          <tr>
-            <th class="pr-6 text-left font-normal text-zinc-400" scope="row"
-              >Business No.</th
-            >
-            <td class="text-zinc-300">{organization.businessNumber}</td>
-          </tr>
-        </tbody>
-      </table>
     </div>
   </div>
 
-  <div class="mx-auto w-full max-w-[1248px] px-6 max-sm:px-4">
-    <div class="flex justify-center py-6 text-zinc-400">
+  <div class="mx-auto w-full max-w-site px-6 max-sm:px-4">
+    <div
+      class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 py-6 text-center text-base text-zinc-400"
+    >
       <p class="m-0 text-base">
         &copy; {`${new Date().getFullYear()} ${organization.legalName}`}
       </p>
+      <a class="underline underline-offset-4 hover:text-white" href="/privacy"
+        >Privacy policy</a
+      >
     </div>
   </div>
 </footer>
