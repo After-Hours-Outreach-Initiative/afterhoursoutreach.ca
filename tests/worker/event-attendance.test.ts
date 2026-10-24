@@ -286,7 +286,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           };
         });
         expect(Math.abs(avatarLayout.leftOffset)).toBeLessThan(1);
-        expect(avatarLayout.width).toBe(28);
+        expect(avatarLayout.width).toBeCloseTo((32 * 14) / 19.5, 1);
         expect(avatarLayout.height).toBe(32);
         await expect(
           card.locator(".event-avatar-row .attendee-medic"),
@@ -305,6 +305,15 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           const avatar = card
             .locator(`.event-avatar-row .attendee-${category} svg`)
             .first();
+          const bounds = await avatar.evaluate((element: SVGSVGElement) => {
+            const { x, y, width, height } = element.getBBox();
+            const viewBox = element.viewBox.baseVal;
+            return {
+              artwork: [x, y, width, height],
+              viewBox: [viewBox.x, viewBox.y, viewBox.width, viewBox.height],
+            };
+          });
+          expect(bounds.artwork).toEqual(bounds.viewBox);
           for (const tag of ["circle", "path"]) {
             const shape = avatar.locator(`${tag}[fill="currentColor"]`);
             await expect(shape).toHaveAttribute("fill", "currentColor");

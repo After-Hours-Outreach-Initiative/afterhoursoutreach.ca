@@ -1,7 +1,6 @@
 @reference "./tailwind.css";
 
 .volunteer-portal {
-  --attendee-avatar-width: 1.375rem;
   --volunteer-border: 1px solid #3f3f46;
   --volunteer-check-size: 1.375rem;
   --volunteer-check-gap: 0.625rem;
