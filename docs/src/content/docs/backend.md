@@ -66,8 +66,10 @@ accounts/drafts remain listed too, so repeated selections never leave invisible
 accounts. The four manual presets **Applied**, **Accepted**, **Inactive**, and
 **Organizer** have no trash button, and the server rejects their deletion without
 changing any records. Protection uses only their exact preset IDs, even if renamed.
-Other saved local accounts retain the compact trash button on the right with
-confirmation, including regular sign-in accounts, other named fixtures, and the
+Other saved local accounts retain the compact trash button on the right. Click
+it once to show a confirmation checkmark, then click again to delete. Clicking
+away, pressing Escape, or closing the panel clears the confirmation. This includes
+regular sign-in accounts, other named fixtures, and the
 original Not applied account. Visitor and the virtual Not applied choice have no
 trash button; deleting the current account signs out, while deleting another
 leaves the current session alone. Deletion removes its application, draft,

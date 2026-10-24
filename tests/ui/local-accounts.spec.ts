@@ -269,11 +269,12 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   for (const [name, value] of [
     ["teams", "outreach"],
     ["training", "none"],
+    ["relevantExperience", "none"],
     ["heardAboutUsSources", "friend-word-of-mouth"],
   ])
     await page.locator(`[name="${name}"][value="${value}"]`).check();
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/events$/);
+  await expect(page).toHaveURL(/\/volunteer$/);
   expect(await current()).toMatchObject({
     id: second.id,
     name: sampleAnswers.preferredName,
@@ -294,15 +295,31 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   const third = await current();
   const choices = await openLocalAccountSwitcher(page);
   const remove = choices.locator(`[data-delete-user="${second.id}"]`);
-  page.once("dialog", (dialog) => dialog.dismiss());
+  const deletions: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/v1/auth/dev/delete-user"))
+      deletions.push(request.url());
+  });
   await remove.click();
-  await expect(remove).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
+  await expect(remove).toHaveAccessibleName(/^Confirm deletion of/);
+  await expect(remove.locator("svg path")).toHaveAttribute(
+    "d",
+    "m5 12 4 4L19 6",
+  );
+  expect(deletions).toHaveLength(0);
+  await page.keyboard.press("Escape");
+  await expect(choices).toBeVisible();
+  await expect(remove).not.toHaveAttribute("data-delete-confirming");
+  await remove.click();
+  await choices.getByRole("heading", { name: "Existing accounts" }).click();
+  await expect(remove).not.toHaveAttribute("data-delete-confirming");
+  await remove.click();
   await remove.click();
   await expect(remove).toHaveCount(0);
+  expect(deletions).toHaveLength(1);
   expect((await current()).id).toBe(third.id);
   // Deleting the current account revokes its session and returns to Visitor.
-  page.once("dialog", (dialog) => dialog.accept());
+  await choices.locator(`[data-delete-user="${third.id}"]`).click();
   await choices.locator(`[data-delete-user="${third.id}"]`).click();
   await expect(page).toHaveURL(/\/volunteer$/);
   expect(

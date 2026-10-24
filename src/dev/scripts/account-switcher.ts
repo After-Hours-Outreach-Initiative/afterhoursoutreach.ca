@@ -58,6 +58,38 @@ export async function initAccountSwitcher() {
   let busy = true;
   let currentUserId: string | null = null;
   let progress: DevelopmentUsers["applicationProgress"] = null;
+  let pendingDelete: HTMLButtonElement | undefined;
+  const showDeleteConfirmation = (
+    button: HTMLButtonElement,
+    confirming: boolean,
+  ) => {
+    const label = `${confirming ? "Confirm deletion of" : "Delete"} ${button.dataset.deleteName}`;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.toggleAttribute("data-delete-confirming", confirming);
+    button.classList.toggle("btn-quiet", !confirming);
+    button.classList.toggle("btn-red", confirming);
+    const icon = button.querySelector("svg")!;
+    icon.replaceChildren();
+    // Match CheckIcon.astro and TrashIcon.astro using DOM nodes, not account HTML.
+    for (const d of confirming
+      ? ["m5 12 4 4L19 6"]
+      : [
+          "M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2",
+          "m5 6 1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7m4-7v7",
+        ]) {
+      const path = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path",
+      );
+      path.setAttribute("d", d);
+      icon.appendChild(path);
+    }
+  };
+  const resetDeleteConfirmation = () => {
+    if (pendingDelete) showDeleteConfirmation(pendingDelete, false);
+    pendingDelete = undefined;
+  };
   const updateSteps = () => {
     const submitted = progress?.submittedAt != null;
     const naloxone = progress?.naloxoneCompletedAt != null;
@@ -119,9 +151,17 @@ export async function initAccountSwitcher() {
     .querySelector<HTMLButtonElement>("[data-close-account-switcher]")
     ?.addEventListener("click", () => root.close());
   root.addEventListener("close", () => {
+    resetDeleteConfirmation();
     trigger?.setAttribute("aria-expanded", "false");
   });
+  root.addEventListener("cancel", (event) => {
+    if (!pendingDelete) return;
+    event.preventDefault();
+    resetDeleteConfirmation();
+  });
   root.addEventListener("click", (event) => {
+    if (pendingDelete && !event.composedPath().includes(pendingDelete))
+      resetDeleteConfirmation();
     if (event.target !== root) return;
     const bounds = root.getBoundingClientRect();
     if (
@@ -192,12 +232,14 @@ export async function initAccountSwitcher() {
     if (!button || !profiles.contains(button) || button.disabled || busy)
       return;
     if (button.dataset.deleteUser) {
-      if (
-        !window.confirm(
-          `Delete ${button.dataset.deleteName}? This permanently removes this local account, its application, and its draft.`,
-        )
-      )
+      if (pendingDelete !== button) {
+        resetDeleteConfirmation();
+        pendingDelete = button;
+        showDeleteConfirmation(button, true);
+        button.focus({ preventScroll: true });
         return;
+      }
+      resetDeleteConfirmation();
       setBusy(true);
       message.hidden = true;
       try {
@@ -305,11 +347,8 @@ export async function initAccountSwitcher() {
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "btn btn-quiet account-profile-delete";
-      remove.setAttribute("aria-label", `Delete ${label} (${user.email})`);
-      remove.title = `Delete ${label} (${user.email})`;
       remove.dataset.deleteUser = user.id;
       remove.dataset.deleteName = `${label} (${user.email})`;
-      // Match TrashIcon.astro using DOM nodes, not HTML containing account data.
       const icon = document.createElementNS(
         "http://www.w3.org/2000/svg",
         "svg",
@@ -326,18 +365,11 @@ export async function initAccountSwitcher() {
         focusable: "false",
       }))
         icon.setAttribute(name, value);
-      for (const d of [
-        "M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2",
-        "m5 6 1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7m4-7v7",
-      ]) {
-        const path = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "path",
-        );
-        path.setAttribute("d", d);
-        icon.appendChild(path);
-      }
       remove.appendChild(icon);
+      showDeleteConfirmation(remove, false);
+      remove.addEventListener("blur", () => {
+        if (pendingDelete === remove) resetDeleteConfirmation();
+      });
       row.appendChild(button);
       row.appendChild(remove);
       accounts.appendChild(row);
