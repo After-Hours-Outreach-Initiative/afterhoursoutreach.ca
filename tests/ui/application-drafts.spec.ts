@@ -424,8 +424,8 @@ test("last confirmed save time persists across input and option edits while newe
     await page.locator('[name="firstName"]').fill("Pending answer");
     await expect(messages).toHaveText(Array(3).fill(confirmedStatus));
     await expect(indicator).toHaveAttribute("data-save-state", "pending");
-    await expect(indicator.locator(".cloud-save-pending")).toBeVisible();
-    await expect(indicator.locator(".cloud-save-saved")).toBeHidden();
+    await expect(indicator.locator("svg")).toBeVisible();
+    await expect(indicator.locator(".cloud-save-mark:visible")).toHaveCount(0);
     await page.clock.runFor(1000);
     await expect.poll(() => requests).toBe(1);
     await expect(messages).toHaveText(Array(3).fill(confirmedStatus));

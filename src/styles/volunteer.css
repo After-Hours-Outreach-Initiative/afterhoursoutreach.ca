@@ -68,7 +68,6 @@ body:has(
 .cloud-save-mark {
   display: none;
 }
-[data-save-state="pending"] .cloud-save-pending,
 [data-save-state="loading"] .cloud-save-loading,
 [data-save-state="saved"] .cloud-save-saved,
 [data-save-state="error"] .cloud-save-error,
