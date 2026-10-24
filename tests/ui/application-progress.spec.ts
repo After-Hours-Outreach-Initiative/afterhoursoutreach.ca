@@ -377,21 +377,21 @@ for (const width of [390, 1280]) {
     await expectComplete(page, "emergency-contact", true);
 
     await form.locator('[name="teams"][value="medic"]').check();
-    await expectComplete(page, "training-and-safety", false);
+    await expectComplete(page, "team-interests", false);
     await expectProgress(page, 3);
     await form.locator('[name="certifications"][value="other"]').check();
     await fillApplicationField(form, "certificationExpiry", "2030-01-01");
-    await expectComplete(page, "training-and-safety", false);
+    await expectComplete(page, "team-interests", false);
     await form.locator('[name="experience"]').fill("Other medical training");
-    await expectComplete(page, "training-and-safety", true);
+    await expectComplete(page, "team-interests", true);
     await form.locator('[name="training"][value="other"]').check();
     await expectComplete(page, "training-and-safety", false);
     await form.locator('[name="otherTraining"]').fill("Safety training");
     await expectComplete(page, "training-and-safety", true);
     await form.locator('[name="experience"]').fill("");
-    await expectComplete(page, "training-and-safety", false);
+    await expectComplete(page, "team-interests", false);
     await form.locator('[name="teams"][value="medic"]').uncheck();
-    await expectComplete(page, "training-and-safety", true);
+    await expectComplete(page, "team-interests", true);
 
     await form
       .locator('[name="motivation"]')
@@ -614,10 +614,10 @@ test("restored drafts initialize completion without showing validation errors", 
   expect(response.ok(), await response.text()).toBe(true);
   await page.goto("/apply");
   await expect(page.locator('[name="teams"][value="outreach"]')).toBeChecked();
-  await expectComplete(page, "team-interests", true);
+  await expectComplete(page, "team-interests", false);
   await expectComplete(page, "emergency-contact", true);
   await expectComplete(page, "training-and-safety", false);
-  await expectProgress(page, 2);
+  await expectProgress(page, 1);
   await expect(
     page.locator(".volunteer-application-section > fieldset:visible"),
   ).toHaveCount(5);

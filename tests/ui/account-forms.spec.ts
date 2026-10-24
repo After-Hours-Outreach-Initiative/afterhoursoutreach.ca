@@ -1869,6 +1869,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   });
   const certifications = form.locator("[data-medic-certifications]");
   const medic = form.getByLabel("Medic", { exact: true });
+  const details = form.locator("[data-medic-details]");
   const firstAid = certifications.getByRole("radio", {
     name: "Advanced First Aid (formerly OFA Level 3)",
     exact: true,
@@ -1925,8 +1926,24 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(
     form.getByRole("checkbox", { name: "Outreach", exact: true }),
   ).toBeChecked();
-  await medic.check();
+  expect(
+    await medic.evaluate((input: HTMLInputElement) => {
+      input.click();
+      const details = document.querySelector<HTMLElement>(
+        "[data-medic-details]",
+      )!;
+      return details.getAnimations()[0]?.effect?.getTiming().duration;
+    }),
+  ).toBe(220);
   await expect(certifications).toBeVisible();
+  await expect(medic).toHaveAttribute("aria-controls", "profile-medic-details");
+  await expect(medic).toHaveAttribute("aria-expanded", "true");
+  await expect(details).toHaveJSProperty("inert", false);
+  await expect(
+    form.locator(
+      '.volunteer-team-option:has([value="medic"]) + [data-medic-details] + .volunteer-team-option:has([value="non-patrol"])',
+    ),
+  ).toHaveCount(1);
   const certificationChoices = certifications.locator(
     ".volunteer-choice-options",
   );
@@ -2048,7 +2065,33 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(experience).not.toHaveAttribute("required");
   await other.check();
   await expect(experience).toHaveValue("Naloxone training");
-  await medic.uncheck();
+  expect(
+    await medic.evaluate((input: HTMLInputElement) => {
+      input.click();
+      const details = document.querySelector<HTMLElement>(
+        "[data-medic-details]",
+      )!;
+      return {
+        inert: details.inert,
+        ariaHidden: details.getAttribute("aria-hidden"),
+        animating: details.getAnimations().length,
+        required: details.querySelectorAll("[required]").length,
+        valid: [
+          ...details.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+            "input, textarea",
+          ),
+        ].every((field) => field.validity.valid),
+      };
+    }),
+  ).toEqual({
+    inert: true,
+    ariaHidden: "true",
+    animating: 1,
+    required: 0,
+    valid: true,
+  });
+  await expect(medic).toBeFocused();
+  await expect(certifications.getByRole("radio")).toHaveCount(0);
   await expect(training).toBeVisible();
   await expect(certifications).toBeHidden();
   await expect(certifications.locator("[required]")).toHaveCount(0);
@@ -2056,6 +2099,21 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).not.toHaveAttribute("required");
   await expect(experience).toBeHidden();
   await expect(experience).not.toHaveAttribute("required");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await medic.check();
+  await expect(details).not.toHaveAttribute("data-transitioning");
+  expect(
+    await details.evaluate((element) => element.getAnimations().length),
+  ).toBe(0);
+  expect(
+    await medic.evaluate((input: HTMLInputElement) => {
+      input.click();
+      const details = document.querySelector<HTMLElement>(
+        "[data-medic-details]",
+      )!;
+      return [details.hidden, details.inert, details.getAnimations().length];
+    }),
+  ).toEqual([true, true, 0]);
   await medic.check();
   await expect(other).toBeChecked();
   await expect(form.locator('[name="certificationExpiry"]')).toHaveValue(
@@ -2588,8 +2646,15 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(medic).toBeChecked();
   await expect(cards.nth(1)).toHaveCSS("background-color", "rgb(22, 33, 74)");
   await expect(training).toBeVisible();
+  await expect(
+    form.locator(
+      '.volunteer-team-option:has([value="medic"]) + [data-profile-team-training] [data-medic-details]',
+    ),
+  ).toBeVisible();
   await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
   await medic.press("Tab");
+  await expect(training.getByRole("radio").first()).toBeFocused();
+  await support.focus();
   await expect(support).toBeFocused();
   await expect(cards.nth(2)).toHaveCSS("outline-style", "solid");
   await support.press("Space");

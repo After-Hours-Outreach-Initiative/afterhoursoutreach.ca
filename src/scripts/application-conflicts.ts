@@ -80,7 +80,7 @@ export function initApplicationConflicts(form: HTMLFormElement) {
           parent && !parent.matches(".volunteer-application-section");
           parent = parent.parentElement
         )
-          if (parent.hidden) placement = parent;
+          if (parent.hidden || parent.inert) placement = parent;
         let next = placement.nextElementSibling;
         while (
           next?.hasAttribute("data-draft-conflict") &&
@@ -109,7 +109,7 @@ export function initApplicationConflicts(form: HTMLFormElement) {
                 "[data-draft-conflict] button",
               ),
               ...current.controls,
-            ].find((control) => !control.closest("[hidden]"));
+            ].find((control) => !control.closest("[hidden], [inert]"));
             next?.focus();
           },
           field,

@@ -162,11 +162,7 @@ test("draft offline merges retain local input and unresolved conflicts survive r
   await expect(page.locator('[name="phone"]')).toHaveValue("604-555-0122");
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect(conflict).toBeVisible();
-  for (const section of [
-    "personal-info",
-    "team-interests",
-    "training-and-safety",
-  ])
+  for (const section of ["personal-info", "team-interests"])
     for (const link of await page
       .locator(
         `[data-application-progress-link][href="#application-${section}"]`,

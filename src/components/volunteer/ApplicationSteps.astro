@@ -28,9 +28,8 @@ const reviewSections = sections.map((section) => {
       label: field.label + (field.required ? "" : " (optional)"),
     }));
   if (section.key === "team-interests")
-    rows = [{ name: "teams", label: "Which teams interest you?" }];
-  if (section.key === "training-and-safety")
     rows = [
+      { name: "teams", label: "Which teams interest you?" },
       {
         name: "certifications",
         label: certificationQuestion,
@@ -41,7 +40,14 @@ const reviewSections = sections.map((section) => {
         label: "Other training and experience",
         condition: "other-certification",
       },
-      ...rows.map((row) => ({ ...row, condition: "medic" })),
+      {
+        name: "certificationExpiry",
+        label: "Certification expiry date",
+        condition: "medic",
+      },
+    ];
+  if (section.key === "training-and-safety")
+    rows = [
       { name: "training", label: trainingQuestion },
       {
         name: "otherTraining",

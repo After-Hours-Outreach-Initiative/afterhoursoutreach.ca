@@ -290,12 +290,26 @@ body:has(
   width: 1rem;
   height: 1rem;
 }
-[data-profile-fields] > [data-profile-actions],
-[data-profile-team-training]:has([data-profile-medical-fields]) {
+[data-profile-fields] > [data-profile-actions] {
   margin-top: 1.5rem;
 }
-[data-profile-team-training] > p {
-  margin-bottom: 1rem;
+.volunteer-medic-details {
+  min-width: 0;
+}
+.volunteer-medic-details[data-transitioning] {
+  overflow: hidden;
+}
+.volunteer-medic-details-content {
+  padding-block: 0.75rem;
+}
+.volunteer-medic-note,
+[data-profile-team-training]:not(
+  :has([data-profile-medical-fields]:not([hidden]))
+) {
+  display: none;
+}
+[data-profile-team-training] .volunteer-medic-note {
+  display: block;
 }
 .volunteer-contents {
   --contents-padding: 1.5rem;

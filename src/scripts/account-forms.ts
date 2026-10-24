@@ -85,7 +85,7 @@ export function initMedicCertifications(element: HTMLFormElement) {
     '[name="teams"][value="medic"]',
   );
   if (!section || !medic) return;
-  const medicalFields = section.parentElement!;
+  const medicalFields = section.closest<HTMLElement>("[data-medic-details]")!;
   const fields = [
     ...section.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
   ];
@@ -95,19 +95,61 @@ export function initMedicCertifications(element: HTMLFormElement) {
   const expiry = element.querySelector<HTMLFieldSetElement>(
     "[data-certification-expiry]",
   );
-  const teamTraining = element.querySelector<HTMLElement>(
-    "[data-profile-team-training]",
-  );
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let expanded = !medicalFields.hidden;
+  let transition: Animation | undefined;
+  const finishTransition = () => {
+    medicalFields.hidden = !expanded;
+    transition?.cancel();
+    transition = undefined;
+    delete medicalFields.dataset.transitioning;
+  };
+  const reveal = (active: boolean) => {
+    if (!active && medicalFields.contains(document.activeElement))
+      medic.focus({ preventScroll: true });
+    // Remove collapsing controls from focus/accessibility immediately, not at
+    // the end of their visual transition. Keep their draft answers intact.
+    medicalFields.inert = !active;
+    medicalFields.setAttribute("aria-hidden", String(!active));
+    medic.setAttribute("aria-expanded", String(active));
+    if (expanded === active) return;
+    expanded = active;
+    const height = medicalFields.getBoundingClientRect().height;
+    const opacity = getComputedStyle(medicalFields).opacity;
+    transition?.cancel();
+    medicalFields.hidden = false;
+    if (reducedMotion.matches || !medicalFields.getClientRects().length) {
+      finishTransition();
+      return;
+    }
+    medicalFields.dataset.transitioning = "";
+    transition = medicalFields.animate(
+      [
+        { height: `${height}px`, opacity: height ? opacity : 0 },
+        {
+          height: `${active ? medicalFields.scrollHeight : 0}px`,
+          opacity: active ? 1 : 0,
+        },
+      ],
+      { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "both" },
+    );
+    transition.onfinish = finishTransition;
+  };
+  reducedMotion.addEventListener("change", () => {
+    if (reducedMotion.matches) finishTransition();
+  });
   const update = () => {
-    section.hidden = !medic.checked;
-    medicalFields.hidden = !medic.checked;
-    if (teamTraining) teamTraining.hidden = !medic.checked;
     // Retain checked answers in FormData and drafts without hidden validation.
     for (const field of fields) field.required = medic.checked;
-    if (expiry) setDateInputActive(expiry, medic.checked);
+    if (expiry) {
+      setDateInputActive(expiry, medic.checked);
+      // The enclosing reveal owns visibility while the date validator still
+      // deactivates required/custom validity synchronously on collapse.
+      expiry.hidden = false;
+    }
     if (training && experience) {
       const active = medic.checked && Boolean(other?.checked);
-      training.hidden = !active;
+      training.hidden = !other?.checked;
       experience.required = active;
       experience.readOnly = !active;
       experience.setCustomValidity(
@@ -116,6 +158,7 @@ export function initMedicCertifications(element: HTMLFormElement) {
           : "",
       );
     }
+    reveal(medic.checked);
   };
   medic.addEventListener("change", update);
   section.addEventListener("change", update);

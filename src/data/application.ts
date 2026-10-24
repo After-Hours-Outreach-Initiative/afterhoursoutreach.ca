@@ -100,7 +100,7 @@ export function countWords(value: string): number {
 }
 
 export const certificationQuestion =
-  "Select the highest first-aid, medical, or health care certification or licence that you currently hold or are presently enrolled in schooling for.";
+  "Select the highest first-aid, medical, or health care certification or licence that you currently hold.";
 
 export const certificationOptions = [
   {

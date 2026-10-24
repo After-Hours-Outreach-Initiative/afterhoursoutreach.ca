@@ -10,7 +10,7 @@ import AccountProfileAnswers from "./AccountProfileAnswers.astro";
 import AccountProfileSection from "./AccountProfileSection.astro";
 import ApplicationContents from "./ApplicationContents.astro";
 import ApplicationSteps from "./ApplicationSteps.astro";
-import MedicalCertifications from "./MedicalCertifications.astro";
+import MedicDetails from "./MedicDetails.astro";
 import RelevantTraining from "./RelevantTraining.astro";
 import ReferralSources from "./ReferralSources.astro";
 import ApplicationDraftStatus from "./ApplicationDraftStatus.astro";
@@ -123,66 +123,80 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                   </div>
                   <div class="volunteer-team-options volunteer-choice-options">
                     {teams.map((team) => (
-                      <label
-                        for={`profile-team-${team.value}`}
-                        class="volunteer-team-option"
-                        data-included={
-                          (!application && team.value === "outreach") ||
-                          undefined
-                        }
-                      >
-                        <input
-                          type="checkbox"
-                          id={`profile-team-${team.value}`}
-                          name="teams"
-                          value={team.value}
-                          checked={values?.teams.includes(team.value) ?? false}
-                          required={application && team.value === "outreach"}
-                          disabled={!application && team.value === "outreach"}
-                          aria-labelledby={`team-${team.value}-label`}
-                          aria-describedby={`team-${team.value}-description help-teams${application && team.value === "outreach" ? " error-teams" : ""}`}
-                        />
-                        <span class="volunteer-team-content">
-                          <span
-                            class="volunteer-team-title"
-                            id={`team-${team.value}-label`}
-                          >
-                            {team.label}
-                            {application && team.value === "outreach" && (
-                              <span
-                                class="volunteer-required"
-                                aria-hidden="true"
-                              >
-                                {" "}
-                                *
-                              </span>
-                            )}
+                      <>
+                        <label
+                          for={`profile-team-${team.value}`}
+                          class="volunteer-team-option"
+                          data-included={
+                            (!application && team.value === "outreach") ||
+                            undefined
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            id={`profile-team-${team.value}`}
+                            name="teams"
+                            value={team.value}
+                            checked={
+                              values?.teams.includes(team.value) ?? false
+                            }
+                            required={application && team.value === "outreach"}
+                            disabled={!application && team.value === "outreach"}
+                            aria-labelledby={`team-${team.value}-label`}
+                            aria-describedby={`team-${team.value}-description help-teams${application && team.value === "outreach" ? " error-teams" : ""}`}
+                            aria-controls={
+                              team.value === "medic"
+                                ? "profile-medic-details"
+                                : undefined
+                            }
+                            aria-expanded={
+                              team.value === "medic" ? medicSelected : undefined
+                            }
+                          />
+                          <span class="volunteer-team-content">
+                            <span
+                              class="volunteer-team-title"
+                              id={`team-${team.value}-label`}
+                            >
+                              {team.label}
+                              {application && team.value === "outreach" && (
+                                <span
+                                  class="volunteer-required"
+                                  aria-hidden="true"
+                                >
+                                  {" "}
+                                  *
+                                </span>
+                              )}
+                            </span>
+                            <span
+                              class="volunteer-team-description"
+                              id={`team-${team.value}-description`}
+                            >
+                              {team.description}
+                              {"requirement" in team && (
+                                <span class="volunteer-team-requirement">
+                                  {team.requirement}
+                                </span>
+                              )}
+                            </span>
                           </span>
-                          <span
-                            class="volunteer-team-description"
-                            id={`team-${team.value}-description`}
-                          >
-                            {team.description}
-                            {"requirement" in team && (
-                              <span class="volunteer-team-requirement">
-                                {team.requirement}
-                              </span>
-                            )}
-                          </span>
-                        </span>
-                      </label>
+                        </label>
+                        {team.value === "medic" &&
+                          (application ? (
+                            <MedicDetails
+                              values={values}
+                              active={medicSelected}
+                              application
+                            />
+                          ) : (
+                            <div data-profile-team-training />
+                          ))}
+                      </>
                     ))}
                   </div>
                   {application && (
                     <FieldError field="teams" message={outreachRequiredError} />
-                  )}
-                  {!application && (
-                    <div data-profile-team-training hidden={!medicSelected}>
-                      <p class="volunteer-help">
-                        Medic's required certification details are saved with
-                        your team interests.
-                      </p>
-                    </div>
                   )}
                 </>
               ) : (
@@ -204,24 +218,8 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                         ))}
                     </div>
                   )}
-                  {section.key === "training-and-safety" && (
-                    <div
-                      class="volunteer-fields volunteer-wide"
-                      data-profile-medical-fields={!application || undefined}
-                      hidden={!medicSelected}
-                    >
-                      <MedicalCertifications
-                        values={values}
-                        active={medicSelected}
-                      />
-                      <AccountProfileField
-                        field={section.fields.find(
-                          (field) => field.name === "certificationExpiry",
-                        )!}
-                        values={values}
-                        active={medicSelected}
-                      />
-                    </div>
+                  {!application && section.key === "training-and-safety" && (
+                    <MedicDetails values={values} active={medicSelected} />
                   )}
                   {section.fields
                     .filter(
