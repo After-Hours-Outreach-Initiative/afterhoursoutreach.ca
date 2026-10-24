@@ -1,3 +1,5 @@
+import { contactEmail } from "./site";
+
 // Pure message formatting shared by delivery and the local docs preview. Keep
 // provider calls, database access, credentials, and sample data out of this file.
 export interface EmailContent {
@@ -133,7 +135,7 @@ export function volunteerAccessEmail(
   applicationApprovalChanged: boolean,
 ): EmailContent {
   const nextStep = !active
-    ? "Your volunteer account is currently inactive. Please contact an organizer before registering for events."
+    ? `Your volunteer account is currently inactive. Please contact an organizer at ${contactEmail} to restore access before registering for events.`
     : !applicationApproved
       ? "Sign in using the events link below to review your application steps on the Volunteer page."
       : patrolApproved

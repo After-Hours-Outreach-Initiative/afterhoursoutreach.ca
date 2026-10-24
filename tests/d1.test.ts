@@ -496,7 +496,7 @@ test("application queue counts all submitted unapproved applications independent
     [
       false,
       false,
-      /currently inactive.*contact an organizer before registering/,
+      /currently inactive.*contact an organizer at info@afterhoursoutreach\.ca to restore access before registering/,
     ],
     [true, true, /browse upcoming patrols and register for an available spot/],
     [

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
+import { contactEmail } from "../src/data/site";
 import {
   canViewVolunteerProfile,
   availableSignupSpots,
@@ -167,9 +168,9 @@ test("sign-in, application and active status are required", () => {
     )!,
     "Complete your volunteer application before registering for events.",
   );
-  assert.match(
+  assert.equal(
     signupBlockReason({ ...volunteer, active: false }, event, 0, now)!,
-    /inactive/,
+    `Your volunteer account is inactive. Contact an organizer at ${contactEmail} to restore access.`,
   );
 });
 

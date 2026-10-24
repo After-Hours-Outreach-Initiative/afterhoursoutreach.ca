@@ -29,7 +29,7 @@ import {
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
-import { social } from "@/data/site";
+import { contactEmail, social } from "@/data/site";
 import "@/styles/volunteer.css";
 
 interface Props {
@@ -186,7 +186,8 @@ const hasVisiblePastEvents = pastEvents.some((event) =>
     {
       actor.applicationSubmitted && !actor.active && (
         <p class="volunteer-notice" role="status">
-          Your volunteer account is inactive. Contact an organizer to restore
+          Your volunteer account is inactive. Contact an organizer at{" "}
+          <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore
           access.
         </p>
       )

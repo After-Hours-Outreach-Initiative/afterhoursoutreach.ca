@@ -8,6 +8,7 @@ import type { AuthBindings } from "../auth";
 import { createDatabase } from ".";
 import { profile, volunteerStatus } from "./schema";
 import { accountGreeting } from "../../data/account-navigation";
+import { contactEmail } from "../../data/site";
 import { RequestError, requireSameOrigin } from "../http";
 import { isApplicationComplete } from "./application-progress";
 
@@ -101,7 +102,10 @@ export function requireVolunteer(actor: Actor | null): asserts actor is Actor {
   if (!actor.applicationSubmitted)
     throw new RequestError(403, "Complete your application first.");
   if (!actor.active)
-    throw new RequestError(403, "Your volunteer account is inactive.");
+    throw new RequestError(
+      403,
+      `Your volunteer account is inactive. Contact an organizer at ${contactEmail} to restore access.`,
+    );
   if (!actor.applicationApproved && actor.role !== "organizer")
     throw new RequestError(
       403,

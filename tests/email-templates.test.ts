@@ -21,6 +21,7 @@ import {
   type EmailEvent,
 } from "../src/data/email-templates";
 import { emailTextSql } from "../src/server/db/email-text";
+import { contactEmail } from "../src/data/site";
 
 const origin = "https://example.invalid";
 const event: EmailEvent = {
@@ -92,8 +93,14 @@ test("approval and access messages retain the existing next-step branches", () =
         for (const approvalChanged of [true, false]) {
           const content = volunteerAccessEmail(status, approvalChanged);
           assert.equal(content.html, undefined);
-          if (!active) assert.match(content.text, /currently inactive/);
-          else if (!applicationApproved)
+          if (!active) {
+            assert.match(content.text, /currently inactive/);
+            assert.ok(
+              content.text.includes(
+                `contact an organizer at ${contactEmail} to restore access`,
+              ),
+            );
+          } else if (!applicationApproved)
             assert.match(content.text, /review your application steps/);
           else if (patrolApproved)
             assert.match(content.text, /browse upcoming patrols/);

@@ -12,6 +12,7 @@ import {
 import PageContents from "@/components/volunteer/PageContents.astro";
 import FieldError from "@/components/FieldError.astro";
 import { accountGreeting } from "@/data/account-navigation";
+import { contactEmail } from "@/data/site";
 import {
   authBindingsForRequest,
   authenticatorFreshAge,
@@ -175,7 +176,8 @@ const contents = [
       {
         !active && (
           <p class="volunteer-notice" role="status">
-            Your volunteer account is inactive. Contact an organizer to restore
+            Your volunteer account is inactive. Contact an organizer at{" "}
+            <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore
             access.
           </p>
         )
