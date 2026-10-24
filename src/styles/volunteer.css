@@ -228,6 +228,14 @@ body:has(
   padding: 0;
   border: 0;
 }
+/* Separate complete sections, never a heading from its own fields or answers. */
+.volunteer-profile-section + .volunteer-profile-section,
+.volunteer-application-section + .volunteer-application-section,
+.volunteer-application-review > section + section,
+.volunteer-application-review + .volunteer-code-of-conduct {
+  padding-top: 2rem;
+  border-top: var(--volunteer-border);
+}
 .volunteer-profile-section > .volunteer-help {
   margin-bottom: 1.5rem;
 }
@@ -237,8 +245,6 @@ body:has(
   padding: 0;
 }
 .volunteer-profile-heading {
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #3f3f46;
   @apply text-2xl;
   line-height: 1.4;
 }
@@ -249,17 +255,11 @@ body:has(
   justify-content: space-between;
   gap: 1rem;
   min-width: 0;
-  padding-bottom: 1rem;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid #3f3f46;
 }
 .volunteer-profile-section-heading > h3 {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-.volunteer-profile-section-heading .volunteer-profile-heading {
-  padding: 0;
-  border: 0;
 }
 .volunteer-profile-section-heading .btn {
   flex-shrink: 0;
@@ -1096,8 +1096,8 @@ body:has(
   gap: 1.25rem;
   padding: 1.5rem 0;
 }
-.volunteer-setting:not(:last-child) {
-  border-bottom: 1px solid #27272a;
+.volunteer-setting + .volunteer-setting {
+  border-top: 1px solid #27272a;
 }
 .volunteer-setting > div {
   min-width: 0;
