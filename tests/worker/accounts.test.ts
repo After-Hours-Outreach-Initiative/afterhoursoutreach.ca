@@ -1520,6 +1520,7 @@ describe(
           if (
             name === "heardAboutUsSources" ||
             name === "training" ||
+            name === "relevantExperience" ||
             name === "teams"
           ) {
             for (const source of value as string[])
@@ -1539,6 +1540,7 @@ describe(
               "experience",
               "training",
               "otherTraining",
+              "otherExperience",
             ].includes(name)
           )
             continue;
