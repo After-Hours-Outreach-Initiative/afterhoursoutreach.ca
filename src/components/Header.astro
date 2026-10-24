@@ -191,11 +191,11 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
             links.map((link) => (
               <li>
                 {link.children ? (
-                  <details class="header-menu" data-header-menu>
+                  <details class="header-menu" data-header-menu open>
                     <summary
                       class="header-mobile-link"
                       role="button"
-                      aria-expanded="false"
+                      aria-expanded="true"
                     >
                       {link.label}
                       <svg

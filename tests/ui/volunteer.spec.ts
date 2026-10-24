@@ -461,10 +461,11 @@ test("View as has a button for every seeded profile and supports keyboard switch
   await page
     .getByRole("button", { name: "Open navigation", exact: true })
     .click();
-  await page
-    .getByRole("navigation", { name: "Mobile navigation" })
-    .getByRole("button", { name: "Manage", exact: true })
-    .click();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Mobile navigation" })
+      .getByRole("button", { name: "Manage", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
   await expect(
     page
       .getByRole("navigation", { name: "Mobile navigation" })

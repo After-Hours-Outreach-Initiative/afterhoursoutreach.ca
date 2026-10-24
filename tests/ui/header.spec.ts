@@ -299,6 +299,11 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     const manageMenu = manage.locator("..");
     await manage.hover();
     if (mobile) {
+      await expect(manage).toHaveAttribute("aria-expanded", "true");
+      await expect(
+        manageMenu.getByRole("link", { name: "Volunteers", exact: true }),
+      ).toBeVisible();
+      await manage.click();
       await expect(manage).toHaveAttribute("aria-expanded", "false");
       await manage.click();
       await expect(manage).toHaveAttribute("aria-expanded", "true");
@@ -366,6 +371,11 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await expect(toggle).toHaveAttribute("aria-expanded", "true");
     }
     await manage.focus();
+    if (mobile) {
+      await expect(manage).toHaveAttribute("aria-expanded", "true");
+      await manage.press("Enter");
+      await expect(manage).toHaveAttribute("aria-expanded", "false");
+    }
     await manage.press("Enter");
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
