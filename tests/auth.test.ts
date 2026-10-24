@@ -1201,10 +1201,20 @@ test("profile edits preserve unsplit legacy names and birthdays without revalida
       preferred_name: answers.preferredName,
     },
   );
-  await assert.rejects(
-    saveProfile(bindings.DB, id, { ...editable, firstName, lastName }),
-    (error: unknown) => error instanceof RequestError && error.status === 400,
-  );
+  const submission = await loadSubmittedApplication(bindings.DB, id);
+  await saveProfile(bindings.DB, id, {
+    ...editable,
+    firstName: "Renamed",
+    lastName,
+    preferredName: "",
+  });
+  assert.equal((await loadProfile(bindings.DB, id))?.firstName, "Renamed");
+  assert.equal((await loadProfile(bindings.DB, id))?.lastName, lastName);
+  const session = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.equal(session?.user.name, "Renamed Volunteer");
+  assert.deepEqual(await loadSubmittedApplication(bindings.DB, id), submission);
   await saveProfile(bindings.DB, id, {
     ...editable,
     preferredName: "Legacy nickname",

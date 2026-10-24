@@ -431,6 +431,7 @@ test("application queue counts all submitted unapproved applications independent
   // Legacy profiles have no recorded acknowledgement; never invent one.
   assert.equal(profile?.codeOfConductVersion, null);
   assert.equal(profile?.codeOfConductAcceptedAt, null);
+  assert.equal(profile?.submission, null);
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting")).rows
       .length,
@@ -799,7 +800,7 @@ test("concurrent first submissions are insert-only and durable first-submission 
   );
 });
 
-test("simultaneous same-field profile edits allow one winner and preserve the original submission", async () => {
+test("simultaneous profile name edits allow one winner and preserve the original submission", async () => {
   const actor = await draftActor();
   const baseline = completeAnswers();
   await saveProfile(env.DB, actor.id, {
@@ -808,11 +809,11 @@ test("simultaneous same-field profile edits allow one winner and preserve the or
   });
   const original = await loadSubmittedApplication(env.DB, actor.id);
   const results = await Promise.allSettled(
-    ["One", "Two"].map((preferredName) =>
+    [{ firstName: "One" }, { lastName: "Two" }].map((name) =>
       saveProfile(
         env.DB,
         actor.id,
-        { ...baseline, preferredName },
+        { ...baseline, ...name },
         { actor, baseline, intent: "edit" },
       ),
     ),
@@ -825,6 +826,9 @@ test("simultaneous same-field profile edits allow one winner and preserve the or
   assert.ok(
     rejected?.status === "rejected" && statusError(409)(rejected.reason),
   );
+  assert.deepEqual(rejected.reason.details.conflicts, [
+    ["firstName", "middleNames", "lastName"],
+  ]);
   assert.deepEqual(await loadSubmittedApplication(env.DB, actor.id), original);
   assert.equal(
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
@@ -1351,21 +1355,70 @@ test("submission atomically removes drafts; failed submissions retain them and l
   await env.DB.prepare("UPDATE user SET email=? WHERE id=?")
     .bind("changed@example.org", actor.id)
     .run();
+  for (const name of [
+    { firstName: "" },
+    { lastName: null },
+    { middleNames: "a".repeat(201) },
+  ])
+    await assert.rejects(
+      saveProfile(
+        env.DB,
+        actor.id,
+        { ...answers, ...name },
+        { actor, baseline: answers, intent: "edit" },
+      ),
+      statusError(400),
+    );
   await saveProfile(
     env.DB,
     actor.id,
     {
       ...answers,
-      preferredName: "Changed nickname",
+      firstName: "  Changed first  ",
+      middleNames: " Changed middle ",
+      lastName: " Changed last ",
+      preferredName: "",
       phone: "604-555-0199",
       emergencyName: "Changed contact",
       medicalConditions: "Changed safety answer",
       teams: ["outreach", "non-patrol"],
       training: ["naloxone-administration"],
     },
-    { baseline: answers },
+    { actor, baseline: answers, intent: "edit" },
   );
-  assert.equal((await loadProfile(env.DB, actor.id))?.phone, "604-555-0199");
+  const latest = (await loadProfile(env.DB, actor.id))!;
+  assert.equal(latest.phone, "604-555-0199");
+  assert.equal(latest.firstName, "Changed first");
+  assert.equal(latest.middleNames, "Changed middle");
+  assert.equal(latest.lastName, "Changed last");
+  assert.equal(
+    await env.DB.prepare("SELECT name FROM user WHERE id=?")
+      .bind(actor.id)
+      .first("name"),
+    "Changed first Changed middle Changed last",
+  );
+  const organizer: Actor = {
+    ...(await draftActor("snapshot-reviewer")),
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+    applicationApproved: true,
+  };
+  await saveProfile(env.DB, organizer.id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
+  await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+    .bind(organizer.id)
+    .run();
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+  )
+    .bind(organizer.id)
+    .run();
+  const review = await viewVolunteerProfile(env.DB, organizer, actor.id);
+  assert.deepEqual(review?.answers, latest);
+  assert.deepEqual(review?.submission, submission);
   assert.deepEqual(
     await loadSubmittedApplication(env.DB, actor.id),
     submission,

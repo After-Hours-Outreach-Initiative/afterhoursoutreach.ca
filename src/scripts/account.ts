@@ -4,7 +4,7 @@ import { initEmailSignIn } from "./email-sign-in";
 import { actionFragment, loadActionPage } from "./action-page";
 import {
   applicationDisplayName,
-  profileIdentityFields,
+  profileReadOnlyFields,
   type ApplicationAnswers,
 } from "../data/application";
 import { accountGreeting, signInDestination } from "../data/account-navigation";
@@ -214,7 +214,7 @@ form("[data-account-profile]", async (element, values) => {
           key !== "heardAboutUsSources" &&
           key !== "codeOfConductAccepted" &&
           (element.hasAttribute("data-application") ||
-            !profileIdentityFields.some((field) => field === key)),
+            !profileReadOnlyFields.some((field) => field === key)),
       ),
     );
     const payload = {
@@ -262,20 +262,12 @@ form("[data-account-profile]", async (element, values) => {
       await draft?.refresh();
     throw error;
   }
-  // Saved legal names are display metadata, not editable profile controls.
-  const nameAnswers = {
-    firstName: String(
-      values.get("firstName") ?? element.dataset.profileFirstName ?? "",
-    ),
-    middleNames: String(
-      values.get("middleNames") ?? element.dataset.profileMiddleNames ?? "",
-    ),
-    lastName: String(
-      values.get("lastName") ?? element.dataset.profileLastName ?? "",
-    ),
-    preferredName:
-      result.answers?.preferredName ??
-      String(values.get("preferredName") ?? ""),
+  // Use acknowledged, normalized names, including merges from another device.
+  const nameAnswers = result.answers ?? {
+    firstName: String(values.get("firstName") ?? ""),
+    middleNames: String(values.get("middleNames") ?? ""),
+    lastName: String(values.get("lastName") ?? ""),
+    preferredName: String(values.get("preferredName") ?? ""),
   };
   for (const menuName of document.querySelectorAll<HTMLElement>(
     "[data-account-menu-name]",

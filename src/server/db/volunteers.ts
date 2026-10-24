@@ -15,6 +15,7 @@ import {
   normalizeCertifications,
   normalizeTrainingAnswers,
   type ApplicationAnswers,
+  type SubmittedApplication,
 } from "../../data/application";
 import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
@@ -135,7 +136,8 @@ export async function viewVolunteerProfile(
           u.email, p.registered_at AS submittedAt,
           p.code_of_conduct_version AS codeOfConductVersion,
           p.code_of_conduct_accepted_at AS codeOfConductAcceptedAt,
-          p.naloxone_completed_at AS naloxoneCompletedAt
+          p.naloxone_completed_at AS naloxoneCompletedAt,
+          p.submitted_application AS submission
         FROM profile p JOIN user u ON u.id = p.user_id
         WHERE p.user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
       )
@@ -165,6 +167,7 @@ export async function viewVolunteerProfile(
         codeOfConductVersion: string | null;
         codeOfConductAcceptedAt: number | null;
         naloxoneCompletedAt: number | null;
+        submission: string | null;
       })
     | undefined;
   if (!row) return null;
@@ -174,12 +177,17 @@ export async function viewVolunteerProfile(
     codeOfConductVersion,
     codeOfConductAcceptedAt,
     naloxoneCompletedAt,
+    submission,
     ...answers
   } = row;
   const sources = row.heardAboutUsSources
     ? (JSON.parse(row.heardAboutUsSources) as string[])
     : [];
   return {
+    // Read the original only through the same audited, authorized disclosure.
+    submission: submission
+      ? (JSON.parse(submission) as SubmittedApplication)
+      : null,
     answers: {
       ...answers,
       heardAboutUsSources: sources,

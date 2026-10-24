@@ -48,9 +48,6 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
   data-application={application || undefined}
   data-profile-user-id={userId}
   data-profile-baseline={!application ? JSON.stringify(values) : undefined}
-  data-profile-first-name={!application ? values?.firstName : undefined}
-  data-profile-middle-names={!application ? values?.middleNames : undefined}
-  data-profile-last-name={!application ? values?.lastName : undefined}
   data-profile-certifications={!application
     ? JSON.stringify(values?.certifications ?? [])
     : undefined}
@@ -209,12 +206,23 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                     },
                   ]}
                 >
-                  {application && section.key === "personal-info" && (
+                  {section.key === "personal-info" && (
                     <div class="volunteer-name-fields volunteer-wide">
                       {section.fields
                         .filter((field) => nameFieldNames.includes(field.name))
                         .map((field) => (
-                          <AccountProfileField field={field} values={values} />
+                          <AccountProfileField
+                            field={field}
+                            values={values}
+                            required={
+                              field.required &&
+                              (application ||
+                                Boolean(
+                                  values?.firstName.trim() &&
+                                  values?.lastName.trim(),
+                                ))
+                            }
+                          />
                         ))}
                     </div>
                   )}

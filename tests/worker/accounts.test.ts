@@ -180,7 +180,7 @@ describe(
       }
     });
 
-    test("the API validates application age and rejects identity edits without writing profile data", async () => {
+    test("the API validates name edits and age, preserves birth dates and original submissions", async () => {
       const ageCookie = await signIn("worker-age-boundary@example.org");
       const account = (await (
         await send("/api/v1/auth/get-session", undefined, ageCookie)
@@ -232,10 +232,9 @@ describe(
       const { firstName, middleNames, lastName, birthDate, ...editedAnswers } =
         answers;
       for (const change of [
-        { firstName: "Changed" },
         { firstName: "" },
-        { middleNames: "Changed" },
-        { lastName: "Changed" },
+        { firstName: "a".repeat(201) },
+        { middleNames: "a".repeat(201) },
         { lastName: null },
         { birthDate: underage },
         { birthDate: "1990-01-01" },
@@ -247,24 +246,39 @@ describe(
           ageCookie,
         );
         assert.equal(rejectedEdit.status, 400);
-        assert.deepEqual(await rejectedEdit.json(), {
-          message:
-            "Your legal name and date of birth cannot be changed from your account.",
-        });
+        if ("birthDate" in change)
+          assert.deepEqual(await rejectedEdit.json(), {
+            message: "Your date of birth cannot be changed from your account.",
+          });
         assert.equal(rejectedEdit.headers.get("cache-control"), "no-store");
         assert.deepEqual(await snapshots(), saved);
       }
       const acceptedEdit = await send(
         "/api/v1/account/profile",
-        { ...editedAnswers, preferredName: "Updated nickname" },
+        {
+          ...editedAnswers,
+          firstName: " Changed ",
+          middleNames: " Middle ",
+          lastName: " Name ",
+          preferredName: "",
+        },
         ageCookie,
       );
       assert.equal(acceptedEdit.status, 200, await acceptedEdit.clone().text());
-      assert.equal((await snapshots()).profile?.birth_date, cutoff);
+      const updated = await snapshots();
+      assert.equal(updated.profile?.birth_date, cutoff);
+      assert.equal(updated.profile?.first_name, "Changed");
+      assert.equal(updated.profile?.middle_names, "Middle");
+      assert.equal(updated.profile?.last_name, "Name");
+      assert.equal(updated.user?.name, "Changed Middle Name");
       assert.equal(
-        (await snapshots()).profile?.preferred_name,
-        "Updated nickname",
+        updated.profile?.submitted_application,
+        saved.profile?.submitted_application,
       );
+      const session = (await (
+        await send("/api/v1/auth/get-session", undefined, ageCookie)
+      ).json()) as { user: { name: string } };
+      assert.equal(session.user.name, "Changed Middle Name");
     });
 
     test("applications require explicit Outreach and leave optional teams optional without rewriting legacy edits", async () => {

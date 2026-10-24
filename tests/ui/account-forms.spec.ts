@@ -1281,9 +1281,8 @@ test("application shows all required errors and saves after they are corrected",
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
-  await expect(
-    form.locator('[name="firstName"], [name="middleNames"], [name="lastName"]'),
-  ).toHaveCount(0);
+  for (const field of ["firstName", "middleNames", "lastName"] as const)
+    await expect(form.locator(`[name="${field}"]`)).toBeEditable();
   await expect(
     page.getByRole("textbox", { name: /^Preferred name/ }),
   ).toHaveValue(sampleAnswers.preferredName);
@@ -2429,7 +2428,14 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     "lastName",
     "birthDate",
   ] as const) {
-    await expect(form.locator(`[name="${field}"]`)).toHaveCount(0);
+    if (field === "birthDate")
+      await expect(form.locator(`[name="${field}"]`)).toHaveCount(0);
+    else {
+      await expect(form.locator(`[name="${field}"]`)).toHaveValue(
+        sampleAnswers[field],
+      );
+      await expect(form.locator(`[name="${field}"]`)).toBeDisabled();
+    }
     expect(baseline[field]).toBe(sampleAnswers[field]);
   }
   await expect(
@@ -2530,6 +2536,9 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await expect(enabledSaves).toHaveCount(0);
   expect(requests).toHaveLength(1);
   expect(requests[0]).toMatchObject({
+    firstName: sampleAnswers.firstName,
+    middleNames: sampleAnswers.middleNames,
+    lastName: sampleAnswers.lastName,
     preferredName: sampleAnswers.preferredName,
     phone: sampleAnswers.phone,
     training: sampleAnswers.training,
@@ -2537,14 +2546,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     experience: "Saved experience",
     certificationExpiry: "2030-10-14",
   });
-  for (const immutable of [
-    "firstName",
-    "middleNames",
-    "lastName",
-    "birthDate",
-    "motivation",
-    "heardAboutUs",
-  ])
+  for (const immutable of ["birthDate", "motivation", "heardAboutUs"])
     expect(requests[0]).not.toHaveProperty(immutable);
   await expect(editor).toBeVisible();
   await expect(name).toHaveValue("Updated volunteer");
@@ -2567,26 +2569,33 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await expect(enabledSaves).toHaveCount(0);
   await expectTextView("Updated volunteer");
 
-  // Clearing the preferred name still falls back to the saved legal name.
+  // Name edits update the current account and saved-answer display.
   await page.getByRole("button", { name: "Edit personal info" }).click();
   const safetyAnswer = "First line\n<em>Text, not markup</em>";
   await medicalConditions.fill(safetyAnswer);
   await form.locator('[name="preferredName"]').fill("");
+  await form.locator('[name="firstName"]').fill("Changed first");
+  await form.locator('[name="middleNames"]').fill("Changed middle");
+  await form.locator('[name="lastName"]').fill("Changed last");
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
     form.locator('[data-profile-answers="personal-info"]'),
   ).toBeVisible();
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(page.locator("[data-account-menu-name]").first()).toHaveText(
-    `${sampleAnswers.firstName} ${sampleAnswers.middleNames} ${sampleAnswers.lastName}`,
+    "Changed first Changed middle Changed last",
   );
   await expect(page.locator("[data-account-greeting]")).toHaveText(
-    sampleAnswers.firstName,
+    "Changed first",
   );
+  await expect(answer("firstName")).toHaveText("Changed first");
+  await expect(answer("middleNames")).toHaveText("Changed middle");
+  await expect(answer("lastName")).toHaveText("Changed last");
   await expect(answer("preferredName")).toHaveText("Not provided");
   await expect(answer("medicalConditions")).toHaveText(safetyAnswer);
   await expect(answer("medicalConditions").locator("em")).toHaveCount(0);
   await page.reload();
+  await expect(answer("firstName")).toHaveText("Changed first");
   await expect(answer("medicalConditions")).toHaveText(safetyAnswer);
   await expectTextView("Updated volunteer");
   await page.getByRole("button", { name: "Edit team interests" }).click();

@@ -12,9 +12,11 @@ import { volunteerListReturnUrl } from "@/data/volunteer-list";
 import {
   applicationDisplayName,
   formatApplicationSubmittedTime,
+  profileFormSections,
 } from "@/data/application";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro";
+import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
 import "@/styles/volunteer.css";
 export const prerender = false;
@@ -88,7 +90,44 @@ if (!profile || !person)
           </div>
         </dl>
       </div>
-      <ApplicationSummary {...profile} idPrefix="volunteer" />
+      <h2 class="mt-8">Current profile</h2>
+      {
+        profile.submission ? (
+          <>
+            <div class="account-profile-summary mt-6">
+              <dl>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{profile.email}</dd>
+                </div>
+              </dl>
+            </div>
+            {profileFormSections().map((section) => (
+              <section class="volunteer-profile-section">
+                <h3 class="volunteer-profile-heading mb-6">
+                  {section.heading}
+                </h3>
+                <AccountProfileAnswers
+                  section={section}
+                  values={profile.answers}
+                />
+              </section>
+            ))}
+            <section data-submitted-application>
+              <h2 class="mt-8">Submitted application</h2>
+              <ApplicationSummary
+                {...profile.submission}
+                idPrefix="volunteer"
+              />
+            </section>
+          </>
+        ) : (
+          <>
+            <p>The original submitted application was not recorded.</p>
+            <ApplicationSummary {...profile} idPrefix="volunteer" />
+          </>
+        )
+      }
     </div>
   </section>
   <a class="btn btn-outline" href={returnUrl}>Back to volunteers</a>

@@ -408,10 +408,7 @@ export const profileFields = applicationFields.filter(
   (field) => !("applicationOnly" in field),
 );
 
-export const profileIdentityFields: readonly (keyof ApplicationAnswers)[] = [
-  "firstName",
-  "middleNames",
-  "lastName",
+export const profileReadOnlyFields: readonly (keyof ApplicationAnswers)[] = [
   "birthDate",
 ];
 
@@ -420,7 +417,7 @@ export function profileFormSections(application = false) {
   const fields = application
     ? applicationFields
     : profileFields.filter(
-        (field) => !profileIdentityFields.includes(field.name),
+        (field) => !profileReadOnlyFields.includes(field.name),
       );
   return [
     { key: "personal-info", heading: "Personal info" },

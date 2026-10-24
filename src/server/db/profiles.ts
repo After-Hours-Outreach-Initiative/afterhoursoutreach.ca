@@ -21,7 +21,7 @@ import {
   countWords,
   motivationMaxWords,
   motivationWordLimitError,
-  profileIdentityFields,
+  profileReadOnlyFields,
   type ApplicationAnswers,
   type SubmittedApplication,
 } from "../../data/application";
@@ -65,6 +65,7 @@ export interface ProfileSaveResult {
 
 const shortAnswer = z.string().trim().min(1).max(200);
 const optionalShortAnswer = z.string().trim().max(200).default("");
+const nameFields = ["firstName", "middleNames", "lastName"] as const;
 const phone = z
   .string()
   .trim()
@@ -258,9 +259,9 @@ export const profileSchema = profileAnswersSchema
       });
   });
 
-// Older clients may still send these answers; profile edits never replace them.
+// Older clients may still send application-only answers; edits never replace them.
 const profileEditSchema = profileAnswersSchema
-  // Keep stored identity verbatim, without revalidating legacy names or birthdays.
+  // Unchanged legacy names and birthdays stay verbatim. Validate changed names below.
   .extend({
     firstName: z.string(),
     middleNames: z.string(),
@@ -414,11 +415,11 @@ export async function saveProfile(
       );
     if (old && input && typeof input === "object" && !Array.isArray(input)) {
       const submitted = input as Record<string, unknown>;
-      for (const field of profileIdentityFields)
+      for (const field of profileReadOnlyFields)
         if (field in submitted && submitted[field] !== old[field])
           throw new RequestError(
             400,
-            "Your legal name and date of birth cannot be changed from your account.",
+            "Your date of birth cannot be changed from your account.",
           );
     }
     let submittedInput =
@@ -469,7 +470,7 @@ export async function saveProfile(
       }
       const local = { ...old, ...submittedInput } as ApplicationAnswers;
       const immutableFields = [
-        ...profileIdentityFields,
+        ...profileReadOnlyFields,
         "heardAboutUs",
         "heardAboutUsSources",
         "heardAboutUsOther",
@@ -481,6 +482,9 @@ export async function saveProfile(
       for (const key of Object.keys(old) as (keyof ApplicationAnswers)[])
         if (
           !immutableFields.some((field) => field === key) &&
+          !(
+            nameFields.some((field) => field === key) && local[key] === old[key]
+          ) &&
           typeof local[key] === "string"
         )
           Object.assign(local, { [key]: (local[key] as string).trim() });
@@ -506,9 +510,24 @@ export async function saveProfile(
         motivation: undefined,
       };
     }
+    const namesChanged =
+      !old ||
+      nameFields.some(
+        (field) =>
+          (submittedInput as Record<string, unknown>)?.[field] !== old[field],
+      );
     const schema = old
       ? profileEditSchema
           .extend({
+            firstName: namesChanged
+              ? profileAnswersSchema.shape.firstName
+              : profileEditSchema.shape.firstName,
+            middleNames: namesChanged
+              ? profileAnswersSchema.shape.middleNames
+              : profileEditSchema.shape.middleNames,
+            lastName: namesChanged
+              ? profileAnswersSchema.shape.lastName
+              : profileEditSchema.shape.lastName,
             // Keep Outreach on submitted profiles, but don't impose a new answer on
             // legacy profiles that never selected it or invent it during an edit.
             teams: old.teams.includes("outreach")
@@ -590,6 +609,12 @@ export async function saveProfile(
       codeOfConductAcceptedAt: now.toISOString(),
     } satisfies Omit<SubmittedApplication, "email">;
     const values = {
+      // Do not split or normalize untouched legacy names on unrelated edits.
+      ...(namesChanged && {
+        first_name: answers.firstName || null,
+        middle_names: answers.middleNames || null,
+        last_name: answers.lastName || null,
+      }),
       preferred_name: answers.preferredName,
       pronouns: answers.pronouns || null,
       phone: answers.phone,
@@ -611,10 +636,7 @@ export async function saveProfile(
     const insertValues = {
       user_id: userId,
       ...values,
-      // Identity is insert-only, including null/unsplit legacy names on updates.
-      first_name: answers.firstName || null,
-      middle_names: answers.middleNames || null,
-      last_name: answers.lastName || null,
+      // Date of birth remains insert-only.
       birth_date: answers.birthDate,
       // Insert-only: preserve legacy text, nullable choices, and saved details on edits.
       heard_about_us: answers.heardAboutUs,
