@@ -73,7 +73,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
   {
     birthDate ? (
       <div class="volunteer-date-parts">
-        {(["day", "month", "year"] as const).map((part) => (
+        {(["year", "month", "day"] as const).map((part) => (
           <div class="volunteer-field">
             <label for={`${id}-${part}`}>
               {part[0].toUpperCase() + part.slice(1)}
@@ -85,6 +85,9 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
               type="text"
               inputmode="numeric"
               autocomplete={`bday-${part}`}
+              placeholder={
+                part === "year" ? "yyyy" : part === "month" ? "mm" : "dd"
+              }
               aria-describedby={describedBy}
               value={parts[part]}
               required={required && active}

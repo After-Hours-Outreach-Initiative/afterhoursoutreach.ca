@@ -1336,10 +1336,19 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
       await page.goto("/apply");
       const form = page.locator("[data-account-profile]");
       const birthDate = form.getByRole("group", {
-        name: "Date of birth",
+        name: "Date of birth (yyyy/mm/dd)",
         exact: true,
       });
-      for (const part of ["day", "month", "year"]) {
+      await expect(birthDate.locator("label")).toHaveText([
+        "Year",
+        "Month",
+        "Day",
+      ]);
+      for (const [part, placeholder] of [
+        ["year", "yyyy"],
+        ["month", "mm"],
+        ["day", "dd"],
+      ]) {
         const input = birthDate.locator(`[data-birth-date-part="${part}"]`);
         await expect(input).toHaveAccessibleName(
           part[0].toUpperCase() + part.slice(1),
@@ -1347,8 +1356,9 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
         await expect(input).toHaveAttribute("type", "text");
         await expect(input).toHaveAttribute("inputmode", "numeric");
         await expect(input).toHaveAttribute("autocomplete", `bday-${part}`);
+        await expect(input).toHaveAttribute("placeholder", placeholder);
         await expect(input).not.toHaveAttribute("name");
-        await expect(input).toHaveAccessibleDescription(
+        await expect(input).not.toHaveAccessibleDescription(
           /at least 19 years old/,
         );
         await expect(input).toHaveValue("");
@@ -1371,10 +1381,13 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
       await day.press("Home");
       await day.press("Delete");
       await expect(day).toHaveValue("10");
-      await day.press("Tab");
+      await year.focus();
+      await year.press("Tab");
       await expect(month).toBeFocused();
-      await month.press("Shift+Tab");
+      await month.press("Tab");
       await expect(day).toBeFocused();
+      await day.press("Shift+Tab");
+      await expect(month).toBeFocused();
       for (const width of [devices[device].viewport.width, 320]) {
         await page.setViewportSize({ width, height: 844 });
         expect(
@@ -1510,8 +1523,8 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   await page
     .getByRole("button", { name: "Submit application", exact: true })
     .click();
-  await expect(page).toHaveURL(/\/events$/);
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await page.goto("/volunteer/account");
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
@@ -1543,8 +1556,14 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     javaScriptEnabled: false,
   });
   try {
-    await createLocalAccount(context.request, baseURL!, false);
     const page = await context.newPage();
+    await page.goto("/volunteer");
+    await expect(
+      page.getByText("You must be at least 19 years old to apply.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await createLocalAccount(context.request, baseURL!, false);
     await page.goto("/apply");
     const form = page.locator("[data-account-profile]");
     await expect(
@@ -1558,8 +1577,9 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     const birthDate = form.locator('[data-birth-date-part="year"]');
     await expect(birthDate).toHaveAttribute("type", "text");
     await expect(birthDate).toHaveValue("");
-    await expect(form.locator("#help-birthDate")).toHaveText(
-      "You must be at least 19 years old to apply.",
+    await expect(form.locator("#help-birthDate")).toHaveCount(0);
+    await expect(form.locator("[data-birth-date] legend")).toHaveText(
+      "Date of birth (yyyy/mm/dd) *",
     );
     await birthDate.fill("not-a-year");
     await expect(localApplicationReviewButton(page)).toBeDisabled();

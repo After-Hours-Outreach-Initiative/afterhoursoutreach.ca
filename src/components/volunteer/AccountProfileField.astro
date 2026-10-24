@@ -45,7 +45,6 @@ const message =
   birthDate && !readOnly ? (
     <ApplicationBirthDate
       value={values?.birthDate ?? ""}
-      help={"help" in field ? field.help : ""}
       required={required && active}
     />
   ) : field.name === "certificationExpiry" && !readOnly ? (
