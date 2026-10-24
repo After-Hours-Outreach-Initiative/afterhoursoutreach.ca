@@ -95,6 +95,7 @@ export const manualAccountPresets = [
   preset("organizer", "Organizer", "access", {
     sampleKey: "robin",
     role: "organizer",
+    patrolApproved: true,
   }),
 ];
 

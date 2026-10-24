@@ -224,6 +224,9 @@ test("DEV panel seeds presets in place without changing the current account or d
     await request.get("/api/v1/auth/get-session")
   ).json();
   expect(organizer.user.twoFactorEnabled).toBe(true);
+  await expect(
+    profiles.locator('[data-switch-user="local-account-user-organizer"]'),
+  ).toContainText("Patrol approved");
   const accountPage = await (await request.get("/volunteer/account")).text();
   expect(accountPage.match(/data-session-row/g)).toHaveLength(1);
   // A fresh session must resolve full application completion and real medic

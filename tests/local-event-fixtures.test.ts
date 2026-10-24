@@ -87,7 +87,7 @@ test("manual presets cover application, orientation, patrol, medic and access st
         ["inactive", 1, 0, 1, 1, 0, 0, 0, 0, 0, "volunteer"],
         ["medic", 1, 0, 1, 1, 1, 1, 1, 0, 1, "volunteer"],
         ["medic-orientee", 1, 0, 1, 1, 1, 0, 0, 0, 0, "volunteer"],
-        ["organizer", 1, 0, 1, 1, 1, 0, 0, 0, 0, "organizer"],
+        ["organizer", 1, 0, 1, 1, 1, 1, 0, 0, 0, "organizer"],
         ["orientation-booked", 1, 0, 1, 1, 1, 0, 0, 1, 0, "volunteer"],
         ["orientation-completed", 1, 0, 1, 1, 1, 0, 1, 0, 0, "volunteer"],
         ["patrol", 1, 0, 1, 1, 1, 1, 1, 0, 0, "volunteer"],
@@ -219,17 +219,136 @@ test("reseeding upgrades only untouched old manual fixtures without replacing th
     for (const key of ["accepted", "inactive", "organizer"]) {
       const row = db
         .prepare(
-          "SELECT p.naloxone_completed_at, v.registration_approved FROM profile p JOIN volunteer_status v ON v.user_id=p.user_id WHERE p.user_id=?",
+          "SELECT p.naloxone_completed_at, v.registration_approved, v.patrol_approved FROM profile p JOIN volunteer_status v ON v.user_id=p.user_id WHERE p.user_id=?",
         )
         .get(localAccountUserId(key))!;
       assert.equal(row.naloxone_completed_at, now + 1000);
       assert.equal(row.registration_approved, 1);
+      assert.equal(row.patrol_approved, key === "organizer" ? 1 : 0);
     }
     const before = db.prepare("SELECT * FROM audit_log ORDER BY id").all();
     db.exec(localAccountFixtures(now + 2000).join(";\n"));
     assert.deepEqual(
       db.prepare("SELECT * FROM audit_log ORDER BY id").all(),
       before,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+function previousOrganizerPreset(db: DatabaseSync, now: number) {
+  db.exec(localAccountFixtures(now).join(";\n"));
+  // Recreate the exact previous seed version, before Organizer had patrol approval.
+  db.exec(`UPDATE volunteer_status SET patrol_approved=0, approved_by=NULL, approved_at=NULL
+    WHERE user_id='local-account-user-organizer';
+    UPDATE audit_log SET changed_fields='["applicationApproved"]' WHERE id='local-account-approval-organizer'`);
+}
+
+test("reseeding grants untouched existing Organizer presets patrol approval once and preserves their profile and authenticator", () => {
+  const db = database();
+  try {
+    const now = Date.now();
+    previousOrganizerPreset(db, now);
+    db.exec(
+      "INSERT INTO two_factor (id,user_id,secret,backup_codes) VALUES ('keep','local-account-user-organizer','secret','codes')",
+    );
+    const profile = db
+      .prepare(
+        "SELECT * FROM profile WHERE user_id='local-account-user-organizer'",
+      )
+      .get();
+    const factor = db.prepare("SELECT * FROM two_factor").all();
+    db.exec(localAccountFixtures(now + 1000).join(";\n"));
+    const status = db
+      .prepare(
+        "SELECT * FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+      )
+      .get()!;
+    assert.equal(status.registration_approved, 1);
+    assert.equal(status.patrol_approved, 1);
+    assert.equal(status.approved_by, localAccountUserId("organizer"));
+    assert.equal(status.approved_at, now + 1000);
+    assert.deepEqual(
+      db
+        .prepare(
+          "SELECT * FROM profile WHERE user_id='local-account-user-organizer'",
+        )
+        .get(),
+      profile,
+    );
+    assert.deepEqual(db.prepare("SELECT * FROM two_factor").all(), factor);
+    const audits = db.prepare("SELECT * FROM audit_log ORDER BY id").all();
+    db.exec(localAccountFixtures(now + 2000).join(";\n"));
+    assert.deepEqual(
+      db
+        .prepare(
+          "SELECT * FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+        )
+        .get(),
+      status,
+    );
+    assert.deepEqual(
+      db.prepare("SELECT * FROM audit_log ORDER BY id").all(),
+      audits,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("reseeding does not overwrite edited or deliberately revoked Organizer access", () => {
+  for (const change of [
+    "UPDATE profile SET phone='604-555-0199' WHERE user_id='local-account-user-organizer'",
+    "UPDATE user SET email='changed@example.org' WHERE id='local-account-user-organizer'",
+    "UPDATE volunteer_status SET active=0 WHERE user_id='local-account-user-organizer'",
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='local-account-user-organizer'",
+    "INSERT INTO audit_log (id,actor_id,subject_id,action,changed_fields,created_at) VALUES ('revoked','local-account-user-organizer','local-account-user-organizer','approval_changed','[\"patrolApproved\"]',1)",
+  ]) {
+    const db = database();
+    try {
+      const now = Date.now();
+      previousOrganizerPreset(db, now);
+      // Deactivating the preset is valid only while another active organizer exists.
+      db.exec(
+        "UPDATE user SET role='organizer' WHERE id='local-account-user-patrol'",
+      );
+      db.exec(change);
+      const before = db
+        .prepare(
+          "SELECT * FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+        )
+        .get();
+      db.exec(localAccountFixtures(now + 1000).join(";\n"));
+      assert.deepEqual(
+        db
+          .prepare(
+            "SELECT * FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+          )
+          .get(),
+        before,
+      );
+    } finally {
+      db.close();
+    }
+  }
+  // A new fully-approved preset must not be reapproved after a manual revocation,
+  // even if that direct local database edit omitted an audit/timestamp update.
+  const db = database();
+  try {
+    const now = Date.now();
+    db.exec(localAccountFixtures(now).join(";\n"));
+    db.exec(
+      "UPDATE volunteer_status SET patrol_approved=0, approved_by=NULL, approved_at=NULL WHERE user_id='local-account-user-organizer'",
+    );
+    db.exec(localAccountFixtures(now + 1000).join(";\n"));
+    assert.equal(
+      db
+        .prepare(
+          "SELECT patrol_approved FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+        )
+        .get()!.patrol_approved,
+      0,
     );
   } finally {
     db.close();

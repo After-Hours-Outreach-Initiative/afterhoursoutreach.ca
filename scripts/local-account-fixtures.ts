@@ -87,20 +87,21 @@ export function localAccountFixtures(now = Date.now()) {
         other_experience: a.otherExperience,
         medical_conditions: a.medicalConditions,
       };
-      statements.push(`INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-        SELECT ${repair}, ${organizer}, ${id}, 'profile_updated', '["naloxoneCompletedAt"]', ${now}
-        FROM user u JOIN profile p ON p.user_id=u.id JOIN volunteer_status v ON v.user_id=u.id
-        WHERE u.id=${id} AND u.email=${quote(email)} AND u.name=${quote(String(legacy[0]))}
-        AND u.role=${quote(preset.role)} AND p.updated_at=p.registered_at AND v.updated_at=p.registered_at
-        AND p.naloxone_completed_at IS NULL AND v.active=${legacy[1]} AND v.registration_approved=${legacy[2]}
-        AND v.patrol_approved=0 AND json_valid(p.submitted_application)
+      const unchangedProfile = `p.updated_at=p.registered_at AND json_valid(p.submitted_application)
         AND ${Object.entries(original)
           .map(([column, value]) => `coalesce(p.${column}, '')=${quote(value)}`)
           .join(" AND ")}
         AND p.code_of_conduct_version=json_extract(p.submitted_application, '$.codeOfConductVersion')
         AND p.code_of_conduct_accepted_at=p.registered_at
         AND json_extract(p.submitted_application, '$.email')=u.email
-        AND json_extract(p.submitted_application, '$.answers')=${quote(JSON.stringify(person.answers))}
+        AND json_extract(p.submitted_application, '$.answers')=${quote(JSON.stringify(person.answers))}`;
+      statements.push(`INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+        SELECT ${repair}, ${organizer}, ${id}, 'profile_updated', '["naloxoneCompletedAt"]', ${now}
+        FROM user u JOIN profile p ON p.user_id=u.id JOIN volunteer_status v ON v.user_id=u.id
+        WHERE u.id=${id} AND u.email=${quote(email)} AND u.name=${quote(String(legacy[0]))}
+        AND u.role=${quote(preset.role)} AND v.updated_at=p.registered_at
+        AND p.naloxone_completed_at IS NULL AND v.active=${legacy[1]} AND v.registration_approved=${legacy[2]}
+        AND v.patrol_approved=0 AND ${unchangedProfile}
         AND NOT EXISTS (SELECT 1 FROM audit_log WHERE subject_id=${id})
         AND NOT EXISTS (SELECT 1 FROM signup WHERE user_id=${id})
         AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id=${id})
@@ -113,6 +114,32 @@ export function localAccountFixtures(now = Date.now()) {
       statements.push(`INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
         SELECT ${quote(`local-account-upgrade-approval-${preset.key}`)}, ${organizer}, ${id}, 'approval_changed', '["applicationApproved"]', ${now}
         WHERE changes()=1 AND EXISTS (SELECT 1 FROM audit_log WHERE id=${repair})`);
+
+      if (preset.key === "organizer") {
+        // The earlier Organizer presets had application approval only. Recognize
+        // their seed audit/timestamps; never reinstate a manually revoked approval.
+        statements.push(`UPDATE volunteer_status SET patrol_approved=1, approved_by=${organizer},
+          approved_at=${now}, updated_at=max(${now}, updated_at+1)
+          WHERE user_id=${organizer} AND patrol_approved=0 AND approved_by IS NULL AND approved_at IS NULL
+          AND EXISTS (SELECT 1 FROM user u JOIN profile p ON p.user_id=u.id
+            JOIN volunteer_status v ON v.user_id=u.id
+            WHERE u.id=${organizer} AND u.email='organizer.local@example.org' AND u.email_verified=1
+            AND u.role='organizer' AND u.name IN ('Organizer', ${quote(person.name)})
+            AND v.active=1 AND v.registration_approved=1 AND p.naloxone_completed_at IS NOT NULL
+            AND ${unchangedProfile}
+            AND EXISTS (SELECT 1 FROM audit_log a WHERE a.subject_id=u.id AND a.actor_id=u.id
+              AND a.action='approval_changed' AND a.changed_fields='["applicationApproved"]'
+              AND ((a.id='local-account-approval-organizer' AND v.updated_at=a.created_at+${12 * 86_400_000}
+                AND p.registered_at=a.created_at-${2 * 86_400_000} AND p.naloxone_completed_at=a.created_at-${86_400_000})
+                OR (a.id='local-account-upgrade-approval-organizer' AND v.updated_at=a.created_at
+                  AND p.naloxone_completed_at=a.created_at))))
+          AND NOT EXISTS (SELECT 1 FROM audit_log WHERE subject_id=${organizer}
+            AND action IN ('profile_updated','approval_changed','active_changed','role_changed')
+            AND id NOT IN ('local-account-approval-organizer','local-account-upgrade-organizer','local-account-upgrade-approval-organizer'))`);
+        statements.push(`INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+          SELECT 'local-account-upgrade-patrol-organizer', ${organizer}, ${organizer},
+          'approval_changed', '["patrolApproved"]', ${now} WHERE changes()=1`);
+      }
     }
 
     statements.push(

@@ -104,7 +104,7 @@ session, and sends no emails. **Visitor** signs out; the remaining choices are g
   approval. Medic also has the medic team and a valid fictional certification;
   selecting the team alone does not qualify for reserved medic places.
 - **Access:** Inactive (completed application, inactive account) and Organizer
-  (active organizer with an enrolled authenticator).
+  (active organizer with application and patrol approval and an enrolled authenticator).
 
 All categories stay expanded. Each account shows its actual saved progress and
 eligibility, even after edits change

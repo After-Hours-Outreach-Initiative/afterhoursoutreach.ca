@@ -1679,6 +1679,20 @@ test("manual presets resolve real application completion, event access and roste
     false,
   );
   assert.ok(await loadApplicationDraft(env.DB, localAccountUserId("draft")));
+  assert.equal(actors.get("organizer")!.applicationApproved, true);
+  assert.equal(actors.get("organizer")!.patrolApproved, true);
+  await changeSignup(
+    env.DB,
+    actors.get("organizer")!,
+    "local-account-event-patrol",
+    "join",
+  );
+  await changeSignup(
+    env.DB,
+    actors.get("organizer")!,
+    "local-account-event-patrol",
+    "cancel",
+  );
   await changeSignup(
     env.DB,
     actors.get("medic")!,
