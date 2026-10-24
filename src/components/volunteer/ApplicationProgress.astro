@@ -27,7 +27,10 @@ const dateFormat = new Intl.DateTimeFormat("en-CA", {
 const steps = [
   {
     key: "form",
-    title: "Application Form Submitted",
+    title:
+      progress.submittedAt !== null
+        ? "Application Form Submitted"
+        : "Application Form",
     completed: progress.submittedAt !== null,
     completedAt: progress.submittedAt,
   },

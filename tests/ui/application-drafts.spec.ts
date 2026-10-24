@@ -695,9 +695,18 @@ test("switching accounts never restores or autosaves another account's answers",
 
 test("resuming requires fresh consent; submission clears drafts and course confirmation persists on Volunteer", async ({
   page,
+  context,
   baseURL,
 }) => {
   const { id } = await createLocalAccount(page.request, baseURL!, false);
+  const portal = await context.newPage();
+  await portal.clock.install();
+  await portal.clock.pauseAt(new Date());
+  await portal.goto("/volunteer");
+  const formTitle = portal.locator(
+    '[data-application-progress-step="form"] .application-progress-title',
+  );
+  await expect(formTitle).toHaveText("Step 1: Application Form");
   await page.goto("/apply");
   const form = page.locator(formSelector);
   for (const [name, value] of Object.entries(sampleAnswers)) {
@@ -731,6 +740,9 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(
     form.locator('[name="codeOfConductAccepted"]'),
   ).not.toBeChecked();
+  // A resumed draft is not a submission, even when all answers are complete.
+  await portal.reload();
+  await expect(formTitle).toHaveText("Step 1: Application Form");
   await submitLocalApplication(page);
   await expect(page).toHaveURL(/\/volunteer$/);
   expect(
@@ -745,6 +757,10 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(
     page.locator('[data-application-progress-step="form"] > summary'),
   ).toContainText("Application Form Submitted");
+  // The already-open portal adopts the submitted title without navigation.
+  await portal.clock.runFor(5_000);
+  await expect(formTitle).toHaveText("Step 1: Application Form Submitted");
+  await portal.close();
   const course = page.locator("[data-naloxone-step]");
   const checkbox = course.getByRole("checkbox", {
     name: "I confirm I have completed Naloxone 101.",
