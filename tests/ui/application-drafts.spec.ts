@@ -707,6 +707,31 @@ test("resuming requires fresh consent; submission clears drafts and course confi
     '[data-application-progress-step="form"] .application-progress-title',
   );
   await expect(formTitle).toHaveText("Step 1: Application Form");
+  const upcomingCourse = portal.locator(
+    '[data-application-progress-step="naloxone"]',
+  );
+  await expect(upcomingCourse).toHaveAttribute("data-state", "upcoming");
+  await upcomingCourse.locator("summary").click();
+  const courseDescription =
+    "Naloxone 101 is an online course that teaches you how to recognize and respond to an opioid overdose, and how to administer naloxone. It takes about 1 hour to complete";
+  await expect(upcomingCourse.locator("[data-naloxone-step] > p")).toHaveText(
+    courseDescription,
+  );
+  const upcomingCourseLink = upcomingCourse.getByRole("link", {
+    name: "Take Naloxone 101",
+  });
+  await expect(upcomingCourseLink).toHaveCount(1);
+  await expect(upcomingCourseLink).toBeVisible();
+  await expect(upcomingCourseLink).toHaveAttribute(
+    "href",
+    "https://towardtheheart.com/naloxone-course",
+  );
+  await expect(upcomingCourseLink).toHaveAttribute("target", "_blank");
+  await expect(upcomingCourseLink).toHaveAttribute("rel", "noreferrer");
+  await expect(upcomingCourseLink).toHaveClass("btn btn-outline mt-6");
+  await expect(upcomingCourse.locator("[data-naloxone-confirm]")).toHaveCount(
+    0,
+  );
   await page.goto("/apply");
   const form = page.locator(formSelector);
   for (const [name, value] of Object.entries(sampleAnswers)) {
@@ -760,11 +785,17 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   // The already-open portal adopts the submitted title without navigation.
   await portal.clock.runFor(5_000);
   await expect(formTitle).toHaveText("Step 1: Application Form Submitted");
+  await expect(upcomingCourse).toHaveAttribute("data-state", "current");
+  await expect(
+    upcomingCourse.getByRole("button", { name: "Confirm completion" }),
+  ).toBeVisible();
+  await expect(upcomingCourseLink).toHaveCount(1);
   await portal.close();
   const course = page.locator("[data-naloxone-step]");
   const checkbox = course.getByRole("checkbox", {
     name: "I confirm I have completed Naloxone 101.",
   });
+  await expect(course.locator(":scope > p")).toHaveText(courseDescription);
   await expect(course.getByRole("heading")).toHaveCount(0);
   await expect(course).not.toContainText(
     /self-reported|not certified|certificate upload/i,
@@ -812,6 +843,10 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await page.goto("/events");
   await expect(courseStep).not.toHaveAttribute("open");
   await courseStep.locator("summary").click();
+  await expect(course.locator(":scope > p")).toHaveText(courseDescription);
+  await expect(
+    course.getByRole("link", { name: "Take Naloxone 101" }),
+  ).toBeVisible();
   await expect(checkbox).toBeChecked();
   await expect(checkbox).toBeDisabled();
   await expect(course.locator("[data-form-message]")).toHaveText(

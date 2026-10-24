@@ -24,6 +24,7 @@ const dateFormat = new Intl.DateTimeFormat("en-CA", {
   day: "numeric",
   year: "numeric",
 });
+const canConfirmNaloxone = progress.submittedAt !== null;
 const steps = [
   {
     key: "form",
@@ -39,6 +40,7 @@ const steps = [
     title: "Complete Naloxone 101",
     completed: progress.naloxoneCompletedAt !== null,
     completedAt: progress.naloxoneCompletedAt,
+    canConfirm: canConfirmNaloxone,
   },
   {
     key: "review",
@@ -130,18 +132,13 @@ const currentStep = steps.findIndex((step) => !step.completed);
                     </a>
                   </>
                 ))}
-              {step.key === "naloxone" &&
-                (progress.submittedAt !== null ? (
-                  <NaloxoneCourseStep
-                    {userId}
-                    completedAt={progress.naloxoneCompletedAt}
-                  />
-                ) : (
-                  <p class="text-base">
-                    After submitting your form and Code of Conduct, take
-                    Naloxone 101 and confirm completion here.
-                  </p>
-                ))}
+              {step.key === "naloxone" && (
+                <NaloxoneCourseStep
+                  {userId}
+                  completedAt={progress.naloxoneCompletedAt}
+                  canConfirm={canConfirmNaloxone}
+                />
+              )}
               {step.key === "review" && (
                 <p class="text-base">
                   {progress.applicationApproved

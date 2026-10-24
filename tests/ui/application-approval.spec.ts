@@ -375,6 +375,15 @@ test("approval preserves the course draft, expanded snapshot and focus until con
       tracker.locator('[data-application-progress-step="review"]'),
     );
     await expect(naloxone).toHaveAttribute("data-state", "current");
+    const approvedCourseLink = naloxone.getByRole("link", {
+      name: "Take Naloxone 101",
+    });
+    await expect(approvedCourseLink).toHaveCount(1);
+    await expect(approvedCourseLink).toBeVisible();
+    await expect(approvedCourseLink).toHaveAttribute(
+      "href",
+      "https://towardtheheart.com/naloxone-course",
+    );
     await expect(formStep).toHaveAttribute("open");
     await expect(submittedApplication.locator("details")).toHaveAttribute(
       "open",
