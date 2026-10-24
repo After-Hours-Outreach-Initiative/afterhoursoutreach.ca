@@ -314,8 +314,14 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   await choices.getByRole("heading", { name: "Existing accounts" }).click();
   await expect(remove).not.toHaveAttribute("data-delete-confirming");
   await remove.click();
+  const panelBody = page.locator("[data-account-switcher] .dialog-body");
+  const scrollBeforeDelete = await panelBody.evaluate((body) => body.scrollTop);
+  expect(scrollBeforeDelete).toBeGreaterThan(0);
   await remove.click();
   await expect(remove).toHaveCount(0);
+  await expect
+    .poll(() => panelBody.evaluate((body) => body.scrollTop))
+    .toBe(scrollBeforeDelete);
   expect(deletions).toHaveLength(1);
   expect((await current()).id).toBe(third.id);
   // Deleting the current account revokes its session and returns to Visitor.

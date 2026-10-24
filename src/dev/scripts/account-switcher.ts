@@ -241,7 +241,8 @@ export async function initAccountSwitcher() {
       }
       resetDeleteConfirmation();
       setBusy(true);
-      message.hidden = true;
+      message.textContent = "Deleting local account…";
+      message.hidden = false;
       try {
         const result = await developmentAuthClient.dev.deleteUser({
           userId: button.dataset.deleteUser,
@@ -251,15 +252,26 @@ export async function initAccountSwitcher() {
           location.assign(result.next);
           return;
         }
-        button.closest("[data-local-account]")?.remove();
+        const row = button.closest("[data-local-account]");
+        const nextFocus =
+          row?.nextElementSibling?.querySelector<HTMLButtonElement>(
+            "[data-delete-user]",
+          ) ??
+          row?.previousElementSibling?.querySelector<HTMLButtonElement>(
+            "[data-delete-user]",
+          ) ??
+          seedAccounts;
+        const panelBody = root.querySelector<HTMLElement>(".dialog-body");
+        const scrollTop = panelBody?.scrollTop;
+        row?.remove();
         if (emptyAccounts)
           emptyAccounts.hidden = accounts.childElementCount > 0;
         setBusy(false);
-        profiles
-          .querySelector<HTMLButtonElement>("[data-switch-user]")
-          ?.focus();
         message.textContent = "Local account deleted.";
         message.hidden = false;
+        nextFocus?.focus({ preventScroll: true });
+        if (panelBody && scrollTop !== undefined)
+          panelBody.scrollTop = scrollTop;
       } catch (error) {
         setBusy(false);
         fail(error);
