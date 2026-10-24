@@ -129,7 +129,7 @@ test("pending applications poll every minute, then approval restores five-second
       "true",
     );
     await expect(review.locator("p")).toHaveText(
-      `An organizer will review your application. We'll email you at ${account.email} to let you know whether it's approved and what to do next.`,
+      "An organizer will review your application. We’ll email you to let you know whether it’s approved and what to do next. You can also return to this page to check its status.",
     );
     await formStep.locator(":scope > summary").click();
     await expect(formToggle).toHaveCSS(
