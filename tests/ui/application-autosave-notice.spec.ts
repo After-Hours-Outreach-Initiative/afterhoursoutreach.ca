@@ -91,17 +91,13 @@ for (const [layout, viewport] of [
         await expect(bottomIndicator).toBeVisible();
         await expect(bottomIndicator).toHaveCSS("font-size", "14px");
         await expect(bottomIndicator).toHaveCSS("font-weight", "400");
-        const listFontSize = await page
-          .locator(".volunteer-application-intro li")
-          .first()
-          .evaluate((element) => getComputedStyle(element).fontSize);
         await expect(
           page.getByText(
             "Your answers are saved to your account and this browser as you fill them in. See our privacy policy.",
             { exact: true },
           ),
-        ).toHaveCSS("font-size", listFontSize);
-        const statusFontSize = layout === "mobile" ? "14px" : listFontSize;
+        ).toHaveCSS("font-size", "16px");
+        const statusFontSize = layout === "mobile" ? "14px" : "16px";
         await expect(indicator).toHaveCSS("font-size", statusFontSize);
         await expect(indicator.locator("[data-draft-save-message]")).toHaveCSS(
           "font-size",
