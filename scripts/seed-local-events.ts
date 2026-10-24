@@ -93,10 +93,18 @@ try {
         env: { ...process.env, CLOUDFLARE_ENV: "" },
       },
     );
-    if (seeded.error || seeded.status !== 0)
+    if (seeded.error || seeded.status !== 0) {
+      const detail =
+        seeded.error?.message || seeded.stderr?.trim() || seeded.stdout?.trim();
       throw new Error(
-        "Local seeding failed. Check that all local migrations are applied.",
+        [
+          "Local seeding failed. If local migrations are missing, run pnpm db:migrate:local, then retry.",
+          detail,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
       );
+    }
   } finally {
     await unlink(file);
     await rmdir(directory);
