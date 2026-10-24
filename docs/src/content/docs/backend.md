@@ -50,7 +50,7 @@ See [testing.md](/testing/).
 
 On localhost or the dev server's LAN address, the shared account layout includes
 a **DEV panel** button. Press **Alt+Z** to open or close it. **Account states** holds
-Visitor, Not applied, and the seeded manual presets; **Existing accounts** lists
+Visitor and permanently visible categories of seeded manual presets; **Existing accounts** lists
 the other saved local users, including unfinished applications. Choosing a saved
 user replaces only this browser's
 session; choosing Visitor signs out. Switching simulates a verified two-factor
@@ -63,8 +63,7 @@ into a fresh disposable local D1 account with an empty application and no draft 
 selected answers. Submitting uses the normal application flow, keeps this browser
 signed into that account, and lists it under the entered name in View as. Unfinished
 accounts/drafts remain listed too, so repeated selections never leave invisible
-accounts. The four manual presets **Applied**, **Accepted**, **Inactive**, and
-**Organizer** have no trash button, and the server rejects their deletion without
+accounts. All manual presets have no trash button, and the server rejects their deletion without
 changing any records. Protection uses only their exact preset IDs, even if renamed.
 Other saved local accounts retain the compact trash button on the right. Click
 it once to show a confirmation checkmark, then click again to delete. Clicking
@@ -93,14 +92,35 @@ For manual testing, click **Seed local accounts** in the DEV panel or run
 The button refreshes the panel in place without switching your account or
 changing its session. It uses the same fixtures as the command, enrolls the
 Organizer authenticator through the normal auth backend in an isolated temporary
-session, and sends no emails. On a fresh local database, View as contains
-**Visitor** (signed out), **Not applied** (always a fresh application), **Applied**
-(awaiting approval), **Accepted** (application approved, not patrol approved),
-**Inactive** (inactive, unapproved application), and **Organizer** (active organizer).
-The four submitted profiles use realistic fictional answers. The command also
-adds an open orientation and patrol and enrolls Organizer's authenticator through
-the real local auth backend. It only inserts missing fixtures: it does not reset
-the database, remove other users, or overwrite subsequent edits to these personas.
+session, and sends no emails. **Visitor** signs out; the remaining choices are grouped:
+
+- **Application:** Not applied (always fresh), Draft application (saved but not
+  submitted), Form submitted (Naloxone incomplete), Awaiting review (Naloxone
+  complete, application unapproved).
+- **Orientation:** Ready for orientation, Orientation booked, Orientation completed
+  (not yet patrol approved), Medic awaiting orientation.
+- **Active volunteers:** Patrol volunteer and Medic. Both have completed
+  applications, recorded orientation attendance and organizer-granted patrol
+  approval. Medic also has the medic team and a valid fictional certification;
+  selecting the team alone does not qualify for reserved medic places.
+- **Access:** Inactive (completed application, inactive account) and Organizer
+  (active organizer with an enrolled authenticator).
+
+All categories stay expanded. Each account shows its actual saved progress and
+eligibility, even after edits change
+its original scenario. The original Applied and Accepted IDs remain stable, with
+the new Form submitted and Ready for orientation labels. Preset definitions,
+ordering, categories and deletion protection share `src/dev/accounts.ts`.
+
+Submitted profiles use realistic fictional answers, immutable application
+snapshots, Code of Conduct acknowledgement, and milestone dates. The command
+also adds an open patrol with orientation, an open regular patrol, and a hidden
+past orientation with attendance. It does not reset the database, remove users,
+restore cancelled bookings or discarded drafts, or overwrite subsequent edits.
+Reseeding repairs missing Naloxone/application-approval milestones only for
+unchanged original Accepted, Inactive and Organizer fixtures, checked against
+their original identity, answers, timestamps, access flags and absence of activity.
+Their original snapshots and authenticators are retained.
 The original Not applied fixture is preserved separately as **Original Not applied
 account** (or its submitted name if already completed); its application/draft is
 never reset when choosing the reusable Not applied option.

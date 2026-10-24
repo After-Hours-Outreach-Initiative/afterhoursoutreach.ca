@@ -119,7 +119,7 @@ try {
   console.log(
     testFixtures
       ? "Local D1 test events and sample accounts are ready. Choose Robin Vance in View as for organizer tools."
-      : "Local D1 manual presets and events are ready: Not applied, Applied, Accepted, Inactive, Organizer. Choose Visitor in View as to sign out.",
+      : "Local D1 presets and events are ready. View as groups accounts by Application, Orientation, Active volunteers, and Access, including a patrol volunteer and an eligible medic. Choose Visitor to sign out.",
   );
 } finally {
   await client.dispose();

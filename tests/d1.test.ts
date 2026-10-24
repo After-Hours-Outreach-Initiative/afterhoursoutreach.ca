@@ -54,6 +54,8 @@ import {
   deleteLocalAccount,
 } from "../src/dev/server/local-accounts";
 import { completeLocalApplicationStep } from "../src/dev/server/application-steps";
+import { listLocalAccounts } from "../src/dev/server/account-list";
+import { manualAccountPresets, localAccountUserId } from "../src/dev/accounts";
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -1599,13 +1601,162 @@ test("new local applications preserve old fixtures; deletion protects only manua
       ),
     );
   const beforePresets = await snapshotTables();
-  for (const key of ["applied", "accepted", "inactive", "organizer"]) {
-    await assert.rejects(
-      deleteLocalAccount(env.DB, `local-account-user-${key}`),
-      statusError(403),
-    );
+  for (const { id } of manualAccountPresets) {
+    await assert.rejects(deleteLocalAccount(env.DB, id), statusError(403));
     assert.deepEqual(await snapshotTables(), beforePresets);
   }
+});
+
+test("manual presets resolve real application completion, event access and roster categories", async () => {
+  const now = Date.now();
+  await env.DB.batch(
+    localAccountFixtures(now).map((sql) => env.DB.prepare(sql)),
+  );
+  const { users, next } = await listLocalAccounts(env.DB);
+  assert.equal(users.length, manualAccountPresets.length);
+  assert.equal(next, null);
+  const actors = new Map<string, Actor>();
+  for (const preset of manualAccountPresets) {
+    const row = users.find(({ id }) => id === preset.id)!;
+    const progress = await loadApplicationProgress(env.DB, preset.id);
+    const complete = isApplicationComplete(progress);
+    assert.equal(
+      complete,
+      !["draft", "applied", "awaiting-review"].includes(preset.key),
+      preset.label,
+    );
+    if (complete) {
+      assert.ok(progress.submittedAt! <= progress.naloxoneCompletedAt!);
+      assert.ok(
+        progress.naloxoneCompletedAt! <= progress.applicationApprovedAt!,
+      );
+    }
+    const sessionId = `preset-session-${preset.key}`;
+    await env.DB.prepare(
+      "INSERT INTO session (id,user_id,token,expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+    )
+      .bind(sessionId, row.id, sessionId, now + 60_000, now, now)
+      .run();
+    const actor: Actor = {
+      id: row.id,
+      name: row.name,
+      sessionId,
+      role: row.role,
+      applicationSubmitted: row.state.submittedAt !== null,
+      applicationComplete: complete,
+      naloxoneCompleted: row.state.naloxoneCompletedAt !== null,
+      applicationApproved: row.state.applicationApproved,
+      patrolApproved: row.state.patrolApproved,
+      active: row.state.active,
+      twoFactorEnabled: false,
+      twoFactorVerified: false,
+    };
+    actors.set(preset.key, actor);
+    const events = await listEvents(env.DB, actor, undefined, "volunteer");
+    assert.equal(
+      events.length,
+      !complete || !actor.active
+        ? 0
+        : actor.patrolApproved || actor.role === "organizer"
+          ? 2
+          : 1,
+      preset.label,
+    );
+  }
+  assert.equal(
+    users.find(({ id }) => id === localAccountUserId("medic"))!.state
+      .medicEligible,
+    true,
+  );
+  assert.equal(
+    users.find(({ id }) => id === localAccountUserId("medic-orientee"))!.state
+      .medicEligible,
+    false,
+  );
+  assert.equal(
+    users.find(({ id }) => id === localAccountUserId("orientation-completed"))!
+      .state.patrolApproved,
+    false,
+  );
+  assert.ok(await loadApplicationDraft(env.DB, localAccountUserId("draft")));
+  await changeSignup(
+    env.DB,
+    actors.get("medic")!,
+    "local-account-event-patrol",
+    "join",
+  );
+  await changeSignup(
+    env.DB,
+    actors.get("patrol")!,
+    "local-account-event-patrol",
+    "join",
+  );
+  await changeSignup(
+    env.DB,
+    actors.get("medic-orientee")!,
+    "local-account-event-orientation",
+    "join",
+  );
+  const roster = await listPublicRosters(env.DB, actors.get("organizer")!, [
+    "local-account-event-patrol",
+    "local-account-event-orientation",
+  ]);
+  assert.deepEqual(roster.people.map(({ category }) => category).sort(), [
+    "medic",
+    "orientee",
+    "orientee",
+    "volunteer",
+  ]);
+
+  const before = await loadSubmittedApplication(
+    env.DB,
+    localAccountUserId("medic"),
+  );
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
+  )
+    .bind(localAccountUserId("medic"))
+    .run();
+  const changed = (await listLocalAccounts(env.DB)).users.find(
+    ({ id }) => id === localAccountUserId("medic"),
+  )!;
+  assert.equal(changed.state.applicationApproved, false);
+  assert.equal(changed.state.medicEligible, false);
+  await env.DB.batch(
+    localAccountFixtures(now + 1000).map((sql) => env.DB.prepare(sql)),
+  );
+  assert.equal(
+    (await loadApplicationProgress(env.DB, changed.id)).applicationApproved,
+    false,
+  );
+  assert.deepEqual(await loadSubmittedApplication(env.DB, changed.id), before);
+});
+
+test("development account state listing paginates without exposing draft answers or submission snapshots", async () => {
+  await env.DB.batch(
+    Array.from({ length: 105 }, (_, index) => {
+      const id = `account-${String(index).padStart(3, "0")}`;
+      return env.DB.prepare(
+        "INSERT INTO user (id,name,email,created_at,updated_at) VALUES (?,?,?,0,0)",
+      ).bind(id, id, `${id}@example.org`);
+    }),
+  );
+  const first = await listLocalAccounts(env.DB);
+  assert.equal(first.users.length, 100);
+  assert.equal(first.next, "account-099");
+  const second = await listLocalAccounts(env.DB, first.next!);
+  assert.equal(second.users.length, 5);
+  assert.equal(second.users[0].id, "account-100");
+  assert.equal(second.next, null);
+  assert.deepEqual(Object.keys(first.users[0]).sort(), [
+    "email",
+    "id",
+    "name",
+    "role",
+    "state",
+  ]);
+  assert.equal(first.users[0].state.submittedAt, null);
+  assert.equal(first.users[0].state.active, false);
 });
 
 async function seedMedic(

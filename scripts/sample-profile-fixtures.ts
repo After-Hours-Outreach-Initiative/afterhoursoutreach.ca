@@ -176,6 +176,7 @@ export function sampleProfileFixtures(
 export function sampleProfileStatement(
   person: ReturnType<typeof sampleProfileFixtures>[number],
   now: number,
+  options: { naloxoneCompletedAt?: number | null } = {},
 ) {
   const a = person.answers;
   const submittedAt = new Date(now).toISOString();
@@ -199,7 +200,7 @@ export function sampleProfileStatement(
     heard_about_us, heard_about_us_sources, heard_about_us_other, motivation, teams,
     medical_certification, medical_certifications, medical_certification_expiry,
     training_experience, relevant_training, other_training, relevant_experience, other_experience, medical_conditions,
-    code_of_conduct_version, code_of_conduct_accepted_at, submitted_application, registered_at, updated_at
+    code_of_conduct_version, code_of_conduct_accepted_at, submitted_application, naloxone_completed_at, registered_at, updated_at
   ) SELECT u.id, ${quote(a.firstName)}, ${quote(a.middleNames)}, ${quote(a.lastName)},
     ${quote(a.preferredName)}, ${quote(a.pronouns)}, ${quote(a.phone)}, ${quote(a.birthDate)},
     ${quote(a.emergencyName)}, ${quote(a.emergencyPhone)}, ${quote(a.emergencyRelationship)},
@@ -209,7 +210,7 @@ export function sampleProfileStatement(
     ${quote(a.experience)}, ${quote(JSON.stringify(a.training))}, ${quote(a.otherTraining)},
     ${quote(JSON.stringify(a.relevantExperience))}, ${quote(a.otherExperience)},
     ${a.medicalConditions ? quote(a.medicalConditions) : "NULL"}, ${quote(codeOfConductVersion)},
-    ${now}, ${quote(JSON.stringify(snapshot))}, ${now}, ${now}
+    ${now}, ${quote(JSON.stringify(snapshot))}, ${options.naloxoneCompletedAt ?? "NULL"}, ${now}, ${now}
   FROM user u WHERE u.id = ${quote(person.id)} AND u.email = ${quote(person.email)}
     AND NOT EXISTS (SELECT 1 FROM profile p WHERE p.user_id = u.id AND p.submitted_application IS NOT NULL)`;
 }

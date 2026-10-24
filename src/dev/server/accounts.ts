@@ -9,15 +9,16 @@ import {
   expireCookie,
   setSessionCookie,
 } from "better-auth/cookies";
-import { asc, eq, gt } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "../../server/db";
-import { profile, user } from "../../server/db/schema";
+import { profile } from "../../server/db/schema";
 import { loadApplicationProgress } from "../../server/db/application-progress";
 import { RequestError, safeReturnTo } from "../../server/http";
 import type { AuthBindings } from "../../server/auth";
 import { newApplicationPersona } from "../accounts";
 import { createDisposableAccount, deleteLocalAccount } from "./local-accounts";
+import { listLocalAccounts } from "./account-list";
 
 export function developmentAccounts(bindings: AuthBindings) {
   const requireLocal = (request: Request | undefined) => {
@@ -44,22 +45,13 @@ export function developmentAccounts(bindings: AuthBindings) {
         },
         async (ctx) => {
           requireLocal(ctx.request);
-          const db = createDatabase(bindings.DB);
-          const rows = await db
-            .select({
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-            })
-            .from(user)
-            .where(ctx.query.after ? gt(user.id, ctx.query.after) : undefined)
-            .orderBy(asc(user.id))
-            .limit(101);
+          const accounts = await listLocalAccounts(
+            bindings.DB,
+            ctx.query.after,
+          );
           const current = await getSessionFromCtx(ctx);
           return ctx.json({
-            users: rows.slice(0, 100),
-            next: rows.length > 100 ? rows[99].id : null,
+            ...accounts,
             currentUserId: current?.user.id ?? null,
             applicationProgress: current
               ? await loadApplicationProgress(bindings.DB, current.user.id)

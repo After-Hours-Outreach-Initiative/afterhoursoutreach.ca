@@ -4,7 +4,9 @@ import type { AccountAuth } from "../../server/auth";
 import { authClient } from "../../scripts/auth-client";
 import { accountErrorMessage } from "../../scripts/account-forms";
 import {
-  isManualAccountPreset,
+  developmentAccountStatus,
+  manualAccountGroups,
+  manualAccountPresets,
   manualAccountPresetIds,
   newApplicationPersona,
   type DevelopmentApplicationStep,
@@ -327,16 +329,37 @@ export async function initAccountSwitcher() {
       return button;
     };
     states
-      .querySelectorAll('[data-switch-user]:not([data-switch-user=""])')
-      .forEach((button) => button.remove());
-    accounts.replaceChildren();
-    states.appendChild(
-      profileButton(
-        newApplicationPersona,
-        "Not applied",
-        "Start a new empty application",
-      ),
+      .querySelectorAll("[data-account-category]")
+      .forEach((group) => group.remove());
+    const groups = new Map(
+      manualAccountGroups.map((group) => {
+        const section = document.createElement("section");
+        section.className = "account-state-category";
+        section.dataset.accountCategory = group.key;
+        const heading = document.createElement("h4");
+        const buttons = document.createElement("div");
+        buttons.className = "account-profile-buttons";
+        buttons.setAttribute("role", "group");
+        buttons.setAttribute("aria-label", group.label);
+        section.appendChild(heading);
+        section.appendChild(buttons);
+        states.appendChild(section);
+        return [
+          group.key,
+          { section, heading, buttons, label: group.label },
+        ] as const;
+      }),
     );
+    accounts.replaceChildren();
+    groups
+      .get("application")!
+      .buttons.appendChild(
+        profileButton(
+          newApplicationPersona,
+          "Not applied",
+          "Start a new empty application",
+        ),
+      );
     for (const user of users) {
       const label =
         user.id === "local-account-user-not-applied" &&
@@ -345,11 +368,12 @@ export async function initAccountSwitcher() {
           : user.name || "Not yet applied";
       const button = profileButton(
         user.id,
-        label,
-        `${user.email}${user.role === "organizer" ? " · Organizer" : ""}`,
+        manualAccountPresets.find(({ id }) => id === user.id)?.label ?? label,
+        `${user.email}${user.role === "organizer" ? " · Organizer" : ""} · ${developmentAccountStatus(user.state)}`,
       );
-      if (isManualAccountPreset(user.id)) {
-        states.appendChild(button);
+      const preset = manualAccountPresets.find(({ id }) => id === user.id);
+      if (preset) {
+        groups.get(preset.group)!.buttons.appendChild(button);
         continue;
       }
       const row = document.createElement("div");
@@ -385,6 +409,10 @@ export async function initAccountSwitcher() {
       row.appendChild(button);
       row.appendChild(remove);
       accounts.appendChild(row);
+    }
+    for (const { section, heading, buttons, label } of groups.values()) {
+      section.hidden = buttons.childElementCount === 0;
+      heading.textContent = `${label} (${buttons.childElementCount})`;
     }
     if (emptyAccounts) emptyAccounts.hidden = accounts.childElementCount > 0;
     const current = users.find((user) => user.id === currentUserId);

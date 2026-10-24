@@ -255,9 +255,8 @@ The Not applied choice creates a new disposable D1 identity on each selection;
 submission, account naming, and private drafts still use the normal backend.
 All created identities remain visible and deletable, even if abandoned before
 submission. Choosing Not applied never clears or repurposes the original fixture.
-Only the exact manual preset IDs `local-account-user-applied`,
-`local-account-user-accepted`, `local-account-user-inactive`, and
-`local-account-user-organizer` have no trash button and reject deletion with `403`,
+Only the exact manual preset IDs defined in `src/dev/accounts.ts` have no trash
+button and reject deletion with `403`,
 before any database cleanup. Names and roles do not affect this protection.
 Other saved accounts retain the compact icon-only trash button on the right,
 including ordinary sign-in accounts, other fixtures, and Original Not applied.
