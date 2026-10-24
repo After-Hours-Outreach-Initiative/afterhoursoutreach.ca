@@ -84,7 +84,8 @@ export const applicationTeamOptions = [
   },
 ] as const;
 
-export const heardAboutUsQuestion = "How did you find out about us?";
+export const heardAboutUsQuestion =
+  "How did you find out about us? Select all that apply.";
 export const heardAboutUsOptions = [
   { value: "social-media", label: "Social Media" },
   { value: "friend-word-of-mouth", label: "Friend/Word of mouth" },

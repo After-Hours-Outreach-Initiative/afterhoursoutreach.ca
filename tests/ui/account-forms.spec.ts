@@ -1037,7 +1037,7 @@ test("application shows all required errors and saves after they are corrected",
     ).toHaveAttribute("required", "");
   await expect(
     form.getByRole("group", {
-      name: "How did you find out about us?",
+      name: "How did you find out about us? Select all that apply.",
       exact: true,
     }),
   ).toBeVisible();
