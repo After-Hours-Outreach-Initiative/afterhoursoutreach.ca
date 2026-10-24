@@ -59,11 +59,27 @@ body:has(
   height: 1rem;
   flex-shrink: 0;
 }
-.volunteer-draft-save-status[data-save-state="saved"]
-  .volunteer-draft-save-icon,
-.volunteer-draft-save-status[data-save-state="pending"][data-has-saved="true"]
+.volunteer-draft-save-status:not(
+    [data-save-state="initializing"],
+    [data-save-state="idle"]
+  )
   .volunteer-draft-save-icon {
   display: block;
+}
+.cloud-save-mark {
+  display: none;
+}
+[data-save-state="pending"] .cloud-save-pending,
+[data-save-state="loading"] .cloud-save-loading,
+[data-save-state="saved"] .cloud-save-saved,
+[data-save-state="error"] .cloud-save-error,
+[data-save-state="paused"] .cloud-save-paused {
+  display: block;
+}
+.cloud-save-loading {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: volunteer-loading 800ms linear infinite;
 }
 .volunteer-draft-save-status:is(
   [data-save-state="error"],
@@ -341,28 +357,17 @@ body:has(
 .volunteer-contents-menu[open] .volunteer-contents-chevron {
   transform: rotate(180deg);
 }
-.volunteer-contents-save-status {
+.volunteer-contents-conflict-warning {
   display: inline-flex;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   flex-shrink: 0;
-  color: #a1a1aa;
+  margin-left: auto;
+  color: #facc15;
 }
-.volunteer-contents-save-status[data-save-state="initializing"] {
-  visibility: hidden;
-}
-.volunteer-contents-save-status svg {
+.volunteer-contents-conflict-warning svg {
   width: 100%;
   height: 100%;
-  visibility: hidden;
-}
-.volunteer-contents-save-status[data-save-state="saved"] svg,
-.volunteer-contents-save-status[data-save-state="pending"][data-has-saved="true"]
-  svg {
-  visibility: visible;
-}
-.volunteer-contents-save-status[data-save-state="pending"] .cloud-check-mark {
-  visibility: hidden;
 }
 .volunteer-contents-progress {
   display: inline-flex;
@@ -1634,7 +1639,8 @@ body:has(
 }
 @media (prefers-reduced-motion: reduce) {
   .volunteer-portal .btn[aria-busy="true"]::before,
-  .volunteer-control-loading::before {
+  .volunteer-control-loading::before,
+  .cloud-save-loading {
     animation: none;
   }
   .volunteer-team-option {

@@ -87,7 +87,11 @@ for (const [layout, viewport] of [
           "data-save-state",
           saved ? "saved" : "idle",
         );
-        await expect(bottomIndicator).toHaveText(await indicator.innerText());
+        await expect(
+          bottomIndicator.locator("[data-draft-save-message]"),
+        ).toHaveText(
+          await indicator.locator("[data-draft-save-message]").innerText(),
+        );
         await expect(bottomIndicator).toBeVisible();
         await expect(bottomIndicator).toHaveCSS("font-size", "14px");
         await expect(bottomIndicator).toHaveCSS("font-weight", "400");
@@ -140,7 +144,7 @@ for (const [layout, viewport] of [
     const saveIndicator = localApplicationSaveIndicator(page);
     if (layout === "mobile") {
       await expect(saveIndicator).toBeHidden();
-      await expect(tracker.getByRole("status")).toHaveCount(1);
+      await expect(tracker.getByRole("status")).toHaveCount(0);
       await tracker.locator("summary").click();
     }
     await expect(saveIndicator).toHaveAttribute("data-save-state", "idle");
@@ -149,9 +153,7 @@ for (const [layout, viewport] of [
     await expect(saveIndicator).toHaveAttribute("role", "status");
     await expect(saveIndicator).toHaveAttribute("aria-live", "polite");
     await expect(page.locator("[data-draft-save-indicator]")).toHaveCount(3);
-    await expect(tracker.getByRole("status")).toHaveCount(
-      layout === "mobile" ? 2 : 1,
-    );
+    await expect(tracker.getByRole("status")).toHaveCount(1);
     expect(
       await page
         .locator("[data-application-draft-actions] [data-draft-save-indicator]")
@@ -212,7 +214,7 @@ for (const [layout, viewport] of [
   });
 }
 
-test("compact save confirmation retains its cloud while saving newer edits and still reports failures", async ({
+test("timestamp icons show save state without replacing normal TOC progress or save history", async ({
   page,
   baseURL,
 }) => {
@@ -240,63 +242,88 @@ test("compact save confirmation retains its cloud while saving newer edits and s
   });
   try {
     await page.goto("/apply");
-    const confirmation = page.locator("[data-draft-save-summary]");
+    const confirmation = page.locator(
+      "[data-application-draft-actions] [data-draft-save-indicator]",
+    );
+    const message = confirmation.locator("[data-draft-save-message]");
+    const announcement = confirmation.locator("[data-draft-save-announcement]");
     const icon = confirmation.locator("svg");
-    const check = icon.locator(".cloud-check-mark");
+    const check = icon.locator(".cloud-save-saved");
+    const loading = icon.locator(".cloud-save-loading");
     const menu = page.locator(
       "[data-application-contents] [data-contents-menu]",
     );
+    const progress = menu.locator("[data-application-progress]");
+    const expectNormalToc = async () => {
+      await expect(progress).toBeVisible();
+      await expect(
+        menu.locator("[data-application-conflict-warning]"),
+      ).toBeHidden();
+      await expect(menu.locator("[data-draft-save-summary]")).toHaveCount(0);
+      await expect(
+        menu.locator("summary .volunteer-draft-save-icon"),
+      ).toHaveCount(0);
+    };
     await expect(confirmation).toHaveAttribute("data-save-state", "idle");
     await expect(confirmation).toHaveAttribute("role", "status");
     await expect(confirmation).toHaveAttribute("aria-live", "polite");
     await expect(icon).toBeHidden();
+    await expectNormalToc();
 
     await page.locator('[name="firstName"]').fill("Saved answer");
-    await expect(confirmation).toHaveAttribute("data-save-state", "pending");
     await expect.poll(() => requests).toBe(1);
-    await expect(icon).toBeHidden();
+    await expect(confirmation).toHaveAttribute("data-save-state", "loading");
+    await expect(message).toHaveText("");
+    await expect(loading).toBeVisible();
+    await expect(announcement).toHaveText("Saving changes");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(loading).toHaveCSS("animation-name", "none");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(loading).toHaveCSS("animation-name", "volunteer-loading");
+    await expectNormalToc();
     releaseFirst();
     await expect(confirmation).toHaveAttribute("data-save-state", "saved");
-    await expect(confirmation).toHaveText(/^Last saved at /);
+    await expect(message).toHaveText(/^Last saved at /);
     await expect(icon).toBeVisible();
     await expect(check).toBeVisible();
+    await expect(loading).toBeHidden();
     await expect(icon).toHaveAttribute("aria-hidden", "true");
     await expect(menu).not.toHaveAttribute("open");
-    expect(
-      await confirmation.evaluate((element) => {
-        const progress = element.nextElementSibling!;
-        const bounds = element.getBoundingClientRect();
-        const progressBounds = progress.getBoundingClientRect();
-        return (
-          progress.hasAttribute("data-application-progress") &&
-          bounds.right <= progressBounds.left &&
-          bounds.top < progressBounds.bottom &&
-          bounds.bottom > progressBounds.top
-        );
-      }),
-    ).toBe(true);
+    await expectNormalToc();
 
-    const savedMessage = await confirmation.textContent();
+    const savedMessage = await message.textContent();
     await page.locator('[name="firstName"]').fill("Newer answer");
-    await expect(confirmation).toHaveAttribute("data-save-state", "pending");
-    await expect(confirmation).toContainText(savedMessage!);
-    await expect(icon).toBeVisible();
-    await expect(check).toBeHidden();
     await expect.poll(() => requests).toBe(2);
-    await expect(confirmation).toHaveText(`${savedMessage}. Saving changes…`);
+    await expect(confirmation).toHaveAttribute("data-save-state", "loading");
+    await expect(message).toHaveText(savedMessage!);
+    await expect(loading).toBeVisible();
+    await expect(check).toBeHidden();
+    await expectNormalToc();
     releaseFailed();
     await expect(confirmation).toHaveAttribute("data-save-state", "error");
-    await expect(confirmation).toHaveText("Couldn’t save to your account");
-    await expect(icon).toBeHidden();
+    await expect(message).toHaveText(savedMessage!);
+    await expect(icon.locator(".cloud-save-error")).toBeVisible();
+    await expect(loading).toBeHidden();
+    await expect(announcement).toHaveText(". Couldn’t save to your account");
+    await expect(page.locator("[data-draft-status]")).toContainText(
+      "Retrying automatically",
+    );
+    await expect(
+      page.getByRole("button", { name: "Retry saving" }),
+    ).toBeVisible();
+    await expectNormalToc();
     await expect.poll(() => requests).toBe(3);
-    await expect(confirmation).toHaveAttribute("data-save-state", "pending");
-    await expect(confirmation).toHaveText(`${savedMessage}. Saving changes…`);
-    await expect(icon).toBeVisible();
+    await expect(confirmation).toHaveAttribute("data-save-state", "loading");
+    await expect(message).toHaveText(savedMessage!);
+    await expect(loading).toBeVisible();
     await expect(check).toBeHidden();
     releaseRetry();
     await expect(confirmation).toHaveAttribute("data-save-state", "saved");
     await expect(icon).toBeVisible();
     await expect(check).toBeVisible();
+    await expect(announcement).toHaveText(". All changes saved");
+    await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
+    await expectNormalToc();
   } finally {
     releaseFirst();
     releaseFailed();
@@ -396,7 +423,9 @@ test("autosave message is present before answers without JavaScript", async ({
         .locator("[data-draft-save-indicator]")
         .all())
         await expect(indicator).toBeHidden();
-      await expect(page.locator("[data-draft-save-summary]")).toBeHidden();
+      await expect(
+        page.locator("[data-application-conflict-warning]"),
+      ).toBeHidden();
     }
     await expect(page.locator('[name="firstName"]')).toHaveValue("");
     await expect(localApplicationReviewButton(page, "bottom")).toBeDisabled();

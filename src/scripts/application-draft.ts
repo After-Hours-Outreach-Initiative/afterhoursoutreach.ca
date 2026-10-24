@@ -174,12 +174,13 @@ export function initApplicationDraft(element: HTMLFormElement) {
   if (!userId || !element.hasAttribute("data-application")) return;
   const flow = element.closest("[data-application-flow]")!;
   const saveIndicators = [
-    ...flow.querySelectorAll<HTMLElement>(
-      "[data-draft-save-indicator], [data-draft-save-summary]",
-    ),
+    ...flow.querySelectorAll<HTMLElement>("[data-draft-save-indicator]"),
   ].map((indicator) => ({
     indicator,
     message: indicator.querySelector<HTMLElement>("[data-draft-save-message]")!,
+    announcement: indicator.querySelector<HTMLElement>(
+      "[data-draft-save-announcement]",
+    )!,
   }));
   const saveTimeFormat = new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
@@ -358,35 +359,37 @@ export function initApplicationDraft(element: HTMLFormElement) {
     }
 
     let saveState = "idle";
-    let saveMessage = lastSavedMessage;
+    let saveAnnouncement = "";
     if (stopped || paused) {
       saveState = "paused";
-      saveMessage = "Saving paused";
+      saveAnnouncement = "Saving paused";
     } else if (conflict) {
       saveState = "error";
-      saveMessage = "Choose which answers to keep";
+      saveAnnouncement = "Choose which answers to keep";
     } else if (blocked || (failure && !inFlight)) {
       saveState = "error";
-      saveMessage = unsaved
+      saveAnnouncement = unsaved
         ? "Couldn’t save to your account"
         : "Couldn’t check save status";
-    } else if (inFlight || unsaved) {
-      // Retain the confirmed save history without claiming newer edits are saved.
+    } else if (inFlight || refreshing) {
+      saveState = "loading";
+      saveAnnouncement = inFlight ? "Saving changes" : "Checking save status";
+    } else if (unsaved) {
       saveState = "pending";
-      saveMessage = [
-        lastSavedMessage,
-        inFlight ? "Saving changes…" : "Changes waiting to save",
-      ]
-        .filter(Boolean)
-        .join(". ");
+      saveAnnouncement = "Changes waiting to save";
     } else if (lastSavedMessage) {
       saveState = "saved";
+      saveAnnouncement = "All changes saved";
     }
-    for (const { indicator, message } of saveIndicators) {
+    if (lastSavedMessage && saveAnnouncement)
+      saveAnnouncement = `. ${saveAnnouncement}`;
+    for (const { indicator, message, announcement } of saveIndicators) {
       indicator.dataset.saveState = saveState;
-      indicator.dataset.hasSaved = String(Boolean(lastSavedMessage));
-      if (message.textContent !== saveMessage)
-        message.textContent = saveMessage;
+      // Keep visible save history stable; announce icon-only state changes to AT.
+      if (message.textContent !== lastSavedMessage)
+        message.textContent = lastSavedMessage;
+      if (announcement.textContent !== saveAnnouncement)
+        announcement.textContent = saveAnnouncement;
     }
   };
   const restore = (answers: ApplicationDraftAnswers, notify = true) => {
@@ -669,6 +672,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
         schedule();
       }
     })();
+    renderStatus();
     return refreshing;
   };
   const save = (keepalive = false): Promise<void> | undefined => {

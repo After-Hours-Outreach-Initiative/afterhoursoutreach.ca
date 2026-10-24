@@ -33,7 +33,7 @@ async function expectSaveTime(page: Page) {
     }).format(savedDate);
     return `Last saved${date} at ${time}`;
   }, draft.updatedAt as number);
-  await expect(page.locator("[data-draft-save-indicator]")).toHaveText([
+  await expect(page.locator("[data-draft-save-message]")).toHaveText([
     savedMessage,
     savedMessage,
     savedMessage,
@@ -199,12 +199,15 @@ test("browser drafts preserve incomplete answers through reload and closing the 
   await expect(reopened.locator(statusSelector)).toContainText(
     "We could not connect",
   );
-  await expect(reopened.locator("[data-draft-save-indicator]")).toHaveText(
+  await expect(reopened.locator("[data-draft-save-announcement]")).toHaveText(
     Array(3).fill("Couldn’t save to your account"),
+  );
+  await expect(reopened.locator("[data-draft-save-message]")).toHaveText(
+    Array(3).fill(""),
   );
   await expect(
     localApplicationSaveIndicator(reopened).locator("svg"),
-  ).toBeHidden();
+  ).toBeVisible();
   await reopened.evaluate(() =>
     window.dispatchEvent(new Event("draft-test-online")),
   );
@@ -349,18 +352,22 @@ test("edits made during a pending save are backed up immediately and saved after
     "data-save-state",
     "idle",
   );
-  await expect(localApplicationSaveIndicator(page)).toHaveText("");
+  await expect(page.locator("[data-draft-save-message]")).toHaveText(
+    Array(3).fill(""),
+  );
   await page.locator('[name="firstName"]').fill("First version");
   await expect(
-    localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
-  ).toHaveText(/Changes waiting to save|Saving changes…/);
-  await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
+    localApplicationSaveIndicator(page).locator("svg"),
+  ).toBeVisible();
   await expect.poll(() => requests).toBe(1);
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
-  await expect(
-    localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
-  ).toHaveText("Saving changes…");
-  await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
+  await expect(localApplicationSaveIndicator(page)).toHaveAttribute(
+    "data-save-state",
+    "loading",
+  );
+  await expect(page.locator("[data-draft-save-message]")).toHaveText(
+    Array(3).fill(""),
+  );
   await page.locator('[name="firstName"]').fill("Latest version");
   expect(
     await page.evaluate(
@@ -372,11 +379,11 @@ test("edits made during a pending save are backed up immediately and saved after
   await expect.poll(() => requests).toBe(2);
   await expect(localApplicationSaveIndicator(page)).toHaveAttribute(
     "data-save-state",
-    "pending",
+    "loading",
   );
-  await expect(localApplicationSaveIndicator(page)).toHaveText(
-    /^Last saved at .+\. Saving changes…$/,
-  );
+  await expect(
+    localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
+  ).toHaveText(/^Last saved at /);
   await expect(
     localApplicationSaveIndicator(page).locator("svg"),
   ).toBeVisible();
@@ -398,10 +405,10 @@ test("last confirmed save time persists across input and option edits while newe
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   const indicator = localApplicationSaveIndicator(page);
-  const confirmedStatus = await indicator.innerText();
-  const indicators = page.locator(
-    "[data-draft-save-indicator], [data-draft-save-summary]",
-  );
+  const confirmedStatus = await indicator
+    .locator("[data-draft-save-message]")
+    .innerText();
+  const messages = page.locator("[data-draft-save-message]");
 
   let release!: () => void;
   const pending = new Promise<void>((resolve) => (release = resolve));
@@ -415,23 +422,19 @@ test("last confirmed save time persists across input and option edits while newe
   });
   try {
     await page.locator('[name="firstName"]').fill("Pending answer");
-    await expect(indicators).toHaveText(
-      Array(4).fill(`${confirmedStatus}. Changes waiting to save`),
-    );
+    await expect(messages).toHaveText(Array(3).fill(confirmedStatus));
     await expect(indicator).toHaveAttribute("data-save-state", "pending");
+    await expect(indicator.locator(".cloud-save-pending")).toBeVisible();
+    await expect(indicator.locator(".cloud-save-saved")).toBeHidden();
     await page.clock.runFor(1000);
     await expect.poll(() => requests).toBe(1);
-    await expect(indicators).toHaveText(
-      Array(4).fill(`${confirmedStatus}. Saving changes…`),
-    );
-    await expect(indicator).toHaveAttribute("data-save-state", "pending");
-    await expect(indicator.locator("svg")).toBeVisible();
+    await expect(messages).toHaveText(Array(3).fill(confirmedStatus));
+    await expect(indicator).toHaveAttribute("data-save-state", "loading");
+    await expect(indicator.locator(".cloud-save-loading")).toBeVisible();
     await page.locator('[name="teams"][value="medic"]').check();
     await page.locator('[name="certifications"][value="other"]').check();
     await page.locator('[name="experience"]').fill("Another edit");
-    await expect(indicators).toHaveText(
-      Array(4).fill(`${confirmedStatus}. Saving changes…`),
-    );
+    await expect(messages).toHaveText(Array(3).fill(confirmedStatus));
     release();
     await expect
       .poll(async () => {
@@ -548,6 +551,14 @@ for (const keepLocal of [true, false]) {
       "visibility",
       "hidden",
     );
+    await expect(page.locator("[data-application-progress]")).toBeHidden();
+    const conflictWarning = page.locator("[data-application-conflict-warning]");
+    // The compact bar is mobile-only; the same warning replaces its progress ring.
+    await expect(conflictWarning).toHaveJSProperty("hidden", false);
+    await expect(conflictWarning).toHaveText(
+      "Conflicting answers. Choose which answers to keep.",
+    );
+    if (!keepLocal) await expect(conflictWarning).toBeVisible();
     if (!keepLocal)
       await page.locator("[data-contents-menu] summary").first().click();
     const visibleLink = links.filter({ visible: true });
@@ -585,12 +596,17 @@ for (const keepLocal of [true, false]) {
         }),
       ).toBeFocused();
     }
-    await expect(localApplicationSaveIndicator(page)).toHaveText(
-      "Choose which answers to keep",
-    );
     await expect(
-      localApplicationSaveIndicator(page).locator("svg"),
-    ).toBeHidden();
+      localApplicationSaveIndicator(page).locator(
+        "[data-draft-save-announcement]",
+      ),
+    ).toHaveText(". Choose which answers to keep");
+    await expect(
+      localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
+    ).toHaveText(/^Last saved at /);
+    await expect(
+      page.locator("[data-application-draft-actions] .cloud-save-error"),
+    ).toBeVisible();
     await page.unroute(`**${endpoint}`);
     // Legal name and date of birth are separate conflicts, not a whole-form
     // overwrite choice. Resolve each explicitly.
@@ -602,6 +618,11 @@ for (const keepLocal of [true, false]) {
         })
         .click();
     await expect(page.locator("[data-draft-conflict]")).toHaveCount(0);
+    await expect(conflictWarning).toBeHidden();
+    await expect(page.locator("[data-application-progress]")).toHaveJSProperty(
+      "hidden",
+      false,
+    );
     await expect(
       page.locator('[name="firstName"]'),
     ).not.toHaveAccessibleDescription(/Conflicting answers/);
@@ -669,15 +690,24 @@ test("switching accounts never restores or autosaves another account's answers",
   await page.goto("/apply");
   await page.locator('[name="firstName"]').fill("First account answers");
   await expectDraftSaved(page, { firstName: "First account answers" });
+  const confirmedStatus = await localApplicationSaveIndicator(page)
+    .locator("[data-draft-save-message]")
+    .innerText();
   const second = await createLocalAccount(page.request, baseURL!, false);
   await page.locator('[name="firstName"]').fill("Stale tab changes");
   await expect(page.locator(statusSelector)).toContainText(
     "Sign in again or reload",
   );
-  await expect(localApplicationSaveIndicator(page)).toHaveText(
-    "Couldn’t save to your account",
+  await expect(localApplicationSaveIndicator(page)).toHaveAttribute(
+    "data-save-state",
+    "error",
   );
-  await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
+  await expect(
+    localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
+  ).toHaveText(confirmedStatus);
+  await expect(
+    localApplicationSaveIndicator(page).locator(".cloud-save-error"),
+  ).toBeVisible();
   expect((await (await page.request.get(endpoint)).json()).draft).toBe(null);
   await page.goto("/apply");
   await expect(page.locator('[name="firstName"]')).toHaveValue("");
