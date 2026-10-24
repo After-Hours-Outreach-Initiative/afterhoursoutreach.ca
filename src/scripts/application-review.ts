@@ -58,6 +58,23 @@ export function initApplicationReview(element: HTMLFormElement) {
   );
   if (!questions || !review || !reviewButtons?.length || !submitButton) return;
 
+  const consent = review.querySelector<HTMLInputElement>(
+    '[name="codeOfConductAccepted"]',
+  );
+  // Submitting the questions marks even disabled controls as :user-invalid.
+  // Keep consent's feedback tied to its own interaction/validation, without
+  // removing its native required constraint or resetting other form controls.
+  const resetConsentValidation = () =>
+    consent?.setAttribute("data-validation-untouched", "");
+  consent?.addEventListener("change", (event) => {
+    // Draft restoration dispatches synthetic changes, not user consent edits.
+    if (event.isTrusted) consent?.removeAttribute("data-validation-untouched");
+  });
+  consent?.addEventListener("invalid", () =>
+    consent?.removeAttribute("data-validation-untouched"),
+  );
+  element.addEventListener("reset", resetConsentValidation);
+
   const originalTitle = document.title;
   let step: "questions" | "review" = "questions";
   let editTarget: string | undefined;
@@ -178,6 +195,7 @@ export function initApplicationReview(element: HTMLFormElement) {
     }
   };
   element.addEventListener("application-draft-restored", () => {
+    resetConsentValidation();
     reviewDepth = 0;
     history.replaceState(state("questions"), "");
     display("questions", false);

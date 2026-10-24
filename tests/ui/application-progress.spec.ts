@@ -5,7 +5,10 @@ import {
   fillApplicationField,
   localApplicationReviewButton,
   localApplicationSaveIndicator,
+  reviewLocalApplication,
+  sampleAnswers,
 } from "../helpers/local-account";
+import { codeOfConductError } from "../../src/data/code-of-conduct";
 
 test.beforeEach(({ baseURL }) => {
   test.skip(
@@ -592,6 +595,79 @@ for (const width of [390, 1280]) {
     }
   });
 }
+
+test("review consent errors wait for interaction or a submission attempt", async ({
+  page,
+  baseURL,
+}) => {
+  const { id } = await createLocalAccount(page.request, baseURL!, false);
+  const {
+    heardAboutUs: _referral,
+    certification: _certification,
+    ...answers
+  } = sampleAnswers;
+  const saved = await page.request.put("/api/v1/account/application-draft", {
+    headers: { origin: baseURL! },
+    data: { userId: id, version: 1, revision: null, answers },
+  });
+  expect(saved.ok(), await saved.text()).toBe(true);
+  const form = page.locator("form[data-application]");
+  const confirmation = form.locator('[name="codeOfConductAccepted"]');
+  const error = form.locator('[data-error="codeOfConductAccepted"]');
+  const submissions: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/account/profile")
+      submissions.push(request.url());
+  });
+
+  for (const action of ["uncheck", "submit"]) {
+    await page.goto("/apply");
+    await expectProgress(page, 5);
+    await reviewLocalApplication(page);
+    await expect(confirmation).toBeVisible();
+    await expect(confirmation).not.toBeChecked();
+    expect(
+      await confirmation.evaluate(
+        (input: HTMLInputElement) => input.validity.valueMissing,
+      ),
+    ).toBe(true);
+    await expect(error).toBeHidden();
+    await expect(confirmation).not.toHaveCSS(
+      "outline-color",
+      "rgb(248, 113, 113)",
+    );
+    if (action === "uncheck") {
+      await confirmation.check();
+      await expect(error).toBeHidden();
+      await confirmation.press("Space");
+    } else {
+      await form.getByRole("button", { name: "Submit application" }).click();
+      await expect(confirmation).toBeFocused();
+    }
+    await expect(error).toBeVisible();
+    await expect(error).toHaveText(codeOfConductError);
+    await expect(confirmation).toHaveCSS("outline-color", "rgb(248, 113, 113)");
+    await confirmation.check();
+    await expect(error).toBeHidden();
+    await expect(form.locator("[data-error]:visible")).toHaveCount(0);
+    expect(
+      await form.evaluate((element: HTMLFormElement) =>
+        element.checkValidity(),
+      ),
+    ).toBe(true);
+    expect(submissions).toEqual([]);
+    await form.getByRole("button", { name: "Back to answers" }).click();
+    await expectProgress(page, 5);
+    await expect(form.locator('[name="firstName"]')).toHaveValue(
+      answers.firstName,
+    );
+  }
+  await form.locator('[name="firstName"]').fill("");
+  await expectProgress(page, 4);
+  await reviewLocalApplication(page);
+  await expect(form.locator('[data-error="firstName"]')).toBeVisible();
+  await expect(confirmation).toBeDisabled();
+});
 
 test("restored drafts initialize completion without showing validation errors", async ({
   page,
