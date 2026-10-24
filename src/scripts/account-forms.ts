@@ -4,6 +4,8 @@ import {
   motivationWordLimitError,
   trainingRequiredError,
   trainingExclusiveError,
+  experienceRequiredError,
+  experienceExclusiveError,
   profileFormSections,
   type ApplicationAnswers,
 } from "../data/application";
@@ -85,7 +87,7 @@ export function initMedicCertifications(element: HTMLFormElement) {
     '[name="teams"][value="medic"]',
   );
   if (!section || !medic) return;
-  const medicalFields = section.parentElement!;
+  const medicalFields = section.closest<HTMLElement>("[data-medic-details]")!;
   const fields = [
     ...section.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
   ];
@@ -95,19 +97,61 @@ export function initMedicCertifications(element: HTMLFormElement) {
   const expiry = element.querySelector<HTMLFieldSetElement>(
     "[data-certification-expiry]",
   );
-  const teamTraining = element.querySelector<HTMLElement>(
-    "[data-profile-team-training]",
-  );
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let expanded = !medicalFields.hidden;
+  let transition: Animation | undefined;
+  const finishTransition = () => {
+    medicalFields.hidden = !expanded;
+    transition?.cancel();
+    transition = undefined;
+    delete medicalFields.dataset.transitioning;
+  };
+  const reveal = (active: boolean) => {
+    if (!active && medicalFields.contains(document.activeElement))
+      medic.focus({ preventScroll: true });
+    // Remove collapsing controls from focus/accessibility immediately, not at
+    // the end of their visual transition. Keep their draft answers intact.
+    medicalFields.inert = !active;
+    medicalFields.setAttribute("aria-hidden", String(!active));
+    medic.setAttribute("aria-expanded", String(active));
+    if (expanded === active) return;
+    expanded = active;
+    const height = medicalFields.getBoundingClientRect().height;
+    const opacity = getComputedStyle(medicalFields).opacity;
+    transition?.cancel();
+    medicalFields.hidden = false;
+    if (reducedMotion.matches || !medicalFields.getClientRects().length) {
+      finishTransition();
+      return;
+    }
+    medicalFields.dataset.transitioning = "";
+    transition = medicalFields.animate(
+      [
+        { height: `${height}px`, opacity: height ? opacity : 0 },
+        {
+          height: `${active ? medicalFields.scrollHeight : 0}px`,
+          opacity: active ? 1 : 0,
+        },
+      ],
+      { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "both" },
+    );
+    transition.onfinish = finishTransition;
+  };
+  reducedMotion.addEventListener("change", () => {
+    if (reducedMotion.matches) finishTransition();
+  });
   const update = () => {
-    section.hidden = !medic.checked;
-    medicalFields.hidden = !medic.checked;
-    if (teamTraining) teamTraining.hidden = !medic.checked;
     // Retain checked answers in FormData and drafts without hidden validation.
     for (const field of fields) field.required = medic.checked;
-    if (expiry) setDateInputActive(expiry, medic.checked);
+    if (expiry) {
+      setDateInputActive(expiry, medic.checked);
+      // The enclosing reveal owns visibility while the date validator still
+      // deactivates required/custom validity synchronously on collapse.
+      expiry.hidden = false;
+    }
     if (training && experience) {
       const active = medic.checked && Boolean(other?.checked);
-      training.hidden = !active;
+      training.hidden = !other?.checked;
       experience.required = active;
       experience.readOnly = !active;
       experience.setCustomValidity(
@@ -116,6 +160,7 @@ export function initMedicCertifications(element: HTMLFormElement) {
           : "",
       );
     }
+    reveal(medic.checked);
   };
   medic.addEventListener("change", update);
   section.addEventListener("change", update);
@@ -125,66 +170,77 @@ export function initMedicCertifications(element: HTMLFormElement) {
 }
 
 export function initRelevantTraining(element: HTMLFormElement) {
-  const section = element.querySelector<HTMLElement>(
+  for (const section of element.querySelectorAll<HTMLElement>(
     "[data-relevant-training]",
-  );
-  const choices = [
-    ...(section?.querySelectorAll<HTMLInputElement>('[name="training"]') ?? []),
-  ];
-  const first = choices[0];
-  const other = choices.find((choice) => choice.value === "other");
-  const none = choices.find((choice) => choice.value === "none");
-  const feedback = section?.querySelector<HTMLElement>(
-    '[data-error="training"] span',
-  );
-  const details = element.querySelector<HTMLElement>(
-    "[data-other-relevant-training]",
-  );
-  const input = details?.querySelector<HTMLTextAreaElement>("textarea");
-  if (!section || !first || !other || !none || !details || !input) return;
-  const update = () => {
-    const selected = choices.filter((choice) => choice.checked);
-    const required =
-      section.dataset.trainingRequired !== "false" ||
-      // A legacy blank answer becomes required once an explicit answer is saved.
-      choices.some((choice) => choice.defaultChecked);
-    first.required = required && !selected.length;
-    const error =
-      none.checked && selected.length > 1
-        ? trainingExclusiveError
-        : first.required
-          ? trainingRequiredError
-          : "";
-    first.setCustomValidity(error);
-    if (feedback) feedback.textContent = error || trainingRequiredError;
-    details.hidden = !other.checked;
-    input.required = other.checked;
-    input.readOnly = !other.checked;
-    input.setCustomValidity(
-      other.checked && !input.value.trim()
-        ? "Describe your other relevant training or experience."
-        : "",
+  )) {
+    const name = section.dataset.relevantTraining!;
+    const experience = name === "relevantExperience";
+    const requiredError = experience
+      ? experienceRequiredError
+      : trainingRequiredError;
+    const exclusiveError = experience
+      ? experienceExclusiveError
+      : trainingExclusiveError;
+    const choices = [
+      ...section.querySelectorAll<HTMLInputElement>(`[name="${name}"]`),
+    ];
+    const first = choices[0];
+    const other = choices.find((choice) => choice.value === "other");
+    const none = choices.find((choice) => choice.value === "none");
+    const feedback = section?.querySelector<HTMLElement>(
+      `[data-error="${name}"] span`,
     );
-  };
-  const updateSelection = (event: Event) => {
-    const target = event.target;
-    if (
-      target instanceof HTMLInputElement &&
-      target.name === "training" &&
-      target.checked
-    ) {
-      if (target === none) {
-        for (const choice of choices)
-          if (choice !== none) choice.checked = false;
-      } else none.checked = false;
-    }
+    const details = section.querySelector<HTMLElement>(
+      experience
+        ? "[data-other-relevant-experience]"
+        : "[data-other-relevant-training]",
+    );
+    const input = details?.querySelector<HTMLTextAreaElement>("textarea");
+    if (!first || !other || !none || !details || !input) continue;
+    const update = () => {
+      const selected = choices.filter((choice) => choice.checked);
+      const required =
+        section.dataset.trainingRequired !== "false" ||
+        // A legacy blank answer becomes required once an explicit answer is saved.
+        choices.some((choice) => choice.defaultChecked);
+      first.required = required && !selected.length;
+      const error =
+        none.checked && selected.length > 1
+          ? exclusiveError
+          : first.required
+            ? requiredError
+            : "";
+      first.setCustomValidity(error);
+      if (feedback) feedback.textContent = error || requiredError;
+      details.hidden = !other.checked;
+      input.required = other.checked;
+      input.readOnly = !other.checked;
+      input.setCustomValidity(
+        other.checked && !input.value.trim()
+          ? `Describe your other relevant ${experience ? "experience" : "training"}.`
+          : "",
+      );
+    };
+    const updateSelection = (event: Event) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement &&
+        target.name === name &&
+        target.checked
+      ) {
+        if (target === none) {
+          for (const choice of choices)
+            if (choice !== none) choice.checked = false;
+        } else none.checked = false;
+      }
+      update();
+    };
+    // Resolve exclusivity before form-level listeners back up a checkbox input.
+    section.addEventListener("input", updateSelection);
+    section.addEventListener("change", updateSelection);
+    element.addEventListener("reset", () => queueMicrotask(update));
     update();
-  };
-  // Resolve exclusivity before form-level listeners back up a checkbox input.
-  section.addEventListener("input", updateSelection);
-  section.addEventListener("change", updateSelection);
-  element.addEventListener("reset", () => queueMicrotask(update));
-  update();
+  }
 }
 
 export function initReferralSources(element: HTMLFormElement) {
@@ -292,6 +348,7 @@ export function initAccountFormChanges(element: HTMLFormElement) {
       teams: values.getAll("teams").map(String),
       certifications: values.getAll("certifications").map(String),
       training: values.getAll("training").map(String),
+      relevantExperience: values.getAll("relevantExperience").map(String),
     };
     for (const section of profileFormSections()) {
       const summary = [...summaries].find(
@@ -449,7 +506,13 @@ export function initAccountFormChanges(element: HTMLFormElement) {
     for (const key of Object.keys(result) as (keyof ApplicationAnswers)[]) {
       if (
         Array.isArray(result[key]) &&
-        (data.has(key) || ["teams", "certifications", "training"].includes(key))
+        (data.has(key) ||
+          [
+            "teams",
+            "certifications",
+            "training",
+            "relevantExperience",
+          ].includes(key))
       )
         Object.assign(result, { [key]: data.getAll(key).map(String) });
       else if (data.has(key))

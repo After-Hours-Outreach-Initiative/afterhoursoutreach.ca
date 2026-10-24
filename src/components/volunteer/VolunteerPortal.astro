@@ -29,7 +29,7 @@ import {
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
-import { social } from "@/data/site";
+import { contactEmail, social } from "@/data/site";
 import "@/styles/volunteer.css";
 
 interface Props {
@@ -186,7 +186,8 @@ const hasVisiblePastEvents = pastEvents.some((event) =>
     {
       actor.applicationSubmitted && !actor.active && (
         <p class="volunteer-notice" role="status">
-          Your volunteer account is inactive. Contact an organizer to restore
+          Your volunteer account is inactive. Contact an organizer at{" "}
+          <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore
           access.
         </p>
       )
@@ -224,7 +225,7 @@ const hasVisiblePastEvents = pastEvents.some((event) =>
       !eventAccess && (
         <>
           <p class="mt-12 max-w-3xl text-zinc-300">
-            Join our Discord for more information and to become more involved.
+            Join our Discord for the most up to date information.
           </p>
           <div class="mt-6 flex flex-wrap gap-3.5 max-sm:flex-col">
             <a

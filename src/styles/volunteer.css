@@ -1,7 +1,6 @@
 @reference "./tailwind.css";
 
 .volunteer-portal {
-  --attendee-avatar-width: 1.375rem;
   --volunteer-border: 1px solid #3f3f46;
   --volunteer-check-size: 1.375rem;
   --volunteer-check-gap: 0.625rem;
@@ -55,13 +54,30 @@ body:has(
 }
 .volunteer-draft-save-icon {
   display: none;
-  width: 1rem;
-  height: 1rem;
+  width: 1.5rem;
+  height: 1.5rem;
   flex-shrink: 0;
 }
-.volunteer-draft-save-status[data-save-state="saved"]
+.volunteer-draft-save-status:not(
+    [data-save-state="initializing"],
+    [data-save-state="idle"]
+  )
   .volunteer-draft-save-icon {
   display: block;
+}
+.cloud-save-mark {
+  display: none;
+}
+[data-save-state="loading"] .cloud-save-loading,
+[data-save-state="saved"] .cloud-save-saved,
+[data-save-state="error"] .cloud-save-error,
+[data-save-state="paused"] .cloud-save-paused {
+  display: block;
+}
+.cloud-save-loading {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: volunteer-loading 800ms linear infinite;
 }
 .volunteer-draft-save-status:is(
   [data-save-state="error"],
@@ -220,31 +236,19 @@ body:has(
 .volunteer-application-step > .btn {
   align-self: flex-start;
 }
-.volunteer-application-review,
-.volunteer-application-review dl {
-  display: grid;
-  gap: 1.5rem;
-  min-width: 0;
-}
-.volunteer-application-review dt {
-  margin-bottom: 0.375rem;
-  color: #a1a1aa;
-}
-.volunteer-application-review dd {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.volunteer-application-review ul {
-  padding-left: 1.5rem;
-  list-style: disc;
-  white-space: normal;
-}
 .volunteer-profile-section {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
+}
+/* Separate complete sections, never a heading from its own fields or answers. */
+.volunteer-profile-section + .volunteer-profile-section,
+.volunteer-application-section + .volunteer-application-section,
+.volunteer-application-review > section + section,
+.volunteer-application-review + .volunteer-code-of-conduct {
+  padding-top: 2rem;
+  border-top: var(--volunteer-border);
 }
 .volunteer-profile-section > .volunteer-help {
   margin-bottom: 1.5rem;
@@ -255,8 +259,6 @@ body:has(
   padding: 0;
 }
 .volunteer-profile-heading {
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #3f3f46;
   @apply text-2xl;
   line-height: 1.4;
 }
@@ -267,17 +269,11 @@ body:has(
   justify-content: space-between;
   gap: 1rem;
   min-width: 0;
-  padding-bottom: 1rem;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid #3f3f46;
 }
 .volunteer-profile-section-heading > h3 {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-.volunteer-profile-section-heading .volunteer-profile-heading {
-  padding: 0;
-  border: 0;
 }
 .volunteer-profile-section-heading .btn {
   flex-shrink: 0;
@@ -288,12 +284,26 @@ body:has(
   width: 1rem;
   height: 1rem;
 }
-[data-profile-fields] > [data-profile-actions],
-[data-profile-team-training]:has([data-profile-medical-fields]) {
+[data-profile-fields] > [data-profile-actions] {
   margin-top: 1.5rem;
 }
-[data-profile-team-training] > p {
-  margin-bottom: 1rem;
+.volunteer-medic-details {
+  min-width: 0;
+}
+.volunteer-medic-details[data-transitioning] {
+  overflow: hidden;
+}
+.volunteer-medic-details-content {
+  padding-block: 0.75rem;
+}
+.volunteer-medic-note,
+[data-profile-team-training]:not(
+  :has([data-profile-medical-fields]:not([hidden]))
+) {
+  display: none;
+}
+[data-profile-team-training] .volunteer-medic-note {
+  display: block;
 }
 .volunteer-contents {
   --contents-padding: 1.5rem;
@@ -345,23 +355,17 @@ body:has(
 .volunteer-contents-menu[open] .volunteer-contents-chevron {
   transform: rotate(180deg);
 }
-.volunteer-contents-save-status {
+.volunteer-contents-conflict-warning {
   display: inline-flex;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   flex-shrink: 0;
-  color: #a1a1aa;
+  margin-left: auto;
+  color: #facc15;
 }
-.volunteer-contents-save-status[data-save-state="initializing"] {
-  visibility: hidden;
-}
-.volunteer-contents-save-status svg {
+.volunteer-contents-conflict-warning svg {
   width: 100%;
   height: 100%;
-  visibility: hidden;
-}
-.volunteer-contents-save-status[data-save-state="saved"] svg {
-  visibility: visible;
 }
 .volunteer-contents-progress {
   display: inline-flex;
@@ -762,7 +766,7 @@ body:has(
 }
 .volunteer-date-parts {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.75rem;
   max-width: 20rem;
 }
@@ -1081,6 +1085,7 @@ body:has(
 /* Keep the entire follow-up field in the option's text column. */
 .volunteer-certification-options > [data-other-training],
 .volunteer-training-options > [data-other-relevant-training],
+.volunteer-training-options > [data-other-relevant-experience],
 .volunteer-referral-sources > [data-other-referral] {
   margin-inline-start: calc(
     var(--volunteer-check-size) + var(--volunteer-check-gap)
@@ -1094,8 +1099,8 @@ body:has(
   gap: 1.25rem;
   padding: 1.5rem 0;
 }
-.volunteer-setting:not(:last-child) {
-  border-bottom: 1px solid #27272a;
+.volunteer-setting + .volunteer-setting {
+  border-top: 1px solid #27272a;
 }
 .volunteer-setting > div {
   min-width: 0;
@@ -1379,7 +1384,8 @@ body:has(
   cursor: pointer;
   color: #d4d4d8;
 }
-.volunteer-series-occurrences > .volunteer-event-list {
+.volunteer-series-occurrences > .volunteer-event-list,
+.volunteer-series-settings > summary + .volunteer-form {
   margin-top: 1rem;
 }
 .volunteer-event-card p {
@@ -1556,32 +1562,40 @@ body:has(
 .volunteer-answer-conflict p:first-child {
   color: #facc15;
 }
-.volunteer-field:has(:user-invalid) > [data-error],
+.volunteer-field:has(:user-invalid:not([data-validation-untouched]))
+  > [data-error],
 .volunteer-date-input:has([aria-invalid="true"]) > [data-error],
 .volunteer-team-options:has(input[name="teams"]:user-invalid) + [data-error],
 .volunteer-certifications:has(input[name="certifications"]:user-invalid)
   > [data-error],
-.volunteer-relevant-training:has(input[name="training"]:user-invalid)
+.volunteer-relevant-training:has(input[type="checkbox"]:user-invalid)
   > [data-error],
 .volunteer-referral-sources:has(input[name="heardAboutUsSources"]:user-invalid)
   > [data-error] {
   display: flex;
 }
 .volunteer-portal
-  input:user-invalid:not(.volunteer-choice-options > label > input),
+  input:user-invalid:not(
+    .volunteer-choice-options > label > input,
+    [data-validation-untouched]
+  ),
 .volunteer-date-input input[aria-invalid="true"],
 .volunteer-portal textarea:user-invalid,
 .volunteer-portal select:user-invalid {
   border-color: #f87171;
 }
 .volunteer-portal
-  :user-invalid:focus-visible:not(.volunteer-choice-options > label > input),
+  :user-invalid:focus-visible:not(
+    .volunteer-choice-options > label > input,
+    [data-validation-untouched]
+  ),
 .volunteer-date-input [aria-invalid="true"]:focus-visible {
   outline-color: #f87171;
 }
 .volunteer-portal
   input:is([type="checkbox"], [type="radio"]):user-invalid:not(
-    .volunteer-choice-options > label > input
+    .volunteer-choice-options > label > input,
+    [data-validation-untouched]
   ) {
   outline: 2px solid #f87171;
   outline-offset: 0.125rem;
@@ -1623,7 +1637,8 @@ body:has(
 }
 @media (prefers-reduced-motion: reduce) {
   .volunteer-portal .btn[aria-busy="true"]::before,
-  .volunteer-control-loading::before {
+  .volunteer-control-loading::before,
+  .cloud-save-loading {
     animation: none;
   }
   .volunteer-team-option {

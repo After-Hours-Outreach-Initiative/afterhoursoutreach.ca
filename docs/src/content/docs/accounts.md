@@ -94,14 +94,15 @@ Email appears first during application. On the account page it appears in
 
 Both forms use larger section headings with horizontal dividers: **Personal
 info**, **Emergency contact**, **Training and safety**, and **Team interests**.
-Application also includes **About volunteering** and **Code of Conduct**.
+Application also includes **Personal statement** and **Code of Conduct**.
 
 **Save profile** is greyed out until an answer or team selection differs from
 the saved profile. Reverting every change disables it again. Successful saves
 establish the new baseline; failed saves remain retryable, and edits made while
 a save is pending stay unsaved. **Complete application** is unaffected.
 
-“How did you find out about us?”, “Why do you want to volunteer?”, and the Code of
+“How did you find out about us?”,
+“Please tell us what motivates you volunteer with us?”, and the Code of
 Conduct are editable only during application, not on the volunteer's profile.
 Organizers can view referral answers on profile pages/dialogs; motivation and
 the acknowledgement are not displayed there. The server preserves these
@@ -135,7 +136,7 @@ view referral answers and the remaining profile answers.
 | Emergency contact phone                                   | Yes                                                  |
 | Emergency contact relationship                            | Yes                                                  |
 | How did you find out about us                             | At least one choice; short detail required for Other |
-| Why do you want to volunteer                              | Yes                                                  |
+| Please tell us what motivates you volunteer with us?       | Yes                                                  |
 | Teams (outreach, medic, non-patrol)                       | Yes                                                  |
 | Highest medical certification                             | Yes                                                  |
 | Other training and experience, and other                  | Yes                                                  |
@@ -224,7 +225,7 @@ Requests are counted by both the address being sent to and the IP asking,
 since either one on its own is easy to work around.
 
 Sign-in emails have a 30-second per-address cooldown; email-change requests keep
-a one-minute cooldown. Both share limits of three per address per hour, ten per
+a one-minute cooldown. Both share limits of ten per address per hour, ten per
 IP per hour, and 80 total per day. Counters are stored in D1.
 
 Code verification: 3 attempts per code, plus 10 submissions per address per hour
@@ -243,18 +244,19 @@ safe because TypeScript removes them.
 
 The development controls are available only in the local dev server. Built
 Worker tests check that `GET /api/v1/auth/dev/users`,
-`POST /api/v1/auth/dev/switch-user`, and `POST /api/v1/auth/dev/delete-user`
+`POST /api/v1/auth/dev/switch-user`, `POST /api/v1/auth/dev/delete-user`,
+`POST /api/v1/auth/dev/application-step`, and `POST /api/v1/auth/dev/seed-accounts`
 return `404` in production and preview builds;
-local browser tests exercise account switching and simulated email delivery.
+local browser tests exercise account switching, application-step shortcuts, and
+simulated email delivery.
 Dev-tool assets must not be placed in `public/`, which is copied into builds.
 
 The Not applied choice creates a new disposable D1 identity on each selection;
 submission, account naming, and private drafts still use the normal backend.
 All created identities remain visible and deletable, even if abandoned before
 submission. Choosing Not applied never clears or repurposes the original fixture.
-Only the exact manual preset IDs `local-account-user-applied`,
-`local-account-user-accepted`, `local-account-user-inactive`, and
-`local-account-user-organizer` have no trash button and reject deletion with `403`,
+Only the exact manual preset IDs defined in `src/dev/accounts.ts` have no trash
+button and reject deletion with `403`,
 before any database cleanup. Names and roles do not affect this protection.
 Other saved accounts retain the compact icon-only trash button on the right,
 including ordinary sign-in accounts, other fixtures, and Original Not applied.

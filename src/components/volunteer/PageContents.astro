@@ -1,5 +1,5 @@
 ---
-import CloudCheckIcon from "@/components/icons/CloudCheckIcon.astro";
+import WarningIcon from "@/components/icons/WarningIcon.astro";
 import DraftSaveStatus from "./DraftSaveStatus.astro";
 import PageContentsList from "./PageContentsList.astro";
 
@@ -63,15 +63,18 @@ const totalSections = entries.filter((entry) => entry.completable).length;
             application && !review && (
               <>
                 <span
-                  class="volunteer-contents-save-status"
-                  data-draft-save-summary
-                  data-save-state="initializing"
+                  class="volunteer-contents-conflict-warning"
+                  data-application-conflict-warning
                   role="status"
                   aria-live="polite"
                   aria-atomic="true"
+                  title="Conflicting answers. Choose which answers to keep."
+                  hidden
                 >
-                  <CloudCheckIcon />
-                  <span class="sr-only" data-draft-save-message />
+                  <WarningIcon />
+                  <span class="sr-only">
+                    Conflicting answers. Choose which answers to keep.
+                  </span>
                 </span>
                 <span
                   class="volunteer-contents-progress"

@@ -24,6 +24,8 @@ export interface ApplicationAnswers {
   experience: string;
   training: string[];
   otherTraining: string;
+  relevantExperience: string[];
+  otherExperience: string;
   medicalConditions: string;
 }
 
@@ -82,7 +84,8 @@ export const applicationTeamOptions = [
   },
 ] as const;
 
-export const heardAboutUsQuestion = "How did you find out about us?";
+export const heardAboutUsQuestion =
+  "How did you find out about us? Select all that apply.";
 export const heardAboutUsOptions = [
   { value: "social-media", label: "Social Media" },
   { value: "friend-word-of-mouth", label: "Friend/Word of mouth" },
@@ -100,7 +103,7 @@ export function countWords(value: string): number {
 }
 
 export const certificationQuestion =
-  "Select the highest first-aid, medical, or health care certification or licence that you currently hold or are presently enrolled in schooling for.";
+  "Select the highest first-aid, medical, or health care certification or licence that you currently hold.";
 
 export const certificationOptions = [
   {
@@ -121,22 +124,24 @@ export const certificationOptions = [
 ] as const;
 
 export const trainingQuestion =
-  "Do you have any of the following relevant training or experience? Select all that apply.";
+  "Do you have any of the following relevant training? Select all that apply.";
 export const trainingRequiredError =
-  "Select at least one option, including No relevant training or experience if none apply.";
+  "Select at least one option, including No relevant training if none apply.";
 export const trainingExclusiveError =
-  "Select No relevant training or experience on its own, or choose your relevant training and experience.";
+  "Select No relevant training on its own, or choose your relevant training.";
+export const experienceQuestion =
+  "Do you have any of the following relevant experience? Select all that apply.";
+export const experienceRequiredError =
+  "Select at least one option, including No relevant experience if none apply.";
+export const experienceExclusiveError =
+  "Select No relevant experience on its own, or choose your relevant experience.";
+// Leave room for the removed trainer option alongside a full legacy Other answer.
+export const otherTrainingMaxLength = 2048;
 
 export const trainingOptions = [
   {
     value: "naloxone-administration",
     label: "Naloxone administration training",
-  },
-  { value: "naloxone-trainer", label: "Certified naloxone trainer" },
-  {
-    value: "overdose-response",
-    label:
-      "Overdose response experience (naloxone, rescue breathing, CPR, etc.)",
   },
   {
     value: "basic-first-aid-cpr",
@@ -156,6 +161,16 @@ export const trainingOptions = [
     value: "mental-health-first-aid",
     label: "Mental Health First Aid or Psychological First Aid",
   },
+  { value: "other", label: "Other" },
+  { value: "none", label: "No relevant training" },
+] as const;
+
+export const experienceOptions = [
+  {
+    value: "overdose-response",
+    label:
+      "Overdose response experience (naloxone, rescue breathing, CPR, etc.)",
+  },
   {
     value: "lived-experience",
     label:
@@ -168,11 +183,57 @@ export const trainingOptions = [
   },
   {
     value: "nonprofit-fundraising",
-    label: "Nonprofit grant writing, fundraising, or donor relations",
+    label:
+      "Experience in non-profit grant writing, fundraising, or donor relations",
   },
   { value: "other", label: "Other" },
-  { value: "none", label: "No relevant training or experience" },
+  { value: "none", label: "No relevant experience" },
 ] as const;
+
+/** Split saved combined answers without guessing a negative answer for either question. */
+export function normalizeTrainingAnswers<
+  T extends {
+    training?: string[];
+    otherTraining?: string;
+    relevantExperience?: string[] | null;
+    otherExperience?: string;
+  },
+>(answers: T) {
+  if (answers.relevantExperience != null)
+    return {
+      ...answers,
+      training: answers.training ?? [],
+      otherTraining: answers.otherTraining ?? "",
+      relevantExperience: answers.relevantExperience,
+      otherExperience: answers.otherExperience ?? "",
+    };
+  const combined = answers.training ?? [];
+  const experienceValues: readonly string[] = experienceOptions
+    .filter((option) => !["other", "none"].includes(option.value))
+    .map((option) => option.value);
+  const training = combined.filter(
+    (value) =>
+      !experienceValues.includes(value) && value !== "naloxone-trainer",
+  );
+  // Combined Other text cannot be reliably classified; retain it under training.
+  let otherTraining = answers.otherTraining ?? "";
+  // The removed option remains an editable answer, not a selectable certification.
+  if (combined.includes("naloxone-trainer")) {
+    if (!training.includes("other")) training.push("other");
+    otherTraining = [otherTraining, "Certified naloxone trainer"]
+      .filter(Boolean)
+      .join("\n");
+  }
+  return {
+    ...answers,
+    training,
+    otherTraining,
+    relevantExperience: combined.filter(
+      (value) => experienceValues.includes(value) || value === "none",
+    ),
+    otherExperience: answers.otherExperience ?? "",
+  };
+}
 
 // Keep existing saved answers and older form submissions compatible.
 const legacyCertificationAliases = new Map<string, string>([
@@ -269,7 +330,6 @@ export const applicationFields = [
     label: "Date of birth",
     required: true,
     type: "text",
-    help: "You must be at least 19 years old to apply.",
   },
   {
     name: "medicalConditions",
@@ -315,7 +375,14 @@ export const applicationFields = [
   {
     name: "otherTraining",
     section: "training-and-safety",
-    label: "Other relevant training or experience",
+    label: "Other relevant training",
+    required: true,
+    multiline: true,
+  },
+  {
+    name: "otherExperience",
+    section: "training-and-safety",
+    label: "Other relevant experience",
     required: true,
     multiline: true,
   },
@@ -329,7 +396,7 @@ export const applicationFields = [
   {
     name: "motivation",
     section: "about-volunteering",
-    label: "Why do you want to volunteer?",
+    label: "Please tell us what motivates you volunteer with us?",
     required: true,
     multiline: true,
     applicationOnly: true,
@@ -341,10 +408,7 @@ export const profileFields = applicationFields.filter(
   (field) => !("applicationOnly" in field),
 );
 
-export const profileIdentityFields: readonly (keyof ApplicationAnswers)[] = [
-  "firstName",
-  "middleNames",
-  "lastName",
+export const profileReadOnlyFields: readonly (keyof ApplicationAnswers)[] = [
   "birthDate",
 ];
 
@@ -353,7 +417,7 @@ export function profileFormSections(application = false) {
   const fields = application
     ? applicationFields
     : profileFields.filter(
-        (field) => !profileIdentityFields.includes(field.name),
+        (field) => !profileReadOnlyFields.includes(field.name),
       );
   return [
     { key: "personal-info", heading: "Personal info" },
@@ -366,7 +430,7 @@ export function profileFormSections(application = false) {
     },
     { key: "team-interests", heading: "Team interests" },
     { key: "training-and-safety", heading: "Training and safety" },
-    { key: "about-volunteering", heading: "About volunteering" },
+    { key: "about-volunteering", heading: "Personal statement" },
   ]
     .map((section) => ({
       ...section,

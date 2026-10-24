@@ -135,6 +135,8 @@ const answers = {
   experience: "None",
   training: ["none"],
   otherTraining: "",
+  relevantExperience: ["none"],
+  otherExperience: "",
   medicalConditions: "Sample private answer",
 };
 
@@ -752,8 +754,14 @@ test("email hourly limits still apply after the resend cooldown expires", async 
   vi.useFakeTimers({ toFake: ["Date"] });
   const start = new Date("2026-10-16T12:10:00Z").getTime();
   const email = "hourly@example.org";
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i <= 10; i++) {
     vi.setSystemTime(start + i * 30_000);
+    // Rotate IPs so the separate ten-per-IP budget cannot mask this limit.
+    auth = createAuth(bindings, `192.0.2.${i + 1}`, {
+      sendEmail: async (email) => {
+        outbox.push(email);
+      },
+    });
     assert.equal(
       (
         await request("/email-otp/send-verification-otp", {
@@ -761,10 +769,11 @@ test("email hourly limits still apply after the resend cooldown expires", async 
           type: "sign-in",
         })
       ).status,
-      200,
+      i < 10 ? 200 : 429,
     );
   }
-  vi.setSystemTime(start + 90_000);
+  assert.equal(outbox.length, 10);
+  vi.setSystemTime(new Date("2026-10-16T13:00:00Z"));
   assert.equal(
     (
       await request("/email-otp/send-verification-otp", {
@@ -772,9 +781,9 @@ test("email hourly limits still apply after the resend cooldown expires", async 
         type: "sign-in",
       })
     ).status,
-    429,
+    200,
   );
-  assert.equal(outbox.length, 3);
+  assert.equal(outbox.length, 11);
 });
 
 test("sign-in resends enforce the real D1 30-second boundary and replace the old challenge", async () => {
@@ -1192,10 +1201,20 @@ test("profile edits preserve unsplit legacy names and birthdays without revalida
       preferred_name: answers.preferredName,
     },
   );
-  await assert.rejects(
-    saveProfile(bindings.DB, id, { ...editable, firstName, lastName }),
-    (error: unknown) => error instanceof RequestError && error.status === 400,
-  );
+  const submission = await loadSubmittedApplication(bindings.DB, id);
+  await saveProfile(bindings.DB, id, {
+    ...editable,
+    firstName: "Renamed",
+    lastName,
+    preferredName: "",
+  });
+  assert.equal((await loadProfile(bindings.DB, id))?.firstName, "Renamed");
+  assert.equal((await loadProfile(bindings.DB, id))?.lastName, lastName);
+  const session = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  assert.equal(session?.user.name, "Renamed Volunteer");
+  assert.deepEqual(await loadSubmittedApplication(bindings.DB, id), submission);
   await saveProfile(bindings.DB, id, {
     ...editable,
     preferredName: "Legacy nickname",
@@ -1370,7 +1389,7 @@ test("relevant training requires an answer for every team, exclusive None, and d
     for (const training of [
       [],
       ["none"],
-      ["naloxone-administration", "overdose-response"],
+      ["naloxone-administration", "basic-first-aid-cpr"],
       ["other"],
     ]) {
       for (const otherTraining of [
@@ -1408,7 +1427,7 @@ test("relevant training requires an answer for every team, exclusive None, and d
       false,
     );
   assert.equal(
-    profileSchema.safeParse({ ...answers, otherTraining: "x".repeat(2001) })
+    profileSchema.safeParse({ ...answers, otherTraining: "x".repeat(2049) })
       .success,
     false,
   );
@@ -1434,13 +1453,23 @@ test("relevant training and Other details round-trip independently of medical ce
   const id = current.user.id;
   const training = ["naloxone-administration", "crisis-intervention", "other"];
   const otherTraining = "Crisis intervention course";
+  const relevantExperience = ["overdose-response", "other"];
+  const otherExperience = "Community pantry volunteer";
   await saveProfile(bindings.DB, id, {
     ...answers,
     training: [...training].reverse(),
     otherTraining: ` ${otherTraining} `,
+    relevantExperience: [...relevantExperience].reverse(),
+    otherExperience: ` ${otherExperience} `,
     codeOfConductAccepted: true,
   });
-  const expected = { ...answers, training, otherTraining };
+  const expected = {
+    ...answers,
+    training,
+    otherTraining,
+    relevantExperience,
+    otherExperience,
+  };
   assert.deepEqual(await loadProfile(bindings.DB, id), expected);
   await bindings.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
     .bind(id)
@@ -1501,6 +1530,55 @@ test("relevant training and Other details round-trip independently of medical ce
     (await viewVolunteerProfile(bindings.DB, actor, id))?.answers.teams,
     ["non-patrol"],
   );
+});
+
+test("legacy combined training round-trips through an unrelated profile edit without changing the submission", async () => {
+  const { cookie } = await signIn();
+  const current = (await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  }))!;
+  const id = current.user.id;
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    codeOfConductAccepted: true,
+  });
+  const submission = await loadSubmittedApplication(bindings.DB, id);
+  await bindings.DB.prepare(
+    "UPDATE profile SET relevant_training=?, other_training=?, relevant_experience=NULL WHERE user_id=?",
+  )
+    .bind(
+      JSON.stringify(["naloxone-trainer", "overdose-response", "other"]),
+      "Original Other answer",
+      id,
+    )
+    .run();
+  const legacy = (await loadProfile(bindings.DB, id))!;
+  assert.deepEqual(legacy.training, ["other"]);
+  assert.equal(
+    legacy.otherTraining,
+    "Original Other answer\nCertified naloxone trainer",
+  );
+  assert.deepEqual(legacy.relevantExperience, ["overdose-response"]);
+  await saveProfile(bindings.DB, id, {
+    ...legacy,
+    preferredName: "Updated display name",
+  });
+  assert.deepEqual(await loadProfile(bindings.DB, id), {
+    ...legacy,
+    preferredName: "Updated display name",
+  });
+  assert.deepEqual(await loadSubmittedApplication(bindings.DB, id), submission);
+  // A legacy one-sided positive answer does not become an invented negative answer.
+  await bindings.DB.prepare(
+    "UPDATE profile SET relevant_training='[\"overdose-response\"]', other_training='', relevant_experience=NULL WHERE user_id=?",
+  )
+    .bind(id)
+    .run();
+  const oneSided = (await loadProfile(bindings.DB, id))!;
+  assert.deepEqual(oneSided.training, []);
+  assert.deepEqual(oneSided.relevantExperience, ["overdose-response"]);
+  await saveProfile(bindings.DB, id, { ...oneSided, pronouns: "they/them" });
+  assert.deepEqual((await loadProfile(bindings.DB, id))?.training, []);
 });
 
 test("certification expiry is required only for Medic", () => {

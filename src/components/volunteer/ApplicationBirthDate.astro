@@ -3,18 +3,16 @@ import DateInput from "./DateInput.astro";
 
 interface Props {
   value: string;
-  help: string;
   required: boolean;
 }
-const { value, help, required } = Astro.props;
+const { value, required } = Astro.props;
 ---
 
 <DateInput
   name="birthDate"
   id="birthDate"
-  label="Date of birth"
+  label="Date of birth (yyyy/mm/dd)"
   {value}
-  {help}
   {required}
   birthDate
 />

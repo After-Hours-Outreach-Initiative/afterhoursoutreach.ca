@@ -16,6 +16,47 @@ test("home page offers volunteering without an upcoming events section", async (
   ).toHaveAttribute("href", "/volunteer");
 });
 
+test("short pages keep unused space above the footer black at the bottom of the viewport", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 1280, height: 1400 },
+    { width: 375, height: 2000 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/missing-short-layout-page");
+    const main = page.getByRole("main");
+    const footer = page.getByRole("contentinfo");
+    await expect(main).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    await expect(footer).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    const layout = await page.evaluate(() => {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: "instant",
+      });
+      const main = document.querySelector("main")!;
+      const content = main.firstElementChild!.getBoundingClientRect();
+      const bounds = main.getBoundingClientRect();
+      const footer = document.querySelector("footer")!.getBoundingClientRect();
+      return {
+        gap: bounds.bottom - content.bottom,
+        mainBottom: bounds.bottom,
+        footerTop: footer.top,
+        footerBottom: footer.bottom,
+        height: innerHeight,
+      };
+    });
+    // Exercise an actual stretched gap, not merely a black content section.
+    expect(layout.gap).toBeGreaterThan(1);
+    expect(Math.abs(layout.mainBottom - layout.footerTop)).toBeLessThanOrEqual(
+      1,
+    );
+    expect(Math.abs(layout.footerBottom - layout.height)).toBeLessThanOrEqual(
+      1,
+    );
+  }
+});
+
 for (const width of [1280, 375]) {
   test(`footer replaces nonprofit information with socials at ${width}px`, async ({
     page,

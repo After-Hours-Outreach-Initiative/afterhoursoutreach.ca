@@ -76,7 +76,7 @@ export async function limitEmailRequests(
         ? "Wait 30 seconds before requesting another email."
         : "Wait one minute before requesting another email.",
     );
-  await takeRateLimit(binding, secret, `send-email:${email}`, 3, 3_600_000);
+  await takeRateLimit(binding, secret, `send-email:${email}`, 10, 3_600_000);
   if (consumeProviderBudget) await takeEmailBudget(binding, secret);
 }
 

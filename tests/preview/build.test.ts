@@ -80,6 +80,24 @@ test("preview builds support real account features but reject development endpoi
         },
       );
       assert.equal(deletion.status, 404);
+      const shortcut = await worker.fetch(
+        `${origin}/api/v1/auth/dev/application-step`,
+        {
+          method: "POST",
+          headers: { origin, "content-type": "application/json" },
+          body: JSON.stringify({ userId: "new-application", step: "review" }),
+        },
+      );
+      assert.equal(shortcut.status, 404);
+      const seed = await worker.fetch(
+        `${origin}/api/v1/auth/dev/seed-accounts`,
+        {
+          method: "POST",
+          headers: { origin, "content-type": "application/json" },
+          body: "{}",
+        },
+      );
+      assert.equal(seed.status, 404);
     }
     const { DB } = await worker.getEnv();
     await DB.batch(previewEventFixtures().map((sql) => DB.prepare(sql)));

@@ -3,6 +3,7 @@ import {
   certificationOptions,
   heardAboutUsOptions,
   trainingOptions,
+  experienceOptions,
 } from "../data/application";
 import { clearFormMessage } from "./account-forms";
 import { readDateInputs } from "./date-input";
@@ -24,6 +25,8 @@ export function applicationSubmissionValues(
   }
   if (!values.getAll("training").includes("other"))
     values.set("otherTraining", "");
+  if (!values.getAll("relevantExperience").includes("other"))
+    values.set("otherExperience", "");
   if (!values.getAll("heardAboutUsSources").includes("other"))
     values.set("heardAboutUsOther", "");
   return values;
@@ -54,6 +57,23 @@ export function initApplicationReview(element: HTMLFormElement) {
     "[data-application-submit]",
   );
   if (!questions || !review || !reviewButtons?.length || !submitButton) return;
+
+  const consent = review.querySelector<HTMLInputElement>(
+    '[name="codeOfConductAccepted"]',
+  );
+  // Submitting the questions marks even disabled controls as :user-invalid.
+  // Keep consent's feedback tied to its own interaction/validation, without
+  // removing its native required constraint or resetting other form controls.
+  const resetConsentValidation = () =>
+    consent?.setAttribute("data-validation-untouched", "");
+  consent?.addEventListener("change", (event) => {
+    // Draft restoration dispatches synthetic changes, not user consent edits.
+    if (event.isTrusted) consent?.removeAttribute("data-validation-untouched");
+  });
+  consent?.addEventListener("invalid", () =>
+    consent?.removeAttribute("data-validation-untouched"),
+  );
+  element.addEventListener("reset", resetConsentValidation);
 
   const originalTitle = document.title;
   let step: "questions" | "review" = "questions";
@@ -129,6 +149,7 @@ export function initApplicationReview(element: HTMLFormElement) {
       "other-certification":
         medic && values.getAll("certifications").includes("other"),
       "other-training": values.getAll("training").includes("other"),
+      "other-experience": values.getAll("relevantExperience").includes("other"),
       "other-referral": values.getAll("heardAboutUsSources").includes("other"),
     };
     for (const row of review.querySelectorAll<HTMLElement>(
@@ -140,6 +161,7 @@ export function initApplicationReview(element: HTMLFormElement) {
         teams: applicationTeamOptions,
         certifications: certificationOptions,
         training: trainingOptions,
+        relevantExperience: experienceOptions,
         heardAboutUsSources: heardAboutUsOptions,
       };
     for (const answer of review.querySelectorAll<HTMLElement>(
@@ -173,6 +195,7 @@ export function initApplicationReview(element: HTMLFormElement) {
     }
   };
   element.addEventListener("application-draft-restored", () => {
+    resetConsentValidation();
     reviewDepth = 0;
     history.replaceState(state("questions"), "");
     display("questions", false);

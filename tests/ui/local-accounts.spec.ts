@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { profileWriteBody } from "../helpers/profile-write";
+import { manualAccountPresets } from "../../src/dev/accounts";
 import {
   createLocalAccount,
   fillApplicationField,
@@ -23,6 +24,233 @@ test.beforeEach(async ({ page, baseURL }) => {
   await expect(
     page.getByRole("button", { name: "Continue with Email" }),
   ).toBeVisible();
+});
+
+test("Alt+Z toggles the DEV panel and restores focus without changing form input", async ({
+  page,
+}) => {
+  const trigger = page.getByRole("button", { name: "DEV panel", exact: true });
+  const panel = page.getByRole("dialog", { name: "DEV panel", exact: true });
+  const email = page.getByRole("textbox", { name: "Email", exact: true });
+  await expect(trigger).toHaveAttribute("aria-keyshortcuts", "Alt+Z");
+  await email.fill("dev-panel@example.org");
+  await page.keyboard.press("Alt+KeyZ");
+  await expect(panel).toBeVisible();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Alt+KeyZ");
+  await expect(panel).toBeHidden();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(email).toBeFocused();
+  await expect(email).toHaveValue("dev-panel@example.org");
+
+  await trigger.click();
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Alt+KeyZ");
+  await expect(panel).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test("DEV panel separates states from saved accounts and completes each application step", async ({
+  page,
+  baseURL,
+}) => {
+  const endpoint = "/api/v1/auth/dev/application-step";
+  const post = (userId: string, step: string, origin = baseURL!) =>
+    page.request.post(endpoint, {
+      headers: { origin },
+      data: { userId, step },
+    });
+  expect((await post("visitor", "form")).status()).toBe(401);
+  const profiles = await openLocalAccountSwitcher(page);
+  const states = profiles.getByRole("group", {
+    name: "Account states",
+    exact: true,
+  });
+  const accounts = profiles.getByRole("group", {
+    name: "Existing accounts",
+    exact: true,
+  });
+  await expect(
+    states.locator('[data-switch-user="new-application"]'),
+  ).toBeVisible();
+  await expect(
+    accounts.locator('[data-switch-user="local-fixture-user-robin"]'),
+  ).toBeVisible();
+  await expect(
+    states.locator('[data-switch-user^="local-fixture-user-"]'),
+  ).toHaveCount(0);
+  await expect(
+    profiles.locator('[data-application-step="form"]'),
+  ).toBeDisabled();
+  await states.locator('[data-switch-user="new-application"]').click();
+  await expect(page).toHaveURL(/\/apply$/);
+  const { user } = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  expect(
+    (await post(user.id, "form", "https://unrelated.example.org")).status(),
+  ).toBe(403);
+  expect((await post("another-account", "form")).status()).toBe(409);
+
+  for (const [index, step] of ["form", "naloxone", "review"].entries()) {
+    const panel = await openLocalAccountSwitcher(page);
+    const button = panel.locator(`[data-application-step="${step}"]`);
+    await expect(button).toBeEnabled();
+    if (index === 0)
+      await expect(
+        panel.locator('[data-application-step="naloxone"]'),
+      ).toBeDisabled();
+    if (index < 2)
+      await expect(
+        panel.locator('[data-application-step="review"]'),
+      ).toBeDisabled();
+    await button.click();
+    await expect(page).toHaveURL(/\/volunteer$/);
+    const refreshed = await openLocalAccountSwitcher(page);
+    await expect(
+      refreshed.locator(`[data-application-step="${step}"]`),
+    ).toBeDisabled();
+    await expect(
+      refreshed.locator(`[data-application-step="${step}"] [data-step-status]`),
+    ).toHaveText("Completed");
+    await page.keyboard.press("Alt+KeyZ");
+  }
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+});
+
+test("DEV panel seeds presets in place without changing the current account or duplicating users", async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  const endpoint = "/api/v1/auth/dev/seed-accounts";
+  expect(
+    (
+      await page.request.post(endpoint, {
+        headers: { origin: "https://unrelated.example.org" },
+        data: {},
+      })
+    ).status(),
+  ).toBe(403);
+  const profiles = await openLocalAccountSwitcher(page);
+  await profiles.locator('[data-switch-user="new-application"]').click();
+  await expect(page).toHaveURL(/\/apply$/);
+  const original = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  await page.locator('[name="firstName"]').fill("Keep my draft");
+  await openLocalAccountSwitcher(page);
+  const seed = page.getByRole("button", {
+    name: "Seed local accounts",
+    exact: true,
+  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = page.waitForResponse((response) =>
+      response.url().endsWith(endpoint),
+    );
+    await seed.click();
+    expect(await (await response).headerValue("set-cookie")).toBeNull();
+    await expect(page.locator("[data-switch-message]")).toContainText(
+      "Existing records and edits were preserved",
+    );
+    await expect(profiles).toHaveAttribute("aria-busy", "false");
+    await expect(
+      profiles.locator('[data-switch-user^="local-account-user-"]'),
+    ).toHaveCount(manualAccountPresets.length);
+    await expect(seed).toBeEnabled();
+  }
+  const current = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  expect(current.user.id).toBe(original.user.id);
+  expect(current.session.id).toBe(original.session.id);
+  await expect(page).toHaveURL(/\/apply$/);
+  await expect(page.locator('[name="firstName"]')).toHaveValue("Keep my draft");
+  const categories = profiles.locator("[data-account-category]");
+  await expect(categories).toHaveCount(4);
+  await expect(profiles.locator("details[data-account-category]")).toHaveCount(
+    0,
+  );
+  for (const preset of manualAccountPresets)
+    await expect(
+      profiles.locator(`[data-switch-user="${preset.id}"]`),
+    ).toBeVisible();
+  for (const [key, count] of [
+    ["application", 4],
+    ["orientation", 4],
+    ["volunteers", 2],
+    ["access", 2],
+  ] as const) {
+    await expect(
+      profiles.locator(`[data-account-category="${key}"] [data-switch-user]`),
+    ).toHaveCount(count);
+  }
+  const volunteers = profiles.locator('[data-account-category="volunteers"]');
+  await expect(
+    volunteers.locator('[data-switch-user="local-account-user-medic"]'),
+  ).toContainText("Medic eligible");
+  await expect(
+    volunteers.locator('[data-switch-user="local-account-user-patrol"]'),
+  ).toContainText("Patrol approved");
+  const orientation = profiles.locator('[data-account-category="orientation"]');
+  await expect(
+    orientation.locator(
+      '[data-switch-user="local-account-user-medic-orientee"]',
+    ),
+  ).toContainText("Not medic eligible");
+  await expect(
+    orientation.locator(
+      '[data-switch-user="local-account-user-orientation-booked"]',
+    ),
+  ).toContainText("Orientation booked");
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(
+    await profiles.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  await expect(
+    profiles
+      .getByRole("group", { name: "Account states", exact: true })
+      .locator('[data-switch-user="local-account-user-organizer"]'),
+  ).toBeVisible();
+  // Verify actual authenticator enrollment using a separate request cookie jar.
+  const switched = await request.post("/api/v1/auth/dev/switch-user", {
+    headers: { origin: baseURL! },
+    data: { userId: "local-account-user-organizer" },
+  });
+  expect(switched.ok()).toBe(true);
+  const organizer = await (
+    await request.get("/api/v1/auth/get-session")
+  ).json();
+  expect(organizer.user.twoFactorEnabled).toBe(true);
+  await expect(
+    profiles.locator('[data-switch-user="local-account-user-organizer"]'),
+  ).toContainText("Patrol approved");
+  const accountPage = await (await request.get("/volunteer/account")).text();
+  expect(accountPage.match(/data-session-row/g)).toHaveLength(1);
+  // A fresh session must resolve full application completion and real medic
+  // eligibility through the normal portal, not just the development listing.
+  for (const [key, patrolAccess] of [
+    ["accepted", false],
+    ["patrol", true],
+    ["medic", true],
+    ["inactive", false],
+  ] as const) {
+    const switched = await request.post("/api/v1/auth/dev/switch-user", {
+      headers: { origin: baseURL! },
+      data: { userId: `local-account-user-${key}` },
+    });
+    expect(switched.ok()).toBe(true);
+    const portal = await (await request.get("/volunteer")).text();
+    expect(portal.match(/data-application-tracker/g) ?? []).toHaveLength(0);
+    expect(
+      portal.includes('data-live-event="local-account-event-orientation"'),
+    ).toBe(key !== "inactive");
+    expect(
+      portal.includes('data-live-event="local-account-event-patrol"'),
+    ).toBe(patrolAccess);
+  }
 });
 
 test("Not applied always starts blank; submitted local accounts persist and can be deleted", async ({
@@ -110,11 +338,12 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   for (const [name, value] of [
     ["teams", "outreach"],
     ["training", "none"],
+    ["relevantExperience", "none"],
     ["heardAboutUsSources", "friend-word-of-mouth"],
   ])
     await page.locator(`[name="${name}"][value="${value}"]`).check();
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/events$/);
+  await expect(page).toHaveURL(/\/volunteer$/);
   expect(await current()).toMatchObject({
     id: second.id,
     name: sampleAnswers.preferredName,
@@ -128,24 +357,44 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   await expect(
     profiles.locator(`[data-switch-user="${second.id}"]`),
   ).toHaveAttribute("aria-pressed", "true");
-  await page
-    .getByRole("button", { name: "Close development controls" })
-    .click();
+  await page.getByRole("button", { name: "Close DEV panel" }).click();
 
   await choose("new-application");
   await expectBlank();
   const third = await current();
   const choices = await openLocalAccountSwitcher(page);
   const remove = choices.locator(`[data-delete-user="${second.id}"]`);
-  page.once("dialog", (dialog) => dialog.dismiss());
+  const deletions: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/v1/auth/dev/delete-user"))
+      deletions.push(request.url());
+  });
   await remove.click();
-  await expect(remove).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
+  await expect(remove).toHaveAccessibleName(/^Confirm deletion of/);
+  await expect(remove.locator("svg path")).toHaveAttribute(
+    "d",
+    "m5 12 4 4L19 6",
+  );
+  expect(deletions).toHaveLength(0);
+  await page.keyboard.press("Escape");
+  await expect(choices).toBeVisible();
+  await expect(remove).not.toHaveAttribute("data-delete-confirming");
+  await remove.click();
+  await choices.getByRole("heading", { name: "Existing accounts" }).click();
+  await expect(remove).not.toHaveAttribute("data-delete-confirming");
+  await remove.click();
+  const panelBody = page.locator("[data-account-switcher] .dialog-body");
+  const scrollBeforeDelete = await panelBody.evaluate((body) => body.scrollTop);
+  expect(scrollBeforeDelete).toBeGreaterThan(0);
   await remove.click();
   await expect(remove).toHaveCount(0);
+  await expect
+    .poll(() => panelBody.evaluate((body) => body.scrollTop))
+    .toBe(scrollBeforeDelete);
+  expect(deletions).toHaveLength(1);
   expect((await current()).id).toBe(third.id);
   // Deleting the current account revokes its session and returns to Visitor.
-  page.once("dialog", (dialog) => dialog.accept());
+  await choices.locator(`[data-delete-user="${third.id}"]`).click();
   await choices.locator(`[data-delete-user="${third.id}"]`).click();
   await expect(page).toHaveURL(/\/volunteer$/);
   expect(
@@ -164,46 +413,31 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   ).toBeEnabled();
 });
 
-test("unfinished application shows a clickable yellow warning card without clipping", async ({
+test("unfinished application shows current milestones and a keyboard-accessible form link without clipping", async ({
   page,
   baseURL,
 }) => {
   await page.goto("/volunteer");
-  const warning = page.getByRole("link", {
-    name: "Please complete your Volunteer Application",
+  const tracker = page.locator("[data-application-tracker]");
+  const formLink = page.getByRole("link", {
+    name: "Complete application form",
     exact: true,
   });
-  await expect(warning).toHaveCount(0);
+  await expect(tracker).toHaveCount(0);
   await createLocalAccount(page.request, baseURL!, false);
   await page.goto("/volunteer");
-  await expect(warning).toBeVisible();
-  await expect(warning).toHaveClass(/volunteer-application-warning/);
-  await expect(warning).toHaveAttribute("href", "/apply");
-  await expect(warning).toHaveText(
-    "Please complete your Volunteer Application",
+  await expect(tracker).toBeVisible();
+  await expect(tracker.locator("[data-application-progress-step]")).toHaveCount(
+    3,
   );
-  await expect(warning).toHaveCSS("background-color", "rgb(33, 26, 8)");
-  await expect(warning).toHaveCSS("border-top-color", "rgb(161, 98, 7)");
-  const icon = warning.locator("svg.volunteer-warning-icon");
-  await expect(icon).toBeVisible();
-  await expect(icon).toHaveAttribute("aria-hidden", "true");
-  await expect(icon).toHaveCSS("color", "rgb(250, 204, 21)");
-  const arrow = warning.locator("svg.volunteer-application-warning-arrow");
-  await expect(arrow).toBeVisible();
-  await expect(arrow).toHaveAttribute("aria-hidden", "true");
-  const text = warning.locator(".volunteer-application-warning-text");
-  expect(
-    await text.evaluate(
-      (element) =>
-        element.getBoundingClientRect().height <=
-        Number.parseFloat(getComputedStyle(element).lineHeight) + 1,
-    ),
-  ).toBe(true);
+  await expect(
+    tracker.locator('[data-application-progress-step="form"]'),
+  ).toHaveAttribute("data-state", "current");
+  await expect(formLink).toHaveAttribute("href", "/apply");
   for (const width of [375, 320]) {
     await page.setViewportSize({ width, height: 812 });
-    await expect(text).toHaveCSS("white-space", "normal");
     expect(
-      await text.evaluate(
+      await tracker.evaluate(
         (element) => element.scrollWidth <= element.clientWidth,
       ),
     ).toBe(true);
@@ -213,12 +447,11 @@ test("unfinished application shows a clickable yellow warning card without clipp
       ),
     ).toBe(false);
   }
-  await warning.focus();
-  await warning.press("Enter");
+  await formLink.focus();
+  await formLink.press("Enter");
   await expect(page).toHaveURL(/\/apply$/);
   await page.goto("/volunteer");
-  // The padding is clickable too, not just the text or arrow.
-  await warning.click({ position: { x: 4, y: 4 } });
+  await formLink.click();
   await expect(page).toHaveURL(/\/apply$/);
   const application = await page.request.post("/api/v1/account/profile", {
     headers: { origin: baseURL! },
@@ -229,7 +462,17 @@ test("unfinished application shows a clickable yellow warning card without clipp
   });
   expect(application.status(), await application.text()).toBe(200);
   await page.goto("/volunteer");
-  await expect(warning).toHaveCount(0);
+  await expect(formLink).toHaveCount(0);
+  await expect(
+    tracker.locator('[data-application-progress-step="form"]'),
+  ).toHaveAttribute("data-state", "complete");
+  await expect(
+    tracker.locator('[data-application-progress-step="naloxone"]'),
+  ).toHaveAttribute("data-state", "current");
+  await expect(
+    tracker.locator('[data-application-progress-step="review"]'),
+  ).toHaveAttribute("data-state", "upcoming");
+  await expect(page.locator("[data-event-list]")).toHaveCount(0);
 });
 
 test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async ({

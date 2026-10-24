@@ -9,14 +9,16 @@ import {
   expireCookie,
   setSessionCookie,
 } from "better-auth/cookies";
-import { asc, eq, gt } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "../../server/db";
-import { profile, user } from "../../server/db/schema";
+import { profile } from "../../server/db/schema";
+import { loadApplicationProgress } from "../../server/db/application-progress";
 import { RequestError, safeReturnTo } from "../../server/http";
 import type { AuthBindings } from "../../server/auth";
 import { newApplicationPersona } from "../accounts";
 import { createDisposableAccount, deleteLocalAccount } from "./local-accounts";
+import { listLocalAccounts } from "./account-list";
 
 export function developmentAccounts(bindings: AuthBindings) {
   const requireLocal = (request: Request | undefined) => {
@@ -43,23 +45,43 @@ export function developmentAccounts(bindings: AuthBindings) {
         },
         async (ctx) => {
           requireLocal(ctx.request);
-          const db = createDatabase(bindings.DB);
-          const rows = await db
-            .select({
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-            })
-            .from(user)
-            .where(ctx.query.after ? gt(user.id, ctx.query.after) : undefined)
-            .orderBy(asc(user.id))
-            .limit(101);
+          const accounts = await listLocalAccounts(
+            bindings.DB,
+            ctx.query.after,
+          );
           const current = await getSessionFromCtx(ctx);
           return ctx.json({
-            users: rows.slice(0, 100),
-            next: rows.length > 100 ? rows[99].id : null,
+            ...accounts,
             currentUserId: current?.user.id ?? null,
+            applicationProgress: current
+              ? await loadApplicationProgress(bindings.DB, current.user.id)
+              : null,
+          });
+        },
+      ),
+      developmentSeedAccounts: createAuthEndpoint(
+        "/dev/seed-accounts",
+        {
+          method: "POST",
+          requireHeaders: true,
+          body: z.strictObject({}),
+        },
+        async (ctx) => {
+          requireLocal(ctx.request);
+          const { seedLocalAccounts } = await import("./seed-accounts");
+          try {
+            await seedLocalAccounts(bindings);
+          } catch (error) {
+            throw new APIError("SERVICE_UNAVAILABLE", {
+              message:
+                error instanceof RequestError
+                  ? error.message
+                  : "Could not seed local accounts. Check local migrations and try again.",
+            });
+          }
+          return ctx.json({
+            message:
+              "Local preset accounts and sample events are ready. Existing records and edits were preserved.",
           });
         },
       ),
@@ -128,6 +150,62 @@ export function developmentAccounts(bindings: AuthBindings) {
           )
             next = "/events";
           return ctx.json({ next });
+        },
+      ),
+      developmentApplicationStep: createAuthEndpoint(
+        "/dev/application-step",
+        {
+          method: "POST",
+          requireHeaders: true,
+          body: z.strictObject({
+            userId: z.string().min(1).max(200),
+            step: z.enum(["form", "naloxone", "review"]),
+          }),
+        },
+        async (ctx) => {
+          requireLocal(ctx.request);
+          // Load after auth initialization: these helpers use the normal auth
+          // context and must not introduce a cycle in the development plugin.
+          const { accountContext } = await import("../../server/db/access");
+          const { completeLocalApplicationStep } =
+            await import("./application-steps");
+          try {
+            const { actor } = await accountContext(
+              bindings,
+              ctx.request!,
+              true,
+            );
+            if (!actor) throw new RequestError(401, "Choose an account first.");
+            if (actor.twoFactorEnabled && !actor.twoFactorVerified)
+              throw new RequestError(
+                403,
+                "Sign in with your authenticator first.",
+              );
+            if (actor.id !== ctx.body.userId)
+              throw new RequestError(
+                409,
+                "Your account changed. Reload before completing this step.",
+              );
+            await completeLocalApplicationStep(
+              bindings.DB,
+              actor,
+              ctx.body.step,
+            );
+            return ctx.json({ next: "/volunteer" });
+          } catch (error) {
+            if (error instanceof RequestError)
+              throw new APIError(
+                error.status === 401
+                  ? "UNAUTHORIZED"
+                  : error.status === 403
+                    ? "FORBIDDEN"
+                    : error.status === 409
+                      ? "CONFLICT"
+                      : "BAD_REQUEST",
+                { message: error.message },
+              );
+            throw error;
+          }
         },
       ),
       developmentDeleteUser: createAuthEndpoint(

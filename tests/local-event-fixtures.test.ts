@@ -15,6 +15,15 @@ import {
 import { vancouverInput } from "../src/data/event-time";
 import { profileSchema } from "../src/server/db/profiles";
 import { assertCompleteSampleProfiles } from "./helpers/sample-profile-fixtures";
+import {
+  manualAccountPresets,
+  developmentAccountStatus,
+} from "../src/dev/accounts";
+import {
+  sampleProfileFixtures,
+  sampleProfileStatement,
+} from "../scripts/sample-profile-fixtures";
+import { approvedMedicSql } from "../src/server/db/sql";
 
 function database() {
   const db = new DatabaseSync(":memory:");
@@ -33,7 +42,8 @@ test("the local seed refuses nonlocal targets and unknown arguments before any w
     ["--preview"],
     ["--production"],
     ["--unknown"],
-    ["--accounts", "--remote"],
+    ["--accounts"],
+    ["--test-fixtures", "--remote"],
   ]) {
     const result = spawnSync(
       process.execPath,
@@ -49,7 +59,7 @@ test("the local seed refuses nonlocal targets and unknown arguments before any w
   }
 });
 
-test("manual local personas have exactly the requested application/access states", () => {
+test("manual presets cover application, orientation, patrol, medic and access states in the current schema", () => {
   const db = database();
   try {
     const now = Date.now();
@@ -57,19 +67,30 @@ test("manual local personas have exactly the requested application/access states
     assert.deepEqual(
       db
         .prepare(
-          `SELECT u.name, u.email_verified, u.role, p.user_id IS NOT NULL AS submitted,
-          v.active, v.registration_approved, v.patrol_approved, u.two_factor_enabled
+          `SELECT substr(u.id, 20) AS preset, p.user_id IS NOT NULL AS submitted,
+          EXISTS(SELECT 1 FROM application_draft WHERE user_id=u.id) AS draft,
+          p.naloxone_completed_at IS NOT NULL AS naloxone,
+          coalesce(v.registration_approved, 0), coalesce(v.active, 0), coalesce(v.patrol_approved, 0),
+          EXISTS(SELECT 1 FROM orientation_completion WHERE user_id=u.id) AS orientation,
+          EXISTS(SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id WHERE s.user_id=u.id AND s.status='confirmed' AND e.starts_at>${now}) AS booked,
+          ${approvedMedicSql("u.id")} AS medic, u.role
           FROM user u LEFT JOIN profile p ON p.user_id = u.id
-          LEFT JOIN volunteer_status v ON v.user_id = u.id ORDER BY u.name`,
+          LEFT JOIN volunteer_status v ON v.user_id = u.id ORDER BY u.id`,
         )
         .all()
         .map((row) => Object.values(row)),
       [
-        ["Accepted", 1, "volunteer", 1, 1, 1, 0, 0],
-        ["Applied", 1, "volunteer", 1, 1, 0, 0, 0],
-        ["Inactive", 1, "volunteer", 1, 0, 0, 0, 0],
-        ["Not applied", 1, "volunteer", 0, null, null, null, 0],
-        ["Organizer", 1, "organizer", 1, 1, 1, 0, 0],
+        ["accepted", 1, 0, 1, 1, 1, 0, 0, 0, 0, "volunteer"],
+        ["applied", 1, 0, 0, 0, 1, 0, 0, 0, 0, "volunteer"],
+        ["awaiting-review", 1, 0, 1, 0, 1, 0, 0, 0, 0, "volunteer"],
+        ["draft", 0, 1, 0, 0, 0, 0, 0, 0, 0, "volunteer"],
+        ["inactive", 1, 0, 1, 1, 0, 0, 0, 0, 0, "volunteer"],
+        ["medic", 1, 0, 1, 1, 1, 1, 1, 0, 1, "volunteer"],
+        ["medic-orientee", 1, 0, 1, 1, 1, 0, 0, 0, 0, "volunteer"],
+        ["organizer", 1, 0, 1, 1, 1, 1, 0, 0, 0, "organizer"],
+        ["orientation-booked", 1, 0, 1, 1, 1, 0, 0, 1, 0, "volunteer"],
+        ["orientation-completed", 1, 0, 1, 1, 1, 0, 1, 0, 0, "volunteer"],
+        ["patrol", 1, 0, 1, 1, 1, 1, 1, 0, 0, "volunteer"],
       ],
     );
     const profiles = db
@@ -77,16 +98,19 @@ test("manual local personas have exactly the requested application/access states
         "SELECT p.submitted_application, u.email FROM profile p JOIN user u ON u.id = p.user_id",
       )
       .all();
-    assert.equal(profiles.length, 4);
+    assert.equal(profiles.length, manualAccountPresets.length - 1);
     for (const row of profiles) {
       const snapshot = JSON.parse(String(row.submitted_application));
       assert.deepEqual(profileSchema.parse(snapshot.answers), snapshot.answers);
       assert.equal(snapshot.email, row.email);
-      assert.equal(snapshot.submittedAt, new Date(now).toISOString());
+      assert.equal(
+        snapshot.submittedAt,
+        new Date(now - 14 * 86_400_000).toISOString(),
+      );
     }
     assert.equal(
       db.prepare("SELECT count(*) AS n FROM application_draft").get()!.n,
-      0,
+      1,
     );
     assert.equal(
       db
@@ -100,7 +124,26 @@ test("manual local personas have exactly the requested application/access states
     db.prepare(
       "UPDATE volunteer_status SET registration_approved = 1 WHERE user_id = ?",
     ).run(localAccountUserId("applied"));
-    const tables = ["user", "profile", "volunteer_status", "event"];
+    db.exec(
+      "UPDATE signup SET status='cancelled' WHERE id='local-account-signup-orientation-booked'",
+    );
+    db.exec(
+      "DELETE FROM orientation_completion WHERE user_id='local-account-user-patrol'",
+    );
+    db.exec(
+      "INSERT INTO application_draft_generation (user_id,generation) VALUES ('local-account-user-draft','discarded')",
+    );
+    const tables = [
+      "user",
+      "profile",
+      "volunteer_status",
+      "event",
+      "signup",
+      "orientation_completion",
+      "audit_log",
+      "application_draft",
+      "application_draft_generation",
+    ];
     const before = tables.map((table) =>
       db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
     );
@@ -114,6 +157,300 @@ test("manual local personas have exactly the requested application/access states
   } finally {
     db.close();
   }
+});
+
+function legacyManualPreset(
+  db: DatabaseSync,
+  key: "accepted" | "inactive" | "organizer",
+  now: number,
+) {
+  const sampleKey = { accepted: "alex", inactive: "jamie", organizer: "robin" }[
+    key
+  ];
+  const person = {
+    ...sampleProfileFixtures("local", now).find(
+      (person) => person.key === sampleKey,
+    )!,
+    id: localAccountUserId(key),
+    email: `${key}.local@example.org`,
+  };
+  db.prepare(
+    "INSERT INTO user (id,name,email,email_verified,role,created_at,updated_at) VALUES (?,?,?,1,?,?,?)",
+  ).run(
+    person.id,
+    { accepted: "Accepted", inactive: "Inactive", organizer: "Organizer" }[key],
+    person.email,
+    key === "organizer" ? "organizer" : "volunteer",
+    now,
+    now,
+  );
+  db.exec(sampleProfileStatement(person, now));
+  db.prepare(
+    "INSERT INTO volunteer_status (user_id,active,registration_approved,updated_at) VALUES (?,?,?,?)",
+  ).run(person.id, key === "inactive" ? 0 : 1, key === "inactive" ? 0 : 1, now);
+}
+
+test("reseeding upgrades only untouched old manual fixtures without replacing their snapshots or authenticators", () => {
+  const db = database();
+  try {
+    const now = Date.now();
+    for (const key of ["accepted", "inactive", "organizer"] as const)
+      legacyManualPreset(db, key, now);
+    db.exec(
+      "INSERT INTO two_factor (id,user_id,secret,backup_codes) VALUES ('keep','local-account-user-organizer','secret','codes')",
+    );
+    const snapshots = db
+      .prepare("SELECT submitted_application FROM profile ORDER BY user_id")
+      .all();
+    const originalFactor = db.prepare("SELECT * FROM two_factor").all();
+    db.exec(localAccountFixtures(now + 1000).join(";\n"));
+    assert.deepEqual(
+      db
+        .prepare(
+          "SELECT submitted_application FROM profile WHERE user_id IN ('local-account-user-accepted','local-account-user-inactive','local-account-user-organizer') ORDER BY user_id",
+        )
+        .all(),
+      snapshots,
+    );
+    assert.deepEqual(
+      db.prepare("SELECT * FROM two_factor").all(),
+      originalFactor,
+    );
+    for (const key of ["accepted", "inactive", "organizer"]) {
+      const row = db
+        .prepare(
+          "SELECT p.naloxone_completed_at, v.registration_approved, v.patrol_approved FROM profile p JOIN volunteer_status v ON v.user_id=p.user_id WHERE p.user_id=?",
+        )
+        .get(localAccountUserId(key))!;
+      assert.equal(row.naloxone_completed_at, now + 1000);
+      assert.equal(row.registration_approved, 1);
+      assert.equal(row.patrol_approved, key === "organizer" ? 1 : 0);
+    }
+    const before = db.prepare("SELECT * FROM audit_log ORDER BY id").all();
+    db.exec(localAccountFixtures(now + 2000).join(";\n"));
+    assert.deepEqual(
+      db.prepare("SELECT * FROM audit_log ORDER BY id").all(),
+      before,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+function previousOrganizerPreset(db: DatabaseSync, now: number) {
+  db.exec(localAccountFixtures(now).join(";\n"));
+  // Recreate the exact previous seed version, before Organizer had patrol approval.
+  db.exec(`UPDATE volunteer_status SET patrol_approved=0, approved_by=NULL, approved_at=NULL
+    WHERE user_id='local-account-user-organizer';
+    UPDATE audit_log SET changed_fields='["applicationApproved"]' WHERE id='local-account-approval-organizer'`);
+}
+
+test("reseeding grants untouched existing Organizer presets patrol approval once and preserves their profile and authenticator", () => {
+  const db = database();
+  try {
+    const now = Date.now();
+    previousOrganizerPreset(db, now);
+    db.exec(
+      "INSERT INTO two_factor (id,user_id,secret,backup_codes) VALUES ('keep','local-account-user-organizer','secret','codes')",
+    );
+    const profile = db
+      .prepare(
+        "SELECT * FROM profile WHERE user_id='local-account-user-organizer'",
+      )
+      .get();
+    const factor = db.prepare("SELECT * FROM two_factor").all();
+    db.exec(localAccountFixtures(now + 1000).join(";\n"));
+    const status = db
+      .prepare(
+        "SELECT * FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+      )
+      .get()!;
+    assert.equal(status.registration_approved, 1);
+    assert.equal(status.patrol_approved, 1);
+    assert.equal(status.approved_by, localAccountUserId("organizer"));
+    assert.equal(status.approved_at, now + 1000);
+    assert.deepEqual(
+      db
+        .prepare(
+          "SELECT * FROM profile WHERE user_id='local-account-user-organizer'",
+        )
+        .get(),
+      profile,
+    );
+    assert.deepEqual(db.prepare("SELECT * FROM two_factor").all(), factor);
+    const audits = db.prepare("SELECT * FROM audit_log ORDER BY id").all();
+    db.exec(localAccountFixtures(now + 2000).join(";\n"));
+    assert.deepEqual(
+      db
+        .prepare(
+          "SELECT * FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+        )
+        .get(),
+      status,
+    );
+    assert.deepEqual(
+      db.prepare("SELECT * FROM audit_log ORDER BY id").all(),
+      audits,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("reseeding does not overwrite edited or deliberately revoked Organizer access", () => {
+  for (const change of [
+    "UPDATE profile SET phone='604-555-0199' WHERE user_id='local-account-user-organizer'",
+    "UPDATE user SET email='changed@example.org' WHERE id='local-account-user-organizer'",
+    "UPDATE volunteer_status SET active=0 WHERE user_id='local-account-user-organizer'",
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='local-account-user-organizer'",
+    "INSERT INTO audit_log (id,actor_id,subject_id,action,changed_fields,created_at) VALUES ('revoked','local-account-user-organizer','local-account-user-organizer','approval_changed','[\"patrolApproved\"]',1)",
+  ]) {
+    const db = database();
+    try {
+      const now = Date.now();
+      previousOrganizerPreset(db, now);
+      // Deactivating the preset is valid only while another active organizer exists.
+      db.exec(
+        "UPDATE user SET role='organizer' WHERE id='local-account-user-patrol'",
+      );
+      db.exec(change);
+      const before = db
+        .prepare(
+          "SELECT * FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+        )
+        .get();
+      db.exec(localAccountFixtures(now + 1000).join(";\n"));
+      assert.deepEqual(
+        db
+          .prepare(
+            "SELECT * FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+          )
+          .get(),
+        before,
+      );
+    } finally {
+      db.close();
+    }
+  }
+  // A new fully-approved preset must not be reapproved after a manual revocation,
+  // even if that direct local database edit omitted an audit/timestamp update.
+  const db = database();
+  try {
+    const now = Date.now();
+    db.exec(localAccountFixtures(now).join(";\n"));
+    db.exec(
+      "UPDATE volunteer_status SET patrol_approved=0, approved_by=NULL, approved_at=NULL WHERE user_id='local-account-user-organizer'",
+    );
+    db.exec(localAccountFixtures(now + 1000).join(";\n"));
+    assert.equal(
+      db
+        .prepare(
+          "SELECT patrol_approved FROM volunteer_status WHERE user_id='local-account-user-organizer'",
+        )
+        .get()!.patrol_approved,
+      0,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("old presets with changed answers, identity, access, or audited activity are never upgraded", () => {
+  for (const change of [
+    "UPDATE profile SET phone='604-555-0199' WHERE user_id='local-account-user-accepted'",
+    "UPDATE user SET email='changed@example.org' WHERE id='local-account-user-accepted'",
+    "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='local-account-user-accepted'",
+    "INSERT INTO audit_log (id,actor_id,subject_id,action,created_at) VALUES ('viewed','local-account-user-organizer','local-account-user-accepted','profile_viewed',1)",
+  ]) {
+    const db = database();
+    try {
+      const now = Date.now();
+      legacyManualPreset(db, "organizer", now);
+      legacyManualPreset(db, "accepted", now);
+      db.exec(change);
+      const before = db
+        .prepare(
+          "SELECT * FROM profile WHERE user_id='local-account-user-accepted'",
+        )
+        .get();
+      db.exec(localAccountFixtures(now + 1000).join(";\n"));
+      assert.deepEqual(
+        db
+          .prepare(
+            "SELECT * FROM profile WHERE user_id='local-account-user-accepted'",
+          )
+          .get(),
+        before,
+      );
+    } finally {
+      db.close();
+    }
+  }
+});
+
+test("new booking presets work alongside preserved legacy events", () => {
+  const db = database();
+  try {
+    const now = Date.now();
+    legacyManualPreset(db, "organizer", now);
+    db.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,open,created_by,created_at,updated_at)
+      VALUES ('local-account-event-orientation','orientation',?,'Original meeting point',12,1,'local-account-user-organizer',?,?)`,
+    ).run(now + 86_400_000, now, now);
+    const event = db.prepare("SELECT * FROM event").get();
+    db.exec(localAccountFixtures(now + 1000).join(";\n"));
+    assert.deepEqual(
+      db
+        .prepare(
+          "SELECT * FROM event WHERE id='local-account-event-orientation'",
+        )
+        .get(),
+      event,
+    );
+    assert.equal(
+      db
+        .prepare(
+          "SELECT status FROM signup WHERE id='local-account-signup-orientation-booked'",
+        )
+        .get()!.status,
+      "confirmed",
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("account descriptions follow edited database state rather than preset names", () => {
+  const state = {
+    submittedAt: 0,
+    naloxoneCompletedAt: 0,
+    applicationApproved: true,
+    hasDraft: false,
+    active: true,
+    patrolApproved: true,
+    orientationCompleted: true,
+    orientationBooked: false,
+    medicSelected: true,
+    medicEligible: true,
+    twoFactorEnabled: false,
+  };
+  assert.match(
+    developmentAccountStatus(state),
+    /Application complete.*Medic eligible/,
+  );
+  assert.match(
+    developmentAccountStatus({
+      ...state,
+      active: false,
+      applicationApproved: false,
+      medicEligible: false,
+    }),
+    /Awaiting application approval.*Inactive.*Not medic eligible/,
+  );
+  assert.equal(
+    developmentAccountStatus({ ...state, submittedAt: null, hasDraft: true }),
+    "Draft saved · Not submitted",
+  );
 });
 
 test("local fixtures restore open, full, hidden, and past events in the real schema", () => {

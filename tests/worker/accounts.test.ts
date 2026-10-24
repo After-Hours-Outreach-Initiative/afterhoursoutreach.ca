@@ -50,6 +50,8 @@ const answers = {
   experience: "None",
   training: ["none"],
   otherTraining: "",
+  relevantExperience: ["none"],
+  otherExperience: "",
   medicalConditions: "Sample private answer",
 };
 
@@ -178,7 +180,7 @@ describe(
       }
     });
 
-    test("the API validates application age and rejects identity edits without writing profile data", async () => {
+    test("the API validates name edits and age, preserves birth dates and original submissions", async () => {
       const ageCookie = await signIn("worker-age-boundary@example.org");
       const account = (await (
         await send("/api/v1/auth/get-session", undefined, ageCookie)
@@ -230,10 +232,9 @@ describe(
       const { firstName, middleNames, lastName, birthDate, ...editedAnswers } =
         answers;
       for (const change of [
-        { firstName: "Changed" },
         { firstName: "" },
-        { middleNames: "Changed" },
-        { lastName: "Changed" },
+        { firstName: "a".repeat(201) },
+        { middleNames: "a".repeat(201) },
         { lastName: null },
         { birthDate: underage },
         { birthDate: "1990-01-01" },
@@ -245,24 +246,39 @@ describe(
           ageCookie,
         );
         assert.equal(rejectedEdit.status, 400);
-        assert.deepEqual(await rejectedEdit.json(), {
-          message:
-            "Your legal name and date of birth cannot be changed from your account.",
-        });
+        if ("birthDate" in change)
+          assert.deepEqual(await rejectedEdit.json(), {
+            message: "Your date of birth cannot be changed from your account.",
+          });
         assert.equal(rejectedEdit.headers.get("cache-control"), "no-store");
         assert.deepEqual(await snapshots(), saved);
       }
       const acceptedEdit = await send(
         "/api/v1/account/profile",
-        { ...editedAnswers, preferredName: "Updated nickname" },
+        {
+          ...editedAnswers,
+          firstName: " Changed ",
+          middleNames: " Middle ",
+          lastName: " Name ",
+          preferredName: "",
+        },
         ageCookie,
       );
       assert.equal(acceptedEdit.status, 200, await acceptedEdit.clone().text());
-      assert.equal((await snapshots()).profile?.birth_date, cutoff);
+      const updated = await snapshots();
+      assert.equal(updated.profile?.birth_date, cutoff);
+      assert.equal(updated.profile?.first_name, "Changed");
+      assert.equal(updated.profile?.middle_names, "Middle");
+      assert.equal(updated.profile?.last_name, "Name");
+      assert.equal(updated.user?.name, "Changed Middle Name");
       assert.equal(
-        (await snapshots()).profile?.preferred_name,
-        "Updated nickname",
+        updated.profile?.submitted_application,
+        saved.profile?.submitted_application,
       );
+      const session = (await (
+        await send("/api/v1/auth/get-session", undefined, ageCookie)
+      ).json()) as { user: { name: string } };
+      assert.equal(session.user.name, "Changed Middle Name");
     });
 
     test("applications require explicit Outreach and leave optional teams optional without rewriting legacy edits", async () => {
@@ -456,14 +472,15 @@ describe(
         {
           ...trainingAnswers,
           teams: ["outreach", "non-patrol"],
-          training: ["overdose-response", "lived-experience"],
+          training: ["none"],
+          relevantExperience: ["overdose-response", "lived-experience"],
           otherTraining: "",
         },
         trainingCookie,
       );
       assert.equal(edited.status, 200, await edited.clone().text());
       assert.equal(
-        (await savedProfile())?.relevant_training,
+        (await savedProfile())?.relevant_experience,
         JSON.stringify(["overdose-response", "lived-experience"]),
       );
       assert.equal((await savedProfile())?.other_training, "");
@@ -676,10 +693,13 @@ describe(
         html,
         /submitted-application-heading|data-submitted-application|data-application-tracker|data-naloxone-confirm|account-naloxone-heading/,
       );
-      assert.doesNotMatch(html, /Why do you want to volunteer\?/);
+      assert.doesNotMatch(
+        html,
+        /Please tell us what motivates you volunteer with us\?/,
+      );
       assert.doesNotMatch(
         html.match(/<form\b[^>]*data-account-profile[\s\S]*?<\/form>/)![0],
-        /How did you find out about us\?|Why do you want to volunteer\?|code-of-conduct-heading/,
+        /How did you find out about us\?|Please tell us what motivates you volunteer with us\?|code-of-conduct-heading/,
       );
       assert.doesNotMatch(
         html,
@@ -782,7 +802,10 @@ describe(
           })
           .replace(/\s+/g, " "),
       );
-      assert.match(html, /Why do you want to volunteer\?/);
+      assert.match(
+        html,
+        /Please tell us what motivates you volunteer with us\?/,
+      );
     });
 
     test("submitted applications stay private and legacy profile edits do not invent an original snapshot", async () => {
@@ -1089,12 +1112,26 @@ describe(
           ).status,
           404,
         );
+        assert.equal(
+          (
+            await send(
+              "/api/v1/auth/dev/application-step",
+              { userId: before.user.id, step: "review" },
+              sessionCookie,
+            )
+          ).status,
+          404,
+        );
       }
       const after = (await (
         await send("/api/v1/auth/get-session", undefined, cookie)
       ).json()) as typeof current;
       assert.equal(after.user.id, before.user.id);
       assert.equal(after.session.id, before.session.id);
+      assert.equal(
+        (await send("/api/v1/auth/dev/seed-accounts", {}, cookie)).status,
+        404,
+      );
     });
 
     test("email-change endpoints enforce authentication, same-origin POSTs and fail closed without delivery", async () => {
@@ -1177,7 +1214,7 @@ describe(
         const response = await page.goto(`${origin}/volunteer/sign-in`);
         await expect(
           page.getByRole("button", {
-            name: "Development controls",
+            name: "DEV panel",
             exact: true,
           }),
         ).toHaveCount(0);
@@ -1497,6 +1534,7 @@ describe(
           if (
             name === "heardAboutUsSources" ||
             name === "training" ||
+            name === "relevantExperience" ||
             name === "teams"
           ) {
             for (const source of value as string[])
@@ -1516,6 +1554,7 @@ describe(
               "experience",
               "training",
               "otherTraining",
+              "otherExperience",
             ].includes(name)
           )
             continue;
@@ -1835,6 +1874,30 @@ test("a built Worker cannot enable account switching with local runtime vars", a
       },
     );
     assert.equal(deletion.status, 404);
+    const shortcut = await worker.fetch(
+      "http://localhost:4321/api/v1/auth/dev/application-step",
+      {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:4321",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ userId: "new-application", step: "review" }),
+      },
+    );
+    assert.equal(shortcut.status, 404);
+    const seed = await worker.fetch(
+      "http://localhost:4321/api/v1/auth/dev/seed-accounts",
+      {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:4321",
+          "content-type": "application/json",
+        },
+        body: "{}",
+      },
+    );
+    assert.equal(seed.status, 404);
   } finally {
     await server.close();
   }

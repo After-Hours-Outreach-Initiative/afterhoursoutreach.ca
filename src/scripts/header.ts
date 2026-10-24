@@ -21,6 +21,8 @@ function closeMenus(except?: HTMLDetailsElement) {
       menu.open = false;
 }
 
+closeMenus();
+
 for (const menu of menus) {
   menu.addEventListener("toggle", () => {
     const toggle = menu.querySelector("summary")!;
@@ -30,8 +32,14 @@ for (const menu of menus) {
         "aria-label",
         menu.open ? "Close navigation" : "Open navigation",
       );
-    if (menu.open) closeMenus(menu);
-    else
+    if (menu.open) {
+      closeMenus(menu);
+      if (menu === mobileNav)
+        for (const child of menu.querySelectorAll<HTMLDetailsElement>(
+          "[data-header-menu]",
+        ))
+          child.open = true;
+    } else
       for (const child of menus)
         if (menu.contains(child) && child !== menu) child.open = false;
   });

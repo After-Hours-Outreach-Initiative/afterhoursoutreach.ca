@@ -29,8 +29,15 @@ export function initApplicationSections(element: HTMLFormElement) {
   const progress = flow.querySelectorAll<HTMLElement>(
     "[data-application-progress]",
   );
+  const conflictWarnings = flow.querySelectorAll<HTMLElement>(
+    "[data-application-conflict-warning]",
+  );
   const update = () => {
     const sections = new Map<string, boolean>();
+    const hasConflicts = Boolean(
+      content.querySelector("[data-draft-conflicted]"),
+    );
+    for (const warning of conflictWarnings) warning.hidden = !hasConflicts;
     for (const link of links) {
       const section = document.getElementById(link.hash.slice(1));
       if (!section) continue;
@@ -70,6 +77,7 @@ export function initApplicationSections(element: HTMLFormElement) {
     }
     const completed = [...sections.values()].filter(Boolean).length;
     for (const indicator of progress) {
+      indicator.hidden = hasConflicts;
       indicator.setAttribute("aria-valuemax", String(sections.size));
       indicator.setAttribute("aria-valuenow", String(completed));
       indicator.setAttribute(

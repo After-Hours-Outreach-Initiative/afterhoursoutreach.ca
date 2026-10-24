@@ -2,6 +2,7 @@
 import { env } from "cloudflare:workers";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import {
   authBindingsForRequest,
   createAuth,
@@ -49,25 +50,13 @@ try {
 >
   <section data-application-flow>
     <div class="volunteer-application-intro">
+      <a class="volunteer-back-link" href="/volunteer">
+        <ArrowRightIcon class="size-[1.25em] shrink-0 rotate-180" />
+        <span>Back to application progress</span>
+      </a>
       <h2 id="application-overview" data-application-section>
         Volunteer Application
       </h2>
-      <ol class="mt-4 list-decimal space-y-2 pl-6 text-zinc-400">
-        <li>
-          Complete this application form, accept the Code of Conduct, and
-          submit.
-        </li>
-        <li>
-          Take the Naloxone 101 online course and confirm completion on the
-          Volunteer page.
-        </li>
-        <li>
-          An organizer will review your application and we will notify you.
-        </li>
-        <li>
-          If approved, you will be eligible to sign up for an orientation.
-        </li>
-      </ol>
       <p class="mt-6 text-base text-zinc-400">
         Your answers are saved to your account and this browser as you fill them
         in. See our <a href="/privacy" class="underline underline-offset-4"

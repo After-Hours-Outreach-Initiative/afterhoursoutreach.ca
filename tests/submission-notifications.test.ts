@@ -88,6 +88,8 @@ const answers = {
   experience: "Private experience",
   training: ["none"],
   otherTraining: "",
+  relevantExperience: ["none"],
+  otherExperience: "",
   certificationExpiry: "",
   medicalConditions: "Private health answer",
 };

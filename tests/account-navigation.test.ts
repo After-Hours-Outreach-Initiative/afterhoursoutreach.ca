@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { accountGreeting } from "../src/data/account-navigation";
-import { siteNavigation } from "../src/data/site";
+import { contactEmail, siteNavigation } from "../src/data/site";
 import {
   canViewEvents,
   requireVolunteer,
@@ -93,6 +93,9 @@ test("event access uses all three application milestones, not orientation attend
   }
   expect(canViewEvents(null)).toBe(false);
   expect(canViewEvents({ ...actor, active: false })).toBe(false);
+  expect(() => requireVolunteer({ ...actor, active: false })).toThrow(
+    `Your volunteer account is inactive. Contact an organizer at ${contactEmail} to restore access.`,
+  );
   expect(canViewEvents({ ...actor, twoFactorEnabled: true })).toBe(false);
   expect(
     canViewEvents({

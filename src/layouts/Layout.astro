@@ -43,7 +43,7 @@ const {
     <title>{title}</title>
   </head>
   <body
-    class="m-0 overflow-x-hidden bg-ink font-body text-base leading-relaxed text-zinc-100 antialiased"
+    class="m-0 flex min-h-dvh flex-col overflow-x-hidden bg-ink font-body text-base leading-relaxed text-zinc-100 antialiased"
   >
     <a
       data-skip-to-main
@@ -70,7 +70,7 @@ const {
     }
     <Header {...account} />
 
-    <main id="main-content" tabindex="-1">
+    <main id="main-content" class="flex-1 bg-black" tabindex="-1">
       <slot />
     </main>
 

@@ -15,7 +15,7 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
   aria-label={decorative ? undefined : label}
   title={decorative ? undefined : label}
 >
-  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <svg viewBox="5 2.5 14 19.5" aria-hidden="true" focusable="false">
     <circle cx="12" cy="6" r="3.5" fill="currentColor" stroke="none"></circle>
     <path d="M5 22v-5a7 7 0 0 1 14 0v5Z" fill="currentColor" stroke="none"
     ></path>
@@ -34,9 +34,9 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
 <style>
   .attendee-avatar {
     display: inline-flex;
-    width: var(--attendee-avatar-width);
-    height: 1.5rem;
-    flex: 0 0 var(--attendee-avatar-width);
+    height: var(--attendee-avatar-height, 1.5rem);
+    aspect-ratio: 14 / 19.5;
+    flex: 0 0 auto;
   }
   svg {
     width: 100%;

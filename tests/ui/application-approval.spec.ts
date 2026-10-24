@@ -129,7 +129,7 @@ test("pending applications poll every minute, then approval restores five-second
       "true",
     );
     await expect(review.locator("p")).toHaveText(
-      `An organizer will review your application. We'll email you at ${account.email} to let you know whether it's approved and what to do next.`,
+      "An organizer will review your application. We’ll email you to let you know whether it’s approved and what to do next. You can also return to this page to check its status.",
     );
     await formStep.locator(":scope > summary").click();
     await expect(formToggle).toHaveCSS(
@@ -157,7 +157,7 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(naloxone.locator('[name="completed"]')).toBeDisabled();
     await expect(
       portal.getByText(
-        "Join our Discord for more information and to become more involved.",
+        "Join our Discord for the most up to date information.",
       ),
     ).toBeVisible();
     const discord = portal.getByRole("link", { name: "Join Discord" });
@@ -375,6 +375,15 @@ test("approval preserves the course draft, expanded snapshot and focus until con
       tracker.locator('[data-application-progress-step="review"]'),
     );
     await expect(naloxone).toHaveAttribute("data-state", "current");
+    const approvedCourseLink = naloxone.getByRole("link", {
+      name: "Take Naloxone 101",
+    });
+    await expect(approvedCourseLink).toHaveCount(1);
+    await expect(approvedCourseLink).toBeVisible();
+    await expect(approvedCourseLink).toHaveAttribute(
+      "href",
+      "https://towardtheheart.com/naloxone-course",
+    );
     await expect(formStep).toHaveAttribute("open");
     await expect(submittedApplication.locator("details")).toHaveAttribute(
       "open",

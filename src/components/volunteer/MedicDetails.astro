@@ -1,0 +1,41 @@
+---
+import { applicationFields, type ApplicationAnswers } from "@/data/application";
+import AccountProfileField from "./AccountProfileField.astro";
+import MedicalCertifications from "./MedicalCertifications.astro";
+
+interface Props {
+  values?: ApplicationAnswers | null;
+  active: boolean;
+  application?: boolean;
+}
+const { values, active, application = false } = Astro.props;
+---
+
+<div
+  id="profile-medic-details"
+  class="volunteer-medic-details volunteer-wide"
+  data-medic-details
+  data-profile-medical-fields={!application || undefined}
+  hidden={!active}
+  inert={!active}
+  aria-hidden={!active}
+>
+  <div class="volunteer-fields volunteer-medic-details-content">
+    {
+      !application && (
+        <p class="volunteer-help volunteer-wide volunteer-medic-note">
+          Medic's required certification details are saved with your team
+          interests.
+        </p>
+      )
+    }
+    <MedicalCertifications values={values} active={active} />
+    <AccountProfileField
+      field={applicationFields.find(
+        (field) => field.name === "certificationExpiry",
+      )!}
+      values={values}
+      active={active}
+    />
+  </div>
+</div>

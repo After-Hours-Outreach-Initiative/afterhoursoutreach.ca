@@ -59,3 +59,31 @@ test("a save acknowledgement rebases newer typing without marking it saved", () 
   assert.equal(merged.answers.pronouns, "remote");
   assert.deepEqual(merged.conflicts, []);
 });
+
+test("training and experience merge independently while each keeps its own Other details", () => {
+  const baseline = blank();
+  const local = {
+    ...baseline,
+    training: ["other"],
+    otherTraining: "Training details",
+  };
+  const latest = {
+    ...baseline,
+    relevantExperience: ["other"],
+    otherExperience: "Experience details",
+  };
+  const merged = mergeAnswers(baseline, local, latest);
+  assert.deepEqual(merged.conflicts, []);
+  assert.deepEqual(merged.answers, {
+    ...local,
+    relevantExperience: ["other"],
+    otherExperience: "Experience details",
+  });
+  assert.deepEqual(
+    mergeAnswers(baseline, latest, {
+      ...baseline,
+      otherExperience: "Conflicting details",
+    }).conflicts,
+    [["relevantExperience", "otherExperience"]],
+  );
+});

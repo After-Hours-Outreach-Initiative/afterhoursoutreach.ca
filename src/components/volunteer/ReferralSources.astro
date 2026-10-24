@@ -18,15 +18,12 @@ const otherSelected = sources.includes("other");
 <fieldset
   class="volunteer-referral-sources volunteer-wide"
   data-referral-sources
-  aria-describedby="help-heardAboutUsSources error-heardAboutUsSources"
+  aria-describedby="error-heardAboutUsSources"
 >
   <legend>
     {heardAboutUsQuestion}
     <span class="volunteer-required" aria-hidden="true"> *</span>
   </legend>
-  <p class="volunteer-help" id="help-heardAboutUsSources">
-    Select at least one option. You can choose more than one.
-  </p>
   <div class="volunteer-referral-options volunteer-choice-options">
     {
       heardAboutUsOptions.map((option, index) => (
@@ -37,7 +34,7 @@ const otherSelected = sources.includes("other");
             value={option.value}
             checked={sources.includes(option.value)}
             required={index === 0 && !sources.length}
-            aria-describedby="help-heardAboutUsSources error-heardAboutUsSources"
+            aria-describedby="error-heardAboutUsSources"
             aria-controls={
               option.value === "other" ? "other-referral" : undefined
             }

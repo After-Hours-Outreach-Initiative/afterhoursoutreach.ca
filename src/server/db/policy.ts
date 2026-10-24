@@ -1,3 +1,5 @@
+import { contactEmail } from "../../data/site";
+
 // User-facing previews of the rules enforced by database writes and triggers.sql.
 export interface SignupVolunteer {
   applicationSubmitted: boolean;
@@ -96,7 +98,8 @@ export function signupBlockReason(
   if (!volunteer) return "Sign in to register.";
   if (!volunteer.applicationSubmitted)
     return "Complete your volunteer application before registering for events.";
-  if (!volunteer.active) return "Your volunteer account is inactive.";
+  if (!volunteer.active)
+    return `Your volunteer account is inactive. Contact an organizer at ${contactEmail} to restore access.`;
   if (!volunteer.applicationApproved && volunteer.role !== "organizer")
     return "Your application is awaiting organizer approval.";
   return eventSignupBlockReason(volunteer, event, confirmed, now);

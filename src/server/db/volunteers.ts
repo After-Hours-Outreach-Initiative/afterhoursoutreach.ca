@@ -13,7 +13,9 @@ import {
 } from "./access";
 import {
   normalizeCertifications,
+  normalizeTrainingAnswers,
   type ApplicationAnswers,
+  type SubmittedApplication,
 } from "../../data/application";
 import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
@@ -128,12 +130,14 @@ export async function viewVolunteerProfile(
           medical_certification AS certification, training_experience AS experience,
           medical_certifications AS certifications,
           relevant_training AS training, other_training AS otherTraining,
+          relevant_experience AS relevantExperience, other_experience AS otherExperience,
           coalesce(medical_certification_expiry, '') AS certificationExpiry,
           coalesce(medical_conditions, '') AS medicalConditions,
           u.email, p.registered_at AS submittedAt,
           p.code_of_conduct_version AS codeOfConductVersion,
           p.code_of_conduct_accepted_at AS codeOfConductAcceptedAt,
-          p.naloxone_completed_at AS naloxoneCompletedAt
+          p.naloxone_completed_at AS naloxoneCompletedAt,
+          p.submitted_application AS submission
         FROM profile p JOIN user u ON u.id = p.user_id
         WHERE p.user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
       )
@@ -147,17 +151,23 @@ export async function viewVolunteerProfile(
   const row = results[1].results[0] as
     | (Omit<
         ApplicationAnswers,
-        "teams" | "certifications" | "training" | "heardAboutUsSources"
+        | "teams"
+        | "certifications"
+        | "training"
+        | "relevantExperience"
+        | "heardAboutUsSources"
       > & {
         teams: string;
         certifications: string;
         training: string;
+        relevantExperience: string | null;
         heardAboutUsSources: string | null;
         email: string;
         submittedAt: number;
         codeOfConductVersion: string | null;
         codeOfConductAcceptedAt: number | null;
         naloxoneCompletedAt: number | null;
+        submission: string | null;
       })
     | undefined;
   if (!row) return null;
@@ -167,12 +177,17 @@ export async function viewVolunteerProfile(
     codeOfConductVersion,
     codeOfConductAcceptedAt,
     naloxoneCompletedAt,
+    submission,
     ...answers
   } = row;
   const sources = row.heardAboutUsSources
     ? (JSON.parse(row.heardAboutUsSources) as string[])
     : [];
   return {
+    // Read the original only through the same audited, authorized disclosure.
+    submission: submission
+      ? (JSON.parse(submission) as SubmittedApplication)
+      : null,
     answers: {
       ...answers,
       heardAboutUsSources: sources,
@@ -181,7 +196,14 @@ export async function viewVolunteerProfile(
       certifications: normalizeCertifications(
         JSON.parse(row.certifications) as string[],
       ),
-      training: JSON.parse(row.training) as string[],
+      ...normalizeTrainingAnswers({
+        training: JSON.parse(row.training) as string[],
+        otherTraining: row.otherTraining,
+        relevantExperience: row.relevantExperience
+          ? (JSON.parse(row.relevantExperience) as string[])
+          : null,
+        otherExperience: row.otherExperience,
+      }),
     } satisfies ApplicationAnswers,
     email,
     submittedAt: new Date(submittedAt).toISOString(),

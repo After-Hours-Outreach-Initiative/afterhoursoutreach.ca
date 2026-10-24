@@ -77,6 +77,11 @@ test("drafts reject consent, unexpected fields, invalid types and oversized answ
     { teams: ["medic", "medic"] },
     { certifications: ["unknown"] },
     { training: ["none", "other"] },
+    { training: ["naloxone-trainer", "naloxone-trainer"] },
+    { relevantExperience: ["none", "other"] },
+    { relevantExperience: ["other", "other"] },
+    { relevantExperience: ["naloxone-administration"] },
+    { otherExperience: "a".repeat(2001) },
     { firstName: "a".repeat(201) },
     { medicalConditions: "a".repeat(2001) },
     { motivation: "a".repeat(16_385) },
@@ -91,5 +96,34 @@ test("drafts reject consent, unexpected fields, invalid types and oversized answ
     localApplicationDraftSchema.safeParse({ version: 999, answers: {} })
       .success,
     false,
+  );
+});
+
+test("saved server and local drafts retain old combined choices and full Other text", () => {
+  const answers = applicationDraftAnswersSchema.parse({
+    training: ["naloxone-trainer", "overdose-response", "other"],
+    otherTraining: "a".repeat(2000),
+  });
+  assert.deepEqual(answers.training, ["other"]);
+  assert.deepEqual(answers.relevantExperience, ["overdose-response"]);
+  assert.equal(
+    answers.otherTraining,
+    `${"a".repeat(2000)}\nCertified naloxone trainer`,
+  );
+  const local = localApplicationDraftSchema.parse({
+    version: 1,
+    revision: null,
+    answers: { training: ["none"] },
+    savedAnswers: { training: ["none"] },
+  });
+  assert.deepEqual(local.answers.relevantExperience, ["none"]);
+  assert.equal(sameDraftAnswers(local.answers, local.savedAnswers), true);
+  assert.deepEqual(
+    applicationDraftAnswersSchema.parse({
+      training: ["none"],
+      relevantExperience: [],
+      otherExperience: "Unfinished text",
+    }).relevantExperience,
+    [],
   );
 });

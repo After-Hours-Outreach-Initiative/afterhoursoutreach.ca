@@ -10,7 +10,7 @@ import AccountProfileAnswers from "./AccountProfileAnswers.astro";
 import AccountProfileSection from "./AccountProfileSection.astro";
 import ApplicationContents from "./ApplicationContents.astro";
 import ApplicationSteps from "./ApplicationSteps.astro";
-import MedicalCertifications from "./MedicalCertifications.astro";
+import MedicDetails from "./MedicDetails.astro";
 import RelevantTraining from "./RelevantTraining.astro";
 import ReferralSources from "./ReferralSources.astro";
 import ApplicationDraftStatus from "./ApplicationDraftStatus.astro";
@@ -48,9 +48,6 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
   data-application={application || undefined}
   data-profile-user-id={userId}
   data-profile-baseline={!application ? JSON.stringify(values) : undefined}
-  data-profile-first-name={!application ? values?.firstName : undefined}
-  data-profile-middle-names={!application ? values?.middleNames : undefined}
-  data-profile-last-name={!application ? values?.lastName : undefined}
   data-profile-certifications={!application
     ? JSON.stringify(values?.certifications ?? [])
     : undefined}
@@ -123,66 +120,80 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                   </div>
                   <div class="volunteer-team-options volunteer-choice-options">
                     {teams.map((team) => (
-                      <label
-                        for={`profile-team-${team.value}`}
-                        class="volunteer-team-option"
-                        data-included={
-                          (!application && team.value === "outreach") ||
-                          undefined
-                        }
-                      >
-                        <input
-                          type="checkbox"
-                          id={`profile-team-${team.value}`}
-                          name="teams"
-                          value={team.value}
-                          checked={values?.teams.includes(team.value) ?? false}
-                          required={application && team.value === "outreach"}
-                          disabled={!application && team.value === "outreach"}
-                          aria-labelledby={`team-${team.value}-label`}
-                          aria-describedby={`team-${team.value}-description help-teams${application && team.value === "outreach" ? " error-teams" : ""}`}
-                        />
-                        <span class="volunteer-team-content">
-                          <span
-                            class="volunteer-team-title"
-                            id={`team-${team.value}-label`}
-                          >
-                            {team.label}
-                            {application && team.value === "outreach" && (
-                              <span
-                                class="volunteer-required"
-                                aria-hidden="true"
-                              >
-                                {" "}
-                                *
-                              </span>
-                            )}
+                      <>
+                        <label
+                          for={`profile-team-${team.value}`}
+                          class="volunteer-team-option"
+                          data-included={
+                            (!application && team.value === "outreach") ||
+                            undefined
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            id={`profile-team-${team.value}`}
+                            name="teams"
+                            value={team.value}
+                            checked={
+                              values?.teams.includes(team.value) ?? false
+                            }
+                            required={application && team.value === "outreach"}
+                            disabled={!application && team.value === "outreach"}
+                            aria-labelledby={`team-${team.value}-label`}
+                            aria-describedby={`team-${team.value}-description help-teams${application && team.value === "outreach" ? " error-teams" : ""}`}
+                            aria-controls={
+                              team.value === "medic"
+                                ? "profile-medic-details"
+                                : undefined
+                            }
+                            aria-expanded={
+                              team.value === "medic" ? medicSelected : undefined
+                            }
+                          />
+                          <span class="volunteer-team-content">
+                            <span
+                              class="volunteer-team-title"
+                              id={`team-${team.value}-label`}
+                            >
+                              {team.label}
+                              {application && team.value === "outreach" && (
+                                <span
+                                  class="volunteer-required"
+                                  aria-hidden="true"
+                                >
+                                  {" "}
+                                  *
+                                </span>
+                              )}
+                            </span>
+                            <span
+                              class="volunteer-team-description"
+                              id={`team-${team.value}-description`}
+                            >
+                              {team.description}
+                              {"requirement" in team && (
+                                <span class="volunteer-team-requirement">
+                                  {team.requirement}
+                                </span>
+                              )}
+                            </span>
                           </span>
-                          <span
-                            class="volunteer-team-description"
-                            id={`team-${team.value}-description`}
-                          >
-                            {team.description}
-                            {"requirement" in team && (
-                              <span class="volunteer-team-requirement">
-                                {team.requirement}
-                              </span>
-                            )}
-                          </span>
-                        </span>
-                      </label>
+                        </label>
+                        {team.value === "medic" &&
+                          (application ? (
+                            <MedicDetails
+                              values={values}
+                              active={medicSelected}
+                              application
+                            />
+                          ) : (
+                            <div data-profile-team-training />
+                          ))}
+                      </>
                     ))}
                   </div>
                   {application && (
                     <FieldError field="teams" message={outreachRequiredError} />
-                  )}
-                  {!application && (
-                    <div data-profile-team-training hidden={!medicSelected}>
-                      <p class="volunteer-help">
-                        Medic's required certification details are saved with
-                        your team interests.
-                      </p>
-                    </div>
                   )}
                 </>
               ) : (
@@ -195,33 +206,28 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                     },
                   ]}
                 >
-                  {application && section.key === "personal-info" && (
+                  {section.key === "personal-info" && (
                     <div class="volunteer-name-fields volunteer-wide">
                       {section.fields
                         .filter((field) => nameFieldNames.includes(field.name))
                         .map((field) => (
-                          <AccountProfileField field={field} values={values} />
+                          <AccountProfileField
+                            field={field}
+                            values={values}
+                            required={
+                              field.required &&
+                              (application ||
+                                Boolean(
+                                  values?.firstName.trim() &&
+                                  values?.lastName.trim(),
+                                ))
+                            }
+                          />
                         ))}
                     </div>
                   )}
-                  {section.key === "training-and-safety" && (
-                    <div
-                      class="volunteer-fields volunteer-wide"
-                      data-profile-medical-fields={!application || undefined}
-                      hidden={!medicSelected}
-                    >
-                      <MedicalCertifications
-                        values={values}
-                        active={medicSelected}
-                      />
-                      <AccountProfileField
-                        field={section.fields.find(
-                          (field) => field.name === "certificationExpiry",
-                        )!}
-                        values={values}
-                        active={medicSelected}
-                      />
-                    </div>
+                  {!application && section.key === "training-and-safety" && (
+                    <MedicDetails values={values} active={medicSelected} />
                   )}
                   {section.fields
                     .filter(
@@ -229,7 +235,8 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                         !nameFieldNames.includes(field.name) &&
                         field.name !== "experience" &&
                         field.name !== "certificationExpiry" &&
-                        field.name !== "otherTraining",
+                        field.name !== "otherTraining" &&
+                        field.name !== "otherExperience",
                     )
                     .map((field) =>
                       field.name === "heardAboutUs" ? (
@@ -239,10 +246,22 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                       ),
                     )}
                   {section.key === "training-and-safety" && (
-                    <RelevantTraining
-                      values={values}
-                      required={application || Boolean(values?.training.length)}
-                    />
+                    <>
+                      <RelevantTraining
+                        values={values}
+                        required={
+                          application || Boolean(values?.training.length)
+                        }
+                      />
+                      <RelevantTraining
+                        values={values}
+                        experience
+                        required={
+                          application ||
+                          Boolean(values?.relevantExperience.length)
+                        }
+                      />
+                    </>
                   )}
                 </div>
               )}

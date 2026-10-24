@@ -1,5 +1,5 @@
 ---
-import CloudIcon from "@/components/icons/CloudIcon.astro";
+import CloudSaveIcon from "@/components/icons/CloudSaveIcon.astro";
 ---
 
 <p
@@ -10,6 +10,7 @@ import CloudIcon from "@/components/icons/CloudIcon.astro";
   aria-live="polite"
   aria-atomic="true"
 >
-  <CloudIcon class="volunteer-draft-save-icon" />
+  <CloudSaveIcon class="volunteer-draft-save-icon" />
   <span data-draft-save-message></span>
+  <span class="sr-only" data-draft-save-announcement></span>
 </p>

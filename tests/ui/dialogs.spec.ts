@@ -109,11 +109,11 @@ test("application dialogs keep their chrome visible while only their body scroll
   for (const width of [1280, 320]) {
     await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
     await openLocalAccountSwitcher(page);
-    const development = page.getByRole("dialog", { name: "Local development" });
+    const development = page.getByRole("dialog", { name: "DEV panel" });
     await expectPinnedChrome(development);
     await development.locator(".dialog-close").click();
     await expect(
-      page.getByRole("button", { name: "Development controls", exact: true }),
+      page.getByRole("button", { name: "DEV panel", exact: true }),
     ).toBeFocused();
 
     const add = page.locator('[data-show-dialog="event-editor-new"]');

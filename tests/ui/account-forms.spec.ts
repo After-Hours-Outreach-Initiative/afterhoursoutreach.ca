@@ -939,21 +939,25 @@ test("application shows all required errors and saves after they are corrected",
     "Emergency contact",
     "Team interests",
     "Training and safety",
-    "About volunteering",
+    "Personal statement",
   ]);
   const sections = form.locator("[data-application-questions] > section");
   await expect(sections).toHaveCount(5);
   await expect(sections.locator("details, summary, h3 svg")).toHaveCount(0);
-  for (const section of await sections.all()) {
+  for (const [index, section] of (await sections.all()).entries()) {
     const heading = section.getByRole("heading", { level: 3 });
     await expect(heading).not.toHaveAttribute("tabindex");
     await expect(heading).toHaveAttribute("data-application-section");
     await expect(heading).toHaveCSS("font-weight", "700");
-    await expect(heading).toHaveCSS(
-      "border-bottom",
-      "1px solid rgb(63, 63, 70)",
-    );
-    await expect(heading).toHaveCSS("padding-bottom", "16px");
+    await expect(heading).toHaveCSS("border-bottom-width", "0px");
+    await expect(heading).toHaveCSS("padding-bottom", "0px");
+    await expect(section).toHaveCSS("border-top-width", index ? "1px" : "0px");
+    if (index)
+      await expect(section).toHaveCSS(
+        "border-top",
+        "1px solid rgb(63, 63, 70)",
+      );
+    await expect(section).toHaveCSS("padding-top", index ? "32px" : "0px");
     await expect(section.locator(":scope > fieldset")).toBeVisible();
   }
   await expect(form.locator('input[type="email"]')).toHaveCount(0);
@@ -1004,7 +1008,7 @@ test("application shows all required errors and saves after they are corrected",
   await expect(emergencyContact.locator("input")).toHaveCount(3);
   await expect(
     form
-      .getByRole("group", { name: "About volunteering", exact: true })
+      .getByRole("group", { name: "Personal statement", exact: true })
       .locator("input, textarea"),
   ).toHaveCount(6);
   const training = form.getByRole("group", {
@@ -1014,11 +1018,11 @@ test("application shows all required errors and saves after they are corrected",
   await expect(training).toBeVisible();
   await expect(training.locator('[name="experience"]')).toBeHidden();
   await expect(training.locator("[data-medic-certifications]")).toBeHidden();
-  await expect(training.locator("[required]")).toHaveCount(1);
+  await expect(training.locator("[required]")).toHaveCount(2);
   await expect(
     form
       .getByRole("group", { name: "Team interests", exact: true })
-      .locator(".volunteer-field .volunteer-required"),
+      .locator(".volunteer-field .volunteer-required:visible"),
   ).toHaveText("*");
   const outreach = form.getByRole("checkbox", {
     name: "Outreach",
@@ -1037,13 +1041,13 @@ test("application shows all required errors and saves after they are corrected",
     ).toHaveAttribute("required", "");
   await expect(
     form.getByRole("group", {
-      name: "How did you find out about us?",
+      name: "How did you find out about us? Select all that apply.",
       exact: true,
     }),
   ).toBeVisible();
   await expect(
     form.getByRole("textbox", {
-      name: "Why do you want to volunteer?",
+      name: "Please tell us what motivates you volunteer with us?",
       exact: true,
     }),
   ).toBeVisible();
@@ -1101,7 +1105,8 @@ test("application shows all required errors and saves after they are corrected",
     const id = await input.getAttribute("id");
     const name = await input.getAttribute("name");
     const label =
-      !name || ["heardAboutUsSources", "training"].includes(name)
+      !name ||
+      ["heardAboutUsSources", "training", "relevantExperience"].includes(name)
         ? input.locator("xpath=ancestor::fieldset[1]/legend")
         : form.locator(`label[for="${id}"]`);
     await expect(label.locator(".volunteer-required")).toHaveText("*");
@@ -1134,6 +1139,7 @@ test("application shows all required errors and saves after they are corrected",
     if (
       field === "heardAboutUsSources" ||
       field === "training" ||
+      field === "relevantExperience" ||
       field === "teams"
     ) {
       for (const source of value as string[])
@@ -1149,6 +1155,7 @@ test("application shows all required errors and saves after they are corrected",
         "experience",
         "training",
         "otherTraining",
+        "otherExperience",
       ].includes(field)
     )
       await fillApplicationField(form, field, String(value));
@@ -1174,13 +1181,21 @@ test("application shows all required errors and saves after they are corrected",
     ".volunteer-application-review .volunteer-profile-section-heading",
   );
   await expect(reviewHeadings).toHaveCount(5);
-  for (const row of await reviewHeadings.all()) {
+  for (const [index, row] of (await reviewHeadings.all()).entries()) {
     await expect(row.getByRole("heading", { level: 3 })).toHaveCSS(
       "font-weight",
       "700",
     );
-    await expect(row).toHaveCSS("border-bottom", "1px solid rgb(63, 63, 70)");
-    await expect(row).toHaveCSS("padding-bottom", "16px");
+    await expect(row).toHaveCSS("border-bottom-width", "0px");
+    await expect(row).toHaveCSS("padding-bottom", "0px");
+    const section = row.locator("..");
+    await expect(section).toHaveCSS("border-top-width", index ? "1px" : "0px");
+    if (index)
+      await expect(section).toHaveCSS(
+        "border-top",
+        "1px solid rgb(63, 63, 70)",
+      );
+    await expect(section).toHaveCSS("padding-top", index ? "32px" : "0px");
     await expect(row).toHaveCSS("margin-bottom", "24px");
     const bounds = (await row.boundingBox())!;
     const edit = (await row.getByRole("button").boundingBox())!;
@@ -1273,14 +1288,16 @@ test("application shows all required errors and saves after they are corrected",
   await toggle.click();
   await expect(confirmation).toBeChecked();
   await page.getByRole("button", { name: "Submit application" }).click();
-  await expect(page).toHaveURL(/\/events$/);
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await page
+    .getByRole("button", { name: "Open navigation", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
-  await expect(
-    form.locator('[name="firstName"], [name="middleNames"], [name="lastName"]'),
-  ).toHaveCount(0);
+  for (const field of ["firstName", "middleNames", "lastName"] as const)
+    await expect(form.locator(`[name="${field}"]`)).toBeEditable();
   await expect(
     page.getByRole("textbox", { name: /^Preferred name/ }),
   ).toHaveValue(sampleAnswers.preferredName);
@@ -1333,10 +1350,19 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
       await page.goto("/apply");
       const form = page.locator("[data-account-profile]");
       const birthDate = form.getByRole("group", {
-        name: "Date of birth",
+        name: "Date of birth (yyyy/mm/dd)",
         exact: true,
       });
-      for (const part of ["day", "month", "year"]) {
+      await expect(birthDate.locator("label.sr-only")).toHaveText([
+        "Year",
+        "Month",
+        "Day",
+      ]);
+      for (const [part, placeholder] of [
+        ["year", "yyyy"],
+        ["month", "mm"],
+        ["day", "dd"],
+      ]) {
         const input = birthDate.locator(`[data-birth-date-part="${part}"]`);
         await expect(input).toHaveAccessibleName(
           part[0].toUpperCase() + part.slice(1),
@@ -1344,8 +1370,9 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
         await expect(input).toHaveAttribute("type", "text");
         await expect(input).toHaveAttribute("inputmode", "numeric");
         await expect(input).toHaveAttribute("autocomplete", `bday-${part}`);
+        await expect(input).toHaveAttribute("placeholder", placeholder);
         await expect(input).not.toHaveAttribute("name");
-        await expect(input).toHaveAccessibleDescription(
+        await expect(input).not.toHaveAccessibleDescription(
           /at least 19 years old/,
         );
         await expect(input).toHaveValue("");
@@ -1368,10 +1395,13 @@ test("mobile birth-date entry stays blank, labelled and within the form", async 
       await day.press("Home");
       await day.press("Delete");
       await expect(day).toHaveValue("10");
-      await day.press("Tab");
+      await year.focus();
+      await year.press("Tab");
       await expect(month).toBeFocused();
-      await month.press("Shift+Tab");
+      await month.press("Tab");
       await expect(day).toBeFocused();
+      await day.press("Shift+Tab");
+      await expect(month).toBeFocused();
       for (const width of [devices[device].viewport.width, 320]) {
         await page.setViewportSize({ width, height: 844 });
         expect(
@@ -1440,6 +1470,7 @@ test("applications validate the birthday boundary and profiles keep the saved bi
     if (
       field === "heardAboutUsSources" ||
       field === "training" ||
+      field === "relevantExperience" ||
       field === "teams"
     ) {
       for (const source of value as string[])
@@ -1455,6 +1486,7 @@ test("applications validate the birthday boundary and profiles keep the saved bi
         "experience",
         "training",
         "otherTraining",
+        "otherExperience",
       ].includes(field)
     )
       await fillApplicationField(form, field, String(value));
@@ -1505,8 +1537,8 @@ test("applications validate the birthday boundary and profiles keep the saved bi
   await page
     .getByRole("button", { name: "Submit application", exact: true })
     .click();
-  await expect(page).toHaveURL(/\/events$/);
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await page.goto("/volunteer/account");
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
@@ -1538,8 +1570,14 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     javaScriptEnabled: false,
   });
   try {
-    await createLocalAccount(context.request, baseURL!, false);
     const page = await context.newPage();
+    await page.goto("/volunteer");
+    await expect(
+      page.getByText("You must be at least 19 years old to apply.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await createLocalAccount(context.request, baseURL!, false);
     await page.goto("/apply");
     const form = page.locator("[data-account-profile]");
     await expect(
@@ -1553,8 +1591,9 @@ test("the application requires JavaScript and renders blank DOB format guidance"
     const birthDate = form.locator('[data-birth-date-part="year"]');
     await expect(birthDate).toHaveAttribute("type", "text");
     await expect(birthDate).toHaveValue("");
-    await expect(form.locator("#help-birthDate")).toHaveText(
-      "You must be at least 19 years old to apply.",
+    await expect(form.locator("#help-birthDate")).toHaveCount(0);
+    await expect(form.locator("[data-birth-date] legend")).toHaveText(
+      "Date of birth (yyyy/mm/dd) *",
     );
     await birthDate.fill("not-a-year");
     await expect(localApplicationReviewButton(page)).toBeDisabled();
@@ -1633,7 +1672,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     exact: true,
   });
   const none = training.getByRole("checkbox", {
-    name: "No relevant training or experience",
+    name: "No relevant training",
     exact: true,
   });
   const medic = form.getByLabel("Medic", { exact: true });
@@ -1704,6 +1743,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     if (
       field === "heardAboutUsSources" ||
       field === "training" ||
+      field === "relevantExperience" ||
       field === "teams"
     ) {
       for (const source of value as string[])
@@ -1719,6 +1759,7 @@ test("all teams can select multiple relevant training answers and add Other deta
         "experience",
         "training",
         "otherTraining",
+        "otherExperience",
       ].includes(field)
     )
       await fillApplicationField(form, field, String(value));
@@ -1735,7 +1776,7 @@ test("all teams can select multiple relevant training answers and add Other deta
   await none.check();
   await reviewLocalApplication(page);
   await expect(form.locator('[data-review-answer="training"]')).toHaveText(
-    "No relevant training or experience",
+    "No relevant training",
   );
   await form
     .getByRole("button", { name: "Back to answers", exact: true })
@@ -1779,8 +1820,11 @@ test("all teams can select multiple relevant training answers and add Other deta
   await medic.uncheck();
   await expect(training).toBeVisible();
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/events$/);
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await page
+    .getByRole("button", { name: "Open navigation", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   await page.getByRole("button", { name: "Edit training and safety" }).click();
@@ -1840,7 +1884,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     form.locator('[data-profile-answers="training-and-safety"]'),
   ).toBeVisible();
   await expect(form.locator('[data-profile-answer="training"] dd')).toHaveText(
-    "No relevant training or experience",
+    "No relevant training",
   );
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await page.reload();
@@ -1869,6 +1913,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   });
   const certifications = form.locator("[data-medic-certifications]");
   const medic = form.getByLabel("Medic", { exact: true });
+  const details = form.locator("[data-medic-details]");
   const firstAid = certifications.getByRole("radio", {
     name: "Advanced First Aid (formerly OFA Level 3)",
     exact: true,
@@ -1903,6 +1948,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     if (
       field === "heardAboutUsSources" ||
       field === "training" ||
+      field === "relevantExperience" ||
       field === "teams"
     ) {
       for (const source of value as string[])
@@ -1918,6 +1964,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
         "experience",
         "training",
         "otherTraining",
+        "otherExperience",
       ].includes(field)
     )
       await fillApplicationField(form, field, String(value));
@@ -1925,8 +1972,24 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(
     form.getByRole("checkbox", { name: "Outreach", exact: true }),
   ).toBeChecked();
-  await medic.check();
+  expect(
+    await medic.evaluate((input: HTMLInputElement) => {
+      input.click();
+      const details = document.querySelector<HTMLElement>(
+        "[data-medic-details]",
+      )!;
+      return details.getAnimations()[0]?.effect?.getTiming().duration;
+    }),
+  ).toBe(220);
   await expect(certifications).toBeVisible();
+  await expect(medic).toHaveAttribute("aria-controls", "profile-medic-details");
+  await expect(medic).toHaveAttribute("aria-expanded", "true");
+  await expect(details).toHaveJSProperty("inert", false);
+  await expect(
+    form.locator(
+      '.volunteer-team-option:has([value="medic"]) + [data-medic-details] + .volunteer-team-option:has([value="non-patrol"])',
+    ),
+  ).toHaveCount(1);
   const certificationChoices = certifications.locator(
     ".volunteer-choice-options",
   );
@@ -1966,7 +2029,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     "Emergency contact",
     "Team interests",
     "Training and safety",
-    "About volunteering",
+    "Personal statement",
   ]);
   await reviewLocalApplication(page);
   await expect(firstAid).toBeFocused();
@@ -2048,7 +2111,33 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(experience).not.toHaveAttribute("required");
   await other.check();
   await expect(experience).toHaveValue("Naloxone training");
-  await medic.uncheck();
+  expect(
+    await medic.evaluate((input: HTMLInputElement) => {
+      input.click();
+      const details = document.querySelector<HTMLElement>(
+        "[data-medic-details]",
+      )!;
+      return {
+        inert: details.inert,
+        ariaHidden: details.getAttribute("aria-hidden"),
+        animating: details.getAnimations().length,
+        required: details.querySelectorAll("[required]").length,
+        valid: [
+          ...details.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+            "input, textarea",
+          ),
+        ].every((field) => field.validity.valid),
+      };
+    }),
+  ).toEqual({
+    inert: true,
+    ariaHidden: "true",
+    animating: 1,
+    required: 0,
+    valid: true,
+  });
+  await expect(medic).toBeFocused();
+  await expect(certifications.getByRole("radio")).toHaveCount(0);
   await expect(training).toBeVisible();
   await expect(certifications).toBeHidden();
   await expect(certifications.locator("[required]")).toHaveCount(0);
@@ -2056,6 +2145,21 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).not.toHaveAttribute("required");
   await expect(experience).toBeHidden();
   await expect(experience).not.toHaveAttribute("required");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await medic.check();
+  await expect(details).not.toHaveAttribute("data-transitioning");
+  expect(
+    await details.evaluate((element) => element.getAnimations().length),
+  ).toBe(0);
+  expect(
+    await medic.evaluate((input: HTMLInputElement) => {
+      input.click();
+      const details = document.querySelector<HTMLElement>(
+        "[data-medic-details]",
+      )!;
+      return [details.hidden, details.inert, details.getAnimations().length];
+    }),
+  ).toEqual([true, true, 0]);
   await medic.check();
   await expect(other).toBeChecked();
   await expect(form.locator('[name="certificationExpiry"]')).toHaveValue(
@@ -2064,8 +2168,9 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).toHaveAttribute("required", "");
   await expect(experience).toHaveValue("Naloxone training");
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/events$/);
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await page.locator("[data-account-menu] > summary").click();
+  await page.getByRole("link", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   for (const [name, value] of [
@@ -2304,14 +2409,13 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     await expect(answer("teams").getByRole("listitem")).toHaveText([
       "Outreach",
     ]);
-    await expect(answer("training")).toHaveText(
-      "No relevant training or experience",
-    );
+    await expect(answer("training")).toHaveText("No relevant training");
     for (const conditional of [
       "certifications",
       "certificationExpiry",
       "experience",
       "otherTraining",
+      "otherExperience",
     ])
       await expect(answer(conditional)).toBeHidden();
   };
@@ -2343,7 +2447,14 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     "lastName",
     "birthDate",
   ] as const) {
-    await expect(form.locator(`[name="${field}"]`)).toHaveCount(0);
+    if (field === "birthDate")
+      await expect(form.locator(`[name="${field}"]`)).toHaveCount(0);
+    else {
+      await expect(form.locator(`[name="${field}"]`)).toHaveValue(
+        sampleAnswers[field],
+      );
+      await expect(form.locator(`[name="${field}"]`)).toBeDisabled();
+    }
     expect(baseline[field]).toBe(sampleAnswers[field]);
   }
   await expect(
@@ -2444,6 +2555,9 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await expect(enabledSaves).toHaveCount(0);
   expect(requests).toHaveLength(1);
   expect(requests[0]).toMatchObject({
+    firstName: sampleAnswers.firstName,
+    middleNames: sampleAnswers.middleNames,
+    lastName: sampleAnswers.lastName,
     preferredName: sampleAnswers.preferredName,
     phone: sampleAnswers.phone,
     training: sampleAnswers.training,
@@ -2451,14 +2565,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     experience: "Saved experience",
     certificationExpiry: "2030-10-14",
   });
-  for (const immutable of [
-    "firstName",
-    "middleNames",
-    "lastName",
-    "birthDate",
-    "motivation",
-    "heardAboutUs",
-  ])
+  for (const immutable of ["birthDate", "motivation", "heardAboutUs"])
     expect(requests[0]).not.toHaveProperty(immutable);
   await expect(editor).toBeVisible();
   await expect(name).toHaveValue("Updated volunteer");
@@ -2481,26 +2588,33 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await expect(enabledSaves).toHaveCount(0);
   await expectTextView("Updated volunteer");
 
-  // Clearing the preferred name still falls back to the saved legal name.
+  // Name edits update the current account and saved-answer display.
   await page.getByRole("button", { name: "Edit personal info" }).click();
   const safetyAnswer = "First line\n<em>Text, not markup</em>";
   await medicalConditions.fill(safetyAnswer);
   await form.locator('[name="preferredName"]').fill("");
+  await form.locator('[name="firstName"]').fill("Changed first");
+  await form.locator('[name="middleNames"]').fill("Changed middle");
+  await form.locator('[name="lastName"]').fill("Changed last");
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
     form.locator('[data-profile-answers="personal-info"]'),
   ).toBeVisible();
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(page.locator("[data-account-menu-name]").first()).toHaveText(
-    `${sampleAnswers.firstName} ${sampleAnswers.middleNames} ${sampleAnswers.lastName}`,
+    "Changed first Changed middle Changed last",
   );
   await expect(page.locator("[data-account-greeting]")).toHaveText(
-    sampleAnswers.firstName,
+    "Changed first",
   );
+  await expect(answer("firstName")).toHaveText("Changed first");
+  await expect(answer("middleNames")).toHaveText("Changed middle");
+  await expect(answer("lastName")).toHaveText("Changed last");
   await expect(answer("preferredName")).toHaveText("Not provided");
   await expect(answer("medicalConditions")).toHaveText(safetyAnswer);
   await expect(answer("medicalConditions").locator("em")).toHaveCount(0);
   await page.reload();
+  await expect(answer("firstName")).toHaveText("Changed first");
   await expect(answer("medicalConditions")).toHaveText(safetyAnswer);
   await expectTextView("Updated volunteer");
   await page.getByRole("button", { name: "Edit team interests" }).click();
@@ -2588,8 +2702,15 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(medic).toBeChecked();
   await expect(cards.nth(1)).toHaveCSS("background-color", "rgb(22, 33, 74)");
   await expect(training).toBeVisible();
+  await expect(
+    form.locator(
+      '.volunteer-team-option:has([value="medic"]) + [data-profile-team-training] [data-medic-details]',
+    ),
+  ).toBeVisible();
   await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
   await medic.press("Tab");
+  await expect(training.getByRole("radio").first()).toBeFocused();
+  await support.focus();
   await expect(support).toBeFocused();
   await expect(cards.nth(2)).toHaveCSS("outline-style", "solid");
   await support.press("Space");

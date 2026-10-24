@@ -174,12 +174,13 @@ export function initApplicationDraft(element: HTMLFormElement) {
   if (!userId || !element.hasAttribute("data-application")) return;
   const flow = element.closest("[data-application-flow]")!;
   const saveIndicators = [
-    ...flow.querySelectorAll<HTMLElement>(
-      "[data-draft-save-indicator], [data-draft-save-summary]",
-    ),
+    ...flow.querySelectorAll<HTMLElement>("[data-draft-save-indicator]"),
   ].map((indicator) => ({
     indicator,
     message: indicator.querySelector<HTMLElement>("[data-draft-save-message]")!,
+    announcement: indicator.querySelector<HTMLElement>(
+      "[data-draft-save-announcement]",
+    )!,
   }));
   const saveTimeFormat = new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
@@ -342,41 +343,53 @@ export function initApplicationDraft(element: HTMLFormElement) {
     status.hidden = !message;
     statusPanel.hidden = !message;
 
-    let saveState = "idle";
-    let saveMessage = "";
-    if (stopped || paused) {
-      saveState = "paused";
-      saveMessage = "Saving paused";
-    } else if (conflict) {
-      saveState = "error";
-      saveMessage = "Choose which answers to keep";
-    } else if (failure || blocked) {
-      saveState = "error";
-      saveMessage = unsaved
-        ? "Couldn’t save to your account"
-        : "Couldn’t check save status";
-    } else if (inFlight || unsaved) {
-      // An earlier save does not confirm the latest pending answers.
-      saveState = "pending";
-      saveMessage = "";
-    } else if (revision && savedAt !== null) {
-      saveState = "saved";
+    let lastSavedMessage = "";
+    if (revision && savedAt !== null) {
       const savedDate = new Date(savedAt);
       const now = new Date();
       const date =
         savedDate.toDateString() === now.toDateString()
           ? ""
           : ` on ${saveDateFormat.format(savedDate)}`;
-      saveMessage = `Last saved${date} at ${saveTimeFormat.format(savedDate)}`;
-      // Refresh at local midnight without a ticking counter.
+      lastSavedMessage = `Last saved${date} at ${saveTimeFormat.format(savedDate)}`;
+      // Keep the last-save date accurate while newer answers are pending too.
       const midnight = new Date(now);
       midnight.setHours(24, 0, 0, 0);
       dateTimer = setTimeout(renderStatus, midnight.getTime() - now.getTime());
     }
-    for (const { indicator, message } of saveIndicators) {
+
+    let saveState = "idle";
+    let saveAnnouncement = "";
+    if (stopped || paused) {
+      saveState = "paused";
+      saveAnnouncement = "Saving paused";
+    } else if (conflict) {
+      saveState = "error";
+      saveAnnouncement = "Choose which answers to keep";
+    } else if (blocked || (failure && !inFlight)) {
+      saveState = "error";
+      saveAnnouncement = unsaved
+        ? "Couldn’t save to your account"
+        : "Couldn’t check save status";
+    } else if (inFlight || refreshing) {
+      saveState = "loading";
+      saveAnnouncement = inFlight ? "Saving changes" : "Checking save status";
+    } else if (unsaved) {
+      saveState = "pending";
+      saveAnnouncement = "Changes waiting to save";
+    } else if (lastSavedMessage) {
+      saveState = "saved";
+      saveAnnouncement = "All changes saved";
+    }
+    if (lastSavedMessage && saveAnnouncement)
+      saveAnnouncement = `. ${saveAnnouncement}`;
+    for (const { indicator, message, announcement } of saveIndicators) {
       indicator.dataset.saveState = saveState;
-      if (message.textContent !== saveMessage)
-        message.textContent = saveMessage;
+      // Keep visible save history stable; announce icon-only state changes to AT.
+      if (message.textContent !== lastSavedMessage)
+        message.textContent = lastSavedMessage;
+      if (announcement.textContent !== saveAnnouncement)
+        announcement.textContent = saveAnnouncement;
     }
   };
   const restore = (answers: ApplicationDraftAnswers, notify = true) => {
@@ -659,6 +672,7 @@ export function initApplicationDraft(element: HTMLFormElement) {
         schedule();
       }
     })();
+    renderStatus();
     return refreshing;
   };
   const save = (keepalive = false): Promise<void> | undefined => {

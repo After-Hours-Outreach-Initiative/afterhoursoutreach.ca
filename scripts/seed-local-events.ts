@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { createHmac } from "node:crypto";
 import { mkdir, mkdtemp, rmdir, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,12 +10,15 @@ import {
   localAccountUserId,
 } from "./local-account-fixtures";
 import { fixtureUserId, localEventFixtures } from "./local-event-fixtures";
+import { localAuthenticatorCode } from "../src/dev/server/authenticator-code";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const accountsOnly =
-  process.argv.length === 3 && process.argv[2] === "--accounts";
-if (process.argv.length !== 2 && !accountsOnly)
-  throw new Error("Usage: pnpm db:seed:local [--accounts] (local only)");
+// The browser-test harness selects its broader fixtures in a disposable copy.
+// The normal command always seeds the small manual View as dataset.
+const testFixtures =
+  process.argv.length === 3 && process.argv[2] === "--test-fixtures";
+if (process.argv.length !== 2 && !testFixtures)
+  throw new Error("Usage: pnpm db:seed:local (local only)");
 const config: {
   vars?: Record<string, unknown>;
   d1_databases?: { binding: string; remote?: boolean }[];
@@ -31,23 +33,6 @@ if (
   throw new Error(
     "Seeding requires a loopback dev server and local D1 binding.",
   );
-
-function authenticatorCode(key: string) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  const bits = [...key.replace(/=+$/, "")]
-    .map((letter) => alphabet.indexOf(letter).toString(2).padStart(5, "0"))
-    .join("");
-  const secret = Buffer.from(
-    bits.match(/.{8}/g)!.map((byte) => parseInt(byte, 2)),
-  );
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
-  const digest = createHmac("sha1", secret).update(counter).digest();
-  return String(
-    (digest.readUInt32BE(digest[digest.length - 1] & 15) & 0x7fffffff) %
-      1_000_000,
-  ).padStart(6, "0");
-}
 
 const client = await request.newContext({
   baseURL: origin.origin,
@@ -65,9 +50,9 @@ try {
   const directory = await mkdtemp(join(temporaryRoot, "local-events-"));
   const file = join(directory, "fixtures.sql");
   try {
-    const fixtures = accountsOnly
-      ? localAccountFixtures()
-      : localEventFixtures();
+    const fixtures = testFixtures
+      ? localEventFixtures()
+      : localAccountFixtures();
     await writeFile(file, fixtures.join(";\n") + ";\n", {
       mode: 0o600,
     });
@@ -91,10 +76,18 @@ try {
         env: { ...process.env, CLOUDFLARE_ENV: "" },
       },
     );
-    if (seeded.error || seeded.status !== 0)
+    if (seeded.error || seeded.status !== 0) {
+      const detail =
+        seeded.error?.message || seeded.stderr?.trim() || seeded.stdout?.trim();
       throw new Error(
-        "Local seeding failed. Check that all local migrations are applied.",
+        [
+          "Local seeding failed. If local migrations are missing, run pnpm db:migrate:local, then retry.",
+          detail,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
       );
+    }
   } finally {
     await unlink(file);
     await rmdir(directory);
@@ -106,9 +99,9 @@ try {
     return result.json();
   };
   await post("/api/v1/auth/dev/switch-user", {
-    userId: accountsOnly
-      ? localAccountUserId("organizer")
-      : fixtureUserId("robin"),
+    userId: testFixtures
+      ? fixtureUserId("robin")
+      : localAccountUserId("organizer"),
   });
   const current = await (await client.get("/api/v1/auth/get-session")).json();
   if (!current?.user?.twoFactorEnabled) {
@@ -119,14 +112,14 @@ try {
     });
     const key = new URL(setup.totpURI).searchParams.get("secret")!;
     await post("/api/v1/auth/two-factor/verify-totp", {
-      code: authenticatorCode(key),
+      code: localAuthenticatorCode(key),
     });
   }
   await post("/api/v1/auth/sign-out", {});
   console.log(
-    accountsOnly
-      ? "Local D1 accounts are ready: Not applied, Applied, Accepted, Inactive, Organizer. Choose Visitor in View as to sign out."
-      : "Local D1 test events and sample accounts are ready. Choose Robin Vance in View as for organizer tools.",
+    testFixtures
+      ? "Local D1 test events and sample accounts are ready. Choose Robin Vance in View as for organizer tools."
+      : "Local D1 presets and events are ready. View as groups accounts by Application, Orientation, Active volunteers, and Access, including a patrol volunteer and an eligible medic. Choose Visitor to sign out.",
   );
 } finally {
   await client.dispose();

@@ -4,6 +4,15 @@
   display: grid;
   gap: 0.75rem;
 }
+.account-state-category {
+  min-width: 0;
+}
+.account-state-category > h4 {
+  padding: 0.75rem 0;
+}
+.account-state-category > .account-profile-buttons {
+  padding: 0 0 0.75rem;
+}
 .account-profile-buttons {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -449,7 +449,7 @@ test("View as has a button for every seeded profile and supports keyboard switch
       ),
     ).toBe(false);
     await page
-      .getByRole("button", { name: "Close development controls", exact: true })
+      .getByRole("button", { name: "Close DEV panel", exact: true })
       .click();
   }
   const profiles = await openLocalAccountSwitcher(page);
@@ -461,6 +461,11 @@ test("View as has a button for every seeded profile and supports keyboard switch
   await page
     .getByRole("button", { name: "Open navigation", exact: true })
     .click();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Mobile navigation" })
+      .getByRole("button", { name: "Manage", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
   await expect(
     page
       .getByRole("navigation", { name: "Mobile navigation" })
@@ -657,7 +662,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
       "Training and safety",
     ]);
     await expect(
-      form.getByRole("group", { name: "About volunteering", exact: true }),
+      form.getByRole("group", { name: "Personal statement", exact: true }),
     ).toHaveCount(0);
     const name = page.getByLabel("Preferred name", { exact: false });
     await expect(name).toHaveValue(sampleAnswers.preferredName);

@@ -4,10 +4,155 @@ import {
   normalizeCertifications,
   outreachRequiredError,
   profileFormSections,
+  trainingOptions,
+  experienceOptions,
+  normalizeTrainingAnswers,
 } from "../src/data/application";
 import { profileSchema } from "../src/server/db/profiles";
+import {
+  applicationDraftAnswersSchema,
+  draftProfileValues,
+} from "../src/data/application-draft";
+import { profileAnswerRows } from "../src/data/profile-answers";
 
 const birthDateSchema = profileSchema.shape.birthDate;
+
+test("training and experience offer separate, exact choices", () => {
+  expect(trainingOptions.map((option) => option.label)).toEqual([
+    "Naloxone administration training",
+    "Basic First Aid, Emergency First Aid, Standard First Aid, or CPR certification",
+    "Expired first-aid certification (specify under Other)",
+    "Crisis intervention and de-escalation training (specify under Other)",
+    "Mental Health First Aid or Psychological First Aid",
+    "Other",
+    "No relevant training",
+  ]);
+  expect(experienceOptions.map((option) => option.label)).toEqual([
+    "Overdose response experience (naloxone, rescue breathing, CPR, etc.)",
+    "Lived experience in the Downtown Eastside (DTES), with substance use, or in recovery",
+    "Work or volunteer experience in the DTES or with vulnerable populations",
+    "Experience in non-profit grant writing, fundraising, or donor relations",
+    "Other",
+    "No relevant experience",
+  ]);
+});
+
+test("legacy combined answers split without inventing missing answers or losing text", () => {
+  const original = {
+    training: [
+      "naloxone-administration",
+      "overdose-response",
+      "lived-experience",
+      "naloxone-trainer",
+      "other",
+    ],
+    otherTraining: "Original combined Other details",
+  };
+  const normalized = normalizeTrainingAnswers(original);
+  expect(normalized).toEqual({
+    training: ["naloxone-administration", "other"],
+    otherTraining:
+      "Original combined Other details\nCertified naloxone trainer",
+    relevantExperience: ["overdose-response", "lived-experience"],
+    otherExperience: "",
+  });
+  expect(original.training).toContain("naloxone-trainer");
+  expect(normalizeTrainingAnswers(normalized)).toEqual(normalized);
+  expect(
+    normalizeTrainingAnswers({ training: ["none"] }).relevantExperience,
+  ).toEqual(["none"]);
+  expect(
+    normalizeTrainingAnswers({ training: ["overdose-response"] }).training,
+  ).toEqual([]);
+  expect(
+    normalizeTrainingAnswers({ training: ["naloxone-administration"] })
+      .relevantExperience,
+  ).toEqual([]);
+  expect(
+    normalizeTrainingAnswers({ training: ["none"], relevantExperience: [] })
+      .relevantExperience,
+  ).toEqual([]);
+  expect(
+    normalizeTrainingAnswers({
+      training: [],
+      otherTraining: "Saved hidden text",
+    }).otherTraining,
+  ).toBe("Saved hidden text");
+});
+
+test("both questions require an answer, exclusive None and conditional Other details", () => {
+  const answers = {
+    ...draftProfileValues(applicationDraftAnswersSchema.parse({})),
+    firstName: "Sample",
+    lastName: "Volunteer",
+    phone: "6045550100",
+    birthDate: "1990-01-01",
+    emergencyName: "Contact",
+    emergencyPhone: "6045550101",
+    emergencyRelationship: "Friend",
+    heardAboutUsSources: ["internet"],
+    motivation: "Help my community",
+    teams: ["outreach"],
+    training: ["none"],
+    relevantExperience: ["none"],
+  };
+  expect(profileSchema.safeParse(answers).success).toBe(true);
+  for (const name of ["training", "relevantExperience"] as const) {
+    const otherName = name === "training" ? "otherTraining" : "otherExperience";
+    for (const values of [undefined, [], ["none", "other"], ["other", "other"]])
+      expect(
+        profileSchema.safeParse({ ...answers, [name]: values }).success,
+      ).toBe(false);
+    expect(
+      profileSchema.safeParse({
+        ...answers,
+        [name]: ["other"],
+        [otherName]: " \t ",
+      }).success,
+    ).toBe(false);
+    const parsed = profileSchema.parse({
+      ...answers,
+      [name]: ["other"],
+      [otherName]: " Details ",
+    });
+    expect(parsed[otherName]).toBe("Details");
+  }
+  expect(
+    profileSchema.safeParse({ ...answers, training: ["naloxone-trainer"] })
+      .success,
+  ).toBe(false);
+  expect(
+    profileSchema.safeParse({ ...answers, training: ["overdose-response"] })
+      .success,
+  ).toBe(false);
+  expect(
+    profileSchema.safeParse({
+      ...answers,
+      relevantExperience: ["naloxone-administration"],
+    }).success,
+  ).toBe(false);
+  const parsed = profileSchema.parse({
+    ...answers,
+    relevantExperience: ["other", "overdose-response"],
+    otherExperience: "Details",
+  });
+  expect(parsed.relevantExperience).toEqual(["overdose-response", "other"]);
+  const section = profileFormSections().find(
+    (section) => section.key === "training-and-safety",
+  )!;
+  const rows = profileAnswerRows(section, parsed);
+  expect(rows.find((row) => row.name === "training")?.value).toEqual([
+    "No relevant training",
+  ]);
+  expect(rows.find((row) => row.name === "relevantExperience")?.value).toEqual([
+    experienceOptions[0].label,
+    "Other",
+  ]);
+  expect(rows.find((row) => row.name === "otherExperience")).toMatchObject({
+    value: "Details",
+    hidden: false,
+  });
+});
 
 test("emergency contact helper text appears only in the application", () => {
   const emergencyContact = (application: boolean) =>

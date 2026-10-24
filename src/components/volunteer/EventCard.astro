@@ -265,6 +265,10 @@ const blocked =
     }
     .volunteer-actions {
       grid-column: 2;
+      grid-row: 1;
+    }
+    .volunteer-event-layout:has(> :global(.event-attendance))
+      .volunteer-actions {
       grid-row: 1 / 3;
     }
   }

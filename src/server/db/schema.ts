@@ -175,6 +175,9 @@ export const profile = sqliteTable("profile", {
     .notNull()
     .default(sql`'[]'`),
   other_training: text().notNull().default(""),
+  // Null identifies legacy combined training/experience answers until their next save.
+  relevant_experience: text({ mode: "json" }).$type<string[]>(),
+  other_experience: text().notNull().default(""),
   medical_conditions: text(),
   // Nullable for existing/synthetic profiles; never invent an acknowledgement.
   code_of_conduct_version: text(),
