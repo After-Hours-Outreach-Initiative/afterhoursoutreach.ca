@@ -944,16 +944,20 @@ test("application shows all required errors and saves after they are corrected",
   const sections = form.locator("[data-application-questions] > section");
   await expect(sections).toHaveCount(5);
   await expect(sections.locator("details, summary, h3 svg")).toHaveCount(0);
-  for (const section of await sections.all()) {
+  for (const [index, section] of (await sections.all()).entries()) {
     const heading = section.getByRole("heading", { level: 3 });
     await expect(heading).not.toHaveAttribute("tabindex");
     await expect(heading).toHaveAttribute("data-application-section");
     await expect(heading).toHaveCSS("font-weight", "700");
-    await expect(heading).toHaveCSS(
-      "border-bottom",
-      "1px solid rgb(63, 63, 70)",
-    );
-    await expect(heading).toHaveCSS("padding-bottom", "16px");
+    await expect(heading).toHaveCSS("border-bottom-width", "0px");
+    await expect(heading).toHaveCSS("padding-bottom", "0px");
+    await expect(section).toHaveCSS("border-top-width", index ? "1px" : "0px");
+    if (index)
+      await expect(section).toHaveCSS(
+        "border-top",
+        "1px solid rgb(63, 63, 70)",
+      );
+    await expect(section).toHaveCSS("padding-top", index ? "32px" : "0px");
     await expect(section.locator(":scope > fieldset")).toBeVisible();
   }
   await expect(form.locator('input[type="email"]')).toHaveCount(0);
@@ -1014,11 +1018,11 @@ test("application shows all required errors and saves after they are corrected",
   await expect(training).toBeVisible();
   await expect(training.locator('[name="experience"]')).toBeHidden();
   await expect(training.locator("[data-medic-certifications]")).toBeHidden();
-  await expect(training.locator("[required]")).toHaveCount(1);
+  await expect(training.locator("[required]")).toHaveCount(2);
   await expect(
     form
       .getByRole("group", { name: "Team interests", exact: true })
-      .locator(".volunteer-field .volunteer-required"),
+      .locator(".volunteer-field .volunteer-required:visible"),
   ).toHaveText("*");
   const outreach = form.getByRole("checkbox", {
     name: "Outreach",
@@ -1177,13 +1181,21 @@ test("application shows all required errors and saves after they are corrected",
     ".volunteer-application-review .volunteer-profile-section-heading",
   );
   await expect(reviewHeadings).toHaveCount(5);
-  for (const row of await reviewHeadings.all()) {
+  for (const [index, row] of (await reviewHeadings.all()).entries()) {
     await expect(row.getByRole("heading", { level: 3 })).toHaveCSS(
       "font-weight",
       "700",
     );
-    await expect(row).toHaveCSS("border-bottom", "1px solid rgb(63, 63, 70)");
-    await expect(row).toHaveCSS("padding-bottom", "16px");
+    await expect(row).toHaveCSS("border-bottom-width", "0px");
+    await expect(row).toHaveCSS("padding-bottom", "0px");
+    const section = row.locator("..");
+    await expect(section).toHaveCSS("border-top-width", index ? "1px" : "0px");
+    if (index)
+      await expect(section).toHaveCSS(
+        "border-top",
+        "1px solid rgb(63, 63, 70)",
+      );
+    await expect(section).toHaveCSS("padding-top", index ? "32px" : "0px");
     await expect(row).toHaveCSS("margin-bottom", "24px");
     const bounds = (await row.boundingBox())!;
     const edit = (await row.getByRole("button").boundingBox())!;
@@ -1276,8 +1288,11 @@ test("application shows all required errors and saves after they are corrected",
   await toggle.click();
   await expect(confirmation).toBeChecked();
   await page.getByRole("button", { name: "Submit application" }).click();
-  await expect(page).toHaveURL(/\/events$/);
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await page
+    .getByRole("button", { name: "Open navigation", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
@@ -1805,8 +1820,11 @@ test("all teams can select multiple relevant training answers and add Other deta
   await medic.uncheck();
   await expect(training).toBeVisible();
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/events$/);
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await page
+    .getByRole("button", { name: "Open navigation", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   await page.getByRole("button", { name: "Edit training and safety" }).click();
@@ -2150,8 +2168,9 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(expiry).toHaveAttribute("required", "");
   await expect(experience).toHaveValue("Naloxone training");
   await submitLocalApplication(page);
-  await expect(page).toHaveURL(/\/events$/);
-  await page.getByRole("link", { name: "View Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await page.locator("[data-account-menu] > summary").click();
+  await page.getByRole("link", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   for (const [name, value] of [
