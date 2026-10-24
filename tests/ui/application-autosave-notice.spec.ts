@@ -216,7 +216,7 @@ for (const [layout, viewport] of [
   });
 }
 
-test("compact save confirmation appears left of progress only after account saving succeeds", async ({
+test("compact save confirmation retains its cloud while saving newer edits and still reports failures", async ({
   page,
   baseURL,
 }) => {
@@ -226,6 +226,8 @@ test("compact save confirmation appears left of progress only after account savi
   const firstSave = new Promise<void>((resolve) => (releaseFirst = resolve));
   let releaseFailed!: () => void;
   const failedSave = new Promise<void>((resolve) => (releaseFailed = resolve));
+  let releaseRetry!: () => void;
+  const retrySave = new Promise<void>((resolve) => (releaseRetry = resolve));
   let requests = 0;
   await page.route("**/api/v1/account/application-draft", async (route) => {
     if (route.request().method() === "PUT") {
@@ -236,6 +238,7 @@ test("compact save confirmation appears left of progress only after account savi
         await route.fulfill({ status: 503, body: "Save unavailable" });
         return;
       }
+      if (attempt === 3) await retrySave;
     }
     await route.continue();
   });
@@ -243,6 +246,7 @@ test("compact save confirmation appears left of progress only after account savi
     await page.goto("/apply");
     const confirmation = page.locator("[data-draft-save-summary]");
     const icon = confirmation.locator("svg");
+    const check = icon.locator(".cloud-check-mark");
     const menu = page.locator(
       "[data-application-contents] [data-contents-menu]",
     );
@@ -259,6 +263,7 @@ test("compact save confirmation appears left of progress only after account savi
     await expect(confirmation).toHaveAttribute("data-save-state", "saved");
     await expect(confirmation).toHaveText(/^Last saved at /);
     await expect(icon).toBeVisible();
+    await expect(check).toBeVisible();
     await expect(icon).toHaveAttribute("aria-hidden", "true");
     await expect(menu).not.toHaveAttribute("open");
     expect(
@@ -275,19 +280,31 @@ test("compact save confirmation appears left of progress only after account savi
       }),
     ).toBe(true);
 
+    const savedMessage = await confirmation.textContent();
     await page.locator('[name="firstName"]').fill("Newer answer");
     await expect(confirmation).toHaveAttribute("data-save-state", "pending");
-    await expect(icon).toBeHidden();
+    await expect(confirmation).toContainText(savedMessage!);
+    await expect(icon).toBeVisible();
+    await expect(check).toBeHidden();
     await expect.poll(() => requests).toBe(2);
+    await expect(confirmation).toHaveText(`${savedMessage}. Saving changes…`);
     releaseFailed();
     await expect(confirmation).toHaveAttribute("data-save-state", "error");
     await expect(confirmation).toHaveText("Couldn’t save to your account");
     await expect(icon).toBeHidden();
+    await expect.poll(() => requests).toBe(3);
+    await expect(confirmation).toHaveAttribute("data-save-state", "pending");
+    await expect(confirmation).toHaveText(`${savedMessage}. Saving changes…`);
+    await expect(icon).toBeVisible();
+    await expect(check).toBeHidden();
+    releaseRetry();
     await expect(confirmation).toHaveAttribute("data-save-state", "saved");
     await expect(icon).toBeVisible();
+    await expect(check).toBeVisible();
   } finally {
     releaseFirst();
     releaseFailed();
+    releaseRetry();
   }
 });
 

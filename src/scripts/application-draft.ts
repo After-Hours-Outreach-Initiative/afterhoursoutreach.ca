@@ -342,39 +342,49 @@ export function initApplicationDraft(element: HTMLFormElement) {
     status.hidden = !message;
     statusPanel.hidden = !message;
 
-    let saveState = "idle";
-    let saveMessage = "";
-    if (stopped || paused) {
-      saveState = "paused";
-      saveMessage = "Saving paused";
-    } else if (conflict) {
-      saveState = "error";
-      saveMessage = "Choose which answers to keep";
-    } else if (failure || blocked) {
-      saveState = "error";
-      saveMessage = unsaved
-        ? "Couldn’t save to your account"
-        : "Couldn’t check save status";
-    } else if (inFlight || unsaved) {
-      // An earlier save does not confirm the latest pending answers.
-      saveState = "pending";
-      saveMessage = "";
-    } else if (revision && savedAt !== null) {
-      saveState = "saved";
+    let lastSavedMessage = "";
+    if (revision && savedAt !== null) {
       const savedDate = new Date(savedAt);
       const now = new Date();
       const date =
         savedDate.toDateString() === now.toDateString()
           ? ""
           : ` on ${saveDateFormat.format(savedDate)}`;
-      saveMessage = `Last saved${date} at ${saveTimeFormat.format(savedDate)}`;
-      // Refresh at local midnight without a ticking counter.
+      lastSavedMessage = `Last saved${date} at ${saveTimeFormat.format(savedDate)}`;
+      // Keep the last-save date accurate while newer answers are pending too.
       const midnight = new Date(now);
       midnight.setHours(24, 0, 0, 0);
       dateTimer = setTimeout(renderStatus, midnight.getTime() - now.getTime());
     }
+
+    let saveState = "idle";
+    let saveMessage = lastSavedMessage;
+    if (stopped || paused) {
+      saveState = "paused";
+      saveMessage = "Saving paused";
+    } else if (conflict) {
+      saveState = "error";
+      saveMessage = "Choose which answers to keep";
+    } else if (blocked || (failure && !inFlight)) {
+      saveState = "error";
+      saveMessage = unsaved
+        ? "Couldn’t save to your account"
+        : "Couldn’t check save status";
+    } else if (inFlight || unsaved) {
+      // Retain the confirmed save history without claiming newer edits are saved.
+      saveState = "pending";
+      saveMessage = [
+        lastSavedMessage,
+        inFlight ? "Saving changes…" : "Changes waiting to save",
+      ]
+        .filter(Boolean)
+        .join(". ");
+    } else if (lastSavedMessage) {
+      saveState = "saved";
+    }
     for (const { indicator, message } of saveIndicators) {
       indicator.dataset.saveState = saveState;
+      indicator.dataset.hasSaved = String(Boolean(lastSavedMessage));
       if (message.textContent !== saveMessage)
         message.textContent = saveMessage;
     }

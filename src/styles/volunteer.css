@@ -60,6 +60,8 @@ body:has(
   flex-shrink: 0;
 }
 .volunteer-draft-save-status[data-save-state="saved"]
+  .volunteer-draft-save-icon,
+.volunteer-draft-save-status[data-save-state="pending"][data-has-saved="true"]
   .volunteer-draft-save-icon {
   display: block;
 }
@@ -360,8 +362,13 @@ body:has(
   height: 100%;
   visibility: hidden;
 }
-.volunteer-contents-save-status[data-save-state="saved"] svg {
+.volunteer-contents-save-status[data-save-state="saved"] svg,
+.volunteer-contents-save-status[data-save-state="pending"][data-has-saved="true"]
+  svg {
   visibility: visible;
+}
+.volunteer-contents-save-status[data-save-state="pending"] .cloud-check-mark {
+  visibility: hidden;
 }
 .volunteer-contents-progress {
   display: inline-flex;

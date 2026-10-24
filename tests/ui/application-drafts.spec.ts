@@ -353,13 +353,13 @@ test("edits made during a pending save are backed up immediately and saved after
   await page.locator('[name="firstName"]').fill("First version");
   await expect(
     localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
-  ).toBeEmpty();
+  ).toHaveText(/Changes waiting to save|Saving changes…/);
   await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
   await expect.poll(() => requests).toBe(1);
   await expect(page.locator("[data-draft-status-panel]")).toBeHidden();
   await expect(
     localApplicationSaveIndicator(page).locator("[data-draft-save-message]"),
-  ).toBeEmpty();
+  ).toHaveText("Saving changes…");
   await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
   await page.locator('[name="firstName"]').fill("Latest version");
   expect(
@@ -374,8 +374,12 @@ test("edits made during a pending save are backed up immediately and saved after
     "data-save-state",
     "pending",
   );
-  await expect(localApplicationSaveIndicator(page)).toHaveText("");
-  await expect(localApplicationSaveIndicator(page).locator("svg")).toBeHidden();
+  await expect(localApplicationSaveIndicator(page)).toHaveText(
+    /^Last saved at .+\. Saving changes…$/,
+  );
+  await expect(
+    localApplicationSaveIndicator(page).locator("svg"),
+  ).toBeVisible();
   expect(
     (await (await page.request.get(endpoint)).json()).draft.answers.firstName,
   ).toBe("First version");
@@ -383,7 +387,7 @@ test("edits made during a pending save are backed up immediately and saved after
   await expectDraftSaved(page, { firstName: "Latest version" });
 });
 
-test("last confirmed save status stays steady while editing", async ({
+test("last confirmed save time persists across input and option edits while newer saves are pending", async ({
   page,
   baseURL,
 }) => {
@@ -391,8 +395,13 @@ test("last confirmed save status stays steady while editing", async ({
   await page.goto("/apply");
   await page.locator('[name="firstName"]').fill("Confirmed answer");
   await expectDraftSaved(page, { firstName: "Confirmed answer" });
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
   const indicator = localApplicationSaveIndicator(page);
   const confirmedStatus = await indicator.innerText();
+  const indicators = page.locator(
+    "[data-draft-save-indicator], [data-draft-save-summary]",
+  );
 
   let release!: () => void;
   const pending = new Promise<void>((resolve) => (release = resolve));
@@ -406,17 +415,38 @@ test("last confirmed save status stays steady while editing", async ({
   });
   try {
     await page.locator('[name="firstName"]').fill("Pending answer");
-    await expect(indicator).toHaveText(confirmedStatus);
+    await expect(indicators).toHaveText(
+      Array(4).fill(`${confirmedStatus}. Changes waiting to save`),
+    );
+    await expect(indicator).toHaveAttribute("data-save-state", "pending");
+    await page.clock.runFor(1000);
     await expect.poll(() => requests).toBe(1);
-    await expect(indicator).toHaveText(confirmedStatus);
-    await expect(indicator).toHaveAttribute("data-save-state", "saved");
+    await expect(indicators).toHaveText(
+      Array(4).fill(`${confirmedStatus}. Saving changes…`),
+    );
+    await expect(indicator).toHaveAttribute("data-save-state", "pending");
     await expect(indicator.locator("svg")).toBeVisible();
-    await page.locator('[name="preferredName"]').fill("Another edit");
-    await expect(indicator).toHaveText(confirmedStatus);
+    await page.locator('[name="teams"][value="medic"]').check();
+    await page.locator('[name="certifications"][value="other"]').check();
+    await page.locator('[name="experience"]').fill("Another edit");
+    await expect(indicators).toHaveText(
+      Array(4).fill(`${confirmedStatus}. Saving changes…`),
+    );
     release();
+    await expect
+      .poll(async () => {
+        await page.clock.runFor(1000);
+        return (await (await page.request.get(endpoint)).json()).draft.answers;
+      })
+      .toMatchObject({
+        firstName: "Pending answer",
+        experience: "Another edit",
+      });
     await expectDraftSaved(page, {
       firstName: "Pending answer",
-      preferredName: "Another edit",
+      teams: ["medic"],
+      certifications: ["other"],
+      experience: "Another edit",
     });
   } finally {
     release();
