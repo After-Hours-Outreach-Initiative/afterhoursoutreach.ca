@@ -225,7 +225,7 @@ Requests are counted by both the address being sent to and the IP asking,
 since either one on its own is easy to work around.
 
 Sign-in emails have a 30-second per-address cooldown; email-change requests keep
-a one-minute cooldown. Both share limits of three per address per hour, ten per
+a one-minute cooldown. Both share limits of ten per address per hour, ten per
 IP per hour, and 80 total per day. Counters are stored in D1.
 
 Code verification: 3 attempts per code, plus 10 submissions per address per hour

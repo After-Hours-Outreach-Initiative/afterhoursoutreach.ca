@@ -754,8 +754,14 @@ test("email hourly limits still apply after the resend cooldown expires", async 
   vi.useFakeTimers({ toFake: ["Date"] });
   const start = new Date("2026-10-16T12:10:00Z").getTime();
   const email = "hourly@example.org";
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i <= 10; i++) {
     vi.setSystemTime(start + i * 30_000);
+    // Rotate IPs so the separate ten-per-IP budget cannot mask this limit.
+    auth = createAuth(bindings, `192.0.2.${i + 1}`, {
+      sendEmail: async (email) => {
+        outbox.push(email);
+      },
+    });
     assert.equal(
       (
         await request("/email-otp/send-verification-otp", {
@@ -763,10 +769,11 @@ test("email hourly limits still apply after the resend cooldown expires", async 
           type: "sign-in",
         })
       ).status,
-      200,
+      i < 10 ? 200 : 429,
     );
   }
-  vi.setSystemTime(start + 90_000);
+  assert.equal(outbox.length, 10);
+  vi.setSystemTime(new Date("2026-10-16T13:00:00Z"));
   assert.equal(
     (
       await request("/email-otp/send-verification-otp", {
@@ -774,9 +781,9 @@ test("email hourly limits still apply after the resend cooldown expires", async 
         type: "sign-in",
       })
     ).status,
-    429,
+    200,
   );
-  assert.equal(outbox.length, 3);
+  assert.equal(outbox.length, 11);
 });
 
 test("sign-in resends enforce the real D1 30-second boundary and replace the old challenge", async () => {
