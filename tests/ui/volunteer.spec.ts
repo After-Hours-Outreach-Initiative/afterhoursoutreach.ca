@@ -657,7 +657,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
       "Training and safety",
     ]);
     await expect(
-      form.getByRole("group", { name: "About volunteering", exact: true }),
+      form.getByRole("group", { name: "Personal statement", exact: true }),
     ).toHaveCount(0);
     const name = page.getByLabel("Preferred name", { exact: false });
     await expect(name).toHaveValue(sampleAnswers.preferredName);

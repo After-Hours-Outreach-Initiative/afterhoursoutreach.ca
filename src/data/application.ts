@@ -433,7 +433,7 @@ export function profileFormSections(application = false) {
     },
     { key: "team-interests", heading: "Team interests" },
     { key: "training-and-safety", heading: "Training and safety" },
-    { key: "about-volunteering", heading: "About volunteering" },
+    { key: "about-volunteering", heading: "Personal statement" },
   ]
     .map((section) => ({
       ...section,

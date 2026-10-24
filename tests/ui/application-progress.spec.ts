@@ -502,7 +502,7 @@ for (const width of [390, 1280]) {
       "Emergency contact",
       "Team interests",
       "Training and safety",
-      "About volunteering",
+      "Personal statement",
       "Code of Conduct",
     ]);
     await reviewTracker

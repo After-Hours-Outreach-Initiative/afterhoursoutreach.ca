@@ -939,7 +939,7 @@ test("application shows all required errors and saves after they are corrected",
     "Emergency contact",
     "Team interests",
     "Training and safety",
-    "About volunteering",
+    "Personal statement",
   ]);
   const sections = form.locator("[data-application-questions] > section");
   await expect(sections).toHaveCount(5);
@@ -1004,7 +1004,7 @@ test("application shows all required errors and saves after they are corrected",
   await expect(emergencyContact.locator("input")).toHaveCount(3);
   await expect(
     form
-      .getByRole("group", { name: "About volunteering", exact: true })
+      .getByRole("group", { name: "Personal statement", exact: true })
       .locator("input, textarea"),
   ).toHaveCount(6);
   const training = form.getByRole("group", {
@@ -1992,7 +1992,7 @@ test("Medic selects one highest certification, expiry and conditional Other deta
     "Emergency contact",
     "Team interests",
     "Training and safety",
-    "About volunteering",
+    "Personal statement",
   ]);
   await reviewLocalApplication(page);
   await expect(firstAid).toBeFocused();

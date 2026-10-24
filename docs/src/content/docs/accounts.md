@@ -94,7 +94,7 @@ Email appears first during application. On the account page it appears in
 
 Both forms use larger section headings with horizontal dividers: **Personal
 info**, **Emergency contact**, **Training and safety**, and **Team interests**.
-Application also includes **About volunteering** and **Code of Conduct**.
+Application also includes **Personal statement** and **Code of Conduct**.
 
 **Save profile** is greyed out until an answer or team selection differs from
 the saved profile. Reverting every change disables it again. Successful saves

@@ -291,7 +291,7 @@ test("organizers review submitted applications with a global queue count and per
       "Emergency contact",
       "Team interests",
       "Training and safety",
-      "About volunteering",
+      "Personal statement",
     ]);
     const answer = (label: string) =>
       summary
