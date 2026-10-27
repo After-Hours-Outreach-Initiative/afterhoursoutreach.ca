@@ -76,6 +76,11 @@ export const applicationTeamOptions = [
     requirement:
       "Minimum requirement: Valid OFA Level 3 or Advanced First Aid certification.",
   },
+] as const;
+
+// Retain labels and validation for saved answers without offering retired teams.
+export const savedTeamOptions = [
+  ...applicationTeamOptions,
   {
     value: "non-patrol",
     label: "Non-patrol support",

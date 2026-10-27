@@ -1,5 +1,5 @@
 import {
-  applicationTeamOptions,
+  savedTeamOptions,
   certificationOptions,
   profileFormSections,
   trainingOptions,
@@ -37,7 +37,7 @@ export function profileAnswerRows(
     wide: true,
   });
   if (section.key === "team-interests")
-    return [choices("teams", "Teams", applicationTeamOptions)];
+    return [choices("teams", "Teams", savedTeamOptions)];
 
   const rows: ProfileAnswer[] = section.fields
     .filter(

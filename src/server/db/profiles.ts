@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import {
+  savedTeamOptions,
   certificationOptions,
   legacyCertificationValues,
   isValidApplicationBirthDate,
@@ -108,8 +109,8 @@ const profileAnswersSchema = z.strictObject({
       motivationWordLimitError,
     ),
   teams: z
-    .array(z.enum(["outreach", "medic", "non-patrol"]))
-    .max(3)
+    .array(z.enum(savedTeamOptions.map((option) => option.value)))
+    .max(savedTeamOptions.length)
     .refine((values) => new Set(values).size === values.length)
     .default([]),
   certification: z.string().trim().max(200).default(""),

@@ -1,7 +1,7 @@
 ---
 import {
   applicationFields,
-  applicationTeamOptions,
+  savedTeamOptions,
   certificationOptions,
   formatApplicationSubmittedTime,
   heardAboutUsOptions,
@@ -85,7 +85,7 @@ const rows: {
   {
     section: "team-interests",
     label: "Teams",
-    value: choices(answers.teams, applicationTeamOptions),
+    value: choices(answers.teams, savedTeamOptions),
   },
   {
     section: "training-and-safety",

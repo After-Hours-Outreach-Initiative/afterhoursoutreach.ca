@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  applicationTeamOptions,
+  savedTeamOptions,
   certificationOptions,
   heardAboutUsOptions,
   trainingOptions,
@@ -54,7 +54,7 @@ export const applicationDraftAnswersSchema = z.preprocess(
     heardAboutUsSources: choices(heardAboutUsOptions),
     heardAboutUsOther: text(),
     motivation: text(16_384),
-    teams: choices(applicationTeamOptions),
+    teams: choices(savedTeamOptions),
     certifications: choices(certificationOptions),
     certificationExpiry: text(),
     experience: text(2000),

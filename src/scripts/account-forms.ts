@@ -389,6 +389,9 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   // the complete saved payload explicitly: the API is not a section/PATCH API.
   for (const { fields } of sections) fields.disabled = false;
   let saved = new FormData(element);
+  // Retired team choices have no editor control; unrelated saves retain them.
+  saved.delete("teams");
+  for (const team of baseline.teams) saved.append("teams", team);
   // Legacy non-Medic profiles may have multiple saved certifications that the
   // single-choice editor cannot represent. Unrelated section saves retain them.
   saved.delete("certifications");

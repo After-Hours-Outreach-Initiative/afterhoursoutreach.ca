@@ -1676,7 +1676,6 @@ test("all teams can select multiple relevant training answers and add Other deta
     exact: true,
   });
   const medic = form.getByLabel("Medic", { exact: true });
-  const support = form.getByLabel("Non-patrol support", { exact: true });
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/account/profile")
@@ -1816,7 +1815,6 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(training).toBeVisible();
   await expect(otherText).toBeEditable();
   await expect(training.locator(":checked")).toHaveCount(3);
-  await support.check();
   await medic.uncheck();
   await expect(training).toBeVisible();
   await submitLocalApplication(page);
@@ -1829,7 +1827,6 @@ test("all teams can select multiple relevant training answers and add Other deta
   await page.reload();
   await page.getByRole("button", { name: "Edit training and safety" }).click();
   await expect(medic).not.toBeChecked();
-  await expect(support).toBeChecked();
   await expect(naloxone).toBeChecked();
   await expect(crisis).toBeChecked();
   await expect(other).toBeChecked();
@@ -1987,9 +1984,13 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(details).toHaveJSProperty("inert", false);
   await expect(
     form.locator(
-      '.volunteer-team-option:has([value="medic"]) + [data-medic-details] + .volunteer-team-option:has([value="non-patrol"])',
+      '.volunteer-team-options + [data-error="teams"] + [data-medic-details]',
     ),
   ).toHaveCount(1);
+  await expect(form.locator(".volunteer-team-options > label")).toHaveCount(2);
+  await expect(form.locator('[name="teams"][value="non-patrol"]')).toHaveCount(
+    0,
+  );
   const certificationChoices = certifications.locator(
     ".volunteer-choice-options",
   );
@@ -2364,6 +2365,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     data: await profileWriteBody((path) => page.request.get(path), {
       ...sampleAnswers,
       certifications,
+      teams: ["outreach", "non-patrol"],
       experience: "Saved experience",
       certificationExpiry: "2030-10-14",
     }),
@@ -2408,6 +2410,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     await expect(answer("emergencyName")).toHaveText(contact);
     await expect(answer("teams").getByRole("listitem")).toHaveText([
       "Outreach",
+      "Non-patrol support",
     ]);
     await expect(answer("training")).toHaveText("No relevant training");
     for (const conditional of [
@@ -2562,6 +2565,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     phone: sampleAnswers.phone,
     training: sampleAnswers.training,
     certifications,
+    teams: ["outreach", "non-patrol"],
     experience: "Saved experience",
     certificationExpiry: "2030-10-14",
   });
@@ -2620,21 +2624,27 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await page.getByRole("button", { name: "Edit team interests" }).click();
   await expect(
     form.getByRole("button", { name: "Save", exact: true }),
-  ).toBeDisabled();
-  await form.getByLabel("Non-patrol support", { exact: true }).check();
+  ).toBeEnabled();
+  await form.getByLabel("Medic", { exact: true }).check();
+  await form
+    .getByRole("radio", {
+      name: "Advanced First Aid (formerly OFA Level 3)",
+      exact: true,
+    })
+    .check();
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
     form.locator('[data-profile-answers="team-interests"]'),
   ).toBeVisible();
   await expect(answer("teams").getByRole("listitem")).toHaveText([
     "Outreach",
-    "Non-patrol support",
+    "Medic",
   ]);
   await expect(form.locator("[data-form-message]")).toBeHidden();
-  expect(requests[2].certifications).toEqual(certifications);
+  expect(requests[2].certifications).toEqual(["advanced-first-aid"]);
 });
 
-test("Outreach stays selected while optional teams support cards, keyboard input and reset", async ({
+test("Outreach stays selected while Medic supports cards, keyboard input and reset", async ({
   page,
   baseURL,
 }) => {
@@ -2644,7 +2654,6 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   const form = page.locator("[data-account-profile]");
   const outreach = form.getByLabel("Outreach", { exact: true });
   const medic = form.getByLabel("Medic", { exact: true });
-  const support = form.getByLabel("Non-patrol support", { exact: true });
   const save = form
     .locator('[data-profile-fields="team-interests"]')
     .getByRole("button", { name: "Save", exact: true, includeHidden: true })
@@ -2652,7 +2661,7 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   const cards = form.locator(".volunteer-team-option");
   const training = form.locator("[data-medic-certifications]");
   await expect(training).toBeHidden();
-  await expect(cards).toHaveCount(3);
+  await expect(cards).toHaveCount(2);
   for (const width of [320, 375, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     await expectTeamCardRows(form);
@@ -2674,7 +2683,7 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   );
   await expect(
     form.getByLabel("Non-patrol support", { exact: true }),
-  ).toHaveAccessibleDescription(/Assist with inventory, logistics/);
+  ).toHaveCount(0);
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/account/profile")
@@ -2704,26 +2713,20 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(training).toBeVisible();
   await expect(
     form.locator(
-      '.volunteer-team-option:has([value="medic"]) + [data-profile-team-training] [data-medic-details]',
+      ".volunteer-team-options + [data-profile-team-training] [data-medic-details]",
     ),
   ).toBeVisible();
   await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
   await medic.press("Tab");
   await expect(training.getByRole("radio").first()).toBeFocused();
-  await support.focus();
-  await expect(support).toBeFocused();
-  await expect(cards.nth(2)).toHaveCSS("outline-style", "solid");
-  await support.press("Space");
-  await expect(support).toBeChecked();
-  await expect(medic).toBeChecked();
   await medic.focus();
+  await expect(medic).toBeFocused();
+  await expect(cards.nth(1)).toHaveCSS("outline-style", "solid");
   await medic.press("Space");
   await expect(medic).not.toBeChecked();
   await expect(training).toBeHidden();
-  await support.uncheck();
   await expect(save).toBeDisabled();
   await medic.check();
-  await support.check();
   const other = training.getByRole("radio", {
     name: "Other",
     exact: true,
@@ -2735,7 +2738,6 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(outreach).toBeChecked();
   await expect(outreach).toBeDisabled();
   await expect(medic).not.toBeChecked();
-  await expect(support).not.toBeChecked();
   await expect(training).toBeHidden();
   await expect(training.locator("[required]")).toHaveCount(0);
   await expect(other).not.toBeChecked();
@@ -2746,18 +2748,12 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
   await expect(save).toBeDisabled();
   expect(requests).toEqual([]);
-  await support.check();
-  await save.click();
-  await expect(
-    form.locator('[data-profile-answers="team-interests"]'),
-  ).toBeVisible();
-  await expect(form.locator("[data-form-message]")).toBeHidden();
   await page.reload();
   await expect(outreach).toBeChecked();
   await expect(outreach).toBeDisabled();
-  await expect(support).toBeChecked();
+  await expect(medic).not.toBeChecked();
   await expect(training).toBeHidden();
-  expect(requests).toHaveLength(1);
+  expect(requests).toHaveLength(0);
 
   // Medic's dependent fields stay inside the open Team interests section;
   // Training and safety remains saved text until its own Edit is selected.
@@ -2777,7 +2773,7 @@ test("Outreach stays selected while optional teams support cards, keyboard input
     exact: true,
   });
   await expect(firstAid).toBeFocused();
-  expect(requests).toHaveLength(1);
+  expect(requests).toHaveLength(0);
   await firstAid.check();
   const expiry = form.locator('[name="certificationExpiry"]');
   await fillApplicationField(form, "certificationExpiry", "2030-10-14");

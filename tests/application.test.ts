@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import {
+  applicationTeamOptions,
   latestApplicationBirthDate,
   normalizeCertifications,
   outreachRequiredError,
@@ -16,6 +17,19 @@ import {
 import { profileAnswerRows } from "../src/data/profile-answers";
 
 const birthDateSchema = profileSchema.shape.birthDate;
+
+test("team choices offer Outreach and Medic while saved retired answers remain readable", () => {
+  expect(applicationTeamOptions.map((option) => option.value)).toEqual([
+    "outreach",
+    "medic",
+  ]);
+  const section = profileFormSections().find(
+    (section) => section.key === "team-interests",
+  )!;
+  expect(
+    profileAnswerRows(section, { teams: ["outreach", "non-patrol"] })[0].value,
+  ).toEqual(["Outreach", "Non-patrol support"]);
+});
 
 test("training and experience offer separate, exact choices", () => {
   expect(trainingOptions.map((option) => option.label)).toEqual([

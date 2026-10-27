@@ -1,5 +1,5 @@
 import {
-  applicationTeamOptions,
+  savedTeamOptions,
   certificationOptions,
   heardAboutUsOptions,
   trainingOptions,
@@ -158,7 +158,7 @@ export function initApplicationReview(element: HTMLFormElement) {
       row.hidden = !conditions[row.dataset.reviewCondition!];
     const choices: Record<string, readonly { value: string; label: string }[]> =
       {
-        teams: applicationTeamOptions,
+        teams: savedTeamOptions,
         certifications: certificationOptions,
         training: trainingOptions,
         relevantExperience: experienceOptions,
