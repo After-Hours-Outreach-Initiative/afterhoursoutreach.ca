@@ -3,6 +3,23 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { test } from "vitest";
 
+test("production deployment migrates before deploying the existing production build", () => {
+  const { scripts } = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  assert.match(
+    scripts.deploy,
+    /^pnpm\s+(?:run\s+)?db:migrate:production\s+&&\s+wrangler\s+deploy\b/,
+  );
+  assert.match(
+    scripts.deploy,
+    /--config\s+["']?(?:\.\/)?dist\/server\/wrangler\.json\b/,
+  );
+  assert.doesNotMatch(scripts.deploy, /\bbuild\b|preview|seed|--env\b/);
+  assert.match(scripts.build, /\bastro\s+build\b/);
+  assert.doesNotMatch(scripts.build, /db:migrate|--remote\b|\bdeploy\b/);
+});
+
 test("production migration guard pins the isolated account/database and rejects deployable configs", () => {
   const result = spawnSync(
     process.execPath,
