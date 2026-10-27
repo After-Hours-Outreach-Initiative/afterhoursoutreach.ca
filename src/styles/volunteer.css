@@ -137,8 +137,23 @@ body:has(
   max-width: 35rem;
   margin-inline: auto;
   text-align: left;
+  @apply text-base/6;
   /* Clear the sticky site header on anchor jumps. */
   scroll-margin-top: 7rem;
+}
+.volunteer-signin-panel p,
+.volunteer-signin-panel .volunteer-form :is(.volunteer-help, [data-error]) {
+  @apply text-base/6;
+}
+.volunteer-signin-panel > p {
+  margin: 1rem 0 0;
+}
+.volunteer-signin-panel > p + p {
+  margin-top: 0.25rem;
+}
+.volunteer-signin-panel > .volunteer-notice,
+.volunteer-signin-panel > p + .volunteer-form {
+  margin-top: 1.5rem;
 }
 .volunteer-signin-panel .volunteer-form {
   max-width: none;
