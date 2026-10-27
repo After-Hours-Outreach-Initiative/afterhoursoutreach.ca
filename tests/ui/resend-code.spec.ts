@@ -60,6 +60,7 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
   const initial = page.getByRole("button", { name: "Continue with Email" });
   const code = page.locator("[data-email-code]");
   const resend = code.locator("[data-resend-code]");
+  const resendHelp = code.locator("#sign-in-code-help");
   await page
     .getByRole("textbox", { name: "Email", exact: true })
     .fill("  First@EXAMPLE.org  ");
@@ -74,13 +75,21 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
   release();
   await expect(resend).toHaveText("Resend code (30s)");
   await expect(resend).toBeDisabled();
+  await expect(resendHelp).toBeHidden();
+  await expect(resend).not.toHaveAttribute("aria-describedby");
   await page.clock.fastForward(29_999);
   await expect(resend).toHaveText("Resend code (1s)");
+  await expect(resendHelp).toBeHidden();
   await resend.dispatchEvent("click");
   expect(requests).toHaveLength(1);
   await page.clock.fastForward(1);
   await expect(resend).toHaveText("Resend code");
   await expect(resend).toBeEnabled();
+  await expect(resendHelp).toBeVisible();
+  await expect(resend.locator("+ #sign-in-code-help")).toHaveText(
+    "Code or link expired or already used? Choose Resend code for a new email. Only the latest code and link will work.",
+  );
+  await expect(resend).toHaveAttribute("aria-describedby", "sign-in-code-help");
   // Resending must not validate the empty, required code field.
   pending = new Promise<void>((resolve) => {
     release = resolve;
@@ -88,6 +97,7 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
   await resend.click();
   await expect(resend).toHaveText("Sending email…");
   await expect(resend).toBeDisabled();
+  await expect(resendHelp).toBeVisible();
   await expect(resend).toHaveAttribute("aria-busy", "true");
   await chooseDelivery(page);
   await expect.poll(() => requests.length).toBe(2);
@@ -104,6 +114,7 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
   await expect(code).toBeVisible();
   release();
   await expect(resend).toHaveText("Resend code (30s)");
+  await expect(resendHelp).toBeVisible();
   await expect(code.locator("[data-form-message]")).toHaveAttribute(
     "role",
     "status",
@@ -124,6 +135,16 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
       returnTo: "/volunteer",
     }),
   );
+  await page.getByRole("link", { name: "Use a different email" }).click();
+  await expect(resendHelp).toHaveAttribute("hidden", "");
+  await expect(resend).not.toHaveAttribute("aria-describedby");
+  await page
+    .getByRole("textbox", { name: "Email", exact: true })
+    .fill("new@example.org");
+  await initial.click();
+  await chooseDelivery(page);
+  await expect(resend).toHaveText("Resend code (30s)");
+  await expect(resendHelp).toBeHidden();
 });
 
 test("resend failures and cancellations preserve the email and allow retry without a new cooldown", async ({

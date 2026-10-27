@@ -23,6 +23,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
     const link = panel.querySelector<HTMLFormElement>("[data-email-link]");
     const code = panel.querySelector<HTMLFormElement>("[data-email-code]")!;
     const resend = code.querySelector<HTMLButtonElement>("[data-resend-code]")!;
+    const resendHelp = code.querySelector<HTMLElement>("#sign-in-code-help")!;
     const reset = panel.querySelector<HTMLAnchorElement>(
       "[data-use-different-email]",
     )!;
@@ -55,6 +56,11 @@ export function initEmailSignIn(finish: (result: object) => void) {
       const remaining = Math.max(0, resendAt - Date.now());
       const seconds = Math.ceil(remaining / 1000);
       resend.disabled = busy || !email || seconds > 0;
+      // Reveal after a real cooldown ends, then keep the guidance through resends.
+      if (resendAt > 0 && !resend.disabled) {
+        resendHelp.hidden = false;
+        resend.setAttribute("aria-describedby", resendHelp.id);
+      }
       resend.textContent = sending
         ? "Sending email…"
         : seconds > 0
@@ -228,6 +234,8 @@ export function initEmailSignIn(finish: (result: object) => void) {
       event.preventDefault();
       email = "";
       resendAt = 0;
+      resendHelp.hidden = true;
+      resend.removeAttribute("aria-describedby");
       for (const form of [request, code]) {
         form.reset();
         clearFormMessage(form);
