@@ -1007,7 +1007,7 @@ test("durable first-submission intent failures roll back answers and side effect
   );
 });
 
-test("application progress uses milestone dates, not patrol approval or unrelated updates", async () => {
+test("application progress and organizer attribution use application audits, not patrol approval or unrelated updates", async () => {
   const actor = await draftActor();
   assert.deepEqual(await loadApplicationProgress(env.DB, actor.id), {
     submittedAt: null,
@@ -1045,20 +1045,64 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   assert.equal(undated.naloxoneCompletedAt, confirmedAt);
   assert.equal(undated.applicationApproved, true);
   assert.equal(undated.applicationApprovedAt, null);
+  const reviewer: Actor = {
+    ...actor,
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+  };
+  assert.equal(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy,
+    null,
+  ); // Never infer a legacy application approver from patrol approved_by.
   assert.equal(isApplicationComplete(undated), true);
   assert.equal(
     isApplicationComplete({ ...undated, applicationApproved: false }),
     false,
   );
+  const approver = await draftActor("application-approver");
+  await env.DB.prepare(
+    "UPDATE user SET role='organizer',name='Application Organizer' WHERE id=?",
+  )
+    .bind(approver.id)
+    .run();
   await env.DB.prepare(
     `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-      VALUES ('application-approval', ?, ?, 'approval_changed', '["applicationApproved"]', 2000),
+      VALUES ('application-approval', ?, ?, 'approval_changed', '["registrationApproved"]', 2000),
         ('patrol-approval', ?, ?, 'approval_changed', '["patrolApproved"]', 3000)`,
   )
-    .bind(actor.id, actor.id, actor.id, actor.id)
+    .bind(approver.id, actor.id, actor.id, actor.id)
     .run();
   const dated = await loadApplicationProgress(env.DB, actor.id);
   assert.equal(dated.applicationApprovedAt, 2000);
+  assert.deepEqual(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy,
+    {
+      id: approver.id,
+      name: "Application Organizer",
+      email: "application-approver@example.org",
+    },
+  ); // A later, different patrol approver must not replace the application approver.
+  assert.equal("applicationApprovedBy" in dated, false);
+  assert.equal(
+    "applicationApprovedBy" in (await loadProfile(env.DB, actor.id))!,
+    false,
+  );
+  await assert.rejects(
+    viewVolunteerProfile(
+      env.DB,
+      {
+        ...reviewer,
+        role: "volunteer",
+        applicationApproved: true,
+        applicationComplete: true,
+      },
+      actor.id,
+    ),
+    statusError(403),
+  );
   assert.equal(isApplicationComplete(dated), true);
   assert.equal(isApplicationComplete({ ...dated, submittedAt: null }), false);
   assert.equal(
@@ -1073,11 +1117,28 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   const revoked = await loadApplicationProgress(env.DB, actor.id);
   assert.equal(revoked.applicationApproved, false);
   assert.equal(revoked.applicationApprovedAt, null);
+  assert.equal(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy,
+    null,
+  );
   assert.equal(isApplicationComplete(revoked), false);
   assert.equal(
     isApplicationComplete({ ...revoked, applicationApproved: true }),
     true,
   );
+  await setVolunteerStatus(env.DB, reviewer, {
+    userId: actor.id,
+    version: 5678,
+    active: true,
+    applicationApproved: true,
+    patrolApproved: true,
+  });
+  assert.equal(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy?.id,
+    reviewer.id,
+  ); // Reapproval uses the latest applicationApproved audit, not the old approver.
 });
 
 test("orientees only see orientation events and rosters; patrol approval and organizers retain full access", async () => {

@@ -147,6 +147,22 @@ export async function viewVolunteerProfile(
         WHERE p.user_id = ? AND u.deleted_at IS NULL AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
       )
       .bind(userId, accessId),
+    // approved_by belongs to patrol approval. The latest application-status
+    // audit identifies the current approver only while the application is approved.
+    // Historical approvals without such an audit deliberately stay unattributed.
+    db
+      .prepare(
+        `SELECT approver.id, approver.name, approver.email
+        FROM audit_log a JOIN user approver ON approver.id=a.actor_id
+        JOIN volunteer_status v ON v.user_id=a.subject_id
+        WHERE a.subject_id=? AND v.registration_approved=1
+          AND a.action='approval_changed'
+          AND EXISTS (SELECT 1 FROM json_each(a.changed_fields)
+            WHERE value IN ('applicationApproved', 'registrationApproved'))
+          AND EXISTS (SELECT 1 FROM audit_log WHERE id=?)
+        ORDER BY a.created_at DESC, a.rowid DESC LIMIT 1`,
+      )
+      .bind(userId, accessId),
   ]);
   if (!results[0].meta.changes)
     throw new RequestError(
@@ -185,6 +201,8 @@ export async function viewVolunteerProfile(
     submission,
     ...answers
   } = row;
+  const applicationApprovedBy = results[2].results[0] as
+    { id: string; name: string; email: string } | undefined;
   const sources = row.heardAboutUsSources
     ? (JSON.parse(row.heardAboutUsSources) as string[])
     : [];
@@ -213,6 +231,7 @@ export async function viewVolunteerProfile(
       }),
     } satisfies ApplicationAnswers,
     email,
+    applicationApprovedBy: applicationApprovedBy ?? null,
     submittedAt: new Date(submittedAt).toISOString(),
     naloxoneCompletedAt,
     codeOfConductVersion,
