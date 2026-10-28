@@ -50,20 +50,33 @@ See [testing.md](/testing/).
 
 On localhost or the dev server's LAN address, the shared account layout includes
 a **DEV panel** button. Press **Alt+Z** to open or close it. **Account states** holds
-Visitor and permanently visible categories of seeded manual presets; **Existing accounts** lists
-the other saved local users, including unfinished applications. Choosing a saved
+Visitor and reusable test scenarios; **Existing accounts** lists saved local users,
+including unfinished applications and older seeded presets. Choosing a saved
 user replaces only this browser's
 session; choosing Visitor signs out. Switching simulates a verified two-factor
 session for users with an enrolled authenticator, without changing their role,
 email verification, active status, profile, or patrol approval. Create new
 accounts through the regular sign-in form.
 
-**Not applied** is a reusable virtual choice: every selection creates and signs
-into a fresh disposable local D1 account with an empty application and no draft or
-selected answers. Submitting uses the normal application flow, keeps this browser
-signed into that account, and lists it under the entered name in View as. Unfinished
-accounts/drafts remain listed too, so repeated selections never leave invisible
-accounts. All manual presets have no trash button, and the server rejects their deletion without
+**Account states** reuses one temporary sandbox identity per browser, identified
+by a signed HttpOnly development cookie. Choosing **Draft application** always
+resets it to a sample draft, even after completing all application steps. **Not
+applied** resets it to an empty application. The other buttons similarly restore
+their named milestones, access, and attendance. Progress remains usable while
+testing but is discarded on the next state selection; clicks do not create a new
+account each time or add the sandbox to Existing accounts. Browsers have separate
+sandboxes. Switching to a saved account or Visitor does not reset saved work.
+
+Resets are atomic and limited to the marked temporary identity. They revoke its
+old sessions and rotate the draft generation so old browser backups cannot restore
+discarded test answers. A fixed internal sample organizer supports patrol approvals
+and attendance; it is not listed as a saved account. Sample orientation events are
+reused too, and refuse to reset if that would affect another volunteer's booking
+or attendance. A real Discord link must be handled before resetting the sandbox;
+the reset never drops its role-removal obligations. These are actual local D1
+records needed to exercise the normal backend, not a frontend-only mock.
+
+Older manual presets have no trash button, and the server rejects their deletion without
 changing any records. Protection uses only their exact preset IDs, even if renamed.
 Other saved local accounts retain the compact trash button on the right. Click
 it once to show a confirmation checkmark, then click again to delete. Clicking
@@ -85,18 +98,20 @@ button enables after its prerequisite and shows Completed afterward. Step 1 uses
 fictional seed answers and normal submission validation, never replaces an
 existing submission, and clears its draft. The shortcuts send no email and do
 not grant organizer or patrol approval. They update actual local records, not a
-visual override; choose Not applied to begin again without resetting an account.
+visual override; choose Draft application or Not applied to reset the temporary
+sandbox and begin again. Saved accounts are never reset by these buttons.
 Signed-out requests, cross-origin requests, and requests for a different account
 are rejected. These endpoints are absent from deployed builds.
 
-For manual testing, click **Seed local accounts** in the DEV panel or run
+State buttons work without seeding. To add persistent sample accounts and events,
+click **Seed local accounts** in the DEV panel or run
 `pnpm db:seed:local` with the dev server running and local migrations applied.
 The button refreshes the panel in place without switching your account or
 changing its session. It uses the same fixtures as the command, enrolls the
 Organizer authenticator through the normal auth backend in an isolated temporary
 session, and sends no emails. **Visitor** signs out; the remaining choices are grouped:
 
-- **Application:** Not applied (always fresh), Draft application (saved but not
+- **Application:** Not applied (always empty), Draft application (sample draft, not
   submitted), Form submitted (Naloxone incomplete), Awaiting review (Naloxone
   complete, application unapproved).
 - **Orientation:** Ready for orientation, Orientation booked, Orientation completed
@@ -106,18 +121,20 @@ session, and sends no emails. **Visitor** signs out; the remaining choices are g
   approval. Medic also has the medic team and a valid fictional certification;
   selecting the team alone does not qualify for reserved medic places.
 - **Access:** Inactive (completed application, inactive account) and Organizer
-  (active organizer with application and patrol approval and an enrolled authenticator).
+  (active organizer with application and patrol approval). The older seeded
+  Organizer account additionally has an enrolled authenticator.
 
-All categories stay expanded. Each account shows its actual saved progress and
-eligibility, even after edits change
-its original scenario. The original Applied and Accepted IDs remain stable, with
+All categories stay expanded. State buttons describe their reset points, while
+Existing accounts shows each saved account's actual progress and eligibility.
+The original Applied and Accepted IDs remain stable in Existing accounts, with
 the new Form submitted and Ready for orientation labels. Preset definitions,
 ordering, categories and deletion protection share `src/dev/accounts.ts`.
 
 Submitted profiles use realistic fictional answers, immutable application
 snapshots, Code of Conduct acknowledgement, and milestone dates. Submitted sample
 personas model existing volunteers exempt from Discord linking, rather than
-inventing real OAuth consent. Fresh disposable applications use the four-step flow.
+inventing real OAuth consent. Temporary states use the new four-step flow with
+simulated Discord membership, never real OAuth credentials.
 See [Discord](/discord/) for configuration and isolation. The command
 also adds an open patrol with orientation, an open regular patrol, and a hidden
 past orientation with attendance. It does not reset the database, remove users,

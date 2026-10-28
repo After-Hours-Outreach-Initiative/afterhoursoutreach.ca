@@ -54,8 +54,14 @@ import {
   deleteLocalAccount,
 } from "../src/dev/server/local-accounts";
 import { completeLocalApplicationStep } from "../src/dev/server/application-steps";
+import { resetAccountState } from "../src/dev/server/account-states";
 import { listLocalAccounts } from "../src/dev/server/account-list";
-import { manualAccountPresets, localAccountUserId } from "../src/dev/accounts";
+import {
+  manualAccountPresets,
+  localAccountUserId,
+  developmentPresetStatus,
+  developmentAccountStatus,
+} from "../src/dev/accounts";
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -1760,6 +1766,168 @@ test("manual presets resolve real application completion, event access and roste
     false,
   );
   assert.deepEqual(await loadSubmittedApplication(env.DB, changed.id), before);
+});
+
+test("state buttons reset one temporary account without accumulating saved accounts or changing saved work", async () => {
+  const saved = await draftActor("saved-account");
+  await saveProfile(env.DB, saved.id, {
+    ...completeAnswers(),
+    codeOfConductAccepted: true,
+  });
+  const original = await loadSubmittedApplication(env.DB, saved.id);
+  const slot = crypto.randomUUID();
+  const id = await resetAccountState(env.DB, "draft", slot);
+  const firstDraft = await loadApplicationDraftState(env.DB, id);
+  assert.ok(firstDraft.draft);
+  const sessionId = "temporary-session";
+  await env.DB.prepare(
+    "INSERT INTO session (id,user_id,token,expires_at,created_at,updated_at) VALUES (?,?,?,?,0,0)",
+  )
+    .bind(sessionId, id, sessionId, Date.now() + 60_000)
+    .run();
+  const actor: Actor = { ...saved, id, sessionId };
+  for (const step of ["form", "naloxone", "discord", "review"] as const)
+    await completeLocalApplicationStep(env.DB, actor, step);
+  assert.ok(isApplicationComplete(await loadApplicationProgress(env.DB, id)));
+  const count = await env.DB.prepare("SELECT count(*) AS n FROM user").first(
+    "n",
+  );
+  for (let attempt = 0; attempt < 5; attempt++) {
+    assert.equal(await resetAccountState(env.DB, "draft", slot), id);
+    assert.equal(await loadProfile(env.DB, id), null);
+    const reset = await loadApplicationDraftState(env.DB, id);
+    assert.ok(reset.draft);
+    assert.notEqual(reset.generation, firstDraft.generation);
+    assert.equal(reset.draft.answers.firstName, "Casey");
+    assert.equal(
+      await env.DB.prepare("SELECT count(*) AS n FROM user").first("n"),
+      count,
+    );
+    assert.deepEqual(
+      (await listLocalAccounts(env.DB)).users.map((user) => user.id),
+      [saved.id],
+    );
+  }
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM session WHERE user_id=?")
+      .bind(id)
+      .first("n"),
+    0,
+  );
+  assert.deepEqual(await loadSubmittedApplication(env.DB, saved.id), original);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM event_notification").first(
+      "n",
+    ),
+    0,
+  );
+});
+
+test("every reusable state resolves its declared milestones, permissions and attendance without creating more identities", async () => {
+  const slot = crypto.randomUUID();
+  let id = "";
+  for (const preset of [...manualAccountPresets, ...manualAccountPresets]) {
+    const next = await resetAccountState(env.DB, preset.key, slot);
+    if (id) assert.equal(next, id);
+    else id = next;
+    const progress = await loadApplicationProgress(env.DB, id);
+    assert.equal(progress.submittedAt !== null, !preset.draft, preset.key);
+    assert.equal(
+      progress.naloxoneCompletedAt !== null,
+      preset.naloxoneCompleted,
+      preset.key,
+    );
+    assert.equal(
+      progress.applicationApproved,
+      preset.applicationApproved,
+      preset.key,
+    );
+    const row = await env.DB.prepare(
+      `SELECT u.role,v.active,v.patrol_approved,
+      EXISTS(SELECT 1 FROM application_draft WHERE user_id=u.id) AS hasDraft,
+      EXISTS(SELECT 1 FROM orientation_completion WHERE user_id=u.id) AS orientationCompleted,
+      EXISTS(SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id WHERE s.user_id=u.id
+        AND s.status='confirmed' AND e.starts_at>?) AS orientationBooked,
+      EXISTS(SELECT 1 FROM json_each(p.teams) WHERE value='medic') AS medicSelected
+      FROM user u LEFT JOIN volunteer_status v ON v.user_id=u.id LEFT JOIN profile p ON p.user_id=u.id WHERE u.id=?`,
+    )
+      .bind(Date.now(), id)
+      .first<{
+        role: string;
+        active: number | null;
+        patrol_approved: number | null;
+        hasDraft: number;
+        orientationCompleted: number;
+        orientationBooked: number;
+        medicSelected: number;
+      }>();
+    assert.ok(row);
+    assert.equal(row.role, preset.role, preset.key);
+    assert.equal(
+      Boolean(row.orientationCompleted),
+      preset.orientation === "completed",
+      preset.key,
+    );
+    assert.equal(
+      Boolean(row.orientationBooked),
+      preset.orientation === "booked",
+      preset.key,
+    );
+    const actual = developmentAccountStatus({
+      ...progress,
+      hasDraft: Boolean(row.hasDraft),
+      active: Boolean(row.active),
+      patrolApproved: Boolean(row.patrol_approved),
+      orientationCompleted: Boolean(row.orientationCompleted),
+      orientationBooked: Boolean(row.orientationBooked),
+      medicSelected: Boolean(row.medicSelected),
+      medicEligible: Boolean(
+        row.medicSelected &&
+        row.patrol_approved &&
+        row.orientationCompleted &&
+        row.active &&
+        progress.applicationApproved,
+      ),
+      twoFactorEnabled: false,
+    });
+    assert.equal(actual, developmentPresetStatus(preset), preset.key);
+    assert.equal(
+      await env.DB.prepare("SELECT count(*) AS n FROM user").first("n"),
+      2,
+    );
+    assert.deepEqual((await listLocalAccounts(env.DB)).users, []);
+  }
+  await resetAccountState(env.DB, "not-applied", slot);
+  assert.equal(await loadApplicationDraft(env.DB, id), null);
+  assert.equal(await loadProfile(env.DB, id), null);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM user").first("n"),
+    2,
+  );
+});
+
+test("browser sandboxes are separate and reserved ID collisions cannot reset saved accounts", async () => {
+  const a = crypto.randomUUID(),
+    b = crypto.randomUUID();
+  const [first, second] = await Promise.all([
+    resetAccountState(env.DB, "draft", a),
+    resetAccountState(env.DB, "applied", b),
+  ]);
+  assert.notEqual(first, second);
+  assert.ok(await loadApplicationDraft(env.DB, first));
+  assert.ok(await loadProfile(env.DB, second));
+  const collision = crypto.randomUUID(),
+    saved = await draftActor(`local-state-${collision}`);
+  await assert.rejects(
+    resetAccountState(env.DB, "draft", collision),
+    statusError(409),
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM session WHERE user_id=?")
+      .bind(saved.id)
+      .first("n"),
+    1,
+  );
 });
 
 test("development account state listing paginates without exposing draft answers or submission snapshots", async () => {

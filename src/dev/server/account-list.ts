@@ -1,4 +1,7 @@
-import type { DevelopmentAccountState } from "../accounts";
+import {
+  developmentStateProvider,
+  type DevelopmentAccountState,
+} from "../accounts";
 import {
   approvedMedicSql,
   includesOrientationSql,
@@ -43,9 +46,11 @@ export async function listLocalAccounts(db: Env["DB"], after?: string) {
     EXISTS (SELECT 1 FROM json_each(coalesce(p.teams, '[]')) WHERE value='medic') AS medicSelected,
     ${approvedMedicSql("u.id")} AS medicEligible
     FROM user u LEFT JOIN profile p ON p.user_id=u.id LEFT JOIN volunteer_status v ON v.user_id=u.id
-    WHERE (? IS NULL OR u.id>?) ORDER BY u.id LIMIT 101`,
+     WHERE (? IS NULL OR u.id>?)
+       AND NOT EXISTS(SELECT 1 FROM account a WHERE a.user_id=u.id AND a.provider_id=?)
+     ORDER BY u.id LIMIT 101`,
     )
-    .bind(after ?? null, after ?? null)
+    .bind(after ?? null, after ?? null, developmentStateProvider)
     .all<AccountRow>();
   return {
     users: results.slice(0, 100).map(({ id, name, email, role, ...row }) => ({

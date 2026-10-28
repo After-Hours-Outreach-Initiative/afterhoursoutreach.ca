@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { profileWriteBody } from "../helpers/profile-write";
-import { manualAccountPresets } from "../../src/dev/accounts";
+import {
+  accountStatePersona,
+  manualAccountPresets,
+} from "../../src/dev/accounts";
 import {
   createLocalAccount,
   fillApplicationField,
@@ -209,21 +212,17 @@ test("DEV panel seeds presets in place without changing the current account or d
   }
   const volunteers = profiles.locator('[data-account-category="volunteers"]');
   await expect(
-    volunteers.locator('[data-switch-user="local-account-user-medic"]'),
+    volunteers.locator('[data-switch-user="new-state:medic"]'),
   ).toContainText("Medic eligible");
   await expect(
-    volunteers.locator('[data-switch-user="local-account-user-patrol"]'),
+    volunteers.locator('[data-switch-user="new-state:patrol"]'),
   ).toContainText("Patrol approved");
   const orientation = profiles.locator('[data-account-category="orientation"]');
   await expect(
-    orientation.locator(
-      '[data-switch-user="local-account-user-medic-orientee"]',
-    ),
+    orientation.locator('[data-switch-user="new-state:medic-orientee"]'),
   ).toContainText("Not medic eligible");
   await expect(
-    orientation.locator(
-      '[data-switch-user="local-account-user-orientation-booked"]',
-    ),
+    orientation.locator('[data-switch-user="new-state:orientation-booked"]'),
   ).toContainText("Orientation booked");
   await page.setViewportSize({ width: 375, height: 812 });
   expect(
@@ -234,7 +233,7 @@ test("DEV panel seeds presets in place without changing the current account or d
   await expect(
     profiles
       .getByRole("group", { name: "Account states", exact: true })
-      .locator('[data-switch-user="local-account-user-organizer"]'),
+      .locator('[data-switch-user="new-state:organizer"]'),
   ).toBeVisible();
   // Verify actual authenticator enrollment using a separate request cookie jar.
   const switched = await request.post("/api/v1/auth/dev/switch-user", {
@@ -275,7 +274,75 @@ test("DEV panel seeds presets in place without changing the current account or d
   }
 });
 
-test("Not applied always starts blank; submitted local accounts persist and can be deleted", async ({
+test("state buttons reuse a temporary sandbox and Draft always returns to the draft instead of saving progressed accounts", async ({
+  page,
+  baseURL,
+}) => {
+  const saved = await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer/account");
+  const current = async () =>
+    (await (await page.request.get("/api/v1/auth/get-session")).json()).user;
+  const draft = async () =>
+    await (await page.request.get("/api/v1/account/application-draft")).json();
+  const choose = async (id: string) => {
+    const panel = await openLocalAccountSwitcher(page);
+    await Promise.all([
+      page.waitForEvent("domcontentloaded"),
+      panel.locator(`[data-switch-user="${id}"]`).click(),
+    ]);
+  };
+  await choose(accountStatePersona("draft"));
+  await expect(page).toHaveURL(/\/apply$/);
+  const sandbox = await current(),
+    firstDraft = await draft();
+  await expect(page.locator('[name="firstName"]')).toHaveValue("Casey");
+  await page.locator('[name="firstName"]').fill("Old sandbox draft");
+  await expect
+    .poll(async () => (await draft()).draft?.answers.firstName)
+    .toBe("Old sandbox draft");
+  for (const step of ["form", "naloxone", "discord", "review"]) {
+    const response = await page.request.post(
+      "/api/v1/auth/dev/application-step",
+      { headers: { origin: baseURL! }, data: { userId: sandbox.id, step } },
+    );
+    expect(response.ok(), await response.text()).toBe(true);
+  }
+  await page.goto("/volunteer");
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await choose(accountStatePersona("draft"));
+    await expect(page).toHaveURL(/\/apply$/);
+    expect((await current()).id).toBe(sandbox.id);
+    await expect(page.locator('[name="firstName"]')).toHaveValue("Casey");
+    const state = await draft();
+    expect(state.submitted).toBe(false);
+    expect(state.generation).not.toBe(firstDraft.generation);
+    const panel = await openLocalAccountSwitcher(page);
+    await expect(panel.locator('[data-application-step="form"]')).toBeEnabled();
+    await expect(
+      panel.locator(
+        '[data-existing-accounts] [data-switch-user^="local-state-"]',
+      ),
+    ).toHaveCount(0);
+    await expect(
+      panel.locator(
+        `[data-existing-accounts] [data-switch-user="${saved.id}"]`,
+      ),
+    ).toBeVisible();
+    await page.keyboard.press("Alt+KeyZ");
+  }
+  await choose("new-application");
+  await expect(page.locator('[name="firstName"]')).toHaveValue("");
+  expect((await current()).id).toBe(sandbox.id);
+  expect(await draft()).toMatchObject({ submitted: false, draft: null });
+  await choose(saved.id);
+  expect((await current()).id).toBe(saved.id);
+  await expect(page.locator('[name="firstName"]')).toHaveValue(
+    sampleAnswers.firstName,
+  );
+});
+
+test("saved accounts keep their drafts and submitted answers and can be deleted", async ({
   page,
   baseURL,
 }) => {
@@ -305,9 +372,13 @@ test("Not applied always starts blank; submitted local accounts persist and can 
     ).toHaveCount(0);
     expect(await draft()).toMatchObject({ submitted: false, draft: null });
   };
+  const createSaved = async () => {
+    await createLocalAccount(page.request, baseURL!, false);
+    await page.goto("/apply");
+    await expectBlank();
+  };
 
-  await choose("new-application");
-  await expectBlank();
+  await createSaved();
   const first = await current();
   await page.locator('[name="firstName"]').fill("Unfinished draft");
   await page.locator('[name="teams"][value="outreach"]').check();
@@ -333,8 +404,7 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   });
   expect(await disposableUsers()).toEqual(before);
 
-  await choose("new-application");
-  await expectBlank();
+  await createSaved();
   const second = await current();
   expect(second.id).not.toBe(first.id);
   // The abandoned draft remains explicitly selectable/deletable, never invisible.
@@ -381,8 +451,7 @@ test("Not applied always starts blank; submitted local accounts persist and can 
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Close DEV panel" }).click();
 
-  await choose("new-application");
-  await expectBlank();
+  await createSaved();
   const third = await current();
   const choices = await openLocalAccountSwitcher(page);
   const remove = choices.locator(`[data-delete-user="${second.id}"]`);
@@ -450,7 +519,7 @@ test("unfinished application shows current milestones and a keyboard-accessible 
   await page.goto("/volunteer");
   await expect(tracker).toBeVisible();
   await expect(tracker.locator("[data-application-progress-step]")).toHaveCount(
-    3,
+    4,
   );
   await expect(
     tracker.locator('[data-application-progress-step="form"]'),

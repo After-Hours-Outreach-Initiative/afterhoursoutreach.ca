@@ -2,6 +2,9 @@ import type { ApplicationProgress } from "../server/db/application-progress";
 
 // A virtual choice, never the ID of a fixture or a saved application.
 export const newApplicationPersona = "new-application";
+export const accountStatePersona = (key: string) => `new-state:${key}`;
+export const developmentStateProvider = "local-development-state";
+export const developmentStateOrganizerId = "local-state-organizer";
 
 export type DevelopmentApplicationStep =
   "form" | "naloxone" | "discord" | "review";
@@ -158,4 +161,30 @@ export function developmentAccountStatus(state: DevelopmentAccountState) {
     );
   if (state.twoFactorEnabled) labels.push("Authenticator enabled");
   return labels.join(" · ");
+}
+
+/** State launchers describe their reset point, never saved account progress. */
+export function developmentPresetStatus(
+  preset: (typeof manualAccountPresets)[number],
+) {
+  return developmentAccountStatus({
+    submittedAt: preset.draft ? null : 0,
+    naloxoneCompletedAt: preset.naloxoneCompleted ? 0 : null,
+    applicationApproved: preset.applicationApproved,
+    discordRequired: true,
+    discordCompletedAt: preset.naloxoneCompleted ? 0 : null,
+    hasDraft: preset.draft,
+    active: preset.active,
+    patrolApproved: preset.patrolApproved,
+    orientationCompleted: preset.orientation === "completed",
+    orientationBooked: preset.orientation === "booked",
+    medicSelected: preset.sampleKey === "dana",
+    medicEligible:
+      preset.sampleKey === "dana" &&
+      preset.active &&
+      preset.applicationApproved &&
+      preset.patrolApproved &&
+      preset.orientation === "completed",
+    twoFactorEnabled: false,
+  });
 }
