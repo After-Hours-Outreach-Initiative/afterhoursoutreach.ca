@@ -12,6 +12,7 @@ export const prerender = false;
 let team: Awaited<ReturnType<typeof listVolunteers>> = {
   rows: [],
   hasMore: false,
+  allApplicantsCount: 0,
   awaitingApprovalCount: 0,
 };
 let lock = "";
@@ -91,7 +92,11 @@ try {
               data-volunteer-filter="all"
               aria-pressed={approval === "all" ? "true" : "false"}
             >
-              All applicants
+              <span>
+                All applicants (
+                <span data-all-applicants-count>{team.allApplicantsCount}</span>
+                )
+              </span>
             </button>
             <button
               class="volunteer-filter"

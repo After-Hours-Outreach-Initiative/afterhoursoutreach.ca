@@ -748,7 +748,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await expect(emptyGroup).toHaveCount(0);
     await expect(uiGroup).toHaveCount(1);
     // The same production script still initializes task4's extracted browser:
-    // live searching must retain its approval filter and global queue count.
+    // live searching must retain its approval filter and refresh its queue count.
     const awaiting = await DB.prepare(
       "SELECT count(*) n FROM profile p JOIN volunteer_status v ON v.user_id=p.user_id WHERE v.registration_approved=0",
     ).first<number>("n");
@@ -764,7 +764,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     ).toContainText("No applications awaiting approval match your search");
     await expect(
       organizerPage.locator("[data-awaiting-approval-count]"),
-    ).toHaveText(String(awaiting));
+    ).toHaveText("0");
     expect(new URL(organizerPage.url()).searchParams.get("approval")).toBe(
       "awaiting",
     );

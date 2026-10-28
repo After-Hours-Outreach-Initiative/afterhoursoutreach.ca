@@ -49,34 +49,43 @@ export async function listVolunteers(
 ) {
   requireOrganizer(actor);
   // A profile is created only on submission; private drafts never enter either
-  // query. Count all unapproved applications, not just this search or page.
-  const [rows, awaiting] = (await db.batch([
+  // query. Both filter counts respect search, but not approval or pagination.
+  const applicantsSql = `FROM user u
+      JOIN profile p ON p.user_id = u.id
+      JOIN volunteer_status v ON v.user_id = u.id
+      WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
+        AND u.deleted_at IS NULL`;
+  const query = search.slice(0, 100);
+  const [rows, counts] = (await db.batch([
     db
       .prepare(
         `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
-      FROM user u
-      JOIN profile p ON p.user_id = u.id
-      JOIN volunteer_status v ON v.user_id = u.id
-      WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
-        AND u.deleted_at IS NULL
+      ${applicantsSql}
         AND (? = 'all' OR v.registration_approved = 0)
       ORDER BY v.registration_approved, name, u.id
       LIMIT ? OFFSET ?`,
       )
-      .bind(search.slice(0, 100), approval, volunteerPageSize + 1, offset),
-    db.prepare(
-      `SELECT count(*) AS count FROM user u
-      JOIN profile p ON p.user_id = u.id
-      JOIN volunteer_status v ON v.user_id = u.id
-      WHERE v.registration_approved = 0 AND u.deleted_at IS NULL`,
-    ),
-  ])) as [D1Result<VolunteerRow>, D1Result<{ count: number }>];
+      .bind(query, approval, volunteerPageSize + 1, offset),
+    db
+      .prepare(
+        `SELECT count(*) AS allApplicantsCount,
+          count(CASE WHEN v.registration_approved = 0 THEN 1 END) AS awaitingApprovalCount
+        ${applicantsSql}`,
+      )
+      .bind(query),
+  ])) as [
+    D1Result<VolunteerRow>,
+    D1Result<{ allApplicantsCount: number; awaitingApprovalCount: number }>,
+  ];
   return {
     rows: rows.results.slice(0, volunteerPageSize),
     hasMore: rows.results.length > volunteerPageSize,
-    awaitingApprovalCount: Number(awaiting.results[0]?.count ?? 0),
+    allApplicantsCount: Number(counts.results[0]?.allApplicantsCount ?? 0),
+    awaitingApprovalCount: Number(
+      counts.results[0]?.awaitingApprovalCount ?? 0,
+    ),
   };
 }
 

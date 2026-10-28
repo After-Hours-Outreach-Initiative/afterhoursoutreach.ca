@@ -399,7 +399,7 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
 
-test("application queue counts all submitted unapproved applications independently of search, pages and profile views", async () => {
+test("application queue counts submitted unapproved applications matching search independently of pages and profile views", async () => {
   const actor: Actor = {
     ...(await draftActor("queue-organizer")),
     role: "organizer",
@@ -468,11 +468,15 @@ test("application queue counts all submitted unapproved applications independent
     new Set([...first.rows, ...second.rows].map((row) => row.id)).size,
     count,
   );
-  for (const search of ["pending-02", "no match", "approved"])
+  for (const [search, expected] of [
+    ["pending-02", 1],
+    ["no match", 0],
+    ["approved", 0],
+  ] as const)
     assert.equal(
       (await listVolunteers(env.DB, actor, search, 0, "awaiting"))
         .awaitingApprovalCount,
-      count,
+      expected,
     );
   assert.deepEqual(
     (await listVolunteers(env.DB, actor, "approved", 0, "awaiting")).rows,
@@ -604,7 +608,7 @@ test("application queue counts all submitted unapproved applications independent
     "awaiting",
   );
   assert.deepEqual(after.rows, []);
-  assert.equal(after.awaitingApprovalCount, count - 1);
+  assert.equal(after.awaitingApprovalCount, 0);
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
       .applicationApproved,
@@ -639,7 +643,7 @@ test("application queue counts all submitted unapproved applications independent
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting"))
       .awaitingApprovalCount,
-    count,
+    1,
   );
   for (const denied of [
     { ...actor, role: "volunteer" as const },
@@ -664,7 +668,7 @@ test("application queue counts all submitted unapproved applications independent
     0,
     "awaiting",
   );
-  assert.equal(organizerQueue.awaitingApprovalCount, count + 1);
+  assert.equal(organizerQueue.awaitingApprovalCount, 1);
   assert.equal(organizerQueue.rows[0].id, actor.id);
   await env.DB.prepare("DELETE FROM session WHERE id=?")
     .bind(actor.sessionId)

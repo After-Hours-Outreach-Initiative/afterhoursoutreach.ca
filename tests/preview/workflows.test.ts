@@ -177,7 +177,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       1,
     );
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
-      "2",
+      "1",
     );
     await page.locator("[data-volunteer-profile-link]").click();
     await page
@@ -194,7 +194,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
     ).toBeEnabled();
     await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
-      "1",
+      "0",
     );
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
       0,
