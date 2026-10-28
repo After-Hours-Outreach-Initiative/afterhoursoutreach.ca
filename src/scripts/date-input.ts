@@ -179,7 +179,7 @@ export function initDateInputs(root: Document | HTMLElement) {
       if (!day.value)
         error = [
           "day",
-          birthDate ? "Enter your day of birth." : "Enter the day.",
+          birthDate ? "Enter your date of birth." : "Enter the day.",
         ];
       else if (
         !/^\d{1,2}$/.test(day.value) ||
