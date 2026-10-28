@@ -330,7 +330,7 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         expect(layout.stripes).toEqual(["rgb(12, 13, 16)", "rgb(23, 26, 32)"]);
         expect(layout.summaryWidth).toBe(layout.rosterWidth);
         expect(layout.summaryHeight).toBeGreaterThanOrEqual(48);
-        expect(layout.avatarsBelowTitle).toBe(true);
+        expect(layout.avatarsBelowTitle).toBe(layout.rosterWidth < 512);
         expect(layout.avatarsLeftOfChevron).toBe(true);
         expect(Math.abs(layout.chevronCenterOffset)).toBeLessThan(1);
         expect(layout.rosterBorderTop).toBe("0px");

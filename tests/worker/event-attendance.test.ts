@@ -287,6 +287,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             .querySelector(".event-roster-chevron")!
             .getBoundingClientRect();
           return {
+            summaryWidth: summary.getBoundingClientRect().width,
             leftOffset: avatar.left - label.left,
             rowLeftOffset: row.left - label.left,
             belowLabel: row.top >= label.bottom,
@@ -295,9 +296,14 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             height: avatar.height,
           };
         });
-        expect(Math.abs(avatarLayout.leftOffset)).toBeLessThan(1);
-        expect(Math.abs(avatarLayout.rowLeftOffset)).toBeLessThan(1);
-        expect(avatarLayout.belowLabel).toBe(true);
+        if (avatarLayout.summaryWidth < 512) {
+          expect(Math.abs(avatarLayout.leftOffset)).toBeLessThan(1);
+          expect(Math.abs(avatarLayout.rowLeftOffset)).toBeLessThan(1);
+        } else {
+          expect(avatarLayout.leftOffset).toBeGreaterThan(0);
+          expect(avatarLayout.rowLeftOffset).toBeGreaterThan(0);
+        }
+        expect(avatarLayout.belowLabel).toBe(avatarLayout.summaryWidth < 512);
         expect(avatarLayout.beforeChevron).toBe(true);
         expect(avatarLayout.width).toBeCloseTo((24 * 14) / 19.5, 1);
         expect(avatarLayout.height).toBe(24);
