@@ -30,21 +30,23 @@ const publicVisibility = settings
     <span>Includes orientation</span>
   </label>
 </div>
-<DateInput
-  name="startsAt"
-  id={`${id}-startsAt`}
-  errorField={`${id}-startsAt`}
-  label={series ? "Start date (fixed)" : "Start date"}
-  value={event
-    ? vancouverInput(event.startsAt)
-    : series
-      ? `${series.firstDate}T${series.localTime}`
-      : ""}
-  withTime
-  defaultTime="21:00"
-  readonly={Boolean(series)}
-  warnPast={!series}
-/>
+<div class="volunteer-event-start volunteer-wide">
+  <DateInput
+    name="startsAt"
+    id={`${id}-startsAt`}
+    errorField={`${id}-startsAt`}
+    label={series ? "Start date (fixed)" : "Start date"}
+    value={event
+      ? vancouverInput(event.startsAt)
+      : series
+        ? `${series.firstDate}T${series.localTime}`
+        : ""}
+    withTime
+    defaultTime="21:00"
+    readonly={Boolean(series)}
+    warnPast={!series}
+  />
+</div>
 {
   !event && (
     <div class="volunteer-field volunteer-wide" data-recurrence-controls>
@@ -198,3 +200,41 @@ const publicVisibility = settings
     </label>
   </div>
 </fieldset>
+
+<style>
+  .volunteer-event-start {
+    container-type: inline-size;
+    min-width: 0;
+  }
+
+  @container (min-width: 30rem) {
+    .volunteer-event-start :global(.volunteer-date-input) {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 1.5rem;
+    }
+
+    .volunteer-event-start :global(legend) {
+      /* Let the legend share the grid with the time label. */
+      float: left;
+      grid-column: 1;
+      grid-row: 1;
+      margin-bottom: 0;
+    }
+
+    .volunteer-event-start :global(.volunteer-native-picker) {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .volunteer-event-start :global(.volunteer-date-input > .volunteer-field) {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+    }
+
+    .volunteer-event-start :global([data-error]),
+    .volunteer-event-start :global(.volunteer-help) {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
