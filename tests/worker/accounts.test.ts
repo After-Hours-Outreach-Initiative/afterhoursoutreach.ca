@@ -4,8 +4,7 @@ import { existsSync } from "node:fs";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { chromium, expect } from "@playwright/test";
-import jsQR from "jsqr";
-import sharp from "sharp";
+import { createAuth } from "../../src/server/auth";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
@@ -1738,7 +1737,7 @@ describe(
       const signedOut = await send("/volunteer/sign-in", undefined, cookie);
       assert.doesNotMatch(await signedOut.text(), /data-account-menu/);
     });
-    test("the Worker encrypts authenticator data and requires a second factor after email sign-in", async () => {
+    test("the Worker pauses authenticator setup and preserves existing two-factor sign-ins", async () => {
       const email = "worker-factor@example.org";
       const initialCookie = await signIn(email);
       const application = await send(
@@ -1747,61 +1746,66 @@ describe(
         initialCookie,
       );
       assert.equal(application.status, 200, await application.clone().text());
-      let setup: {
+      assert.equal(
+        (
+          await send(
+            "/api/v1/auth/two-factor/enable",
+            { method: "totp" },
+            initialCookie,
+          )
+        ).status,
+        404,
+      );
+      const account = await send(
+        "/volunteer/account",
+        undefined,
+        initialCookie,
+      );
+      const html = await account.text();
+      assert.match(html, /Coming soon\./);
+      assert.match(html, /data-factor-settings[^>]*aria-disabled="true"/);
+      assert.doesNotMatch(
+        html,
+        /data-enable-factor|data-confirm-factor|data-disable-factor/,
+      );
+
+      // Seed a pre-existing enrollment through the auth service, never by
+      // reopening the public setup endpoint or bypassing sign-in verification.
+      const auth = createAuth({
+        DB,
+        APP_ENV: "production",
+        AUTH_BASE_URL: origin,
+        BETTER_AUTH_SECRET: secret,
+        RESEND_API_KEY: "",
+      });
+      const seed = (path: string, body: object) =>
+        auth.handler(
+          new Request(`${origin}/api/v1/auth${path}`, {
+            method: "POST",
+            headers: {
+              origin,
+              cookie: initialCookie,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(body),
+          }),
+        );
+      const enabled = await seed("/two-factor/enable", { method: "totp" });
+      assert.equal(enabled.status, 200, await enabled.clone().text());
+      const setup = (await enabled.json()) as {
         totpURI: string;
         backupCodes: string[];
       };
-      const browser = await chromium.launch({
-        executablePath:
-          process.env.CHROMIUM_PATH ??
-          (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-      });
-      try {
-        const page = await browser.newPage();
-        // Exercise the production bundle and CSP, not only Vite's dev renderer.
-        await page.route("**/*", async (route) => {
-          const request = route.request();
-          if (new URL(request.url()).origin !== origin) return route.abort();
-          const response = await worker.fetch(request.url(), {
-            method: request.method(),
-            headers: { ...(await request.allHeaders()), cookie: initialCookie },
-            body: request.postData() ?? undefined,
-          });
-          await route.fulfill({
-            status: response.status,
-            headers: Object.fromEntries(response.headers),
-            body: Buffer.from(await response.arrayBuffer()),
-          });
-        });
-        await page.goto(`${origin}/volunteer/account`);
-        const enabled = page.waitForResponse((response) =>
-          response.url().endsWith("/two-factor/enable"),
-        );
-        await page
-          .getByRole("button", { name: "Set up an authenticator" })
-          .click();
-        setup = await (await enabled).json();
-        const qr = page.getByRole("img", {
-          name: "QR code for authenticator setup",
-        });
-        await expect(qr).toBeVisible();
-        const { data, info } = await sharp(await qr.screenshot())
-          .ensureAlpha()
-          .raw()
-          .toBuffer({ resolveWithObject: true });
-        assert.equal(
-          jsQR(new Uint8ClampedArray(data), info.width, info.height)?.data,
-          setup.totpURI,
-        );
-      } finally {
-        await browser.close();
-      }
       const key = new URL(setup.totpURI).searchParams.get("secret")!;
-      const confirmed = await send(
+      const paused = await send(
         "/api/v1/auth/two-factor/verify-totp",
         { code: totpFromSetupKey(key) },
         initialCookie,
       );
+      assert.equal(paused.status, 403);
+      const confirmed = await seed("/two-factor/verify-totp", {
+        code: totpFromSetupKey(key),
+      });
       assert.equal(confirmed.status, 200, await confirmed.clone().text());
       const confirmedCookie = confirmed.headers
         .getSetCookie()
@@ -1812,6 +1816,18 @@ describe(
         await send("/api/v1/auth/get-session", undefined, confirmedCookie)
       ).json()) as { session: { twoFactorVerified: boolean } };
       assert.equal(factorSession.session.twoFactorVerified, true);
+      const enrolledPage = await send(
+        "/volunteer/account",
+        undefined,
+        confirmedCookie,
+      );
+      const enrolledHTML = await enrolledPage.text();
+      assert.match(enrolledHTML, /Your authenticator is enabled\./);
+      assert.match(enrolledHTML, /Coming soon\./);
+      assert.doesNotMatch(
+        enrolledHTML,
+        /data-enable-factor|data-confirm-factor|data-disable-factor/,
+      );
       const encrypted = await DB.prepare(
         "SELECT secret, backup_codes FROM two_factor",
       ).all();
@@ -1867,6 +1883,23 @@ describe(
         await send("/api/v1/auth/get-session", undefined, verifiedCookie)
       ).json()) as { session: { twoFactorVerified: boolean } };
       assert.equal(result.session.twoFactorVerified, true);
+      await send("/api/v1/auth/sign-out", {}, verifiedCookie);
+      const totpProof = await createSignInOTP(DB, secret, email);
+      const totpPending = await send(
+        "/api/v1/auth/sign-in/email-otp",
+        totpProof,
+      );
+      const totpCookie = totpPending.headers
+        .getSetCookie()
+        .filter((value) => !value.includes("Max-Age=0"))
+        .map((value) => value.split(";")[0])
+        .join("; ");
+      const totpVerified = await send(
+        "/api/v1/auth/two-factor/verify-totp",
+        { code: totpFromSetupKey(key) },
+        totpCookie,
+      );
+      assert.equal(totpVerified.status, 200, await totpVerified.clone().text());
     });
     afterAll(async () => {
       try {

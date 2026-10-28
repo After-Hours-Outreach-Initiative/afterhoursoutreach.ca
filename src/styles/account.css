@@ -151,6 +151,9 @@
   list-style: disc;
   white-space: normal;
 }
+.account-setting-unavailable h3 {
+  color: #a1a1aa;
+}
 .account-sessions {
   display: flex;
   flex-direction: column;

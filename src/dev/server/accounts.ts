@@ -70,13 +70,13 @@ export function developmentAccounts(bindings: AuthBindings) {
         {
           method: "POST",
           requireHeaders: true,
-          body: z.strictObject({}),
+          body: z.strictObject({ testFixtures: z.literal(true).optional() }),
         },
         async (ctx) => {
           requireLocal(ctx.request);
           const { seedLocalAccounts } = await import("./seed-accounts");
           try {
-            await seedLocalAccounts(bindings);
+            await seedLocalAccounts(bindings, ctx.body.testFixtures);
           } catch (error) {
             throw new APIError("SERVICE_UNAVAILABLE", {
               message:

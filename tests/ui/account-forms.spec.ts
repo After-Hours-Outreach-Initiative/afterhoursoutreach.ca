@@ -20,7 +20,6 @@ import {
   codeOfConductError,
   codeOfConductRules,
 } from "../../src/data/code-of-conduct";
-import { totpFromSetupKey } from "../helpers/totp";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { fillDateInput } from "../helpers/date-input";
 import { vancouverInput } from "../../src/data/event-time";
@@ -3553,7 +3552,7 @@ test("edits made during a profile save remain unsaved", async ({
   }
 });
 
-test("session dividers stay between rows after removal and settings refresh", async ({
+test("session dividers stay between rows after removal", async ({
   page,
   browser,
   baseURL,
@@ -3570,10 +3569,7 @@ test("session dividers stay between rows after removal and settings refresh", as
         "border-bottom-width",
         index < count - 1 ? "1px" : "0px",
       );
-    await expect(page.locator("[data-factor-settings]")).toHaveCSS(
-      "border-bottom-width",
-      "1px",
-    );
+    await expect(sessions).toHaveCSS("border-top-width", "1px");
   };
   await expectDividers(1);
 
@@ -3616,22 +3612,9 @@ test("session dividers stay between rows after removal and settings refresh", as
     "tabindex",
     "-1",
   );
-
-  // Authenticator verification replaces the server-rendered Sessions fragment.
-  await page.getByRole("button", { name: "Set up an authenticator" }).click();
-  await expect(page.locator("#account-sessions-heading")).not.toHaveAttribute(
-    "tabindex",
-  );
-  const setup = page.locator("[data-confirm-factor]");
-  await expect(setup).toBeVisible();
-  const key = (await page.locator("[data-factor-key]").textContent())!;
-  await setup.locator('input[name="code"]').fill(totpFromSetupKey(key));
-  await page.getByRole("button", { name: "Verify and enable" }).click();
-  await expect(setup).toHaveCount(0);
-  await expectDividers(1);
 });
 
-test("authenticator setup and sign-in show native inline code errors", async ({
+test("authenticator sign-in shows native inline code errors", async ({
   page,
   baseURL,
 }) => {
@@ -3642,33 +3625,9 @@ test("authenticator setup and sign-in show native inline code errors", async ({
     name: /^Preferred name/,
   });
   await name.fill("Unsaved authenticator draft");
-  await page.getByRole("button", { name: "Set up an authenticator" }).click();
-  const setup = page.locator("[data-confirm-factor]");
-  await expect(setup).toBeVisible();
-  await expect(setup.locator("[data-error=factor-setup-code]")).toBeHidden();
-  await page.getByRole("button", { name: "Verify and enable" }).click();
-  await expect(setup.locator("[data-error=factor-setup-code]")).toBeVisible();
-  const code = setup.locator('input[name="code"]');
-  await code.fill("123");
-  await expect(setup.locator("[data-error=factor-setup-code]")).toHaveText(
-    "Enter a six-digit code.",
+  await expect(page.locator("[data-factor-settings]")).toContainText(
+    "Coming soon.",
   );
-  await expect(setup.locator("[data-error=factor-setup-code]")).toBeVisible();
-  const key = (await page.locator("[data-factor-key]").textContent())!;
-  await code.fill(totpFromSetupKey(key));
-  await inPlaceAction(page, {
-    endpoint: "/api/v1/auth/two-factor/verify-totp",
-    form: setup,
-    trigger: () =>
-      page.getByRole("button", { name: "Verify and enable" }).click(),
-    updated: () =>
-      expect(
-        page.getByText("Your authenticator is enabled.", { exact: false }),
-      ).toBeVisible(),
-    loadingLabel: "Verifying…",
-  });
-  await expect(name).toHaveValue("Unsaved authenticator draft");
-  await expect(page.locator("#account-factor-heading")).toBeFocused();
   const contents = page.getByRole("navigation", { name: "Sections" });
   await contents
     .getByRole("link", { name: "Two-factor authentication", exact: true })

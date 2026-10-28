@@ -1,7 +1,7 @@
 import { authClient, showSecondFactor } from "./auth-client";
 import { signOut } from "./sign-out";
 import { initEmailSignIn } from "./email-sign-in";
-import { actionFragment, loadActionPage } from "./action-page";
+import { loadActionPage } from "./action-page";
 import {
   applicationDisplayName,
   profileReadOnlyFields,
@@ -469,77 +469,6 @@ form("[data-delete-account]", async (element, values) => {
   // Deletion intentionally discards unsynced answers too, unlike signing out.
   clearApplicationDraft(userId);
   location.replace(result.next ?? "/volunteer/sign-in?deleted");
-});
-
-form("[data-enable-factor]", async (element) => {
-  const result = await authClient.twoFactor.enable({ method: "totp" });
-  if (result.method !== "totp" || !result.totpURI || !result.backupCodes)
-    throw new Error("Could not start authenticator setup.");
-  const setup = document.querySelector<HTMLElement>("[data-factor-setup]")!;
-  setup.querySelector<HTMLElement>("[data-factor-key]")!.textContent = new URL(
-    result.totpURI,
-  ).searchParams.get("secret");
-  setup.querySelector<HTMLElement>("[data-backup-codes]")!.textContent =
-    result.backupCodes.join("\n");
-  const qr = setup.querySelector<HTMLElement>("[data-factor-qr]")!;
-  try {
-    // Generate locally: the setup URI contains the authenticator secret.
-    const { default: QRCode } = await import("qrcode");
-    // SVG does not depend on canvas, which some privacy settings disable.
-    const svg = await QRCode.toString(result.totpURI, {
-      type: "svg",
-      width: 256,
-      margin: 4,
-      errorCorrectionLevel: "M",
-    });
-    const image = qr.querySelector<HTMLImageElement>("[data-factor-qr-image]")!;
-    image.src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
-    await image.decode();
-    qr.hidden = false;
-  } catch {
-    // Keep manual enrollment usable if the QR module or image is unavailable.
-    qr.hidden = true;
-    setup.querySelector<HTMLElement>("[data-factor-qr-error]")!.hidden = false;
-  }
-  setup.hidden = false;
-  element.hidden = true;
-});
-
-async function refreshFactorSettings(element: HTMLFormElement) {
-  // Verification and removal rotate the current session. Refresh its metadata
-  // too, leaving unsaved profile answers untouched.
-  const page = await loadActionPage();
-  const settings = actionFragment(page, "[data-factor-settings]");
-  const sessions = actionFragment(page, "[data-account-sessions]");
-  const restoreFocus =
-    element.contains(document.activeElement) ||
-    document.activeElement === document.body;
-  element.closest("[data-factor-settings]")!.replaceWith(settings);
-  document.querySelector("[data-account-sessions]")!.replaceWith(sessions);
-  if (restoreFocus) focusAfterUpdate(settings.querySelector<HTMLElement>("h3"));
-  return settings;
-}
-
-form("[data-confirm-factor]", async (element, values) => {
-  await authClient.twoFactor.verifyTotp({
-    code: String(values.get("code")),
-  });
-  await refreshFactorSettings(element);
-});
-
-form("[data-disable-factor]", async (element, values) => {
-  // The server requires the current TOTP and explicit confirmation in this same
-  // request; a previous successful verification is not removal authorization.
-  await post("/api/v1/auth/two-factor/disable", {
-    code: String(values.get("code")),
-    confirm: values.get("confirm") === "on",
-  });
-  const settings = await refreshFactorSettings(element);
-  message(
-    settings,
-    "Your authenticator was removed. Two-factor protection is off. Set up and verify a new authenticator to turn it back on.",
-    "success",
-  );
 });
 
 export {};
