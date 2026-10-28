@@ -772,11 +772,12 @@ test("Connect Discord locally simulates consent, cancellation, failure and scree
     exact: true,
   });
   await expect(connect).toBeEnabled();
+  await expect(form.getByRole("checkbox")).toHaveCount(0);
+  await expect(form.getByRole("link", { name: "Privacy policy" })).toHaveCount(
+    0,
+  );
   await connect.click();
   const dialog = page.getByRole("dialog", { name: "Authorize AHOI Bot" });
-  await expect(dialog).toHaveCount(0);
-  await form.locator('[name="consent"]').check();
-  await connect.click();
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Local simulation");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -814,7 +815,6 @@ test("Connect Discord locally simulates consent, cancellation, failure and scree
   const pending = await (await page.request.get(endpoint)).json();
   expect(pending.completedAt).toBeNull();
   expect(pending.discordId).toBe(`local:${user.id}`);
-  await form.locator('[name="consent"]').check();
   await form.getByRole("button", { name: "Reconnect Discord" }).click();
   await dialog.getByRole("button", { name: "Authorize connection" }).click();
   await expect(discord).toHaveAttribute("data-state", "complete");

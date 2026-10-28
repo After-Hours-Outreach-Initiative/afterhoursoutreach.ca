@@ -32,7 +32,8 @@ document.addEventListener("submit", async (event) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: root.dataset.discordUser,
-        consent: new FormData(form).get("consent") === "on",
+        // Submitting starts authorization; permissions are approved on Discord.
+        consent: true,
         ...(outcome ? { outcome } : {}),
       }),
     });
