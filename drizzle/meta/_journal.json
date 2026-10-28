@@ -162,6 +162,13 @@
       "when": 1793219904630,
       "tag": "0022_training_details",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1793220676726,
+      "tag": "0023_editable_patrol_schedule_defaults",
+      "breakpoints": true
     }
   ]
 }

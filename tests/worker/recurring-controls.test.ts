@@ -523,13 +523,37 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .getByRole("button", { name: "Edit series", exact: true })
       .click();
     await expect(manager.locator('[name="recurring"]')).toHaveCount(0);
-    await expect(manager.getByLabel("Start time (fixed)")).toHaveValue(
-      "8:30 PM",
+    await expect(manager.getByLabel("Start time")).toHaveValue("8:30 PM");
+    await expect(manager.getByLabel("Interval (weeks)")).toBeEditable();
+    await expect(manager.getByLabel("Start time")).toBeEditable();
+    await expect(manager.locator("[data-native-date]").first()).toHaveAttribute(
+      "readonly",
+      "",
     );
-    await expect(
-      manager.getByLabel("Interval in weeks (fixed)"),
-    ).toHaveAttribute("readonly", "");
-    await manager.getByRole("button", { name: "Close", exact: true }).click();
+    await manager.getByLabel("Start time").fill("7:15 PM");
+    await manager.getByLabel("Interval (weeks)").fill("3");
+    await manager
+      .getByRole("button", { name: "Save series defaults", exact: true })
+      .click();
+    await organizerPage
+      .getByRole("button", { name: "Save without email", exact: true })
+      .click();
+    await expect(manager).not.toBeVisible();
+    expect(
+      await DB.prepare(
+        "SELECT local_time, interval_weeks FROM patrol_series WHERE id=?",
+      )
+        .bind(uiSeries)
+        .first(),
+    ).toEqual({ local_time: "19:15", interval_weeks: 3 });
+    expect(
+      await DB.prepare(
+        "SELECT starts_at FROM event WHERE series_id=? AND occurrence_date=?",
+      )
+        .bind(uiSeries, addCalendarDays(firstDate, 21))
+        .first<number>("starts_at")
+        .then((start) => vancouverInput(start!)),
+    ).toBe(`${addCalendarDays(firstDate, 21)}T19:15`);
     await uiGroup.locator("[data-series-occurrences] > summary").click();
     const uiDate = addCalendarDays(firstDate, 42);
     await uiGroup

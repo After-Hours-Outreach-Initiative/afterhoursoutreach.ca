@@ -368,7 +368,9 @@ export async function ensurePatrolOccurrences(
 /**
  * Create, or edit the defaults for as-yet unmaterialized occurrences. Existing
  * occurrences are frozen snapshots, editable individually with saveEvent.
- * Schedule identity is immutable; create a new series to change its cadence.
+ * The first date/time zone remain fixed. Time and interval edits affect only
+ * missing future snapshots; the cadence stays anchored to the first date.
+ * Effective templates still override defaults, and off-cadence snapshots survive.
  * End dates are inclusive. Shortening atomically cancels generated FUTURE
  * occurrences beyond that nominal date and their bookings (optionally notifying
  * those rosters). History and cancellation tombstones are never removed.
@@ -395,17 +397,12 @@ export async function savePatrolSeries(
   const now = Date.now();
   const operation = crypto.randomUUID();
   const old = id ? await findPatrolSeries(db, actor, id) : null;
-  if (
-    old &&
-    (old.firstDate !== data.firstDate ||
-      old.localTime !== data.localTime ||
-      old.intervalWeeks !== data.intervalWeeks)
-  )
+  if (old && old.firstDate !== data.firstDate)
     throw new RequestError(
       409,
-      "A series' first date, local time and interval cannot change. Create a new series instead.",
+      "A series' first date cannot change. Create a new series instead.",
     );
-  if (!old) {
+  if (!old || old.localTime !== data.localTime) {
     try {
       vancouverInstant(`${data.firstDate}T${data.localTime}`);
     } catch {
@@ -429,12 +426,17 @@ export async function savePatrolSeries(
       ? db
           .prepare(
             `UPDATE patrol_series SET meeting_point = ?, meeting_point_url = ?, spots = ?, open = ?, hidden = ?, includes_orientation = ?,
-          end_date = ?, generation_until = CASE WHEN end_date IS ? THEN generation_until ELSE 0 END, updated_at = ?
+          local_time = ?, interval_weeks = ?, end_date = ?,
+          generation_until = CASE WHEN local_time IS ? AND interval_weeks IS ? AND end_date IS ? THEN generation_until ELSE 0 END, updated_at = ?
         WHERE id = ? AND updated_at = ? AND ${writePermission(true)}`,
           )
           .bind(
             ...values,
+            data.localTime,
+            data.intervalWeeks,
             data.endDate,
+            data.localTime,
+            data.intervalWeeks,
             data.endDate,
             Math.max(now, old.updatedAt + 1),
             id,
@@ -569,7 +571,7 @@ export async function materializePatrolOccurrence(
       );
     return { id: existing.id };
   }
-  requireScheduledDate(series, occurrenceDate);
+  await requireScheduledDate(db, series, occurrenceDate);
   const templates = await readTemplates(db, seriesId);
   const template = patrolTemplateFor(series, templates, occurrenceDate);
   if (!validOrientationCapacity(template))
@@ -617,7 +619,8 @@ export async function materializePatrolOccurrence(
   return { id: patrolOccurrenceId(seriesId, occurrenceDate) };
 }
 
-function requireScheduledDate(
+async function requireScheduledDate(
+  db: Env["DB"],
   series: PatrolSeriesRow,
   date: string,
   allowStopped = false,
@@ -628,9 +631,19 @@ function requireScheduledDate(
     (Date.parse(`${date}T00:00:00Z`) -
       Date.parse(`${series.firstDate}T00:00:00Z`)) /
     86_400_000;
+  // A defaults-only interval edit never re-keys existing snapshots. They remain
+  // valid boundaries for this-and-future edits/stops even off the new cadence.
+  const existing =
+    days % (7 * series.intervalWeeks) !== 0 &&
+    (await db
+      .prepare(
+        "SELECT 1 FROM event WHERE series_id = ? AND occurrence_date = ?",
+      )
+      .bind(series.id, date)
+      .first());
   if (
     days < 0 ||
-    days % (7 * series.intervalWeeks) !== 0 ||
+    (days % (7 * series.intervalWeeks) !== 0 && !existing) ||
     (series.endDate && date > series.endDate) ||
     (!allowStopped && series.stoppedFrom && date >= series.stoppedFrom)
   )
@@ -665,7 +678,7 @@ export async function updatePatrolSeriesFrom(
     );
   const data = parsed.data;
   const series = await findPatrolSeries(db, actor, id);
-  requireScheduledDate(series, date);
+  await requireScheduledDate(db, series, date);
   if (templateStart(date, data) <= Date.now())
     throw new RequestError(400, "Choose a future recurring date and time.");
   const now = Date.now();
@@ -857,7 +870,7 @@ async function stopSeries(
   if (reason.length > 1000)
     throw new RequestError(400, "Keep the reason to 1000 characters or fewer.");
   const series = await findPatrolSeries(db, actor, id);
-  requireScheduledDate(series, date, true);
+  await requireScheduledDate(db, series, date, true);
   const now = Date.now();
   const operation = crypto.randomUUID();
   const results = await db.batch([

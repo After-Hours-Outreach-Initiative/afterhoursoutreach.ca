@@ -137,12 +137,11 @@ BEGIN
       'series_occurrence_created', '["seriesId","occurrenceDate"]', NEW.created_at);
 END;
 --> statement-breakpoint
-CREATE TRIGGER patrol_series_schedule_immutable
-BEFORE UPDATE OF id, first_date, local_time, interval_weeks, time_zone ON patrol_series
-WHEN NEW.id IS NOT OLD.id OR NEW.first_date IS NOT OLD.first_date OR NEW.local_time IS NOT OLD.local_time
-  OR NEW.interval_weeks IS NOT OLD.interval_weeks OR NEW.time_zone IS NOT OLD.time_zone
+CREATE TRIGGER patrol_series_identity_immutable
+BEFORE UPDATE OF id, first_date, time_zone ON patrol_series
+WHEN NEW.id IS NOT OLD.id OR NEW.first_date IS NOT OLD.first_date OR NEW.time_zone IS NOT OLD.time_zone
 BEGIN
-  SELECT RAISE(ABORT, 'patrol_series_schedule_immutable');
+  SELECT RAISE(ABORT, 'patrol_series_identity_immutable');
 END;
 --> statement-breakpoint
 CREATE TRIGGER signup_confirm_update

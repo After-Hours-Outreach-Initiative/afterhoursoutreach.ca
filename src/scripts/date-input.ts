@@ -142,7 +142,7 @@ export function initDateInputs(root: Document | HTMLElement) {
         }
         if (withTime) group.removeAttribute("aria-invalid");
         let error = "";
-        if (!date.readOnly && date.value && time) {
+        if (time && !time.readOnly && date.value) {
           if (!parseTimeInput(time.value))
             error = "Enter a start time with AM or PM, such as 9:00 PM.";
           else if (date.validity.valid && time.validity.valid) {

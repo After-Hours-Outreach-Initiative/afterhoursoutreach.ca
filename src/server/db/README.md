@@ -185,7 +185,13 @@ hidden, closed, and full occurrences consume slots. Reads and version polling
 await generation, and SQL signup guards fail closed beyond its coverage frontier.
 
 - `savePatrolSeries(db, actor, input, id?, version?, notify?)` creates a series or
-  updates its base defaults/end date. Existing snapshots are not rewritten.
+  updates its base defaults/end date, including local time and interval (1–52
+  weeks). Existing snapshots are not rewritten, even if now off-cadence; the new
+  interval stays anchored to the fixed first date. Effective this-and-future
+  templates continue to override base defaults, including local time. Time,
+  interval and end-date changes invalidate generation coverage atomically.
+  Booked occurrences pushed beyond the signup window remain visible/cancellable
+  to their volunteers, without admitting new registrations outside that window.
   End dates are inclusive; shortening atomically cancels affected future snapshots
   and bookings, including individual exceptions. Extending never restores them.
 - `updatePatrolSeriesFrom(db, actor, seriesId, nominalDate, template, version,
@@ -209,9 +215,10 @@ notify?)` provides actual **this-and-future** editing, including already-generat
   after shortening/stopping. It never restores a cancellation. Organizer listings
   accept an optional selected occurrence ID so the 100-row limit cannot hide it.
 
-The first date and interval remain the immutable nominal cadence. Change cadence
-by stopping the old series and creating another; change actual day/time using
-effective templates, not by re-keying occurrences. All series mutations recheck
+The first date and time zone remain immutable. Time/interval settings affect only
+newly generated future snapshots; use this-and-future edits to change existing
+snapshots. Existing off-cadence dates remain valid boundaries for those edits and
+stops. No schedule edit re-keys occurrences. All series mutations recheck
 the live organizer session and version inside a D1 batch. Notification creation
 requires explicit consent and uses only affected booked occurrences. Retrying
 recognizes both `event_audit` and `patrol_series_audit` operation IDs and does not

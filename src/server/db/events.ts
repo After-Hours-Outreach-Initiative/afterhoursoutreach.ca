@@ -225,6 +225,8 @@ export async function listEvents(
     FROM event e`;
   const notDeleted = `NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
     AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')`;
+  // A shorter cadence can push existing bookings beyond the signup window.
+  // Keep them visible to their owners; signup writes still enforce that window.
   const statement = organizer
     ? db
         .prepare(
@@ -250,7 +252,9 @@ export async function listEvents(
         WHERE ${notDeleted} AND e.starts_at ${past ? "<=" : ">"} ${nowMsSql}
           AND e.cancelled_at IS NULL
           AND ${volunteerEventVisibilitySql(actor)}
-          AND ${past ? "1" : recurringSignupWindowSql()}
+          AND (${past ? "1" : recurringSignupWindowSql()} OR EXISTS(
+            SELECT 1 FROM signup own WHERE own.event_id = e.id AND own.user_id = ? AND own.status = 'confirmed'
+          ))
           AND (e.series_id IS NULL OR e.hidden = 0)
           AND ((e.series_id IS NOT NULL AND e.hidden = 0)
             OR (e.open = 1 AND e.hidden = 0) OR EXISTS(
@@ -261,6 +265,7 @@ export async function listEvents(
         LIMIT 100`,
         )
         .bind(
+          actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
@@ -841,14 +846,16 @@ export async function listPublicRosters(
      WHERE s.status = 'confirmed' AND e.id IN (SELECT value FROM json_each(?))
       AND e.starts_at > ${nowMsSql} AND e.cancelled_at IS NULL
       AND ${volunteerEventVisibilitySql(actor)}
-      AND ${recurringSignupWindowSql()}
+      AND (${recurringSignupWindowSql()} OR EXISTS(
+        SELECT 1 FROM signup own WHERE own.event_id = e.id AND own.user_id = ? AND own.status = 'confirmed'
+      ))
       AND (e.series_id IS NULL OR e.hidden = 0)
       AND ((e.series_id IS NOT NULL AND e.hidden = 0) OR (e.open = 1 AND e.hidden = 0)
         OR EXISTS (SELECT 1 FROM signup own WHERE own.event_id = e.id AND own.user_id = ? AND own.status = 'confirmed'))
     ORDER BY s.event_id, s.id LIMIT 10000`,
     )
     // One JSON binding keeps a full 100-event page below D1's 100-parameter limit.
-    .bind(JSON.stringify(ids), actor.id)
+    .bind(JSON.stringify(ids), actor.id, actor.id)
     .all<{
       membership: string;
       attendeeIdentity: string;

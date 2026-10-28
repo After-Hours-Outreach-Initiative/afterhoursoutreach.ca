@@ -28,6 +28,11 @@ const dialogId = `series-editor-${series.id}`;
     >
       <input type="hidden" name="seriesId" value={series.id} />
       <input type="hidden" name="version" value={series.updatedAt} />
+      <p class="volunteer-help">
+        New defaults apply only to occurrences not yet generated. Existing
+        occurrences, registrations and this-and-future overrides are kept.
+        Intervals count from the fixed start date.
+      </p>
       <div class="volunteer-fields">
         <EventFields id={dialogId} {series} />
       </div>

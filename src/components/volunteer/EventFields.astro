@@ -43,7 +43,7 @@ const publicVisibility = settings
         : ""}
     withTime
     defaultTime="21:00"
-    readonly={Boolean(series)}
+    readonlyDate={Boolean(series)}
     warnPast={!series}
   />
 </div>
@@ -65,14 +65,13 @@ const publicVisibility = settings
       )}
       <div class="volunteer-fields" data-recurrence-fields hidden={!series}>
         <label class="volunteer-field">
-          {series ? "Interval in weeks (fixed)" : "Interval (weeks)"}
+          Interval (weeks)
           <input
             name="intervalWeeks"
             type="number"
             min="1"
             max="52"
             value={series?.intervalWeeks ?? 1}
-            readonly={Boolean(series)}
             disabled={!series}
             required
           />

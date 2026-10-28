@@ -19,6 +19,7 @@ import {
   findPatrolSeries,
   listEvents,
   listRosters,
+  listPublicRosters,
   manageSignup,
   materializePatrolOccurrence,
   patrolOccurrenceId,
@@ -974,7 +975,7 @@ test("series defaults are versioned and future-only; inclusive end dates stop ge
     savePatrolSeries(
       db,
       organizer,
-      { ...data, intervalWeeks: 1 },
+      { ...data, firstDate: addCalendarDays(data.firstDate, 1) },
       series.id,
       current.updatedAt,
     ),
@@ -1011,6 +1012,233 @@ test("series defaults are versioned and future-only; inclusive end dates stop ge
   assert.deepEqual(
     (await window()).map((event) => event.occurrenceDate),
     [0, 14, 42].map((days) => addCalendarDays(data.firstDate, days)),
+  );
+});
+
+test("time/interval defaults persist without rewriting history, bookings or tombstones; displaced bookings stay accessible", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  const initial = await all(series.id);
+  await changeSignup(db, alice, initial[2].id, "join");
+  await db
+    .prepare("UPDATE event SET starts_at=0 WHERE id=?")
+    .bind(initial[0].id)
+    .run();
+  const cancelled = await materializePatrolOccurrence(
+    db,
+    organizer,
+    series.id,
+    addCalendarDays(data.firstDate, 42),
+  );
+  await cancelEvent(
+    db,
+    organizer,
+    cancelled.id,
+    (await findEvent(db, cancelled.id)).updatedAt,
+    "Skip this date",
+  );
+  const snapshots = (await db.prepare("SELECT * FROM event ORDER BY id").all())
+    .results;
+  const bookings = (await db.prepare("SELECT * FROM signup ORDER BY id").all())
+    .results;
+  const old = await findPatrolSeries(db, organizer, series.id);
+  const edited = { ...data, localTime: "19:15", intervalWeeks: 1 };
+  await savePatrolSeries(db, organizer, edited, series.id, old.updatedAt, true);
+  const current = await findPatrolSeries(db, organizer, series.id);
+  assert.equal(current.localTime, "19:15");
+  assert.equal(current.intervalWeeks, 1);
+  assert.ok(current.updatedAt > old.updatedAt);
+  for (const snapshot of snapshots) {
+    assert.deepEqual(
+      await db
+        .prepare("SELECT * FROM event WHERE id=?")
+        .bind(snapshot.id)
+        .first(),
+      snapshot,
+    );
+  }
+  assert.deepEqual(
+    (await db.prepare("SELECT * FROM signup ORDER BY id").all()).results,
+    bookings,
+  );
+  assert.equal(await count("event_notification"), 0);
+  const newDate = addCalendarDays(data.firstDate, 7);
+  assert.equal(
+    vancouverInput(
+      (await findEvent(db, patrolOccurrenceId(series.id, newDate))).startsAt,
+    ),
+    `${newDate}T19:15`,
+  );
+  const booked = (await listEvents(db, alice)).find(
+    (event) => event.id === initial[2].id,
+  );
+  assert.equal(booked?.signedUp, 1);
+  assert.equal(booked?.inSignupWindow, 0);
+  assert.equal(
+    (await listEvents(db, bob)).some((event) => event.id === initial[2].id),
+    false,
+  );
+  assert.equal(
+    (await listPublicRosters(db, alice, [initial[2].id])).people.length,
+    1,
+  );
+  assert.equal(
+    (await listPublicRosters(db, bob, [initial[2].id])).people.length,
+    0,
+  );
+  await assert.rejects(
+    changeSignup(db, bob, initial[2].id, "join"),
+    status(409),
+  );
+  await assert.rejects(
+    savePatrolSeries(db, organizer, data, series.id, old.updatedAt),
+    status(409),
+  );
+  await changeSignup(db, alice, initial[2].id, "cancel");
+  await ensurePatrolOccurrences(db, series.id);
+  assert.ok((await findEvent(db, cancelled.id)).cancelledAt);
+  await assert.rejects(
+    db
+      .prepare("UPDATE patrol_series SET first_date=? WHERE id=?")
+      .bind(newDate, series.id)
+      .run(),
+    /patrol_series_identity_immutable/,
+  );
+});
+
+test("longer intervals retain effective templates and off-cadence snapshots as editable/stoppable boundaries", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  const initial = await all(series.id);
+  let current = await findPatrolSeries(db, organizer, series.id);
+  await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    data.firstDate,
+    templateInput(),
+    current.updatedAt,
+  );
+  const templates = await listPatrolTemplates(db, organizer, series.id);
+  const snapshots = (await db.prepare("SELECT * FROM event ORDER BY id").all())
+    .results;
+  current = await findPatrolSeries(db, organizer, series.id);
+  const edited = { ...data, localTime: "19:15", intervalWeeks: 3 };
+  // Simulate a pause between the atomic defaults write and maintenance: the old
+  // coverage must not authorize a direct signup under the new cadence.
+  const paused = new Proxy(db, {
+    get(target, key) {
+      if (key === "batch")
+        return async (statements: D1PreparedStatement[]) => {
+          await target.batch(statements);
+          assert.equal(
+            await target
+              .prepare("SELECT generation_until FROM patrol_series WHERE id=?")
+              .bind(series.id)
+              .first("generation_until"),
+            0,
+          );
+          throw new Error("maintenance paused");
+        };
+      const value = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  await assert.rejects(
+    savePatrolSeries(paused, organizer, edited, series.id, current.updatedAt),
+    /maintenance paused/,
+  );
+  await assert.rejects(
+    db
+      .prepare(
+        "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('paused',?,'alice',0,0)",
+      )
+      .bind(initial[0].id)
+      .run(),
+    /recurring_signup_window/,
+  );
+  await ensurePatrolOccurrences(db, series.id);
+  assert.deepEqual(
+    await listPatrolTemplates(db, organizer, series.id),
+    templates,
+  );
+  for (const snapshot of snapshots) {
+    assert.deepEqual(
+      await db
+        .prepare("SELECT * FROM event WHERE id=?")
+        .bind(snapshot.id)
+        .first(),
+      snapshot,
+    );
+  }
+  const futureDate = addCalendarDays(data.firstDate, 42);
+  const future = await materializePatrolOccurrence(
+    db,
+    organizer,
+    series.id,
+    futureDate,
+  );
+  assert.equal(
+    vancouverInput((await findEvent(db, future.id)).startsAt),
+    `${addCalendarDays(futureDate, 1)}T21:15`,
+  );
+  assert.equal(
+    (
+      await materializePatrolOccurrence(
+        db,
+        organizer,
+        series.id,
+        initial[1].occurrenceDate!,
+      )
+    ).id,
+    initial[1].id,
+  );
+  await assert.rejects(
+    materializePatrolOccurrence(
+      db,
+      organizer,
+      series.id,
+      addCalendarDays(data.firstDate, 7),
+    ),
+    status(400),
+  );
+  current = await findPatrolSeries(db, organizer, series.id);
+  await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    initial[1].occurrenceDate!,
+    { ...templateInput(), localTime: "22:00" },
+    current.updatedAt,
+  );
+  assert.equal(
+    vancouverInput((await findEvent(db, initial[1].id)).startsAt).slice(11),
+    "22:00",
+  );
+  current = await findPatrolSeries(db, organizer, series.id);
+  await stopPatrolSeries(
+    db,
+    organizer,
+    series.id,
+    initial[1].occurrenceDate!,
+    current.updatedAt,
+  );
+  current = await findPatrolSeries(db, organizer, series.id);
+  await savePatrolSeries(
+    db,
+    organizer,
+    { ...edited, intervalWeeks: 1 },
+    series.id,
+    current.updatedAt,
+  );
+  assert.ok((await findEvent(db, initial[1].id)).cancelledAt);
+  assert.equal(
+    (await all(series.id)).some(
+      (event) =>
+        !event.cancelledAt &&
+        event.occurrenceDate! >= initial[1].occurrenceDate!,
+    ),
+    false,
   );
 });
 
