@@ -95,7 +95,7 @@ for (const width of [390, 1280]) {
   }
 }
 
-test("organizer profile contents reveal tabs and clear sticky navigation on the page and in dialogs", async ({
+test("organizer profile contents reveal application details on the page and in dialogs", async ({
   page,
   baseURL,
 }) => {
@@ -123,10 +123,10 @@ test("organizer profile contents reveal tabs and clear sticky navigation on the 
         await page.goto("/manage/volunteers/local-fixture-user-robin");
       }
       const profile = page.locator("[data-volunteer-profile]");
-      const tabs = profile.getByRole("tablist", { name: "Volunteer details" });
+      await expect(profile.getByRole("tablist")).toHaveCount(0);
       await expect(
-        tabs.getByRole("tab", { name: "Profile", exact: true }),
-      ).toHaveAttribute("aria-selected", "true");
+        profile.getByRole("heading", { name: "Profile", exact: true }),
+      ).toBeVisible();
       const contents = profile.locator("[data-page-contents]");
       const menu = contents.locator("[data-contents-menu]");
       const compact = await menu.locator("summary").isVisible();
@@ -137,61 +137,34 @@ test("organizer profile contents reveal tabs and clear sticky navigation on the 
         await expect(heading).toBeInViewport({
           ratio: id.endsWith("-panel") ? 0 : 1,
         });
-        await expect
-          .poll(async () => {
-            const headingBox = (await heading.boundingBox())!;
-            const tabsBox = (await tabs.boundingBox())!;
-            return headingBox.y - tabsBox.y - tabsBox.height;
-          })
-          .toBeGreaterThanOrEqual(15);
         if (compact) {
           await expect(menu).not.toHaveAttribute("open");
           const bar = (await contents
             .locator("[data-contents-bar]")
             .boundingBox())!;
-          expect((await tabs.boundingBox())!.y).toBeGreaterThanOrEqual(
+          expect((await heading.boundingBox())!.y).toBeGreaterThanOrEqual(
             bar.y + bar.height - 1,
           );
         }
       };
       await jump("volunteer-profile-panel");
-      const profileTab = tabs.getByRole("tab", {
-        name: "Profile",
-        exact: true,
-      });
-      const applicationTab = tabs.getByRole("tab", {
-        name: "Application",
-        exact: true,
-      });
-      await profileTab.focus();
-      await profileTab.press("End");
-      await expect(applicationTab).toBeFocused();
-      await expect(applicationTab).toHaveAttribute("aria-selected", "true");
-      await applicationTab.press("Home");
-      await expect(profileTab).toBeFocused();
       await jump("volunteer-application-panel");
       await jump("volunteer-emergency-contact");
       await expect(
-        tabs.getByRole("tab", { name: "Application", exact: true }),
-      ).toHaveAttribute("aria-selected", "true");
+        profile.locator('[data-volunteer-profile-panel="application"] details'),
+      ).toHaveAttribute("open");
       await expect(
         profile.locator('[data-volunteer-profile-panel="profile"]'),
-      ).toBeHidden();
+      ).toBeVisible();
       await jump("volunteer-current-emergency-contact");
-      await expect(
-        tabs.getByRole("tab", { name: "Profile", exact: true }),
-      ).toHaveAttribute("aria-selected", "true");
       await page.goBack();
-      await expect(
-        tabs.getByRole("tab", { name: "Application", exact: true }),
-      ).toHaveAttribute("aria-selected", "true");
       await expect(
         profile.locator("#volunteer-emergency-contact"),
       ).toBeInViewport({ ratio: 1 });
       expect(
         await profile.evaluate((element) => {
           const panel = element.querySelector<HTMLElement>(
-            "[data-volunteer-profile-panel]:not([hidden])",
+            '[data-volunteer-profile-panel="application"]',
           )!;
           const controls = element.querySelector<HTMLElement>(
             "[data-volunteer-controls]",
@@ -218,8 +191,10 @@ test("organizer profile contents reveal tabs and clear sticky navigation on the 
       } else {
         await page.reload();
         await expect(
-          tabs.getByRole("tab", { name: "Application", exact: true }),
-        ).toHaveAttribute("aria-selected", "true");
+          profile.locator(
+            '[data-volunteer-profile-panel="application"] details',
+          ),
+        ).toHaveAttribute("open");
         await expect(
           profile.locator("#volunteer-emergency-contact"),
         ).toBeInViewport({ ratio: 1 });

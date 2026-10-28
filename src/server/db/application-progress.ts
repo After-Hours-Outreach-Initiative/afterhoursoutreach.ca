@@ -3,6 +3,7 @@ export interface ApplicationProgress {
   naloxoneCompletedAt: number | null;
   applicationApproved: boolean;
   applicationApprovedAt: number | null;
+  applicationRejectionReason?: string | null;
   discordRequired?: boolean;
   discordCompletedAt?: number | null;
 }
@@ -36,6 +37,7 @@ export async function loadApplicationProgress(
       `SELECT p.registered_at AS submittedAt,
         p.naloxone_completed_at AS naloxoneCompletedAt,
         v.registration_approved AS applicationApproved,
+        v.application_rejection_reason AS applicationRejectionReason,
         (p.user_id IS NULL OR EXISTS(SELECT 1 FROM discord_requirement WHERE user_id=u.id)) AS discordRequired,
         (SELECT completed_at FROM discord_link WHERE user_id=u.id) AS discordCompletedAt,
         (SELECT max(a.created_at) FROM audit_log a
@@ -57,6 +59,7 @@ export async function loadApplicationProgress(
     submittedAt: row?.submittedAt ?? null,
     naloxoneCompletedAt: row?.naloxoneCompletedAt ?? null,
     applicationApproved: Boolean(row?.applicationApproved),
+    applicationRejectionReason: row?.applicationRejectionReason ?? null,
     discordRequired: Boolean(row?.discordRequired),
     discordCompletedAt: row?.discordCompletedAt ?? null,
     // approved_at belongs to patrol approval. Only an application-status audit

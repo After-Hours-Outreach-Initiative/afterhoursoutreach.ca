@@ -39,6 +39,7 @@ import { RequestError } from "../src/server/http";
 import {
   listVolunteers,
   setVolunteerStatus,
+  rejectApplication,
   viewVolunteerProfile,
   volunteerPageSize,
 } from "../src/server/db/volunteers";
@@ -673,6 +674,40 @@ test("application queue counts submitted unapproved applications matching search
   );
   assert.equal(organizerQueue.awaitingApprovalCount, 1);
   assert.equal(organizerQueue.rows[0].id, actor.id);
+  const rejection = {
+    userId: "pending-02",
+    version: (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
+      .updatedAt,
+    reason: "We cannot accommodate your availability.",
+  };
+  const decision = await rejectApplication(env.DB, actor, rejection);
+  assert.equal(
+    (await loadApplicationProgress(env.DB, rejection.userId))
+      .applicationRejectionReason,
+    rejection.reason,
+  );
+  assert.equal(
+    (await listVolunteers(env.DB, actor, rejection.userId, 0, "awaiting"))
+      .awaitingApprovalCount,
+    0,
+  );
+  const localDelivery = await deliverNotifications(
+    { ...env, APP_ENV: "local" },
+    decision.operation,
+    async () => {
+      throw new Error("Local rejection must not call a provider");
+    },
+  );
+  assert.equal(localDelivery.simulated, 1);
+  const rejectionPayload = JSON.parse(
+    (await env.DB.prepare(
+      "SELECT payload FROM event_notification_batch WHERE operation_id=?",
+    )
+      .bind(decision.operation)
+      .first<string>("payload"))!,
+  );
+  assert.ok(rejectionPayload[0].text.includes(rejection.reason));
+  assert.deepEqual(rejectionPayload[0].to, ["pending-02@example.org"]);
   await env.DB.prepare("DELETE FROM session WHERE id=?")
     .bind(actor.sessionId)
     .run();
@@ -680,6 +715,20 @@ test("application queue counts submitted unapproved applications matching search
     viewVolunteerProfile(env.DB, actor, "pending-02"),
     statusError(403),
   ); // A stale organizer actor cannot disclose email or application answers.
+  await assert.rejects(
+    rejectApplication(env.DB, actor, {
+      ...rejection,
+      userId: "pending-03",
+      version: 0,
+    }),
+    statusError(409),
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT application_rejection_reason FROM volunteer_status WHERE user_id='pending-03'",
+    ).first("application_rejection_reason"),
+    null,
+  );
 });
 
 const completeAnswers = () =>
@@ -1021,6 +1070,7 @@ test("application progress and organizer attribution use application audits, not
     naloxoneCompletedAt: null,
     applicationApproved: false,
     applicationApprovedAt: null,
+    applicationRejectionReason: null,
     discordRequired: true,
     discordCompletedAt: null,
   });

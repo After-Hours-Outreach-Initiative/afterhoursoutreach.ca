@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   accessRegistrationCancelledTemplate,
+  applicationRejectedEmail,
   roleChangedEmail,
   volunteerAccessEmail,
 } from "../../data/email-templates";
@@ -33,6 +34,7 @@ export interface VolunteerRow {
   role: "volunteer" | "organizer";
   active: number;
   applicationApproved: number;
+  applicationRejectionReason: string | null;
   patrolApproved: number;
   updatedAt: number;
   twoFactorEnabled: number;
@@ -60,10 +62,10 @@ export async function listVolunteers(
     db
       .prepare(
         `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
-        v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       ${applicantsSql}
-        AND (? = 'all' OR v.registration_approved = 0)
+        AND (? = 'all' OR (v.registration_approved = 0 AND v.application_rejection_reason IS NULL))
       ORDER BY v.registration_approved, name, u.id
       LIMIT ? OFFSET ?`,
       )
@@ -71,7 +73,7 @@ export async function listVolunteers(
     db
       .prepare(
         `SELECT count(*) AS allApplicantsCount,
-          count(CASE WHEN v.registration_approved = 0 THEN 1 END) AS awaitingApprovalCount
+          count(CASE WHEN v.registration_approved = 0 AND v.application_rejection_reason IS NULL THEN 1 END) AS awaitingApprovalCount
         ${applicantsSql}`,
       )
       .bind(query),
@@ -94,7 +96,7 @@ export function findVolunteer(db: Env["DB"], actor: Actor, userId: string) {
   return db
     .prepare(
       `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
-        v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
       FROM user u JOIN profile p ON p.user_id=u.id
       JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=? AND u.deleted_at IS NULL`,
@@ -337,6 +339,7 @@ export async function setVolunteerStatus(
           `UPDATE volunteer_status
           SET active = ?,
               registration_approved = ?,
+              application_rejection_reason = CASE WHEN ? = 1 THEN NULL ELSE application_rejection_reason END,
               patrol_approved = ?,
               approved_by = CASE WHEN patrol_approved = ? THEN approved_by ELSE ? END,
               approved_at = CASE WHEN patrol_approved = ? THEN approved_at ELSE ? END,
@@ -351,6 +354,7 @@ export async function setVolunteerStatus(
         )
         .bind(
           Number(active),
+          Number(applicationApproved),
           Number(applicationApproved),
           Number(patrolApproved),
           Number(patrolApproved),
@@ -456,6 +460,75 @@ export async function setVolunteerStatus(
         "This volunteer's status changed. Reload before saving.",
       );
     return { operation, message: "Volunteer access saved." };
+  } catch (error) {
+    return databaseWriteError(error);
+  }
+}
+
+export const rejectionSchema = z.strictObject({
+  userId: z.string().min(1).max(200),
+  version: z.number().int().nonnegative(),
+  reason: z.string().trim().min(1).max(2000),
+});
+
+/** Save the decision, audit, and required applicant email in one guarded batch. */
+export async function rejectApplication(
+  db: Env["DB"],
+  actor: Actor,
+  input: unknown,
+) {
+  requireOrganizer(actor);
+  const parsed = rejectionSchema.safeParse(input);
+  if (!parsed.success)
+    throw new RequestError(
+      400,
+      "Provide a rejection reason of up to 2,000 characters.",
+    );
+  const { userId, version, reason } = parsed.data;
+  const operation = crypto.randomUUID();
+  const now = Math.max(Date.now(), version + 1);
+  const email = applicationRejectedEmail(reason);
+  try {
+    const results = await db.batch([
+      db
+        .prepare(
+          `UPDATE volunteer_status SET application_rejection_reason=?, updated_at=?
+        WHERE user_id=? AND updated_at=? AND registration_approved=0
+          AND application_rejection_reason IS NULL
+          AND EXISTS (SELECT 1 FROM profile p JOIN user u ON u.id=p.user_id
+            WHERE p.user_id=volunteer_status.user_id AND u.deleted_at IS NULL AND u.email_verified=1)
+          AND ${writePermission(true)}`,
+        )
+        .bind(reason, now, userId, version, ...permissionValues(actor)),
+      db
+        .prepare(
+          `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+        SELECT ?, ?, ?, 'application_rejected', '["applicationRejectionReason"]', ?
+        WHERE changes()=1`,
+        )
+        .bind(operation, actor.id, userId, now),
+      db
+        .prepare(
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+        SELECT ?, ?, id, ?, ?, ?, email FROM user
+        WHERE id=? AND EXISTS (SELECT 1 FROM audit_log WHERE id=?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          operation,
+          email.subject,
+          email.text,
+          now,
+          userId,
+          operation,
+        ),
+    ]);
+    if (!results[0].meta.changes)
+      throw new RequestError(
+        409,
+        "The application or organizer access changed. Reload before reviewing.",
+      );
+    return { operation, message: "Application rejected." };
   } catch (error) {
     return databaseWriteError(error);
   }

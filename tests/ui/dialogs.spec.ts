@@ -272,12 +272,13 @@ test("event and profile dialogs preserve their layout and content throughout the
     const profile = page.locator("[data-volunteer-profile-dialog]");
     await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
     await expect(profile.locator(".volunteer-profile-loading")).toHaveCount(0);
-    const profilePanel = profile.getByRole("tabpanel", {
+    const profilePanel = profile.getByRole("region", {
       name: "Profile",
       exact: true,
     });
     await expect(profilePanel).toBeVisible();
     await expect(profilePanel.getByRole("heading")).toHaveText([
+      "Profile",
       "Personal info",
       "Emergency contact",
       "Team interests",
@@ -287,15 +288,16 @@ test("event and profile dialogs preserve their layout and content throughout the
       '[data-volunteer-profile-panel="application"] + [data-volunteer-controls]',
     );
     await expect(controls).toBeVisible();
-    await profile
-      .getByRole("tab", { name: "Application", exact: true })
-      .click();
-    const applicationPanel = profile.getByRole("tabpanel", {
+    const applicationPanel = profile.getByRole("region", {
       name: "Application",
       exact: true,
     });
     await expect(applicationPanel).toBeVisible();
+    await applicationPanel
+      .getByText("View submitted application", { exact: true })
+      .click();
     await expect(applicationPanel.getByRole("heading")).toHaveText([
+      "Application",
       "Submission details",
       "Personal info",
       "Emergency contact",

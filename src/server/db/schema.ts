@@ -275,6 +275,7 @@ export const volunteerStatus = sqliteTable(
     registration_approved: integer({ mode: "boolean" })
       .notNull()
       .default(false),
+    application_rejection_reason: text(),
     patrol_approved: integer({ mode: "boolean" }).notNull().default(false),
     approved_by: text().references(() => user.id),
     approved_at: timestamp(),
@@ -492,6 +493,7 @@ export const auditLog = sqliteTable(
         "profile_viewed",
         "profile_updated",
         "approval_changed",
+        "application_rejected",
         "role_changed",
         "active_changed",
         "orientation_completed",

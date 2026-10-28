@@ -34,7 +34,15 @@ test("Discord migration preserves existing volunteers and drafts without inventi
       draft = db.prepare("SELECT * FROM application_draft").get();
     const preservedTables = ["volunteer_status", "session", "event", "signup"];
     const before = preservedTables.map((table) =>
-      db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+      db
+        .prepare(`SELECT * FROM ${table} ORDER BY 1`)
+        .all()
+        .map((row) => ({
+          ...row,
+          ...(table === "volunteer_status"
+            ? { application_rejection_reason: null }
+            : {}),
+        })),
     );
     for (const file of files.slice(discord))
       db.exec(readFileSync(new URL(file, directory), "utf8"));
@@ -54,7 +62,10 @@ test("Discord migration preserves existing volunteers and drafts without inventi
     );
     assert.deepEqual(
       preservedTables.map((table) =>
-        db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+        db
+          .prepare(`SELECT * FROM ${table} ORDER BY 1`)
+          .all()
+          .map((row) => ({ ...row })),
       ),
       before,
       "Existing approvals, active sessions, events and bookings must survive migration unchanged.",

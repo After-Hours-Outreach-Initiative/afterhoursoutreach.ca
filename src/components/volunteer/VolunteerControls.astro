@@ -56,120 +56,180 @@ const { person } = Astro.props;
       }</button
     >
   </form>
-  <form
-    class="volunteer-form"
-    data-organizer-status
-    data-access-kind="patrol"
-    data-email-prompt="access"
-    action="/api/v1/organizer/action"
-    method="post"
-  >
-    <input type="hidden" name="userId" value={person.id} />
-    <input type="hidden" name="version" value={person.updatedAt} />
-    <input
-      type="checkbox"
-      name="applicationApproved"
-      checked={Boolean(person.applicationApproved)}
-      hidden
-    />
-    <input
-      type="checkbox"
-      name="active"
-      checked={Boolean(person.active)}
-      hidden
-    />
-    <input
-      type="checkbox"
-      name="patrolApproved"
-      checked={!person.patrolApproved}
-      hidden
-    />
-    <p data-form-message role="status" hidden></p>
-    <button
-      class:list={["btn", person.patrolApproved ? "btn-red" : "btn-green"]}
-      type="submit"
-      data-loading-label="Saving…"
-      data-volunteer-control
-      disabled
-      >{
-        person.patrolApproved ? "Revoke patrol approval" : "Approve for patrols"
-      }</button
-    >
-  </form>
-  <form
-    class="volunteer-form"
-    data-organizer-status
-    data-access-kind="active"
-    data-submit-on-change
-    data-email-prompt="access"
-    action="/api/v1/organizer/action"
-    method="post"
-  >
-    <input type="hidden" name="userId" value={person.id} />
-    <input type="hidden" name="version" value={person.updatedAt} />
-    <input
-      type="checkbox"
-      name="applicationApproved"
-      checked={Boolean(person.applicationApproved)}
-      hidden
-    />
-    <input
-      type="checkbox"
-      name="patrolApproved"
-      checked={Boolean(person.patrolApproved)}
-      hidden
-    />
-    <label class="volunteer-check"
-      ><input
-        type="checkbox"
-        name="active"
-        checked={Boolean(person.active)}
-        data-volunteer-control
-        disabled
-      />Active volunteer</label
-    >
-    <p data-form-message role="status" hidden></p>
-    <span
-      class="volunteer-control-loading"
-      data-action-loading
-      role="status"
-      hidden>Saving…</span
-    >
-    <noscript
-      ><button class="btn btn-quiet" type="submit">Save active status</button
-      ></noscript
-    >
-  </form>
-  <form
-    class="volunteer-form"
-    data-organizer-role
-    data-email-prompt="role"
-    data-submit-on-change
-    action="/api/v1/organizer/action"
-    method="post"
-  >
-    <input type="hidden" name="userId" value={person.id} />
-    <label class="volunteer-field"
-      >Account role
-      <select name="role" data-volunteer-control disabled>
-        <option value="volunteer" selected={person.role === "volunteer"}
-          >Volunteer</option
+  {
+    !person.applicationApproved && !person.applicationRejectionReason && (
+      <details>
+        <summary class="cursor-pointer text-red-300 underline underline-offset-4">
+          Reject application
+        </summary>
+        <form
+          class="volunteer-form mt-4"
+          data-organizer-rejection
+          action="/api/v1/organizer/action"
+          method="post"
         >
-        <option value="organizer" selected={person.role === "organizer"}
-          >Organizer</option
+          <input type="hidden" name="userId" value={person.id} />
+          <input type="hidden" name="version" value={person.updatedAt} />
+          <label class="volunteer-field">
+            Reason for rejection
+            <textarea
+              name="reason"
+              required
+              maxlength="2000"
+              rows="4"
+              data-volunteer-control
+              disabled
+            />
+          </label>
+          <p class="volunteer-help">
+            This reason will be emailed to the applicant and shown in their
+            application.
+          </p>
+          <p data-form-message role="status" hidden />
+          <button
+            class="btn btn-red"
+            type="submit"
+            data-loading-label="Sending…"
+            data-volunteer-control
+            disabled
+          >
+            Reject application and email reason
+          </button>
+        </form>
+      </details>
+    )
+  }
+  {
+    Boolean(person.applicationApproved) && (
+      <>
+        <form
+          class="volunteer-form"
+          data-organizer-status
+          data-access-kind="patrol"
+          data-email-prompt="access"
+          action="/api/v1/organizer/action"
+          method="post"
         >
-      </select>
-    </label>
-    <p data-form-message role="status" hidden></p>
-    <span
-      class="volunteer-control-loading"
-      data-action-loading
-      role="status"
-      hidden>Saving…</span
-    >
-    <noscript
-      ><button class="btn btn-outline" type="submit">Save role</button
-      ></noscript
-    >
-  </form>
+          <input type="hidden" name="userId" value={person.id} />
+          <input type="hidden" name="version" value={person.updatedAt} />
+          <input
+            type="checkbox"
+            name="applicationApproved"
+            checked={Boolean(person.applicationApproved)}
+            hidden
+          />
+          <input
+            type="checkbox"
+            name="active"
+            checked={Boolean(person.active)}
+            hidden
+          />
+          <input
+            type="checkbox"
+            name="patrolApproved"
+            checked={!person.patrolApproved}
+            hidden
+          />
+          <p data-form-message role="status" hidden />
+          <button
+            class:list={[
+              "btn",
+              person.patrolApproved ? "btn-red" : "btn-green",
+            ]}
+            type="submit"
+            data-loading-label="Saving…"
+            data-volunteer-control
+            disabled
+          >
+            {person.patrolApproved
+              ? "Revoke patrol approval"
+              : "Approve for patrols"}
+          </button>
+        </form>
+        <form
+          class="volunteer-form"
+          data-organizer-status
+          data-access-kind="active"
+          data-submit-on-change
+          data-email-prompt="access"
+          action="/api/v1/organizer/action"
+          method="post"
+        >
+          <input type="hidden" name="userId" value={person.id} />
+          <input type="hidden" name="version" value={person.updatedAt} />
+          <input
+            type="checkbox"
+            name="applicationApproved"
+            checked={Boolean(person.applicationApproved)}
+            hidden
+          />
+          <input
+            type="checkbox"
+            name="patrolApproved"
+            checked={Boolean(person.patrolApproved)}
+            hidden
+          />
+          <label class="volunteer-check">
+            <input
+              type="checkbox"
+              name="active"
+              checked={Boolean(person.active)}
+              data-volunteer-control
+              disabled
+            />
+            Active volunteer
+          </label>
+          <p data-form-message role="status" hidden />
+          <span
+            class="volunteer-control-loading"
+            data-action-loading
+            role="status"
+            hidden
+          >
+            Saving…
+          </span>
+          <noscript>
+            <button class="btn btn-quiet" type="submit">
+              Save active status
+            </button>
+          </noscript>
+        </form>
+        <form
+          class="volunteer-form"
+          data-organizer-role
+          data-email-prompt="role"
+          data-submit-on-change
+          action="/api/v1/organizer/action"
+          method="post"
+        >
+          <input type="hidden" name="userId" value={person.id} />
+          <label class="volunteer-field">
+            Account role
+            <select name="role" data-volunteer-control disabled>
+              <option value="volunteer" selected={person.role === "volunteer"}>
+                Volunteer
+              </option>
+              <option value="organizer" selected={person.role === "organizer"}>
+                Organizer
+              </option>
+            </select>
+          </label>
+          <p data-form-message role="status" hidden />
+          <span
+            class="volunteer-control-loading"
+            data-action-loading
+            role="status"
+            hidden
+          >
+            Saving…
+          </span>
+          <noscript>
+            <button class="btn btn-outline" type="submit">
+              Save role
+            </button>
+          </noscript>
+        </form>
+      </>
+    )
+  }
 </section>

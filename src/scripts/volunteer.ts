@@ -8,9 +8,9 @@ import { chooseNotification } from "./notification-choice";
 import { confirmSeriesDeletion } from "./event-deletion";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
-  disposeVolunteerProfileTabs,
-  initVolunteerProfileTabs,
-} from "./volunteer-profile-tabs";
+  disposeVolunteerProfileContents,
+  initVolunteerProfileContents,
+} from "./volunteer-profile-contents";
 import { initSignupMenus } from "./signup-menu";
 import {
   initBulkEvents,
@@ -72,7 +72,7 @@ let refreshDeferredEvents = () => {};
 for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
   renderedCards.set(card, card.outerHTML);
 initEventDates(document);
-initVolunteerProfileTabs();
+initVolunteerProfileContents();
 initSignupMenus();
 
 function applyEventFilter(root: HTMLElement, type: string) {
@@ -488,9 +488,13 @@ async function refreshVolunteer(element: HTMLFormElement) {
   ]);
   const replacement = actionFragment(page, "[data-volunteer-profile]");
   initVolunteerControls(replacement);
-  const selectedTab = profile.querySelector<HTMLElement>(
-    '[data-volunteer-profile-tab][aria-selected="true"]',
-  )?.dataset.volunteerProfileTab;
+  const applicationOpen = profile.querySelector<HTMLDetailsElement>(
+    "[data-submitted-application] details",
+  )?.open;
+  const nextApplication = replacement.querySelector<HTMLDetailsElement>(
+    "[data-submitted-application] details",
+  );
+  if (nextApplication && applicationOpen) nextApplication.open = true;
   // Keep the dialog itself (and its scroll position) open; replace all status
   // forms together so their versions and hidden checkbox values stay in sync.
   const dialog = element.closest<HTMLDialogElement>("dialog");
@@ -502,13 +506,15 @@ async function refreshVolunteer(element: HTMLFormElement) {
   const restoreFocus = element.contains(active) || active === document.body;
   const selector = element.matches("[data-organizer-role]")
     ? '[data-organizer-role] select[name="role"]'
-    : element.hasAttribute("data-submit-on-change")
-      ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
-      : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
+    : element.matches("[data-organizer-rejection]")
+      ? '[data-organizer-status][data-access-kind="application"] button[type="submit"]'
+      : element.hasAttribute("data-submit-on-change")
+        ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
+        : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
   if (profile.isConnected && (!dialog || dialog.open)) {
-    disposeVolunteerProfileTabs(profile);
+    disposeVolunteerProfileContents(profile);
     profile.replaceWith(replacement);
-    initVolunteerProfileTabs(replacement, selectedTab);
+    initVolunteerProfileContents(replacement, true);
     if (scrollContainer && scroll !== undefined)
       scrollContainer.scrollTop = scroll;
     if (restoreFocus)
@@ -742,7 +748,9 @@ function form(
                 ? "Registration changed"
                 : element.matches("[data-organizer-role]")
                   ? "Account role saved"
-                  : "Volunteer access saved";
+                  : element.matches("[data-organizer-rejection]")
+                    ? "Application rejected"
+                    : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -755,7 +763,11 @@ function form(
         !(await confirmSeriesDeletion())
       )
         return;
-      let notify: boolean | undefined;
+      let notify: boolean | undefined = element.matches(
+        "[data-organizer-rejection]",
+      )
+        ? true
+        : undefined;
       const prompt = eventEmailPrompt(
         values,
         element.dataset.emailPrompt,
@@ -789,7 +801,10 @@ function form(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...body(values),
-          ...(notify === undefined ? {} : { notify }),
+          ...(notify === undefined ||
+          element.matches("[data-organizer-rejection]")
+            ? {}
+            : { notify }),
         }),
       });
       const result: EmailActionResult = await response.json();
@@ -978,6 +993,17 @@ form(
   refreshVolunteer,
 );
 form(
+  "[data-organizer-rejection]",
+  "/api/v1/organizer/action",
+  (v) => ({
+    action: "reject-application",
+    userId: str(v, "userId"),
+    version: Number(v.get("version")),
+    reason: str(v, "reason"),
+  }),
+  refreshVolunteer,
+);
+form(
   "[data-organizer-role]",
   "/api/v1/organizer/action",
   (v) => ({
@@ -1058,7 +1084,7 @@ if (profileDialog && profileContent) {
     // A rapid reopen (even followed by another close) owns its own cleanup.
     if (profileDialog.open || pending !== closingRequest) return;
     pending = undefined;
-    disposeVolunteerProfileTabs(profileContent);
+    disposeVolunteerProfileContents(profileContent);
     profileContent.replaceChildren();
     profileContent.removeAttribute("aria-busy");
     profileContent.scrollTop = 0;
@@ -1081,7 +1107,7 @@ if (profileDialog && profileContent) {
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
-    disposeVolunteerProfileTabs(profileContent);
+    disposeVolunteerProfileContents(profileContent);
     if (loadingTemplate)
       profileContent.replaceChildren(loadingTemplate.content.cloneNode(true));
     else profileContent.textContent = "Loading";
@@ -1130,7 +1156,7 @@ if (profileDialog && profileContent) {
           });
         }
         profileContent.replaceChildren(profile);
-        initVolunteerProfileTabs(profile);
+        initVolunteerProfileContents(profile);
         if (loading && animate) {
           // Keep the outgoing loader in place as the full profile grows below it.
           loading.style.height = `${loadingHeight}px`;

@@ -297,57 +297,36 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(page.locator("[data-volunteer-profile-dialog]")).toHaveCount(
       0,
     );
-    const profile = page.getByRole("tabpanel", {
+    const profile = page.getByRole("region", {
       name: "Profile",
       exact: true,
     });
-    const application = page.getByRole("tabpanel", {
+    const application = page.getByRole("region", {
       name: "Application",
       exact: true,
     });
-    const profileTab = page.getByRole("tab", { name: "Profile", exact: true });
-    const applicationTab = page.getByRole("tab", {
-      name: "Application",
-      exact: true,
-    });
+    await expect(page.getByRole("tab")).toHaveCount(0);
     await expect(
       page.locator(
         '[data-volunteer-profile-panel="application"] + [data-volunteer-controls]',
       ),
     ).toBeVisible();
-    await expect(profileTab).toHaveAttribute("aria-selected", "true");
-    await expect(profile.getByRole("heading")).toHaveText([
-      "Personal info",
-      "Emergency contact",
-      "Team interests",
-      "Training and safety",
-    ]);
+    await expect(profile).toHaveCount(0);
     await expect(
-      profile.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
+      application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByText("Application awaiting approval", { exact: true }),
     ).toBeVisible();
-    await expect(application).toBeHidden();
-    await profileTab.focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(applicationTab).toBeFocused();
-    await expect(applicationTab).toHaveAttribute("aria-selected", "true");
-    await expect(profileTab).toHaveAttribute("tabindex", "-1");
-    await expect(profile).toBeHidden();
     await expect(application).toBeVisible();
-    await page.keyboard.press("Home");
-    await expect(profileTab).toBeFocused();
-    await page.keyboard.press("End");
-    await expect(applicationTab).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(application).toBeFocused();
-    await page.keyboard.press("Tab");
     await expect(
-      page.getByRole("button", { name: "Approve application", exact: true }),
-    ).toBeFocused();
+      page.locator(
+        '[data-access-kind="patrol"], [data-organizer-role], [data-access-kind="active"]',
+      ),
+    ).toHaveCount(0);
     const summary = application.locator(".account-profile-summary");
     await expect(application.getByRole("heading")).toHaveText([
+      "Application",
       "Submission details",
       "Personal info",
       "Emergency contact",
@@ -401,7 +380,6 @@ test("organizers review submitted applications with search-aware filter counts a
     await page.setViewportSize({ width: 1280, height: 900 });
     await results.locator("tbody tr").first().locator("td").first().click();
     await expect(page).toHaveURL(`${origin}${profileHref}`);
-    await applicationTab.click();
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
@@ -411,9 +389,18 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(
       page.getByRole("button", { name: "Revoke application approval" }),
     ).toBeEnabled();
-    await expect(applicationTab).toHaveAttribute("aria-selected", "true");
     await expect(application).toBeVisible();
-    await expect(profile).toBeHidden();
+    await expect(profile).toBeVisible();
+    await expect(profile.getByRole("heading").first()).toHaveText("Profile");
+    const submittedDetails = application.locator("details");
+    await expect(submittedDetails).not.toHaveAttribute("open");
+    await application
+      .getByText("View submitted application", { exact: true })
+      .click();
+    await expect(submittedDetails).toHaveAttribute("open");
+    await expect(
+      application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
+    ).toBeVisible();
     await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(count).toHaveText("52");
     await expect(allCount).toHaveText("53");
@@ -510,11 +497,11 @@ test("organizers review submitted applications with search-aware filter counts a
     await plain.getByRole("button", { name: "Awaiting approval (1)" }).click();
     await plain.locator("[data-volunteer-profile-link]").click();
     await expect(
-      plain.getByRole("heading", { name: "Current profile", exact: true }),
-    ).toBeVisible();
+      plain.getByRole("heading", { name: "Profile", exact: true }),
+    ).toHaveCount(0);
     await expect(
       plain.getByRole("heading", {
-        name: "Submitted application",
+        name: "Application",
         exact: true,
       }),
     ).toBeVisible();
@@ -557,6 +544,153 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(
       results.getByText("No applications are awaiting approval."),
     ).toBeVisible();
+
+    const postAction = (body: object, auth = cookie, requestOrigin = origin) =>
+      worker.fetch(`${origin}/api/v1/organizer/action`, {
+        method: "POST",
+        headers: {
+          cookie: auth,
+          origin: requestOrigin,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    const status = () =>
+      DB.prepare(
+        "SELECT * FROM volunteer_status WHERE user_id='applicant-50'",
+      ).first<{
+        updated_at: number;
+        application_rejection_reason: string | null;
+      }>();
+    const version = (await status())!.updated_at;
+    const rejection = {
+      action: "reject-application",
+      userId: "applicant-50",
+      version,
+      reason:
+        "We cannot accommodate your availability. <Please contact us>\nThank you for applying.",
+    };
+    // Rejection is a pending-application decision, not a shortcut for revoking approval.
+    assert.equal((await postAction(rejection)).status, 409);
+    await DB.prepare(
+      "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='applicant-50'",
+    ).run();
+    const beforeRejection = await status();
+    assert.equal((await postAction(rejection, "")).status, 401);
+    assert.equal((await postAction(rejection, volunteerCookie)).status, 403);
+    assert.equal(
+      (await postAction(rejection, cookie, "https://evil.example.org")).status,
+      403,
+    );
+    for (const reason of ["", " \n\t ", "x".repeat(2001)])
+      assert.equal((await postAction({ ...rejection, reason })).status, 400);
+    assert.equal(
+      (await postAction({ ...rejection, version: version + 1 })).status,
+      409,
+    );
+    assert.deepEqual(await status(), beforeRejection);
+    const applicantCookie = await signIn("applicant-50");
+    const beforeDecisionVersion = await (
+      await get("/api/v1/events/version", applicantCookie)
+    ).text();
+
+    await page.goto(`${origin}/manage/volunteers/applicant-50`);
+    await page.getByText("Reject application", { exact: true }).click();
+    await page
+      .getByLabel("Reason for rejection")
+      .fill(`  ${rejection.reason}  `);
+    await page
+      .getByRole("button", {
+        name: "Reject application and email reason",
+        exact: true,
+      })
+      .click();
+    await expect(page.locator("[data-application-rejection]")).toHaveText(
+      `Reason: ${rejection.reason}`,
+    );
+    const feedback = page.locator("[data-action-email-feedback]");
+    await expect(feedback).toBeVisible();
+    await expect(feedback).toContainText("Application rejected.");
+    await expect(feedback).toContainText("could not be sent");
+    const savedRejection = await status();
+    assert.equal(
+      savedRejection!.application_rejection_reason,
+      rejection.reason,
+    );
+    const queued = await DB.prepare(
+      "SELECT operation_id, delivery_to, body FROM event_notification WHERE user_id='applicant-50' AND subject='Your volunteer application was not approved'",
+    ).all<{ operation_id: string; delivery_to: string; body: string }>();
+    assert.equal(queued.results.length, 1);
+    assert.equal(queued.results[0].delivery_to, "applicant-50@example.org");
+    assert.ok(queued.results[0].body.includes(rejection.reason));
+    const decisionAudit = await DB.prepare(
+      "SELECT changed_fields FROM audit_log WHERE id=? AND action='application_rejected'",
+    )
+      .bind(queued.results[0].operation_id)
+      .first<string>("changed_fields");
+    assert.equal(decisionAudit, '["applicationRejectionReason"]');
+    // Retrying only email cannot repeat the decision or overwrite its reason.
+    await feedback.getByRole("button", { name: "Retry email only" }).click();
+    await expect(
+      feedback.getByRole("button", { name: "Retry email only" }),
+    ).toBeEnabled();
+    assert.deepEqual(await status(), savedRejection);
+    assert.equal((await postAction(rejection)).status, 409);
+    assert.equal(
+      await DB.prepare(
+        "SELECT count(*) AS n FROM event_notification WHERE operation_id=?",
+      )
+        .bind(queued.results[0].operation_id)
+        .first<number>("n"),
+      1,
+    );
+    await feedback.locator(".dialog-close").click();
+    await page
+      .getByRole("button", { name: "Approve application", exact: true })
+      .focus();
+    await page.goto(
+      `${origin}/manage/volunteers?approval=awaiting&q=applicant-50`,
+    );
+    await expect(count).toHaveText("0");
+    await page.getByRole("button", { name: "All (1)", exact: true }).click();
+    await expect(results).toContainText("Rejected");
+    assert.notEqual(
+      await (await get("/api/v1/events/version", applicantCookie)).text(),
+      beforeDecisionVersion,
+    );
+    for (const path of ["/volunteer", "/volunteer/account"]) {
+      const decision = await get(path, applicantCookie);
+      assert.equal(decision.status, 200);
+      const decisionHtml = await decision.text();
+      assert.match(decisionHtml, /Application rejected/);
+      assert.ok(decisionHtml.includes("&lt;Please contact us&gt;"));
+      assert.equal(
+        await page.evaluate(
+          (html) =>
+            new DOMParser()
+              .parseFromString(html, "text/html")
+              .querySelector("please") !== null,
+          decisionHtml,
+        ),
+        false,
+      );
+    }
+    assert.ok(
+      !(
+        await (await get("/volunteer/account", volunteerCookie)).text()
+      ).includes("We cannot accommodate your availability."),
+    );
+    const approvedAgain = await postAction({
+      action: "status",
+      userId: "applicant-50",
+      version: savedRejection!.updated_at,
+      active: true,
+      applicationApproved: true,
+      patrolApproved: false,
+    });
+    assert.equal(approvedAgain.status, 200, await approvedAgain.clone().text());
+    assert.equal((await status())!.application_rejection_reason, null);
+    assert.deepEqual(errors, []);
   } finally {
     await browser.close();
     await server.close();

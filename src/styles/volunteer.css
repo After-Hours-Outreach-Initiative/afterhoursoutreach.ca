@@ -1512,39 +1512,7 @@ body:has(
   + .volunteer-profile-section {
   margin-top: 2rem;
 }
-.volunteer-profile-tabs {
-  position: sticky;
-  top: calc(
-    var(--contents-sticky-offset, var(--site-header-height)) +
-      var(--contents-bar-height, 4.875rem)
-  );
-  z-index: 20;
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
-  background: #0c0d10;
-  border-bottom: var(--volunteer-border);
-}
-.volunteer-profile-tabs a {
-  min-width: 0;
-  min-height: 2.75rem;
-  padding: 0.75rem;
-  border-bottom: 3px solid transparent;
-  color: #a1a1aa;
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-.volunteer-profile-tabs a:is(:hover, [aria-selected="true"]) {
-  color: #e0e7ff;
-  border-bottom-color: #818cf8;
-}
-.volunteer-profile-tabs a:focus-visible,
-[data-volunteer-profile-panel]:focus-visible {
-  outline: 3px solid #a5b4fc;
-  outline-offset: 0.25rem;
-}
-[data-volunteer-profile-panel]
-  + [data-volunteer-profile-panel]:not([role="tabpanel"]) {
+[data-volunteer-profile-panel] + [data-volunteer-profile-panel] {
   margin-top: 2rem;
 }
 .volunteer-profile-controls {

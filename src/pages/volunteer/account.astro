@@ -150,7 +150,7 @@ const contents = [
     heading: section.heading,
     nested: true,
   })),
-  ...(applicationComplete
+  ...(applicationComplete || applicationProgress.applicationRejectionReason
     ? [
         {
           id: "submitted-application-heading",
@@ -252,7 +252,8 @@ const contents = [
         }
       </section>
       {
-        applicationComplete && (
+        (applicationComplete ||
+          applicationProgress.applicationRejectionReason) && (
           <section
             class="volunteer-panel"
             aria-labelledby="submitted-application-heading"
@@ -260,6 +261,14 @@ const contents = [
             <h2 id="submitted-application-heading" data-contents-section>
               Volunteer Application
             </h2>
+            {applicationProgress.applicationRejectionReason && (
+              <div class="volunteer-notice" data-application-rejection>
+                <p>Application rejected</p>
+                <p class="mt-2 whitespace-pre-wrap">
+                  Reason: {applicationProgress.applicationRejectionReason}
+                </p>
+              </div>
+            )}
             {submission ? (
               <SubmittedApplication submission={submission} embedded />
             ) : (
@@ -268,28 +277,30 @@ const contents = [
                 answers were not captured for this account.
               </p>
             )}
-            <div class="account-profile-summary mt-6">
-              <dl>
-                {completedMilestones.map((milestone) => (
-                  <div>
-                    <dt>{milestone.heading}</dt>
-                    <dd>
-                      {milestone.completedAt !== null ? (
-                        <time
-                          datetime={new Date(
-                            milestone.completedAt,
-                          ).toISOString()}
-                        >
-                          {accountDate.format(milestone.completedAt)}
-                        </time>
-                      ) : (
-                        "Date not recorded"
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
+            {applicationComplete && (
+              <div class="account-profile-summary mt-6">
+                <dl>
+                  {completedMilestones.map((milestone) => (
+                    <div>
+                      <dt>{milestone.heading}</dt>
+                      <dd>
+                        {milestone.completedAt !== null ? (
+                          <time
+                            datetime={new Date(
+                              milestone.completedAt,
+                            ).toISOString()}
+                          >
+                            {accountDate.format(milestone.completedAt)}
+                          </time>
+                        ) : (
+                          "Date not recorded"
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
           </section>
         )
       }

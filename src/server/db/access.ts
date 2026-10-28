@@ -65,6 +65,9 @@ export async function accountContext(
       naloxoneCompleted: Boolean(application?.naloxone_completed_at),
       active: status?.active ?? false,
       applicationApproved: status?.registration_approved ?? false,
+      ...(status?.application_rejection_reason
+        ? { applicationRejected: true }
+        : {}),
       patrolApproved: status?.patrol_approved ?? false,
     },
     email: person.email,

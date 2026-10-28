@@ -167,6 +167,13 @@ export function roleChangedEmail(
   };
 }
 
+export function applicationRejectedEmail(reason: string): EmailContent {
+  return {
+    subject: "Your volunteer application was not approved",
+    text: `Thank you for applying to volunteer with After Hours Outreach. Your application was not approved.\n\nReason: ${reason}\n\nYou can view this decision in your application on the Volunteer page. If you have questions, contact ${contactEmail}.`,
+  };
+}
+
 export interface EmailEvent {
   type: "patrol" | "orientation";
   includesOrientation?: number;

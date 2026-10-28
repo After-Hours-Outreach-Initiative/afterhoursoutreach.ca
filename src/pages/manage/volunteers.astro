@@ -176,7 +176,9 @@ try {
                       <td>
                         {person.applicationApproved
                           ? "Approved"
-                          : "Awaiting approval"}
+                          : person.applicationRejectionReason
+                            ? "Rejected"
+                            : "Awaiting approval"}
                         {person.role === "organizer" && (
                           <span class="volunteer-table-detail">
                             Event access through organizer role
