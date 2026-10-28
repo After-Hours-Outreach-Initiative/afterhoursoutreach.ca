@@ -18,7 +18,7 @@ operations. Edit files here, not generated SQL in `drizzle/`.
 | `sessions.ts`                 | Ownership-scoped session lookup and second-factor verification markers.                                                                                     |
 | `notifications.ts`            | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                                     |
 | `medic-certifications.ts`     | Certification reminder eligibility, renewal-cycle ledger, atomic claims, and bounded retry state.                                                           |
-| `submission-notifications.ts` | Fixed-recipient first-submission ledger, transactional intent creation, production claims and shared budget reservations; Preview suppression.              |
+| `submission-notifications.ts` | Fixed-recipient review-entry ledger, transactional intents, production claims and shared budget reservations; Preview/legacy suppression.                   |
 | `rate-limits.ts`              | Persistent request/email counters and cleanup.                                                                                                              |
 | `errors.ts`                   | Safe translation of database invariant errors into application errors.                                                                                      |
 | `index.ts`, `sql.ts`          | Request-scoped Drizzle connection and shared SQL clock.                                                                                                     |

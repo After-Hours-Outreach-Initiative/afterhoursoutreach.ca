@@ -21,7 +21,6 @@ export async function completeLocalApplicationStep(
     const sample = sampleProfileFixtures("local", Date.now()).find(
       (person) => person.key === "casey",
     )!;
-    // No notification callback: sample submissions must never queue real emails.
     await saveProfile(
       db,
       actor.id,
@@ -31,6 +30,7 @@ export async function completeLocalApplicationStep(
     return;
   }
   if (step === "naloxone") {
+    // No review callback: development shortcuts do not queue organizer emails.
     await confirmNaloxoneCompletion(db, actor, {
       userId: actor.id,
       completed: true,

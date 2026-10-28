@@ -77,7 +77,7 @@ export function signInEmailContent(email: SignInEmailInput): EmailContent {
 // These two messages are composed inside atomic SQL writes. Sharing their text
 // templates keeps previews accurate without moving transactional reads into JS.
 export const applicationSubmittedTemplate = {
-  subject: "New volunteer application submitted",
+  subject: "Volunteer application ready for review",
   text: "Applicant: {{applicant}}\nSubmitted: {{submittedAt}}\nOrganizer review (authorized organizer sign-in required): {{reviewUrl}}",
 } satisfies EmailContent;
 

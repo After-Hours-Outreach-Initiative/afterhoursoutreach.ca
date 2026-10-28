@@ -318,6 +318,9 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(
       page.getByText("Application awaiting approval", { exact: true }),
     ).toBeVisible();
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Complete Naloxone 101",
+    );
     await expect(application).toBeVisible();
     await expect(
       page.locator(
@@ -380,6 +383,13 @@ test("organizers review submitted applications with search-aware filter counts a
     await page.setViewportSize({ width: 1280, height: 900 });
     await results.locator("tbody tr").first().locator("td").first().click();
     await expect(page).toHaveURL(`${origin}${profileHref}`);
+    await DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='applicant-50'",
+    ).run();
+    await page.reload();
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Application review",
+    );
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
@@ -391,6 +401,9 @@ test("organizers review submitted applications with search-aware filter counts a
     ).toBeEnabled();
     await expect(application).toBeVisible();
     await expect(profile).toBeVisible();
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Application approved",
+    );
     await expect(profile.getByRole("heading").first()).toHaveText("Profile");
     const submittedDetails = application.locator("details");
     await expect(submittedDetails).not.toHaveAttribute("open");
@@ -607,6 +620,9 @@ test("organizers review submitted applications with search-aware filter counts a
       .click();
     await expect(page.locator("[data-application-rejection]")).toHaveText(
       `Reason: ${rejection.reason}`,
+    );
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Application rejected",
     );
     const feedback = page.locator("[data-action-email-feedback]");
     await expect(feedback).toBeVisible();

@@ -633,7 +633,7 @@ export const medicCertificationNotification = sqliteTable(
   ],
 );
 
-// One immutable request per first submission and fixed organizer mailbox. No
+// One immutable request per applicant entering review and fixed organizer mailbox. No
 // recipient account is required; only name/time/review metadata is copied.
 export const applicationSubmissionNotification = sqliteTable(
   "application_submission_notification",
@@ -645,7 +645,7 @@ export const applicationSubmissionNotification = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     recipient: text().notNull(),
     mode: text({ enum: ["production", "local", "preview"] }).notNull(),
-    // Frozen at submission; previews retain only a suppressed ledger entry.
+    // Frozen on entry to review; previews retain only a suppressed ledger entry.
     payload: text(),
     status: text({
       enum: ["pending", "sending", "sent", "local", "suppressed", "expired"],

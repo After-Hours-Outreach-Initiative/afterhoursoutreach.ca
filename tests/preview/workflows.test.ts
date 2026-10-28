@@ -102,11 +102,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
           "SELECT mode,status,payload FROM application_submission_notification",
         ).all()
       ).results,
-      Array.from({ length: 6 }, () => ({
-        mode: "preview",
-        status: "suppressed",
-        payload: null,
-      })),
+      [], // Initial form submission is silent even in Preview.
     );
     await DB.prepare("INSERT INTO organizer_bootstrap VALUES (1,?,?)")
       .bind(organizer.id, Date.now())
@@ -133,6 +129,18 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
         { userId: applicant.id, completed: true },
         applicant.cookie,
       ),
+    );
+    assert.deepEqual(
+      (
+        await DB.prepare(
+          "SELECT mode,status,payload FROM application_submission_notification",
+        ).all()
+      ).results,
+      Array.from({ length: 3 }, () => ({
+        mode: "preview",
+        status: "suppressed",
+        payload: null,
+      })),
     );
     await seedVerifiedDiscordMembership(DB, applicant.id);
 
@@ -239,7 +247,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       await DB.prepare(
         "SELECT count(*) n FROM application_submission_notification",
       ).first("n"),
-      6,
+      3,
     );
     await DB.prepare(
       "UPDATE volunteer_status SET patrol_approved=1,approved_by=?,approved_at=? WHERE user_id=?",

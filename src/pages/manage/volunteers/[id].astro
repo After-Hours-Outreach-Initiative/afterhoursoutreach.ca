@@ -123,6 +123,20 @@ const contents = [
         <div class="account-profile-summary mt-8" data-naloxone-review>
           <dl>
             <div>
+              <dt>Current step</dt>
+              <dd data-application-current-step>
+                {
+                  person.applicationApproved
+                    ? "Application approved"
+                    : person.applicationRejectionReason
+                      ? "Application rejected"
+                      : profile.naloxoneCompletedAt === null
+                        ? "Complete Naloxone 101"
+                        : "Application review"
+                }
+              </dd>
+            </div>
+            <div>
               <dt>Naloxone 101</dt>
               <dd>
                 {
