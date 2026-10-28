@@ -262,10 +262,15 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
     expect(joined.status(), await joined.text()).toBe(200);
     await viewer.goto("/events");
 
-    for (const width of [1280, 320]) {
+    for (const [path, width] of [
+      ["/events", 1280],
+      ["/manage/events", 1280],
+      ["/events", 320],
+      ["/manage/events", 320],
+    ] as const) {
       await page.setViewportSize({ width, height: 900 });
       await viewer.setViewportSize({ width, height: 900 });
-      await page.goto("/manage/events");
+      await page.goto(path);
       for (const current of [page, viewer]) {
         const card = current.locator(`[data-live-event="${id}"]`);
         const roster = card.locator(".volunteer-roster, .public-event-roster");
@@ -307,8 +312,10 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
       }
       const card = page.locator(`[data-live-event="${id}"]`);
       const trigger = card.locator("[data-signup-menu-trigger]").first();
+      await expect(card.locator("[data-signup-menu-trigger]")).toHaveCount(2);
       await expect(trigger).toHaveText("");
       await expect(trigger).toHaveAccessibleName(/Registration actions for /);
+      await expect(trigger).toHaveCSS("border-top-width", "0px");
       await trigger.focus();
       await trigger.press("ArrowDown");
       const menu = card.getByRole("menu");
@@ -326,6 +333,12 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
       await move.press("Escape");
       await expect(menu).toBeHidden();
       await expect(trigger).toBeFocused();
+      await expect(trigger).toHaveCSS("outline-style", "solid");
+      expect(
+        await trigger.evaluate((element) =>
+          parseFloat(getComputedStyle(element).outlineWidth),
+        ),
+      ).toBeGreaterThan(0);
       await expect(trigger).toHaveAttribute("aria-expanded", "false");
       await trigger.press("ArrowUp");
       await expect(remove).toBeFocused();

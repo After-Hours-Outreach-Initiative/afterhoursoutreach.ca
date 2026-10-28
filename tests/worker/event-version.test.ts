@@ -213,8 +213,16 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
           : />\s*Register\s*<\/button>/,
       );
       expect(html).not.toMatch(
-        /data-live-event="hidden"|data-event-save|data-live-series|data-manage-signup|volunteer-roster|Renamed attendee/,
+        /data-live-event="hidden"|data-event-save|data-live-series|Renamed attendee/,
       );
+      if (cookie === organizerCookie) {
+        expect(html).toContain("data-signup-menu-trigger");
+        expect(html).toContain("data-manage-signup");
+      } else {
+        expect(html).not.toMatch(
+          /data-signup-menu-trigger|data-manage-signup|volunteer-roster/,
+        );
+      }
       const history = html.match(
         /<section\b[^>]*aria-labelledby="past-events-heading"[\s\S]*?<\/section>/,
       )?.[0];
@@ -267,6 +275,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       await listingVersion(organizerCookie, true),
     );
     const browsingVersion = await readVersion(organizerCookie);
+    const volunteerBrowsingVersion = await readVersion(attendee.cookie);
     const beforeRename = await readVersion(organizerCookie, true);
     await DB.prepare("UPDATE profile SET preferred_name=? WHERE user_id=?")
       .bind("Renamed attendee", attendee.id)
@@ -276,21 +285,23 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     expect(organizerJoinedVersion).toBe(
       await listingVersion(organizerCookie, true),
     );
-    expect(await readVersion(organizerCookie)).toBe(browsingVersion);
-    expect(browsingVersion).toBe(await listingVersion(organizerCookie));
+    const renamedRosterVersion = await readVersion(organizerCookie);
+    expect(renamedRosterVersion).not.toBe(browsingVersion);
+    expect(renamedRosterVersion).toBe(await listingVersion(organizerCookie));
+    expect(await readVersion(attendee.cookie)).toBe(volunteerBrowsingVersion);
     await DB.prepare("UPDATE profile SET first_name='Changed' WHERE user_id=?")
       .bind(attendee.id)
       .run();
-    const renamedPublicVersion = await readVersion(organizerCookie);
-    expect(renamedPublicVersion).not.toBe(browsingVersion);
-    expect(renamedPublicVersion).toBe(await listingVersion(organizerCookie));
+    const renamedPublicVersion = await readVersion(attendee.cookie);
+    expect(renamedPublicVersion).not.toBe(volunteerBrowsingVersion);
+    expect(renamedPublicVersion).toBe(await listingVersion(attendee.cookie));
     const publicHtml = await (
-      await send("/events", undefined, organizerCookie)
+      await send("/events", undefined, attendee.cookie)
     ).text();
     expect(publicHtml).toContain("public-event-roster");
     expect(publicHtml).toContain("Changed V.");
     expect(publicHtml).not.toMatch(
-      /Renamed attendee|data-volunteer-profile-link|data-manage-signup/,
+      /data-volunteer-profile-link|data-manage-signup/,
     );
 
     const cancelled = await send(

@@ -22,6 +22,7 @@ export const GET: APIRoute = async ({ request }) => {
     const params = new URL(request.url).searchParams;
     const manage = params.get("view") === "manage";
     if (manage) requireOrganizer(actor);
+    const organizer = actor?.role === "organizer" && canViewEvents(actor);
     const events = await listEvents(
       env.DB,
       actor,
@@ -33,7 +34,7 @@ export const GET: APIRoute = async ({ request }) => {
       : await listEvents(env.DB, actor, undefined, "past");
     const series = manage && actor ? await listPatrolSeries(env.DB, actor) : [];
     const rosters =
-      manage && actor
+      organizer && actor
         ? await listRosters(
             env.DB,
             actor,
@@ -46,7 +47,7 @@ export const GET: APIRoute = async ({ request }) => {
       rosters,
       Date.now(),
       series,
-      !manage && canViewEvents(actor) && actor
+      !manage && !organizer && canViewEvents(actor) && actor
         ? await listPublicRosters(
             env.DB,
             actor,

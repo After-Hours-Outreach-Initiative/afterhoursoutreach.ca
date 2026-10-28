@@ -36,6 +36,8 @@ const {
   publicRoster,
 } = Astro.props;
 const future = event.startsAt > Date.now();
+// The volunteer view keeps self-registration while organizers can manage its roster.
+const organizerRoster = actor.role === "organizer" && (organizer || future);
 const blocked =
   future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
     ? "Registration is available only for the next three patrol occurrences in this series."
@@ -178,9 +180,13 @@ const blocked =
       }
     </div>
   </div>
-  {!organizer && future && <PublicEventRoster roster={publicRoster ?? []} />}
   {
-    organizer && (
+    !organizerRoster && future && (
+      <PublicEventRoster roster={publicRoster ?? []} />
+    )
+  }
+  {
+    organizerRoster && (
       <EventRoster
         event={event}
         roster={roster}

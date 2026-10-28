@@ -1641,6 +1641,7 @@ body:has(
   width: 2.75rem;
   height: 2.75rem;
   padding: 0;
+  border: 0;
 }
 .signup-menu {
   position: fixed;
