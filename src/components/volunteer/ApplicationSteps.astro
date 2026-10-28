@@ -3,6 +3,7 @@ import {
   applicationFields,
   certificationQuestion,
   trainingQuestion,
+  trainingDetailOptions,
   experienceQuestion,
 } from "@/data/application";
 import CodeOfConduct from "./CodeOfConduct.astro";
@@ -28,7 +29,8 @@ const reviewSections = sections.map((section) => {
       (field) =>
         !["experience", "otherTraining", "otherExperience"].includes(
           field.name,
-        ),
+        ) &&
+        !trainingDetailOptions.some((option) => option.name === field.name),
     )
     .map((field) => ({
       name: field.name === "heardAboutUs" ? "heardAboutUsSources" : field.name,
@@ -59,6 +61,12 @@ const reviewSections = sections.map((section) => {
   if (section.key === "training-and-safety")
     rows = [
       { name: "training", label: trainingQuestion, wide: true },
+      ...trainingDetailOptions.map((option) => ({
+        name: option.name,
+        label: option.label,
+        condition: option.value,
+        wide: true,
+      })),
       {
         name: "otherTraining",
         label: "Other relevant training",

@@ -7,6 +7,7 @@ import {
   heardAboutUsOptions,
   heardAboutUsQuestion,
   trainingOptions,
+  trainingDetailOptions,
   experienceOptions,
   normalizeTrainingAnswers,
   type ApplicationAnswers,
@@ -76,6 +77,11 @@ const rows: {
   },
   ...applicationFields
     .filter((field) => field.name !== "heardAboutUs" || answers.heardAboutUs)
+    .filter(
+      (field) =>
+        !trainingDetailOptions.some((option) => option.name === field.name) ||
+        Boolean(answers[field.name]),
+    )
     .map((field) => ({
       section: field.section,
       label: field.label,

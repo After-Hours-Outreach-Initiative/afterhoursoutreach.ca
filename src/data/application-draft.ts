@@ -9,6 +9,7 @@ import {
   experienceExclusiveError,
   normalizeTrainingAnswers,
   otherTrainingMaxLength,
+  trainingDetailsMaxLength,
   type ApplicationAnswers,
 } from "./application";
 
@@ -63,6 +64,8 @@ export const applicationDraftAnswersSchema = z.preprocess(
       trainingExclusiveError,
     ),
     otherTraining: text(otherTrainingMaxLength),
+    expiredFirstAidDetails: text(trainingDetailsMaxLength),
+    crisisInterventionDetails: text(trainingDetailsMaxLength),
     relevantExperience: choices(experienceOptions).refine(
       (values) => !values.includes("none") || values.length === 1,
       experienceExclusiveError,

@@ -11,6 +11,9 @@ import {
   trainingOptions,
   trainingRequiredError,
   trainingExclusiveError,
+  trainingDetailOptions,
+  trainingDetailsMaxLength,
+  requiresTrainingDetails,
   experienceOptions,
   experienceRequiredError,
   experienceExclusiveError,
@@ -146,6 +149,9 @@ const profileAnswersSchema = z.strictObject({
         .map((option) => option.value),
     ),
   otherTraining: z.string().trim().max(otherTrainingMaxLength).default(""),
+  // Validate only selected details; stale hidden text must not block a save.
+  expiredFirstAidDetails: z.string().trim().default(""),
+  crisisInterventionDetails: z.string().trim().default(""),
   relevantExperience: z
     .array(z.enum(experienceOptions.map((option) => option.value)))
     .max(experienceOptions.length)
@@ -187,12 +193,15 @@ function validateTraining(
     | "certificationExpiry"
     | "training"
     | "otherTraining"
+    | "expiredFirstAidDetails"
+    | "crisisInterventionDetails"
     | "relevantExperience"
     | "otherExperience"
   >,
   context: z.RefinementCtx,
   requireTraining = true,
   requireExperience = true,
+  previous?: ApplicationAnswers,
 ) {
   if (requireTraining && !answers.training.length)
     context.addIssue({
@@ -206,6 +215,22 @@ function validateTraining(
       path: ["otherTraining"],
       message: "Describe your other relevant training.",
     });
+  for (const option of trainingDetailOptions) {
+    if (!answers.training.includes(option.value)) continue;
+    const details = answers[option.name];
+    if (
+      (!details && requiresTrainingDetails(option, previous)) ||
+      details.length > trainingDetailsMaxLength
+    )
+      context.addIssue({
+        code: "custom",
+        path: [option.name],
+        message:
+          details.length > trainingDetailsMaxLength
+            ? `Keep this answer to ${trainingDetailsMaxLength} characters or fewer.`
+            : option.message,
+      });
+  }
   if (requireExperience && !answers.relevantExperience.length)
     context.addIssue({
       code: "custom",
@@ -315,6 +340,8 @@ export async function loadProfile(binding: Env["DB"], userId: string) {
     ...normalizeTrainingAnswers({
       training: row.relevant_training,
       otherTraining: row.other_training,
+      expiredFirstAidDetails: row.expired_first_aid_details,
+      crisisInterventionDetails: row.crisis_intervention_details,
       relevantExperience: row.relevant_experience,
       otherExperience: row.other_experience,
     }),
@@ -382,6 +409,13 @@ export async function saveProfile(
       );
     baseline = normalizeTrainingAnswers(baseline);
   }
+  // Open profile forms from before dedicated detail fields have no such baseline keys.
+  if (baseline)
+    baseline = {
+      ...baseline,
+      expiredFirstAidDetails: baseline.expiredFirstAidDetails ?? "",
+      crisisInterventionDetails: baseline.crisisInterventionDetails ?? "",
+    };
   if (options.actor && options.actor.id !== userId)
     throw new RequestError(
       403,
@@ -438,6 +472,8 @@ export async function saveProfile(
             experience: old.experience,
             training: old.training,
             otherTraining: old.otherTraining,
+            expiredFirstAidDetails: old.expiredFirstAidDetails,
+            crisisInterventionDetails: old.crisisInterventionDetails,
             relevantExperience: old.relevantExperience,
             otherExperience: old.otherExperience,
             certificationExpiry: old.certificationExpiry,
@@ -494,6 +530,9 @@ export async function saveProfile(
           local.certifications,
         );
       if (certifications.success) local.certifications = certifications.data;
+      if (Array.isArray(local.training))
+        for (const option of trainingDetailOptions)
+          if (!local.training.includes(option.value)) local[option.name] = "";
       for (const key of immutableFields)
         Object.assign(local, { [key]: old[key] });
       const merged = mergeAnswers(baseline, local, old);
@@ -542,6 +581,7 @@ export async function saveProfile(
               context,
               old.training.length > 0,
               old.relevantExperience.length > 0,
+              old,
             ),
           )
       : profileSchema;
@@ -571,6 +611,8 @@ export async function saveProfile(
                       "training",
                       "relevantExperience",
                       "otherTraining",
+                      "expiredFirstAidDetails",
+                      "crisisInterventionDetails",
                       "otherExperience",
                     ].includes(String(issue.path[0])),
                   )?.message ??
@@ -581,6 +623,14 @@ export async function saveProfile(
       throw new RequestError(400, codeOfConductError);
     const answers: ApplicationAnswers = {
       ...submitted,
+      expiredFirstAidDetails: submitted.training.includes("expired-first-aid")
+        ? submitted.expiredFirstAidDetails
+        : "",
+      crisisInterventionDetails: submitted.training.includes(
+        "crisis-intervention",
+      )
+        ? submitted.crisisInterventionDetails
+        : "",
       heardAboutUs: old?.heardAboutUs ?? submitted.heardAboutUs!,
       heardAboutUsSources:
         old?.heardAboutUsSources ?? submitted.heardAboutUsSources!,
@@ -629,6 +679,8 @@ export async function saveProfile(
       training_experience: answers.experience,
       relevant_training: answers.training,
       other_training: answers.otherTraining,
+      expired_first_aid_details: answers.expiredFirstAidDetails,
+      crisis_intervention_details: answers.crisisInterventionDetails,
       relevant_experience: answers.relevantExperience,
       other_experience: answers.otherExperience,
       medical_conditions: answers.medicalConditions || null,

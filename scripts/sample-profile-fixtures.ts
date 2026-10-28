@@ -13,6 +13,8 @@ const optionalAnswers = {
   certificationExpiry: "",
   experience: "",
   otherTraining: "",
+  expiredFirstAidDetails: "",
+  crisisInterventionDetails: "",
   relevantExperience: ["none"],
   otherExperience: "",
   medicalConditions: "",

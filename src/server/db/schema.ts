@@ -246,6 +246,8 @@ export const profile = sqliteTable("profile", {
     .notNull()
     .default(sql`'[]'`),
   other_training: text().notNull().default(""),
+  expired_first_aid_details: text().notNull().default(""),
+  crisis_intervention_details: text().notNull().default(""),
   // Null identifies legacy combined training/experience answers until their next save.
   relevant_experience: text({ mode: "json" }).$type<string[]>(),
   other_experience: text().notNull().default(""),

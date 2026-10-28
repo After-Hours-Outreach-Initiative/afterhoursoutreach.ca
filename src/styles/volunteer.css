@@ -1144,6 +1144,7 @@ body:has(
 }
 /* Keep the entire follow-up field in the option's text column. */
 .volunteer-certification-options > [data-other-training],
+.volunteer-training-options > [data-training-detail-for],
 .volunteer-training-options > [data-other-relevant-training],
 .volunteer-training-options > [data-other-relevant-experience],
 .volunteer-referral-sources > [data-other-referral] {

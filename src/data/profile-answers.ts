@@ -3,6 +3,7 @@ import {
   certificationOptions,
   profileFormSections,
   trainingOptions,
+  trainingDetailOptions,
   experienceOptions,
   type ApplicationAnswers,
 } from "./application";
@@ -44,7 +45,8 @@ export function profileAnswerRows(
       (field) =>
         !["experience", "otherTraining", "otherExperience"].includes(
           field.name,
-        ),
+        ) &&
+        !trainingDetailOptions.some((option) => option.name === field.name),
     )
     .map((field) => ({
       name: field.name,
@@ -70,6 +72,13 @@ export function profileAnswerRows(
       },
       ...rows,
       choices("training", "Relevant training", trainingOptions),
+      ...trainingDetailOptions.map((option) => ({
+        name: option.name,
+        label: option.label,
+        value: answers?.[option.name] ?? "",
+        hidden: !answers?.training?.includes(option.value),
+        wide: true,
+      })),
       {
         name: "otherTraining",
         label: "Other relevant training",

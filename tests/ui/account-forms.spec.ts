@@ -1679,6 +1679,105 @@ test("the application requires JavaScript and renders blank DOB format guidance"
   }
 });
 
+test("training options have independent details through review, submission and profile edits", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  const form = page.locator("[data-account-profile]");
+  for (const [name, value] of Object.entries(sampleAnswers)) {
+    if (Array.isArray(value)) {
+      for (const choice of value)
+        await form.locator(`[name="${name}"][value="${choice}"]`).check();
+    } else {
+      const control = form.locator(`[name="${name}"]`);
+      if (
+        name === "birthDate" ||
+        ((await control.count()) &&
+          (await control.isVisible()) &&
+          (await control.isEditable()))
+      )
+        await fillApplicationField(form, name, value);
+    }
+  }
+  const followups = [
+    ["expired-first-aid", "expiredFirstAidDetails", "Expired OFA Level 2"],
+    [
+      "crisis-intervention",
+      "crisisInterventionDetails",
+      "Crisis prevention certification",
+    ],
+  ] as const;
+  for (const [value, name, details] of followups) {
+    const checkbox = form.locator(`[name="training"][value="${value}"]`);
+    const input = form.locator(`[name="${name}"]`);
+    await expect(input).toBeHidden();
+    await checkbox.check();
+    await expect(input).toBeEditable();
+    await expect(input).toHaveAttribute("required", "");
+    await input.fill(" \t ");
+    expect(
+      await input.evaluate(
+        (input: HTMLTextAreaElement) => input.validity.valid,
+      ),
+    ).toBe(false);
+    await input.fill(details);
+  }
+  await reviewLocalApplication(page);
+  for (const [, name, details] of followups)
+    await expect(form.locator(`[data-review-answer="${name}"]`)).toHaveText(
+      details,
+    );
+  await form.locator('[name="codeOfConductAccepted"]').check();
+  await form
+    .getByRole("button", { name: "Submit application", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  const submission = page.locator("[data-submitted-application]");
+  for (const [, , details] of followups)
+    await expect(submission).toContainText(details);
+  await page.goto("/volunteer/account");
+  await page.getByRole("button", { name: "Edit training and safety" }).click();
+  const [value, name, details] = followups[0];
+  const checkbox = form.locator(`[name="training"][value="${value}"]`);
+  const input = form.locator(`[name="${name}"]`);
+  await expect(input).toHaveValue(details);
+  await checkbox.uncheck();
+  await expect(input).toBeHidden();
+  await expect(input).not.toHaveAttribute("required");
+  await form
+    .locator('[data-profile-fields="training-and-safety"]')
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Edit training and safety" }).click();
+  await expect(checkbox).toBeChecked();
+  await expect(input).toHaveValue(details);
+  await checkbox.uncheck();
+  await form
+    .locator('[data-profile-fields="training-and-safety"]')
+    .getByRole("button", { name: "Save", exact: true })
+    .click();
+  await expect(
+    form.locator('[data-profile-answers="training-and-safety"]'),
+  ).toBeVisible();
+  await expect(form.locator(`[data-profile-answer="${name}"]`)).toBeHidden();
+  await page.reload();
+  await page.getByRole("button", { name: "Edit training and safety" }).click();
+  await checkbox.check();
+  await expect(input).toHaveValue("");
+  await expect(input).toHaveAttribute("required", "");
+  await expect(form.locator('[name="crisisInterventionDetails"]')).toHaveValue(
+    followups[1][2],
+  );
+  await form
+    .locator('[data-profile-fields="training-and-safety"]')
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await page.goto("/volunteer");
+  await expect(submission).toContainText(details);
+});
+
 test("all teams can select multiple relevant training answers and add Other details", async ({
   page,
   baseURL,
@@ -1701,7 +1800,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     exact: true,
   });
   const crisis = training.getByRole("checkbox", {
-    name: "Crisis intervention and de-escalation training (specify under Other)",
+    name: "Crisis intervention and de-escalation training",
     exact: true,
   });
   const none = training.getByRole("checkbox", {
@@ -1820,6 +1919,9 @@ test("all teams can select multiple relevant training answers and add Other deta
   await naloxone.check();
   await expect(none).not.toBeChecked();
   await crisis.check();
+  await training
+    .locator('[name="crisisInterventionDetails"]')
+    .fill("Crisis prevention certification");
   await other.check();
   await expect(training.locator(":checked")).toHaveCount(3);
   await expect(otherText).toBeEditable();

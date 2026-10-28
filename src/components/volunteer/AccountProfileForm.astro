@@ -3,6 +3,7 @@ import {
   profileFormSections,
   applicationTeamOptions as teams,
   outreachRequiredError,
+  trainingDetailOptions,
   type ApplicationAnswers,
 } from "@/data/application";
 import AccountProfileField from "./AccountProfileField.astro";
@@ -231,7 +232,10 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                         field.name !== "experience" &&
                         field.name !== "certificationExpiry" &&
                         field.name !== "otherTraining" &&
-                        field.name !== "otherExperience",
+                        field.name !== "otherExperience" &&
+                        !trainingDetailOptions.some(
+                          (option) => option.name === field.name,
+                        ),
                     )
                     .map((field) =>
                       field.name === "heardAboutUs" ? (
@@ -244,12 +248,14 @@ const nameFieldNames = ["firstName", "middleNames", "lastName"];
                     <>
                       <RelevantTraining
                         values={values}
+                        application={application}
                         required={
                           application || Boolean(values?.training.length)
                         }
                       />
                       <RelevantTraining
                         values={values}
+                        application={application}
                         experience
                         required={
                           application ||

@@ -23,6 +23,8 @@ export interface ApplicationAnswers {
   certification: string;
   experience: string;
   training: string[];
+  expiredFirstAidDetails: string;
+  crisisInterventionDetails: string;
   otherTraining: string;
   relevantExperience: string[];
   otherExperience: string;
@@ -142,6 +144,34 @@ export const experienceExclusiveError =
   "Select No relevant experience on its own, or choose your relevant experience.";
 // Leave room for the removed trainer option alongside a full legacy Other answer.
 export const otherTrainingMaxLength = 2048;
+export const trainingDetailsMaxLength = 2000;
+export const trainingDetailOptions = [
+  {
+    value: "expired-first-aid",
+    name: "expiredFirstAidDetails",
+    label: "Expired first-aid certification details",
+    message: "Describe your expired first-aid certification.",
+  },
+  {
+    value: "crisis-intervention",
+    name: "crisisInterventionDetails",
+    label: "Crisis intervention and de-escalation training details",
+    message: "Describe your crisis intervention and de-escalation training.",
+  },
+] as const;
+
+/** Existing selected answers may predate dedicated details; never guess from Other. */
+export function requiresTrainingDetails(
+  option: (typeof trainingDetailOptions)[number],
+  previous?: Pick<
+    ApplicationAnswers,
+    "training" | "expiredFirstAidDetails" | "crisisInterventionDetails"
+  > | null,
+) {
+  return (
+    !previous?.training.includes(option.value) || Boolean(previous[option.name])
+  );
+}
 
 export const trainingOptions = [
   {
@@ -155,12 +185,11 @@ export const trainingOptions = [
   },
   {
     value: "expired-first-aid",
-    label: "Expired first-aid certification (specify under Other)",
+    label: "Expired first-aid certification",
   },
   {
     value: "crisis-intervention",
-    label:
-      "Crisis intervention and de-escalation training (specify under Other)",
+    label: "Crisis intervention and de-escalation training",
   },
   {
     value: "mental-health-first-aid",
@@ -199,14 +228,21 @@ export const experienceOptions = [
 export function normalizeTrainingAnswers<
   T extends {
     training?: string[];
+    expiredFirstAidDetails?: string;
+    crisisInterventionDetails?: string;
     otherTraining?: string;
     relevantExperience?: string[] | null;
     otherExperience?: string;
   },
 >(answers: T) {
+  const details = {
+    expiredFirstAidDetails: answers.expiredFirstAidDetails ?? "",
+    crisisInterventionDetails: answers.crisisInterventionDetails ?? "",
+  };
   if (answers.relevantExperience != null)
     return {
       ...answers,
+      ...details,
       training: answers.training ?? [],
       otherTraining: answers.otherTraining ?? "",
       relevantExperience: answers.relevantExperience,
@@ -231,6 +267,7 @@ export function normalizeTrainingAnswers<
   }
   return {
     ...answers,
+    ...details,
     training,
     otherTraining,
     relevantExperience: combined.filter(
@@ -384,6 +421,16 @@ export const applicationFields = [
     required: true,
     multiline: true,
   },
+  ...trainingDetailOptions.map(
+    (option) =>
+      ({
+        name: option.name,
+        section: "training-and-safety" as const,
+        label: option.label,
+        required: true,
+        multiline: true,
+      }) as const,
+  ),
   {
     name: "otherExperience",
     section: "training-and-safety",

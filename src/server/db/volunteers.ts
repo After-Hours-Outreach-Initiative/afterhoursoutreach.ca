@@ -133,6 +133,8 @@ export async function viewVolunteerProfile(
           medical_certification AS certification, training_experience AS experience,
           medical_certifications AS certifications,
           relevant_training AS training, other_training AS otherTraining,
+          expired_first_aid_details AS expiredFirstAidDetails,
+          crisis_intervention_details AS crisisInterventionDetails,
           relevant_experience AS relevantExperience, other_experience AS otherExperience,
           coalesce(medical_certification_expiry, '') AS certificationExpiry,
           coalesce(medical_conditions, '') AS medicalConditions,
@@ -202,6 +204,8 @@ export async function viewVolunteerProfile(
       ...normalizeTrainingAnswers({
         training: JSON.parse(row.training) as string[],
         otherTraining: row.otherTraining,
+        expiredFirstAidDetails: row.expiredFirstAidDetails,
+        crisisInterventionDetails: row.crisisInterventionDetails,
         relevantExperience: row.relevantExperience
           ? (JSON.parse(row.relevantExperience) as string[])
           : null,

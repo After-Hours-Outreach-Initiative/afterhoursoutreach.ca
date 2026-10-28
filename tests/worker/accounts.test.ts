@@ -422,6 +422,7 @@ describe(
       const trainingAnswers = {
         ...answers,
         training: ["naloxone-administration", "crisis-intervention", "other"],
+        crisisInterventionDetails: "Crisis prevention certification",
         otherTraining: "Crisis intervention course",
         codeOfConductAccepted: true,
       };
