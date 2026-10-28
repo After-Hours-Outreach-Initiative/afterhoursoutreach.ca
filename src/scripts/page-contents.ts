@@ -29,6 +29,7 @@ export function initPageContents(
   if (!contents || !menu || !toggle || !current) return;
   const bar =
     contents.querySelector<HTMLElement>("[data-contents-bar]") ?? menu;
+  const dropdown = menu.querySelector<HTMLElement>("[data-contents-dropdown]");
   const review = contents.hasAttribute("data-application-review-contents");
   const application =
     contents.hasAttribute("data-application-contents") || review;
@@ -55,6 +56,15 @@ export function initPageContents(
     : document.querySelector<HTMLElement>("body > header");
   const controller = new AbortController();
   const { signal } = controller;
+  // A closing disclosure remains painted during its fade, but its controls must
+  // leave the focus order and accessibility tree as soon as it closes.
+  const syncMenu = () => {
+    if (dropdown) dropdown.inert = !menu.open;
+  };
+  const menuVisibility = new MutationObserver(syncMenu);
+  menuVisibility.observe(menu, { attributes: true, attributeFilter: ["open"] });
+  syncMenu();
+  menu.dataset.contentsEnhanced = "";
   let stickyHeight = 0;
   let scrollInset = 0;
   let barHeight = 0;
@@ -301,6 +311,9 @@ export function initPageContents(
     controller.abort();
     resize.disconnect();
     visibility.disconnect();
+    menuVisibility.disconnect();
+    delete menu.dataset.contentsEnhanced;
+    if (dropdown) dropdown.inert = false;
     cancelAnimationFrame(frame);
   };
 }

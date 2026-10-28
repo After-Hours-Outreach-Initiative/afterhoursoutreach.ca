@@ -628,6 +628,21 @@ body:has(
     border-radius: 0 0 0.625rem 0.625rem;
     box-shadow: none;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    .volunteer-contents-chevron {
+      transition: transform 180ms ease-out;
+    }
+    .volunteer-contents-menu[data-contents-enhanced]::details-content {
+      opacity: 0;
+      /* Keep the native disclosure visible long enough to animate its exit. */
+      transition:
+        opacity 180ms ease-out,
+        content-visibility 180ms allow-discrete;
+    }
+    .volunteer-contents-menu[data-contents-enhanced][open]::details-content {
+      opacity: 1;
+    }
+  }
   .volunteer-application-contents .volunteer-draft-save-status {
     justify-content: flex-start;
     @apply text-sm;
@@ -641,12 +656,11 @@ body:has(
     white-space: nowrap;
   }
   .volunteer-contents a {
-    min-height: 3rem;
-    padding-block: 0.625rem;
+    min-height: 2.75rem;
+    padding-block: 0.5rem;
     @apply text-base/[inherit];
   }
   .volunteer-contents-dropdown a {
-    @apply text-lg/[inherit];
     font-weight: normal;
   }
 }
