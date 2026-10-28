@@ -62,6 +62,11 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
       data: { userId: account.id, completed: true },
     });
     expect(completed.status(), await completed.text()).toBe(200);
+    const connected = await viewer.request.post("/api/v1/account/discord", {
+      headers: { origin: baseURL! },
+      data: { userId: account.id, consent: true, outcome: "authorize" },
+    });
+    expect(connected.status(), await connected.text()).toBe(200);
     await approveLocalApplication(page.request, baseURL!, account.id);
     await viewer.goto("/events");
     const cards = [page, viewer].map((current) =>
