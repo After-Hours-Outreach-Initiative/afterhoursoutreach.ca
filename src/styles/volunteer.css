@@ -11,6 +11,18 @@
 .volunteer-portal [hidden] {
   display: none !important;
 }
+/* Text links stay recognizable without changing buttons, tabs or calendar controls. */
+.volunteer-portal p a:not(.btn),
+.volunteer-back-link,
+.volunteer-contents a:not(.btn),
+.volunteer-email-reset,
+.volunteer-notice a:not(.btn),
+.volunteer-table a:not(.btn),
+.volunteer-event-card a:not(.btn),
+.volunteer-application-warning-text {
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
 /* `overflow-x: hidden` traps sticky descendants in a non-scrolling ancestor.
    Clip still prevents horizontal overflow without trapping contents navigation. */
 body:has(
@@ -171,8 +183,6 @@ body:has(
   width: fit-content;
   margin: 1.5rem auto 0;
   color: #c7d2fe;
-  text-decoration: underline;
-  text-underline-offset: 0.25rem;
 }
 .volunteer-email-reset:hover {
   color: white;
@@ -462,7 +472,6 @@ body:has(
   padding: 0.25rem 0;
   color: #a1a1aa;
   @apply text-sm/[inherit];
-  text-decoration: none;
   overflow-wrap: anywhere;
 }
 .volunteer-contents a:hover {
@@ -1192,7 +1201,6 @@ body:has(
 }
 .volunteer-notice a {
   color: #a5b4fc;
-  text-decoration: underline;
 }
 .volunteer-actions,
 .volunteer-filters {
@@ -1289,13 +1297,10 @@ body:has(
   border-radius: 0.25rem;
   color: #a1a1aa;
   @apply text-base;
-  text-decoration: none;
-  text-underline-offset: 0.25rem;
   transition: color 150ms;
 }
 .volunteer-back-link:is(:hover, :focus-visible) {
   color: white;
-  text-decoration: underline;
 }
 .volunteer-back-link:focus-visible {
   outline: 2px solid #a5b4fc;
@@ -1396,8 +1401,6 @@ body:has(
   min-height: 2.75rem;
   margin-block: -0.5rem;
   color: #c7d2fe;
-  text-decoration: underline;
-  text-underline-offset: 0.25rem;
 }
 .volunteer-table a:focus-visible {
   outline: 3px solid #a5b4fc;
@@ -1539,7 +1542,6 @@ body:has(
   line-height: 1.65;
 }
 .volunteer-event-card a:not(.btn) {
-  text-decoration: underline;
   color: #c7d2fe;
 }
 .volunteer-event-card .volunteer-spots {
