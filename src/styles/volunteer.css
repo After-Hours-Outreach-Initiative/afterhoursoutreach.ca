@@ -1670,6 +1670,7 @@ body:has(
   text-align: right;
 }
 .signup-menu-trigger {
+  @apply rounded-full hover:bg-panel-soft;
   width: 2.75rem;
   height: 2.75rem;
   padding: 0;
