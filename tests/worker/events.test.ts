@@ -1639,9 +1639,7 @@ describe(
                 })
                 .click(),
             updated: async () => {
-              await expect(
-                card.locator(".volunteer-roster > summary"),
-              ).toHaveText("Volunteers (0)");
+              await expect(card.locator(".volunteer-roster")).toHaveCount(0);
               await expect(
                 destinationCard.locator(".volunteer-roster > summary"),
               ).toHaveText("Volunteers (1)");
@@ -1693,10 +1691,7 @@ describe(
           await registrationEmailResult
             .getByRole("button", { name: "Close", exact: true })
             .click();
-          await expect(card.locator(".volunteer-roster")).toHaveAttribute(
-            "open",
-            "",
-          );
+          await expect(card.locator(".volunteer-roster")).toHaveCount(0);
           await destinationCard.locator(".volunteer-roster > summary").click();
           await destinationCard.locator("[data-signup-menu-trigger]").click();
           await destinationCard
@@ -1718,11 +1713,12 @@ describe(
                 card.locator(".volunteer-roster > summary"),
               ).toHaveText("Volunteers (1)");
               await expect(
-                destinationCard.locator(".volunteer-roster > summary"),
-              ).toHaveText("Volunteers (0)");
+                destinationCard.locator(".volunteer-roster"),
+              ).toHaveCount(0);
             },
             loadingLabel: "Saving…",
           });
+          await card.locator(".volunteer-roster > summary").click();
           await card.locator("[data-signup-menu-trigger]").click();
           await card
             .getByRole("menuitem", { name: "Remove volunteer", exact: true })
@@ -1741,7 +1737,7 @@ describe(
                 })
                 .click(),
             updated: () =>
-              card.getByText("Volunteers (0)", { exact: true }).waitFor(),
+              expect(card.locator(".volunteer-roster")).toHaveCount(0),
             loadingLabel: "Saving…",
           });
           assert.equal(await signupDialog.isVisible(), false);

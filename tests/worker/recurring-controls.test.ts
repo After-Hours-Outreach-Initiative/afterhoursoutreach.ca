@@ -378,7 +378,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await organizerPage.getByRole("button", { name: /^All \(\d+\)$/ }).click();
 
     // Polling updates occurrences without discarding the open series draft or
-    // collapsing an expanded roster/occurrence list behind the modal.
+    // collapsing the expanded occurrence list behind the modal.
     const originalManager = initialGroup.locator("[data-live-series]");
     await initialGroup.locator("[data-series-occurrences] > summary").click();
     const firstCard = initialGroup.locator(
@@ -426,13 +426,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await originalManager
       .getByRole("button", { name: "Close", exact: true })
       .click();
-    await expect(firstCard.locator(".volunteer-roster > summary")).toHaveText(
-      "Volunteers (0)",
-    );
-    await expect(firstCard.locator(".volunteer-roster")).toHaveAttribute(
-      "open",
-      "",
-    );
+    await expect(firstCard.locator(".volunteer-roster")).toHaveCount(0);
     await expect(
       initialGroup.locator("[data-series-occurrences]"),
     ).toHaveAttribute("open", "");
