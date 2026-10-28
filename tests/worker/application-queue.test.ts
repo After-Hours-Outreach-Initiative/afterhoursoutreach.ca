@@ -258,7 +258,7 @@ test("organizers review submitted applications with search-aware filter counts a
     ]);
     const filters = page.getByRole("group", { name: "Application approval" });
     const allApplicants = filters.getByRole("button", {
-      name: "All applicants",
+      name: /^All \(\d+\)$/,
     });
     const awaitingApproval = filters.getByRole("button", {
       name: /^Awaiting approval/,
@@ -502,10 +502,10 @@ test("organizers review submitted applications with search-aware filter counts a
     ).toHaveCount(1);
     expect(new URL(plain.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
-    await plain.getByRole("button", { name: "All applicants" }).click();
+    await plain.getByRole("button", { name: "All (1)", exact: true }).click();
     expect(new URL(plain.url()).searchParams.get("q")).toBe("applicant-52");
     await expect(
-      plain.getByRole("button", { name: "All applicants" }),
+      plain.getByRole("button", { name: "All (1)", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
     await plain.getByRole("button", { name: "Awaiting approval (1)" }).click();
     await plain.locator("[data-volunteer-profile-link]").click();

@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { addCalendarDays, vancouverInput } from "../../src/data/event-time";
+import { fillDateInput } from "../helpers/date-input";
 import {
   createLocalAccount,
   approveLocalApplication,
@@ -330,7 +332,7 @@ test("other viewers see signups and cancellations through polling without losing
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
     await expect(
-      viewer.getByRole("button", { name: "Orientations", exact: true }),
+      viewer.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
     ).toBeFocused();
     expect(failedRefreshes).toBeGreaterThanOrEqual(2);
     await viewer.unroute("**/events?type=orientation");
@@ -397,4 +399,86 @@ test("other viewers see signups and cancellations through polling without losing
       attendeeContext.close(),
     ]);
   }
+});
+
+test("filter counts track grouped series, polling, actions and past events", async ({
+  page,
+  baseURL,
+}) => {
+  test.skip(
+    !baseURL?.startsWith("http://localhost:"),
+    "Local D1 development only",
+  );
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  const filters = page.getByRole("group", { name: "Filter events" });
+  await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
+  const counts = filters.locator("[data-event-filter-count]");
+  const before = (await counts.allTextContents()).map(Number);
+  expect(before).toHaveLength(4);
+  const selectedFilter = filters.locator('[aria-pressed="true"]');
+  await selectedFilter.focus();
+  const firstDate = addCalendarDays(vancouverInput(Date.now()).slice(0, 10), 1);
+  const created = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: {
+      action: "save-series",
+      series: {
+        firstDate,
+        localTime: "20:30",
+        intervalWeeks: 1,
+        endDate: null,
+        includesOrientation: true,
+        meetingPoint: `Filter counts ${crypto.randomUUID()}`,
+        meetingPointUrl: "",
+        spots: 8,
+        open: true,
+        hidden: false,
+      },
+    },
+  });
+  expect(created.status(), await created.text()).toBe(200);
+  const { id } = await created.json();
+  await expect(counts).toHaveText(
+    [before[0] + 1, before[1], before[2] + 1, before[3] + 1].map(String),
+    { timeout: 15_000 },
+  );
+  const series = page.locator(`[data-series-card="${id}"]`);
+  expect(await series.locator("[data-live-event]").count()).toBeGreaterThan(1);
+  await expect(selectedFilter).toBeFocused();
+
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  const editor = page.locator("#event-editor-new");
+  await fillDateInput(editor, "startsAt", `${firstDate}T21:30`);
+  const meetingPoint = `One-off count ${crypto.randomUUID()}`;
+  await editor.getByLabel("Meeting point", { exact: true }).fill(meetingPoint);
+  await editor
+    .getByRole("button", { name: "Create event", exact: true })
+    .click();
+  await expect(editor).not.toBeVisible();
+  await expect(counts).toHaveText(
+    [before[0] + 2, before[1] + 1, before[2] + 1, before[3] + 1].map(String),
+  );
+  await expect(
+    page.locator("[data-live-event]").filter({ hasText: meetingPoint }),
+  ).toBeHidden();
+  await expect(selectedFilter).toHaveAttribute(
+    "data-event-filter",
+    "orientation",
+  );
+
+  await page.goto("/events?type=orientation");
+  const cards = page.locator("[data-live-event]");
+  expect(
+    await page.locator("[data-past-event-list] > li").count(),
+  ).toBeGreaterThan(0);
+  await expect(filters.getByRole("button")).toHaveText([
+    `All (${await cards.count()})`,
+    `Orientations (${await page.locator('[data-live-event][data-includes-orientation="true"]').count()})`,
+  ]);
 });

@@ -374,6 +374,16 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     "[data-past-event-list]",
   );
   if (pastList && nextPastList) syncList(pastList, nextPastList);
+  // Adopt authoritative counts after polling/actions without replacing a
+  // focused filter button or counting nested occurrences as extra series.
+  for (const count of root.querySelectorAll<HTMLElement>(
+    "[data-event-filter-count]",
+  )) {
+    const updated = refreshed.querySelector(
+      `[data-event-filter-count="${count.dataset.eventFilterCount}"]`,
+    );
+    if (updated) count.textContent = updated.textContent;
+  }
   for (const selector of [
     "[data-empty-events]",
     "[data-event-limit]",

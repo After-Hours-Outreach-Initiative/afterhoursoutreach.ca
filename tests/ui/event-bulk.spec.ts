@@ -46,15 +46,13 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   await cards.first().locator("[data-bulk-event]").check();
   await expect(page.locator("[data-bulk-count]")).toHaveText("1 selected");
   await page
-    .getByRole("button", { name: "Recurring series", exact: true })
+    .getByRole("button", { name: /^Recurring series \(\d+\)$/ })
     .click();
   await expect(page.locator("[data-bulk-count]")).toContainText("0 selected");
   await expect(
     page.getByRole("button", { name: "Bulk edit", exact: true }),
   ).toBeDisabled();
-  await page
-    .getByRole("button", { name: "One-off events", exact: true })
-    .click();
+  await page.getByRole("button", { name: /^One-off events \(\d+\)$/ }).click();
   await page
     .getByRole("button", { name: "Select all shown", exact: true })
     .click();

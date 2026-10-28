@@ -156,9 +156,7 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(naloxone.locator('[name="completed"]')).toBeChecked();
     await expect(naloxone.locator('[name="completed"]')).toBeDisabled();
     await expect(
-      portal.getByText(
-        "Join our Discord for the most up to date information.",
-      ),
+      portal.getByText("Join our Discord for the most up to date information."),
     ).toBeVisible();
     const discord = portal.getByRole("link", { name: "Join Discord" });
     await expect(discord).toBeVisible();
@@ -248,7 +246,7 @@ test("pending applications poll every minute, then approval restores five-second
     await volunteer.clock.runFor(1);
     await expect.poll(() => checks).toBe(3);
     await volunteer
-      .getByRole("button", { name: "Orientations", exact: true })
+      .getByRole("button", { name: /^Orientations \(\d+\)$/ })
       .click();
     await expect(volunteer).toHaveURL(/\?type=orientation$/);
     const orientation = volunteer

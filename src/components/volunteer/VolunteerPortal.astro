@@ -105,31 +105,33 @@ const destinations = events.filter(
 const filter = eventFilter(Astro.url.searchParams.get("type"), manage);
 const managementItems = manage ? groupManagementEvents(events, series) : [];
 const selectedOccurrence = Astro.url.searchParams.get("occurrence");
+const countEvents = (items: typeof events, type: string) =>
+  items.filter((event) =>
+    matchesEventFilter(
+      type,
+      Boolean(event.seriesId),
+      Boolean(event.includesOrientation),
+    ),
+  ).length;
+// Count the items each filter controls: grouped series once in management,
+// and both upcoming and past event cards in the volunteer view.
+const filterCount = (type: string) =>
+  manage
+    ? managementItems.filter((item) =>
+        matchesEventFilter(
+          type,
+          item.kind === "series",
+          item.kind === "series"
+            ? Boolean(item.series.includesOrientation) ||
+                item.events.some((event) => Boolean(event.includesOrientation))
+            : Boolean(item.event.includesOrientation),
+        ),
+      ).length
+    : countEvents([...events, ...pastEvents], type);
 const hasVisibleEvents = manage
-  ? managementItems.some((item) =>
-      matchesEventFilter(
-        filter,
-        item.kind === "series",
-        item.kind === "series"
-          ? Boolean(item.series.includesOrientation) ||
-              item.events.some((event) => Boolean(event.includesOrientation))
-          : Boolean(item.event.includesOrientation),
-      ),
-    )
-  : events.some((event) =>
-      matchesEventFilter(
-        filter,
-        Boolean(event.seriesId),
-        Boolean(event.includesOrientation),
-      ),
-    );
-const hasVisiblePastEvents = pastEvents.some((event) =>
-  matchesEventFilter(
-    filter,
-    Boolean(event.seriesId),
-    Boolean(event.includesOrientation),
-  ),
-);
+  ? filterCount(filter) > 0
+  : countEvents(events, filter) > 0;
+const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
 ---
 
 <AccountLayout
@@ -300,7 +302,13 @@ const hasVisiblePastEvents = pastEvents.some((event) =>
                 data-event-filter={type}
                 aria-pressed={filter === type ? "true" : "false"}
               >
-                {label}
+                <span>
+                  {label} (
+                  <span data-event-filter-count={type}>
+                    {filterCount(type)}
+                  </span>
+                  )
+                </span>
               </button>
             ))}
           </form>
