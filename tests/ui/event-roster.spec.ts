@@ -334,6 +334,17 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         name: "Change a registration",
       });
       await expect(dialog).toBeVisible();
+      await expect(dialog.locator(".dialog-body")).toHaveCSS(
+        "text-align",
+        "left",
+      );
+      await expect(
+        dialog.locator('label:has(select[name="destination"])'),
+      ).toHaveCSS("text-align", "left");
+      await expect(dialog.locator('label[for^="signup-reason-"]')).toHaveCSS(
+        "text-align",
+        "left",
+      );
       await expect(dialog.getByLabel("Destination")).toHaveValue("");
       await page.keyboard.press("Escape");
       await expect(trigger).toBeFocused();
