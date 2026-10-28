@@ -1,6 +1,7 @@
 ---
 import type { PublicRosterRow } from "@/server/db/events";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
+import EventRosterSummary from "./EventRosterSummary.astro";
 interface Props {
   roster: PublicRosterRow[];
 }
@@ -8,7 +9,7 @@ const { roster } = Astro.props;
 ---
 
 <details class="public-event-roster">
-  <summary>Volunteers ({roster.length})</summary>
+  <EventRosterSummary count={roster.length} />
   {roster.length === 0 && <p>No volunteers registered yet.</p>}
   <table class="event-roster-table" hidden={roster.length === 0}>
     <caption class="sr-only">Registered volunteers</caption>
@@ -33,12 +34,7 @@ const { roster } = Astro.props;
 <style>
   .public-event-roster {
     margin-top: 0.5rem;
-  }
-  summary {
-    cursor: pointer;
-    min-height: 2.75rem;
-    padding-block: 0.5rem;
-    align-content: center;
-    width: fit-content;
+    border-top: 1px solid #27272a;
+    padding-top: 0.5rem;
   }
 </style>

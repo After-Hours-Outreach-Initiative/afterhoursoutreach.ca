@@ -2,6 +2,7 @@
 import type { EventRow, RosterRow } from "@/server/db/events";
 import SignupEditor from "./SignupEditor.astro";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
+import EventRosterSummary from "./EventRosterSummary.astro";
 
 interface Props {
   event: EventRow;
@@ -13,7 +14,7 @@ const { event, roster, future, destinations } = Astro.props;
 ---
 
 <details class="volunteer-roster">
-  <summary>Volunteers ({roster.length})</summary>
+  <EventRosterSummary count={roster.length} />
   {roster.length === 0 && <p>No volunteers registered yet.</p>}
   <table class="event-roster-table" hidden={roster.length === 0}>
     <caption class="sr-only">Registered volunteers</caption>

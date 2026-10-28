@@ -279,8 +279,15 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           !(await roster.evaluate(
             (element: HTMLDetailsElement) => element.open,
           ))
-        )
-          await summary.click();
+        ) {
+          await expect(summary.locator("svg")).toHaveCSS("transform", "none");
+          await summary.click({
+            position: {
+              x: await summary.evaluate((element) => element.clientWidth - 20),
+              y: 24,
+            },
+          });
+        }
         await expect(
           roster.getByRole("table", { name: "Registered volunteers" }),
         ).toBeVisible();
@@ -289,18 +296,32 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           const rows = [...element.querySelectorAll("tbody tr")];
           const avatar = (selector: string) =>
             element.querySelector(selector)!.getBoundingClientRect().height;
+          const summary = element.querySelector("details > summary")!;
           return {
             avatars: [
               avatar(".event-avatar-row .attendee-avatar"),
               avatar(".event-roster-person .attendee-avatar"),
             ],
             stripes: rows.map((row) => getComputedStyle(row).backgroundColor),
+            summaryWidth: summary.getBoundingClientRect().width,
+            rosterWidth: summary.parentElement!.getBoundingClientRect().width,
+            summaryHeight: summary.getBoundingClientRect().height,
+            chevron: getComputedStyle(summary.querySelector("svg")!).transform,
             overflow: document.documentElement.scrollWidth > innerWidth,
           };
         });
         expect(layout.avatars).toEqual([24, 24]);
         expect(layout.stripes).toEqual(["rgb(12, 13, 16)", "rgb(23, 26, 32)"]);
+        expect(layout.summaryWidth).toBe(layout.rosterWidth);
+        expect(layout.summaryHeight).toBeGreaterThanOrEqual(48);
+        expect(layout.chevron).toBe("matrix(-1, 0, 0, -1, 0, 0)");
         expect(layout.overflow).toBe(false);
+        await summary.focus();
+        await summary.press("Enter");
+        await expect(roster).not.toHaveAttribute("open");
+        await expect(summary).toHaveCSS("outline-style", "solid");
+        await summary.press("Space");
+        await expect(roster).toHaveAttribute("open", "");
         if (current === viewer) {
           await expect(
             roster.locator("a, button, input, dialog, [role=menu]"),

@@ -1,0 +1,50 @@
+---
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+
+interface Props {
+  count: number;
+}
+const { count } = Astro.props;
+---
+
+<summary class="event-roster-toggle">
+  <span>Volunteers ({count})</span>
+  <ChevronDownIcon class="event-roster-chevron size-5 shrink-0" />
+</summary>
+
+<style>
+  .event-roster-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid #52525b;
+    border-radius: 0.5rem;
+    background: #18181b;
+    color: #e4e4e7;
+    cursor: pointer;
+    list-style: none;
+  }
+  .event-roster-toggle::-webkit-details-marker {
+    display: none;
+  }
+  .event-roster-toggle:hover {
+    border-color: #a5b4fc;
+    background: #27272a;
+    color: white;
+  }
+  .event-roster-toggle:focus-visible {
+    outline: 3px solid #a5b4fc;
+    outline-offset: 3px;
+  }
+  :global(details[open]) > .event-roster-toggle {
+    border-color: #818cf8;
+    background: #16214a;
+  }
+  :global(details[open]) > .event-roster-toggle :global(.event-roster-chevron) {
+    transform: rotate(180deg);
+  }
+</style>
