@@ -419,7 +419,7 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
       )
     }
     {
-      eventAccess && (
+      eventAccess && pastEvents.length > 0 && (
         <section class="volunteer-events" aria-labelledby="past-events-heading">
           <div class="volunteer-section-heading">
             <h2 id="past-events-heading">Past events</h2>
@@ -442,9 +442,7 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
             role="status"
             hidden={hasVisiblePastEvents}
           >
-            {pastEvents.length
-              ? "No past events match this filter."
-              : "No past events yet."}
+            No past events match this filter.
           </p>
           <p
             class="volunteer-help"

@@ -382,10 +382,20 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     }
   };
   syncList(list, refreshed.querySelector("[data-event-list]")!);
-  const pastList = root.querySelector<HTMLElement>("[data-past-event-list]");
+  let pastList = root.querySelector<HTMLElement>("[data-past-event-list]");
   const nextPastList = refreshed.querySelector<HTMLElement>(
     "[data-past-event-list]",
   );
+  // History is omitted when empty, but can appear or disappear during polling.
+  if (!pastList && nextPastList) {
+    const section = document.importNode(nextPastList.closest("section")!, true);
+    pastList = section.querySelector<HTMLElement>("[data-past-event-list]")!;
+    // Reconcile cards normally so an occurrence keeps its expanded roster.
+    pastList.replaceChildren();
+    root.insertBefore(section, list.closest("section")!.nextSibling);
+  } else if (pastList && !nextPastList) {
+    pastList.closest("section")!.remove();
+  }
   if (pastList && nextPastList) syncList(pastList, nextPastList);
   // Adopt authoritative counts after polling/actions without replacing a
   // focused filter button or counting nested occurrences as extra series.

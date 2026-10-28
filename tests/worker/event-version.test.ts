@@ -181,6 +181,17 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
         )
       ).status,
     ).toBe(403);
+    for (const [path, cookie] of [
+      ["/events", attendee.cookie],
+      ["/events", organizerCookie],
+      ["/manage/events", organizerCookie],
+    ]) {
+      const html = await (await send(path, undefined, cookie)).text();
+      expect(html).toContain("data-event-list");
+      expect(html).not.toMatch(
+        /past-events-heading|data-past-event-list|data-empty-past-events/,
+      );
+    }
     await DB.prepare(
       `INSERT INTO event
       (id,type,starts_at,meeting_point,spots,hidden,created_by,created_at,updated_at)
@@ -268,6 +279,11 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       ),
     ]);
     expect(managementHtml).not.toMatch(/<h2\b[^>]*>\s*Events\s*<\/h2>/);
+    const filteredHistory = await (
+      await send("/manage/events?type=recurring", undefined, organizerCookie)
+    ).text();
+    expect(filteredHistory).toContain('id="past-events-heading"');
+    expect(filteredHistory).toContain("No past events match this filter.");
     expect(managementHtml).toMatch(
       /<button[^>]*data-show-dialog="event-editor-new"[^>]*>[\s\S]*?\bCreate\s*<\/button>/,
     );
