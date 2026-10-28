@@ -269,6 +269,14 @@ test("event and profile dialogs preserve their layout and content throughout the
     const profile = page.locator("[data-volunteer-profile-dialog]");
     await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
     await expect(profile.locator(".volunteer-profile-loading")).toHaveCount(0);
+    const controls = profile.locator(
+      '[data-volunteer-profile-panel="application"] + [data-volunteer-controls]',
+    );
+    await expect(controls).toBeVisible();
+    await profile
+      .getByRole("tab", { name: "Application", exact: true })
+      .click();
+    await expect(controls).toBeVisible();
     await expectStableExit(profile);
     await expect(profile.locator("[data-profile-dialog-content]")).toBeEmpty();
   }

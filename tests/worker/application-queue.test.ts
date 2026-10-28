@@ -310,6 +310,11 @@ test("organizers review submitted applications with search-aware filter counts a
       name: "Application",
       exact: true,
     });
+    await expect(
+      page.locator(
+        '[data-volunteer-profile-panel="application"] + [data-volunteer-controls]',
+      ),
+    ).toBeVisible();
     await expect(profileTab).toHaveAttribute("aria-selected", "true");
     await expect(
       profile.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
@@ -329,6 +334,12 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(profileTab).toBeFocused();
     await page.keyboard.press("End");
     await expect(applicationTab).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(application).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(
+      page.getByRole("button", { name: "Approve application", exact: true }),
+    ).toBeFocused();
     const summary = application.locator(".account-profile-summary");
     await expect(summary.getByRole("heading")).toHaveText([
       "Submission details",

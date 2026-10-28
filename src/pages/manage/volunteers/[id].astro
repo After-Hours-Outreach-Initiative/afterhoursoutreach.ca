@@ -86,7 +86,6 @@ const progress = await loadApplicationProgress(env.DB, person.id);
             : "Application awaiting approval"
         }
       </p>
-      <VolunteerControls person={person} />
       <div class="account-profile-summary mt-8" data-naloxone-review>
         <dl>
           <div>
@@ -176,6 +175,7 @@ const progress = await loadApplicationProgress(env.DB, person.id);
           )
         }
       </section>
+      <VolunteerControls person={person} />
     </div>
   </section>
 </AccountLayout>
