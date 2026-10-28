@@ -1278,9 +1278,6 @@ body:has(
   line-height: 1.6;
   cursor: pointer;
 }
-.volunteer-conduct-confirmation input {
-  margin-top: 0.25rem;
-}
 .volunteer-back-link {
   display: flex;
   align-items: center;
