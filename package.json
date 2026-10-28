@@ -7,7 +7,7 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "wrangler types --strict-vars false && astro dev --host",
+    "dev": "wrangler types --strict-vars false && astro dev --host --background",
     "docs:dev": "pnpm --dir docs dev",
     "docs:stop": "pnpm --dir docs stop",
     "docs:status": "pnpm --dir docs status",
