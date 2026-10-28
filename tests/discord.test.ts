@@ -21,6 +21,10 @@ import {
 } from "../src/server/db/application-progress";
 import { setVolunteerStatus } from "../src/server/db/volunteers";
 import { RequestError } from "../src/server/http";
+import {
+  loadLocalDiscordStatus,
+  simulateDiscordConnection,
+} from "../src/dev/server/discord";
 
 const config: DiscordBindings = {
   ...env,
@@ -183,6 +187,143 @@ test("Discord uses only the three allowed roles, all gated by active application
       DISCORD_MEDIC_ROLE_ID: config.DISCORD_VOLUNTEER_ROLE_ID,
     }),
     false,
+  );
+});
+
+test("local Discord simulation preserves consent and screening, then reconciles eligible roles without tokens", async () => {
+  const actor = await person();
+  const input = { userId: actor.id, consent: true, outcome: "authorize" };
+  await assert.rejects(
+    simulateDiscordConnection(env.DB, actor, { ...input, consent: false }),
+    statusError(400),
+  );
+  await assert.rejects(
+    simulateDiscordConnection(env.DB, actor, { ...input, userId: "other" }),
+    statusError(403),
+  );
+  await assert.rejects(
+    simulateDiscordConnection(env.DB, actor, {
+      ...input,
+      outcome: "unavailable",
+    }),
+    statusError(503),
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM discord_link").first("n"),
+    0,
+  );
+  await simulateDiscordConnection(env.DB, actor, {
+    ...input,
+    outcome: "screening",
+  });
+  const pending = await loadLocalDiscordStatus(config, actor.id);
+  assert.equal(pending.configured, true);
+  assert.equal(pending.completedAt, null);
+  assert.match(pending.connection, /Accept the server rules/);
+  assert.equal(
+    (await loadApplicationProgress(env.DB, actor.id)).discordCompletedAt,
+    null,
+  );
+
+  await simulateDiscordConnection(env.DB, actor, input);
+  const connected = await loadLocalDiscordStatus(config, actor.id);
+  assert.ok(connected.completedAt);
+  assert.match(connected.sync, /Roles synchronized/);
+  const local = () =>
+    env.DB.prepare("SELECT * FROM discord_link WHERE user_id=?")
+      .bind(actor.id)
+      .first<{
+        guild_id: string;
+        discord_id: string;
+        observed_roles: string;
+        join_token: string | null;
+        token_expires_at: number | null;
+        version: number;
+        synced_version: number;
+      }>();
+  assert.equal((await local())!.guild_id, "local-only");
+  assert.equal((await local())!.discord_id, `local:${actor.id}`);
+  assert.equal((await local())!.join_token, null);
+  assert.equal((await local())!.token_expires_at, null);
+  assert.deepEqual(JSON.parse((await local())!.observed_roles), []);
+
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
+  await loadLocalDiscordStatus(config, actor.id);
+  assert.deepEqual(JSON.parse((await local())!.observed_roles), [
+    "local-volunteer",
+  ]);
+  assert.equal((await local())!.version, (await local())!.synced_version);
+  await env.DB.prepare("UPDATE volunteer_status SET active=0 WHERE user_id=?")
+    .bind(actor.id)
+    .run();
+  await loadLocalDiscordStatus(config, actor.id);
+  assert.deepEqual(JSON.parse((await local())!.observed_roles), []);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM discord_oauth").first("n"),
+    0,
+  );
+});
+
+test("local Discord simulation rechecks prerequisites and session authorization and never replaces real links", async () => {
+  const actor = await person();
+  const input = { userId: actor.id, consent: true, outcome: "authorize" };
+  await env.DB.prepare("UPDATE profile SET naloxone_completed_at=NULL").run();
+  await assert.rejects(
+    simulateDiscordConnection(env.DB, actor, input),
+    statusError(409),
+  );
+  await env.DB.prepare("UPDATE profile SET naloxone_completed_at=1").run();
+  await assert.rejects(
+    simulateDiscordConnection(
+      env.DB,
+      { ...actor, twoFactorEnabled: true, twoFactorVerified: false },
+      input,
+    ),
+    statusError(401),
+  );
+  await link(actor);
+  const before = await env.DB.prepare(
+    "SELECT * FROM discord_link WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .first();
+  await assert.rejects(
+    simulateDiscordConnection(env.DB, actor, input),
+    statusError(409),
+  );
+  await loadLocalDiscordStatus(config, actor.id);
+  assert.deepEqual(
+    await env.DB.prepare("SELECT * FROM discord_link WHERE user_id=?")
+      .bind(actor.id)
+      .first(),
+    before,
+  );
+  await env.DB.prepare("UPDATE session SET expires_at=0").run();
+  await assert.rejects(
+    simulateDiscordConnection(env.DB, actor, input),
+    statusError(409),
+  );
+});
+
+test("unconfigured Discord exposes availability without user-facing setup instructions", async () => {
+  const actor = await person();
+  const disabled = { ...config, DISCORD_BOT_TOKEN: "" };
+  const status = await loadDiscordStatus(disabled, actor.id);
+  assert.equal(status.configured, false);
+  assert.doesNotMatch(status.sync, /not configured|organizer|secret|token/i);
+  await assert.rejects(
+    startDiscordLink(disabled, actor, origin, {
+      userId: actor.id,
+      consent: true,
+    }),
+    (error: unknown) =>
+      error instanceof RequestError &&
+      error.status === 503 &&
+      error.message === "Discord connection is coming soon.",
   );
 });
 
@@ -636,7 +777,7 @@ test("bot permission failures are durable and previews never contact Discord", a
   await processDiscordSync(config, denied);
   assert.equal(calls, 1);
   const status = await loadDiscordStatus(config, actor.id);
-  assert.match(status.sync, /permissions/);
+  assert.match(status.sync, /temporarily unavailable/);
   assert.equal(
     JSON.stringify(status).includes("private provider detail"),
     false,

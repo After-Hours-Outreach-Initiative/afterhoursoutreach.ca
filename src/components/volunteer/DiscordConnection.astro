@@ -8,7 +8,11 @@ interface Props {
   required?: boolean;
 }
 const { userId, canConnect = true, required = false } = Astro.props;
-const status = await loadDiscordStatus(env, userId);
+const status = import.meta.env.DEV
+  ? await (
+      await import("@/dev/server/discord")
+    ).loadLocalDiscordStatus(env, userId)
+  : await loadDiscordStatus(env, userId);
 const result = Astro.url.searchParams.get("discord");
 ---
 
@@ -19,79 +23,63 @@ const result = Astro.url.searchParams.get("discord");
 >
   <p>
     {
-      required
-        ? "Connect Discord to complete this application step."
-        : "Connecting Discord is optional for existing volunteers and does not change your website access."
-    } Email remains your sign-in method.
+      !status.configured
+        ? "Discord connection is coming soon."
+        : required
+          ? "Connect Discord to access our volunteer channels once you’re approved."
+          : "Connect Discord to keep your volunteer channel access up to date. This is optional."
+    }
   </p>
   {
     result && (
       <p class="volunteer-notice" role="status">
         {result === "connected"
-          ? "Discord linked. We are verifying server membership and syncing your eligible roles."
+          ? "Discord linked. Checking membership and volunteer access."
           : result}
       </p>
     )
   }
-  <p class="mt-4" data-discord-identity>
+  <p class="mt-4" data-discord-identity hidden={!status.username}>
+    {status.username ? `Connected as ${status.username}.` : ""}
+  </p>
+  <p
+    class="mt-4"
+    data-discord-status
+    role="status"
+    hidden={!status.configured || !status.username}
+  >
     {
       status.username
-        ? `Linked Discord: ${status.username} (${status.discordId})`
-        : "No Discord identity linked."
+        ? `${status.connection.replace(/\.$/, "")}. ${status.sync.replace(/\.$/, "")}.`
+        : ""
     }
   </p>
-  <p class="mt-4" data-discord-status role="status">
-    {status.connection.replace(/\.$/, "")}. {status.sync.replace(/\.$/, "")}.
-  </p>
-  <p class="mt-4">
-    We sync only Volunteer, Organizer, and Medic roles from your active,
-    application-approved website account. Medic also requires Medic team
-    selection, patrol approval, and recorded orientation completion. We preserve
-    unrelated roles and never remove you from the server.
-  </p>
   {
-    !canConnect ? (
-      <p class="mt-4">
-        Submit your application and complete Naloxone 101 first.
-      </p>
-    ) : (
+    status.configured && canConnect && (
       <form class="volunteer-form mt-4" data-discord-connect>
         <label class="volunteer-check">
           <>
-            <input
-              type="checkbox"
-              name="consent"
-              required
-              disabled={!status.configured}
-            />
+            <input type="checkbox" name="consent" required />
             <span>
-              I agree to link my Discord identity, automatically join the After
-              Hours Outreach server, and keep these roles in sync.{" "}
+              I agree to link my Discord account, join the After Hours Outreach
+              server, and keep my volunteer channel access up to date.{" "}
               <a href="/privacy">Privacy policy</a>.
             </span>
           </>
         </label>
         <p data-discord-message role="status" hidden />
-        <button
-          class="btn btn-primary mt-4"
-          type="submit"
-          disabled={!status.configured}
-        >
+        <button class="btn btn-primary mt-4" type="submit">
           <DiscordIcon class="btn-icon fill-current" />
-          {status.username
-            ? "Reconnect the same Discord account"
-            : "Connect Discord"}
+          {status.username ? "Reconnect Discord" : "Connect Discord"}
         </button>
       </form>
     )
   }
-  <p class="mt-4">
-    Already linked? Reconnect only the same Discord identity. Contact an
-    organizer to correct a link or withdraw consent. You can leave the server
-    yourself; we will not automatically rejoin you without fresh consent.
-  </p>
-  <button type="button" class="btn btn-outline mt-4" data-discord-refresh
-    >Refresh connection status</button
+  <button
+    type="button"
+    class="btn btn-outline mt-4"
+    data-discord-refresh
+    hidden={!status.configured || !status.username}>Refresh status</button
   >
 </div>
 <script src="../../scripts/discord.ts"></script>

@@ -28,22 +28,20 @@ export async function loadDiscordStatus(env: DiscordBindings, userId: string) {
         : row.member_verified_at !== null
           ? "Server membership verified"
           : "Joining and verifying server membership";
-  const sync = !configured
-    ? "Discord is not configured. Contact an organizer."
-    : !row
-      ? "Connect Discord to enable role synchronization."
-      : row.last_error === "bot_permissions"
-        ? "Role sync needs an organizer to check the bot’s permissions. It will retry automatically."
-        : row.last_error === "rate_limited"
-          ? "Discord requested a pause. Role sync will retry automatically."
-          : row.last_error &&
-              !["membership_missing", "membership_screening"].includes(
-                row.last_error,
-              )
-            ? "Discord sync is delayed. We will retry automatically; contact an organizer if it persists."
-            : row.version !== row.synced_version
-              ? "Role sync pending"
-              : "Roles synchronized with your current website eligibility";
+  const sync = !row
+    ? "Connect Discord to enable role synchronization."
+    : row.last_error === "bot_permissions"
+      ? "Role sync is temporarily unavailable. It will retry automatically."
+      : row.last_error === "rate_limited"
+        ? "Discord requested a pause. Role sync will retry automatically."
+        : row.last_error &&
+            !["membership_missing", "membership_screening"].includes(
+              row.last_error,
+            )
+          ? "Discord sync is delayed. We will retry automatically; contact an organizer if it persists."
+          : row.version !== row.synced_version
+            ? "Role sync pending"
+            : "Roles synchronized with your current website eligibility";
   return {
     userId,
     configured,

@@ -145,10 +145,22 @@ test("DEV panel separates states from saved accounts and completes each applicat
       await expect(
         page.locator('[data-application-progress-step="discord"]'),
       ).toHaveAttribute("data-state", "current");
-    if (index === 2)
+    if (index < 2)
+      await expect(
+        page
+          .locator('[data-application-progress-step="review"]')
+          .getByText("Pending approval", { exact: true }),
+      ).toHaveCount(0);
+    if (index === 2) {
       await expect(
         page.locator('[data-application-progress-step="review"]'),
       ).toHaveAttribute("data-state", "current");
+      await expect(
+        page
+          .locator('[data-application-progress-step="review"]')
+          .getByText("Pending approval", { exact: true }),
+      ).toBeVisible();
+    }
     const refreshed = await openLocalAccountSwitcher(page);
     await expect(
       refreshed.locator(`[data-application-step="${step}"]`),
@@ -542,6 +554,21 @@ test("unfinished application shows current milestones and a keyboard-accessible 
   await expect(
     tracker.locator('[data-application-progress-step="form"]'),
   ).toHaveAttribute("data-state", "current");
+  const upcomingDiscord = tracker.locator(
+    '[data-application-progress-step="discord"]',
+  );
+  await upcomingDiscord.locator(":scope > summary").click();
+  await expect(
+    upcomingDiscord.locator("[data-discord-connection] > p").first(),
+  ).toHaveText(
+    "Connect Discord to access our volunteer channels once you’re approved.",
+  );
+  await expect(upcomingDiscord.locator("[data-discord-connect]")).toHaveCount(
+    0,
+  );
+  await expect(upcomingDiscord).not.toContainText(
+    /Submit your application|complete Naloxone 101|before connecting Discord/i,
+  );
   await expect(formLink).toHaveAttribute("href", "/apply");
   for (const width of [375, 320]) {
     await page.setViewportSize({ width, height: 812 });
@@ -582,6 +609,235 @@ test("unfinished application shows current milestones and a keyboard-accessible 
     tracker.locator('[data-application-progress-step="review"]'),
   ).toHaveAttribute("data-state", "upcoming");
   await expect(page.locator("[data-event-list]")).toHaveCount(0);
+});
+
+test("Discord application step stays brief outside the current step", async ({
+  page,
+  baseURL,
+}) => {
+  const user = await createLocalAccount(page.request, baseURL!);
+  await page.goto("/volunteer");
+  const discord = page.locator('[data-application-progress-step="discord"]');
+  await expect(discord).toHaveAttribute("data-state", "upcoming");
+  await discord.locator(":scope > summary").click();
+  await expect(
+    discord.locator("[data-discord-connection] > p").first(),
+  ).toHaveText(
+    "Connect Discord to access our volunteer channels once you’re approved.",
+  );
+  await expect(discord.locator("[data-discord-connect]")).toHaveCount(0);
+  await expect(discord).not.toContainText(
+    /Submit your application|complete Naloxone 101|before connecting Discord/i,
+  );
+  await expect(
+    discord.getByText("About Discord linking", { exact: true }),
+  ).toHaveCount(0);
+
+  let connection: "unlinked" | "linked" | "error" = "unlinked";
+  await page.route("**/api/v1/account/discord", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    if (connection === "error")
+      return route.fulfill({
+        status: 503,
+        json: { message: "Status is unavailable. Try again." },
+      });
+    return route.fulfill({
+      json: {
+        userId: user.id,
+        configured: true,
+        username: connection === "linked" ? "volunteer" : null,
+        discordId: connection === "linked" ? "1564831264081715302" : null,
+        connection:
+          connection === "linked"
+            ? "Server membership verified"
+            : "Not connected",
+        sync:
+          connection === "linked"
+            ? "Role sync pending"
+            : "Connect Discord to enable role synchronization.",
+      },
+    });
+  });
+
+  // Completing the preceding step reveals the actions without changing the description.
+  const naloxone = page.locator("[data-naloxone-confirm]");
+  await naloxone.locator('[name="completed"]').check();
+  await naloxone.getByRole("button", { name: "Confirm completion" }).click();
+  await expect(discord).toHaveAttribute("data-state", "current");
+  await expect(discord).toHaveAttribute("open", "");
+  await expect(discord.locator("[data-discord-connect]")).toBeVisible();
+  await expect(
+    discord.getByRole("link", { name: "Privacy policy" }),
+  ).toBeVisible();
+  await expect(
+    discord.locator("[data-discord-connection] details"),
+  ).toHaveCount(0);
+  await expect(
+    discord.getByText("Email remains your sign-in method."),
+  ).toHaveCount(0);
+
+  const status = discord.locator("[data-discord-status]");
+  const identity = discord.locator("[data-discord-identity]");
+  const refresh = discord.locator("[data-discord-refresh]");
+  // Handlers and polling remain available when the widget appears after load.
+  await expect(status).toBeHidden({ timeout: 10_000 });
+  await expect(identity).toBeHidden();
+  await expect(refresh).toBeHidden();
+  connection = "linked";
+  await expect(identity).toHaveText("Connected as volunteer.", {
+    timeout: 10_000,
+  });
+  await expect(identity).toBeVisible();
+  await expect(refresh).toBeVisible();
+  await expect(status).toContainText("Role sync pending");
+  connection = "error";
+  await refresh.click();
+  await expect(status).toHaveText("Status is unavailable. Try again.");
+
+  const completed = await page.request.post(
+    "/api/v1/auth/dev/application-step",
+    {
+      headers: { origin: baseURL! },
+      data: { userId: user.id, step: "discord" },
+    },
+  );
+  expect(completed.ok(), await completed.text()).toBe(true);
+  await page.evaluate(async () => {
+    const response = await fetch(location.href);
+    document.dispatchEvent(
+      new CustomEvent("application-progress-updated", {
+        detail: new DOMParser().parseFromString(
+          await response.text(),
+          "text/html",
+        ),
+      }),
+    );
+  });
+  const review = page.locator('[data-application-progress-step="review"]');
+  await expect(review).toHaveAttribute("data-state", "current");
+  await expect(
+    review.getByText("Pending approval", { exact: true }),
+  ).toBeVisible();
+  await expect(discord).toHaveAttribute("data-state", "complete");
+  await discord.locator(":scope > summary").click();
+  await expect(discord.locator("[data-discord-connection]")).toHaveCount(0);
+  await expect(discord.locator(".application-progress-content")).toContainText(
+    "Discord connected.",
+  );
+  const manage = discord.getByRole("link", {
+    name: "Manage Discord connection",
+  });
+  await expect(manage).toHaveAttribute(
+    "href",
+    "/volunteer/account#account-discord-heading",
+  );
+  await manage.click();
+  await expect(page.locator("[data-discord-connect]")).toBeVisible();
+});
+
+test("Connect Discord locally simulates consent, cancellation, failure and screening through the real UI", async ({
+  page,
+  baseURL,
+}) => {
+  const external: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).origin !== baseURL) external.push(request.url());
+  });
+  const endpoint = "/api/v1/account/discord";
+  const post = (data: object, origin = baseURL!) =>
+    page.request.post(endpoint, {
+      headers: { origin },
+      data,
+    });
+  expect((await post({})).status()).toBe(401);
+  const user = await createLocalAccount(page.request, baseURL!);
+  const input = { userId: user.id, consent: true, outcome: "authorize" };
+  expect((await post(input, "https://unrelated.example.org")).status()).toBe(
+    403,
+  );
+  expect((await post({ ...input, consent: false })).status()).toBe(400);
+  expect((await post({ ...input, userId: "other" })).status()).toBe(403);
+  expect((await post(input)).status()).toBe(409);
+
+  await page.goto("/volunteer");
+  const course = page.locator("[data-naloxone-confirm]");
+  await course.locator('[name="completed"]').check();
+  await course.getByRole("button", { name: "Confirm completion" }).click();
+  const discord = page.locator('[data-application-progress-step="discord"]');
+  await expect(discord).toHaveAttribute("data-state", "current");
+  await expect(discord).not.toContainText(/not configured|coming soon/i);
+  const form = discord.locator("[data-discord-connect]");
+  const connect = form.getByRole("button", {
+    name: "Connect Discord",
+    exact: true,
+  });
+  await expect(connect).toBeEnabled();
+  await connect.click();
+  const dialog = page.getByRole("dialog", { name: "Authorize AHOI Bot" });
+  await expect(dialog).toHaveCount(0);
+  await form.locator('[name="consent"]').check();
+  await connect.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Local simulation");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(form.locator("[data-discord-message]")).toContainText(
+    "cancelled",
+  );
+  expect((await (await page.request.get(endpoint)).json()).username).toBeNull();
+  await connect.click();
+  await dialog
+    .getByRole("button", { name: "Simulate Discord unavailable" })
+    .click();
+  await expect(form.locator("[data-discord-message]")).toHaveText(
+    "Discord could not be connected. Please try again.",
+  );
+  await expect(connect).toBeEnabled();
+  expect((await (await page.request.get(endpoint)).json()).username).toBeNull();
+
+  await page.setViewportSize({ width: 320, height: 812 });
+  await connect.click();
+  expect(
+    await dialog.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  await dialog
+    .getByRole("button", { name: "Simulate server rules required" })
+    .click();
+  await expect(discord.locator("[data-discord-status]")).toContainText(
+    "Accept the server rules in Discord",
+  );
+  await expect(discord).toHaveAttribute("data-state", "current");
+  await expect(page.getByText("Pending approval", { exact: true })).toHaveCount(
+    0,
+  );
+  const pending = await (await page.request.get(endpoint)).json();
+  expect(pending.completedAt).toBeNull();
+  expect(pending.discordId).toBe(`local:${user.id}`);
+  await form.locator('[name="consent"]').check();
+  await form.getByRole("button", { name: "Reconnect Discord" }).click();
+  await dialog.getByRole("button", { name: "Authorize connection" }).click();
+  await expect(discord).toHaveAttribute("data-state", "complete");
+  const review = page.locator('[data-application-progress-step="review"]');
+  await expect(review).toHaveAttribute("data-state", "current");
+  await expect(
+    review.getByText("Pending approval", { exact: true }),
+  ).toBeVisible();
+  await discord.locator(":scope > summary").click();
+  await discord
+    .getByRole("link", { name: "Manage Discord connection" })
+    .click();
+  await expect(page.locator("[data-discord-identity]")).toHaveText(
+    "Connected as aho_volunteer.",
+  );
+  await expect(page.locator("[data-discord-status]")).toContainText(
+    "Roles synchronized",
+  );
+  const connected = await (await page.request.get(endpoint)).json();
+  expect(connected.configured).toBe(true);
+  expect(connected.completedAt).toBeGreaterThan(0);
+  expect(connected.memberVerifiedAt).toBeGreaterThan(0);
+  expect(external).toEqual([]);
 });
 
 test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async ({

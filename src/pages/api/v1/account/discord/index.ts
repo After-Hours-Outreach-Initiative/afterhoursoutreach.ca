@@ -13,7 +13,12 @@ export const GET: APIRoute = async ({ request }) => {
     const { actor, headers } = await accountContext(env, request);
     if (!actor || (actor.twoFactorEnabled && !actor.twoFactorVerified))
       throw new RequestError(401, "Sign in to view your Discord connection.");
-    const response = Response.json(await loadDiscordStatus(env, actor.id), {
+    const status = import.meta.env.DEV
+      ? await (
+          await import("@/dev/server/discord")
+        ).loadLocalDiscordStatus(env, actor.id)
+      : await loadDiscordStatus(env, actor.id);
+    const response = Response.json(status, {
       headers: { "Cache-Control": "no-store" },
     });
     forwardCookies(headers, response.headers);
@@ -29,7 +34,22 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       request,
       true,
     );
-    if (!actor) throw new RequestError(401, "Sign in to connect Discord.");
+    if (!actor || (actor.twoFactorEnabled && !actor.twoFactorVerified))
+      throw new RequestError(401, "Sign in to connect Discord.");
+    const input = await readJson(request, 1024);
+    if (import.meta.env.DEV) {
+      const { simulateDiscordConnection } =
+        await import("@/dev/server/discord");
+      await simulateDiscordConnection(env.DB, actor, input);
+      const response = Response.json(
+        { simulated: true },
+        {
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
+      forwardCookies(headers, response.headers);
+      return response;
+    }
     await takeRateLimit(
       env.DB,
       env.BETTER_AUTH_SECRET,
@@ -41,7 +61,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       env,
       actor,
       new URL(bindings.AUTH_BASE_URL).origin,
-      await readJson(request, 1024),
+      input,
     );
     cookies.set(discordCookie, browser, {
       httpOnly: true,

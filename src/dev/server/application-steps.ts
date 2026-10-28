@@ -9,6 +9,7 @@ import { confirmNaloxoneCompletion } from "../../server/db/naloxone";
 import { saveProfile } from "../../server/db/profiles";
 import { RequestError } from "../../server/http";
 import type { DevelopmentApplicationStep } from "../accounts";
+import { simulateDiscordConnection } from "./discord";
 
 /** Local-only shortcuts: keep normal submission validation and immutable snapshots. */
 export async function completeLocalApplicationStep(
@@ -44,24 +45,12 @@ export async function completeLocalApplicationStep(
       "Submit the application and complete Naloxone 101 first.",
     );
   if (step === "discord") {
-    // Deliberately fictional local-only membership. Its non-snowflake guild can
-    // never be selected by the real sync job; no provider call or token exists.
-    await db
-      .prepare(
-        `INSERT OR IGNORE INTO discord_link
-      (user_id,discord_id,username,guild_id,consented_at,completed_at,member_verified_at,next_attempt_at)
-      SELECT ?,?,'Simulated local Discord','local-only',?,?,?,? WHERE ${writePermission()}`,
-      )
-      .bind(
-        actor.id,
-        `local:${actor.id}`,
-        Date.now(),
-        Date.now(),
-        Date.now(),
-        Date.now(),
-        ...permissionValues(actor),
-      )
-      .run();
+    if (progress.discordCompletedAt == null)
+      await simulateDiscordConnection(db, actor, {
+        userId: actor.id,
+        consent: true,
+        outcome: "authorize",
+      });
     return;
   }
   if (progress.discordRequired && progress.discordCompletedAt == null)

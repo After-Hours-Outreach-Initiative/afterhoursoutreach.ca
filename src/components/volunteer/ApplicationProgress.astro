@@ -48,6 +48,9 @@ const steps = [
     title: "Connect Discord",
     completed: !progress.discordRequired || progress.discordCompletedAt != null,
     completedAt: progress.discordCompletedAt ?? null,
+    canConnect:
+      progress.submittedAt !== null &&
+      (!progress.discordRequired || progress.naloxoneCompletedAt !== null),
   },
   {
     key: "review",
@@ -121,7 +124,7 @@ const currentStep = steps.findIndex((step) => !step.completed);
                       </>
                     )}
                   </span>
-                ) : step.key === "review" && progress.submittedAt !== null ? (
+                ) : step.key === "review" && index === currentStep ? (
                   <span class="application-progress-status text-sm">
                     Pending approval
                   </span>
@@ -160,20 +163,27 @@ const currentStep = steps.findIndex((step) => !step.completed);
                 <p class="text-base">
                   {progress.applicationApproved
                     ? "Your application has been approved. You can sign up for a patrol that includes orientation when your volunteer account is active."
-                    : "After Naloxone 101 and the required Discord connection, an organizer will review your application. We’ll email you to let you know whether it’s approved and what to do next. You can also return to this page to check its status."}
+                    : "An organizer will review your application. We’ll email you to let you know whether it’s approved and what to do next. You can also return to this page to check its status."}
                 </p>
               )}
-              {step.key === "discord" && (
-                <DiscordConnection
-                  {userId}
-                  canConnect={
-                    progress.submittedAt !== null &&
-                    (!progress.discordRequired ||
-                      progress.naloxoneCompletedAt !== null)
-                  }
-                  required={progress.discordRequired}
-                />
-              )}
+              {step.key === "discord" &&
+                (step.completed ? (
+                  <p>
+                    {progress.discordCompletedAt != null
+                      ? "Discord connected."
+                      : "Discord is optional for your account."}{" "}
+                    <a href="/volunteer/account#account-discord-heading">
+                      Manage Discord connection
+                    </a>
+                    .
+                  </p>
+                ) : (
+                  <DiscordConnection
+                    {userId}
+                    canConnect={step.canConnect}
+                    required={progress.discordRequired}
+                  />
+                ))}
             </div>
           </details>
         </li>
@@ -181,6 +191,8 @@ const currentStep = steps.findIndex((step) => !step.completed);
     }
   </ol>
 </section>
+
+<script src="../../scripts/discord.ts"></script>
 
 <style>
   .application-progress-list {

@@ -16,6 +16,14 @@ locally unless a remote migration or deployment is explicitly requested.
 Do not write or run tests for the documentation site (`docs/`), including
 browser/Playwright tests for its diagrams or editing controls.
 
+Do not add end-user website setup/configuration warnings for unfinished or
+unconfigured features. Use concise placeholders for planned functionality and
+keep operator diagnostics out of the user interface. External integrations must
+have development-only simulations, like local email delivery, accessible through
+the normal user flow so success, cancellation, pending, and failure states can be
+previewed without real credentials or provider calls. Exclude simulation code
+and bypasses from hosted production and preview builds.
+
 ## Cloudflare tooling
 
 Use `cf` for Cloudflare account and resource configuration management, including
@@ -38,6 +46,9 @@ building and deploying the application.
   account/resource identifiers, then inspect the selected command's `--help`.
 
 ## Design
+
+Upcoming application steps describe the step itself, without reminders to finish
+earlier steps. Keep their descriptions visible and omit actions until available.
 
 Do not use UI eyebrows: the small, uppercase, letter-spaced label sitting above
 a heading or field value. Let the heading or the value carry the section on its

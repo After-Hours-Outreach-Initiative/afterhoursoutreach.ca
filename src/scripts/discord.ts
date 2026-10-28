@@ -9,14 +9,31 @@ document.addEventListener("submit", async (event) => {
   const root = form.closest<HTMLElement>("[data-discord-connection]")!;
   const message = form.querySelector<HTMLElement>("[data-discord-message]")!;
   const button = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
+  if (button.disabled) return;
   button.disabled = true;
+  message.hidden = true;
   try {
+    let outcome: string | undefined;
+    if (import.meta.env.DEV) {
+      const { localDiscordDialog } =
+        await import("../dev/scripts/local-discord-dialog");
+      const chosen = await localDiscordDialog();
+      if (!chosen) {
+        message.textContent =
+          "Discord connection was cancelled. You can try again.";
+        message.hidden = false;
+        button.disabled = false;
+        return;
+      }
+      outcome = chosen;
+    }
     const response = await fetch("/api/v1/account/discord", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: root.dataset.discordUser,
         consent: new FormData(form).get("consent") === "on",
+        ...(outcome ? { outcome } : {}),
       }),
     });
     const data = await response.json();
@@ -24,6 +41,13 @@ document.addEventListener("submit", async (event) => {
       throw new Error(
         errorSchema.parse(data).message ?? "Discord could not be connected.",
       );
+    if (import.meta.env.DEV) {
+      if (z.object({ simulated: z.literal(true) }).safeParse(data).success) {
+        window.location.reload();
+        return;
+      }
+      throw new Error("Discord could not be connected. Please try again.");
+    }
     const target = new URL(urlSchema.parse(data).url);
     if (
       target.origin !== "https://discord.com" ||
@@ -54,12 +78,21 @@ async function refresh(root: HTMLElement) {
     const data = statusSchema.parse(body);
     if (data.userId !== root.dataset.discordUser)
       throw new Error("Your account changed. Reload this page.");
-    root.querySelector<HTMLElement>("[data-discord-identity]")!.textContent =
-      data.username
-        ? `Linked Discord: ${data.username} (${data.discordId})`
-        : "No Discord identity linked.";
-    status.textContent = `${data.connection.replace(/\.$/, "")}. ${data.sync.replace(/\.$/, "")}.`;
+    const identity = root.querySelector<HTMLElement>(
+      "[data-discord-identity]",
+    )!;
+    identity.hidden = !data.username;
+    identity.textContent = data.username
+      ? `Connected as ${data.username}.`
+      : "";
+    status.hidden = !data.configured || !data.username;
+    status.textContent = data.username
+      ? `${data.connection.replace(/\.$/, "")}. ${data.sync.replace(/\.$/, "")}.`
+      : "";
+    root.querySelector<HTMLButtonElement>("[data-discord-refresh]")!.hidden =
+      !data.configured || !data.username;
   } catch (error) {
+    status.hidden = false;
     status.textContent =
       error instanceof Error
         ? error.message
@@ -90,6 +123,7 @@ const errorSchema = z.object({ message: z.string().optional() });
 const urlSchema = z.object({ url: z.string() });
 const statusSchema = z.object({
   userId: z.string(),
+  configured: z.boolean(),
   username: z.string().nullable(),
   discordId: z.string().nullable(),
   connection: z.string(),

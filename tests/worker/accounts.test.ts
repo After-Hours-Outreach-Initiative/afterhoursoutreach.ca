@@ -1146,6 +1146,39 @@ describe(
       ).json()) as typeof current;
       assert.equal(after.user.id, before.user.id);
       assert.equal(after.session.id, before.session.id);
+      const discordPage = await (
+        await send("/volunteer/account", undefined, cookie)
+      ).text();
+      assert.match(discordPage, /Discord connection is coming soon\./);
+      assert.doesNotMatch(
+        discordPage,
+        /Discord (?:connection )?is not configured|data-discord-connect(?:\s|>)|Authorize AHOI Bot/,
+      );
+      const previousDiscord = await DB.prepare(
+        "SELECT * FROM discord_link WHERE user_id=?",
+      )
+        .bind(before.user.id)
+        .first();
+      const simulated = await send(
+        "/api/v1/account/discord",
+        {
+          userId: before.user.id,
+          consent: true,
+          outcome: "authorize",
+        },
+        cookie,
+      );
+      assert.equal(simulated.status, 503);
+      assert.equal(
+        ((await simulated.json()) as { message: string }).message,
+        "Discord connection is coming soon.",
+      );
+      assert.deepEqual(
+        await DB.prepare("SELECT * FROM discord_link WHERE user_id=?")
+          .bind(before.user.id)
+          .first(),
+        previousDiscord,
+      );
       assert.equal(
         (await send("/api/v1/auth/dev/seed-accounts", {}, cookie)).status,
         404,

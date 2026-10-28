@@ -35,6 +35,12 @@ export function syncApplicationProgress(page: Document) {
     if (current) step.parentElement!.setAttribute("aria-current", current);
     else step.parentElement!.removeAttribute("aria-current");
     if (previous.get(milestone.key) === JSON.stringify(milestone)) {
+      if (step.dataset.state !== updated.dataset.state)
+        step
+          .querySelector("summary")!
+          .replaceWith(
+            document.importNode(updated.querySelector("summary")!, true),
+          );
       // A new current step opens after completion, but an unrelated milestone
       // must not reset expanded snapshots, course drafts, or their focus.
       if (

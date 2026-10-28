@@ -42,10 +42,7 @@ export function discordConfigured(env: DiscordBindings) {
 
 export function requireDiscord(env: DiscordBindings) {
   if (!discordConfigured(env))
-    throw new RequestError(
-      503,
-      "Discord connection is not configured. Please contact an organizer.",
-    );
+    throw new RequestError(503, "Discord connection is coming soon.");
 }
 
 export function managedRoles(env: DiscordBindings) {
