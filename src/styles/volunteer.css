@@ -1321,10 +1321,15 @@ body:has(
   min-width: min(16.25rem, 100%);
 }
 .volunteer-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   width: 100%;
   margin-bottom: 1.5rem;
 }
 .volunteer-search-field {
+  flex: 1;
+  min-width: min(15rem, 100%);
   display: block;
   position: relative;
 }
@@ -1340,6 +1345,100 @@ body:has(
 }
 .volunteer-portal .volunteer-search input {
   padding-left: 2.75rem;
+}
+.volunteer-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: var(--volunteer-border);
+  border-radius: 0.5rem;
+}
+.volunteer-table-scroll:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 0.25rem;
+}
+.volunteer-table {
+  width: 100%;
+  min-width: 48rem;
+  border-collapse: collapse;
+  text-align: left;
+  @apply text-base;
+}
+.volunteer-table :is(th, td) {
+  padding: 1rem;
+  vertical-align: top;
+  border-bottom: var(--volunteer-border);
+  overflow-wrap: anywhere;
+}
+.volunteer-table thead {
+  background: #171a20;
+}
+.volunteer-table th {
+  font-weight: normal;
+}
+.volunteer-table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+.volunteer-table tbody tr {
+  background: #0c0d10;
+}
+[data-row-navigation] .volunteer-table tbody tr {
+  cursor: pointer;
+}
+.volunteer-table tbody tr:is(:hover, :focus-within) {
+  background: #16214a;
+}
+.volunteer-table th[scope="row"] {
+  min-width: 12rem;
+}
+.volunteer-table a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  margin-block: -0.5rem;
+  color: #c7d2fe;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+.volunteer-table a:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 0.25rem;
+}
+.volunteer-table-detail {
+  display: block;
+  margin-top: 0.375rem;
+  color: #a1a1aa;
+  @apply text-sm;
+}
+.volunteer-table-approved {
+  color: #4ade80;
+}
+.volunteer-profile-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-block: 2rem;
+  border-bottom: var(--volunteer-border);
+}
+.volunteer-profile-tabs a {
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.75rem;
+  border-bottom: 3px solid transparent;
+  color: #a1a1aa;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.volunteer-profile-tabs a:is(:hover, [aria-selected="true"]) {
+  color: #e0e7ff;
+  border-bottom-color: #818cf8;
+}
+.volunteer-profile-tabs a:focus-visible,
+[data-volunteer-profile-panel]:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 0.25rem;
+}
+[data-volunteer-profile-panel]
+  + [data-volunteer-profile-panel]:not([role="tabpanel"]) {
+  margin-top: 2rem;
 }
 .volunteer-profile-controls {
   display: flex;

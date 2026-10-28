@@ -149,22 +149,32 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       "2",
     );
     await page.locator("[data-volunteer-search]").fill("Sample Applicant");
-    await expect(page.locator("[data-volunteer-results] li")).toHaveCount(1);
+    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
+      1,
+    );
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
       "2",
     );
     await page.locator("[data-volunteer-profile-link]").click();
-    const dialog = page.locator("[data-volunteer-profile-dialog]");
-    await dialog
+    await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
+    await expect(
+      page.getByRole("button", {
+        name: "Revoke application approval",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
       "1",
     );
-    await expect(page.locator("[data-volunteer-results] li")).toHaveCount(0);
+    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
+      0,
+    );
     assert.equal(new URL(page.url()).searchParams.get("approval"), "awaiting");
     assert.equal(
       await DB.prepare("SELECT count(*) n FROM event_notification").first("n"),

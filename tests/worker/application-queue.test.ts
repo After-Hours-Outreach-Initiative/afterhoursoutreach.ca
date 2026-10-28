@@ -23,7 +23,6 @@ test("organizers review submitted applications with a global queue count and per
       process.env.CHROMIUM_PATH ??
       (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
   });
-  let releaseSearch = () => {};
   try {
     await server.listen();
     const worker = server.getWorker<Env>();
@@ -243,7 +242,14 @@ test("organizers review submitted applications with a global queue count and per
     const count = page.locator("[data-awaiting-approval-count]");
     const results = page.locator("[data-volunteer-results]");
     await expect(count).toHaveText("53");
-    await expect(results.locator("li")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(3);
+    await expect(results.getByRole("columnheader")).toHaveText([
+      "Name and role",
+      "Application",
+      "Patrol access",
+      "Orientations completed",
+      "Status",
+    ]);
     const filters = page.getByRole("group", { name: "Application approval" });
     const allApplicants = filters.getByRole("button", {
       name: "All applicants",
@@ -262,7 +268,7 @@ test("organizers review submitted applications with a global queue count and per
     await allApplicants.click();
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await expect(allApplicants).toBeFocused();
-    await expect(results.locator("li")).toHaveCount(50);
+    await expect(results.locator("tbody tr")).toHaveCount(50);
     await expect(page).toHaveURL(`${origin}/manage/volunteers?q=applicant`);
     await awaitingApproval.click();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
@@ -273,21 +279,51 @@ test("organizers review submitted applications with a global queue count and per
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
-    await expect(results.locator("li")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(3);
     assert.equal(page.url(), `${origin}${listPath}`);
     assert.deepEqual(documents, []);
     const reviewLink = results.locator("[data-volunteer-profile-link]").first();
     const profileHref = await reviewLink.getAttribute("href");
     assert.ok(profileHref);
-    await reviewLink.click();
-    const dialog = page.locator("[data-volunteer-profile-dialog]");
+    await reviewLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(`${origin}${profileHref}`);
+    await expect(page.locator("[data-volunteer-profile-dialog]")).toHaveCount(
+      0,
+    );
+    const profile = page.getByRole("tabpanel", {
+      name: "Profile",
+      exact: true,
+    });
+    const application = page.getByRole("tabpanel", {
+      name: "Application",
+      exact: true,
+    });
+    const profileTab = page.getByRole("tab", { name: "Profile", exact: true });
+    const applicationTab = page.getByRole("tab", {
+      name: "Application",
+      exact: true,
+    });
+    await expect(profileTab).toHaveAttribute("aria-selected", "true");
     await expect(
-      dialog.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
+      profile.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
     ).toBeVisible();
     await expect(
-      dialog.getByText("Application awaiting approval", { exact: true }),
+      page.getByText("Application awaiting approval", { exact: true }),
     ).toBeVisible();
-    const summary = dialog.locator(".account-profile-summary");
+    await expect(application).toBeHidden();
+    await profileTab.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(applicationTab).toBeFocused();
+    await expect(applicationTab).toHaveAttribute("aria-selected", "true");
+    await expect(profileTab).toHaveAttribute("tabindex", "-1");
+    await expect(profile).toBeHidden();
+    await expect(application).toBeVisible();
+    await page.keyboard.press("Home");
+    await expect(profileTab).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(applicationTab).toBeFocused();
+    const summary = application.locator(".account-profile-summary");
     await expect(summary.getByRole("heading")).toHaveText([
       "Submission details",
       "Personal info",
@@ -313,62 +349,51 @@ test("organizers review submitted applications with a global queue count and per
     );
     assert.equal(await auditCount(), 1);
     // Merely reading the application is not review completion.
-    await dialog
-      .getByRole("button", { name: "Close volunteer profile" })
-      .click();
+    await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(count).toHaveText("53");
-    await expect(results.locator("li")).toHaveCount(3);
-    assert.equal(page.url(), `${origin}${listPath}`);
-    const heldSearch = new Promise<void>((resolve) => {
-      releaseSearch = resolve;
+    await expect(results.locator("tbody tr")).toHaveCount(3);
+    // The table scrolls within the viewport on small screens. Modifier clicks on
+    // ordinary cells do not hijack the native profile link's browsing behavior.
+    await page.setViewportSize({ width: 320, height: 640 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(320);
+    const tableRegion = results.getByRole("region", {
+      name: "Volunteer table",
     });
-    let searchStarted!: () => void;
-    const startedSearch = new Promise<void>((resolve) => {
-      searchStarted = resolve;
-    });
-    let held = false;
-    await page.route("**/manage/volunteers?*", async (route) => {
-      const request = route.request();
-      if (
-        held ||
-        request.isNavigationRequest() ||
-        new URL(request.url()).searchParams.has("offset")
-      )
-        return route.fallback();
-      held = true;
-      // This response observes the pre-approval state and must never restore it.
-      const stale = await worker.fetch(request.url(), {
-        headers: await request.allHeaders(),
-      });
-      const body = Buffer.from(await stale.arrayBuffer());
-      searchStarted();
-      await heldSearch;
-      await route.fulfill({
-        status: stale.status,
-        headers: Object.fromEntries(stale.headers),
-        body,
-      });
-    });
-    await page.locator("[data-volunteer-search]").fill("applicant");
-    await startedSearch;
-    await reviewLink.click();
-    await dialog
+    expect(
+      await tableRegion.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      ),
+    ).toBe(true);
+    await results
+      .locator("tbody tr")
+      .first()
+      .locator("td")
+      .first()
+      .click({ modifiers: ["Control"] });
+    await expect(page).toHaveURL(
+      `${origin}/manage/volunteers?q=applicant&approval=awaiting&offset=50`,
+    );
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await results.locator("tbody tr").first().locator("td").first().click();
+    await expect(page).toHaveURL(`${origin}${profileHref}`);
+    await applicationTab.click();
+    await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(
-      dialog.getByRole("button", { name: "Revoke application approval" }),
+      page.getByRole("button", { name: "Revoke application approval" }),
     ).toBeEnabled();
+    await expect(applicationTab).toHaveAttribute("aria-selected", "true");
+    await expect(application).toBeVisible();
+    await expect(profile).toBeHidden();
+    await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(count).toHaveText("52");
-    await expect(results.locator("li")).toHaveCount(2);
-    releaseSearch();
-    await expect(dialog).toBeVisible();
-    await dialog
-      .getByRole("button", { name: "Close volunteer profile" })
-      .click();
-    assert.equal(page.url(), `${origin}${listPath}`);
+    await expect(results.locator("tbody tr")).toHaveCount(2);
     // Normal full-page links retain exactly the same list context.
     await page.goto(`${origin}${profileHref}`);
     await expect(
@@ -389,24 +414,24 @@ test("organizers review submitted applications with a global queue count and per
     await page.getByRole("link", { name: "Back to volunteers" }).click();
     await page.waitForLoadState("load");
     await expect(count).toHaveText("53");
-    await expect(results.locator("li")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(3);
     const search = page.locator("[data-volunteer-search]");
     await search.fill("applicant-52");
-    await expect(results.locator("li")).toHaveCount(1);
+    await expect(results.locator("tbody tr")).toHaveCount(1);
     await expect(count).toHaveText("53");
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(page.url()).searchParams.has("offset")).toBe(false);
     await search.fill("approved");
-    await expect(results.locator("li")).toHaveCount(0);
+    await expect(results.locator("tbody tr")).toHaveCount(0);
     await allApplicants.click();
-    await expect(results.locator("li")).toHaveCount(1);
+    await expect(results.locator("tbody tr")).toHaveCount(1);
     await expect(
-      results.getByRole("heading", { name: "approved", exact: true }),
+      results.getByRole("link", { name: "approved", exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(`${origin}/manage/volunteers?q=approved`);
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
-    await expect(results.locator("li")).toHaveCount(0);
+    await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(search).toHaveValue("approved");
     await search.fill("no match");
     await expect(
@@ -414,9 +439,9 @@ test("organizers review submitted applications with a global queue count and per
     ).toBeVisible();
     await expect(count).toHaveText("53");
     await search.fill("applicant");
-    await expect(results.locator("li")).toHaveCount(50);
+    await expect(results.locator("tbody tr")).toHaveCount(50);
     await page.getByRole("link", { name: "Next volunteers" }).click();
-    await expect(results.locator("li")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(3);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(page.url()).searchParams.get("q")).toBe("applicant");
     assert.deepEqual(errors, []);
@@ -442,7 +467,9 @@ test("organizers review submitted applications with a global queue count and per
     await plain.goto(`${origin}${listPath}`);
     await plain.locator("[data-volunteer-search]").fill("applicant-52");
     await plain.getByRole("button", { name: "Search", exact: true }).click();
-    await expect(plain.locator("[data-volunteer-results] li")).toHaveCount(1);
+    await expect(
+      plain.locator("[data-volunteer-results] tbody tr"),
+    ).toHaveCount(1);
     expect(new URL(plain.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
     await plain.getByRole("button", { name: "All applicants" }).click();
@@ -452,6 +479,15 @@ test("organizers review submitted applications with a global queue count and per
     ).toHaveAttribute("aria-pressed", "true");
     await plain.getByRole("button", { name: "Awaiting approval (53)" }).click();
     await plain.locator("[data-volunteer-profile-link]").click();
+    await expect(
+      plain.getByRole("heading", { name: "Current profile", exact: true }),
+    ).toBeVisible();
+    await expect(
+      plain.getByRole("heading", {
+        name: "Submitted application",
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(
       plain.getByRole("link", { name: "Back to volunteers" }),
     ).toHaveAttribute(
@@ -471,7 +507,7 @@ test("organizers review submitted applications with a global queue count and per
       ),
     );
     await expect(count).toHaveText("50");
-    await expect(results.locator("li")).toHaveCount(0);
+    await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(
       results.getByText(
         "No applications awaiting approval on this page. Return to the previous page.",
@@ -479,7 +515,7 @@ test("organizers review submitted applications with a global queue count and per
     ).toBeVisible();
     expect(page.url()).toBe(restoredListUrl);
     await page.getByRole("link", { name: "Previous volunteers" }).click();
-    await expect(results.locator("li")).toHaveCount(50);
+    await expect(results.locator("tbody tr")).toHaveCount(50);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1",
@@ -490,7 +526,6 @@ test("organizers review submitted applications with a global queue count and per
       results.getByText("No applications are awaiting approval."),
     ).toBeVisible();
   } finally {
-    releaseSearch();
     await browser.close();
     await server.close();
   }

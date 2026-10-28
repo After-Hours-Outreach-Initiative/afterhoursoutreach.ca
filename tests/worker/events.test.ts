@@ -1119,82 +1119,39 @@ describe(
           await page.waitForURL(`${origin}/manage/volunteers?q=Sample+Alice`);
           await page
             .locator("[data-volunteer-results]")
+            .getByRole("link", { name: "Sample Alice", exact: true })
+            .waitFor();
+          await page
+            .getByRole("link", { name: "Sample Alice", exact: true })
+            .click();
+          const profileView = page.locator("[data-volunteer-profile]");
+          await profileView
             .getByRole("heading", { name: "Sample Alice", exact: true })
             .waitFor();
-          const profileDialog = page.getByRole("dialog", {
-            name: "Volunteer profile",
-            exact: true,
-          });
-          const profilePane = profileDialog.locator(
-            "[data-profile-dialog-content]",
-          );
-          let releaseProfile!: () => void;
-          const profileGate = new Promise<void>((resolve) => {
-            releaseProfile = resolve;
-          });
-          const profilePattern = `**/manage/volunteers/${alice.id}*`;
-          await page.route(profilePattern, async (route) => {
-            await profileGate;
-            await route.fallback();
-          });
-          try {
-            await page
-              .getByRole("link", {
-                name: "View profile and approval",
-                exact: true,
-              })
-              .click();
-            await expect(profilePane).toHaveAttribute("aria-busy", "true");
-            await expect(
-              profilePane.getByText("Loading", {
-                exact: true,
-              }),
-            ).toBeVisible();
-            await expect(
-              profileDialog.getByRole("button", {
-                name: "Close volunteer profile",
-                exact: true,
-              }),
-            ).toBeVisible();
-          } finally {
-            releaseProfile();
-          }
-          await profileDialog
-            .getByRole("heading", { name: "Sample Alice", exact: true })
-            .waitFor();
-          await page.unroute(profilePattern);
-          await expect(profilePane).not.toHaveAttribute("aria-busy", "true");
-          await expect(
-            profilePane.locator(".volunteer-profile-loading"),
-          ).toHaveCount(0);
-          await profileDialog
+          await profileView
             .getByLabel("Active volunteer", { exact: true })
             .focus();
           await page.keyboard.press("Tab");
-          await expect(profileDialog.getByLabel("Account role")).toBeFocused();
-          await profileDialog.locator(".dialog-body").evaluate((popup) => {
-            popup.scrollTop = 80;
-          });
-          assert.match(
-            await profileDialog.innerText(),
-            /PRIVATE HEALTH ANSWER/,
-          );
-          assert.match(page.url(), /\/volunteers\?q=Sample\+Alice$/);
+          await expect(profileView.getByLabel("Account role")).toBeFocused();
+          assert.match(await profileView.innerText(), /PRIVATE HEALTH ANSWER/);
+          await expect(
+            page.getByRole("link", { name: "Back to volunteers" }),
+          ).toHaveAttribute("href", "/manage/volunteers?q=Sample+Alice");
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
-            form: profileDialog.locator(
+            form: profileView.locator(
               '[data-organizer-status][data-access-kind="patrol"]',
             ),
             notify: true,
             trigger: () =>
-              profileDialog
+              profileView
                 .getByRole("button", {
                   name: "Approve for patrols",
                   exact: true,
                 })
                 .click(),
             updated: () =>
-              profileDialog
+              profileView
                 .getByRole("button", {
                   name: "Revoke patrol approval",
                   exact: true,
@@ -1203,10 +1160,10 @@ describe(
             loadingLabel: "Sending…",
             pending: async () => {
               await expect(
-                profileDialog.getByLabel("Active volunteer", { exact: true }),
+                profileView.getByLabel("Active volunteer", { exact: true }),
               ).toBeDisabled();
               await expect(
-                profileDialog.getByLabel("Account role"),
+                profileView.getByLabel("Account role"),
               ).toBeDisabled();
             },
           });
@@ -1227,13 +1184,8 @@ describe(
           await accessEmailResult
             .getByRole("button", { name: "Close", exact: true })
             .click();
-          await expect(profileDialog).toBeVisible();
-          assert.equal(
-            await profileDialog
-              .locator(".dialog-body")
-              .evaluate((popup) => popup.scrollTop),
-            80,
-          );
+          await expect(profileView).toBeVisible();
+          await page.getByRole("link", { name: "Back to volunteers" }).click();
           await expect(
             page
               .locator("[data-volunteer-results]")
@@ -1278,31 +1230,26 @@ describe(
           await page.goto(`${origin}/manage/volunteers?q=Sample+Alice`);
           await page
             .getByRole("link", {
-              name: "View profile and approval",
+              name: "Sample Alice",
               exact: true,
             })
             .click();
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
-            form: profileDialog.locator("[data-organizer-role]"),
+            form: profileView.locator("[data-organizer-role]"),
             trigger: () =>
-              profileDialog
-                .getByLabel("Account role")
-                .selectOption("organizer"),
+              profileView.getByLabel("Account role").selectOption("organizer"),
             updated: async () => {
               await expect(
-                profileDialog.getByLabel("Account role"),
+                profileView.getByLabel("Account role"),
               ).toBeEnabled();
-              await expect(
-                profileDialog.getByLabel("Account role"),
-              ).toHaveValue("organizer");
+              await expect(profileView.getByLabel("Account role")).toHaveValue(
+                "organizer",
+              );
             },
             loadingLabel: "Saving…",
           });
-          await expect(profileDialog).toBeVisible();
-          await expect(page.locator("[data-volunteer-results]")).toContainText(
-            "Organizer",
-          );
+          await expect(profileView).toBeVisible();
           assert.equal(
             (
               await DB.prepare("SELECT role FROM user WHERE id=?")
@@ -1313,17 +1260,15 @@ describe(
           );
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
-            form: profileDialog.locator("[data-organizer-role]"),
+            form: profileView.locator("[data-organizer-role]"),
             trigger: () =>
-              profileDialog
-                .getByLabel("Account role")
-                .selectOption("volunteer"),
+              profileView.getByLabel("Account role").selectOption("volunteer"),
             updated: () =>
-              expect(profileDialog.getByLabel("Account role")).toBeEnabled(),
+              expect(profileView.getByLabel("Account role")).toBeEnabled(),
             loadingLabel: "Saving…",
           });
-          await expect(profileDialog).toBeVisible();
-          const activeForm = profileDialog.locator(
+          await expect(profileView).toBeVisible();
+          const activeForm = profileView.locator(
             "[data-organizer-status][data-submit-on-change]",
           );
           await page.route("**/api/v1/organizer/action", (route) =>
@@ -1336,7 +1281,7 @@ describe(
             endpoint: "/api/v1/organizer/action",
             form: activeForm,
             trigger: () =>
-              profileDialog
+              profileView
                 .getByLabel("Active volunteer", { exact: true })
                 .uncheck(),
             updated: () =>
@@ -1346,10 +1291,10 @@ describe(
             loadingLabel: "Saving…",
           });
           await expect(
-            profileDialog.getByLabel("Active volunteer", { exact: true }),
+            profileView.getByLabel("Active volunteer", { exact: true }),
           ).toBeChecked();
           await expect(
-            profileDialog.getByLabel("Active volunteer", { exact: true }),
+            profileView.getByLabel("Active volunteer", { exact: true }),
           ).toBeEnabled();
           await page.unroute("**/api/v1/organizer/action");
           alice.cookie = await signIn(alice.email);

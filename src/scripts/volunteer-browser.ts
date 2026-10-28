@@ -1,17 +1,5 @@
 import { actionFragment } from "./action-page";
 
-let refreshBrowser: ((page: Document) => void) | undefined;
-let cancelSearch = () => {};
-
-export function cancelVolunteerSearch() {
-  cancelSearch();
-}
-
-/** Refresh the queue and its global count together after organizer changes. */
-export function syncVolunteerBrowser(page: Document) {
-  refreshBrowser?.(page);
-}
-
 export function initVolunteerBrowser() {
   const root = document.querySelector<HTMLElement>("[data-volunteer-browser]");
   const search = root?.querySelector<HTMLInputElement>(
@@ -25,11 +13,34 @@ export function initVolunteerBrowser() {
   const error = root?.querySelector<HTMLElement>(
     "[data-volunteer-search-error]",
   );
-  if (!search || !form || !results || !filters || !error) return;
+  if (!root || !search || !form || !results || !filters || !error) return;
+
+  root.dataset.rowNavigation = "true";
+  results.addEventListener("click", (event) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      !(event.target instanceof Element) ||
+      event.target.closest(
+        "a, button, input, select, textarea, label, summary, [role='button'], [contenteditable]",
+      ) ||
+      window.getSelection()?.toString()
+    )
+      return;
+    const row = event.target.closest("[data-volunteer-row]");
+    const link = row?.querySelector<HTMLAnchorElement>(
+      "[data-volunteer-profile-link]",
+    );
+    if (link) location.assign(link.href);
+  });
 
   let timer: number | undefined;
   let pending: AbortController | undefined;
-  cancelSearch = () => {
+  const cancelSearch = () => {
     clearTimeout(timer);
     pending?.abort();
     results.removeAttribute("aria-busy");
@@ -101,18 +112,6 @@ export function initVolunteerBrowser() {
     } finally {
       if (!controller.signal.aborted) results.removeAttribute("aria-busy");
     }
-  };
-  refreshBrowser = (page) => {
-    // An older search response must not put an approved application back in the
-    // queue. If the organizer has since typed more, re-fetch that newer search.
-    cancelSearch();
-    replaceResults(page);
-    error.hidden = true;
-    const renderedSearch = page.querySelector<HTMLInputElement>(
-      "[data-volunteer-search]",
-    );
-    if (renderedSearch && renderedSearch.value !== search.value)
-      void loadResults();
   };
   search.addEventListener("input", () => {
     cancelSearch();

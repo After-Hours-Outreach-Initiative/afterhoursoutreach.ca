@@ -80,8 +80,11 @@ test("event and profile dialogs preserve their layout and content throughout the
       .click();
     await expectStableExit(page.getByRole("dialog", { name: "Edit event" }));
 
-    await page.goto("/manage/volunteers");
-    await page.locator("[data-volunteer-profile-link]").first().click();
+    const roster = page.locator(
+      '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',
+    );
+    await roster.locator("summary").click();
+    await roster.locator("[data-volunteer-profile-link]").first().click();
     const profile = page.locator("[data-volunteer-profile-dialog]");
     await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
     await expect(profile.locator(".volunteer-profile-loading")).toHaveCount(0);
@@ -194,8 +197,10 @@ test("application dialogs keep their chrome visible while only their body scroll
     await registration.locator(".dialog-close").click();
   }
 
-  await page.goto("/manage/volunteers");
-  await page.locator("[data-volunteer-profile-link]").first().click();
+  await page
+    .locator(".volunteer-roster[open] [data-volunteer-profile-link]")
+    .first()
+    .click();
   const profile = page.getByRole("dialog", {
     name: "Volunteer profile",
     exact: true,

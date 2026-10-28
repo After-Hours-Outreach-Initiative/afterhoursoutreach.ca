@@ -7,6 +7,7 @@ import { focusAfterUpdate } from "./focus";
 import { chooseNotification } from "./notification-choice";
 import { confirmEventDeletion } from "./event-deletion";
 import { initDateInputs, readDateInputs } from "./date-input";
+import { initVolunteerProfileTabs } from "./volunteer-profile-tabs";
 import {
   initRecurrenceControls,
   recurringSaveAction,
@@ -15,11 +16,6 @@ import {
   syncSeriesControls,
   eventEmailPrompt,
 } from "./event-recurrence";
-import {
-  cancelVolunteerSearch,
-  initVolunteerBrowser,
-  syncVolunteerBrowser,
-} from "./volunteer-browser";
 import {
   actionEmailNeedsFeedback,
   showActionEmailFeedback,
@@ -56,6 +52,7 @@ let refreshDeferredEvents = () => {};
 for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
   renderedCards.set(card, card.outerHTML);
 initEventDates(document);
+initVolunteerProfileTabs();
 
 function applyEventFilter(root: HTMLElement, type: string) {
   const selected = eventFilter(type, root.dataset.eventView === "manage");
@@ -431,7 +428,6 @@ async function refreshEvents(element: HTMLFormElement) {
 }
 
 async function refreshVolunteer(element: HTMLFormElement) {
-  cancelVolunteerSearch();
   const userId = element.querySelector<HTMLInputElement>(
     'input[name="userId"]',
   )!.value;
@@ -444,6 +440,12 @@ async function refreshVolunteer(element: HTMLFormElement) {
     onProfilePage ? Promise.resolve(null) : loadActionPage(hostUrl),
   ]);
   const replacement = actionFragment(page, "[data-volunteer-profile]");
+  initVolunteerProfileTabs(
+    replacement,
+    profile.querySelector<HTMLElement>(
+      '[data-volunteer-profile-tab][aria-selected="true"]',
+    )?.dataset.volunteerProfileTab,
+  );
   // Keep the dialog itself (and its scroll position) open; replace all status
   // forms together so their versions and hidden checkbox values stay in sync.
   const dialog = element.closest<HTMLDialogElement>("dialog");
@@ -464,7 +466,6 @@ async function refreshVolunteer(element: HTMLFormElement) {
         ?.focus({ preventScroll: true });
   }
   if (host && location.href === hostUrl) {
-    syncVolunteerBrowser(host);
     syncEvents(host);
   }
 }
@@ -1024,7 +1025,9 @@ if (profileDialog && profileContent) {
         await response.text(),
         "text/html",
       );
-      const content = page.querySelector("[data-volunteer-profile]");
+      const content = page.querySelector<HTMLElement>(
+        "[data-volunteer-profile]",
+      );
       if (!content) throw new Error("The volunteer profile is unavailable.");
       if (!controller.signal.aborted && profileDialog.open) {
         const loading = profileContent.querySelector<HTMLElement>(
@@ -1032,6 +1035,7 @@ if (profileDialog && profileContent) {
         );
         const loadingHeight = profileContent.clientHeight;
         const profile = document.importNode(content, true);
+        initVolunteerProfileTabs(profile);
         const animate = !window.matchMedia("(prefers-reduced-motion: reduce)")
           .matches;
         if (animate) {
@@ -1077,8 +1081,6 @@ if (profileDialog && profileContent) {
     }
   });
 }
-
-initVolunteerBrowser();
 
 document.addEventListener("click", (event) => {
   const dialog = event.target;

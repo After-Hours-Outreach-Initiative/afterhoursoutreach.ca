@@ -18,6 +18,7 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro";
 import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import { loadDiscordStatus } from "@/server/discord/status";
 import { loadApplicationProgress } from "@/server/db/application-progress";
 import "@/styles/volunteer.css";
@@ -69,6 +70,10 @@ const progress = await loadApplicationProgress(env.DB, person.id);
   greetingName={accountGreeting}
   email={accountEmail}
 >
+  <a class="volunteer-back-link" href={returnUrl}>
+    <ArrowRightIcon class="size-[1.25em] shrink-0 rotate-180" />
+    <span>Back to volunteers</span>
+  </a>
   <section class="volunteer-panel">
     <div data-volunteer-profile>
       <h2>{applicationDisplayName(profile.answers)}</h2>
@@ -106,47 +111,71 @@ const progress = await loadApplicationProgress(env.DB, person.id);
           </div>
         </dl>
       </div>
-      <h2 class="mt-8">Current profile</h2>
-      {
-        profile.submission ? (
-          <>
-            <div class="account-profile-summary mt-6">
-              <dl>
-                <div>
-                  <dt>Email</dt>
-                  <dd>{profile.email}</dd>
-                </div>
-              </dl>
+      <nav
+        class="volunteer-profile-tabs"
+        aria-label="Volunteer details"
+        data-volunteer-profile-tabs
+      >
+        <a
+          id="volunteer-profile-tab"
+          href="#volunteer-profile-panel"
+          data-volunteer-profile-tab="profile">Profile</a
+        >
+        <a
+          id="volunteer-application-tab"
+          href="#volunteer-application-panel"
+          data-volunteer-profile-tab="application">Application</a
+        >
+      </nav>
+      <section
+        id="volunteer-profile-panel"
+        data-volunteer-profile-panel="profile"
+        aria-labelledby="volunteer-profile-heading"
+      >
+        <h2 id="volunteer-profile-heading">Current profile</h2>
+        <div class="account-profile-summary mt-6 mb-8">
+          <dl>
+            <div>
+              <dt>Email</dt>
+              <dd>{profile.email}</dd>
             </div>
-            {profileFormSections().map((section) => (
-              <section class="volunteer-profile-section">
-                <h3 class="volunteer-profile-heading mb-6">
-                  {section.heading}
-                </h3>
-                <AccountProfileAnswers
-                  section={section}
-                  values={profile.answers}
-                />
-              </section>
-            ))}
-            <section data-submitted-application>
-              <h2 class="mt-8">Submitted application</h2>
-              <ApplicationSummary
-                {...profile.submission}
-                idPrefix="volunteer"
+          </dl>
+        </div>
+        {
+          profileFormSections().map((section) => (
+            <section class="volunteer-profile-section">
+              <h3 class="volunteer-profile-heading mb-6">{section.heading}</h3>
+              <AccountProfileAnswers
+                section={section}
+                values={profile.answers}
               />
             </section>
-          </>
-        ) : (
-          <>
-            <p>The original submitted application was not recorded.</p>
-            <ApplicationSummary {...profile} idPrefix="volunteer" />
-          </>
-        )
-      }
+          ))
+        }
+      </section>
+      <section
+        id="volunteer-application-panel"
+        data-volunteer-profile-panel="application"
+        data-submitted-application
+        aria-labelledby="volunteer-application-heading"
+      >
+        <h2 id="volunteer-application-heading">Submitted application</h2>
+        {
+          profile.submission ? (
+            <ApplicationSummary {...profile.submission} idPrefix="volunteer" />
+          ) : (
+            <>
+              <p class="volunteer-help mt-4">
+                The original submitted application was not recorded. These
+                details use the current profile.
+              </p>
+              <ApplicationSummary {...profile} idPrefix="volunteer" />
+            </>
+          )
+        }
+      </section>
     </div>
   </section>
-  <a class="btn btn-outline" href={returnUrl}>Back to volunteers</a>
 </AccountLayout>
 <script>
   import "@/scripts/volunteer";
