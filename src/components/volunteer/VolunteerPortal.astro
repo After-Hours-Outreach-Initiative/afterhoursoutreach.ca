@@ -21,6 +21,7 @@ import {
 } from "@/data/event-browser";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import ApplicationProgress from "./ApplicationProgress.astro";
+import DiscordConnectionNotice from "./DiscordConnectionNotice.astro";
 import SubmittedApplication from "./SubmittedApplication.astro";
 import { loadSubmittedApplication } from "@/server/db/profiles";
 import {
@@ -185,6 +186,11 @@ const hasVisiblePastEvents = pastEvents.some((event) =>
       ),
     )}
   >
+    {
+      !manage && actor.applicationComplete && (
+        <DiscordConnectionNotice userId={actor.id} />
+      )
+    }
     {
       actor.applicationSubmitted && !actor.active && (
         <p class="volunteer-notice" role="status">

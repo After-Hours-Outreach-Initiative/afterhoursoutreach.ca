@@ -6,6 +6,7 @@ import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro"
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import AccountDeleteSettings from "@/components/volunteer/AccountDeleteSettings.astro";
 import DiscordConnection from "@/components/volunteer/DiscordConnection.astro";
+import DiscordConnectionNotice from "@/components/volunteer/DiscordConnectionNotice.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
 import {
   isApplicationComplete,
@@ -181,6 +182,7 @@ const contents = [
   email={email}
 >
   <h1 slot="heading" class="mb-6 text-2xl md:text-4xl">Account</h1>
+  {applicationComplete && <DiscordConnectionNotice {userId} />}
   <div data-account-contents-flow>
     <PageContents
       entries={contents}
