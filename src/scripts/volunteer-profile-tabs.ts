@@ -31,6 +31,11 @@ export function initVolunteerProfileTabs(
       tab.setAttribute("aria-controls", panel.id);
       panel.setAttribute("role", "tabpanel");
       panel.setAttribute("aria-labelledby", tab.id);
+      // Section headings label the no-JS page; tabs label the enhanced panels.
+      const heading = panel.querySelector<HTMLElement>(
+        "[data-volunteer-profile-panel-heading]",
+      );
+      if (heading) heading.hidden = true;
       panel.tabIndex = 0;
       tab.addEventListener("click", (event) => {
         if (

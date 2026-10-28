@@ -316,6 +316,12 @@ test("organizers review submitted applications with search-aware filter counts a
       ),
     ).toBeVisible();
     await expect(profileTab).toHaveAttribute("aria-selected", "true");
+    await expect(profile.getByRole("heading")).toHaveText([
+      "Personal info",
+      "Emergency contact",
+      "Team interests",
+      "Training and safety",
+    ]);
     await expect(
       profile.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
     ).toBeVisible();
@@ -341,7 +347,7 @@ test("organizers review submitted applications with search-aware filter counts a
       page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeFocused();
     const summary = application.locator(".account-profile-summary");
-    await expect(summary.getByRole("heading")).toHaveText([
+    await expect(application.getByRole("heading")).toHaveText([
       "Submission details",
       "Personal info",
       "Emergency contact",

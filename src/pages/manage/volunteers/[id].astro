@@ -133,7 +133,9 @@ const progress = await loadApplicationProgress(env.DB, person.id);
         data-volunteer-profile-panel="profile"
         aria-labelledby="volunteer-profile-heading"
       >
-        <h2 id="volunteer-profile-heading">Current profile</h2>
+        <h2 id="volunteer-profile-heading" data-volunteer-profile-panel-heading>
+          Current profile
+        </h2>
         <div class="account-profile-summary mt-6 mb-8">
           <dl>
             <div>
@@ -160,7 +162,12 @@ const progress = await loadApplicationProgress(env.DB, person.id);
         data-submitted-application
         aria-labelledby="volunteer-application-heading"
       >
-        <h2 id="volunteer-application-heading">Submitted application</h2>
+        <h2
+          id="volunteer-application-heading"
+          data-volunteer-profile-panel-heading
+        >
+          Submitted application
+        </h2>
         {
           profile.submission ? (
             <ApplicationSummary {...profile.submission} idPrefix="volunteer" />
