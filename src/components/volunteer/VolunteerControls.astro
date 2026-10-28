@@ -6,7 +6,14 @@ interface Props {
 const { person } = Astro.props;
 ---
 
-<div class="volunteer-profile-controls" data-volunteer-controls>
+<section
+  class="volunteer-profile-controls"
+  data-volunteer-controls
+  aria-labelledby="volunteer-organizer-controls-heading"
+>
+  <h2 id="volunteer-organizer-controls-heading" data-contents-section>
+    Organizer controls
+  </h2>
   <form
     class="volunteer-form"
     data-organizer-status
@@ -165,4 +172,4 @@ const { person } = Astro.props;
       ></noscript
     >
   </form>
-</div>
+</section>

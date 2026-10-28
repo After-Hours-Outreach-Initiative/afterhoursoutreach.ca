@@ -464,6 +464,16 @@ export const profileReadOnlyFields: readonly (keyof ApplicationAnswers)[] = [
   "birthDate",
 ];
 
+/** Shared by the immutable application summary and organizer contents links. */
+export const submittedApplicationSections = [
+  { key: "submission", heading: "Submission details" },
+  { key: "personal-info", heading: "Personal info" },
+  { key: "emergency-contact", heading: "Emergency contact" },
+  { key: "team-interests", heading: "Team interests" },
+  { key: "training-and-safety", heading: "Training and safety" },
+  { key: "about-volunteering", heading: "Personal statement" },
+] as const;
+
 /** Keep form sections and their contents links in the same order. */
 export function profileFormSections(application = false) {
   const fields = application

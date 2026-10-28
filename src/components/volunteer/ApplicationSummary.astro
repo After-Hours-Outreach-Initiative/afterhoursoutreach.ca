@@ -10,6 +10,7 @@ import {
   trainingDetailOptions,
   experienceOptions,
   normalizeTrainingAnswers,
+  submittedApplicationSections,
   type ApplicationAnswers,
 } from "@/data/application";
 import AnswerValue from "./AnswerValue.astro";
@@ -32,14 +33,6 @@ const {
 } = Astro.props;
 // Display old immutable snapshots without rewriting the accepted submission.
 const answers = normalizeTrainingAnswers(savedAnswers);
-const sections = [
-  { key: "submission", heading: "Submission details" },
-  { key: "personal-info", heading: "Personal info" },
-  { key: "emergency-contact", heading: "Emergency contact" },
-  { key: "team-interests", heading: "Team interests" },
-  { key: "training-and-safety", heading: "Training and safety" },
-  { key: "about-volunteering", heading: "Personal statement" },
-];
 const choices = (
   selected: string[],
   options: readonly { value: string; label: string }[],
@@ -138,7 +131,7 @@ const rows: {
 
 <div class="account-profile-summary mt-8">
   {
-    sections.map((section) => (
+    submittedApplicationSections.map((section) => (
       <section
         class="volunteer-profile-section"
         aria-labelledby={`${idPrefix}-${section.key}`}

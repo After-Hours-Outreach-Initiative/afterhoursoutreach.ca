@@ -7,7 +7,10 @@ import { focusAfterUpdate } from "./focus";
 import { chooseNotification } from "./notification-choice";
 import { confirmEventDeletion } from "./event-deletion";
 import { initDateInputs, readDateInputs } from "./date-input";
-import { initVolunteerProfileTabs } from "./volunteer-profile-tabs";
+import {
+  disposeVolunteerProfileTabs,
+  initVolunteerProfileTabs,
+} from "./volunteer-profile-tabs";
 import { initSignupMenus } from "./signup-menu";
 import {
   initBulkEvents,
@@ -465,16 +468,16 @@ async function refreshVolunteer(element: HTMLFormElement) {
   ]);
   const replacement = actionFragment(page, "[data-volunteer-profile]");
   initVolunteerControls(replacement);
-  initVolunteerProfileTabs(
-    replacement,
-    profile.querySelector<HTMLElement>(
-      '[data-volunteer-profile-tab][aria-selected="true"]',
-    )?.dataset.volunteerProfileTab,
-  );
+  const selectedTab = profile.querySelector<HTMLElement>(
+    '[data-volunteer-profile-tab][aria-selected="true"]',
+  )?.dataset.volunteerProfileTab;
   // Keep the dialog itself (and its scroll position) open; replace all status
   // forms together so their versions and hidden checkbox values stay in sync.
   const dialog = element.closest<HTMLDialogElement>("dialog");
-  const scroll = dialog?.scrollTop;
+  const scrollContainer = dialog?.querySelector<HTMLElement>(
+    "[data-profile-dialog-content]",
+  );
+  const scroll = scrollContainer?.scrollTop;
   const active = document.activeElement;
   const restoreFocus = element.contains(active) || active === document.body;
   const selector = element.matches("[data-organizer-role]")
@@ -483,8 +486,11 @@ async function refreshVolunteer(element: HTMLFormElement) {
       ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
       : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
   if (profile.isConnected && (!dialog || dialog.open)) {
+    disposeVolunteerProfileTabs(profile);
     profile.replaceWith(replacement);
-    if (dialog && scroll !== undefined) dialog.scrollTop = scroll;
+    initVolunteerProfileTabs(replacement, selectedTab);
+    if (scrollContainer && scroll !== undefined)
+      scrollContainer.scrollTop = scroll;
     if (restoreFocus)
       replacement
         .querySelector<HTMLElement>(selector)
@@ -1032,6 +1038,7 @@ if (profileDialog && profileContent) {
     // A rapid reopen (even followed by another close) owns its own cleanup.
     if (profileDialog.open || pending !== closingRequest) return;
     pending = undefined;
+    disposeVolunteerProfileTabs(profileContent);
     profileContent.replaceChildren();
     profileContent.removeAttribute("aria-busy");
     profileContent.scrollTop = 0;
@@ -1054,6 +1061,7 @@ if (profileDialog && profileContent) {
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
+    disposeVolunteerProfileTabs(profileContent);
     if (loadingTemplate)
       profileContent.replaceChildren(loadingTemplate.content.cloneNode(true));
     else profileContent.textContent = "Loading";
@@ -1086,7 +1094,6 @@ if (profileDialog && profileContent) {
         const loadingHeight = profileContent.clientHeight;
         const profile = document.importNode(content, true);
         initVolunteerControls(profile);
-        initVolunteerProfileTabs(profile);
         const animate = !window.matchMedia("(prefers-reduced-motion: reduce)")
           .matches;
         if (animate) {
@@ -1103,6 +1110,7 @@ if (profileDialog && profileContent) {
           });
         }
         profileContent.replaceChildren(profile);
+        initVolunteerProfileTabs(profile);
         if (loading && animate) {
           // Keep the outgoing loader in place as the full profile grows below it.
           loading.style.height = `${loadingHeight}px`;
