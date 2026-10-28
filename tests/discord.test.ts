@@ -553,7 +553,8 @@ test("consented auto-join requires a separate verified membership check before t
       ...(await loadApplicationProgress(env.DB, actor.id)),
       applicationApproved: true,
     }),
-    false,
+    // Discord linking is paused; pending membership must not block the application.
+    true,
   );
   await processDiscordSync(config, server.send);
   assert.deepEqual(
@@ -602,7 +603,7 @@ test("Membership Screening cannot complete the step or be bypassed by role assig
   assert.deepEqual(server.state.roles, [config.DISCORD_VOLUNTEER_ROLE_ID]);
 });
 
-test("approval is blocked until new applicants finish both prerequisites; legacy applicants remain exempt", async () => {
+test("approval requires Naloxone but not Discord while linking is paused; legacy applicants remain exempt", async () => {
   const organizer = {
     ...(await person("organizer", true)),
     applicationApproved: true,
@@ -616,13 +617,36 @@ test("approval is blocked until new applicants finish both prerequisites; legacy
     applicationApproved: true,
     patrolApproved: false,
   };
+  await env.DB.prepare(
+    "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
   await assert.rejects(
     setVolunteerStatus(env.DB, organizer, input),
     statusError(409),
   );
-  await link(actor);
-  await processDiscordSync(config, discordServer().send);
+  await env.DB.prepare(
+    "UPDATE profile SET naloxone_completed_at=1 WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
+  // Discord connection is temporarily disabled.
+  // await link(actor);
+  // await processDiscordSync(config, discordServer().send);
   await setVolunteerStatus(env.DB, organizer, input);
+  const progress = await loadApplicationProgress(env.DB, actor.id);
+  assert.equal(progress.discordRequired, true); // Preserve the future requirement.
+  assert.equal(progress.discordCompletedAt, null); // Never invent a connection.
+  assert.equal(isApplicationComplete(progress), true);
+  assert.equal(
+    isApplicationComplete({ ...progress, naloxoneCompletedAt: null }),
+    false,
+  );
+  assert.equal(
+    isApplicationComplete({ ...progress, applicationApproved: false }),
+    false,
+  );
   const legacy = await person("legacy");
   // Represents an existing submitted profile: migration never creates this row.
   await env.DB.prepare("DELETE FROM discord_requirement WHERE user_id=?")

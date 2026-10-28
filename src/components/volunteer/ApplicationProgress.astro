@@ -4,7 +4,8 @@ import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import CheckIcon from "@/components/icons/CheckIcon.astro";
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
 import NaloxoneCourseStep from "./NaloxoneCourseStep.astro";
-import DiscordConnection from "./DiscordConnection.astro";
+// Discord connection is temporarily disabled; keep the integration for later.
+// import DiscordConnection from "./DiscordConnection.astro";
 
 interface Props {
   progress: ApplicationProgress;
@@ -43,6 +44,7 @@ const steps = [
     completedAt: progress.naloxoneCompletedAt,
     canConfirm: canConfirmNaloxone,
   },
+  /* Discord connection is temporarily disabled.
   {
     key: "discord",
     title: "Connect Discord",
@@ -52,6 +54,7 @@ const steps = [
       progress.submittedAt !== null &&
       (!progress.discordRequired || progress.naloxoneCompletedAt !== null),
   },
+  */
   {
     key: "review",
     title: "Application review",
@@ -166,6 +169,7 @@ const currentStep = steps.findIndex((step) => !step.completed);
                     : "An organizer will review your application. We’ll email you to let you know whether it’s approved and what to do next. You can also return to this page to check its status."}
                 </p>
               )}
+              {/* Discord connection is temporarily disabled.
               {step.key === "discord" &&
                 (step.completed ? (
                   <p>
@@ -184,6 +188,7 @@ const currentStep = steps.findIndex((step) => !step.completed);
                     required={progress.discordRequired}
                   />
                 ))}
+              */}
             </div>
           </details>
         </li>
@@ -192,7 +197,11 @@ const currentStep = steps.findIndex((step) => !step.completed);
   </ol>
 </section>
 
+{
+  /* Discord connection is temporarily disabled.
 <script src="../../scripts/discord.ts"></script>
+*/
+}
 
 <style>
   .application-progress-list {

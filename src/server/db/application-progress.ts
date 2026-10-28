@@ -21,7 +21,8 @@ export function isApplicationComplete(
   return (
     progress.submittedAt !== null &&
     progress.naloxoneCompletedAt !== null &&
-    (!progress.discordRequired || progress.discordCompletedAt != null) &&
+    // Discord connection is temporarily disabled; retain recorded milestones.
+    // (!progress.discordRequired || progress.discordCompletedAt != null) &&
     progress.applicationApproved
   );
 }

@@ -298,16 +298,20 @@ export async function setVolunteerStatus(
   if (applicationApproved && !old.applicationApproved) {
     const blocked = await db
       .prepare(
+        // Keep the Naloxone prerequisite and legacy exemptions while Discord is paused.
         `SELECT 1 FROM discord_requirement r
-      LEFT JOIN profile p ON p.user_id=r.user_id LEFT JOIN discord_link d ON d.user_id=r.user_id
-      WHERE r.user_id=? AND (p.naloxone_completed_at IS NULL OR d.completed_at IS NULL OR d.member_verified_at IS NULL)`,
+      LEFT JOIN profile p ON p.user_id=r.user_id
+      /* LEFT JOIN discord_link d ON d.user_id=r.user_id */
+      WHERE r.user_id=? AND (p.naloxone_completed_at IS NULL
+        /* OR d.completed_at IS NULL OR d.member_verified_at IS NULL */)`,
       )
       .bind(userId)
       .first();
     if (blocked)
       throw new RequestError(
         409,
-        "The applicant must complete Naloxone 101 and connect Discord with verified server membership before approval.",
+        // "The applicant must complete Naloxone 101 and connect Discord with verified server membership before approval.",
+        "The applicant must complete Naloxone 101 before approval.",
       );
   }
   const fields = [
@@ -340,9 +344,9 @@ export async function setVolunteerStatus(
           WHERE user_id = ?
             AND updated_at = ?
             AND (registration_approved=1 OR ?=0 OR NOT EXISTS(SELECT 1 FROM discord_requirement WHERE user_id=volunteer_status.user_id)
-              OR EXISTS(SELECT 1 FROM profile p JOIN discord_link d ON d.user_id=p.user_id
+              OR EXISTS(SELECT 1 FROM profile p /* JOIN discord_link d ON d.user_id=p.user_id */
                 WHERE p.user_id=volunteer_status.user_id AND p.naloxone_completed_at IS NOT NULL
-                  AND d.completed_at IS NOT NULL AND d.member_verified_at IS NOT NULL))
+                  /* AND d.completed_at IS NOT NULL AND d.member_verified_at IS NOT NULL */))
             AND ${writePermission(true)}`,
         )
         .bind(

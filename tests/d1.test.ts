@@ -182,11 +182,12 @@ test("development application shortcuts preserve snapshots and advance without e
     statusError(409),
   );
   await completeLocalApplicationStep(env.DB, actor, "naloxone");
-  await assert.rejects(
-    completeLocalApplicationStep(env.DB, actor, "review"),
-    statusError(409),
-  );
-  await completeLocalApplicationStep(env.DB, actor, "discord");
+  // Discord connection is temporarily disabled.
+  // await assert.rejects(
+  //   completeLocalApplicationStep(env.DB, actor, "review"),
+  //   statusError(409),
+  // );
+  // await completeLocalApplicationStep(env.DB, actor, "discord");
   await completeLocalApplicationStep(env.DB, actor, "review");
   const progress = await loadApplicationProgress(env.DB, actor.id);
   assert.ok(isApplicationComplete(progress));
@@ -194,7 +195,8 @@ test("development application shortcuts preserve snapshots and advance without e
   const auditCount = await env.DB.prepare(
     "SELECT count(*) FROM audit_log",
   ).first("count(*)");
-  for (const step of ["form", "naloxone", "discord", "review"] as const)
+  assert.equal(progress.discordCompletedAt, null);
+  for (const step of ["form", "naloxone", /* "discord", */ "review"] as const)
     await completeLocalApplicationStep(env.DB, actor, step);
   assert.deepEqual(await loadApplicationProgress(env.DB, actor.id), progress);
   assert.deepEqual(await loadSubmittedApplication(env.DB, actor.id), original);

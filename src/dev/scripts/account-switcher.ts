@@ -110,11 +110,10 @@ export async function initAccountSwitcher() {
             : step === "discord"
               ? discord
               : Boolean(progress?.applicationApproved);
+      // Discord connection is temporarily disabled: omit && (step === "discord" || discord).
       const available =
         step === "form" ||
-        (step === "naloxone"
-          ? submitted
-          : submitted && naloxone && (step === "discord" || discord));
+        (step === "naloxone" ? submitted : submitted && naloxone);
       button.disabled = busy || !currentUserId || !available || completed;
       const status = button.querySelector<HTMLElement>("[data-step-status]");
       if (status) status.textContent = completed ? "Completed" : "";

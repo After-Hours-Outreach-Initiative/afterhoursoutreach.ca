@@ -21,7 +21,8 @@ import {
 } from "@/data/event-browser";
 import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import ApplicationProgress from "./ApplicationProgress.astro";
-import DiscordConnectionNotice from "./DiscordConnectionNotice.astro";
+// Discord connection is temporarily disabled.
+// import DiscordConnectionNotice from "./DiscordConnectionNotice.astro";
 import SubmittedApplication from "./SubmittedApplication.astro";
 import { loadSubmittedApplication } from "@/server/db/profiles";
 import {
@@ -192,9 +193,13 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
     )}
   >
     {
+      /* Discord connection is temporarily disabled.
+    {
       !manage && actor.applicationComplete && (
         <DiscordConnectionNotice userId={actor.id} />
       )
+    }
+    */
     }
     {
       actor.applicationSubmitted && !actor.active && (

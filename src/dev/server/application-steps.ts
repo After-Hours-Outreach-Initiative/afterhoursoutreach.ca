@@ -53,11 +53,12 @@ export async function completeLocalApplicationStep(
       });
     return;
   }
-  if (progress.discordRequired && progress.discordCompletedAt == null)
-    throw new RequestError(
-      409,
-      "Complete the simulated Discord connection first.",
-    );
+  // Discord connection is temporarily disabled.
+  // if (progress.discordRequired && progress.discordCompletedAt == null)
+  //   throw new RequestError(
+  //     409,
+  //     "Complete the simulated Discord connection first.",
+  //   );
   if (progress.applicationApproved) return;
   const now = Date.now();
   // This deliberate development-only approval bypass changes only this account's

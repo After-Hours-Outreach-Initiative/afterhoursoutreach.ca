@@ -118,7 +118,9 @@ export function requireVolunteer(actor: Actor | null): asserts actor is Actor {
   )
     throw new RequestError(
       403,
-      "Complete Naloxone 101 and the required Discord connection before viewing events.",
+      // Discord connection is temporarily disabled.
+      // "Complete Naloxone 101 and the required Discord connection before viewing events.",
+      "Complete Naloxone 101 before viewing events.",
     );
   if (actor.twoFactorEnabled && !actor.twoFactorVerified)
     throw new RequestError(403, "Sign in with your authenticator to continue.");

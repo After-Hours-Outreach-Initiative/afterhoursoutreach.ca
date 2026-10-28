@@ -21,8 +21,9 @@ import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
 import PageContents from "@/components/volunteer/PageContents.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
-import { loadDiscordStatus } from "@/server/discord/status";
-import { loadApplicationProgress } from "@/server/db/application-progress";
+// Discord connection is temporarily disabled.
+// import { loadDiscordStatus } from "@/server/discord/status";
+// import { loadApplicationProgress } from "@/server/db/application-progress";
 import "@/styles/volunteer.css";
 export const prerender = false;
 let profile;
@@ -59,8 +60,8 @@ try {
 }
 if (!profile || !person)
   return new Response("Volunteer not found", { status: 404 });
-const discord = await loadDiscordStatus(env, person.id);
-const progress = await loadApplicationProgress(env.DB, person.id);
+// const discord = await loadDiscordStatus(env, person.id);
+// const progress = await loadApplicationProgress(env.DB, person.id);
 const profileSections = profileFormSections();
 const contents = [
   { id: "volunteer-profile-panel", heading: "Current profile" },
@@ -117,6 +118,8 @@ const contents = [
                 }
               </dd>
             </div>
+            {
+              /* Discord connection is temporarily disabled.
             <div>
               <dt>Discord</dt>
               <dd>
@@ -129,6 +132,8 @@ const contents = [
                 }. {discord.sync}.
               </dd>
             </div>
+            */
+            }
           </dl>
         </div>
       </div>

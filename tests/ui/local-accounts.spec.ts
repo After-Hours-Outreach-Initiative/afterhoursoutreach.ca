@@ -99,7 +99,7 @@ test("DEV panel separates states from saved accounts and completes each applicat
   for (const [index, step] of [
     "form",
     "naloxone",
-    "discord",
+    // "discord", // Discord connection is temporarily disabled.
     "review",
   ].entries()) {
     const panel = await openLocalAccountSwitcher(page);
@@ -109,7 +109,7 @@ test("DEV panel separates states from saved accounts and completes each applicat
       await expect(
         panel.locator('[data-application-step="naloxone"]'),
       ).toBeDisabled();
-    if (index < 3)
+    if (index < 2)
       await expect(
         panel.locator('[data-application-step="review"]'),
       ).toBeDisabled();
@@ -136,22 +136,18 @@ test("DEV panel separates states from saved accounts and completes each applicat
       ).toHaveCount(0);
       await expect(
         tracker.locator("[data-application-progress-step]"),
-      ).toHaveCount(4);
+      ).toHaveCount(3);
       await expect(
         tracker.locator('[data-application-progress-step="discord"]'),
-      ).toHaveAttribute("data-state", "upcoming");
+      ).toHaveCount(0);
     }
-    if (index === 1)
-      await expect(
-        page.locator('[data-application-progress-step="discord"]'),
-      ).toHaveAttribute("data-state", "current");
-    if (index < 2)
+    if (index < 1)
       await expect(
         page
           .locator('[data-application-progress-step="review"]')
           .getByText("Pending approval", { exact: true }),
       ).toHaveCount(0);
-    if (index === 2) {
+    if (index === 1) {
       await expect(
         page.locator('[data-application-progress-step="review"]'),
       ).toHaveAttribute("data-state", "current");
@@ -330,7 +326,7 @@ test("state buttons reuse a temporary sandbox and Draft always returns to the dr
   await expect
     .poll(async () => (await draft()).draft?.answers.firstName)
     .toBe("Old sandbox draft");
-  for (const step of ["form", "naloxone", "discord", "review"]) {
+  for (const step of ["form", "naloxone", /* "discord", */ "review"]) {
     const response = await page.request.post(
       "/api/v1/auth/dev/application-step",
       { headers: { origin: baseURL! }, data: { userId: sandbox.id, step } },
@@ -549,26 +545,14 @@ test("unfinished application shows current milestones and a keyboard-accessible 
   await page.goto("/volunteer");
   await expect(tracker).toBeVisible();
   await expect(tracker.locator("[data-application-progress-step]")).toHaveCount(
-    4,
+    3,
   );
   await expect(
     tracker.locator('[data-application-progress-step="form"]'),
   ).toHaveAttribute("data-state", "current");
-  const upcomingDiscord = tracker.locator(
-    '[data-application-progress-step="discord"]',
-  );
-  await upcomingDiscord.locator(":scope > summary").click();
   await expect(
-    upcomingDiscord.locator("[data-discord-connection] > p").first(),
-  ).toHaveText(
-    "Discord keeps volunteer updates and channel access in one place.",
-  );
-  await expect(upcomingDiscord.locator("[data-discord-connect]")).toHaveCount(
-    0,
-  );
-  await expect(upcomingDiscord).not.toContainText(
-    /Submit your application|complete Naloxone 101|before connecting Discord/i,
-  );
+    tracker.locator('[data-application-progress-step="discord"]'),
+  ).toHaveCount(0);
   await expect(formLink).toHaveAttribute("href", "/apply");
   for (const width of [375, 320]) {
     await page.setViewportSize({ width, height: 812 });
@@ -611,7 +595,66 @@ test("unfinished application shows current milestones and a keyboard-accessible 
   await expect(page.locator("[data-event-list]")).toHaveCount(0);
 });
 
-test("Discord application step stays brief outside the current step", async ({
+test("Discord linking stays hidden while applications advance to review and approval", async ({
+  page,
+  baseURL,
+}) => {
+  const user = await createLocalAccount(page.request, baseURL!);
+  const discordRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/v1/account/discord"))
+      discordRequests.push(request.url());
+  });
+  const expectNoDiscord = async () => {
+    await expect(
+      page.locator("[data-discord-connection], #account-discord-heading"),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('a[href*="account-discord-heading"]'),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('[data-application-progress-step="discord"]'),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Discord connection verified", { exact: true }),
+    ).toHaveCount(0);
+  };
+  await page.goto("/volunteer");
+  await expect(page.locator("[data-application-progress-step]")).toHaveCount(3);
+  await expectNoDiscord();
+  const course = page.locator("[data-naloxone-confirm]");
+  await course.locator('[name="completed"]').check();
+  await course.getByRole("button", { name: "Confirm completion" }).click();
+  await expect(
+    page.locator('[data-application-progress-step="review"]'),
+  ).toHaveAttribute("data-state", "current");
+  await expect(
+    page.getByText("Pending approval", { exact: true }),
+  ).toBeVisible();
+  await expectNoDiscord();
+  await page.goto("/volunteer/account");
+  await expectNoDiscord();
+  const approved = await page.request.post(
+    "/api/v1/auth/dev/application-step",
+    {
+      headers: { origin: baseURL! },
+      data: { userId: user.id, step: "review" },
+    },
+  );
+  expect(approved.ok(), await approved.text()).toBe(true);
+  await page.reload();
+  await expect(
+    page.getByText("Application approved", { exact: true }),
+  ).toBeVisible();
+  await expectNoDiscord();
+  await page.goto("/volunteer");
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+  await expectNoDiscord();
+  expect(discordRequests).toEqual([]);
+});
+
+// Preserve the integration scenarios until Discord linking returns.
+test.skip("Discord application step stays brief outside the current step", async ({
   page,
   baseURL,
 }) => {
@@ -787,7 +830,7 @@ test("Discord application step stays brief outside the current step", async ({
   );
 });
 
-test("Connect Discord locally simulates consent, cancellation, failure and screening through the real UI", async ({
+test.skip("Connect Discord locally simulates consent, cancellation, failure and screening through the real UI", async ({
   page,
   baseURL,
 }) => {

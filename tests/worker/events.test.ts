@@ -7,7 +7,8 @@ import { chromium, expect, type Locator, type Route } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { fillDateInput } from "../helpers/date-input";
 import { createSignInOTP } from "../helpers/email-otp";
-import { seedVerifiedDiscordMembership } from "../helpers/discord";
+// Discord connection is temporarily disabled.
+// import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { totpFromSetupKey } from "../helpers/totp";
 import { hashAuthValue } from "../../src/server/db/rate-limits";
 
@@ -339,7 +340,7 @@ describe(
         );
       });
 
-      test("application approval, Naloxone and verified Discord membership gate orientations independently of patrol approval", async () => {
+      test("application approval and Naloxone gate orientations without Discord while linking is paused", async () => {
         for (const person of [alice, bob]) {
           const page = await ok(
             await send("/volunteer", undefined, person.cookie),
@@ -389,9 +390,10 @@ describe(
             ),
           );
           await ok(await send("/api/v1/events", undefined, person.cookie), 403);
-          await ok(await status(person.id, true, false), 409);
-          await seedVerifiedDiscordMembership(DB, person.id);
-          await ok(await send("/api/v1/events", undefined, person.cookie), 403);
+          // Discord connection is temporarily disabled.
+          // await ok(await status(person.id, true, false), 409);
+          // await seedVerifiedDiscordMembership(DB, person.id);
+          // await ok(await send("/api/v1/events", undefined, person.cookie), 403);
           await ok(await status(person.id, true, false));
           const events = await ok(
             await send("/api/v1/events", undefined, person.cookie),

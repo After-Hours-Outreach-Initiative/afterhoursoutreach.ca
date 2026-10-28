@@ -745,7 +745,7 @@ describe(
       );
     });
 
-    test("account application information appears after all four application milestones without orientation signup and stays read-only", async () => {
+    test("account application information appears after three milestones without Discord or orientation signup and stays read-only", async () => {
       await DB.prepare(
         "UPDATE profile SET naloxone_completed_at=1000 WHERE user_id=?",
       )
@@ -762,13 +762,14 @@ describe(
       )
         .bind(current.user.id)
         .run();
-      const awaitingDiscord = await send(
+      const withoutDiscord = await send(
         "/volunteer/account",
         undefined,
         cookie,
       );
-      assert.doesNotMatch(
-        await awaitingDiscord.text(),
+      // Discord linking is paused: approved applicants need no connection.
+      assert.match(
+        await withoutDiscord.text(),
         /id="submitted-application-heading"/,
       );
       await DB.prepare(
@@ -790,6 +791,10 @@ describe(
       );
       assert.match(html, /Naloxone 101 completion/);
       assert.match(html, /Application approved/);
+      assert.doesNotMatch(
+        html,
+        /account-discord-heading|data-discord-connection|Discord connection verified/,
+      );
       assert.match(html, /Date not recorded/);
       assert.doesNotMatch(html, /Orientation registered/);
       assert.doesNotMatch(
@@ -1146,18 +1151,17 @@ describe(
       ).json()) as typeof current;
       assert.equal(after.user.id, before.user.id);
       assert.equal(after.session.id, before.session.id);
-      // Earlier steps linked the shared account; use an unlinked account to
-      // check the unconfigured placeholder rather than its connected identity.
+      // Discord linking is paused: neither linked nor unlinked accounts get UI.
       const unlinkedCookie = await signIn(
         "worker-unlinked-discord@example.org",
       );
       const discordPage = await (
         await send("/volunteer/account", undefined, unlinkedCookie)
       ).text();
-      assert.match(discordPage, /Discord connection is coming soon\./);
+      // assert.match(discordPage, /Discord connection is coming soon\./);
       assert.doesNotMatch(
         discordPage,
-        /Discord (?:connection )?is not configured|data-discord-connect(?:\s|>)|Authorize AHOI Bot/,
+        /account-discord-heading|data-discord-connection|data-discord-connect|Discord connection is coming soon|Authorize AHOI Bot/,
       );
       const previousDiscord = await DB.prepare(
         "SELECT * FROM discord_link WHERE user_id=?",
