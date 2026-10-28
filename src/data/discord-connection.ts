@@ -107,7 +107,7 @@ export function discordConnectionDescription(
 export function discordConnectionIdentity(
   status: DiscordConnectionStatus,
 ): string {
-  return status.username ? `Connected as ${status.username}.` : "";
+  return status.username ? `Connected as @${status.username}` : "";
 }
 
 export function discordConnectionMessage(

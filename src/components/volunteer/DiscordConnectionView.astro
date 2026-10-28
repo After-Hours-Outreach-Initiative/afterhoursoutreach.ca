@@ -41,14 +41,14 @@ const notice = discordConnectionMessage(status);
     )
   }
   <p
-    class="mt-4 rounded-lg border border-zinc-600 bg-white/5 p-4 text-white"
+    class="mt-4 text-white"
     data-discord-identity
     tabindex="-1"
     hidden={!status.username}
   >
     Connected as <strong class="font-bold" data-discord-username
-      >{status.username}</strong
-    >.
+      >{status.username ? `@${status.username}` : ""}</strong
+    >
   </p>
   <p
     class="mt-4"

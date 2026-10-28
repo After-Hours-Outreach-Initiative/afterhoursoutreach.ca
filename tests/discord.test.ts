@@ -284,7 +284,7 @@ test("local Discord simulation preserves consent and screening, then reconciles 
   assert.equal(discordConnectionMessage(pending), pending.connection);
   assert.equal(
     discordConnectionIdentity(pending),
-    "Connected as aho_volunteer.",
+    "Connected as @aho_volunteer",
   );
   assert.equal(
     (await loadApplicationProgress(env.DB, actor.id)).discordCompletedAt,
@@ -546,7 +546,7 @@ test("consented auto-join requires a separate verified membership check before t
   await link(actor);
   const pending = await loadDiscordStatus(config, actor.id);
   assert.equal(pending.notice, "Joining and verifying server membership");
-  assert.equal(discordConnectionIdentity(pending), "Connected as volunteer.");
+  assert.equal(discordConnectionIdentity(pending), "Connected as @volunteer");
   const server = discordServer([], false);
   assert.equal(
     isApplicationComplete({
@@ -831,7 +831,7 @@ test("leaving never causes an unconsented rejoin and expired join tokens are era
   const missing = await loadDiscordStatus(config, actor.id);
   assert.match(missing.connection, /Reconnect/);
   assert.equal(missing.notice, missing.connection);
-  assert.equal(discordConnectionIdentity(missing), "Connected as volunteer.");
+  assert.equal(discordConnectionIdentity(missing), "Connected as @volunteer");
   assert.equal(missing.needsReconnect, true);
   await link(actor);
   await env.DB.prepare("UPDATE discord_link SET token_expires_at=0").run();

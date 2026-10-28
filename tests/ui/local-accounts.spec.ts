@@ -706,10 +706,10 @@ test("Discord application step stays brief outside the current step", async ({
   await expect(discord.locator("[data-discord-refresh]")).toHaveCount(0);
   connection = "linked";
   await poll();
-  await expect(identity).toHaveText("Connected as volunteer.");
+  await expect(identity).toHaveText("Connected as @volunteer");
   await expect(identity).toBeVisible();
   await expect(identity.locator("strong[data-discord-username]")).toHaveText(
-    "volunteer",
+    "@volunteer",
   );
   await expect(description).toBeHidden();
   await expect(status).toBeHidden();
@@ -719,9 +719,9 @@ test("Discord application step stays brief outside the current step", async ({
   await expect(discord.locator("[data-discord-connect]")).toBeHidden();
   connection = "missing";
   await poll();
-  await expect(identity).toHaveText("Connected as volunteer.");
+  await expect(identity).toHaveText("Connected as @volunteer");
   await expect(identity.locator("strong[data-discord-username]")).toHaveText(
-    "volunteer",
+    "@volunteer",
   );
   await expect(status).toHaveText(
     "Not in the server. Reconnect Discord to join again.",
@@ -732,7 +732,7 @@ test("Discord application step stays brief outside the current step", async ({
   ).toBeVisible();
   connection = "linked";
   await poll();
-  await expect(identity).toHaveText("Connected as volunteer.");
+  await expect(identity).toHaveText("Connected as @volunteer");
   await expect(status).toBeHidden();
   await expect(description).toBeHidden();
   await expect(discord.locator("[data-discord-connect]")).toBeHidden();
@@ -861,10 +861,10 @@ test("Connect Discord locally simulates consent, cancellation, failure and scree
     "Accept the server rules in Discord",
   );
   await expect(discord.locator("[data-discord-identity]")).toHaveText(
-    "Connected as aho_volunteer.",
+    "Connected as @aho_volunteer",
   );
   await expect(discord.locator("strong[data-discord-username]")).toHaveText(
-    "aho_volunteer",
+    "@aho_volunteer",
   );
   await expect(discord.locator("[data-discord-description]")).toBeHidden();
   await expect(discord).toHaveAttribute("data-state", "current");
@@ -896,7 +896,7 @@ test("Connect Discord locally simulates consent, cancellation, failure and scree
     .getByRole("link", { name: "Manage Discord connection" })
     .click();
   await expect(page.locator("[data-discord-identity]")).toHaveText(
-    "Connected as aho_volunteer.",
+    "Connected as @aho_volunteer",
   );
   await expect(page.locator("[data-discord-status]")).toBeHidden();
   await expect(page.locator("[data-discord-description]")).toBeHidden();

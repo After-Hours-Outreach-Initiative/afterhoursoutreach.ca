@@ -22,7 +22,7 @@ export function updateDiscordConnection(
   const identity = root.querySelector<HTMLElement>("[data-discord-identity]")!;
   identity.hidden = !status.username;
   identity.querySelector<HTMLElement>("[data-discord-username]")!.textContent =
-    status.username;
+    status.username ? `@${status.username}` : "";
   const message = root.querySelector<HTMLElement>("[data-discord-status]")!;
   message.textContent = discordConnectionMessage(status);
   message.hidden = !status.configured || !message.textContent;
