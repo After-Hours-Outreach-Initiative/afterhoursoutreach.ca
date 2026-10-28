@@ -14,7 +14,6 @@
 /* Text links stay recognizable without changing buttons, tabs or calendar controls. */
 .volunteer-portal p a:not(.btn),
 .volunteer-back-link,
-.volunteer-contents a:not(.btn),
 .volunteer-email-reset,
 .volunteer-notice a:not(.btn),
 .volunteer-table a:not(.btn),
@@ -474,6 +473,7 @@ body:has(
   padding: 0.25rem 0;
   color: #a1a1aa;
   @apply text-sm/[inherit];
+  text-decoration: none;
   overflow-wrap: anywhere;
 }
 .volunteer-contents a:hover {
