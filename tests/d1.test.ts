@@ -545,6 +545,7 @@ test("application queue counts submitted unapproved applications matching search
     approvalEmails[0].subject,
     "Your volunteer application is approved",
   );
+  assert.ok(approvalEmails[0].text.includes(`approved by ${actor.name}!`));
   assert.match(approvalEmails[0].text, /Thanks for joining us/);
   assert.match(
     approvalEmails[0].text,
@@ -1087,6 +1088,7 @@ test("application progress and organizer attribution use application audits, not
       id: approver.id,
       name: "Application Organizer",
       email: "application-approver@example.org",
+      approvedAt: 2000,
     },
   ); // A later, different patrol approver must not replace the application approver.
   assert.equal("applicationApprovedBy" in dated, false);
@@ -1138,10 +1140,12 @@ test("application progress and organizer attribution use application audits, not
     applicationApproved: true,
     patrolApproved: true,
   });
+  const reapproved = (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+    ?.applicationApprovedBy;
+  assert.equal(reapproved?.id, reviewer.id);
   assert.equal(
-    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
-      ?.applicationApprovedBy?.id,
-    reviewer.id,
+    reapproved?.approvedAt,
+    (await loadApplicationProgress(env.DB, actor.id)).applicationApprovedAt,
   ); // Reapproval uses the latest applicationApproved audit, not the old approver.
 });
 

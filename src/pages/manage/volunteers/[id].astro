@@ -100,7 +100,7 @@ const contents = [
           {
             person.applicationApproved
               ? profile.applicationApprovedBy
-                ? `Application approved by ${profile.applicationApprovedBy.name} (${profile.applicationApprovedBy.email})`
+                ? `Application approved by ${profile.applicationApprovedBy.name} (${profile.applicationApprovedBy.email}) on ${formatApplicationSubmittedTime(new Date(profile.applicationApprovedBy.approvedAt).toISOString())}`
                 : "Application approved. Approving organizer not recorded."
               : "Application awaiting approval"
           }

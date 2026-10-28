@@ -133,6 +133,7 @@ interface VolunteerAccess {
 export function volunteerAccessEmail(
   { active, applicationApproved, patrolApproved }: VolunteerAccess,
   applicationApprovalChanged: boolean,
+  approvingOrganizerName?: string,
 ): EmailContent {
   const nextStep = !active
     ? `Your volunteer account is currently inactive. Please contact an organizer at ${contactEmail} to restore access before registering for events.`
@@ -153,7 +154,7 @@ export function volunteerAccessEmail(
     };
   return {
     subject: "Your volunteer application is approved",
-    text: `Your volunteer application is approved! Thanks for joining us and supporting our community.\n\n${nextStep}`,
+    text: `Your volunteer application is approved${approvingOrganizerName ? ` by ${approvingOrganizerName}` : ""}! Thanks for joining us and supporting our community.\n\n${nextStep}`,
   };
 }
 

@@ -161,7 +161,7 @@ export async function viewVolunteerProfile(
     // Historical approvals without such an audit deliberately stay unattributed.
     db
       .prepare(
-        `SELECT approver.id, approver.name, approver.email
+        `SELECT approver.id, approver.name, approver.email, a.created_at AS approvedAt
         FROM audit_log a JOIN user approver ON approver.id=a.actor_id
         JOIN volunteer_status v ON v.user_id=a.subject_id
         WHERE a.subject_id=? AND v.registration_approved=1
@@ -211,7 +211,7 @@ export async function viewVolunteerProfile(
     ...answers
   } = row;
   const applicationApprovedBy = results[2].results[0] as
-    { id: string; name: string; email: string } | undefined;
+    { id: string; name: string; email: string; approvedAt: number } | undefined;
   const sources = row.heardAboutUsSources
     ? (JSON.parse(row.heardAboutUsSources) as string[])
     : [];
@@ -322,6 +322,7 @@ export async function setVolunteerStatus(
   const email = volunteerAccessEmail(
     { active, applicationApproved, patrolApproved },
     fields.includes("applicationApproved"),
+    actor.name,
   );
   const operation = crypto.randomUUID();
   const now = Math.max(Date.now(), version + 1);
