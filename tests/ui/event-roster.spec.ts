@@ -102,7 +102,9 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
       await expect(
         roster(card).getByText("No volunteers registered yet."),
       ).toBeVisible();
-      await expect(roster(card).locator("ul")).toBeHidden();
+      await expect(
+        roster(card).getByRole("table", { includeHidden: true }),
+      ).toBeHidden();
       await summary.press("Space");
       await expect(roster(card)).not.toHaveAttribute("open");
     }
@@ -126,12 +128,12 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
       ).toHaveCount(1);
       await expect(roster(card)).not.toHaveAttribute("open");
       const registered = await geometry(card);
-      expect(registered.rowHeight).toBeGreaterThanOrEqual(32);
+      expect(registered.rowHeight).toBe(24);
       expect(registered.height).toBeGreaterThan(initial[index].height);
       expect(registered.summaryTop).toBeGreaterThan(initial[index].summaryTop);
       await roster(card).locator("summary").focus();
       await roster(card).locator("summary").press("Enter");
-      await expect(roster(card).locator("li")).toHaveCount(1);
+      await expect(roster(card).locator("tbody tr")).toHaveCount(1);
       await expect(
         roster(card).getByText("No volunteers registered yet."),
       ).toHaveCount(0);
@@ -190,6 +192,168 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
     await expect(
       publicCard.locator(".event-avatar-row .attendee-avatar"),
     ).toHaveCount(0);
+  } finally {
+    await viewerContext.close();
+  }
+});
+
+test("striped roster tables share avatar sizing and organizer-only keyboard action menus", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  test.skip(
+    !baseURL?.startsWith("http://localhost:"),
+    "Local D1 development only",
+  );
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+  const meetingPoint = `Roster menus ${crypto.randomUUID()}`;
+  const created = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: {
+      action: "save",
+      event: {
+        includesOrientation: false,
+        startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+        meetingPoint,
+        meetingPointUrl: "",
+        spots: 8,
+        open: true,
+        hidden: false,
+      },
+    },
+  });
+  expect(created.status(), await created.text()).toBe(200);
+  await page.reload();
+  const id = await page
+    .locator("[data-live-event]")
+    .filter({ hasText: meetingPoint })
+    .getAttribute("data-live-event");
+  const joined = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: { action: "join", id },
+  });
+  expect(joined.status(), await joined.text()).toBe(200);
+  const viewerContext = await browser.newContext({ baseURL });
+  try {
+    const viewer = await viewerContext.newPage();
+    await viewer.goto("/volunteer");
+    await (
+      await openLocalAccountSwitcher(viewer)
+    )
+      .locator('[data-switch-user="local-fixture-user-dana"]')
+      .click();
+    await expect(
+      viewer.getByRole("button", { name: /Account for Dana/ }),
+    ).toBeVisible();
+    const joined = await viewer.request.post("/api/v1/events/action", {
+      headers: { origin: baseURL! },
+      data: { action: "join", id },
+    });
+    expect(joined.status(), await joined.text()).toBe(200);
+    await viewer.goto("/events");
+
+    for (const width of [1280, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      await viewer.setViewportSize({ width, height: 900 });
+      await page.goto("/manage/events");
+      for (const current of [page, viewer]) {
+        const card = current.locator(`[data-live-event="${id}"]`);
+        const roster = card.locator(".volunteer-roster, .public-event-roster");
+        const summary = roster.locator("summary");
+        if (
+          !(await roster.evaluate(
+            (element: HTMLDetailsElement) => element.open,
+          ))
+        )
+          await summary.click();
+        await expect(
+          roster.getByRole("table", { name: "Registered volunteers" }),
+        ).toBeVisible();
+        await expect(roster.locator("tbody tr")).toHaveCount(2);
+        const layout = await card.evaluate((element) => {
+          const rows = [...element.querySelectorAll("tbody tr")];
+          const avatar = (selector: string) =>
+            element.querySelector(selector)!.getBoundingClientRect().height;
+          return {
+            avatars: [
+              avatar(".event-avatar-row .attendee-avatar"),
+              avatar(".event-roster-person .attendee-avatar"),
+            ],
+            stripes: rows.map((row) => getComputedStyle(row).backgroundColor),
+            overflow: document.documentElement.scrollWidth > innerWidth,
+          };
+        });
+        expect(layout.avatars).toEqual([24, 24]);
+        expect(layout.stripes).toEqual(["rgb(12, 13, 16)", "rgb(23, 26, 32)"]);
+        expect(layout.overflow).toBe(false);
+        if (current === viewer) {
+          await expect(
+            roster.locator("a, button, input, dialog, [role=menu]"),
+          ).toHaveCount(0);
+          await expect(roster.locator("tbody")).not.toContainText(
+            /Vance|Whitfield/,
+          );
+        }
+      }
+      const card = page.locator(`[data-live-event="${id}"]`);
+      const trigger = card.locator("[data-signup-menu-trigger]").first();
+      await expect(trigger).toHaveText("");
+      await expect(trigger).toHaveAccessibleName(/Registration actions for /);
+      await trigger.focus();
+      await trigger.press("ArrowDown");
+      const menu = card.getByRole("menu");
+      const move = menu.getByRole("menuitem", {
+        name: "Move volunteer",
+        exact: true,
+      });
+      const remove = menu.getByRole("menuitem", { name: "Remove volunteer" });
+      await expect(move).toBeFocused();
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
+      await move.press("End");
+      await expect(remove).toBeFocused();
+      await remove.press("ArrowDown");
+      await expect(move).toBeFocused();
+      await move.press("Escape");
+      await expect(menu).toBeHidden();
+      await expect(trigger).toBeFocused();
+      await expect(trigger).toHaveAttribute("aria-expanded", "false");
+      await trigger.press("ArrowUp");
+      await expect(remove).toBeFocused();
+      await remove.press("Enter");
+      const dialog = page.getByRole("dialog", {
+        name: "Change a registration",
+      });
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByLabel("Destination")).toHaveValue("");
+      await page.keyboard.press("Escape");
+      await expect(trigger).toBeFocused();
+      await trigger.click();
+      await move.click();
+      await expect(dialog.getByLabel("Destination")).not.toHaveValue("");
+      await page.keyboard.press("Escape");
+      await expect(trigger).toBeFocused();
+      await trigger.click();
+      await move.press("Tab");
+      await expect(menu).toBeHidden();
+      await trigger.click();
+      await card.locator(".volunteer-event-info h3").click();
+      await expect(menu).toBeHidden();
+    }
+    const denied = await viewer.request.post("/api/v1/events/action", {
+      headers: { origin: baseURL! },
+      data: { action: "manage-signup", id: "not-an-organizer", reason: "" },
+    });
+    expect(denied.status()).toBe(403);
   } finally {
     await viewerContext.close();
   }

@@ -286,8 +286,8 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           };
         });
         expect(Math.abs(avatarLayout.leftOffset)).toBeLessThan(1);
-        expect(avatarLayout.width).toBeCloseTo((32 * 14) / 19.5, 1);
-        expect(avatarLayout.height).toBe(32);
+        expect(avatarLayout.width).toBeCloseTo((24 * 14) / 19.5, 1);
+        expect(avatarLayout.height).toBe(24);
         await expect(
           card.locator(".event-avatar-row .attendee-medic"),
         ).toHaveCount(3);
@@ -480,15 +480,19 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         expect(crowdedLayout.scrollable).toBe(false);
         if (manage) {
           await card.locator(".volunteer-roster > summary").click();
-          await expect(card.locator(".volunteer-roster li")).toHaveCount(8);
+          await expect(card.locator(".volunteer-roster tbody tr")).toHaveCount(
+            8,
+          );
         } else {
           await card.locator(".public-event-roster > summary").click();
           const roster = card.locator(".public-event-roster");
-          await expect(roster.locator("li")).toHaveCount(8);
+          await expect(roster.locator("tbody tr")).toHaveCount(8);
           await expect(roster.locator("a, input, button")).toHaveCount(0);
-          await expect(roster.locator("li").first()).toHaveText(publicName);
+          await expect(roster.locator("tbody tr").first()).toHaveText(
+            publicName,
+          );
           await expect(
-            roster.locator("li").first().locator(".attendee-medic"),
+            roster.locator("tbody tr").first().locator(".attendee-medic"),
           ).toHaveCSS("color", "rgb(185, 28, 28)");
           await expect(roster.locator(".attendee-volunteer").first()).toHaveCSS(
             "color",
@@ -504,9 +508,12 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
               "UPDATE profile SET first_name='Live' WHERE user_id='avatar-attendee-0'",
             ).run();
             publicName = "Live P.";
-            await expect(roster.locator("li").first()).toHaveText(publicName, {
-              timeout: 15_000,
-            });
+            await expect(roster.locator("tbody tr").first()).toHaveText(
+              publicName,
+              {
+                timeout: 15_000,
+              },
+            );
             await expect(roster).toHaveAttribute("open", "");
             await expect(roster.locator("summary")).toBeFocused();
           }

@@ -8,6 +8,7 @@ import { chooseNotification } from "./notification-choice";
 import { confirmEventDeletion } from "./event-deletion";
 import { initDateInputs, readDateInputs } from "./date-input";
 import { initVolunteerProfileTabs } from "./volunteer-profile-tabs";
+import { initSignupMenus } from "./signup-menu";
 import {
   initRecurrenceControls,
   recurringSaveAction,
@@ -53,6 +54,7 @@ for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
   renderedCards.set(card, card.outerHTML);
 initEventDates(document);
 initVolunteerProfileTabs();
+initSignupMenus();
 
 function applyEventFilter(root: HTMLElement, type: string) {
   const selected = eventFilter(type, root.dataset.eventView === "manage");
@@ -233,7 +235,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   let added: HTMLElement | undefined;
   const protectedEvent = (card: HTMLElement) =>
     Boolean(
-      card.querySelector("dialog[open]") ||
+      card.querySelector("dialog[open], [data-signup-menu]:popover-open") ||
       [
         ...card.querySelectorAll<HTMLFormElement>(
           'form[data-submitting="true"]',
@@ -526,7 +528,7 @@ if (eventBrowser) {
         const needsDeferredRefresh =
           deferredEventRefresh &&
           !eventBrowser.querySelector(
-            'dialog[open], [data-live-series][open], form[data-submitting="true"]',
+            'dialog[open], [data-signup-menu]:popover-open, [data-live-series][open], form[data-submitting="true"]',
           );
         if (
           !forceRefresh &&
@@ -614,9 +616,11 @@ if (eventBrowser) {
     (event) => {
       if (
         deferredEventRefresh &&
-        event.target instanceof HTMLDetailsElement &&
-        event.target.matches("[data-live-series]") &&
-        !event.target.open
+        ((event.target instanceof HTMLDetailsElement &&
+          event.target.matches("[data-live-series]") &&
+          !event.target.open) ||
+          (event.target instanceof HTMLElement &&
+            event.target.matches("[data-signup-menu]:not(:popover-open)")))
       )
         refreshDeferredEvents();
     },

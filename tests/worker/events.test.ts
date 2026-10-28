@@ -1579,8 +1579,9 @@ describe(
           routeCookie = organizer.cookie;
           await page.goto(`${origin}/manage/events`);
           await card.locator(".volunteer-roster > summary").click();
+          await card.locator("[data-signup-menu-trigger]").click();
           await card
-            .getByRole("button", { name: "Move or remove", exact: true })
+            .getByRole("menuitem", { name: "Move volunteer", exact: true })
             .click();
           const signupDialog = page.getByRole("dialog", {
             name: "Change a registration",
@@ -1663,8 +1664,9 @@ describe(
             "",
           );
           await destinationCard.locator(".volunteer-roster > summary").click();
+          await destinationCard.locator("[data-signup-menu-trigger]").click();
           await destinationCard
-            .getByRole("button", { name: "Move or remove", exact: true })
+            .getByRole("menuitem", { name: "Move volunteer", exact: true })
             .click();
           await signupDialog.getByLabel("Destination").selectOption(sourceId);
           await inPlaceAction(page, {
@@ -1687,8 +1689,9 @@ describe(
             },
             loadingLabel: "Saving…",
           });
+          await card.locator("[data-signup-menu-trigger]").click();
           await card
-            .getByRole("button", { name: "Move or remove", exact: true })
+            .getByRole("menuitem", { name: "Remove volunteer", exact: true })
             .click();
           await signupDialog
             .getByLabel("Reason (optional)")

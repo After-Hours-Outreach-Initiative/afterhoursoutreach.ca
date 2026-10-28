@@ -1583,29 +1583,102 @@ body:has(
   border-top: 1px solid #27272a;
   padding-top: 0.5rem;
 }
-.volunteer-roster summary {
+.volunteer-roster > summary {
   cursor: pointer;
   color: #d4d4d8;
   min-height: 2.75rem;
   width: fit-content;
   align-content: center;
 }
-.volunteer-roster li {
+.event-roster-table {
+  width: 100%;
+  margin-top: 0.75rem;
+  table-layout: fixed;
+  border: var(--volunteer-border);
+  border-radius: 0.5rem;
+  border-spacing: 0;
+  text-align: left;
+}
+.event-roster-table :is(th, td) {
+  padding: 0.625rem 0.75rem;
+  vertical-align: middle;
+  border-bottom: var(--volunteer-border);
+  font-weight: normal;
+  overflow-wrap: anywhere;
+}
+.event-roster-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+.event-roster-table tbody tr {
+  background: #0c0d10;
+}
+.event-roster-table tbody tr:nth-child(even) {
+  background: #171a20;
+}
+.event-roster-person {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid #27272a;
+  gap: 0.625rem;
 }
-.volunteer-roster li > div {
-  flex: 1;
-  min-width: min(10rem, 100%);
+.event-roster-name {
+  min-width: 0;
 }
-.volunteer-roster li span {
+.event-roster-status {
   display: block;
   @apply text-sm/[inherit];
   color: #a1a1aa;
+}
+.event-roster-orientation {
+  margin-top: 0.75rem;
+}
+.event-roster-orientation .btn {
+  max-width: 100%;
+  white-space: normal;
+}
+.event-roster-table .event-roster-actions {
+  width: 4rem;
+  padding: 0.375rem 0.625rem;
+  text-align: right;
+}
+.signup-menu-trigger {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+}
+.signup-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0.375rem;
+  width: max-content;
+  max-width: calc(100vw - 1rem);
+  border: var(--volunteer-border);
+  border-radius: 0.5rem;
+  background: #171a20;
+  color: #f4f4f5;
+  box-shadow: 0 0.5rem 1.5rem #0008;
+}
+.signup-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  text-align: left;
+  cursor: pointer;
+}
+.signup-menu button:is(:hover, :focus-visible):not(:disabled) {
+  background: #16214a;
+}
+.signup-menu button:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: -2px;
+}
+.signup-menu button:disabled {
+  color: #a1a1aa;
+  cursor: default;
 }
 .volunteer-profile-dialog {
   height: min(50rem, calc(100dvh - 2rem));

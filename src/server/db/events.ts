@@ -115,6 +115,7 @@ export interface RosterRow {
   userId: string;
   name: string;
   completed: number;
+  category: AttendeeCategory;
 }
 export interface PublicRosterRow {
   eventId: string;
@@ -708,9 +709,13 @@ export async function listRosters(
   const rows = await db
     .prepare(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, ${profileDisplayNameSql} AS name,
+        CASE WHEN ${includesOrientationSql()} AND NOT EXISTS (
+          SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id
+        ) THEN 'orientee' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'volunteer' END AS category,
         EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
       FROM signup s
+      JOIN event e ON e.id = s.event_id
       JOIN profile p ON p.user_id = s.user_id
       JOIN user u ON u.id = s.user_id
       WHERE s.event_id IN (${placeholders}) AND s.status = 'confirmed'

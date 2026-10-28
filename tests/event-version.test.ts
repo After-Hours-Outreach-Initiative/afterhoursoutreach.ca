@@ -135,6 +135,7 @@ test("view versions detect capacity, signups, visibility and access changes with
       userId: "attendee",
       name: "Attendee",
       completed: 0,
+      category: "volunteer" as const,
     },
   ];
   const rosterVersion = await eventViewVersion([event], organizer, roster);
@@ -142,6 +143,7 @@ test("view versions detect capacity, signups, visibility and access changes with
     { id: "replacement-signup", userId: "replacement-attendee" },
     { name: "Updated name" },
     { completed: 1 },
+    { category: "medic" as const },
   ]) {
     const updated = [{ ...roster[0], ...change }];
     expect(await eventViewVersion([event], organizer, updated)).not.toBe(

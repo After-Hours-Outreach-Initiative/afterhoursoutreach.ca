@@ -189,7 +189,8 @@ test("application dialogs keep their chrome visible while only their body scroll
     const roster = card.locator(".volunteer-roster");
     if (!(await roster.evaluate((element: HTMLDetailsElement) => element.open)))
       await roster.locator("summary").click();
-    await card.getByRole("button", { name: "Move or remove" }).first().click();
+    await card.locator("[data-signup-menu-trigger]").first().click();
+    await card.getByRole("menuitem", { name: "Remove volunteer" }).click();
     const registration = page.getByRole("dialog", {
       name: "Change a registration",
     });
