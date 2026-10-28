@@ -15,21 +15,15 @@ const { userId, needsSignIn } = Astro.props;
       <summary>Review account deletion</summary>
       <div class="mt-4 space-y-4" id="account-delete-description">
         <p>
-          You will be signed out on every device. Your sign-in access and
-          unsubmitted application drafts will be removed, and your upcoming
-          event signups will be cancelled. Signing in later creates a new
-          account.
+          Deletion signs you out everywhere, deletes drafts, cancels upcoming
+          signups, and removes website-managed Discord roles. Your Discord
+          account and membership stay unchanged.
         </p>
         <p>
-          Submitted applications, volunteer history, and delivery records are
-          retained as required by our <a href="/privacy">privacy policy</a>,
-          including decision records and legal holds. Contact our Privacy
-          officer about further removal. Copies on other devices, in backups,
-          and in messages already sent or sending need separate handling.
-        </p>
-        <p>
-          Website-managed Discord roles will be removed. Your Discord account,
-          server membership, and unrelated roles will not be deleted.
+          Some records are retained under our <a href="/privacy"
+            >privacy policy</a
+          >. Contact our Privacy officer about further removal. Signing in again
+          creates a new account.
         </p>
         <p>Organizers must leave at least one other active organizer.</p>
       </div>
