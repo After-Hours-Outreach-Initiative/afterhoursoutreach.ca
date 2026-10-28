@@ -38,7 +38,16 @@ test("Discord migration preserves existing volunteers and drafts without inventi
     );
     for (const file of files.slice(discord))
       db.exec(readFileSync(new URL(file, directory), "utf8"));
-    assert.deepEqual(db.prepare("SELECT * FROM profile").get(), profile);
+    // Later additive migrations must preserve every original answer and leave
+    // new training details blank, rather than inferring them from legacy text.
+    assert.deepEqual(
+      { ...db.prepare("SELECT * FROM profile").get() },
+      {
+        ...profile,
+        expired_first_aid_details: "",
+        crisis_intervention_details: "",
+      },
+    );
     assert.deepEqual(
       db.prepare("SELECT * FROM application_draft").get(),
       draft,

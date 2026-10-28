@@ -148,8 +148,9 @@ export function sampleProfileFixtures(
         certificationExpiry,
         training: ["naloxone-administration", "crisis-intervention", "other"],
         relevantExperience: ["overdose-response"],
-        otherTraining:
-          "Certified naloxone trainer. Completed a two-day nonviolent crisis intervention and de-escalation course; facilitated volunteer safety practice sessions.",
+        crisisInterventionDetails:
+          "Completed a two-day nonviolent crisis intervention and de-escalation course; facilitated volunteer safety practice sessions.",
+        otherTraining: "Certified naloxone trainer.",
       },
     },
   ];
@@ -201,7 +202,8 @@ export function sampleProfileStatement(
     birth_date, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
     heard_about_us, heard_about_us_sources, heard_about_us_other, motivation, teams,
     medical_certification, medical_certifications, medical_certification_expiry,
-    training_experience, relevant_training, other_training, relevant_experience, other_experience, medical_conditions,
+    training_experience, relevant_training, other_training, expired_first_aid_details, crisis_intervention_details,
+    relevant_experience, other_experience, medical_conditions,
     code_of_conduct_version, code_of_conduct_accepted_at, submitted_application, naloxone_completed_at, registered_at, updated_at
   ) SELECT u.id, ${quote(a.firstName)}, ${quote(a.middleNames)}, ${quote(a.lastName)},
     ${quote(a.preferredName)}, ${quote(a.pronouns)}, ${quote(a.phone)}, ${quote(a.birthDate)},
@@ -210,6 +212,7 @@ export function sampleProfileStatement(
     ${quote(a.motivation)}, ${quote(JSON.stringify(a.teams))}, ${quote(a.certification)},
     ${quote(JSON.stringify(a.certifications))}, ${a.certificationExpiry ? quote(a.certificationExpiry) : "NULL"},
     ${quote(a.experience)}, ${quote(JSON.stringify(a.training))}, ${quote(a.otherTraining)},
+    ${quote(a.expiredFirstAidDetails)}, ${quote(a.crisisInterventionDetails)},
     ${quote(JSON.stringify(a.relevantExperience))}, ${quote(a.otherExperience)},
     ${a.medicalConditions ? quote(a.medicalConditions) : "NULL"}, ${quote(codeOfConductVersion)},
     ${now}, ${quote(JSON.stringify(snapshot))}, ${options.naloxoneCompletedAt ?? "NULL"}, ${now}, ${now}
