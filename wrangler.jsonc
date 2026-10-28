@@ -27,11 +27,11 @@
     "APP_ENV": "production",
     "AUTH_BASE_URL": "https://afterhoursoutreach.ca",
     // Dedicated application/server and only these three managed roles. See docs.
-    "DISCORD_CLIENT_ID": "",
-    "DISCORD_GUILD_ID": "",
-    "DISCORD_VOLUNTEER_ROLE_ID": "",
-    "DISCORD_ORGANIZER_ROLE_ID": "",
-    "DISCORD_MEDIC_ROLE_ID": "",
+    "DISCORD_CLIENT_ID": "1564831264081715302",
+    "DISCORD_GUILD_ID": "1463852439030595637",
+    "DISCORD_VOLUNTEER_ROLE_ID": "1564837301127880887",
+    "DISCORD_ORGANIZER_ROLE_ID": "1564837556019789844",
+    "DISCORD_MEDIC_ROLE_ID": "1564837599212732446",
   },
   // Secret values are configured separately for each deployment target.
   "secrets": {
