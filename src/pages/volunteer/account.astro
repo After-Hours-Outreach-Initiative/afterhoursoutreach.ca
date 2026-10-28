@@ -165,7 +165,7 @@ const contents = [
   },
   {
     id: "account-sessions-heading",
-    heading: "Sign",
+    heading: "Signed in browsers",
     nested: true,
   },
   { id: "account-delete-heading", heading: "Delete account", nested: true },
@@ -324,7 +324,9 @@ const contents = [
         </div>
         <div class="volunteer-setting" data-account-sessions>
           <div class="w-full">
-            <h3 id="account-sessions-heading" data-contents-section>Sign</h3>
+            <h3 id="account-sessions-heading" data-contents-section>
+              Signed in browsers
+            </h3>
             {
               sessionsNeedSignIn && (
                 <form

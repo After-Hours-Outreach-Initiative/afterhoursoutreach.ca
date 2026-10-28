@@ -718,7 +718,7 @@ test("account contents navigate profile and settings sections on desktop and mob
     ).toHaveCount(0);
     for (const [id, heading] of [
       ["account-profile-emergency-contact", "Emergency contact"],
-      ["account-sessions-heading", "Sign"],
+      ["account-sessions-heading", "Signed in browsers"],
     ]) {
       if (width < 1024) await summary.click();
       const link = contents.getByRole("link", { name: heading, exact: true });
@@ -3656,7 +3656,7 @@ test("edits made during a profile save remain unsaved", async ({
   }
 });
 
-test("session dividers stay between rows after removal", async ({
+test("signed-in browser cards stay framed after reload and removal", async ({
   page,
   browser,
   baseURL,
@@ -3665,17 +3665,17 @@ test("session dividers stay between rows after removal", async ({
   await page.goto("/volunteer/account");
   const sessions = page.locator("[data-account-sessions]");
   const rows = sessions.locator("[data-session-row]");
-  const expectDividers = async (count: number) => {
+  const expectCards = async (count: number) => {
     await expect(rows).toHaveCount(count);
     await expect(sessions).toHaveCSS("border-bottom-width", "0px");
-    for (let index = 0; index < count; index++)
-      await expect(rows.nth(index)).toHaveCSS(
-        "border-bottom-width",
-        index < count - 1 ? "1px" : "0px",
-      );
+    for (let index = 0; index < count; index++) {
+      await expect(rows.nth(index)).toHaveCSS("border-width", "1px");
+      await expect(rows.nth(index)).toHaveCSS("border-radius", "8px");
+      await expect(rows.nth(index)).toHaveCSS("padding", "20px");
+    }
     await expect(sessions).toHaveCSS("border-top-width", "1px");
   };
-  await expectDividers(1);
+  await expectCards(1);
 
   // Separate devices keep their sessions when the local browser clears cookies.
   const otherDevice = await browser.newContext({ baseURL });
@@ -3697,7 +3697,7 @@ test("session dividers stay between rows after removal", async ({
   await page.reload();
   for (const width of [1280, 375]) {
     await page.setViewportSize({ width, height: 812 });
-    await expectDividers(3);
+    await expectCards(3);
   }
   for (const remaining of [2, 1]) {
     const form = sessions.locator("[data-end-session]").last();
@@ -3708,12 +3708,15 @@ test("session dividers stay between rows after removal", async ({
         form
           .getByRole("button", { name: "Sign out of session", exact: true })
           .click(),
-      updated: () => expectDividers(remaining),
+      updated: () => expectCards(remaining),
       loadingLabel: "Signing out…",
     });
   }
   await expect(
-    sessions.getByRole("heading", { name: "Sign", exact: true }),
+    sessions.getByRole("heading", {
+      name: "Signed in browsers",
+      exact: true,
+    }),
   ).toBeFocused();
   await expect(page.locator("#account-sessions-heading")).toHaveAttribute(
     "tabindex",
