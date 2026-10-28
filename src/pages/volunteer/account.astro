@@ -165,7 +165,7 @@ const contents = [
   },
   {
     id: "account-sessions-heading",
-    heading: "Signed in browsers",
+    heading: "Sign",
     nested: true,
   },
   { id: "account-delete-heading", heading: "Delete account", nested: true },
@@ -324,9 +324,7 @@ const contents = [
         </div>
         <div class="volunteer-setting" data-account-sessions>
           <div class="w-full">
-            <h3 id="account-sessions-heading" data-contents-section>
-              Signed in browsers
-            </h3>
+            <h3 id="account-sessions-heading" data-contents-section>Sign</h3>
             {
               sessionsNeedSignIn && (
                 <form
@@ -374,7 +372,7 @@ const contents = [
                           type="submit"
                           data-loading-label="Signing out…"
                         >
-                          Sign out
+                          Sign out of session
                         </button>
                         <p data-form-message role="status" hidden />
                       </form>

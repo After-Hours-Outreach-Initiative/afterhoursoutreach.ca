@@ -1421,7 +1421,10 @@ describe(
             form: sessionForm,
             trigger: () =>
               sessionForm
-                .getByRole("button", { name: "Sign out", exact: true })
+                .getByRole("button", {
+                  name: "Sign out of session",
+                  exact: true,
+                })
                 .click(),
             updated: () => expect(sessionForm).toHaveCount(0),
             loadingLabel: "Signing out…",

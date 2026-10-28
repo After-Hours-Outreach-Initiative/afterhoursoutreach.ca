@@ -718,7 +718,7 @@ test("account contents navigate profile and settings sections on desktop and mob
     ).toHaveCount(0);
     for (const [id, heading] of [
       ["account-profile-emergency-contact", "Emergency contact"],
-      ["account-sessions-heading", "Signed in browsers"],
+      ["account-sessions-heading", "Sign"],
     ]) {
       if (width < 1024) await summary.click();
       const link = contents.getByRole("link", { name: heading, exact: true });
@@ -3600,13 +3600,16 @@ test("session dividers stay between rows after removal", async ({
     await inPlaceAction(page, {
       endpoint: "/api/v1/account/session",
       form,
-      trigger: () => form.getByRole("button", { name: "Sign out" }).click(),
+      trigger: () =>
+        form
+          .getByRole("button", { name: "Sign out of session", exact: true })
+          .click(),
       updated: () => expectDividers(remaining),
       loadingLabel: "Signing out…",
     });
   }
   await expect(
-    sessions.getByRole("heading", { name: "Signed in browsers" }),
+    sessions.getByRole("heading", { name: "Sign", exact: true }),
   ).toBeFocused();
   await expect(page.locator("#account-sessions-heading")).toHaveAttribute(
     "tabindex",
