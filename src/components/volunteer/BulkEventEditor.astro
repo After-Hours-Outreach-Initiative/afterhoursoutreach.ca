@@ -26,11 +26,6 @@ import FieldError from "@/components/FieldError.astro";
     aria-controls="bulk-event-editor"
     disabled>Bulk edit</button
   >
-  <p class="volunteer-help">
-    Select future events or expand Occurrences to select loaded dates.
-    Selections are cleared when filtered out, collapsed or changed. Up to 100
-    events.
-  </p>
 </div>
 <dialog
   id="bulk-event-editor"
@@ -187,9 +182,6 @@ import FieldError from "@/components/FieldError.astro";
     align-items: center;
     gap: 0.75rem;
     margin: 1.5rem 0;
-  }
-  .volunteer-bulk-actions > .volunteer-help {
-    flex-basis: 100%;
   }
   [data-bulk-targets] {
     padding-left: 1.5em;
