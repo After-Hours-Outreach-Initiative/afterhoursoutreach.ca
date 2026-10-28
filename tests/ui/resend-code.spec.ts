@@ -104,6 +104,9 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
   await expect(
     code.getByRole("button", { name: "Sign in with code" }),
   ).toBeDisabled();
+  await expect(
+    code.getByRole("button", { name: "Sign in with code" }),
+  ).not.toHaveAttribute("aria-busy");
   await resend.dispatchEvent("click");
   await code.dispatchEvent("submit");
   await page.locator("[data-email-request]").dispatchEvent("submit");

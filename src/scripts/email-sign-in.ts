@@ -69,6 +69,9 @@ export function initEmailSignIn(finish: (result: object) => void) {
       if (sending) resend.setAttribute("aria-busy", "true");
       else resend.removeAttribute("aria-busy");
       codeButton.disabled = busy;
+      if (busy && code.dataset.submitting && !sending)
+        codeButton.setAttribute("aria-busy", "true");
+      else codeButton.removeAttribute("aria-busy");
       if (linkButton) linkButton.disabled = busy || !proof || proofRejected;
       if (requestButton) {
         requestButton.disabled = busy || !ready;

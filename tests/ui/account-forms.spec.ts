@@ -200,8 +200,13 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
     },
   );
   const proofs: object[] = [];
+  let finishVerifying!: () => void;
+  const verifying = new Promise<void>((resolve) => {
+    finishVerifying = resolve;
+  });
   await page.route("**/api/v1/auth/sign-in/email-otp**", async (route) => {
     proofs.push(route.request().postDataJSON());
+    await verifying;
     await route.fulfill({
       status: 400,
       json: { message: "That code is incorrect or has expired." },
@@ -256,18 +261,47 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
     page.getByRole("button", { name: "Simulate successful delivery" }),
   ).toHaveCount(0);
   expect(emails).toEqual(["first@example.org"]);
+  const signInButton = codeForm.getByRole("button", {
+    name: "Sign in with code",
+  });
   await code.fill("123");
-  await page.getByRole("button", { name: "Sign in with code" }).click();
+  await signInButton.click();
   await expect(codeForm.locator("[data-error=email-code]")).toBeVisible();
   await expect(codeForm.locator("[data-error=email-code]")).toHaveText(
     "Enter a six-digit code.",
   );
+  await expect(signInButton).toBeEnabled();
+  await expect(signInButton).not.toHaveAttribute("aria-busy");
   expect(proofs).toEqual([]);
   await code.fill("123456");
-  await page.getByRole("button", { name: "Sign in with code" }).click();
+  await signInButton.click();
+  await expect(signInButton).toBeDisabled();
+  await expect(signInButton).toHaveAttribute("aria-busy", "true");
+  expect(
+    await signInButton.evaluate(
+      (button) => getComputedStyle(button, "::before").animationName,
+    ),
+  ).toBe("volunteer-loading");
+  await expect(codeForm).toHaveAttribute("aria-busy", "true");
+  await expect.poll(() => proofs.length).toBe(1);
+  await codeForm.dispatchEvent("submit");
+  await signInButton.dispatchEvent("click");
+  expect(proofs).toHaveLength(1);
+  finishVerifying();
   await expect(codeForm.locator("[data-form-message]")).toHaveText(
     "That code is incorrect or has expired.",
   );
+  await expect(codeForm.locator("[data-form-message]")).toHaveAttribute(
+    "role",
+    "alert",
+  );
+  await expect(codeForm.locator("[data-form-message]")).toHaveAttribute(
+    "aria-live",
+    "assertive",
+  );
+  await expect(signInButton).toBeEnabled();
+  await expect(signInButton).not.toHaveAttribute("aria-busy");
+  await expect(codeForm).not.toHaveAttribute("aria-busy");
   expect(proofs).toEqual([{ email: "first@example.org", otp: "123456" }]);
   await page.getByRole("link", { name: "Use a different email" }).click();
   await expect(emailForm).toBeVisible();
