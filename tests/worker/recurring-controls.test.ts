@@ -379,10 +379,17 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .getByRole("button", { name: "All", exact: true })
       .click();
 
-    // Settings and occurrence editors are independent: polling updates counts
-    // without discarding either draft or an expanded roster/occurrence list.
+    // Polling updates occurrences without discarding the open series draft or
+    // collapsing an expanded roster/occurrence list behind the modal.
     const originalManager = initialGroup.locator("[data-live-series]");
-    await originalManager.locator(":scope > summary").click();
+    await initialGroup.locator("[data-series-occurrences] > summary").click();
+    const firstCard = initialGroup.locator(
+      `[data-live-event="${initial[0].id}"]`,
+    );
+    await firstCard.locator(".volunteer-roster > summary").click();
+    await initialGroup
+      .getByRole("button", { name: "Edit series", exact: true })
+      .click();
     const draftEnd = addCalendarDays(firstDate, 350);
     await originalManager
       .locator('[data-series-save] [name="endDate"]')
@@ -393,16 +400,6 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     const oldVersion = await originalManager.getAttribute(
       "data-series-version",
     );
-    await initialGroup.locator("[data-series-occurrences] > summary").click();
-    const firstCard = initialGroup.locator(
-      `[data-live-event="${initial[0].id}"]`,
-    );
-    await firstCard.locator(".volunteer-roster > summary").click();
-    await firstCard.getByRole("button", { name: "Edit", exact: true }).click();
-    const draftEditor = firstCard.locator("dialog");
-    await draftEditor
-      .getByLabel("Meeting point", { exact: true })
-      .fill("Unsaved occurrence draft");
     await ok(
       await action({
         action: "save-series",
@@ -419,9 +416,6 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       { timeout: 15_000 },
     );
     await expect(
-      draftEditor.getByLabel("Meeting point", { exact: true }),
-    ).toHaveValue("Unsaved occurrence draft");
-    await expect(
       originalManager.locator('[data-series-save] [name="endDate"]'),
     ).toHaveValue(draftEnd);
     await expect(originalManager.locator('[name="meetingPoint"]')).toHaveValue(
@@ -431,7 +425,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       "data-series-version",
       oldVersion!,
     );
-    await draftEditor
+    await originalManager
       .getByRole("button", { name: "Close", exact: true })
       .click();
     await expect(firstCard.locator(".volunteer-roster > summary")).toHaveText(
@@ -444,7 +438,6 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await expect(
       initialGroup.locator("[data-series-occurrences]"),
     ).toHaveAttribute("open", "");
-    await originalManager.locator(":scope > summary").click();
     await expect(originalManager).toHaveAttribute(
       "data-series-version",
       String(await currentVersion()),
@@ -526,7 +519,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await organizerPage
       .getByRole("button", { name: "Recurring series", exact: true })
       .click();
-    await manager.locator("summary").click();
+    await uiGroup
+      .getByRole("button", { name: "Edit series", exact: true })
+      .click();
     await expect(manager.locator('[name="recurring"]')).toHaveCount(0);
     await expect(manager.getByLabel("Start time (fixed)")).toHaveValue(
       "8:30 PM",
@@ -534,6 +529,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await expect(
       manager.getByLabel("Interval in weeks (fixed)"),
     ).toHaveAttribute("readonly", "");
+    await manager.getByRole("button", { name: "Close", exact: true }).click();
     await uiGroup.locator("[data-series-occurrences] > summary").click();
     const uiDate = addCalendarDays(firstDate, 42);
     await uiGroup
@@ -605,8 +601,6 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
         .bind(uiId)
         .first("includes_orientation"),
     ).toBe(1);
-    // An open manager is protected from polling; closing it applies the deferred version.
-    await manager.locator("summary").click();
     const uiVersion = await DB.prepare(
       "SELECT updated_at FROM patrol_series WHERE id=?",
     )
@@ -616,7 +610,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       "data-series-version",
       String(uiVersion),
     );
-    await manager.locator("summary").click();
+    await uiGroup
+      .getByRole("button", { name: "Edit series", exact: true })
+      .click();
     await manager
       .locator('[data-series-save] [name="endDate"]')
       .fill(addCalendarDays(firstDate, 28));
@@ -644,7 +640,15 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .click();
     await expect(
       uiCard.getByRole("button", { name: "Edit", exact: true }),
+    ).toHaveCount(1);
+    await expect(editor).toBeVisible();
+    await expect(
+      editor.locator("[data-event-save], [data-event-cancel]"),
     ).toHaveCount(0);
+    await expect(
+      editor.getByRole("button", { name: "Delete occurrence", exact: true }),
+    ).toBeEnabled();
+    await editor.getByRole("button", { name: "Close", exact: true }).click();
     await expect(
       uiGroup.getByRole("button", { name: "Open occurrence", exact: true }),
     ).toBeEnabled();
@@ -679,6 +683,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await expect(uiCard).toBeVisible();
     await expect(uiGroup).toHaveCount(1);
     // Cancelled dates remain removable, without deleting the other occurrences.
+    await uiCard.getByRole("button", { name: "Edit", exact: true }).click();
     await uiCard
       .getByRole("button", { name: "Delete occurrence", exact: true })
       .click();
@@ -703,7 +708,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
         .bind(uiId)
         .first("n"),
     ).toBe(1);
-    await emptyGroup.locator("[data-live-series] > summary").click();
+    await emptyGroup
+      .getByRole("button", { name: "Edit series", exact: true })
+      .click();
     await emptyGroup
       .getByRole("button", { name: "Delete series", exact: true })
       .click();

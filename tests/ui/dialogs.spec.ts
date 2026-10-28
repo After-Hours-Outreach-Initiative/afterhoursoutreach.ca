@@ -2,9 +2,15 @@ import { expect, test, type Locator } from "@playwright/test";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 import { fillDateInput } from "../helpers/date-input";
 import { inPlaceAction } from "../helpers/in-place-action";
+import { addCalendarDays, vancouverInput } from "../../src/data/event-time";
 
 async function expectPinnedChrome(dialog: Locator) {
   await expect(dialog).toBeInViewport({ ratio: 1 });
+  await dialog.evaluate(async (element) => {
+    await Promise.allSettled(
+      element.getAnimations().map((animation) => animation.finished),
+    );
+  });
   const header = dialog.locator(".dialog-header");
   const footer = dialog.locator(".dialog-footer");
   const before = {
@@ -56,6 +62,181 @@ async function expectStableExit(dialog: Locator) {
   expect(frames.length).toBeGreaterThan(0);
   for (const frame of frames) expect(frame).toEqual(before);
 }
+
+test("event and series edit dialogs keep deletion available for ended and cancelled events", async ({
+  page,
+  baseURL,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+  const action = async (data: object) => {
+    const response = await page.request.post("/api/v1/events/action", {
+      headers: { origin: baseURL! },
+      data,
+    });
+    expect(response.status(), await response.text()).toBe(200);
+    return await response.json();
+  };
+  const firstDate = addCalendarDays(vancouverInput(Date.now()).slice(0, 10), 1);
+  const fields = {
+    meetingPoint: `Dialog regression ${crypto.randomUUID()}`,
+    meetingPointUrl: "",
+    spots: 8,
+    includesOrientation: false,
+    open: true,
+    hidden: false,
+  };
+  const series = await action({
+    action: "save-series",
+    series: {
+      ...fields,
+      firstDate,
+      localTime: "21:00",
+      intervalWeeks: 1,
+      endDate: addCalendarDays(firstDate, 14),
+    },
+  });
+  await action({
+    action: "save",
+    event: {
+      ...fields,
+      startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+    },
+  });
+  await page.goto("/manage/events");
+  const standaloneId = await page
+    .locator("[data-event-list] > [data-live-event]")
+    .filter({ hasText: fields.meetingPoint })
+    .getAttribute("data-live-event");
+  const occurrenceId = `patrol:${series.id}:${firstDate}`;
+  for (const id of [standaloneId, occurrenceId]) {
+    const form = page.locator(`[data-live-event="${id}"] [data-event-cancel]`);
+    await action({
+      action: "cancel-event",
+      id,
+      version: Number(await form.locator('[name="version"]').inputValue()),
+    });
+  }
+  await page.reload();
+  const group = page.locator(`[data-series-card="${series.id}"]`);
+  const seriesButton = group.getByRole("button", {
+    name: "Edit series",
+    exact: true,
+  });
+  await seriesButton.focus();
+  await seriesButton.press("Enter");
+  const settings = group.getByRole("dialog", {
+    name: "Edit series",
+    exact: true,
+  });
+  await expect(settings.locator("details")).toHaveCount(0);
+  await expectPinnedChrome(settings);
+  await settings
+    .getByLabel("Meeting point", { exact: true })
+    .fill("Saved series meeting point");
+  await page.keyboard.press("Escape");
+  await expect(seriesButton).toBeFocused();
+  await seriesButton.press("Space");
+  await expect(
+    settings.getByLabel("Meeting point", { exact: true }),
+  ).toHaveValue("Saved series meeting point");
+  await settings
+    .getByRole("button", { name: "Save series defaults", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Save without email", exact: true })
+    .click();
+  await expect(settings).toBeHidden();
+  await expect(seriesButton).toBeFocused();
+  await group.locator("[data-series-occurrences] > summary").click();
+
+  const activeOccurrenceId = `patrol:${series.id}:${addCalendarDays(firstDate, 7)}`;
+  for (const [id, editable, recurring] of [
+    ["local-fixture-event-orientation", true, false],
+    ["local-fixture-event-past-orientation", false, false],
+    [standaloneId, false, false],
+    [occurrenceId, false, true],
+    [activeOccurrenceId, true, true],
+  ] as const) {
+    const card = page.locator(`[data-live-event="${id}"]`);
+    await expect(
+      card
+        .locator(".volunteer-actions")
+        .getByRole("button", { name: /Delete/ }),
+    ).toHaveCount(0);
+    const edit = card.getByRole("button", { name: "Edit", exact: true });
+    await edit.focus();
+    await edit.press("Enter");
+    const dialog = card.getByRole("dialog", {
+      name: "Edit event",
+      exact: true,
+    });
+    await expect(
+      dialog.locator("[data-event-save], [data-event-cancel]"),
+    ).toHaveCount(editable ? 2 : 0);
+    if (editable && recurring) {
+      await expect(dialog.getByLabel("Apply changes to")).toHaveValue(
+        "occurrence",
+      );
+      await expect(
+        dialog.locator('[data-event-cancel] [name="scope"]'),
+      ).toHaveValue("occurrence");
+    }
+    const remove = dialog.getByRole("button", {
+      name: recurring ? "Delete occurrence" : "Delete event",
+      exact: true,
+    });
+    await remove.click();
+    const confirmation = page.getByRole("dialog", {
+      name: recurring ? "Delete occurrence?" : "Delete event?",
+      exact: true,
+    });
+    await confirmation
+      .getByRole("button", { name: "Keep", exact: true })
+      .click();
+    await expect(dialog).toBeVisible();
+    await expect(remove).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(edit).toBeFocused();
+  }
+  expect(
+    await page.locator("dialog[id]").evaluateAll((dialogs) => {
+      const ids = dialogs.map((dialog) => dialog.id);
+      return new Set(ids).size === ids.length;
+    }),
+  ).toBe(true);
+  const cancelled = page.locator(`[data-live-event="${standaloneId}"]`);
+  await cancelled.getByRole("button", { name: "Edit", exact: true }).click();
+  await cancelled
+    .getByRole("button", { name: "Delete event", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Delete event?", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(cancelled).toHaveCount(0);
+  await seriesButton.click();
+  await settings
+    .getByRole("button", { name: "Delete series", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Delete series?", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Save without email", exact: true })
+    .click();
+  await expect(group).toHaveCount(0);
+});
 
 test("event and profile dialogs preserve their layout and content throughout the exit transition", async ({
   page,

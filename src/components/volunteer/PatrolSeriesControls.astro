@@ -1,51 +1,64 @@
 ---
 import type { PatrolSeriesRow } from "@/server/db/events";
+import DialogHeader from "@/components/DialogHeader.astro";
 import EventFields from "./EventFields.astro";
 interface Props {
   series: PatrolSeriesRow;
 }
 const { series } = Astro.props;
+const dialogId = `series-editor-${series.id}`;
 ---
 
-<details
-  class="volunteer-series-settings"
+<dialog
+  class="dialog-pop dialog-frame volunteer-dialog"
+  id={dialogId}
+  aria-labelledby={`${dialogId}-heading`}
   data-live-series={series.id}
   data-series-version={series.updatedAt}
 >
-  <summary>Series settings</summary>
-  <form
-    class="volunteer-form"
-    data-series-save
-    data-email-prompt="series-cancel"
-    action="/api/v1/events/action"
-    method="post"
-  >
-    <input type="hidden" name="seriesId" value={series.id} />
-    <input type="hidden" name="version" value={series.updatedAt} />
-    <div class="volunteer-fields">
-      <EventFields id={`series-${series.id}`} {series} />
-    </div>
+  <DialogHeader id={`${dialogId}-heading`} title="Edit series" />
+  <div class="dialog-body">
+    <form
+      id={`${dialogId}-save`}
+      class="volunteer-form"
+      data-series-save
+      data-email-prompt="series-cancel"
+      action="/api/v1/events/action"
+      method="post"
+    >
+      <input type="hidden" name="seriesId" value={series.id} />
+      <input type="hidden" name="version" value={series.updatedAt} />
+      <div class="volunteer-fields">
+        <EventFields id={dialogId} {series} />
+      </div>
+      <p data-form-message role="status" hidden></p>
+    </form>
+    <form
+      id={`${dialogId}-delete`}
+      data-event-delete="series"
+      data-email-prompt="series-cancel"
+      action="/api/v1/events/action"
+      method="post"
+    >
+      <input type="hidden" name="action" value="delete-series" />
+      <input type="hidden" name="id" value={series.id} />
+      <input type="hidden" name="version" value={series.updatedAt} />
+      <p data-form-message role="status" hidden></p>
+    </form>
+  </div>
+  <div class="dialog-footer">
     <button
-      class="btn btn-outline"
+      class="btn btn-primary"
       type="submit"
+      form={`${dialogId}-save`}
       data-loading-label="Saving…"
       disabled>Save series defaults</button
     >
-    <p data-form-message role="status" hidden></p>
-  </form>
-  <form
-    class="volunteer-form volunteer-danger"
-    data-event-delete="series"
-    data-email-prompt="series-cancel"
-    action="/api/v1/events/action"
-    method="post"
-  >
-    <input type="hidden" name="action" value="delete-series" />
-    <input type="hidden" name="id" value={series.id} />
-    <input type="hidden" name="version" value={series.updatedAt} />
-    <button class="btn btn-red" type="submit" data-loading-label="Deleting…"
-      >Delete series</button
+    <button
+      class="btn btn-red"
+      type="submit"
+      form={`${dialogId}-delete`}
+      data-loading-label="Deleting…">Delete series</button
     >
-    <p data-form-message role="status" hidden></p>
-  </form>
-</details>
+  </div>
+</dialog>

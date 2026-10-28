@@ -216,9 +216,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     "[data-series-occurrences] > summary",
   )
     ? "[data-series-occurrences] > summary"
-    : focused?.matches("[data-live-series] > summary")
-      ? "[data-live-series] > summary"
-      : null;
+    : null;
   const focusedEventSummary = [
     ".volunteer-roster > summary",
     ".public-event-roster > summary",
@@ -348,12 +346,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       position = card.nextElementSibling;
     }
     for (const card of previous.values()) {
-      if (
-        protectedEvent(card) ||
-        (card.querySelector("[data-live-series][open]") &&
-          !card.contains(element ?? null))
-      )
-        deferredEventRefresh = true;
+      if (protectedEvent(card)) deferredEventRefresh = true;
       else card.remove();
     }
   };
@@ -389,28 +382,27 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
             (card) => card.dataset.seriesCard === seriesId,
           )
         : added;
-    const seriesForm = ["data-series-save", "data-series-occurrence"].find(
-      (attribute) => element?.hasAttribute(attribute),
-    );
     const selector =
       element?.matches("[data-live-signup]") ||
       (!element && focused?.closest("[data-live-signup]"))
         ? '[data-live-signup] button[type="submit"]'
-        : seriesForm
-          ? `[${seriesForm}] button[type="submit"]`
-          : element?.matches("[data-event-save]")
-            ? card?.dataset.seriesCard
-              ? "[data-series-occurrences] > summary"
-              : "[data-show-dialog]"
-            : !element && focusedSeriesSummary
-              ? focusedSeriesSummary
-              : !element && focusedEventSummary
-                ? focusedEventSummary
-                : !element &&
-                    focused instanceof HTMLElement &&
-                    focused.dataset.showDialog
-                  ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
-                  : ".volunteer-roster summary";
+        : element?.matches("[data-series-occurrence]")
+          ? '[data-series-occurrence] button[type="submit"]'
+          : element?.matches("[data-series-save]")
+            ? `[data-show-dialog="series-editor-${CSS.escape(seriesId ?? "")}"]`
+            : element?.matches("[data-event-save], [data-event-cancel]")
+              ? card?.dataset.seriesCard
+                ? "[data-series-occurrences] > summary"
+                : "[data-show-dialog]"
+              : !element && focusedSeriesSummary
+                ? focusedSeriesSummary
+                : !element && focusedEventSummary
+                  ? focusedEventSummary
+                  : !element &&
+                      focused instanceof HTMLElement &&
+                      focused.dataset.showDialog
+                    ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+                    : ".volunteer-roster summary";
     (card && !card.hidden
       ? !element && focused === focusedCard
         ? card
@@ -616,11 +608,8 @@ if (eventBrowser) {
     (event) => {
       if (
         deferredEventRefresh &&
-        ((event.target instanceof HTMLDetailsElement &&
-          event.target.matches("[data-live-series]") &&
-          !event.target.open) ||
-          (event.target instanceof HTMLElement &&
-            event.target.matches("[data-signup-menu]:not(:popover-open)")))
+        event.target instanceof HTMLElement &&
+        event.target.matches("[data-signup-menu]:not(:popover-open)")
       )
         refreshDeferredEvents();
     },
@@ -632,7 +621,7 @@ if (eventBrowser) {
       if (
         deferredEventRefresh &&
         event.target instanceof HTMLDialogElement &&
-        event.target.closest("[data-live-event]")
+        event.target.closest("[data-live-event], [data-live-series]")
       )
         refreshDeferredEvents();
     },

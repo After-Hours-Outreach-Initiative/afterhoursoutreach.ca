@@ -9,6 +9,7 @@ interface Props {
 }
 const { event, series } = Astro.props;
 const dialogId = `event-editor-${event?.id ?? "new"}`;
+const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
 ---
 
 <dialog
@@ -21,66 +22,64 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
     title={event ? "Edit event" : "Create event"}
   />
   <div class="dialog-body">
-    <form
-      id={`${dialogId}-save`}
-      class="volunteer-form"
-      data-event-save
-      data-email-prompt={event && event.confirmed > 0 ? "event" : undefined}
-      data-future-email-prompt={event && event.futureEditableConfirmed > 0
-        ? "series"
-        : undefined}
-      action="/api/v1/events/action"
-      method="post"
-    >
-      {
-        event && (
-          <>
-            <input type="hidden" name="id" value={event.id} />
-            <input type="hidden" name="version" value={event.updatedAt} />
-          </>
-        )
-      }
-      <div class="volunteer-fields">
-        {
-          event?.seriesId && series && (
-            <>
-              <input type="hidden" name="seriesId" value={series.id} />
-              <input
-                type="hidden"
-                name="seriesVersion"
-                value={series.updatedAt}
-              />
-              <input
-                type="hidden"
-                name="occurrenceDate"
-                value={event.occurrenceDate!}
-              />
-              <label class="volunteer-field volunteer-wide">
-                Apply changes to
-                <select name="scope">
-                  <option value="occurrence">Only this occurrence</option>
-                  <option value="future">This and future occurrences</option>
-                </select>
-                <span class="volunteer-help">
-                  Future edits keep bookings and individual exceptions
-                  unchanged. Dates retain their original recurring identity; the
-                  date shift may be up to 366 days earlier or later.
-                </span>
-              </label>
-            </>
-          )
-        }
-        <EventFields id={dialogId} {event} />
-      </div>
-      <p data-form-message role="status" hidden></p>
-      <noscript
-        ><p>
-          Enable JavaScript to edit event dates and save this event.
-        </p></noscript
-      >
-    </form>
     {
-      event && (
+      editable && (
+        <form
+          id={`${dialogId}-save`}
+          class="volunteer-form"
+          data-event-save
+          data-email-prompt={event && event.confirmed > 0 ? "event" : undefined}
+          data-future-email-prompt={
+            event && event.futureEditableConfirmed > 0 ? "series" : undefined
+          }
+          action="/api/v1/events/action"
+          method="post"
+        >
+          {event && (
+            <>
+              <input type="hidden" name="id" value={event.id} />
+              <input type="hidden" name="version" value={event.updatedAt} />
+            </>
+          )}
+          <div class="volunteer-fields">
+            {event?.seriesId && series && (
+              <>
+                <input type="hidden" name="seriesId" value={series.id} />
+                <input
+                  type="hidden"
+                  name="seriesVersion"
+                  value={series.updatedAt}
+                />
+                <input
+                  type="hidden"
+                  name="occurrenceDate"
+                  value={event.occurrenceDate!}
+                />
+                <label class="volunteer-field volunteer-wide">
+                  Apply changes to
+                  <select name="scope">
+                    <option value="occurrence">Only this occurrence</option>
+                    <option value="future">This and future occurrences</option>
+                  </select>
+                  <span class="volunteer-help">
+                    Future edits keep bookings and individual exceptions
+                    unchanged. Dates retain their original recurring identity;
+                    the date shift may be up to 366 days earlier or later.
+                  </span>
+                </label>
+              </>
+            )}
+            <EventFields id={dialogId} {event} />
+          </div>
+          <p data-form-message role="status" hidden />
+          <noscript>
+            <p>Enable JavaScript to edit event dates and save this event.</p>
+          </noscript>
+        </form>
+      )
+    }
+    {
+      event && editable && (
         <form
           id={`${dialogId}-cancel`}
           class="volunteer-form volunteer-danger"
@@ -149,19 +148,50 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
         </form>
       )
     }
-  </div>
-  <div class="dialog-footer">
-    <button
-      class="btn btn-primary"
-      type="submit"
-      form={`${dialogId}-save`}
-      data-loading-label={event ? "Saving…" : "Creating…"}
-      disabled
-    >
-      {event ? "Save event" : "Create event"}
-    </button>
     {
       event && (
+        <>
+          {!editable && (
+            <p>
+              {event.cancelledAt
+                ? "This event is cancelled."
+                : "This event has ended."}
+            </p>
+          )}
+          <form
+            id={`${dialogId}-delete`}
+            data-event-delete={event.seriesId ? "occurrence" : "event"}
+            data-email-prompt={
+              editable && event.confirmed > 0 ? "event-cancel" : undefined
+            }
+            action="/api/v1/events/action"
+            method="post"
+          >
+            <input type="hidden" name="action" value="delete-event" />
+            <input type="hidden" name="id" value={event.id} />
+            <input type="hidden" name="version" value={event.updatedAt} />
+            <p data-form-message role="status" hidden />
+          </form>
+        </>
+      )
+    }
+  </div>
+  <div class="dialog-footer">
+    {
+      editable && (
+        <button
+          class="btn btn-primary"
+          type="submit"
+          form={`${dialogId}-save`}
+          data-loading-label={event ? "Saving…" : "Creating…"}
+          disabled
+        >
+          {event ? "Save event" : "Create event"}
+        </button>
+      )
+    }
+    {
+      event && editable && (
         <button
           class="btn btn-red"
           type="submit"
@@ -169,6 +199,18 @@ const dialogId = `event-editor-${event?.id ?? "new"}`;
           data-loading-label="Cancelling…"
         >
           Cancel event
+        </button>
+      )
+    }
+    {
+      event && (
+        <button
+          class="btn btn-red"
+          type="submit"
+          form={`${dialogId}-delete`}
+          data-loading-label="Deleting…"
+        >
+          {event.seriesId ? "Delete occurrence" : "Delete event"}
         </button>
       )
     }

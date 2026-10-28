@@ -143,40 +143,16 @@ const blocked =
         ) : null
       }
       {
-        organizer && future && !event.cancelledAt && (
+        organizer && (
           <button
             class="btn btn-quiet"
             type="button"
             data-show-dialog={`event-editor-${event.id}`}
+            aria-haspopup="dialog"
+            aria-controls={`event-editor-${event.id}`}
           >
             Edit
           </button>
-        )
-      }
-      {
-        organizer && (
-          <form
-            data-event-delete={event.seriesId ? "occurrence" : "event"}
-            data-email-prompt={
-              future && !event.cancelledAt && event.confirmed > 0
-                ? "event-cancel"
-                : undefined
-            }
-            action="/api/v1/events/action"
-            method="post"
-          >
-            <input type="hidden" name="action" value="delete-event" />
-            <input type="hidden" name="id" value={event.id} />
-            <input type="hidden" name="version" value={event.updatedAt} />
-            <button
-              class="btn btn-quiet"
-              type="submit"
-              data-loading-label="Deleting…"
-            >
-              {event.seriesId ? "Delete occurrence" : "Delete"}
-            </button>
-            <p data-form-message role="status" hidden />
-          </form>
         )
       }
     </div>
@@ -192,11 +168,7 @@ const blocked =
       />
     )
   }
-  {
-    organizer && future && !event.cancelledAt && (
-      <EventEditor event={event} series={series} />
-    )
-  }
+  {organizer && <EventEditor event={event} series={series} />}
 </li>
 
 <style>
