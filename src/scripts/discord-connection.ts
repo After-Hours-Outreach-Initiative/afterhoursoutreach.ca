@@ -1,6 +1,5 @@
 import {
   discordConnectionDescription,
-  discordConnectionIdentity,
   discordConnectionMessage,
   type DiscordConnectionStatus,
 } from "@/data/discord-connection";
@@ -10,24 +9,30 @@ export function updateDiscordConnection(
   root: HTMLElement,
   status: DiscordConnectionStatus,
 ): void {
-  root.querySelector<HTMLElement>("[data-discord-description]")!.textContent =
-    discordConnectionDescription(
-      status.configured,
-      root.dataset.discordRequired === "true",
-    );
+  const canConnect = root.dataset.discordCanConnect === "true";
+  const description = root.querySelector<HTMLElement>(
+    "[data-discord-description]",
+  )!;
+  description.textContent = discordConnectionDescription(
+    status,
+    root.dataset.discordRequired === "true",
+    canConnect,
+  );
+  description.hidden = !description.textContent;
   const identity = root.querySelector<HTMLElement>("[data-discord-identity]")!;
   identity.hidden = !status.username;
-  identity.textContent = discordConnectionIdentity(status);
+  identity.querySelector<HTMLElement>("[data-discord-username]")!.textContent =
+    status.username;
   const message = root.querySelector<HTMLElement>("[data-discord-status]")!;
-  message.hidden = !status.configured || !status.username;
   message.textContent = discordConnectionMessage(status);
-  root.querySelector<HTMLButtonElement>("[data-discord-refresh]")!.hidden =
-    !status.configured || !status.username;
+  message.hidden = !status.configured || !message.textContent;
   const form = root.querySelector<HTMLFormElement>("[data-discord-connect]");
   if (form) {
     const focused = form.contains(root.ownerDocument.activeElement);
     form.hidden =
-      !status.configured || Boolean(status.username && !status.needsReconnect);
+      !status.configured ||
+      !canConnect ||
+      Boolean(status.username && !status.needsReconnect);
     form.querySelector<HTMLElement>(
       "[data-discord-connect-label]",
     )!.textContent = status.needsReconnect

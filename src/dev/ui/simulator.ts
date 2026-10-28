@@ -1,8 +1,10 @@
+import { discordStatusUnavailableMessage } from "../../data/discord-connection";
 import { updateDiscordConnection } from "../../scripts/discord-connection";
 import {
   fixtureStatus,
   getDiscordScenario,
   playgroundChannel,
+  previewQuery,
   readPreviewOptions,
 } from "./fixtures";
 
@@ -18,7 +20,10 @@ function initializeSimulator() {
   const initialScenario = getDiscordScenario(options.scenario);
   let status = fixtureStatus(initialScenario, options.username);
   let phase: string = initialScenario.phase ?? "idle";
+  let settledPhase = phase;
+  let transitionActive = false;
   let generation = 0;
+  let revision: number | null = null;
 
   const form = root.querySelector<HTMLFormElement>("[data-discord-connect]");
   const connectButton = form?.querySelector<HTMLButtonElement>(
@@ -28,10 +33,6 @@ function initializeSimulator() {
     "[data-discord-connect-label]",
   );
   const message = form?.querySelector<HTMLElement>("[data-discord-message]");
-  const refreshButton = root.querySelector<HTMLButtonElement>(
-    "[data-discord-refresh]",
-  );
-  const statusText = root.querySelector<HTMLElement>("[data-discord-status]");
 
   function report() {
     if (window.parent === window) return;
@@ -41,8 +42,11 @@ function initializeSimulator() {
       {
         channel: playgroundChannel,
         type: "state",
+        revision,
+        query: previewQuery(options).toString(),
         scenario: options.scenario,
         phase,
+        busy: transitionActive || phase === "authorizing",
         status,
         height: Math.ceil(
           (panel?.getBoundingClientRect().bottom ?? 300) + padding,
@@ -54,15 +58,10 @@ function initializeSimulator() {
 
   function render() {
     updateDiscordConnection(root!, status);
-    const busy = phase === "authorizing" || phase === "refreshing";
+    const busy = transitionActive || phase === "authorizing";
     root!.setAttribute("aria-busy", String(busy));
     root!.dataset.uiPhase = phase;
     if (connectButton) connectButton.disabled = busy;
-    if (refreshButton) {
-      refreshButton.disabled = busy;
-      refreshButton.textContent =
-        phase === "refreshing" ? "Refreshing status..." : "Refresh status";
-    }
     if (connectLabel && phase === "authorizing")
       connectLabel.textContent = "Connecting Discord...";
     if (message) {
@@ -74,10 +73,6 @@ function initializeSimulator() {
       message.textContent = messages[phase] ?? "";
       message.hidden = !message.textContent;
     }
-    if (phase === "refresh-error" && statusText) {
-      statusText.hidden = false;
-      statusText.textContent = "Status is unavailable. Try refreshing again.";
-    }
     report();
   }
 
@@ -85,6 +80,7 @@ function initializeSimulator() {
     const scenario = getDiscordScenario(id);
     status = fixtureStatus(scenario, options.username);
     phase = id;
+    settledPhase = phase;
     render();
   }
 
@@ -102,6 +98,7 @@ function initializeSimulator() {
     const current = ++generation;
     const { connect: outcome, latency } = options;
     root!.querySelector(".volunteer-notice")?.remove();
+    transitionActive = true;
     phase = "authorizing";
     render();
     await wait(latency);
@@ -113,30 +110,39 @@ function initializeSimulator() {
       applyScenario("sync-pending");
       await wait(latency);
       if (current !== generation) return;
+      transitionActive = false;
       applyScenario("synced");
     } else if (outcome === "screening") {
+      transitionActive = false;
       applyScenario("screening");
     } else {
+      transitionActive = false;
       phase =
         outcome === "failure"
           ? "connection-error"
           : outcome === "cancel"
             ? "cancelled"
             : "expired";
+      settledPhase = phase;
       render();
     }
   }
 
-  async function refresh() {
-    if (gallery || !status.username || refreshButton?.disabled) return;
+  async function backgroundUpdate() {
+    if (gallery || !status.configured || !status.username || transitionActive)
+      return;
     const current = ++generation;
     const { refresh: outcome, latency } = options;
-    phase = "refreshing";
+    transitionActive = true;
+    phase = "updating";
     render();
     await wait(latency);
     if (current !== generation) return;
+    transitionActive = false;
     if (outcome === "error") {
-      phase = "refresh-error";
+      status = { ...status, notice: discordStatusUnavailableMessage };
+      phase = "update-error";
+      settledPhase = phase;
       render();
     } else {
       applyScenario(
@@ -158,7 +164,6 @@ function initializeSimulator() {
     event.stopPropagation();
     if (event.target === form) void connect();
   });
-  refreshButton?.addEventListener("click", () => void refresh());
 
   window.addEventListener("message", (event: MessageEvent) => {
     if (
@@ -172,9 +177,19 @@ function initializeSimulator() {
       return;
     }
     if (
+      !gallery &&
+      event.data.type === "simulate-update" &&
+      revision !== null &&
+      event.data.revision === revision
+    ) {
+      void backgroundUpdate();
+      return;
+    }
+    if (
       gallery ||
       event.data.type !== "configure" ||
-      typeof event.data.query !== "string"
+      typeof event.data.query !== "string" ||
+      !Number.isSafeInteger(event.data.revision)
     )
       return;
     const next = readPreviewOptions(new URLSearchParams(event.data.query));
@@ -185,10 +200,19 @@ function initializeSimulator() {
       next.required !== options.required
     )
       return;
+    // Cancel outstanding work when controls change, but not for a duplicate
+    // initial/load handshake. Restore the last settled state, never a busy phase.
+    if (previewQuery(next).toString() !== previewQuery(options).toString()) {
+      generation++;
+      transitionActive = false;
+      phase = settledPhase;
+    }
+    revision = event.data.revision;
     options = next;
     if (status.username) status = { ...status, username: options.username };
     render();
   });
+  window.addEventListener("pagehide", () => generation++);
 
   render();
   const panel = preview.querySelector(".preview-panel");

@@ -1,3 +1,4 @@
+import { discordStatusUnavailableMessage } from "@/data/discord-connection";
 import { updateDiscordConnection } from "./discord-connection";
 
 document.addEventListener("submit", async (event) => {
@@ -76,7 +77,7 @@ async function refresh(root: HTMLElement) {
     const body = await response.json();
     if (!response.ok)
       throw new Error(
-        errorSchema.parse(body).message ?? "Status is unavailable.",
+        errorSchema.parse(body).message ?? discordStatusUnavailableMessage,
       );
     const data = statusSchema.parse(body);
     if (data.userId !== root.dataset.discordUser)
@@ -85,19 +86,10 @@ async function refresh(root: HTMLElement) {
   } catch (error) {
     status.hidden = false;
     status.textContent =
-      error instanceof Error
-        ? error.message
-        : "Status is unavailable. Try refreshing again.";
+      error instanceof Error ? error.message : discordStatusUnavailableMessage;
   }
 }
-document.addEventListener("click", (event) => {
-  if (!(event.target instanceof Element)) return;
-  const root = event.target
-    .closest("[data-discord-refresh]")
-    ?.closest<HTMLElement>("[data-discord-connection]");
-  if (root) void refresh(root);
-});
-// Poll status only, never Discord's API. Refresh is also available without waiting.
+// Poll stored status only, never Discord's API, for bounded background recovery.
 let polls = 0;
 const timer = window.setInterval(() => {
   if (++polls > 24) {
@@ -123,4 +115,5 @@ const statusSchema = z.object({
   lastSyncedAt: z.number().nullable().default(null),
   connection: z.string(),
   sync: z.string(),
+  notice: z.string().nullable().default(null),
 });

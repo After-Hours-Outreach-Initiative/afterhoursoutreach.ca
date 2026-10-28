@@ -25,7 +25,12 @@ function initializePlayground() {
   const openLink = document.querySelector<HTMLAnchorElement>(
     "[data-ui-open-preview]",
   );
+  const simulateUpdate = document.querySelector<HTMLButtonElement>(
+    "[data-ui-simulate-update]",
+  );
   let options = readPreviewOptions(new URLSearchParams(window.location.search));
+  let revision = 0;
+  let awaitingLoad = false;
 
   function fromControls() {
     const params = new URLSearchParams();
@@ -36,10 +41,12 @@ function initializePlayground() {
   }
 
   function configurePreview() {
+    if (awaitingLoad) return;
     preview.contentWindow?.postMessage(
       {
         channel: playgroundChannel,
         type: "configure",
+        revision,
         query: previewQuery(options).toString(),
       },
       window.location.origin,
@@ -48,6 +55,8 @@ function initializePlayground() {
 
   function update(reload = false) {
     options = fromControls();
+    revision++;
+    if (simulateUpdate) simulateUpdate.disabled = true;
     const query = previewQuery(options);
     const url = new URL(window.location.href);
     url.search = query.toString();
@@ -59,6 +68,7 @@ function initializePlayground() {
         options.scenario,
       ).description;
     if (reload) {
+      awaitingLoad = true;
       preview.src = `/dev/ui/discord?${query}`;
       if (status)
         status.textContent = `Loading: ${getDiscordScenario(options.scenario).label}`;
@@ -103,6 +113,14 @@ function initializePlayground() {
     // Restore the selected fixture in a fresh frame without losing its controls.
     update(true);
   });
+  simulateUpdate?.addEventListener("click", () => {
+    if (simulateUpdate.disabled) return;
+    simulateUpdate.disabled = true;
+    preview.contentWindow?.postMessage(
+      { channel: playgroundChannel, type: "simulate-update", revision },
+      window.location.origin,
+    );
+  });
   window.addEventListener("message", (event: MessageEvent) => {
     if (
       event.origin !== window.location.origin ||
@@ -126,6 +144,17 @@ function initializePlayground() {
         sourceFrame.height = String(height);
     }
     if (sourceFrame !== preview) return;
+    if (
+      awaitingLoad ||
+      event.data.revision !== revision ||
+      event.data.query !== previewQuery(options).toString()
+    )
+      return;
+    if (simulateUpdate)
+      simulateUpdate.disabled =
+        Boolean(event.data.busy) ||
+        !event.data.status?.configured ||
+        !event.data.status?.username;
     if (typeof event.data.phase === "string" && status) {
       status.textContent = `Simulation: ${event.data.phase.replaceAll("-", " ")}`;
     }
@@ -139,7 +168,10 @@ function initializePlayground() {
 
   // Frames can finish before this module starts. Subscribe first, then request
   // a fresh report now as well as after any pending or subsequent navigation.
-  preview.addEventListener("load", configurePreview);
+  preview.addEventListener("load", () => {
+    awaitingLoad = false;
+    configurePreview();
+  });
   configurePreview();
   document
     .querySelectorAll<HTMLIFrameElement>(".ui-gallery-card iframe")

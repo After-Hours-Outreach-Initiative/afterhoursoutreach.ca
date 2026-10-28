@@ -1,4 +1,5 @@
 import {
+  discordStatusUnavailableMessage,
   presentDiscordConnection,
   type DiscordConnectionLink,
   type DiscordConnectionStatus,
@@ -40,7 +41,7 @@ function present(link: DiscordConnectionLink | null, configured = true) {
 }
 
 export type PreviewPhase =
-  "idle" | "authorizing" | "connection-error" | "refresh-error";
+  "idle" | "authorizing" | "connection-error" | "update-error";
 
 export interface DiscordScenario {
   id: string;
@@ -53,7 +54,8 @@ export interface DiscordScenario {
 }
 
 // Connection and role synchronization are separate layers. A linked account can
-// still be joining, in screening, or waiting for roles; it is not yet verified.
+// still be joining or in screening. Verified role-sync states intentionally share
+// the same quiet identity-only presentation.
 export const discordScenarios: DiscordScenario[] = import.meta.env.DEV
   ? [
       {
@@ -107,14 +109,14 @@ export const discordScenarios: DiscordScenario[] = import.meta.env.DEV
         id: "sync-pending",
         label: "Connected / role sync pending",
         description:
-          "Membership verified; role synchronization is still pending.",
+          "Membership verified; roles are pending, with no routine status notice.",
         status: present(verified),
       },
       {
         id: "synced",
         label: "Connected / roles synchronized",
         description:
-          "Membership and current website eligibility are synchronized.",
+          "Membership and roles are synchronized; only the connected identity is shown.",
         status: present(synced),
       },
       {
@@ -184,11 +186,11 @@ export const discordScenarios: DiscordScenario[] = import.meta.env.DEV
       },
       {
         id: "refresh-failure",
-        label: "Refresh failure",
+        label: "Background status unavailable",
         description:
-          "A status request failed, while the previously linked identity is retained.",
-        status: present(synced),
-        phase: "refresh-error",
+          "A background update failed, while the previously connected identity is retained.",
+        status: { ...present(synced), notice: discordStatusUnavailableMessage },
+        phase: "update-error",
       },
     ]
   : [];

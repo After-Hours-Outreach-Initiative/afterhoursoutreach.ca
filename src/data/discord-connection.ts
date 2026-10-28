@@ -1,3 +1,6 @@
+export const discordStatusUnavailableMessage =
+  "Discord status is temporarily unavailable. Please try again later.";
+
 export interface DiscordConnectionStatus {
   userId: string;
   configured: boolean;
@@ -9,6 +12,7 @@ export interface DiscordConnectionStatus {
   lastSyncedAt: number | null;
   connection: string;
   sync: string;
+  notice: string | null;
 }
 
 export interface DiscordConnectionLink {
@@ -55,6 +59,17 @@ export function presentDiscordConnection({
           : link.version !== link.syncedVersion
             ? "Role sync pending"
             : "Roles synchronized with your current website eligibility";
+  const notice = !link
+    ? null
+    : ["membership_missing", "membership_screening"].includes(
+          link.lastError ?? "",
+        )
+      ? connection
+      : link.lastError
+        ? sync
+        : link.memberVerifiedAt === null
+          ? connection
+          : null;
   return {
     userId,
     configured,
@@ -66,32 +81,37 @@ export function presentDiscordConnection({
     lastSyncedAt: link?.lastSyncedAt ?? null,
     connection,
     sync,
+    notice,
   };
 }
 
 export function discordConnectionDescription(
-  configured: boolean,
+  status: DiscordConnectionStatus,
   required: boolean,
+  canConnect = true,
 ): string {
-  return !configured
-    ? "Discord connection is coming soon."
-    : required
+  if (
+    status.configured &&
+    canConnect &&
+    (!status.username || status.needsReconnect)
+  )
+    return required
       ? "Connect Discord to access our volunteer channels once you’re approved."
       : "Connect Discord to keep your volunteer channel access up to date. This is optional.";
+  if (status.username) return "";
+  return status.configured
+    ? "Discord keeps volunteer updates and channel access in one place."
+    : "Discord connection is coming soon.";
 }
 
 export function discordConnectionIdentity(
   status: DiscordConnectionStatus,
 ): string {
-  return status.username
-    ? `${status.memberVerifiedAt !== null ? "Connected" : "Linked"} as ${status.username}.`
-    : "";
+  return status.username ? `Connected as ${status.username}.` : "";
 }
 
 export function discordConnectionMessage(
   status: DiscordConnectionStatus,
 ): string {
-  return status.username
-    ? `${status.connection.replace(/\.$/, "")}. ${status.sync.replace(/\.$/, "")}.`
-    : "";
+  return status.notice ?? "";
 }

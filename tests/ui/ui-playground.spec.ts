@@ -24,6 +24,10 @@ test("local Discord playground renders real controls and simulates without APIs"
   await page.goto("/dev/ui?scenario=not-connected&latency=0");
   const preview = page.frameLocator("[data-ui-live-preview]");
   const root = preview.locator("[data-discord-connection]");
+  const identity = root.locator("[data-discord-identity]");
+  const strongUsername = identity.locator("strong[data-discord-username]");
+  const status = root.locator("[data-discord-status]");
+  const simulateUpdate = page.getByRole("button", { name: "Simulate update" });
   await expect(root).toHaveAttribute("data-ui-phase", "idle");
   await expect(page.locator("[data-ui-simulation-status]")).toHaveText(
     "Simulation: idle",
@@ -34,6 +38,8 @@ test("local Discord playground renders real controls and simulates without APIs"
   await expect(
     preview.getByRole("button", { name: "Connect Discord", exact: true }),
   ).toBeVisible();
+  await expect(root.locator("[data-discord-refresh]")).toHaveCount(0);
+  await expect(simulateUpdate).toBeDisabled();
 
   await page
     .getByRole("combobox", { name: "Scenario", exact: true })
@@ -42,6 +48,9 @@ test("local Discord playground renders real controls and simulates without APIs"
   await expect(root).toHaveAttribute("data-ui-phase", "idle");
   await expect(root.locator("[data-discord-connect]")).toHaveCount(0);
   await expect(root.locator("[data-discord-description]")).toBeVisible();
+  await expect(root.locator("[data-discord-description]")).not.toContainText(
+    "Connect Discord to",
+  );
   await page.reload();
   await expect(
     page.getByRole("combobox", { name: "Scenario", exact: true }),
@@ -95,18 +104,20 @@ test("local Discord playground renders real controls and simulates without APIs"
   await preview
     .getByRole("button", { name: "Connect Discord", exact: true })
     .click();
-  await expect(root.locator("[data-discord-status]")).toContainText(
-    "Accept the server rules",
-  );
-  await expect(root.locator("[data-discord-identity]")).toContainText(
-    `Linked as ${username}`,
-  );
-  await preview.getByRole("button", { name: "Refresh status" }).click();
-  await expect(root.locator("[data-discord-identity]")).toContainText(
-    `Connected as ${username}`,
-  );
-  await expect(root.locator("[data-discord-status]")).toContainText(
-    "Roles synchronized",
+  await expect(status).toContainText("Accept the server rules");
+  await expect(identity).toContainText(`Connected as ${username}`);
+  await expect(strongUsername).toHaveText(username);
+  await expect(root.locator("[data-discord-description]")).toBeHidden();
+  await expect(status).not.toContainText("Role sync pending");
+  await simulateUpdate.click();
+  await expect(identity).toContainText(`Connected as ${username}`);
+  await expect(strongUsername).toHaveText(username);
+  await expect(status).toBeHidden();
+  await expect(status).toHaveText("");
+  await expect(root.locator("[data-discord-description]")).toBeHidden();
+  await expect(root.locator("[data-discord-refresh]")).toHaveCount(0);
+  await expect(root).not.toContainText(
+    /Server membership verified|Roles synchronized|Role sync pending/,
   );
   expect(await preview.locator("html").evaluate(() => window.innerWidth)).toBe(
     360,
@@ -118,24 +129,33 @@ test("local Discord playground renders real controls and simulates without APIs"
   ).toBe(true);
 
   await page
-    .getByRole("combobox", { name: "Refresh result" })
+    .getByRole("combobox", { name: "Background update" })
+    .selectOption("pending");
+  await simulateUpdate.click();
+  await expect(root).toHaveAttribute("data-ui-phase", "sync-pending");
+  await expect(identity).toContainText(`Connected as ${username}`);
+  await expect(status).toBeHidden();
+  await expect(status).toHaveText("");
+  await page
+    .getByRole("combobox", { name: "Background update" })
     .selectOption("error");
-  await preview.getByRole("button", { name: "Refresh status" }).click();
-  await expect(root.locator("[data-discord-status]")).toContainText(
-    "Status is unavailable",
+  await simulateUpdate.click();
+  await expect(status).toHaveText(
+    "Discord status is temporarily unavailable. Please try again later.",
   );
-  await expect(root.locator("[data-discord-identity]")).toContainText(username);
+  await expect(identity).toContainText(`Connected as ${username}`);
+  await expect(strongUsername).toHaveText(username);
   await page
-    .getByRole("combobox", { name: "Refresh result" })
+    .getByRole("combobox", { name: "Background update" })
     .selectOption("pause");
-  await preview.getByRole("button", { name: "Refresh status" }).click();
-  await expect(root.locator("[data-discord-status]")).toContainText(
-    "Discord requested a pause",
-  );
+  await simulateUpdate.click();
+  await expect(status).toContainText("Discord requested a pause");
   await page
-    .getByRole("combobox", { name: "Refresh result" })
+    .getByRole("combobox", { name: "Background update" })
     .selectOption("reconnect");
-  await preview.getByRole("button", { name: "Refresh status" }).click();
+  await simulateUpdate.click();
+  await expect(identity).toContainText(`Connected as ${username}`);
+  await expect(strongUsername).toHaveText(username);
   await expect(
     preview.getByRole("button", { name: "Reconnect Discord", exact: true }),
   ).toBeVisible();
@@ -145,9 +165,12 @@ test("local Discord playground renders real controls and simulates without APIs"
   await preview
     .getByRole("button", { name: "Reconnect Discord", exact: true })
     .click();
-  await expect(root.locator("[data-discord-status]")).toContainText(
-    "Roles synchronized",
-  );
+  await expect(root).toHaveAttribute("data-ui-phase", "synced");
+  await expect(identity).toContainText(`Connected as ${username}`);
+  await expect(strongUsername).toHaveText(username);
+  await expect(status).toBeHidden();
+  await expect(status).toHaveText("");
+  await expect(root.locator("[data-discord-description]")).toBeHidden();
 
   await page
     .getByRole("combobox", { name: "Preview size" })

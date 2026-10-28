@@ -561,7 +561,7 @@ test("unfinished application shows current milestones and a keyboard-accessible 
   await expect(
     upcomingDiscord.locator("[data-discord-connection] > p").first(),
   ).toHaveText(
-    "Connect Discord to access our volunteer channels once you’re approved.",
+    "Discord keeps volunteer updates and channel access in one place.",
   );
   await expect(upcomingDiscord.locator("[data-discord-connect]")).toHaveCount(
     0,
@@ -616,6 +616,7 @@ test("Discord application step stays brief outside the current step", async ({
   baseURL,
 }) => {
   const user = await createLocalAccount(page.request, baseURL!);
+  await page.clock.install();
   await page.goto("/volunteer");
   const discord = page.locator('[data-application-progress-step="discord"]');
   await expect(discord).toHaveAttribute("data-state", "upcoming");
@@ -623,7 +624,7 @@ test("Discord application step stays brief outside the current step", async ({
   await expect(
     discord.locator("[data-discord-connection] > p").first(),
   ).toHaveText(
-    "Connect Discord to access our volunteer channels once you’re approved.",
+    "Discord keeps volunteer updates and channel access in one place.",
   );
   await expect(discord.locator("[data-discord-connect]")).toHaveCount(0);
   await expect(discord).not.toContainText(
@@ -659,17 +660,25 @@ test("Discord application step stays brief outside the current step", async ({
           connection === "linked"
             ? "Role sync pending"
             : "Connect Discord to enable role synchronization.",
+        notice:
+          connection === "missing"
+            ? "Not in the server. Reconnect Discord to join again."
+            : null,
       },
     });
   });
 
-  // Completing the preceding step reveals the actions without changing the description.
+  // Completing the preceding step reveals the action and its connect prompt.
   const naloxone = page.locator("[data-naloxone-confirm]");
   await naloxone.locator('[name="completed"]').check();
   await naloxone.getByRole("button", { name: "Confirm completion" }).click();
   await expect(discord).toHaveAttribute("data-state", "current");
   await expect(discord).toHaveAttribute("open", "");
   await expect(discord.locator("[data-discord-connect]")).toBeVisible();
+  const description = discord.locator("[data-discord-description]");
+  await expect(description).toHaveText(
+    "Connect Discord to access our volunteer channels once you’re approved.",
+  );
   await expect(
     discord.getByRole("link", { name: "Privacy policy" }),
   ).toHaveCount(0);
@@ -682,32 +691,57 @@ test("Discord application step stays brief outside the current step", async ({
 
   const status = discord.locator("[data-discord-status]");
   const identity = discord.locator("[data-discord-identity]");
-  const refresh = discord.locator("[data-discord-refresh]");
-  // Handlers and polling remain available when the widget appears after load.
-  await expect(status).toBeHidden({ timeout: 10_000 });
+  const poll = async () => {
+    const response = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/v1/account/discord" &&
+        response.request().method() === "GET",
+    );
+    await page.clock.fastForward(5000);
+    await response;
+  };
+  // Background polling remains available when the widget appears after load.
+  await expect(status).toBeHidden();
   await expect(identity).toBeHidden();
-  await expect(refresh).toBeHidden();
+  await expect(discord.locator("[data-discord-refresh]")).toHaveCount(0);
   connection = "linked";
-  await expect(identity).toHaveText("Connected as volunteer.", {
-    timeout: 10_000,
-  });
+  await poll();
+  await expect(identity).toHaveText("Connected as volunteer.");
   await expect(identity).toBeVisible();
-  await expect(refresh).toBeVisible();
-  await expect(status).toContainText("Role sync pending");
+  await expect(identity.locator("strong[data-discord-username]")).toHaveText(
+    "volunteer",
+  );
+  await expect(description).toBeHidden();
+  await expect(status).toBeHidden();
+  await expect(discord).not.toContainText(
+    /Role sync pending|Server membership verified/,
+  );
   await expect(discord.locator("[data-discord-connect]")).toBeHidden();
   connection = "missing";
-  await refresh.click();
-  await expect(identity).toHaveText("Linked as volunteer.");
+  await poll();
+  await expect(identity).toHaveText("Connected as volunteer.");
+  await expect(identity.locator("strong[data-discord-username]")).toHaveText(
+    "volunteer",
+  );
+  await expect(status).toHaveText(
+    "Not in the server. Reconnect Discord to join again.",
+  );
+  await expect(description).toBeVisible();
   await expect(
     discord.getByRole("button", { name: "Reconnect Discord" }),
   ).toBeVisible();
   connection = "linked";
-  await refresh.click();
+  await poll();
   await expect(identity).toHaveText("Connected as volunteer.");
+  await expect(status).toBeHidden();
+  await expect(description).toBeHidden();
   await expect(discord.locator("[data-discord-connect]")).toBeHidden();
   connection = "error";
-  await refresh.click();
+  await poll();
   await expect(status).toHaveText("Status is unavailable. Try again.");
+  connection = "linked";
+  await poll();
+  await expect(status).toBeHidden();
 
   const completed = await page.request.post(
     "/api/v1/auth/dev/application-step",
@@ -826,6 +860,13 @@ test("Connect Discord locally simulates consent, cancellation, failure and scree
   await expect(discord.locator("[data-discord-status]")).toContainText(
     "Accept the server rules in Discord",
   );
+  await expect(discord.locator("[data-discord-identity]")).toHaveText(
+    "Connected as aho_volunteer.",
+  );
+  await expect(discord.locator("strong[data-discord-username]")).toHaveText(
+    "aho_volunteer",
+  );
+  await expect(discord.locator("[data-discord-description]")).toBeHidden();
   await expect(discord).toHaveAttribute("data-state", "current");
   await expect(page.getByText("Pending approval", { exact: true })).toHaveCount(
     0,
@@ -857,9 +898,9 @@ test("Connect Discord locally simulates consent, cancellation, failure and scree
   await expect(page.locator("[data-discord-identity]")).toHaveText(
     "Connected as aho_volunteer.",
   );
-  await expect(page.locator("[data-discord-status]")).toContainText(
-    "Roles synchronized",
-  );
+  await expect(page.locator("[data-discord-status]")).toBeHidden();
+  await expect(page.locator("[data-discord-description]")).toBeHidden();
+  await expect(page.locator("[data-discord-refresh]")).toHaveCount(0);
   await expect(page.locator("[data-discord-connect]")).toBeHidden();
   const connected = await (await page.request.get(endpoint)).json();
   expect(connected.configured).toBe(true);

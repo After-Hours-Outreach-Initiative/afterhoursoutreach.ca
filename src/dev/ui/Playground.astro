@@ -37,8 +37,9 @@ const frameUrl = `/dev/ui/discord?${previewQuery(options)}`;
         <div>
           <h2 id="simulator-heading">Discord</h2>
           <p>
-            Use the real connection controls in the preview. Results are
-            simulated in memory.
+            Use the real connection controls in the preview. Simulate background
+            updates with the developer controls below. All results stay in
+            memory.
           </p>
         </div>
         <button type="button" class="btn btn-quiet" data-ui-reset
@@ -141,9 +142,9 @@ const frameUrl = `/dev/ui/discord?${previewQuery(options)}`;
             >
           </select>
         </label>
-        <label class="ui-field">
-          Refresh result
-          <select name="refresh">
+        <div class="ui-field">
+          <label for="background-update">Background update</label>
+          <select id="background-update" name="refresh">
             <option value="success" selected={options.refresh === "success"}
               >Membership and roles synchronized</option
             >
@@ -151,7 +152,7 @@ const frameUrl = `/dev/ui/discord?${previewQuery(options)}`;
               >Pause / rate limited</option
             >
             <option value="error" selected={options.refresh === "error"}
-              >Status request fails</option
+              >Background status unavailable</option
             >
             <option value="reconnect" selected={options.refresh === "reconnect"}
               >Membership missing / reconnect</option
@@ -160,7 +161,13 @@ const frameUrl = `/dev/ui/discord?${previewQuery(options)}`;
               >Roles still pending</option
             >
           </select>
-        </label>
+          <button
+            type="button"
+            class="btn btn-quiet"
+            data-ui-simulate-update
+            disabled>Simulate update</button
+          >
+        </div>
         <noscript
           ><button type="submit" class="btn btn-primary"
             >Apply preview settings</button

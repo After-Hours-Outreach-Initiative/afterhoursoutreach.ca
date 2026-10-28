@@ -26,6 +26,10 @@ import {
   loadLocalDiscordStatus,
   simulateDiscordConnection,
 } from "../src/dev/server/discord";
+import {
+  discordConnectionIdentity,
+  discordConnectionMessage,
+} from "../src/data/discord-connection";
 
 const config: DiscordBindings = {
   ...env,
@@ -247,6 +251,7 @@ test("Discord uses only the three allowed roles, all gated by active application
 test("local Discord simulation preserves consent and screening, then reconciles eligible roles without tokens", async () => {
   const actor = await person();
   const input = { userId: actor.id, consent: true, outcome: "authorize" };
+  assert.equal((await loadLocalDiscordStatus(config, actor.id)).notice, null);
   await assert.rejects(
     simulateDiscordConnection(env.DB, actor, { ...input, consent: false }),
     statusError(400),
@@ -275,6 +280,12 @@ test("local Discord simulation preserves consent and screening, then reconciles 
   assert.equal(pending.completedAt, null);
   assert.equal(pending.needsReconnect, false);
   assert.match(pending.connection, /Accept the server rules/);
+  assert.equal(pending.notice, pending.connection);
+  assert.equal(discordConnectionMessage(pending), pending.connection);
+  assert.equal(
+    discordConnectionIdentity(pending),
+    "Connected as aho_volunteer.",
+  );
   assert.equal(
     (await loadApplicationProgress(env.DB, actor.id)).discordCompletedAt,
     null,
@@ -285,6 +296,8 @@ test("local Discord simulation preserves consent and screening, then reconciles 
   assert.ok(connected.completedAt);
   assert.equal(connected.needsReconnect, false);
   assert.match(connected.sync, /Roles synchronized/);
+  assert.equal(connected.notice, null);
+  assert.equal(discordConnectionMessage(connected), "");
   const local = () =>
     env.DB.prepare("SELECT * FROM discord_link WHERE user_id=?")
       .bind(actor.id)
@@ -531,6 +544,9 @@ test("identity ownership is unique and immutable; only same-identity reauthoriza
 test("consented auto-join requires a separate verified membership check before the required step completes", async () => {
   const actor = await person();
   await link(actor);
+  const pending = await loadDiscordStatus(config, actor.id);
+  assert.equal(pending.notice, "Joining and verifying server membership");
+  assert.equal(discordConnectionIdentity(pending), "Connected as volunteer.");
   const server = discordServer([], false);
   assert.equal(
     isApplicationComplete({
@@ -638,6 +654,7 @@ test("website changes automatically remove and restore eligible roles without to
     "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES ('done','alice','orientation','organizer',0)",
   ).run();
   await processDiscordSync(config, server.send);
+  assert.equal((await loadDiscordStatus(config, actor.id)).notice, null);
   assert.deepEqual(
     new Set(server.state.roles),
     new Set([unrelated, ...Object.values(managedRoles(config))]),
@@ -645,6 +662,9 @@ test("website changes automatically remove and restore eligible roles without to
   await env.DB.prepare(
     "UPDATE volunteer_status SET active=0 WHERE user_id='alice'",
   ).run();
+  const pendingRoles = await loadDiscordStatus(config, actor.id);
+  assert.match(pendingRoles.sync, /Role sync pending/);
+  assert.equal(pendingRoles.notice, null);
   await due();
   await processDiscordSync(config, server.send);
   assert.deepEqual(server.state.roles, [unrelated]);
@@ -737,7 +757,9 @@ test("durable rate-limit cooldowns survive concurrent workers and eligibility ch
   await env.DB.prepare("UPDATE volunteer_status SET active=0").run();
   await processDiscordSync(config, limited);
   assert.equal(calls, 1);
-  assert.match((await loadDiscordStatus(config, actor.id)).sync, /pause/);
+  const status = await loadDiscordStatus(config, actor.id);
+  assert.match(status.sync, /pause/);
+  assert.equal(status.notice, status.sync);
 });
 
 test("successful exhausted-bucket headers pause subsequent requests without losing the durable reconciliation cursor", async () => {
@@ -778,6 +800,9 @@ test("an ambiguous role mutation is re-read and converges after eligibility revo
   };
   await processDiscordSync(config, send);
   assert.deepEqual(server.state.roles, [config.DISCORD_VOLUNTEER_ROLE_ID]);
+  const delayed = await loadDiscordStatus(config, actor.id);
+  assert.match(delayed.notice!, /Discord sync is delayed/);
+  assert.equal(delayed.notice, delayed.sync);
   await env.DB.prepare(
     "UPDATE volunteer_status SET registration_approved=0",
   ).run();
@@ -805,6 +830,8 @@ test("leaving never causes an unconsented rejoin and expired join tokens are era
   );
   const missing = await loadDiscordStatus(config, actor.id);
   assert.match(missing.connection, /Reconnect/);
+  assert.equal(missing.notice, missing.connection);
+  assert.equal(discordConnectionIdentity(missing), "Connected as volunteer.");
   assert.equal(missing.needsReconnect, true);
   await link(actor);
   await env.DB.prepare("UPDATE discord_link SET token_expires_at=0").run();
@@ -833,6 +860,7 @@ test("bot permission failures are durable and previews never contact Discord", a
   assert.equal(calls, 1);
   const status = await loadDiscordStatus(config, actor.id);
   assert.match(status.sync, /temporarily unavailable/);
+  assert.equal(status.notice, status.sync);
   assert.equal(status.needsReconnect, false);
   assert.equal(
     JSON.stringify(status).includes("private provider detail"),
