@@ -1821,13 +1821,15 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(
     training.locator(".volunteer-training-options > label"),
   ).toHaveText(trainingOptions.map((option) => option.label));
-  await expect(divider).toHaveText("or");
+  await expect(divider).toHaveText("OR");
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     await expect(divider).toBeVisible();
     await expect(divider).toHaveCSS("width", "120px");
     const dividerBounds = await divider.boundingBox();
-    const noneBounds = await none.boundingBox();
+    const noneBounds = await training
+      .locator('label:has(input[value="none"])')
+      .boundingBox();
     expect(dividerBounds!.x).toBeCloseTo(noneBounds!.x, 1);
     expect(
       await training
