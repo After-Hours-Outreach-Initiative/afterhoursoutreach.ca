@@ -175,6 +175,23 @@ test("event dialogs offer only cancellation for future events and keep ended his
         .getByRole("button", { name: /Delete/ }),
     ).toHaveCount(0);
     const edit = card.getByRole("button", { name: "Edit", exact: true });
+    if (!editable) {
+      await expect(
+        page.locator(`[data-past-event-list] [data-live-event="${id}"]`),
+      ).toBeVisible();
+      await expect(edit).toHaveCount(0);
+      await expect(
+        card.locator("[data-event-save], [data-event-cancel]"),
+      ).toHaveCount(0);
+      await expect(
+        card.getByRole("button", { name: "Cancel event", exact: true }),
+      ).toHaveCount(0);
+      await card.locator(".volunteer-roster > summary").click();
+      await expect(
+        card.getByText("Orientation completed", { exact: true }),
+      ).toBeVisible();
+      continue;
+    }
     await edit.focus();
     await edit.press("Enter");
     const dialog = card.getByRole("dialog", {

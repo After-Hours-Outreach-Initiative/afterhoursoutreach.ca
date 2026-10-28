@@ -27,18 +27,21 @@ export const GET: APIRoute = async ({ request }) => {
       env.DB,
       actor,
       params.get("occurrence") ?? undefined,
-      manage ? "manage" : "volunteer",
+      manage ? "manage-upcoming" : "volunteer",
     );
-    const pastEvents = manage
-      ? []
-      : await listEvents(env.DB, actor, undefined, "past");
+    const pastEvents = await listEvents(
+      env.DB,
+      actor,
+      manage ? (params.get("occurrence") ?? undefined) : undefined,
+      manage ? "manage-past" : "past",
+    );
     const series = manage && actor ? await listPatrolSeries(env.DB, actor) : [];
     const rosters =
       organizer && actor
         ? await listRosters(
             env.DB,
             actor,
-            events.map((event) => event.id),
+            [...events, ...(manage ? pastEvents : [])].map((event) => event.id),
           )
         : [];
     const version = await eventViewVersion(

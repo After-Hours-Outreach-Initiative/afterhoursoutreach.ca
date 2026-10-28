@@ -46,11 +46,14 @@ const events = await listEvents(
   env.DB,
   actor,
   Astro.url.searchParams.get("occurrence") ?? undefined,
-  manage ? "manage" : "volunteer",
+  manage ? "manage-upcoming" : "volunteer",
 );
-const pastEvents = manage
-  ? []
-  : await listEvents(env.DB, actor, undefined, "past");
+const pastEvents = await listEvents(
+  env.DB,
+  actor,
+  manage ? (Astro.url.searchParams.get("occurrence") ?? undefined) : undefined,
+  manage ? "manage-past" : "past",
+);
 const series = manage ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
 const organizer = actor.role === "organizer" && eventAccess;
@@ -74,7 +77,7 @@ const rosters = organizer
   ? await listRosters(
       env.DB,
       actor,
-      events.map((event) => event.id),
+      [...events, ...(manage ? pastEvents : [])].map((event) => event.id),
     )
   : [];
 const publicRoster =
@@ -113,23 +116,23 @@ const countEvents = (items: typeof events, type: string) =>
       Boolean(event.includesOrientation),
     ),
   ).length;
-// Count the items each filter controls: grouped series once in management,
-// and both upcoming and past event cards in the volunteer view.
+const countManagementItems = (type: string) =>
+  managementItems.filter((item) =>
+    matchesEventFilter(
+      type,
+      item.kind === "series",
+      item.kind === "series"
+        ? Boolean(item.series.includesOrientation) ||
+            item.events.some((event) => Boolean(event.includesOrientation))
+        : Boolean(item.event.includesOrientation),
+    ),
+  ).length;
+// Count top-level items in both sections: upcoming series once, history per date.
 const filterCount = (type: string) =>
-  manage
-    ? managementItems.filter((item) =>
-        matchesEventFilter(
-          type,
-          item.kind === "series",
-          item.kind === "series"
-            ? Boolean(item.series.includesOrientation) ||
-                item.events.some((event) => Boolean(event.includesOrientation))
-            : Boolean(item.event.includesOrientation),
-        ),
-      ).length
-    : countEvents([...events, ...pastEvents], type);
+  (manage ? countManagementItems(type) : countEvents(events, type)) +
+  countEvents(pastEvents, type);
 const hasVisibleEvents = manage
-  ? filterCount(filter) > 0
+  ? countManagementItems(filter) > 0
   : countEvents(events, filter) > 0;
 const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
 ---
@@ -313,6 +316,11 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
             ))}
           </form>
           {manage && <BulkEventEditor />}
+          {manage && (
+            <div class="volunteer-section-heading">
+              <h2>Upcoming events and series</h2>
+            </div>
+          )}
           <div class:list={{ "volunteer-event-schedule": !manage }}>
             {!manage && (
               <EventCalendar
@@ -383,9 +391,13 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
                 role="status"
                 hidden={hasVisibleEvents}
               >
-                {events.length || series.length
-                  ? "No upcoming events match this filter. Check back soon."
-                  : "No upcoming events are scheduled. Check back soon."}
+                {manage
+                  ? managementItems.length
+                    ? "No upcoming events or series match this filter."
+                    : "No upcoming events or series are scheduled."
+                  : events.length
+                    ? "No upcoming events match this filter. Check back soon."
+                    : "No upcoming events are scheduled. Check back soon."}
               </p>
               <p
                 class="volunteer-help"
@@ -402,7 +414,7 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
       )
     }
     {
-      eventAccess && !manage && (
+      eventAccess && (
         <section class="volunteer-events" aria-labelledby="past-events-heading">
           <div class="volunteer-section-heading">
             <h2 id="past-events-heading">Past events</h2>
@@ -412,8 +424,8 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
               <EventCard
                 event={event}
                 actor={actor}
-                organizer={false}
-                roster={[]}
+                organizer={manage}
+                roster={rosters.filter((person) => person.eventId === event.id)}
                 destinations={[]}
                 filter={filter}
               />
@@ -434,7 +446,9 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
             data-past-event-limit
             hidden={pastEvents.length !== 100}
           >
-            Showing the 100 most recent past events.
+            {manage
+              ? "Showing up to 100 past events. Open another recurring date under Occurrences."
+              : "Showing the 100 most recent past events."}
           </p>
         </section>
       )
@@ -453,6 +467,9 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
 </script>
 
 <style>
+  [data-event-view="manage"] [data-past-event-list] {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .volunteer-event-schedule {
     container: event-schedule / inline-size;
     display: flex;

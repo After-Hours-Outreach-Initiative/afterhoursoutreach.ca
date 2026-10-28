@@ -175,14 +175,21 @@ export async function listEvents(
   db: Env["DB"],
   actor: Actor | null,
   selectedOccurrence?: string,
-  view: "manage" | "volunteer" | "past" = "manage",
+  view:
+    | "manage"
+    | "manage-upcoming"
+    | "manage-past"
+    | "volunteer"
+    | "past" = "manage",
 ) {
   if (!canViewEvents(actor)) return [];
-  // History keeps volunteer visibility rules, but not the future signup window.
-  const past = view === "past";
+  // Volunteer history keeps visibility rules, but not the future signup window.
+  const past = view === "past" || view === "manage-past";
   if (!past) await ensurePatrolOccurrences(db);
   const organizer = Boolean(
-    view === "manage" &&
+    (view === "manage" ||
+      view === "manage-upcoming" ||
+      view === "manage-past") &&
     actor?.role === "organizer" &&
     actor.applicationSubmitted &&
     actor.active &&
@@ -227,10 +234,13 @@ export async function listEvents(
     AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')`;
   // A shorter cadence can push existing bookings beyond the signup window.
   // Keep them visible to their owners; signup writes still enforce that window.
+  // Explicit management sections have independent limits; keep the legacy
+  // combined management read available to existing callers.
   const statement = organizer
     ? db
         .prepare(
           `${select} WHERE ${notDeleted}
+          ${view === "manage" ? "" : `AND e.starts_at ${past ? "<=" : ">"} ${nowMsSql}`}
         ORDER BY
           (e.id = ?) DESC,
           (e.starts_at > ${nowMsSql}) DESC,
@@ -896,8 +906,8 @@ export async function listRosters(
 ) {
   requireOrganizer(actor);
   if (!eventIds.length) return [];
-  const ids = eventIds.slice(0, 100);
-  const placeholders = ids.map(() => "?").join(", ");
+  // Management can show 100 upcoming dates and 100 past dates together.
+  const ids = eventIds.slice(0, 200);
   const rows = await db
     .prepare(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, ${profileDisplayNameSql} AS name,
@@ -910,11 +920,11 @@ export async function listRosters(
       JOIN event e ON e.id = s.event_id
       JOIN profile p ON p.user_id = s.user_id
       JOIN user u ON u.id = s.user_id
-      WHERE s.event_id IN (${placeholders}) AND s.status = 'confirmed'
-      ORDER BY name
-      LIMIT 10000`,
+       WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'
+       ORDER BY name
+       LIMIT 20000`,
     )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .all<RosterRow>();
   return rows.results;
 }

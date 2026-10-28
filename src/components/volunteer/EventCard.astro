@@ -57,6 +57,7 @@ const blocked =
   class="volunteer-event-card"
   tabindex="-1"
   data-live-event={event.id}
+  data-event-series={event.seriesId ?? undefined}
   data-event-start={event.startsAt}
   data-event-label={`${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`}
   data-event-type="patrol"
@@ -164,7 +165,7 @@ const blocked =
         ) : null
       }
       {
-        organizer && (
+        organizer && future && (
           <button
             class="btn btn-quiet"
             type="button"
@@ -193,7 +194,7 @@ const blocked =
       />
     )
   }
-  {organizer && <EventEditor event={event} series={series} />}
+  {organizer && future && <EventEditor event={event} series={series} />}
 </li>
 
 <style>

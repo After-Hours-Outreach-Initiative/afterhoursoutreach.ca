@@ -88,7 +88,7 @@ function applyEventFilter(root: HTMLElement, type: string) {
     ) ?? []) {
       card.hidden = !matchesEventFilter(
         selected,
-        Boolean(card.dataset.seriesCard),
+        Boolean(card.dataset.seriesCard || card.dataset.eventSeries),
         card.dataset.includesOrientation === "true",
       );
       if (!card.hidden) visible++;
@@ -265,6 +265,14 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     card.dataset.seriesCard
       ? `series:${card.dataset.seriesCard}`
       : `event:${card.dataset.liveEvent}`;
+  // A date can move between sections (or out of a series group) as it starts.
+  // Reuse its roster expansion state, and never duplicate an open editor.
+  const existingEvents = new Map(
+    [...root.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
+      key(card),
+      card,
+    ]),
+  );
   const syncList = (list: HTMLElement, nextList: HTMLElement) => {
     const previous = new Map(
       [...list.children]
@@ -275,8 +283,14 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     for (const updated of nextList.children) {
       if (!(updated instanceof HTMLElement)) continue;
       const id = key(updated);
-      let card = previous.get(id);
+      let card =
+        previous.get(id) ??
+        (!updated.dataset.seriesCard ? existingEvents.get(id) : undefined);
       previous.delete(id);
+      if (card && card.parentElement !== list && protectedEvent(card)) {
+        deferredEventRefresh = true;
+        continue;
+      }
       if (updated.dataset.seriesCard) {
         if (!card) {
           card = document.importNode(updated, true);
