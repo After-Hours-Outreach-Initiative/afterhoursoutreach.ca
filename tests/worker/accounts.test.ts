@@ -1026,7 +1026,7 @@ describe(
         const html = await page.text();
         assert.match(html, /Sign in again to view and manage/);
         assert.match(html, /data-account-profile/);
-        assert.doesNotMatch(html, /data-end-session|This device/);
+        assert.doesNotMatch(html, /data-end-session|This browser/);
       } finally {
         await DB.prepare("UPDATE session SET created_at=? WHERE id=?")
           .bind(original!.createdAt, current.session.id)
@@ -1417,10 +1417,10 @@ describe(
             form: sessionForm,
             trigger: () =>
               sessionForm
-                .getByRole("button", { name: "End session", exact: true })
+                .getByRole("button", { name: "Sign out", exact: true })
                 .click(),
             updated: () => expect(sessionForm).toHaveCount(0),
-            loadingLabel: "Ending session…",
+            loadingLabel: "Signing out…",
           });
           await expect(page.getByLabel("Preferred name")).toHaveValue(
             changedName,

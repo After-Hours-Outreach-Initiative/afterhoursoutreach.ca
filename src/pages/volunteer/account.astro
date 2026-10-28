@@ -168,14 +168,18 @@ const contents = [
     heading: "Two-factor authentication",
     nested: true,
   },
-  { id: "account-sessions-heading", heading: "Sessions", nested: true },
+  {
+    id: "account-sessions-heading",
+    heading: "Signed in browsers",
+    nested: true,
+  },
   { id: "account-delete-heading", heading: "Delete account", nested: true },
 ];
 ---
 
 <AccountLayout
   title="Your account"
-  description="Edit your volunteer profile and manage your sessions."
+  description="Edit your volunteer profile and manage your signed in browsers."
   signedIn
   organizer={organizer}
   name={values ? applicationDisplayName(values) : undefined}
@@ -511,7 +515,7 @@ const contents = [
         <div class="volunteer-setting" data-account-sessions>
           <div class="w-full">
             <h3 id="account-sessions-heading" data-contents-section>
-              Sessions
+              Signed in browsers
             </h3>
             {
               sessionsNeedSignIn && (
@@ -521,7 +525,9 @@ const contents = [
                   method="post"
                   class="mt-6"
                 >
-                  <p>Sign in again to view and manage your active sessions.</p>
+                  <p>
+                    Sign in again to view and manage your signed in browsers.
+                  </p>
                   <button class="btn btn-outline mt-4" type="submit">
                     Sign out to sign in again
                   </button>
@@ -536,8 +542,8 @@ const contents = [
                     <div>
                       <span>
                         {entry.id === currentId
-                          ? "This device"
-                          : entry.userAgent || "Another device"}
+                          ? "This browser"
+                          : entry.userAgent || "Another browser"}
                       </span>
                       <span class="volunteer-help">
                         Last active:{" "}
@@ -556,9 +562,9 @@ const contents = [
                         <button
                           class="btn btn-outline"
                           type="submit"
-                          data-loading-label="Ending session…"
+                          data-loading-label="Signing out…"
                         >
-                          End session
+                          Sign out
                         </button>
                         <p data-form-message role="status" hidden />
                       </form>
