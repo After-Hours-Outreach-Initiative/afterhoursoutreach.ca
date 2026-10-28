@@ -45,12 +45,16 @@ export function assertCompleteSampleProfiles(db: DatabaseSync, now: number) {
         row.middle_names,
         row.last_name,
         row.heard_about_us_sources,
+        row.expired_first_aid_details,
+        row.crisis_intervention_details,
       ],
       [
         snapshot.answers.firstName,
         snapshot.answers.middleNames,
         snapshot.answers.lastName,
         JSON.stringify(snapshot.answers.heardAboutUsSources),
+        snapshot.answers.expiredFirstAidDetails,
+        snapshot.answers.crisisInterventionDetails,
       ],
     );
     phones.add(row.phone);

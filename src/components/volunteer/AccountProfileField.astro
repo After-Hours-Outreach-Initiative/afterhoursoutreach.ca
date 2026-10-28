@@ -16,6 +16,7 @@ interface Props {
   hideLabel?: boolean;
   required?: boolean;
   readOnly?: boolean;
+  trainingDetailFor?: string;
 }
 const {
   field,
@@ -24,6 +25,7 @@ const {
   hideLabel = false,
   required = field.required,
   readOnly = false,
+  trainingDetailFor,
 } = Astro.props;
 const phone = field.name === "phone" || field.name === "emergencyPhone";
 const birthDate = field.name === "birthDate";
@@ -63,6 +65,7 @@ const message =
         { "volunteer-wide": "multiline" in field },
       ]}
       data-other-training={field.name === "experience" || undefined}
+      data-training-detail-for={trainingDetailFor}
       data-other-relevant-training={field.name === "otherTraining" || undefined}
       data-other-relevant-experience={
         field.name === "otherExperience" || undefined

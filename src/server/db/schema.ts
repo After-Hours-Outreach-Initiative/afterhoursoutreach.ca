@@ -28,6 +28,8 @@ export const user = sqliteTable(
     two_factor_enabled: integer({ mode: "boolean" }).notNull().default(false),
     created_at: timestamp().notNull(),
     updated_at: timestamp().notNull(),
+    // Irreversible sign-in deletion; referenced decision/history records remain.
+    deleted_at: timestamp(),
   },
   (table) => [
     check("user_role", sql`${table.role} IN ('volunteer', 'organizer')`),
@@ -117,6 +119,75 @@ export const authRateLimit = sqliteTable(
   (table) => [index("auth_rate_limit_expiry").on(table.expires_at)],
 );
 
+// Only profiles submitted after this feature is installed receive a requirement.
+// Absence deliberately grandfathers existing volunteers, without inventing consent.
+export const discordRequirement = sqliteTable("discord_requirement", {
+  user_id: text()
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+});
+
+export const discordOAuth = sqliteTable("discord_oauth", {
+  state_hash: text().primaryKey(),
+  user_id: text()
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+  session_id: text().notNull(),
+  browser_hash: text().notNull(),
+  verifier: text().notNull(),
+  origin: text().notNull(),
+  expires_at: timestamp().notNull(),
+});
+
+// The link is also a durable, coalescing outbox. Workers always derive roles
+// from live website records; queued payloads never contain stale eligibility.
+export const discordLink = sqliteTable(
+  "discord_link",
+  {
+    user_id: text()
+      .primaryKey()
+      .references(() => user.id),
+    discord_id: text().notNull().unique(),
+    username: text().notNull(),
+    guild_id: text().notNull(),
+    consented_at: timestamp().notNull(),
+    completed_at: timestamp(),
+    member_verified_at: timestamp(),
+    observed_roles: text({ mode: "json" }).$type<string[]>(),
+    member_ready: integer({ mode: "boolean" }).notNull().default(false),
+    checked_at: timestamp(),
+    join_token: text(), // AES-GCM ciphertext, discarded after verified membership.
+    token_expires_at: timestamp(),
+    version: integer().notNull().default(1),
+    synced_version: integer().notNull().default(0),
+    next_attempt_at: timestamp().notNull(),
+    attempts: integer().notNull().default(0),
+    last_synced_at: timestamp(),
+    last_error: text(), // Fixed public error code only; never provider bodies.
+  },
+  (table) => [index("discord_link_due").on(table.next_attempt_at)],
+);
+
+// One distributed lease for the dedicated bot. Rate-limit cooldowns survive
+// crashes and apply across routes, isolates, and scheduled/request invocations.
+export const discordWorker = sqliteTable(
+  "discord_worker",
+  {
+    id: integer().primaryKey(),
+    lease_token: text(),
+    lease_until: timestamp()
+      .notNull()
+      .default(sql`0`),
+    not_before: timestamp()
+      .notNull()
+      .default(sql`0`),
+    request_window: integer().notNull().default(0),
+    request_count: integer().notNull().default(0),
+  },
+  (table) => [check("discord_worker_singleton", sql`${table.id} = 1`)],
+);
+
 // A draft is private to its owner and never counts as a submitted profile.
 export const applicationDraft = sqliteTable("application_draft", {
   user_id: text()
@@ -175,6 +246,8 @@ export const profile = sqliteTable("profile", {
     .notNull()
     .default(sql`'[]'`),
   other_training: text().notNull().default(""),
+  expired_first_aid_details: text().notNull().default(""),
+  crisis_intervention_details: text().notNull().default(""),
   // Null identifies legacy combined training/experience answers until their next save.
   relevant_experience: text({ mode: "json" }).$type<string[]>(),
   other_experience: text().notNull().default(""),
@@ -202,6 +275,7 @@ export const volunteerStatus = sqliteTable(
     registration_approved: integer({ mode: "boolean" })
       .notNull()
       .default(false),
+    application_rejection_reason: text(),
     patrol_approved: integer({ mode: "boolean" }).notNull().default(false),
     approved_by: text().references(() => user.id),
     approved_at: timestamp(),
@@ -419,6 +493,7 @@ export const auditLog = sqliteTable(
         "profile_viewed",
         "profile_updated",
         "approval_changed",
+        "application_rejected",
         "role_changed",
         "active_changed",
         "orientation_completed",
@@ -457,7 +532,7 @@ export const eventNotificationBatch = sqliteTable(
     id: text().primaryKey(),
     operation_id: text().notNull(),
     payload: text().notNull(),
-    status: text({ enum: ["pending", "sending", "sent", "local"] })
+    status: text({ enum: ["pending", "sending", "sent", "local", "cancelled"] })
       .notNull()
       .default("pending"),
     outcome: text({ enum: ["failed", "unconfirmed"] }),
@@ -558,7 +633,7 @@ export const medicCertificationNotification = sqliteTable(
   ],
 );
 
-// One immutable request per first submission and fixed organizer mailbox. No
+// One immutable request per applicant entering review and fixed organizer mailbox. No
 // recipient account is required; only name/time/review metadata is copied.
 export const applicationSubmissionNotification = sqliteTable(
   "application_submission_notification",
@@ -570,7 +645,7 @@ export const applicationSubmissionNotification = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     recipient: text().notNull(),
     mode: text({ enum: ["production", "local", "preview"] }).notNull(),
-    // Frozen at submission; previews retain only a suppressed ledger entry.
+    // Frozen on entry to review; previews retain only a suppressed ledger entry.
     payload: text(),
     status: text({
       enum: ["pending", "sending", "sent", "local", "suppressed", "expired"],

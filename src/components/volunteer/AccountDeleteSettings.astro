@@ -1,0 +1,93 @@
+---
+import FieldError from "@/components/FieldError.astro";
+interface Props {
+  userId: string;
+  needsSignIn: boolean;
+}
+const { userId, needsSignIn } = Astro.props;
+---
+
+<div class="volunteer-setting">
+  <div class="w-full">
+    <h3 id="account-delete-heading" data-contents-section>Delete account</h3>
+    <p>Deleting your sign-in account is permanent and cannot be undone.</p>
+    <details class="mt-6">
+      <summary>Review account deletion</summary>
+      <div class="mt-4 space-y-4" id="account-delete-description">
+        <p>
+          Deletion signs you out everywhere, deletes drafts, cancels upcoming
+          signups, and removes website-managed Discord roles. Your Discord
+          account and membership stay unchanged.
+        </p>
+        <p>
+          Some records are retained under our <a href="/privacy"
+            >privacy policy</a
+          >. Contact our Privacy officer about further removal. Signing in again
+          creates a new account.
+        </p>
+      </div>
+      {
+        needsSignIn ? (
+          <form
+            data-sign-out
+            action="/api/v1/auth/sign-out"
+            method="post"
+            class="mt-6"
+          >
+            <p>
+              Sign in again before deleting your account. A sign-in within the
+              last ten minutes is required.
+            </p>
+            <button class="btn btn-outline mt-4" type="submit">
+              Sign out to sign in again
+            </button>
+            <p data-form-message role="status" hidden />
+          </form>
+        ) : (
+          <form
+            data-delete-account
+            data-delete-user-id={userId}
+            action="/api/v1/account/delete"
+            method="post"
+            class="volunteer-form volunteer-small mt-6"
+            aria-describedby="account-delete-description"
+          >
+            <div class="volunteer-field">
+              <label for="account-delete-email">
+                Type your current email address to confirm
+              </label>
+              <input
+                id="account-delete-email"
+                name="email"
+                type="email"
+                autocomplete="off"
+                maxlength="254"
+                required
+                aria-describedby="error-account-delete-email"
+              />
+              <FieldError
+                field="account-delete-email"
+                message="Enter your current email address."
+              />
+            </div>
+            <label class="volunteer-check">
+              <input name="confirm" type="checkbox" required />
+              <span>
+                I understand this permanently deletes my sign-in account and
+                cancels my upcoming signups.
+              </span>
+            </label>
+            <p data-form-message role="status" aria-live="polite" hidden />
+            <button
+              class="btn btn-outline"
+              type="submit"
+              data-loading-label="Deleting…"
+            >
+              Permanently delete my account
+            </button>
+          </form>
+        )
+      }
+    </details>
+  </div>
+</div>

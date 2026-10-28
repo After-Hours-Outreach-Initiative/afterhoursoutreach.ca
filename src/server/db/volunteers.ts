@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   accessRegistrationCancelledTemplate,
+  applicationRejectedEmail,
   roleChangedEmail,
   volunteerAccessEmail,
 } from "../../data/email-templates";
@@ -33,6 +34,7 @@ export interface VolunteerRow {
   role: "volunteer" | "organizer";
   active: number;
   applicationApproved: number;
+  applicationRejectionReason: string | null;
   patrolApproved: number;
   updatedAt: number;
   twoFactorEnabled: number;
@@ -49,33 +51,43 @@ export async function listVolunteers(
 ) {
   requireOrganizer(actor);
   // A profile is created only on submission; private drafts never enter either
-  // query. Count all unapproved applications, not just this search or page.
-  const [rows, awaiting] = (await db.batch([
-    db
-      .prepare(
-        `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
-        v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
-        (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
-      FROM user u
+  // query. Both filter counts respect search, but not approval or pagination.
+  const applicantsSql = `FROM user u
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
       WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
-        AND (? = 'all' OR v.registration_approved = 0)
+        AND u.deleted_at IS NULL`;
+  const query = search.slice(0, 100);
+  const [rows, counts] = (await db.batch([
+    db
+      .prepare(
+        `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+        v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
+      ${applicantsSql}
+        AND (? = 'all' OR (v.registration_approved = 0 AND v.application_rejection_reason IS NULL))
       ORDER BY v.registration_approved, name, u.id
       LIMIT ? OFFSET ?`,
       )
-      .bind(search.slice(0, 100), approval, volunteerPageSize + 1, offset),
-    db.prepare(
-      `SELECT count(*) AS count FROM user u
-      JOIN profile p ON p.user_id = u.id
-      JOIN volunteer_status v ON v.user_id = u.id
-      WHERE v.registration_approved = 0`,
-    ),
-  ])) as [D1Result<VolunteerRow>, D1Result<{ count: number }>];
+      .bind(query, approval, volunteerPageSize + 1, offset),
+    db
+      .prepare(
+        `SELECT count(*) AS allApplicantsCount,
+          count(CASE WHEN v.registration_approved = 0 AND v.application_rejection_reason IS NULL THEN 1 END) AS awaitingApprovalCount
+        ${applicantsSql}`,
+      )
+      .bind(query),
+  ])) as [
+    D1Result<VolunteerRow>,
+    D1Result<{ allApplicantsCount: number; awaitingApprovalCount: number }>,
+  ];
   return {
     rows: rows.results.slice(0, volunteerPageSize),
     hasMore: rows.results.length > volunteerPageSize,
-    awaitingApprovalCount: Number(awaiting.results[0]?.count ?? 0),
+    allApplicantsCount: Number(counts.results[0]?.allApplicantsCount ?? 0),
+    awaitingApprovalCount: Number(
+      counts.results[0]?.awaitingApprovalCount ?? 0,
+    ),
   };
 }
 
@@ -84,10 +96,10 @@ export function findVolunteer(db: Env["DB"], actor: Actor, userId: string) {
   return db
     .prepare(
       `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
-        v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
       FROM user u JOIN profile p ON p.user_id=u.id
-      JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
+      JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=? AND u.deleted_at IS NULL`,
     )
     .bind(userId)
     .first<VolunteerRow>();
@@ -101,7 +113,9 @@ export async function viewVolunteerProfile(
 ) {
   requireOrganizer(actor);
   const subject = await db
-    .prepare("SELECT user_id FROM profile WHERE user_id=?")
+    .prepare(
+      "SELECT user_id FROM profile p JOIN user u ON u.id=p.user_id WHERE p.user_id=? AND u.deleted_at IS NULL",
+    )
     .bind(userId)
     .first();
   if (!subject) throw new RequestError(404, "Volunteer not found.");
@@ -130,6 +144,8 @@ export async function viewVolunteerProfile(
           medical_certification AS certification, training_experience AS experience,
           medical_certifications AS certifications,
           relevant_training AS training, other_training AS otherTraining,
+          expired_first_aid_details AS expiredFirstAidDetails,
+          crisis_intervention_details AS crisisInterventionDetails,
           relevant_experience AS relevantExperience, other_experience AS otherExperience,
           coalesce(medical_certification_expiry, '') AS certificationExpiry,
           coalesce(medical_conditions, '') AS medicalConditions,
@@ -139,7 +155,23 @@ export async function viewVolunteerProfile(
           p.naloxone_completed_at AS naloxoneCompletedAt,
           p.submitted_application AS submission
         FROM profile p JOIN user u ON u.id = p.user_id
-        WHERE p.user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
+        WHERE p.user_id = ? AND u.deleted_at IS NULL AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
+      )
+      .bind(userId, accessId),
+    // approved_by belongs to patrol approval. The latest application-status
+    // audit identifies the current approver only while the application is approved.
+    // Historical approvals without such an audit deliberately stay unattributed.
+    db
+      .prepare(
+        `SELECT approver.id, approver.name, approver.email, a.created_at AS approvedAt
+        FROM audit_log a JOIN user approver ON approver.id=a.actor_id
+        JOIN volunteer_status v ON v.user_id=a.subject_id
+        WHERE a.subject_id=? AND v.registration_approved=1
+          AND a.action='approval_changed'
+          AND EXISTS (SELECT 1 FROM json_each(a.changed_fields)
+            WHERE value IN ('applicationApproved', 'registrationApproved'))
+          AND EXISTS (SELECT 1 FROM audit_log WHERE id=?)
+        ORDER BY a.created_at DESC, a.rowid DESC LIMIT 1`,
       )
       .bind(userId, accessId),
   ]);
@@ -180,6 +212,8 @@ export async function viewVolunteerProfile(
     submission,
     ...answers
   } = row;
+  const applicationApprovedBy = results[2].results[0] as
+    { id: string; name: string; email: string; approvedAt: number } | undefined;
   const sources = row.heardAboutUsSources
     ? (JSON.parse(row.heardAboutUsSources) as string[])
     : [];
@@ -199,6 +233,8 @@ export async function viewVolunteerProfile(
       ...normalizeTrainingAnswers({
         training: JSON.parse(row.training) as string[],
         otherTraining: row.otherTraining,
+        expiredFirstAidDetails: row.expiredFirstAidDetails,
+        crisisInterventionDetails: row.crisisInterventionDetails,
         relevantExperience: row.relevantExperience
           ? (JSON.parse(row.relevantExperience) as string[])
           : null,
@@ -206,6 +242,7 @@ export async function viewVolunteerProfile(
       }),
     } satisfies ApplicationAnswers,
     email,
+    applicationApprovedBy: applicationApprovedBy ?? null,
     submittedAt: new Date(submittedAt).toISOString(),
     naloxoneCompletedAt,
     codeOfConductVersion,
@@ -260,6 +297,25 @@ export async function setVolunteerStatus(
     parsed.data.applicationApproved ??
     parsed.data.registrationApproved ??
     Boolean(old.applicationApproved);
+  if (applicationApproved && !old.applicationApproved) {
+    const blocked = await db
+      .prepare(
+        // Keep the Naloxone prerequisite and legacy exemptions while Discord is paused.
+        `SELECT 1 FROM discord_requirement r
+      LEFT JOIN profile p ON p.user_id=r.user_id
+      /* LEFT JOIN discord_link d ON d.user_id=r.user_id */
+      WHERE r.user_id=? AND (p.naloxone_completed_at IS NULL
+        /* OR d.completed_at IS NULL OR d.member_verified_at IS NULL */)`,
+      )
+      .bind(userId)
+      .first();
+    if (blocked)
+      throw new RequestError(
+        409,
+        // "The applicant must complete Naloxone 101 and connect Discord with verified server membership before approval.",
+        "The applicant must complete Naloxone 101 before approval.",
+      );
+  }
   const fields = [
     old.active !== Number(active) ? "active" : "",
     old.applicationApproved !== Number(applicationApproved)
@@ -272,6 +328,7 @@ export async function setVolunteerStatus(
   const email = volunteerAccessEmail(
     { active, applicationApproved, patrolApproved },
     fields.includes("applicationApproved"),
+    actor.name,
   );
   const operation = crypto.randomUUID();
   const now = Math.max(Date.now(), version + 1);
@@ -282,16 +339,22 @@ export async function setVolunteerStatus(
           `UPDATE volunteer_status
           SET active = ?,
               registration_approved = ?,
+              application_rejection_reason = CASE WHEN ? = 1 THEN NULL ELSE application_rejection_reason END,
               patrol_approved = ?,
               approved_by = CASE WHEN patrol_approved = ? THEN approved_by ELSE ? END,
               approved_at = CASE WHEN patrol_approved = ? THEN approved_at ELSE ? END,
               updated_at = ?
           WHERE user_id = ?
             AND updated_at = ?
+            AND (registration_approved=1 OR ?=0 OR NOT EXISTS(SELECT 1 FROM discord_requirement WHERE user_id=volunteer_status.user_id)
+              OR EXISTS(SELECT 1 FROM profile p /* JOIN discord_link d ON d.user_id=p.user_id */
+                WHERE p.user_id=volunteer_status.user_id AND p.naloxone_completed_at IS NOT NULL
+                  /* AND d.completed_at IS NOT NULL AND d.member_verified_at IS NOT NULL */))
             AND ${writePermission(true)}`,
         )
         .bind(
           Number(active),
+          Number(applicationApproved),
           Number(applicationApproved),
           Number(patrolApproved),
           Number(patrolApproved),
@@ -301,6 +364,7 @@ export async function setVolunteerStatus(
           now,
           userId,
           version,
+          Number(applicationApproved),
           ...permissionValues(actor),
         ),
       db
@@ -396,6 +460,75 @@ export async function setVolunteerStatus(
         "This volunteer's status changed. Reload before saving.",
       );
     return { operation, message: "Volunteer access saved." };
+  } catch (error) {
+    return databaseWriteError(error);
+  }
+}
+
+export const rejectionSchema = z.strictObject({
+  userId: z.string().min(1).max(200),
+  version: z.number().int().nonnegative(),
+  reason: z.string().trim().min(1).max(2000),
+});
+
+/** Save the decision, audit, and required applicant email in one guarded batch. */
+export async function rejectApplication(
+  db: Env["DB"],
+  actor: Actor,
+  input: unknown,
+) {
+  requireOrganizer(actor);
+  const parsed = rejectionSchema.safeParse(input);
+  if (!parsed.success)
+    throw new RequestError(
+      400,
+      "Provide a rejection reason of up to 2,000 characters.",
+    );
+  const { userId, version, reason } = parsed.data;
+  const operation = crypto.randomUUID();
+  const now = Math.max(Date.now(), version + 1);
+  const email = applicationRejectedEmail(reason);
+  try {
+    const results = await db.batch([
+      db
+        .prepare(
+          `UPDATE volunteer_status SET application_rejection_reason=?, updated_at=?
+        WHERE user_id=? AND updated_at=? AND registration_approved=0
+          AND application_rejection_reason IS NULL
+          AND EXISTS (SELECT 1 FROM profile p JOIN user u ON u.id=p.user_id
+            WHERE p.user_id=volunteer_status.user_id AND u.deleted_at IS NULL AND u.email_verified=1)
+          AND ${writePermission(true)}`,
+        )
+        .bind(reason, now, userId, version, ...permissionValues(actor)),
+      db
+        .prepare(
+          `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+        SELECT ?, ?, ?, 'application_rejected', '["applicationRejectionReason"]', ?
+        WHERE changes()=1`,
+        )
+        .bind(operation, actor.id, userId, now),
+      db
+        .prepare(
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+        SELECT ?, ?, id, ?, ?, ?, email FROM user
+        WHERE id=? AND EXISTS (SELECT 1 FROM audit_log WHERE id=?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          operation,
+          email.subject,
+          email.text,
+          now,
+          userId,
+          operation,
+        ),
+    ]);
+    if (!results[0].meta.changes)
+      throw new RequestError(
+        409,
+        "The application or organizer access changed. Reload before reviewing.",
+      );
+    return { operation, message: "Application rejected." };
   } catch (error) {
     return databaseWriteError(error);
   }

@@ -7,6 +7,8 @@ import {
   setRole,
   completeOrientation,
   statusSchema,
+  rejectionSchema,
+  rejectApplication,
 } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { takeRateLimit } from "@/server/db/rate-limits";
@@ -16,6 +18,7 @@ import { readJson, RequestError, errorResponse } from "@/server/http";
 const id = z.string().min(1).max(200);
 const inputSchema = z.discriminatedUnion("action", [
   statusSchema.extend({ action: z.literal("status") }),
+  rejectionSchema.extend({ action: z.literal("reject-application") }),
   z.strictObject({
     action: z.literal("role"),
     userId: id,
@@ -54,7 +57,7 @@ export const POST: APIRoute = async ({ request }) => {
     if (
       input.action === "retry-notifications" &&
       !(await env.DB.prepare(
-        "SELECT id FROM audit_log WHERE id=? AND action IN ('approval_changed','active_changed','role_changed')",
+        "SELECT id FROM audit_log WHERE id=? AND action IN ('approval_changed','active_changed','role_changed','application_rejected')",
       )
         .bind(input.operation)
         .first())
@@ -77,24 +80,31 @@ export const POST: APIRoute = async ({ request }) => {
               patrolApproved: input.patrolApproved,
               notify: input.notify,
             })
-          : input.action === "role"
-            ? await setRole(
-                env.DB,
-                actor,
-                input.userId,
-                input.role,
-                input.notify,
-              )
-            : await completeOrientation(
-                env.DB,
-                actor,
-                input.userId,
-                input.eventId,
-              );
+          : input.action === "reject-application"
+            ? await rejectApplication(env.DB, actor, {
+                userId: input.userId,
+                version: input.version,
+                reason: input.reason,
+              })
+            : input.action === "role"
+              ? await setRole(
+                  env.DB,
+                  actor,
+                  input.userId,
+                  input.role,
+                  input.notify,
+                )
+              : await completeOrientation(
+                  env.DB,
+                  actor,
+                  input.userId,
+                  input.eventId,
+                );
     const delivery = await actionEmailResult(
       bindings,
       result,
       input.action === "retry-notifications" ||
+        input.action === "reject-application" ||
         ("notify" in input && input.notify),
     );
     const response = Response.json(

@@ -12,13 +12,12 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
 
 {
   medics + volunteers + orientees > 0 && (
-    <div class="event-attendance">
-      <div class="event-attendance-row">
-        <div
+    <span class="event-attendance">
+      <span class="event-attendance-row">
+        <span
           class="event-avatar-row"
           role="group"
           aria-label={`${medics} approved medics, ${volunteers} other volunteers and ${orientees} orientees registered`}
-          tabindex="0"
         >
           {Array.from({ length: medics }, () => (
             <AttendeeAvatar category="medic" />
@@ -29,9 +28,9 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
           {Array.from({ length: orientees }, () => (
             <AttendeeAvatar category="orientee" />
           ))}
-        </div>
-      </div>
-    </div>
+        </span>
+      </span>
+    </span>
   )
 }
 
@@ -40,7 +39,6 @@ const volunteers = Math.max(0, event.confirmed - medics - orientees);
     min-width: 0;
   }
   .event-avatar-row {
-    --attendee-avatar-height: 2rem;
     display: flex;
     flex-wrap: wrap;
     align-items: center;

@@ -4,7 +4,7 @@
   "type": "module",
   "version": "0.0.0",
   "scripts": {
-    "dev": "node scripts/prepare-excalidraw.mjs && astro dev --background",
+    "dev": "node scripts/prepare-excalidraw.mjs && astro dev --host --background",
     "stop": "astro dev stop",
     "status": "astro dev status",
     "logs": "astro dev logs",

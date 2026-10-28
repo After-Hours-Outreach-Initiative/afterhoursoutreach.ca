@@ -150,6 +150,24 @@ export async function createLocalAccount(
   return { id: user.id, email, name: sampleAnswers.preferredName };
 }
 
+/** Use the existing enrolled fixture without reopening public authenticator setup. */
+export async function signInLocalAuthenticatorAccount(
+  request: APIRequestContext,
+  origin: string,
+) {
+  const switched = await request.post("/api/v1/auth/dev/switch-user", {
+    headers: { origin },
+    data: { userId: "local-fixture-user-robin" },
+  });
+  expect(switched.status(), await switched.text()).toBe(200);
+  const current = await request.get("/api/v1/auth/get-session");
+  const { user } = (await current.json()) as {
+    user: { id: string; role: string; twoFactorEnabled: boolean };
+  };
+  expect(user.twoFactorEnabled).toBe(true);
+  return user;
+}
+
 export async function approveLocalApplication(
   organizer: APIRequestContext,
   origin: string,

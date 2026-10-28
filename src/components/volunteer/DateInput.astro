@@ -18,7 +18,7 @@ interface Props {
   defaultTime?: string;
   warnPast?: boolean;
   errorField?: string;
-  readonly?: boolean;
+  readonlyDate?: boolean;
 }
 const {
   name,
@@ -33,7 +33,7 @@ const {
   defaultTime = "",
   warnPast = false,
   errorField = name,
-  readonly = false,
+  readonlyDate = false,
 } = Astro.props;
 const parts = dateParts(withTime ? value.split("T")[0] : value);
 const date = canonicalDate(parts);
@@ -91,7 +91,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
               aria-describedby={describedBy}
               value={parts[part]}
               required={required && active}
-              readonly={!active}
+              readonly={!active || readonlyDate}
               pattern={
                 part === "year" ? String.raw`\d{4}` : String.raw`\d{1,2}`
               }
@@ -108,7 +108,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
         aria-describedby={describedBy}
         value={date}
         required={required && active}
-        readonly={!active || readonly}
+        readonly={!active || readonlyDate}
         autocomplete="off"
       />
     )
@@ -117,7 +117,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
     withTime && (
       <div class="volunteer-field">
         <label for={`${id}-time`}>
-          {readonly ? "Start time (fixed)" : "Start time"}
+          Start time
           {required && (
             <span class="volunteer-required" aria-hidden="true">
               {" "}
@@ -131,7 +131,7 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
           type="text"
           value={formatTimeInput(time)}
           placeholder="9:00 PM"
-          readonly={!active || readonly}
+          readonly={!active}
           required={required && active}
           aria-describedby={describedBy}
         />

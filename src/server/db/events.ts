@@ -52,24 +52,24 @@ export {
   type PatrolSeriesRow,
 } from "./patrol-series";
 
-export const eventSchema = z
-  .strictObject({
-    // Accept old clients during rollout; includesOrientation is the public model.
-    type: z.enum(["patrol", "orientation"]).optional(),
-    includesOrientation: z.boolean().optional(),
-    startsAt: z.iso.datetime({ offset: true }),
-    meetingPoint: z.string().trim().min(1).max(500),
-    meetingPointUrl: z.union([
-      z.literal(""),
-      z
-        .url()
-        .max(2048)
-        .refine((value) => new URL(value).protocol === "https:"),
-    ]),
-    spots: z.number().int().min(1).max(100),
-    open: z.boolean(),
-    hidden: z.boolean(),
-  })
+const eventFieldsSchema = z.strictObject({
+  // Accept old clients during rollout; includesOrientation is the public model.
+  type: z.enum(["patrol", "orientation"]).optional(),
+  includesOrientation: z.boolean().optional(),
+  startsAt: z.iso.datetime({ offset: true }),
+  meetingPoint: z.string().trim().min(1).max(500),
+  meetingPointUrl: z.union([
+    z.literal(""),
+    z
+      .url()
+      .max(2048)
+      .refine((value) => new URL(value).protocol === "https:"),
+  ]),
+  spots: z.number().int().min(1).max(100),
+  open: z.boolean(),
+  hidden: z.boolean(),
+});
+export const eventSchema = eventFieldsSchema
   .refine(
     (value) =>
       value.includesOrientation !== undefined || value.type !== undefined,
@@ -82,6 +82,31 @@ export const eventSchema = z
     message: orientationCapacityMessage,
     path: ["spots"],
   });
+export const bulkEventSchema = z.strictObject({
+  selection: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(200),
+        version: z.number().int().nonnegative(),
+      }),
+    )
+    .min(1)
+    .max(100)
+    .refine((rows) => new Set(rows.map((row) => row.id)).size === rows.length),
+  changes: eventFieldsSchema
+    .pick({
+      meetingPoint: true,
+      meetingPointUrl: true,
+      spots: true,
+      includesOrientation: true,
+      open: true,
+      hidden: true,
+    })
+    .partial()
+    .refine((changes) =>
+      Object.values(changes).some((value) => value !== undefined),
+    ),
+});
 export interface EventRow {
   id: string;
   type: "patrol" | "orientation";
@@ -115,6 +140,7 @@ export interface RosterRow {
   userId: string;
   name: string;
   completed: number;
+  category: AttendeeCategory;
 }
 export interface PublicRosterRow {
   eventId: string;
@@ -134,8 +160,28 @@ const eventColumns = `
   e.meeting_point AS meetingPoint, e.meeting_point_url AS meetingPointUrl,
   e.spots, e.open, e.hidden,
   e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
+const confirmedSignupsSql = `(SELECT count(*) FROM signup
+  WHERE event_id = e.id AND status = 'confirmed')`;
 
 export { eventDescription } from "../../data/email-templates";
+
+/** Anonymous homepage summary: no locations, rosters, IDs or viewer state. */
+export async function listUpcomingPublicEvents(db: Env["DB"]) {
+  await ensurePatrolOccurrences(db);
+  const rows = await db
+    .prepare(
+      `SELECT e.starts_at AS startsAt, e.spots, ${confirmedSignupsSql} AS confirmed
+      FROM event e
+      WHERE e.starts_at > ${nowMsSql} AND e.cancelled_at IS NULL
+        AND e.hidden = 0 AND (e.series_id IS NOT NULL OR e.open = 1)
+        AND ${recurringSignupWindowSql()}
+        AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
+        AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')
+      ORDER BY e.starts_at ASC, e.id ASC LIMIT 2`,
+    )
+    .all<Pick<EventRow, "startsAt" | "spots" | "confirmed">>();
+  return rows.results;
+}
 
 // Completion does not grant patrol approval. Organizers and patrol-approved
 // volunteers retain full visibility, including legacy approvals without attendance.
@@ -149,14 +195,21 @@ export async function listEvents(
   db: Env["DB"],
   actor: Actor | null,
   selectedOccurrence?: string,
-  view: "manage" | "volunteer" | "past" = "manage",
+  view:
+    | "manage"
+    | "manage-upcoming"
+    | "manage-past"
+    | "volunteer"
+    | "past" = "manage",
 ) {
   if (!canViewEvents(actor)) return [];
-  // History keeps volunteer visibility rules, but not the future signup window.
-  const past = view === "past";
+  // Volunteer history keeps visibility rules, but not the future signup window.
+  const past = view === "past" || view === "manage-past";
   if (!past) await ensurePatrolOccurrences(db);
   const organizer = Boolean(
-    view === "manage" &&
+    (view === "manage" ||
+      view === "manage-upcoming" ||
+      view === "manage-past") &&
     actor?.role === "organizer" &&
     actor.applicationSubmitted &&
     actor.active &&
@@ -167,8 +220,7 @@ export async function listEvents(
       AND future.cancelled_at IS NULL AND future.starts_at > ${nowMsSql}
       AND s.status = 'confirmed'`;
   const select = `SELECT ${eventColumns},
-    (SELECT count(*) FROM signup
-      WHERE event_id = e.id AND status = 'confirmed') AS confirmed,
+    ${confirmedSignupsSql} AS confirmed,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
       AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) AS orientationConfirmed,
     EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = ?) AS orientationCompleted,
@@ -199,10 +251,15 @@ export async function listEvents(
     FROM event e`;
   const notDeleted = `NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
     AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')`;
+  // A shorter cadence can push existing bookings beyond the signup window.
+  // Keep them visible to their owners; signup writes still enforce that window.
+  // Explicit management sections have independent limits; keep the legacy
+  // combined management read available to existing callers.
   const statement = organizer
     ? db
         .prepare(
           `${select} WHERE ${notDeleted}
+          ${view === "manage" ? "" : `AND e.starts_at ${past ? "<=" : ">"} ${nowMsSql}`}
         ORDER BY
           (e.id = ?) DESC,
           (e.starts_at > ${nowMsSql}) DESC,
@@ -224,7 +281,9 @@ export async function listEvents(
         WHERE ${notDeleted} AND e.starts_at ${past ? "<=" : ">"} ${nowMsSql}
           AND e.cancelled_at IS NULL
           AND ${volunteerEventVisibilitySql(actor)}
-          AND ${past ? "1" : recurringSignupWindowSql()}
+          AND (${past ? "1" : recurringSignupWindowSql()} OR EXISTS(
+            SELECT 1 FROM signup own WHERE own.event_id = e.id AND own.user_id = ? AND own.status = 'confirmed'
+          ))
           AND (e.series_id IS NULL OR e.hidden = 0)
           AND ((e.series_id IS NOT NULL AND e.hidden = 0)
             OR (e.open = 1 AND e.hidden = 0) OR EXISTS(
@@ -235,6 +294,7 @@ export async function listEvents(
         LIMIT 100`,
         )
         .bind(
+          actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
@@ -447,6 +507,171 @@ export async function saveEvent(
   }
 }
 
+/** One transaction for existing snapshots only; never changes dates or templates.
+ * The audit insert is gated on EVERY selected version and current permission.
+ * Event policy triggers abort the batch (including audits/mail) on any conflict. */
+export async function bulkSaveEvents(
+  db: Env["DB"],
+  actor: Actor,
+  input: unknown,
+  notify = false,
+) {
+  requireOrganizer(actor);
+  const parsed = bulkEventSchema.safeParse(input);
+  if (!parsed.success)
+    throw new RequestError(
+      400,
+      "Select 1–100 distinct events and choose supported fields to change.",
+    );
+  const { selection, changes } = parsed.data;
+  const oldRows = (
+    await db
+      .prepare(
+        `SELECT ${eventColumns} FROM event e
+    WHERE e.id IN (SELECT json_extract(value,'$.id') FROM json_each(?))`,
+      )
+      .bind(JSON.stringify(selection))
+      .all<EventRow>()
+  ).results;
+  const oldById = new Map(oldRows.map((row) => [row.id, row]));
+  const operation = crypto.randomUUID();
+  const now = Date.now();
+  let changedCount = 0;
+  const updates = selection.map((selected) => {
+    const old = oldById.get(selected.id);
+    if (
+      !old ||
+      old.cancelledAt ||
+      old.startsAt <= now ||
+      old.updatedAt !== selected.version
+    )
+      throw new RequestError(
+        409,
+        "A selected event changed or is no longer editable. Reload and select again. No events were saved.",
+      );
+    const next = {
+      ...old,
+      includesOrientation:
+        changes.includesOrientation ?? Boolean(old.includesOrientation),
+      spots: changes.spots ?? old.spots,
+    };
+    if (!validOrientationCapacity(next))
+      throw new RequestError(400, orientationCapacityMessage);
+    const fields = Object.keys(changes).filter((key) => {
+      const value = changes[key as keyof typeof changes];
+      const normalized =
+        typeof value === "boolean"
+          ? Number(value)
+          : key === "meetingPointUrl"
+            ? value || null
+            : value;
+      return value !== undefined && old[key as keyof EventRow] !== normalized;
+    });
+    const auditId = fields.length
+      ? changedCount++ === 0
+        ? operation
+        : `${operation}:${old.id}`
+      : null;
+    const content = eventChangedEmail(
+      {
+        ...old,
+        includesOrientation: Number(next.includesOrientation),
+        meetingPoint: changes.meetingPoint ?? old.meetingPoint,
+      },
+      changes.open ?? Boolean(old.open),
+    );
+    return {
+      ...selected,
+      fields,
+      auditId,
+      subject: content.subject,
+      body: content.text,
+    };
+  });
+  const snapshots = JSON.stringify(updates);
+  // JSON keeps a full 100-event selection below D1's bound-parameter limit.
+  const guard = `${writePermission(true)} AND
+    (SELECT count(*) FROM event e JOIN json_each(?) j ON e.id = json_extract(j.value,'$.id')
+      WHERE e.updated_at = json_extract(j.value,'$.version')
+        AND e.cancelled_at IS NULL AND e.starts_at > ${nowMsSql}
+        AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id=e.id AND a.action='deleted')
+        AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id=e.series_id AND a.action='deleted')) = ?`;
+  const guardValues = () => [
+    ...permissionValues(actor),
+    snapshots,
+    selection.length,
+  ];
+  const columns = {
+    meetingPoint: "meeting_point",
+    meetingPointUrl: "meeting_point_url",
+    spots: "spots",
+    includesOrientation: "includes_orientation",
+    open: "open",
+    hidden: "hidden",
+  };
+  const entries = Object.entries(changes).filter(
+    ([, value]) => value !== undefined,
+  );
+  try {
+    const results = await db.batch<{ valid?: number }>([
+      db.prepare(`SELECT (${guard}) AS valid`).bind(...guardValues()),
+      db
+        .prepare(
+          `INSERT INTO event_audit (id,event_id,actor_id,action,changed_fields,created_at)
+        SELECT json_extract(j.value,'$.auditId'),json_extract(j.value,'$.id'),?,'updated',json_extract(j.value,'$.fields'),?
+        FROM json_each(?) j WHERE json_extract(j.value,'$.auditId') IS NOT NULL AND ${guard}`,
+        )
+        .bind(actor.id, now, snapshots, ...guardValues()),
+      db
+        .prepare(
+          `UPDATE event SET ${entries.map(([key]) => `${columns[key as keyof typeof columns]} = ?`).join(", ")}, updated_at=max(updated_at+1,?)
+        WHERE id IN (SELECT json_extract(j.value,'$.id') FROM json_each(?) j
+          JOIN event_audit a ON a.id=json_extract(j.value,'$.auditId'))`,
+        )
+        .bind(
+          ...entries.map(([key, value]) =>
+            typeof value === "boolean"
+              ? Number(value)
+              : key === "meetingPointUrl"
+                ? value || null
+                : value,
+          ),
+          now,
+          snapshots,
+        ),
+      db
+        .prepare(
+          `INSERT INTO event_notification (id,operation_id,user_id,subject,body,created_at,delivery_to)
+        SELECT lower(hex(randomblob(16))),?,s.user_id,json_extract(j.value,'$.subject'),json_extract(j.value,'$.body'),?,u.email
+        FROM json_each(?) j JOIN event_audit a ON a.id=json_extract(j.value,'$.auditId')
+        JOIN signup s ON s.event_id=a.event_id AND s.status='confirmed'
+        JOIN user u ON u.id=s.user_id AND u.email_verified=1 WHERE ?=1`,
+        )
+        .bind(operation, now, snapshots, Number(notify)),
+    ]);
+    if (
+      !results[0].results[0]?.valid ||
+      results[1].meta.changes !== changedCount
+    )
+      throw new RequestError(
+        409,
+        "A selected event or your organizer authorization changed. Reload and select again. No events were saved.",
+      );
+    return {
+      ...(changedCount ? { operation } : {}),
+      message: changedCount
+        ? `${changedCount} selected ${changedCount === 1 ? "event" : "events"} saved. Dates and recurring series settings were kept.`
+        : "No event changes.",
+    };
+  } catch (error) {
+    return databaseWriteError(error);
+  }
+}
+
+/** Registration rows (including cancelled bookings), signup audits and attendance
+ * all count as history. Decide removal inside the cancellation transaction, not
+ * from a roster read: a signup committed before this batch must prevent removal.
+ * Once closed, signup triggers reject any later/concurrent registration. */
 export async function cancelEvent(
   db: Env["DB"],
   actor: Actor,
@@ -460,6 +685,7 @@ export async function cancelEvent(
   if (old.startsAt <= Date.now())
     throw new RequestError(409, "Past events cannot be cancelled.");
   const operation = crypto.randomUUID();
+  const removedAudit = `${operation}:removed`;
   const now = Date.now();
   const results = await db.batch([
     db
@@ -490,6 +716,47 @@ export async function cancelEvent(
           AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
       )
       .bind(now, id, operation),
+    db
+      .prepare(
+        `INSERT INTO event_audit (id, event_id, actor_id, action, changed_fields, created_at)
+        SELECT ?, e.id, ?, 'deleted', '[]', ? FROM event e
+        WHERE e.id = ? AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)
+          AND NOT EXISTS(SELECT 1 FROM signup WHERE event_id = e.id)
+          AND NOT EXISTS(SELECT 1 FROM orientation_completion WHERE event_id = e.id)
+          AND NOT EXISTS(SELECT 1 FROM event_audit WHERE event_id = e.id
+            AND action IN ('signup_joined', 'signup_cancelled', 'signup_moved', 'signup_removed'))`,
+      )
+      .bind(removedAudit, actor.id, now, id, operation),
+    // The immutable recurring row/nominal key must remain. Keep only its required
+    // columns and one listing-removal marker, not optional location details/audits.
+    db
+      .prepare(
+        `UPDATE event SET meeting_point = '', meeting_point_url = NULL, includes_orientation = NULL
+        WHERE id = ? AND series_id IS NOT NULL
+          AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
+      )
+      .bind(id, removedAudit),
+    db
+      .prepare(
+        `DELETE FROM event_audit WHERE event_id = ? AND id != ?
+          AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
+      )
+      .bind(id, removedAudit, removedAudit),
+    db
+      .prepare(
+        `DELETE FROM event_audit WHERE id = ?
+          AND EXISTS(SELECT 1 FROM event WHERE id = ? AND series_id IS NULL)`,
+      )
+      .bind(removedAudit, id),
+    // changes() refers ONLY to removing this operation's one-off marker above.
+    // No references remain; a failed version/permission check cannot reach here.
+    db
+      .prepare(
+        `DELETE FROM event WHERE id = ? AND series_id IS NULL AND changes() = 1
+          AND NOT EXISTS(SELECT 1 FROM signup WHERE event_id = event.id)
+          AND NOT EXISTS(SELECT 1 FROM orientation_completion WHERE event_id = event.id)`,
+      )
+      .bind(id),
   ]);
   if (!results[0].meta.changes)
     throw new RequestError(
@@ -499,13 +766,13 @@ export async function cancelEvent(
   if (old.seriesId) await ensurePatrolOccurrences(db, old.seriesId);
   return {
     operation,
-    message: "Event cancelled. Existing registrations were cancelled too.",
+    message: results[4].meta.changes
+      ? "Event cancelled and removed because no one had ever registered."
+      : "Event cancelled. Any current registrations were cancelled; registration and attendance history was kept.",
   };
 }
 
-/** Remove from listings without cascading through attendance, signups or audits.
- * Recurring rows remain permanent tombstones so generation cannot recreate them.
- * Only future bookings are cancelled; historical attendance stays unchanged. */
+/** Compatibility for old API clients: there is no separate deletion policy. */
 export async function deleteEvent(
   db: Env["DB"],
   actor: Actor,
@@ -513,54 +780,7 @@ export async function deleteEvent(
   version: number,
   notify = false,
 ) {
-  requireOrganizer(actor);
-  const old = await findEvent(db, id);
-  const now = Date.now();
-  const operation = crypto.randomUUID();
-  const results = await db.batch([
-    db
-      .prepare(
-        `UPDATE event SET
-      cancelled_at = CASE WHEN starts_at > ${nowMsSql} THEN coalesce(cancelled_at, ?) ELSE cancelled_at END,
-      open = CASE WHEN starts_at > ${nowMsSql} THEN 0 ELSE open END,
-      hidden = CASE WHEN starts_at > ${nowMsSql} THEN 1 ELSE hidden END,
-      updated_at = ?
-      WHERE id = ? AND updated_at = ? AND ${writePermission(true)}`,
-      )
-      .bind(
-        now,
-        Math.max(now, old.updatedAt + 1),
-        id,
-        version,
-        ...permissionValues(actor),
-      ),
-    eventAudit(db, operation, id, actor.id, "deleted"),
-    notifyRoster(
-      db,
-      operation,
-      id,
-      eventCancelledEmail(old, ""),
-      notify && old.startsAt > now && !old.cancelledAt,
-    ),
-    db
-      .prepare(
-        `UPDATE signup SET status = 'cancelled', updated_at = ?
-      WHERE event_id = ? AND status = 'confirmed'
-        AND EXISTS(SELECT 1 FROM event e WHERE e.id = signup.event_id AND e.starts_at > ${nowMsSql})
-        AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
-      )
-      .bind(now, id, operation),
-  ]);
-  if (!results[0].meta.changes)
-    throw new RequestError(
-      409,
-      "This event or your organizer authorization changed. Reload the page.",
-    );
-  if (old.seriesId) await ensurePatrolOccurrences(db, old.seriesId);
-  return {
-    operation,
-    message: "Event deleted. Registration and attendance history was kept.",
-  };
+  return cancelEvent(db, actor, id, version, "", notify);
 }
 
 export async function changeSignup(
@@ -654,14 +874,16 @@ export async function listPublicRosters(
      WHERE s.status = 'confirmed' AND e.id IN (SELECT value FROM json_each(?))
       AND e.starts_at > ${nowMsSql} AND e.cancelled_at IS NULL
       AND ${volunteerEventVisibilitySql(actor)}
-      AND ${recurringSignupWindowSql()}
+      AND (${recurringSignupWindowSql()} OR EXISTS(
+        SELECT 1 FROM signup own WHERE own.event_id = e.id AND own.user_id = ? AND own.status = 'confirmed'
+      ))
       AND (e.series_id IS NULL OR e.hidden = 0)
       AND ((e.series_id IS NOT NULL AND e.hidden = 0) OR (e.open = 1 AND e.hidden = 0)
         OR EXISTS (SELECT 1 FROM signup own WHERE own.event_id = e.id AND own.user_id = ? AND own.status = 'confirmed'))
     ORDER BY s.event_id, s.id LIMIT 10000`,
     )
     // One JSON binding keeps a full 100-event page below D1's 100-parameter limit.
-    .bind(JSON.stringify(ids), actor.id)
+    .bind(JSON.stringify(ids), actor.id, actor.id)
     .all<{
       membership: string;
       attendeeIdentity: string;
@@ -703,21 +925,25 @@ export async function listRosters(
 ) {
   requireOrganizer(actor);
   if (!eventIds.length) return [];
-  const ids = eventIds.slice(0, 100);
-  const placeholders = ids.map(() => "?").join(", ");
+  // Management can show 100 upcoming dates and 100 past dates together.
+  const ids = eventIds.slice(0, 200);
   const rows = await db
     .prepare(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, ${profileDisplayNameSql} AS name,
+        CASE WHEN ${includesOrientationSql()} AND NOT EXISTS (
+          SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id
+        ) THEN 'orientee' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'volunteer' END AS category,
         EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
       FROM signup s
+      JOIN event e ON e.id = s.event_id
       JOIN profile p ON p.user_id = s.user_id
       JOIN user u ON u.id = s.user_id
-      WHERE s.event_id IN (${placeholders}) AND s.status = 'confirmed'
-      ORDER BY name
-      LIMIT 10000`,
+       WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'
+       ORDER BY name
+       LIMIT 20000`,
     )
-    .bind(...ids)
+    .bind(JSON.stringify(ids))
     .all<RosterRow>();
   return rows.results;
 }

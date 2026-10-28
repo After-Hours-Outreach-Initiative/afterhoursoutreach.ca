@@ -20,7 +20,6 @@ import {
   codeOfConductError,
   codeOfConductRules,
 } from "../../src/data/code-of-conduct";
-import { totpFromSetupKey } from "../helpers/totp";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { fillDateInput } from "../helpers/date-input";
 import { vancouverInput } from "../../src/data/event-time";
@@ -200,8 +199,13 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
     },
   );
   const proofs: object[] = [];
+  let finishVerifying!: () => void;
+  const verifying = new Promise<void>((resolve) => {
+    finishVerifying = resolve;
+  });
   await page.route("**/api/v1/auth/sign-in/email-otp**", async (route) => {
     proofs.push(route.request().postDataJSON());
+    await verifying;
     await route.fulfill({
       status: 400,
       json: { message: "That code is incorrect or has expired." },
@@ -256,18 +260,47 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
     page.getByRole("button", { name: "Simulate successful delivery" }),
   ).toHaveCount(0);
   expect(emails).toEqual(["first@example.org"]);
+  const signInButton = codeForm.getByRole("button", {
+    name: "Sign in with code",
+  });
   await code.fill("123");
-  await page.getByRole("button", { name: "Sign in with code" }).click();
+  await signInButton.click();
   await expect(codeForm.locator("[data-error=email-code]")).toBeVisible();
   await expect(codeForm.locator("[data-error=email-code]")).toHaveText(
     "Enter a six-digit code.",
   );
+  await expect(signInButton).toBeEnabled();
+  await expect(signInButton).not.toHaveAttribute("aria-busy");
   expect(proofs).toEqual([]);
   await code.fill("123456");
-  await page.getByRole("button", { name: "Sign in with code" }).click();
+  await signInButton.click();
+  await expect(signInButton).toBeDisabled();
+  await expect(signInButton).toHaveAttribute("aria-busy", "true");
+  expect(
+    await signInButton.evaluate(
+      (button) => getComputedStyle(button, "::before").animationName,
+    ),
+  ).toBe("volunteer-loading");
+  await expect(codeForm).toHaveAttribute("aria-busy", "true");
+  await expect.poll(() => proofs.length).toBe(1);
+  await codeForm.dispatchEvent("submit");
+  await signInButton.dispatchEvent("click");
+  expect(proofs).toHaveLength(1);
+  finishVerifying();
   await expect(codeForm.locator("[data-form-message]")).toHaveText(
     "That code is incorrect or has expired.",
   );
+  await expect(codeForm.locator("[data-form-message]")).toHaveAttribute(
+    "role",
+    "alert",
+  );
+  await expect(codeForm.locator("[data-form-message]")).toHaveAttribute(
+    "aria-live",
+    "assertive",
+  );
+  await expect(signInButton).toBeEnabled();
+  await expect(signInButton).not.toHaveAttribute("aria-busy");
+  await expect(codeForm).not.toHaveAttribute("aria-busy");
   expect(proofs).toEqual([{ email: "first@example.org", otp: "123456" }]);
   await page.getByRole("link", { name: "Use a different email" }).click();
   await expect(emailForm).toBeVisible();
@@ -685,7 +718,7 @@ test("account contents navigate profile and settings sections on desktop and mob
     ).toHaveCount(0);
     for (const [id, heading] of [
       ["account-profile-emergency-contact", "Emergency contact"],
-      ["account-sessions-heading", "Sessions"],
+      ["account-sessions-heading", "Signed in browsers"],
     ]) {
       if (width < 1024) await summary.click();
       const link = contents.getByRole("link", { name: heading, exact: true });
@@ -1646,6 +1679,105 @@ test("the application requires JavaScript and renders blank DOB format guidance"
   }
 });
 
+test("training options have independent details through review, submission and profile edits", async ({
+  page,
+  baseURL,
+}) => {
+  await createLocalAccount(page.request, baseURL!, false);
+  await page.goto("/apply");
+  const form = page.locator("[data-account-profile]");
+  for (const [name, value] of Object.entries(sampleAnswers)) {
+    if (Array.isArray(value)) {
+      for (const choice of value)
+        await form.locator(`[name="${name}"][value="${choice}"]`).check();
+    } else {
+      const control = form.locator(`[name="${name}"]`);
+      if (
+        name === "birthDate" ||
+        ((await control.count()) &&
+          (await control.isVisible()) &&
+          (await control.isEditable()))
+      )
+        await fillApplicationField(form, name, value);
+    }
+  }
+  const followups = [
+    ["expired-first-aid", "expiredFirstAidDetails", "Expired OFA Level 2"],
+    [
+      "crisis-intervention",
+      "crisisInterventionDetails",
+      "Crisis prevention certification",
+    ],
+  ] as const;
+  for (const [value, name, details] of followups) {
+    const checkbox = form.locator(`[name="training"][value="${value}"]`);
+    const input = form.locator(`[name="${name}"]`);
+    await expect(input).toBeHidden();
+    await checkbox.check();
+    await expect(input).toBeEditable();
+    await expect(input).toHaveAttribute("required", "");
+    await input.fill(" \t ");
+    expect(
+      await input.evaluate(
+        (input: HTMLTextAreaElement) => input.validity.valid,
+      ),
+    ).toBe(false);
+    await input.fill(details);
+  }
+  await reviewLocalApplication(page);
+  for (const [, name, details] of followups)
+    await expect(form.locator(`[data-review-answer="${name}"]`)).toHaveText(
+      details,
+    );
+  await form.locator('[name="codeOfConductAccepted"]').check();
+  await form
+    .getByRole("button", { name: "Submit application", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/volunteer$/);
+  const submission = page.locator("[data-submitted-application]");
+  for (const [, , details] of followups)
+    await expect(submission).toContainText(details);
+  await page.goto("/volunteer/account");
+  await page.getByRole("button", { name: "Edit training and safety" }).click();
+  const [value, name, details] = followups[0];
+  const checkbox = form.locator(`[name="training"][value="${value}"]`);
+  const input = form.locator(`[name="${name}"]`);
+  await expect(input).toHaveValue(details);
+  await checkbox.uncheck();
+  await expect(input).toBeHidden();
+  await expect(input).not.toHaveAttribute("required");
+  await form
+    .locator('[data-profile-fields="training-and-safety"]')
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Edit training and safety" }).click();
+  await expect(checkbox).toBeChecked();
+  await expect(input).toHaveValue(details);
+  await checkbox.uncheck();
+  await form
+    .locator('[data-profile-fields="training-and-safety"]')
+    .getByRole("button", { name: "Save", exact: true })
+    .click();
+  await expect(
+    form.locator('[data-profile-answers="training-and-safety"]'),
+  ).toBeVisible();
+  await expect(form.locator(`[data-profile-answer="${name}"]`)).toBeHidden();
+  await page.reload();
+  await page.getByRole("button", { name: "Edit training and safety" }).click();
+  await checkbox.check();
+  await expect(input).toHaveValue("");
+  await expect(input).toHaveAttribute("required", "");
+  await expect(form.locator('[name="crisisInterventionDetails"]')).toHaveValue(
+    followups[1][2],
+  );
+  await form
+    .locator('[data-profile-fields="training-and-safety"]')
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await page.goto("/volunteer");
+  await expect(submission).toContainText(details);
+});
+
 test("all teams can select multiple relevant training answers and add Other details", async ({
   page,
   baseURL,
@@ -1668,7 +1800,7 @@ test("all teams can select multiple relevant training answers and add Other deta
     exact: true,
   });
   const crisis = training.getByRole("checkbox", {
-    name: "Crisis intervention and de-escalation training (specify under Other)",
+    name: "Crisis intervention and de-escalation training",
     exact: true,
   });
   const none = training.getByRole("checkbox", {
@@ -1676,7 +1808,6 @@ test("all teams can select multiple relevant training answers and add Other deta
     exact: true,
   });
   const medic = form.getByLabel("Medic", { exact: true });
-  const support = form.getByLabel("Non-patrol support", { exact: true });
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/account/profile")
@@ -1690,13 +1821,15 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(
     training.locator(".volunteer-training-options > label"),
   ).toHaveText(trainingOptions.map((option) => option.label));
-  await expect(divider).toHaveText("or");
+  await expect(divider).toHaveText("OR");
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     await expect(divider).toBeVisible();
     await expect(divider).toHaveCSS("width", "120px");
     const dividerBounds = await divider.boundingBox();
-    const noneBounds = await none.boundingBox();
+    const noneBounds = await training
+      .locator('label:has(input[value="none"])')
+      .boundingBox();
     expect(dividerBounds!.x).toBeCloseTo(noneBounds!.x, 1);
     expect(
       await training
@@ -1788,6 +1921,9 @@ test("all teams can select multiple relevant training answers and add Other deta
   await naloxone.check();
   await expect(none).not.toBeChecked();
   await crisis.check();
+  await training
+    .locator('[name="crisisInterventionDetails"]')
+    .fill("Crisis prevention certification");
   await other.check();
   await expect(training.locator(":checked")).toHaveCount(3);
   await expect(otherText).toBeEditable();
@@ -1816,7 +1952,6 @@ test("all teams can select multiple relevant training answers and add Other deta
   await expect(training).toBeVisible();
   await expect(otherText).toBeEditable();
   await expect(training.locator(":checked")).toHaveCount(3);
-  await support.check();
   await medic.uncheck();
   await expect(training).toBeVisible();
   await submitLocalApplication(page);
@@ -1829,7 +1964,6 @@ test("all teams can select multiple relevant training answers and add Other deta
   await page.reload();
   await page.getByRole("button", { name: "Edit training and safety" }).click();
   await expect(medic).not.toBeChecked();
-  await expect(support).toBeChecked();
   await expect(naloxone).toBeChecked();
   await expect(crisis).toBeChecked();
   await expect(other).toBeChecked();
@@ -1987,9 +2121,13 @@ test("Medic selects one highest certification, expiry and conditional Other deta
   await expect(details).toHaveJSProperty("inert", false);
   await expect(
     form.locator(
-      '.volunteer-team-option:has([value="medic"]) + [data-medic-details] + .volunteer-team-option:has([value="non-patrol"])',
+      '.volunteer-team-options + [data-error="teams"] + [data-medic-details]',
     ),
   ).toHaveCount(1);
+  await expect(form.locator(".volunteer-team-options > label")).toHaveCount(2);
+  await expect(form.locator('[name="teams"][value="non-patrol"]')).toHaveCount(
+    0,
+  );
   const certificationChoices = certifications.locator(
     ".volunteer-choice-options",
   );
@@ -2364,6 +2502,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     data: await profileWriteBody((path) => page.request.get(path), {
       ...sampleAnswers,
       certifications,
+      teams: ["outreach", "non-patrol"],
       experience: "Saved experience",
       certificationExpiry: "2030-10-14",
     }),
@@ -2408,6 +2547,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     await expect(answer("emergencyName")).toHaveText(contact);
     await expect(answer("teams").getByRole("listitem")).toHaveText([
       "Outreach",
+      "Non-patrol support",
     ]);
     await expect(answer("training")).toHaveText("No relevant training");
     for (const conditional of [
@@ -2562,6 +2702,7 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
     phone: sampleAnswers.phone,
     training: sampleAnswers.training,
     certifications,
+    teams: ["outreach", "non-patrol"],
     experience: "Saved experience",
     certificationExpiry: "2030-10-14",
   });
@@ -2620,21 +2761,27 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   await page.getByRole("button", { name: "Edit team interests" }).click();
   await expect(
     form.getByRole("button", { name: "Save", exact: true }),
-  ).toBeDisabled();
-  await form.getByLabel("Non-patrol support", { exact: true }).check();
+  ).toBeEnabled();
+  await form.getByLabel("Medic", { exact: true }).check();
+  await form
+    .getByRole("radio", {
+      name: "Advanced First Aid (formerly OFA Level 3)",
+      exact: true,
+    })
+    .check();
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
     form.locator('[data-profile-answers="team-interests"]'),
   ).toBeVisible();
   await expect(answer("teams").getByRole("listitem")).toHaveText([
     "Outreach",
-    "Non-patrol support",
+    "Medic",
   ]);
   await expect(form.locator("[data-form-message]")).toBeHidden();
-  expect(requests[2].certifications).toEqual(certifications);
+  expect(requests[2].certifications).toEqual(["advanced-first-aid"]);
 });
 
-test("Outreach stays selected while optional teams support cards, keyboard input and reset", async ({
+test("Outreach stays selected while Medic supports cards, keyboard input and reset", async ({
   page,
   baseURL,
 }) => {
@@ -2644,7 +2791,6 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   const form = page.locator("[data-account-profile]");
   const outreach = form.getByLabel("Outreach", { exact: true });
   const medic = form.getByLabel("Medic", { exact: true });
-  const support = form.getByLabel("Non-patrol support", { exact: true });
   const save = form
     .locator('[data-profile-fields="team-interests"]')
     .getByRole("button", { name: "Save", exact: true, includeHidden: true })
@@ -2652,7 +2798,7 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   const cards = form.locator(".volunteer-team-option");
   const training = form.locator("[data-medic-certifications]");
   await expect(training).toBeHidden();
-  await expect(cards).toHaveCount(3);
+  await expect(cards).toHaveCount(2);
   for (const width of [320, 375, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     await expectTeamCardRows(form);
@@ -2674,7 +2820,7 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   );
   await expect(
     form.getByLabel("Non-patrol support", { exact: true }),
-  ).toHaveAccessibleDescription(/Assist with inventory, logistics/);
+  ).toHaveCount(0);
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/account/profile")
@@ -2704,26 +2850,20 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(training).toBeVisible();
   await expect(
     form.locator(
-      '.volunteer-team-option:has([value="medic"]) + [data-profile-team-training] [data-medic-details]',
+      ".volunteer-team-options + [data-profile-team-training] [data-medic-details]",
     ),
   ).toBeVisible();
   await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
   await medic.press("Tab");
   await expect(training.getByRole("radio").first()).toBeFocused();
-  await support.focus();
-  await expect(support).toBeFocused();
-  await expect(cards.nth(2)).toHaveCSS("outline-style", "solid");
-  await support.press("Space");
-  await expect(support).toBeChecked();
-  await expect(medic).toBeChecked();
   await medic.focus();
+  await expect(medic).toBeFocused();
+  await expect(cards.nth(1)).toHaveCSS("outline-style", "solid");
   await medic.press("Space");
   await expect(medic).not.toBeChecked();
   await expect(training).toBeHidden();
-  await support.uncheck();
   await expect(save).toBeDisabled();
   await medic.check();
-  await support.check();
   const other = training.getByRole("radio", {
     name: "Other",
     exact: true,
@@ -2735,7 +2875,6 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(outreach).toBeChecked();
   await expect(outreach).toBeDisabled();
   await expect(medic).not.toBeChecked();
-  await expect(support).not.toBeChecked();
   await expect(training).toBeHidden();
   await expect(training.locator("[required]")).toHaveCount(0);
   await expect(other).not.toBeChecked();
@@ -2746,18 +2885,12 @@ test("Outreach stays selected while optional teams support cards, keyboard input
   await expect(form.locator('[name="teams"][required]')).toHaveCount(0);
   await expect(save).toBeDisabled();
   expect(requests).toEqual([]);
-  await support.check();
-  await save.click();
-  await expect(
-    form.locator('[data-profile-answers="team-interests"]'),
-  ).toBeVisible();
-  await expect(form.locator("[data-form-message]")).toBeHidden();
   await page.reload();
   await expect(outreach).toBeChecked();
   await expect(outreach).toBeDisabled();
-  await expect(support).toBeChecked();
+  await expect(medic).not.toBeChecked();
   await expect(training).toBeHidden();
-  expect(requests).toHaveLength(1);
+  expect(requests).toHaveLength(0);
 
   // Medic's dependent fields stay inside the open Team interests section;
   // Training and safety remains saved text until its own Edit is selected.
@@ -2777,7 +2910,7 @@ test("Outreach stays selected while optional teams support cards, keyboard input
     exact: true,
   });
   await expect(firstAid).toBeFocused();
-  expect(requests).toHaveLength(1);
+  expect(requests).toHaveLength(0);
   await firstAid.check();
   const expiry = form.locator('[name="certificationExpiry"]');
   await fillApplicationField(form, "certificationExpiry", "2030-10-14");
@@ -3523,7 +3656,7 @@ test("edits made during a profile save remain unsaved", async ({
   }
 });
 
-test("session dividers stay between rows after removal and settings refresh", async ({
+test("signed-in browser cards stay framed after reload and removal", async ({
   page,
   browser,
   baseURL,
@@ -3532,20 +3665,17 @@ test("session dividers stay between rows after removal and settings refresh", as
   await page.goto("/volunteer/account");
   const sessions = page.locator("[data-account-sessions]");
   const rows = sessions.locator("[data-session-row]");
-  const expectDividers = async (count: number) => {
+  const expectCards = async (count: number) => {
     await expect(rows).toHaveCount(count);
     await expect(sessions).toHaveCSS("border-bottom-width", "0px");
-    for (let index = 0; index < count; index++)
-      await expect(rows.nth(index)).toHaveCSS(
-        "border-bottom-width",
-        index < count - 1 ? "1px" : "0px",
-      );
-    await expect(page.locator("[data-factor-settings]")).toHaveCSS(
-      "border-bottom-width",
-      "1px",
-    );
+    for (let index = 0; index < count; index++) {
+      await expect(rows.nth(index)).toHaveCSS("border-width", "1px");
+      await expect(rows.nth(index)).toHaveCSS("border-radius", "8px");
+      await expect(rows.nth(index)).toHaveCSS("padding", "20px");
+    }
+    await expect(sessions).toHaveCSS("border-top-width", "1px");
   };
-  await expectDividers(1);
+  await expectCards(1);
 
   // Separate devices keep their sessions when the local browser clears cookies.
   const otherDevice = await browser.newContext({ baseURL });
@@ -3567,41 +3697,34 @@ test("session dividers stay between rows after removal and settings refresh", as
   await page.reload();
   for (const width of [1280, 375]) {
     await page.setViewportSize({ width, height: 812 });
-    await expectDividers(3);
+    await expectCards(3);
   }
   for (const remaining of [2, 1]) {
     const form = sessions.locator("[data-end-session]").last();
     await inPlaceAction(page, {
       endpoint: "/api/v1/account/session",
       form,
-      trigger: () => form.getByRole("button", { name: "End session" }).click(),
-      updated: () => expectDividers(remaining),
-      loadingLabel: "Ending session…",
+      trigger: () =>
+        form
+          .getByRole("button", { name: "Sign out of session", exact: true })
+          .click(),
+      updated: () => expectCards(remaining),
+      loadingLabel: "Signing out…",
     });
   }
   await expect(
-    sessions.getByRole("heading", { name: "Sessions" }),
+    sessions.getByRole("heading", {
+      name: "Signed in browsers",
+      exact: true,
+    }),
   ).toBeFocused();
   await expect(page.locator("#account-sessions-heading")).toHaveAttribute(
     "tabindex",
     "-1",
   );
-
-  // Authenticator verification replaces the server-rendered Sessions fragment.
-  await page.getByRole("button", { name: "Set up an authenticator" }).click();
-  await expect(page.locator("#account-sessions-heading")).not.toHaveAttribute(
-    "tabindex",
-  );
-  const setup = page.locator("[data-confirm-factor]");
-  await expect(setup).toBeVisible();
-  const key = (await page.locator("[data-factor-key]").textContent())!;
-  await setup.locator('input[name="code"]').fill(totpFromSetupKey(key));
-  await page.getByRole("button", { name: "Verify and enable" }).click();
-  await expect(setup).toHaveCount(0);
-  await expectDividers(1);
 });
 
-test("authenticator setup and sign-in show native inline code errors", async ({
+test("authenticator sign-in shows native inline code errors", async ({
   page,
   baseURL,
 }) => {
@@ -3612,33 +3735,9 @@ test("authenticator setup and sign-in show native inline code errors", async ({
     name: /^Preferred name/,
   });
   await name.fill("Unsaved authenticator draft");
-  await page.getByRole("button", { name: "Set up an authenticator" }).click();
-  const setup = page.locator("[data-confirm-factor]");
-  await expect(setup).toBeVisible();
-  await expect(setup.locator("[data-error=factor-setup-code]")).toBeHidden();
-  await page.getByRole("button", { name: "Verify and enable" }).click();
-  await expect(setup.locator("[data-error=factor-setup-code]")).toBeVisible();
-  const code = setup.locator('input[name="code"]');
-  await code.fill("123");
-  await expect(setup.locator("[data-error=factor-setup-code]")).toHaveText(
-    "Enter a six-digit code.",
+  await expect(page.locator("[data-factor-settings]")).toContainText(
+    "Coming soon.",
   );
-  await expect(setup.locator("[data-error=factor-setup-code]")).toBeVisible();
-  const key = (await page.locator("[data-factor-key]").textContent())!;
-  await code.fill(totpFromSetupKey(key));
-  await inPlaceAction(page, {
-    endpoint: "/api/v1/auth/two-factor/verify-totp",
-    form: setup,
-    trigger: () =>
-      page.getByRole("button", { name: "Verify and enable" }).click(),
-    updated: () =>
-      expect(
-        page.getByText("Your authenticator is enabled.", { exact: false }),
-      ).toBeVisible(),
-    loadingLabel: "Verifying…",
-  });
-  await expect(name).toHaveValue("Unsaved authenticator draft");
-  await expect(page.locator("#account-factor-heading")).toBeFocused();
   const contents = page.getByRole("navigation", { name: "Sections" });
   await contents
     .getByRole("link", { name: "Two-factor authentication", exact: true })
@@ -3654,7 +3753,7 @@ test("authenticator setup and sign-in show native inline code errors", async ({
     ),
   ).toHaveCount(2);
   await expect(page.locator("[data-account-sessions]")).toContainText(
-    "This device",
+    "This browser",
   );
   await page.locator("[data-account-menu] summary").click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();

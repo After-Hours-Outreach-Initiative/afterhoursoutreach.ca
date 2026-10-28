@@ -1,0 +1,20 @@
+---
+import { env } from "cloudflare:workers";
+import { loadDiscordStatus } from "@/server/discord/status";
+import DiscordConnectionView from "./DiscordConnectionView.astro";
+interface Props {
+  userId: string;
+  canConnect?: boolean;
+  required?: boolean;
+}
+const { userId, canConnect = true, required = false } = Astro.props;
+const status = import.meta.env.DEV
+  ? await (
+      await import("@/dev/server/discord")
+    ).loadLocalDiscordStatus(env, userId)
+  : await loadDiscordStatus(env, userId);
+const result = Astro.url.searchParams.get("discord");
+---
+
+<DiscordConnectionView {status} {canConnect} {required} {result} />
+<script src="../../scripts/discord.ts"></script>

@@ -276,18 +276,37 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           const avatar = element
             .querySelector(".event-avatar-row .attendee-avatar")!
             .getBoundingClientRect();
-          const info = element
-            .querySelector(".volunteer-event-info")!
+          const summary = element.querySelector(".event-roster-toggle")!;
+          const label = summary
+            .querySelector(":scope > span")!
+            .getBoundingClientRect();
+          const row = summary
+            .querySelector(".event-avatar-row")!
+            .getBoundingClientRect();
+          const chevron = summary
+            .querySelector(".event-roster-chevron")!
             .getBoundingClientRect();
           return {
-            leftOffset: avatar.left - info.left,
+            summaryWidth: summary.getBoundingClientRect().width,
+            leftOffset: avatar.left - label.left,
+            rowLeftOffset: row.left - label.left,
+            belowLabel: row.top >= label.bottom,
+            beforeChevron: row.right <= chevron.left,
             width: avatar.width,
             height: avatar.height,
           };
         });
-        expect(Math.abs(avatarLayout.leftOffset)).toBeLessThan(1);
-        expect(avatarLayout.width).toBeCloseTo((32 * 14) / 19.5, 1);
-        expect(avatarLayout.height).toBe(32);
+        if (avatarLayout.summaryWidth < 512) {
+          expect(Math.abs(avatarLayout.leftOffset)).toBeLessThan(1);
+          expect(Math.abs(avatarLayout.rowLeftOffset)).toBeLessThan(1);
+        } else {
+          expect(avatarLayout.leftOffset).toBeGreaterThan(0);
+          expect(avatarLayout.rowLeftOffset).toBeGreaterThan(0);
+        }
+        expect(avatarLayout.belowLabel).toBe(avatarLayout.summaryWidth < 512);
+        expect(avatarLayout.beforeChevron).toBe(true);
+        expect(avatarLayout.width).toBeCloseTo((24 * 14) / 19.5, 1);
+        expect(avatarLayout.height).toBe(24);
         await expect(
           card.locator(".event-avatar-row .attendee-medic"),
         ).toHaveCount(3);
@@ -325,9 +344,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(card.locator(".event-orientee-box")).toHaveCount(0);
         const emptyCard = page.locator(`[data-live-event="${empty}"]`);
         const emptyRoster = emptyCard.locator(rosterSelector);
-        await expect(emptyRoster.locator("summary")).toHaveText(
-          "Volunteers (0)",
-        );
+        await expect(emptyRoster).toHaveCount(0);
         await expect(emptyCard.locator(".event-row-label")).toHaveCount(0);
         await expect(
           emptyCard.locator(".event-attendance .attendee-avatar"),
@@ -356,17 +373,15 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             const bounds = (selector: string) =>
               element.querySelector(selector)!.getBoundingClientRect();
             const action = bounds(".volunteer-actions");
-            const attendance = element
-              .querySelector(".event-attendance")
+            const roster = element
+              .querySelector(".volunteer-roster, .public-event-roster")
               ?.getBoundingClientRect();
             const details = bounds(".volunteer-event-info");
             const layout = bounds(".volunteer-event-layout");
             const style = getComputedStyle(element);
             return {
-              afterAttendance:
-                action.top >= (attendance?.bottom ?? details.bottom),
-              attendanceAfterInfo:
-                !attendance || attendance.top >= details.bottom,
+              afterInfo: action.top >= details.bottom,
+              rosterAfterLayout: !roster || roster.top >= layout.bottom,
               besideInfo:
                 action.left >= details.right && action.top === details.top,
               wide:
@@ -377,18 +392,13 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
               leftOffset: action.left - layout.left,
               rightOffset: action.right - layout.right,
               bottomOffset:
-                layout.bottom -
-                Math.max(
-                  details.bottom,
-                  action.bottom,
-                  attendance?.bottom ?? 0,
-                ),
+                layout.bottom - Math.max(details.bottom, action.bottom),
               controlHeight: bounds(".volunteer-actions .btn").height,
               controlWidth: bounds(".volunteer-actions .btn").width,
               layoutWidth: layout.width,
             };
           });
-          expect(position.attendanceAfterInfo).toBe(true);
+          expect(position.rosterAfterLayout).toBe(true);
           expect(position.controlHeight).toBeGreaterThanOrEqual(44);
           expect(Math.abs(position.rightOffset)).toBeLessThan(1);
           expect(Math.abs(position.bottomOffset)).toBeLessThan(1);
@@ -396,7 +406,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             expect(position.besideInfo).toBe(true);
             expect(position.controlWidth).toBeLessThan(position.layoutWidth);
           } else {
-            expect(position.afterAttendance).toBe(true);
+            expect(position.afterInfo).toBe(true);
             expect(Math.abs(position.leftOffset)).toBeLessThan(1);
             expect(
               Math.abs(position.controlWidth - position.layoutWidth),
@@ -448,16 +458,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           await emptyRoster.locator("summary").click();
           await expectActionPosition();
           await setRegistration(false);
-          await expect(emptyRoster.locator("summary")).toHaveText(
-            "Volunteers (0)",
-            { timeout: 15_000 },
-          );
-          await expect(emptyRoster).toHaveAttribute("open", "");
-          await expect(
-            emptyRoster.getByText("No volunteers registered yet.", {
-              exact: true,
-            }),
-          ).toBeVisible();
+          await expect(emptyRoster).toHaveCount(0, { timeout: 15_000 });
           await expect(
             emptyCard.locator(".event-attendance .attendee-avatar"),
           ).toHaveCount(0);
@@ -480,15 +481,19 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         expect(crowdedLayout.scrollable).toBe(false);
         if (manage) {
           await card.locator(".volunteer-roster > summary").click();
-          await expect(card.locator(".volunteer-roster li")).toHaveCount(8);
+          await expect(card.locator(".volunteer-roster tbody tr")).toHaveCount(
+            8,
+          );
         } else {
           await card.locator(".public-event-roster > summary").click();
           const roster = card.locator(".public-event-roster");
-          await expect(roster.locator("li")).toHaveCount(8);
+          await expect(roster.locator("tbody tr")).toHaveCount(8);
           await expect(roster.locator("a, input, button")).toHaveCount(0);
-          await expect(roster.locator("li").first()).toHaveText(publicName);
+          await expect(roster.locator("tbody tr").first()).toHaveText(
+            publicName,
+          );
           await expect(
-            roster.locator("li").first().locator(".attendee-medic"),
+            roster.locator("tbody tr").first().locator(".attendee-medic"),
           ).toHaveCSS("color", "rgb(185, 28, 28)");
           await expect(roster.locator(".attendee-volunteer").first()).toHaveCSS(
             "color",
@@ -504,9 +509,12 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
               "UPDATE profile SET first_name='Live' WHERE user_id='avatar-attendee-0'",
             ).run();
             publicName = "Live P.";
-            await expect(roster.locator("li").first()).toHaveText(publicName, {
-              timeout: 15_000,
-            });
+            await expect(roster.locator("tbody tr").first()).toHaveText(
+              publicName,
+              {
+                timeout: 15_000,
+              },
+            );
             await expect(roster).toHaveAttribute("open", "");
             await expect(roster.locator("summary")).toBeFocused();
           }

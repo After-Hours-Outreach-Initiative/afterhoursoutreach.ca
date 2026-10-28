@@ -19,7 +19,7 @@ import FieldError from "@/components/FieldError.astro";
     <input
       id="sign-in-code"
       name="code"
-      aria-describedby="error-email-code sign-in-code-help"
+      aria-describedby="error-email-code"
       inputmode="numeric"
       autocomplete="one-time-code"
       pattern="[0-9]{6}"
@@ -28,13 +28,13 @@ import FieldError from "@/components/FieldError.astro";
     />
     <FieldError field="email-code" message="Enter a six-digit code." />
   </div>
-  <p id="sign-in-code-help" class="volunteer-help">
-    Code or link expired or already used? Choose Resend code for a new email.
-    Only the latest code and link will work.
-  </p>
   <p data-form-message role="status" aria-live="polite" hidden></p>
   <button type="submit" class="btn btn-primary">Sign in with code</button>
   <button type="button" class="btn btn-outline" data-resend-code disabled
     >Resend code</button
   >
+  <p id="sign-in-code-help" class="volunteer-help" hidden>
+    Code or link expired or already used? Choose Resend code for a new email.
+    Only the latest code and link will work.
+  </p>
 </form>

@@ -151,6 +151,9 @@
   list-style: disc;
   white-space: normal;
 }
+.account-setting-unavailable h3 {
+  color: #a1a1aa;
+}
 .account-sessions {
   display: flex;
   flex-direction: column;
@@ -163,10 +166,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-}
-.account-sessions li:not(:last-child) {
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid #3f3f46;
+  padding: 1.25rem;
+  border: var(--volunteer-border);
+  border-radius: 0.5rem;
 }
 .account-sessions span {
   display: block;

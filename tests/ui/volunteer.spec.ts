@@ -10,8 +10,8 @@ import {
   createLocalAccount,
   openLocalAccountSwitcher,
   sampleAnswers,
+  signInLocalAuthenticatorAccount,
 } from "../helpers/local-account";
-import { totpFromSetupKey } from "../helpers/totp";
 
 test.use({
   extraHTTPHeaders: async ({}, use) => {
@@ -137,25 +137,23 @@ test("event filters include orientation without excluding other patrols, preserv
       event.includesOrientation ? "Orientation + Patrol" : "Patrol",
     );
   }
-  await filters
-    .getByRole("button", { name: "Orientations", exact: true })
-    .click();
+  await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
   await expect(
-    filters.getByRole("button", { name: "Orientations", exact: true }),
+    filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   await expect(page).toHaveURL(/\?type=orientation$/);
-  await filters.getByRole("button", { name: "All", exact: true }).click();
+  await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
   await expectFilter("all");
   await page.goBack();
   await expect(
-    filters.getByRole("button", { name: "Orientations", exact: true }),
+    filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   expect(documents).toEqual([]);
   await page.reload();
   await expectFilter("orientation");
-  await filters.getByRole("button", { name: "All", exact: true }).click();
+  await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
   await expectFilter("all");
 });
 
@@ -296,7 +294,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
     "",
   );
 
-  await page.getByRole("button", { name: "Orientations", exact: true }).click();
+  await page.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
   await expect(link(patrol.id)).toHaveCount(0);
   await expect(link(orientation.id)).toBeVisible();
   // Every date/event link must still target a real, visible card after filtering.
@@ -947,22 +945,7 @@ test("View as simulates a verified factor without changing the user's real role 
   request,
   baseURL,
 }) => {
-  const user = await createLocalAccount(request, baseURL!);
-  const enabled = await request.post("/api/v1/auth/two-factor/enable", {
-    headers: { origin: baseURL! },
-    data: { method: "totp" },
-  });
-  expect(enabled.status()).toBe(200);
-  const setup: { totpURI: string } = await enabled.json();
-  const verified = await request.post("/api/v1/auth/two-factor/verify-totp", {
-    headers: { origin: baseURL! },
-    data: {
-      code: totpFromSetupKey(
-        new URL(setup.totpURI).searchParams.get("secret")!,
-      ),
-    },
-  });
-  expect(verified.status()).toBe(200);
+  const user = await signInLocalAuthenticatorAccount(request, baseURL!);
   await page.reload();
   const profiles = await openLocalAccountSwitcher(page);
   const profile = profiles.locator(`[data-switch-user="${user.id}"]`);
@@ -972,7 +955,7 @@ test("View as simulates a verified factor without changing the user's real role 
   const current = await page.request.get("/api/v1/auth/get-session");
   const session = await current.json();
   expect(session.user.id).toBe(user.id);
-  expect(session.user.role).toBe("volunteer");
+  expect(session.user.role).toBe(user.role);
   expect(session.user.twoFactorEnabled).toBe(true);
   expect(session.session.twoFactorVerified).toBe(true);
   await expect(page.locator("[data-volunteer-menu]")).toBeHidden();

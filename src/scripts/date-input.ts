@@ -142,7 +142,7 @@ export function initDateInputs(root: Document | HTMLElement) {
         }
         if (withTime) group.removeAttribute("aria-invalid");
         let error = "";
-        if (!date.readOnly && date.value && time) {
+        if (time && !time.readOnly && date.value) {
           if (!parseTimeInput(time.value))
             error = "Enter a start time with AM or PM, such as 9:00 PM.";
           else if (date.validity.valid && time.validity.valid) {
@@ -179,7 +179,7 @@ export function initDateInputs(root: Document | HTMLElement) {
       if (!day.value)
         error = [
           "day",
-          birthDate ? "Enter your day of birth." : "Enter the day.",
+          birthDate ? "Enter your date of birth." : "Enter the day.",
         ];
       else if (
         !/^\d{1,2}$/.test(day.value) ||

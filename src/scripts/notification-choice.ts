@@ -3,6 +3,7 @@ import { createDialogHeader } from "./dialog";
 let nextChoiceId = 0;
 
 const descriptions: Record<string, string> = {
+  bulk: "You can email the volunteers registered for the selected events whose details change. Other occurrences and entire recurring series are not changed or emailed.",
   access:
     "You can email this volunteer about their updated access. If this change cancels any future spots, their cancellation emails will be included too.",
   role: "You can email this volunteer about their new role and ask them to sign in again.",

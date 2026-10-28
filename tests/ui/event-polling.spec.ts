@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { addCalendarDays, vancouverInput } from "../../src/data/event-time";
+import { fillDateInput } from "../helpers/date-input";
 import {
   createLocalAccount,
   approveLocalApplication,
@@ -330,7 +332,7 @@ test("other viewers see signups and cancellations through polling without losing
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
     await expect(
-      viewer.getByRole("button", { name: "Orientations", exact: true }),
+      viewer.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
     ).toBeFocused();
     expect(failedRefreshes).toBeGreaterThanOrEqual(2);
     await viewer.unroute("**/events?type=orientation");
@@ -397,4 +399,170 @@ test("other viewers see signups and cancellations through polling without losing
       attendeeContext.close(),
     ]);
   }
+});
+
+test("filter counts track grouped series, polling, actions and past events", async ({
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(60_000);
+  test.skip(
+    !baseURL?.startsWith("http://localhost:"),
+    "Local D1 development only",
+  );
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  const filters = page.getByRole("group", { name: "Filter events" });
+  await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
+  const counts = filters.locator("[data-event-filter-count]");
+  const before = (await counts.allTextContents()).map(Number);
+  expect(before).toHaveLength(4);
+  const selectedFilter = filters.locator('[aria-pressed="true"]');
+  await selectedFilter.focus();
+  const firstDate = addCalendarDays(vancouverInput(Date.now()).slice(0, 10), 1);
+  const created = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: {
+      action: "save-series",
+      series: {
+        firstDate,
+        localTime: "20:30",
+        intervalWeeks: 1,
+        endDate: null,
+        includesOrientation: true,
+        meetingPoint: `Filter counts ${crypto.randomUUID()}`,
+        meetingPointUrl: "",
+        spots: 8,
+        open: true,
+        hidden: false,
+      },
+    },
+  });
+  expect(created.status(), await created.text()).toBe(200);
+  const { id } = await created.json();
+  await expect(counts).toHaveText(
+    [before[0] + 1, before[1], before[2] + 1, before[3] + 1].map(String),
+    { timeout: 15_000 },
+  );
+  const series = page.locator(`[data-series-card="${id}"]`);
+  expect(await series.locator("[data-live-event]").count()).toBeGreaterThan(1);
+  await expect(selectedFilter).toBeFocused();
+
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  const editor = page.locator("#event-editor-new");
+  await fillDateInput(editor, "startsAt", `${firstDate}T21:30`);
+  const meetingPoint = `One-off count ${crypto.randomUUID()}`;
+  await editor.getByLabel("Meeting point", { exact: true }).fill(meetingPoint);
+  await editor
+    .getByRole("button", { name: "Create event", exact: true })
+    .click();
+  await expect(editor).not.toBeVisible();
+  await expect(counts).toHaveText(
+    [before[0] + 2, before[1] + 1, before[2] + 1, before[3] + 1].map(String),
+  );
+  await expect(
+    page.locator("[data-live-event]").filter({ hasText: meetingPoint }),
+  ).toBeHidden();
+  await expect(selectedFilter).toHaveAttribute(
+    "data-event-filter",
+    "orientation",
+  );
+
+  // An expanded occurrence/roster moves into management history at its start,
+  // without losing series tools, filter counts, or attendance actions.
+  await series.locator("[data-series-occurrences] > summary").click();
+  const occurrence = series.locator("[data-live-event]").first();
+  const occurrenceId = (await occurrence.getAttribute("data-live-event"))!;
+  const joined = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: { action: "join", id: occurrenceId },
+  });
+  expect(joined.status(), await joined.text()).toBe(200);
+  await occurrence.locator(".volunteer-roster > summary").click();
+  const starting = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: {
+      action: "save",
+      id: occurrenceId,
+      version: Number(
+        await occurrence
+          .locator('[data-event-save] [name="version"]')
+          .inputValue(),
+      ),
+      event: {
+        includesOrientation: true,
+        startsAt: new Date(Date.now() + 12_000).toISOString(),
+        meetingPoint: "Starting occurrence",
+        meetingPointUrl: "",
+        spots: 8,
+        open: true,
+        hidden: false,
+      },
+    },
+  });
+  expect(starting.status(), await starting.text()).toBe(200);
+  const past = page.locator("[data-past-event-list]");
+  const pastOccurrence = past.locator(`[data-live-event="${occurrenceId}"]`);
+  await expect(pastOccurrence).toBeVisible({ timeout: 25_000 });
+  await expect(
+    series.locator(`[data-live-event="${occurrenceId}"]`),
+  ).toHaveCount(0);
+  await expect(page.locator(`[data-live-event="${occurrenceId}"]`)).toHaveCount(
+    1,
+  );
+  await expect(pastOccurrence.locator(".volunteer-roster")).toHaveAttribute(
+    "open",
+    "",
+  );
+  await expect(
+    pastOccurrence.locator(
+      "[data-event-save], [data-event-cancel], [data-show-dialog]",
+    ),
+  ).toHaveCount(0);
+  await expect(counts).toHaveText(
+    [before[0] + 3, before[1] + 1, before[2] + 2, before[3] + 2].map(String),
+  );
+  await pastOccurrence
+    .getByRole("button", { name: "Mark orientation completed", exact: true })
+    .click();
+  await expect(
+    pastOccurrence.getByText("Orientation completed", { exact: true }),
+  ).toBeVisible();
+  await expect(pastOccurrence.locator(".volunteer-roster")).toHaveAttribute(
+    "open",
+    "",
+  );
+  await filters
+    .getByRole("button", { name: /^One-off events \(\d+\)$/ })
+    .click();
+  await expect(pastOccurrence).toBeHidden();
+  await filters
+    .getByRole("button", { name: /^Recurring series \(\d+\)$/ })
+    .click();
+  await expect(pastOccurrence).toBeVisible();
+  await page.goto(
+    `/manage/events?type=recurring&occurrence=${encodeURIComponent(occurrenceId)}`,
+  );
+  await expect(pastOccurrence).toBeVisible();
+  await expect(
+    series.locator(`[data-live-event="${occurrenceId}"]`),
+  ).toHaveCount(0);
+  await expect(
+    series.getByRole("button", { name: "Edit series", exact: true }),
+  ).toBeVisible();
+
+  await page.goto("/events?type=orientation");
+  const cards = page.locator("[data-live-event]");
+  expect(
+    await page.locator("[data-past-event-list] > li").count(),
+  ).toBeGreaterThan(0);
+  await expect(filters.getByRole("button")).toHaveText([
+    `All (${await cards.count()})`,
+    `Orientations (${await page.locator('[data-live-event][data-includes-orientation="true"]').count()})`,
+  ]);
 });

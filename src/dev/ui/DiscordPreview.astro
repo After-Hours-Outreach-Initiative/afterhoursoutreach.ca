@@ -1,0 +1,58 @@
+---
+import DiscordConnectionView from "../../components/volunteer/DiscordConnectionView.astro";
+import LocalLayout from "./LocalLayout.astro";
+import {
+  fixtureStatus,
+  getDiscordScenario,
+  readPreviewOptions,
+} from "./fixtures";
+import "../../styles/volunteer.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const options = readPreviewOptions(Astro.url.searchParams);
+const scenario = getDiscordScenario(options.scenario);
+const gallery = Astro.url.searchParams.get("gallery") === "1";
+const status = fixtureStatus(scenario, options.username);
+---
+
+<LocalLayout title={scenario.label}>
+  <main
+    class="volunteer-portal preview-page"
+    data-ui-discord-preview
+    data-gallery={String(gallery)}
+  >
+    <section
+      class="volunteer-panel preview-panel"
+      aria-labelledby="discord-preview-heading"
+      inert={gallery}
+    >
+      <h2 id="discord-preview-heading">Connect Discord</h2>
+      <div class="mt-4">
+        <DiscordConnectionView
+          {status}
+          canConnect={options.eligible}
+          required={options.required}
+          result={scenario.result ?? null}
+        />
+      </div>
+    </section>
+  </main>
+</LocalLayout>
+
+<script src="./simulator.ts"></script>
+
+<style>
+  .preview-page {
+    min-height: 100dvh;
+    padding: 1.5rem;
+  }
+  .preview-panel {
+    max-width: 60rem;
+    margin: 0 auto;
+  }
+  @media (width < 40rem) {
+    .preview-page {
+      padding: 0.75rem;
+    }
+  }
+</style>

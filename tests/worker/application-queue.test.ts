@@ -6,7 +6,7 @@ import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { formatApplicationSubmittedTime } from "../../src/data/application";
 
-test("organizers review submitted applications with a global queue count and persistent list context", async () => {
+test("organizers review submitted applications with search-aware filter counts and persistent list context", async () => {
   const origin = "https://afterhoursoutreach.ca";
   const secret = "application-queue-test-secret-12345678901234567890";
   const server = createTestHarness({
@@ -23,7 +23,6 @@ test("organizers review submitted applications with a global queue count and per
       process.env.CHROMIUM_PATH ??
       (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
   });
-  let releaseSearch = () => {};
   try {
     await server.listen();
     const worker = server.getWorker<Env>();
@@ -64,6 +63,9 @@ test("organizers review submitted applications with a global queue count and per
         ).bind(id, pendingIds.includes(id) ? 0 : 1),
       ]);
     }
+    // Queue/list compatibility for grandfathered submitted applicants. New
+    // applicants' prerequisites are exercised by the Discord application tests.
+    await DB.prepare("DELETE FROM discord_requirement").run();
     await DB.prepare(
       "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='approved'",
     ).run();
@@ -189,7 +191,11 @@ test("organizers review submitted applications with a global queue count and per
       );
       assert.doesNotMatch(
         eventHtml,
-        /data-event-save|data-live-series|data-manage-signup|volunteer-roster|data-volunteer-profile-dialog/,
+        /data-event-save|data-live-series|data-manage-signup|volunteer-roster/,
+      );
+      assert.equal(
+        eventHtml.includes("data-volunteer-profile-dialog"),
+        auth === cookie,
       );
     }
     const response = await get(listPath);
@@ -238,15 +244,24 @@ test("organizers review submitted applications with a global queue count and per
     });
     await page.goto(`${origin}${listPath}`);
     const count = page.locator("[data-awaiting-approval-count]");
+    const allCount = page.locator("[data-all-applicants-count]");
     const results = page.locator("[data-volunteer-results]");
     await expect(count).toHaveText("53");
-    await expect(results.locator("li")).toHaveCount(3);
+    await expect(allCount).toHaveText("53");
+    await expect(results.locator("tbody tr")).toHaveCount(3);
+    await expect(results.getByRole("columnheader")).toHaveText([
+      "Name and role",
+      "Application",
+      "Patrol access",
+      "Orientations completed",
+      "Status",
+    ]);
     const filters = page.getByRole("group", { name: "Application approval" });
     const allApplicants = filters.getByRole("button", {
-      name: "All applicants",
+      name: /^All \(\d+\)$/,
     });
     const awaitingApproval = filters.getByRole("button", {
-      name: "Awaiting approval (53)",
+      name: /^Awaiting approval/,
     });
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(
@@ -259,7 +274,7 @@ test("organizers review submitted applications with a global queue count and per
     await allApplicants.click();
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await expect(allApplicants).toBeFocused();
-    await expect(results.locator("li")).toHaveCount(50);
+    await expect(results.locator("tbody tr")).toHaveCount(50);
     await expect(page).toHaveURL(`${origin}/manage/volunteers?q=applicant`);
     await awaitingApproval.click();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
@@ -270,22 +285,51 @@ test("organizers review submitted applications with a global queue count and per
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
-    await expect(results.locator("li")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(3);
     assert.equal(page.url(), `${origin}${listPath}`);
     assert.deepEqual(documents, []);
     const reviewLink = results.locator("[data-volunteer-profile-link]").first();
     const profileHref = await reviewLink.getAttribute("href");
     assert.ok(profileHref);
-    await reviewLink.click();
-    const dialog = page.locator("[data-volunteer-profile-dialog]");
+    await reviewLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(`${origin}${profileHref}`);
+    await expect(page.locator("[data-volunteer-profile-dialog]")).toHaveCount(
+      0,
+    );
+    const profile = page.getByRole("region", {
+      name: "Profile",
+      exact: true,
+    });
+    const application = page.getByRole("region", {
+      name: "Application",
+      exact: true,
+    });
+    await expect(page.getByRole("tab")).toHaveCount(0);
     await expect(
-      dialog.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
+      page.locator(
+        '[data-volunteer-profile-panel="application"] + [data-volunteer-controls]',
+      ),
+    ).toBeVisible();
+    await expect(profile).toHaveCount(0);
+    await expect(
+      application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
     ).toBeVisible();
     await expect(
-      dialog.getByText("Application awaiting approval", { exact: true }),
+      page.getByText("Application awaiting approval", { exact: true }),
     ).toBeVisible();
-    const summary = dialog.locator(".account-profile-summary");
-    await expect(summary.getByRole("heading")).toHaveText([
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Complete Naloxone 101",
+    );
+    await expect(application).toBeVisible();
+    await expect(
+      page.locator(
+        '[data-access-kind="patrol"], [data-organizer-role], [data-access-kind="active"]',
+      ),
+    ).toHaveCount(0);
+    const summary = application.locator(".account-profile-summary");
+    await expect(application.getByRole("heading")).toHaveText([
+      "Application",
       "Submission details",
       "Personal info",
       "Emergency contact",
@@ -310,62 +354,70 @@ test("organizers review submitted applications with a global queue count and per
     );
     assert.equal(await auditCount(), 1);
     // Merely reading the application is not review completion.
-    await dialog
-      .getByRole("button", { name: "Close volunteer profile" })
-      .click();
+    await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(count).toHaveText("53");
-    await expect(results.locator("li")).toHaveCount(3);
-    assert.equal(page.url(), `${origin}${listPath}`);
-    const heldSearch = new Promise<void>((resolve) => {
-      releaseSearch = resolve;
+    await expect(results.locator("tbody tr")).toHaveCount(3);
+    // The table scrolls within the viewport on small screens. Modifier clicks on
+    // ordinary cells do not hijack the native profile link's browsing behavior.
+    await page.setViewportSize({ width: 320, height: 640 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(320);
+    const tableRegion = results.getByRole("region", {
+      name: "Volunteer table",
     });
-    let searchStarted!: () => void;
-    const startedSearch = new Promise<void>((resolve) => {
-      searchStarted = resolve;
-    });
-    let held = false;
-    await page.route("**/manage/volunteers?*", async (route) => {
-      const request = route.request();
-      if (
-        held ||
-        request.isNavigationRequest() ||
-        new URL(request.url()).searchParams.has("offset")
-      )
-        return route.fallback();
-      held = true;
-      // This response observes the pre-approval state and must never restore it.
-      const stale = await worker.fetch(request.url(), {
-        headers: await request.allHeaders(),
-      });
-      const body = Buffer.from(await stale.arrayBuffer());
-      searchStarted();
-      await heldSearch;
-      await route.fulfill({
-        status: stale.status,
-        headers: Object.fromEntries(stale.headers),
-        body,
-      });
-    });
-    await page.locator("[data-volunteer-search]").fill("applicant");
-    await startedSearch;
-    await reviewLink.click();
-    await dialog
+    expect(
+      await tableRegion.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      ),
+    ).toBe(true);
+    await results
+      .locator("tbody tr")
+      .first()
+      .locator("td")
+      .first()
+      .click({ modifiers: ["Control"] });
+    await expect(page).toHaveURL(
+      `${origin}/manage/volunteers?q=applicant&approval=awaiting&offset=50`,
+    );
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await results.locator("tbody tr").first().locator("td").first().click();
+    await expect(page).toHaveURL(`${origin}${profileHref}`);
+    await DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='applicant-50'",
+    ).run();
+    await page.reload();
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Application review",
+    );
+    await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(
-      dialog.getByRole("button", { name: "Revoke application approval" }),
+      page.getByRole("button", { name: "Revoke application approval" }),
     ).toBeEnabled();
-    await expect(count).toHaveText("52");
-    await expect(results.locator("li")).toHaveCount(2);
-    releaseSearch();
-    await expect(dialog).toBeVisible();
-    await dialog
-      .getByRole("button", { name: "Close volunteer profile" })
+    await expect(application).toBeVisible();
+    await expect(profile).toBeVisible();
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Application approved",
+    );
+    await expect(profile.getByRole("heading").first()).toHaveText("Profile");
+    const submittedDetails = application.locator("details");
+    await expect(submittedDetails).not.toHaveAttribute("open");
+    await application
+      .getByText("View submitted application", { exact: true })
       .click();
-    assert.equal(page.url(), `${origin}${listPath}`);
+    await expect(submittedDetails).toHaveAttribute("open");
+    await expect(
+      application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Back to volunteers" }).click();
+    await expect(count).toHaveText("52");
+    await expect(allCount).toHaveText("53");
+    await expect(results.locator("tbody tr")).toHaveCount(2);
     // Normal full-page links retain exactly the same list context.
     await page.goto(`${origin}${profileHref}`);
     await expect(
@@ -386,34 +438,40 @@ test("organizers review submitted applications with a global queue count and per
     await page.getByRole("link", { name: "Back to volunteers" }).click();
     await page.waitForLoadState("load");
     await expect(count).toHaveText("53");
-    await expect(results.locator("li")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(3);
     const search = page.locator("[data-volunteer-search]");
     await search.fill("applicant-52");
-    await expect(results.locator("li")).toHaveCount(1);
-    await expect(count).toHaveText("53");
+    await expect(results.locator("tbody tr")).toHaveCount(1);
+    await expect(count).toHaveText("1");
+    await expect(allCount).toHaveText("1");
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(page.url()).searchParams.has("offset")).toBe(false);
     await search.fill("approved");
-    await expect(results.locator("li")).toHaveCount(0);
+    await expect(results.locator("tbody tr")).toHaveCount(0);
+    await expect(count).toHaveText("0");
+    await expect(allCount).toHaveText("1");
     await allApplicants.click();
-    await expect(results.locator("li")).toHaveCount(1);
+    await expect(results.locator("tbody tr")).toHaveCount(1);
+    await expect(count).toHaveText("0");
+    await expect(allCount).toHaveText("1");
     await expect(
-      results.getByRole("heading", { name: "approved", exact: true }),
+      results.getByRole("link", { name: "approved", exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(`${origin}/manage/volunteers?q=approved`);
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
-    await expect(results.locator("li")).toHaveCount(0);
+    await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(search).toHaveValue("approved");
     await search.fill("no match");
     await expect(
       results.getByText("No applications awaiting approval match your search."),
     ).toBeVisible();
-    await expect(count).toHaveText("53");
+    await expect(count).toHaveText("0");
+    await expect(allCount).toHaveText("0");
     await search.fill("applicant");
-    await expect(results.locator("li")).toHaveCount(50);
+    await expect(results.locator("tbody tr")).toHaveCount(50);
     await page.getByRole("link", { name: "Next volunteers" }).click();
-    await expect(results.locator("li")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(3);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(page.url()).searchParams.get("q")).toBe("applicant");
     assert.deepEqual(errors, []);
@@ -439,16 +497,27 @@ test("organizers review submitted applications with a global queue count and per
     await plain.goto(`${origin}${listPath}`);
     await plain.locator("[data-volunteer-search]").fill("applicant-52");
     await plain.getByRole("button", { name: "Search", exact: true }).click();
-    await expect(plain.locator("[data-volunteer-results] li")).toHaveCount(1);
+    await expect(
+      plain.locator("[data-volunteer-results] tbody tr"),
+    ).toHaveCount(1);
     expect(new URL(plain.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
-    await plain.getByRole("button", { name: "All applicants" }).click();
+    await plain.getByRole("button", { name: "All (1)", exact: true }).click();
     expect(new URL(plain.url()).searchParams.get("q")).toBe("applicant-52");
     await expect(
-      plain.getByRole("button", { name: "All applicants" }),
+      plain.getByRole("button", { name: "All (1)", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
-    await plain.getByRole("button", { name: "Awaiting approval (53)" }).click();
+    await plain.getByRole("button", { name: "Awaiting approval (1)" }).click();
     await plain.locator("[data-volunteer-profile-link]").click();
+    await expect(
+      plain.getByRole("heading", { name: "Profile", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      plain.getByRole("heading", {
+        name: "Application",
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(
       plain.getByRole("link", { name: "Back to volunteers" }),
     ).toHaveAttribute(
@@ -468,7 +537,8 @@ test("organizers review submitted applications with a global queue count and per
       ),
     );
     await expect(count).toHaveText("50");
-    await expect(results.locator("li")).toHaveCount(0);
+    await expect(allCount).toHaveText("53");
+    await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(
       results.getByText(
         "No applications awaiting approval on this page. Return to the previous page.",
@@ -476,18 +546,168 @@ test("organizers review submitted applications with a global queue count and per
     ).toBeVisible();
     expect(page.url()).toBe(restoredListUrl);
     await page.getByRole("link", { name: "Previous volunteers" }).click();
-    await expect(results.locator("li")).toHaveCount(50);
+    await expect(results.locator("tbody tr")).toHaveCount(50);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1",
     ).run();
     await page.goto(`${origin}/manage/volunteers?approval=awaiting`);
     await expect(count).toHaveText("0");
+    await expect(allCount).toHaveText("55");
     await expect(
       results.getByText("No applications are awaiting approval."),
     ).toBeVisible();
+
+    const postAction = (body: object, auth = cookie, requestOrigin = origin) =>
+      worker.fetch(`${origin}/api/v1/organizer/action`, {
+        method: "POST",
+        headers: {
+          cookie: auth,
+          origin: requestOrigin,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    const status = () =>
+      DB.prepare(
+        "SELECT * FROM volunteer_status WHERE user_id='applicant-50'",
+      ).first<{
+        updated_at: number;
+        application_rejection_reason: string | null;
+      }>();
+    const version = (await status())!.updated_at;
+    const rejection = {
+      action: "reject-application",
+      userId: "applicant-50",
+      version,
+      reason:
+        "We cannot accommodate your availability. <Please contact us>\nThank you for applying.",
+    };
+    // Rejection is a pending-application decision, not a shortcut for revoking approval.
+    assert.equal((await postAction(rejection)).status, 409);
+    await DB.prepare(
+      "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='applicant-50'",
+    ).run();
+    const beforeRejection = await status();
+    assert.equal((await postAction(rejection, "")).status, 401);
+    assert.equal((await postAction(rejection, volunteerCookie)).status, 403);
+    assert.equal(
+      (await postAction(rejection, cookie, "https://evil.example.org")).status,
+      403,
+    );
+    for (const reason of ["", " \n\t ", "x".repeat(2001)])
+      assert.equal((await postAction({ ...rejection, reason })).status, 400);
+    assert.equal(
+      (await postAction({ ...rejection, version: version + 1 })).status,
+      409,
+    );
+    assert.deepEqual(await status(), beforeRejection);
+    const applicantCookie = await signIn("applicant-50");
+    const beforeDecisionVersion = await (
+      await get("/api/v1/events/version", applicantCookie)
+    ).text();
+
+    await page.goto(`${origin}/manage/volunteers/applicant-50`);
+    await page.getByText("Reject application", { exact: true }).click();
+    await page
+      .getByLabel("Reason for rejection")
+      .fill(`  ${rejection.reason}  `);
+    await page
+      .getByRole("button", {
+        name: "Reject application and email reason",
+        exact: true,
+      })
+      .click();
+    await expect(page.locator("[data-application-rejection]")).toHaveText(
+      `Reason: ${rejection.reason}`,
+    );
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Application rejected",
+    );
+    const feedback = page.locator("[data-action-email-feedback]");
+    await expect(feedback).toBeVisible();
+    await expect(feedback).toContainText("Application rejected.");
+    await expect(feedback).toContainText("could not be sent");
+    const savedRejection = await status();
+    assert.equal(
+      savedRejection!.application_rejection_reason,
+      rejection.reason,
+    );
+    const queued = await DB.prepare(
+      "SELECT operation_id, delivery_to, body FROM event_notification WHERE user_id='applicant-50' AND subject='Your volunteer application was not approved'",
+    ).all<{ operation_id: string; delivery_to: string; body: string }>();
+    assert.equal(queued.results.length, 1);
+    assert.equal(queued.results[0].delivery_to, "applicant-50@example.org");
+    assert.ok(queued.results[0].body.includes(rejection.reason));
+    const decisionAudit = await DB.prepare(
+      "SELECT changed_fields FROM audit_log WHERE id=? AND action='application_rejected'",
+    )
+      .bind(queued.results[0].operation_id)
+      .first<string>("changed_fields");
+    assert.equal(decisionAudit, '["applicationRejectionReason"]');
+    // Retrying only email cannot repeat the decision or overwrite its reason.
+    await feedback.getByRole("button", { name: "Retry email only" }).click();
+    await expect(
+      feedback.getByRole("button", { name: "Retry email only" }),
+    ).toBeEnabled();
+    assert.deepEqual(await status(), savedRejection);
+    assert.equal((await postAction(rejection)).status, 409);
+    assert.equal(
+      await DB.prepare(
+        "SELECT count(*) AS n FROM event_notification WHERE operation_id=?",
+      )
+        .bind(queued.results[0].operation_id)
+        .first<number>("n"),
+      1,
+    );
+    await feedback.locator(".dialog-close").click();
+    await page
+      .getByRole("button", { name: "Approve application", exact: true })
+      .focus();
+    await page.goto(
+      `${origin}/manage/volunteers?approval=awaiting&q=applicant-50`,
+    );
+    await expect(count).toHaveText("0");
+    await page.getByRole("button", { name: "All (1)", exact: true }).click();
+    await expect(results).toContainText("Rejected");
+    assert.notEqual(
+      await (await get("/api/v1/events/version", applicantCookie)).text(),
+      beforeDecisionVersion,
+    );
+    for (const path of ["/volunteer", "/volunteer/account"]) {
+      const decision = await get(path, applicantCookie);
+      assert.equal(decision.status, 200);
+      const decisionHtml = await decision.text();
+      assert.match(decisionHtml, /Application rejected/);
+      assert.ok(decisionHtml.includes("&lt;Please contact us&gt;"));
+      assert.equal(
+        await page.evaluate(
+          (html) =>
+            new DOMParser()
+              .parseFromString(html, "text/html")
+              .querySelector("please") !== null,
+          decisionHtml,
+        ),
+        false,
+      );
+    }
+    assert.ok(
+      !(
+        await (await get("/volunteer/account", volunteerCookie)).text()
+      ).includes("We cannot accommodate your availability."),
+    );
+    const approvedAgain = await postAction({
+      action: "status",
+      userId: "applicant-50",
+      version: savedRejection!.updated_at,
+      active: true,
+      applicationApproved: true,
+      patrolApproved: false,
+    });
+    assert.equal(approvedAgain.status, 200, await approvedAgain.clone().text());
+    assert.equal((await status())!.application_rejection_reason, null);
+    assert.deepEqual(errors, []);
   } finally {
-    releaseSearch();
     await browser.close();
     await server.close();
   }

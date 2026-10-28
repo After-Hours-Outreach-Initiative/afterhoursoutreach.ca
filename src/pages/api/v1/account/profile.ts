@@ -5,13 +5,11 @@ import { accountContext } from "@/server/db/access";
 import { z } from "zod";
 import type { ApplicationAnswers } from "@/data/application";
 import { saveProfile } from "@/server/db/profiles";
-import { submissionNotificationStatements } from "@/server/db/submission-notifications";
-import { runSubmissionNotificationJob } from "@/server/submission-notifications";
 import { takeRateLimit } from "@/server/db/rate-limits";
 import { errorResponse, readJson, RequestError } from "@/server/http";
 
 export const prerender = false;
-export const POST: APIRoute = async ({ request, locals }) => {
+export const POST: APIRoute = async ({ request }) => {
   try {
     const { actor, headers } = await accountContext(env, request, true);
     if (!actor) throw new RequestError(401, "Sign in to edit your profile.");
@@ -61,28 +59,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       intent,
       baseline: baseline as ApplicationAnswers | undefined,
       draft,
-      firstSubmissionStatements: submissionNotificationStatements(env),
     });
-    if (saved.firstSubmitted && saved.operationId) {
-      try {
-        locals.cfContext.waitUntil(
-          runSubmissionNotificationJob(env, {
-            operationId: saved.operationId,
-            limit: 3,
-            timeoutMs: 20_000,
-          }),
-        );
-      } catch {
-        // The durable outbox survives scheduling failure; the hourly cron retries.
-        // Never attach errors/answers/addresses or turn a committed save into 500.
-        console.error(
-          JSON.stringify({
-            event: "application_submission_notifications",
-            error: "scheduling_unavailable",
-          }),
-        );
-      }
-    }
     const response = Response.json(
       {
         ...saved,

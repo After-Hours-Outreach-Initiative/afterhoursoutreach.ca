@@ -4,7 +4,7 @@ import {
   emailSenders,
 } from "../../data/email-templates";
 import { emailTextSql } from "./email-text";
-import type { ProfileSaveOptions } from "./profiles";
+import type { NaloxoneCompletionOptions } from "./naloxone";
 import { emailPolicy } from "./policy";
 import { hashAuthValue } from "./rate-limits";
 
@@ -29,10 +29,12 @@ export function submissionNotificationMode(
   return bindings.APP_ENV === "production" ? "production" : "preview";
 }
 
-/** Called only inside saveProfile's winning first-submission D1 transaction. */
+/** Called only inside the winning Naloxone confirmation D1 transaction.
+ * Discord is temporarily disabled: form submission + Naloxone enter review.
+ */
 export function submissionNotificationStatements(
   bindings: AuthBindings,
-): NonNullable<ProfileSaveOptions["firstSubmissionStatements"]> {
+): NonNullable<NaloxoneCompletionOptions["reviewStatements"]> {
   const mode = submissionNotificationMode(bindings);
   return ({ userId, operationId, writeGuard }) =>
     submissionNotificationRecipients.map((recipient) =>
@@ -56,8 +58,12 @@ export function submissionNotificationStatements(
                 "json_extract(submitted_application,'$.submittedAt')",
               reviewUrl: "?",
             })}
-          ) END,?,registered_at,registered_at
-        FROM profile WHERE user_id=? AND submitted_application IS NOT NULL AND ${writeGuard}`,
+          ) END,?,naloxone_completed_at,naloxone_completed_at
+        FROM profile WHERE user_id=? AND submitted_application IS NOT NULL
+          AND naloxone_completed_at IS NOT NULL AND ${writeGuard}
+          AND EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id=profile.user_id
+            AND v.registration_approved=0 AND v.application_rejection_reason IS NULL)
+        ON CONFLICT(user_id,recipient) DO NOTHING`,
       ).bind(
         crypto.randomUUID(),
         operationId,
@@ -83,6 +89,16 @@ export interface SubmissionNotification {
   first_attempt_at: number | null;
 }
 
+// Provenance distinguishes review intents from the old initial-form outbox,
+// including legacy applicants already ready for review. Never sweep/backfill
+// those old messages. Retain every recipient's ledger/key as a dedupe tombstone.
+const reviewIntentGuard = `EXISTS (SELECT 1 FROM audit_log a
+  JOIN profile p ON p.user_id=a.subject_id
+  WHERE a.id=application_submission_notification.operation_id
+    AND a.subject_id=application_submission_notification.user_id
+    AND a.action='profile_updated' AND a.changed_fields='["naloxoneCompletedAt"]'
+    AND p.naloxone_completed_at IS NOT NULL)`;
+
 export async function pendingSubmissionNotifications(
   db: Env["DB"],
   mode: "production" | "local",
@@ -92,6 +108,14 @@ export async function pendingSubmissionNotifications(
 ) {
   // Retain terminal ledger rows. Unattempted mail does not expire during quota
   // or configuration outages; only an actual attempt starts the safety clock.
+  await db
+    .prepare(
+      `UPDATE application_submission_notification
+      SET status='suppressed',lease_until=NULL,lease_token=NULL
+      WHERE mode=? AND status IN ('pending','sending') AND NOT (${reviewIntentGuard})`,
+    )
+    .bind(mode)
+    .run();
   const expiration = await db
     .prepare(
       `UPDATE application_submission_notification SET status='expired',lease_until=NULL
@@ -106,6 +130,7 @@ export async function pendingSubmissionNotifications(
     WHERE mode=? AND status IN ('pending','sending') AND next_attempt_at <= ?
       AND (lease_until IS NULL OR lease_until <= ?)
       AND (first_attempt_at IS NULL OR first_attempt_at > ?)
+      AND ${reviewIntentGuard}
       ${operationId ? "AND operation_id=?" : ""}
     ORDER BY next_attempt_at,created_at,id LIMIT ?`,
     )
@@ -136,6 +161,7 @@ export function claimSubmissionNotification(
     WHERE id=? AND mode=? AND status IN ('pending','sending')
       AND next_attempt_at <= ? AND (lease_until IS NULL OR lease_until <= ?)
       AND (first_attempt_at IS NULL OR first_attempt_at > ?)
+      AND ${reviewIntentGuard}
     RETURNING id,payload,attempts,first_attempt_at`,
     )
     .bind(
@@ -174,7 +200,8 @@ export async function beginSubmissionNotificationAttempt(
       SELECT ?,1,? WHERE EXISTS (SELECT 1 FROM application_submission_notification
         WHERE id=? AND status='sending' AND mode='production' AND lease_token=?
           AND lease_until > ? AND budget_window IS NOT ?
-          AND (first_attempt_at IS NULL OR first_attempt_at > ?))
+          AND (first_attempt_at IS NULL OR first_attempt_at > ?)
+          AND ${reviewIntentGuard})
       ON CONFLICT(key) DO UPDATE SET count=count+1 WHERE count < ?`,
       )
       .bind(
@@ -200,6 +227,7 @@ export async function beginSubmissionNotificationAttempt(
       WHERE id=? AND lease_token=? AND status='sending' AND mode='production'
         AND lease_until > ? AND budget_window=?
         AND (first_attempt_at IS NULL OR first_attempt_at > ?)
+        AND ${reviewIntentGuard}
       RETURNING id,payload,attempts,first_attempt_at`,
       )
       .bind(now, id, token, now, start, now - submissionRetryWindowMs),

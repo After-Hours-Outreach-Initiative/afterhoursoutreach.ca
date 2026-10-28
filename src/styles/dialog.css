@@ -10,6 +10,7 @@
   border-radius: 0.75rem;
   background: #0c0d10;
   color: #f4f4f5;
+  text-align: left;
   /* Native close removes [open] before the discrete exit transition ends. */
   flex-direction: column;
 }

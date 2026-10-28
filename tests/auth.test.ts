@@ -135,6 +135,8 @@ const answers = {
   experience: "None",
   training: ["none"],
   otherTraining: "",
+  expiredFirstAidDetails: "",
+  crisisInterventionDetails: "",
   relevantExperience: ["none"],
   otherExperience: "",
   medicalConditions: "Sample private answer",
@@ -1380,7 +1382,7 @@ test("one highest certification is required for Medic and training details only 
   }
 });
 
-test("relevant training requires an answer for every team, exclusive None, and details only for Other", () => {
+test("relevant training requires an answer for every team, exclusive None, and conditional details", () => {
   for (const teams of [
     ["outreach"],
     ["outreach", "medic"],
@@ -1440,6 +1442,8 @@ test("relevant training requires an answer for every team, exclusive None, and d
       ...answers,
       training: [...all].reverse(),
       otherTraining: "Details",
+      expiredFirstAidDetails: "Expired OFA Level 2",
+      crisisInterventionDetails: "Crisis prevention course",
     }).training,
     all,
   );
@@ -1453,12 +1457,14 @@ test("relevant training and Other details round-trip independently of medical ce
   const id = current.user.id;
   const training = ["naloxone-administration", "crisis-intervention", "other"];
   const otherTraining = "Crisis intervention course";
+  const crisisInterventionDetails = "Crisis prevention certification";
   const relevantExperience = ["overdose-response", "other"];
   const otherExperience = "Community pantry volunteer";
   await saveProfile(bindings.DB, id, {
     ...answers,
     training: [...training].reverse(),
     otherTraining: ` ${otherTraining} `,
+    crisisInterventionDetails: ` ${crisisInterventionDetails} `,
     relevantExperience: [...relevantExperience].reverse(),
     otherExperience: ` ${otherExperience} `,
     codeOfConductAccepted: true,
@@ -1467,6 +1473,7 @@ test("relevant training and Other details round-trip independently of medical ce
     ...answers,
     training,
     otherTraining,
+    crisisInterventionDetails,
     relevantExperience,
     otherExperience,
   };
@@ -1492,10 +1499,12 @@ test("relevant training and Other details round-trip independently of medical ce
   await saveProfile(bindings.DB, id, {
     ...hiddenDetails,
     training: ["naloxone-administration"],
+    crisisInterventionDetails: "",
   });
   assert.deepEqual(await loadProfile(bindings.DB, id), {
     ...expected,
     training: ["naloxone-administration"],
+    crisisInterventionDetails: "",
   });
   await assert.rejects(
     saveProfile(bindings.DB, id, { ...expected, training: [] }),
@@ -1530,6 +1539,69 @@ test("relevant training and Other details round-trip independently of medical ce
     (await viewVolunteerProfile(bindings.DB, actor, id))?.answers.teams,
     ["non-patrol"],
   );
+});
+
+test("dedicated training details round-trip, clear when unchecked, and preserve legacy submissions and edits", async () => {
+  const { cookie } = await signIn();
+  const current = (await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  }))!;
+  const id = current.user.id;
+  await saveProfile(bindings.DB, id, {
+    ...answers,
+    training: ["expired-first-aid", "crisis-intervention", "other"],
+    expiredFirstAidDetails: " Expired OFA Level 2 ",
+    crisisInterventionDetails: " Crisis prevention course ",
+    otherTraining: "Original Other text",
+    codeOfConductAccepted: true,
+  });
+  const original = (await loadProfile(bindings.DB, id))!;
+  assert.equal(original.expiredFirstAidDetails, "Expired OFA Level 2");
+  assert.equal(original.crisisInterventionDetails, "Crisis prevention course");
+  const submission = await loadSubmittedApplication(bindings.DB, id);
+  assert.equal(
+    submission?.answers.expiredFirstAidDetails,
+    original.expiredFirstAidDetails,
+  );
+  await assert.rejects(
+    saveProfile(bindings.DB, id, {
+      ...original,
+      crisisInterventionDetails: " ",
+    }),
+    RequestError,
+  );
+  await saveProfile(bindings.DB, id, {
+    ...original,
+    training: ["other"],
+    expiredFirstAidDetails: "x".repeat(2001),
+  });
+  const cleared = (await loadProfile(bindings.DB, id))!;
+  assert.equal(cleared.expiredFirstAidDetails, "");
+  assert.equal(cleared.crisisInterventionDetails, "");
+  assert.equal(cleared.otherTraining, "Original Other text");
+  assert.deepEqual(await loadSubmittedApplication(bindings.DB, id), submission);
+  await bindings.DB.prepare(
+    'UPDATE profile SET relevant_training=\'["expired-first-aid","crisis-intervention","other"]\' WHERE user_id=?',
+  )
+    .bind(id)
+    .run();
+  const legacy = (await loadProfile(bindings.DB, id))!;
+  const {
+    expiredFirstAidDetails: _expired,
+    crisisInterventionDetails: _crisis,
+    ...oldBaseline
+  } = legacy;
+  await writeProfile(
+    bindings.DB,
+    id,
+    { ...oldBaseline, preferredName: "Legacy edit" },
+    { intent: "edit", baseline: oldBaseline as typeof legacy },
+  );
+  assert.equal(
+    (await loadProfile(bindings.DB, id))?.otherTraining,
+    "Original Other text",
+  );
+  assert.deepEqual(await loadSubmittedApplication(bindings.DB, id), submission);
 });
 
 test("legacy combined training round-trips through an unrelated profile edit without changing the submission", async () => {

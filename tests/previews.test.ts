@@ -78,23 +78,25 @@ test("preview migrations match the shared binding and cannot target production",
   assert.equal(result.status, 0, result.stderr);
 });
 
-test("deployment scripts explicitly select Worker Previews and their migration target", () => {
+test("preview deployment migrates before deploying the existing preview build", () => {
   const { scripts } = JSON.parse(
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   );
   const deploy = scripts["deploy:preview"];
-  assert.match(deploy, /\bpnpm\s+(?:run\s+)?build:preview\b/);
-  assert.match(deploy, /\bpnpm\s+(?:run\s+)?db:migrate:preview\b/);
+  assert.match(
+    deploy,
+    /^pnpm\s+(?:run\s+)?db:migrate:preview\s+&&\s+wrangler\s+preview\b/,
+  );
   assert.match(deploy, /\bwrangler\s+preview\b/);
   assert.match(
     deploy,
     /--config\s+["']?(?:\.\/)?dist-preview\/server\/wrangler\.json\b/,
   );
-  assert.ok(
-    deploy.indexOf("build:preview") < deploy.indexOf("db:migrate:preview"),
-  );
   assert.ok(deploy.indexOf("db:migrate:preview") < deploy.indexOf("wrangler"));
-  assert.doesNotMatch(deploy, /seed|versions|--env\b|\bwrangler\s+deploy\b/);
+  assert.doesNotMatch(
+    deploy,
+    /\bbuild\b|seed|versions|--env\b|\bwrangler\s+deploy\b/,
+  );
 
   const migrations = scripts["db:migrate:preview"];
   assert.match(
@@ -120,4 +122,5 @@ test("deployment scripts explicitly select Worker Previews and their migration t
   assert.match(build, /\bastro\s+build\b/);
   assert.match(build, /--mode(?:\s+|=)preview\b/);
   assert.match(build, /--outDir(?:\s+|=)["']?(?:\.\/)?dist-preview\b/);
+  assert.doesNotMatch(build, /db:migrate|--remote\b|\bdeploy\b/);
 });

@@ -34,6 +34,7 @@ export async function eventViewVersion(
       naloxoneCompleted: actor.naloxoneCompleted,
       active: actor.active,
       applicationApproved: actor.applicationApproved,
+      applicationRejected: Boolean(actor.applicationRejected),
       patrolApproved: actor.patrolApproved,
       twoFactorEnabled: actor.twoFactorEnabled,
       twoFactorVerified: actor.twoFactorVerified,

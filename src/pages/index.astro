@@ -4,12 +4,16 @@ import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
 import { env } from "cloudflare:workers";
 import { loadAccountNavigation } from "@/server/account-navigation";
+import { listUpcomingPublicEvents } from "@/server/db/events";
+import { formatEventDate } from "@/data/event-time";
 export const prerender = false;
-const account = await loadAccountNavigation(
-  env,
-  Astro.request,
-  Astro.response.headers,
-);
+const [account, upcomingEvents] = await Promise.all([
+  loadAccountNavigation(env, Astro.request, Astro.response.headers),
+  listUpcomingPublicEvents(env.DB).catch(() => {
+    console.error(JSON.stringify({ event: "homepage_events_unavailable" }));
+    return null;
+  }),
+]);
 ---
 
 <Layout
@@ -54,6 +58,56 @@ const account = await loadAccountNavigation(
           sizes="(max-width: 480px) 100vw, 420px"
           loading="eager"
         />
+      </div>
+    </div>
+  </section>
+
+  <section
+    class="border-t border-zinc-800 bg-ink text-white"
+    id="upcoming-events"
+    aria-labelledby="upcoming-events-heading"
+  >
+    <div
+      class="mx-auto grid w-full max-w-site items-center gap-10 px-6 py-24 max-sm:px-4 max-sm:py-18 lg:grid-cols-2 lg:gap-16"
+    >
+      {/* Replace this decorative placeholder with an outreach photo. */}
+      <img
+        class="aspect-4/3 w-full rounded-2xl border border-zinc-800 object-cover"
+        src="/upcoming-events-placeholder.svg"
+        alt=""
+        width="960"
+        height="720"
+        loading="lazy"
+        decoding="async"
+      />
+
+      <div class="min-w-0">
+        <h2 id="upcoming-events-heading">Upcoming events</h2>
+        {
+          upcomingEvents?.length ? (
+            <ul class="mt-8 divide-y divide-zinc-700 border-y border-zinc-700">
+              {upcomingEvents.map((event) => (
+                <li class="flex flex-col gap-2 py-6">
+                  <time
+                    class="text-xl font-medium"
+                    datetime={new Date(event.startsAt).toISOString()}
+                  >
+                    {formatEventDate(event.startsAt)}
+                  </time>
+                  <span class="text-base text-zinc-400">
+                    {event.confirmed} of {event.spots} spots taken
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="mt-8 text-zinc-300">
+              {upcomingEvents
+                ? "No upcoming events are scheduled. Check back soon."
+                : "Upcoming events are temporarily unavailable."}
+            </p>
+          )
+        }
       </div>
     </div>
   </section>

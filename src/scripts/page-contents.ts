@@ -4,10 +4,19 @@ export function initPageContents(
     content = flow,
     contents = flow.querySelector<HTMLElement>("[data-page-contents]"),
     topId,
+    initialHash = location.hash,
+    scrollRoot,
+    stickyNavigation,
+    revealTarget,
   }: {
     content?: HTMLElement;
     contents?: HTMLElement | null;
     topId?: string;
+    initialHash?: string;
+    /** An embedded reader can scroll independently of the document. */
+    scrollRoot?: HTMLElement;
+    stickyNavigation?: HTMLElement;
+    revealTarget?: (target: HTMLElement) => void;
   } = {},
 ) {
   const menu = contents?.querySelector<HTMLDetailsElement>(
@@ -20,6 +29,7 @@ export function initPageContents(
   if (!contents || !menu || !toggle || !current) return;
   const bar =
     contents.querySelector<HTMLElement>("[data-contents-bar]") ?? menu;
+  const dropdown = menu.querySelector<HTMLElement>("[data-contents-dropdown]");
   const review = contents.hasAttribute("data-application-review-contents");
   const application =
     contents.hasAttribute("data-application-contents") || review;
@@ -32,8 +42,7 @@ export function initPageContents(
     // Account settings can be replaced in place after authenticator changes.
     // Resolve by ID so jumps and scroll tracking never retain detached headings.
     get target() {
-      const target = document.getElementById(hash.slice(1));
-      return target && flow.contains(target) ? target : null;
+      return flow.querySelector<HTMLElement>(`#${CSS.escape(hash.slice(1))}`);
     },
     links: links.filter((link) => link.hash === hash),
   }));
@@ -42,9 +51,24 @@ export function initPageContents(
         target?.hasAttribute("data-contents-actions"),
       )
     : undefined;
-  const header = document.querySelector<HTMLElement>("body > header");
+  const header = scrollRoot
+    ? null
+    : document.querySelector<HTMLElement>("body > header");
+  const controller = new AbortController();
+  const { signal } = controller;
+  // A closing disclosure remains painted during its fade, but its controls must
+  // leave the focus order and accessibility tree as soon as it closes.
+  const syncMenu = () => {
+    if (dropdown) dropdown.inert = !menu.open;
+  };
+  const menuVisibility = new MutationObserver(syncMenu);
+  menuVisibility.observe(menu, { attributes: true, attributeFilter: ["open"] });
+  syncMenu();
+  menu.dataset.contentsEnhanced = "";
   let stickyHeight = 0;
+  let scrollInset = 0;
   let barHeight = 0;
+  let navigationHeight = 0;
   let readingGap = 0;
   let frame = 0;
 
@@ -60,11 +84,17 @@ export function initPageContents(
       headerPosition === "sticky" || headerPosition === "fixed"
         ? Math.max(0, header?.getBoundingClientRect().bottom ?? 0)
         : 0;
+    // Sticky elements sit inside a scroller's padding, while native fragment
+    // scroll margins are measured from its outer edge.
+    scrollInset = scrollRoot
+      ? Number.parseFloat(getComputedStyle(scrollRoot).paddingTop)
+      : 0;
     // Include the compact band's padding in the reading edge, not its dropdown.
     barHeight = menu.getBoundingClientRect().height
       ? bar.getBoundingClientRect().height
       : 0;
     if (!barHeight) menu.open = false;
+    navigationHeight = stickyNavigation?.getBoundingClientRect().height ?? 0;
     // Match the shared 1rem scroll-margin gap without rescaling measured pixels.
     readingGap = Number.parseFloat(
       getComputedStyle(document.documentElement).fontSize,
@@ -72,16 +102,28 @@ export function initPageContents(
     flow.style.setProperty("--contents-sticky-offset", `${stickyHeight}px`);
     flow.style.setProperty("--contents-bar-height", `${barHeight}px`);
     flow.style.setProperty(
+      "--contents-navigation-height",
+      `${navigationHeight}px`,
+    );
+    flow.style.setProperty(
+      "--contents-viewport-height",
+      `${(scrollRoot?.clientHeight ?? window.innerHeight) - scrollInset}px`,
+    );
+    flow.style.setProperty(
       "--contents-scroll-offset",
-      `${stickyHeight + barHeight}px`,
+      `${stickyHeight + scrollInset + barHeight + navigationHeight}px`,
     );
     contents.toggleAttribute(
       "data-contents-stuck",
       barHeight > 0 &&
         getComputedStyle(contents).position === "sticky" &&
-        Math.abs(contents.getBoundingClientRect().top - stickyHeight) < 1,
+        Math.abs(contents.getBoundingClientRect().top - readingTop()) < 1,
     );
   };
+  const readingTop = () =>
+    stickyHeight + scrollInset + (scrollRoot?.getBoundingClientRect().top ?? 0);
+  const readingEdge = () =>
+    readingTop() + barHeight + navigationHeight + readingGap;
   const activate = (active: (typeof sections)[number]) => {
     const overview = application && active.hash === `#${topId}`;
     const heading =
@@ -102,10 +144,13 @@ export function initPageContents(
   // even when the document ends before they can reach the headings' top edge.
   const actionsReadingEdge = (height: number) =>
     Math.max(
-      stickyHeight + barHeight + readingGap + height / 2,
+      readingEdge() + height / 2,
       Math.min(
-        window.innerHeight * 0.75,
-        window.innerHeight - readingGap - height / 2,
+        (scrollRoot?.getBoundingClientRect().top ?? 0) +
+          (scrollRoot?.clientHeight ?? window.innerHeight) * 0.75,
+        (scrollRoot?.getBoundingClientRect().bottom ?? window.innerHeight) -
+          readingGap -
+          height / 2,
       ),
     );
   const update = () => {
@@ -118,13 +163,13 @@ export function initPageContents(
     }
     // Use the reading edge, not intersection ratios: a tall section remains
     // current throughout its fields, and collapsed summaries still participate.
-    const readingEdge = stickyHeight + barHeight + readingGap;
-    let active = sections[0];
+    const edge = readingEdge();
+    let active = sections.find(({ target }) => target?.getClientRects().length);
     for (const section of sections) {
       if (section === actions) continue;
       const target = section.target;
       if (!target || !target.getClientRects().length) continue;
-      if (target.getBoundingClientRect().top > readingEdge + 1) break;
+      if (target.getBoundingClientRect().top > edge + 1) break;
       active = section;
     }
     // The final action entry uses its own reading edge, not the headings' top
@@ -148,6 +193,7 @@ export function initPageContents(
     schedule();
   };
   const reveal = (target: HTMLElement) => {
+    revealTarget?.(target);
     for (
       let parent: HTMLElement | null = target;
       parent && parent !== flow;
@@ -168,36 +214,53 @@ export function initPageContents(
   };
   for (const { links } of sections) {
     for (const link of links)
-      link.addEventListener("click", (event) => {
-        if (
-          event.defaultPrevented ||
-          event.button !== 0 ||
-          event.altKey ||
-          event.ctrlKey ||
-          event.metaKey ||
-          event.shiftKey
-        )
-          return;
-        revealSection(link.hash);
-      });
+      link.addEventListener(
+        "click",
+        (event) => {
+          if (
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.altKey ||
+            event.ctrlKey ||
+            event.metaKey ||
+            event.shiftKey
+          )
+            return;
+          revealSection(link.hash);
+        },
+        { signal },
+      );
   }
-  flow.addEventListener("toggle", refresh, true);
-  document.addEventListener("click", (event) => {
-    if (event.target instanceof Node && !contents.contains(event.target))
+  flow.addEventListener("toggle", refresh, { capture: true, signal });
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (event.target instanceof Node && !contents.contains(event.target))
+        menu.open = false;
+    },
+    { signal },
+  );
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key !== "Escape" || !menu.open) return;
+      event.preventDefault();
       menu.open = false;
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || !menu.open) return;
-    menu.open = false;
-    toggle.focus({ preventScroll: true });
-  });
-  contents.addEventListener("focusout", (event) => {
-    if (
-      event.relatedTarget instanceof Node &&
-      !contents.contains(event.relatedTarget)
-    )
-      menu.open = false;
-  });
+      toggle.focus({ preventScroll: true });
+    },
+    { signal },
+  );
+  contents.addEventListener(
+    "focusout",
+    (event) => {
+      if (
+        event.relatedTarget instanceof Node &&
+        !contents.contains(event.relatedTarget)
+      )
+        menu.open = false;
+    },
+    { signal },
+  );
   // `invalid` does not bubble. Reveal all ancestors synchronously, before the
   // browser tries to focus its first invalid control (including nested fields).
   flow.addEventListener(
@@ -207,11 +270,13 @@ export function initPageContents(
       menu.open = false;
       refresh();
     },
-    true,
+    { capture: true, signal },
   );
   const resize = new ResizeObserver(refresh);
   for (const target of [
     header,
+    scrollRoot,
+    stickyNavigation,
     contents,
     bar,
     menu,
@@ -230,11 +295,25 @@ export function initPageContents(
     childList: true,
     subtree: true,
   });
-  window.addEventListener("scroll", schedule, { passive: true });
-  window.addEventListener("resize", refresh);
-  window.addEventListener("pageshow", refresh);
-  window.addEventListener("hashchange", () => revealSection(location.hash));
-  window.addEventListener("popstate", schedule);
+  (scrollRoot ?? window).addEventListener("scroll", schedule, {
+    passive: true,
+    signal,
+  });
+  window.addEventListener("resize", refresh, { signal });
+  window.addEventListener("pageshow", refresh, { signal });
+  window.addEventListener("hashchange", () => revealSection(location.hash), {
+    signal,
+  });
+  window.addEventListener("popstate", schedule, { signal });
   refresh();
-  revealSection(location.hash);
+  revealSection(initialHash);
+  return () => {
+    controller.abort();
+    resize.disconnect();
+    visibility.disconnect();
+    menuVisibility.disconnect();
+    delete menu.dataset.contentsEnhanced;
+    if (dropdown) dropdown.inert = false;
+    cancelAnimationFrame(frame);
+  };
 }

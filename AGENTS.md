@@ -8,10 +8,47 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+After creating or regenerating a database migration, run `pnpm db:migrate:local`
+before handing off the change so the local development database matches the code.
+Tests using isolated databases do not replace this step. Apply migrations only
+locally unless a remote migration or deployment is explicitly requested.
+
 Do not write or run tests for the documentation site (`docs/`), including
 browser/Playwright tests for its diagrams or editing controls.
 
+Do not add end-user website setup/configuration warnings for unfinished or
+unconfigured features. Use concise placeholders for planned functionality and
+keep operator diagnostics out of the user interface. External integrations must
+have development-only simulations, like local email delivery, accessible through
+the normal user flow so success, cancellation, pending, and failure states can be
+previewed without real credentials or provider calls. Exclude simulation code
+and bypasses from hosted production and preview builds.
+
+## Cloudflare tooling
+
+Use `cf` for Cloudflare account and resource configuration management, including
+Workers Builds production and preview build/deploy settings. Keep the existing
+Astro and Wrangler pipeline, invoked through the project's `pnpm` scripts, for
+building and deploying the application.
+
+- Keep `wrangler.jsonc` as the project's source configuration and deploy the
+  framework-generated Wrangler configuration through the existing scripts.
+- Do not run `cf migrate`, `cf dev`, `cf build`, or `cf deploy`, or introduce
+  `cloudflare.config.ts`, unless a tooling migration is explicitly requested.
+  Resource/configuration commands work alongside Wrangler without migration.
+- Use OAuth for interactive access. `cf` and Wrangler keep separate credentials;
+  a Wrangler OAuth permission error does not mean `cf` lacks access. In
+  particular, use `cf`'s OAuth grant for Workers Builds configuration.
+- `cf` resource commands do not read `account_id` from `wrangler.jsonc`. Explicitly
+  set `CLOUDFLARE_ACCOUNT_ID` to the account configured there and verify the target
+  Worker/resource before making changes.
+- Discover commands with `cf cli search` using generic task descriptions without
+  account/resource identifiers, then inspect the selected command's `--help`.
+
 ## Design
+
+Upcoming application steps describe the step itself, without reminders to finish
+earlier steps. Keep their descriptions visible and omit actions until available.
 
 Do not use UI eyebrows: the small, uppercase, letter-spaced label sitting above
 a heading or field value. Let the heading or the value carry the section on its

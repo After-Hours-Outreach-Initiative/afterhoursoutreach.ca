@@ -21,6 +21,7 @@ export default defineConfig({
             "tests/auth.test.ts",
             "tests/d1.test.ts",
             "tests/notifications.test.ts",
+            "tests/discord.test.ts",
           ],
         },
       },
@@ -49,6 +50,7 @@ export default defineConfig({
             "tests/auth.test.ts",
             "tests/d1.test.ts",
             "tests/notifications.test.ts",
+            "tests/discord.test.ts",
           ],
           setupFiles: ["tests/helpers/runtime-setup.ts"],
           provide: {

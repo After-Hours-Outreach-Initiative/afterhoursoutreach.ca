@@ -11,11 +11,23 @@
 .volunteer-portal [hidden] {
   display: none !important;
 }
+/* Text links stay recognizable without changing buttons, tabs or calendar controls. */
+.volunteer-portal p a:not(.btn),
+.volunteer-back-link,
+.volunteer-email-reset,
+.volunteer-notice a:not(.btn),
+.volunteer-table a:not(.btn),
+.volunteer-event-card a:not(.btn),
+.volunteer-application-warning-text {
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
 /* `overflow-x: hidden` traps sticky descendants in a non-scrolling ancestor.
    Clip still prevents horizontal overflow without trapping contents navigation. */
 body:has(
   [data-application],
   [data-account-contents-flow],
+  [data-volunteer-profile],
   [data-event-calendar]
 ) {
   overflow-x: clip;
@@ -137,8 +149,23 @@ body:has(
   max-width: 35rem;
   margin-inline: auto;
   text-align: left;
+  @apply text-base/6;
   /* Clear the sticky site header on anchor jumps. */
   scroll-margin-top: 7rem;
+}
+.volunteer-signin-panel p,
+.volunteer-signin-panel .volunteer-form :is(.volunteer-help, [data-error]) {
+  @apply text-base/6;
+}
+.volunteer-signin-panel > p {
+  margin: 1rem 0 0;
+}
+.volunteer-signin-panel > p + p {
+  margin-top: 0.25rem;
+}
+.volunteer-signin-panel > .volunteer-notice,
+.volunteer-signin-panel > p + .volunteer-form {
+  margin-top: 1.5rem;
 }
 .volunteer-signin-panel .volunteer-form {
   max-width: none;
@@ -156,8 +183,6 @@ body:has(
   width: fit-content;
   margin: 1.5rem auto 0;
   color: #c7d2fe;
-  text-decoration: underline;
-  text-underline-offset: 0.25rem;
 }
 .volunteer-email-reset:hover {
   color: white;
@@ -243,6 +268,7 @@ body:has(
   border: 0;
 }
 /* Separate complete sections, never a heading from its own fields or answers. */
+.account-profile-summary + [data-account-profile],
 .volunteer-profile-section + .volunteer-profile-section,
 .volunteer-application-section + .volunteer-application-section,
 .volunteer-application-review > section + section,
@@ -294,7 +320,7 @@ body:has(
   overflow: hidden;
 }
 .volunteer-medic-details-content {
-  padding-block: 0.75rem;
+  padding-block: 2rem 0.75rem;
 }
 .volunteer-medic-note,
 [data-profile-team-training]:not(
@@ -602,6 +628,21 @@ body:has(
     border-radius: 0 0 0.625rem 0.625rem;
     box-shadow: none;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    .volunteer-contents-chevron {
+      transition: transform 180ms ease-out;
+    }
+    .volunteer-contents-menu[data-contents-enhanced]::details-content {
+      opacity: 0;
+      /* Keep the native disclosure visible long enough to animate its exit. */
+      transition:
+        opacity 180ms ease-out,
+        content-visibility 180ms allow-discrete;
+    }
+    .volunteer-contents-menu[data-contents-enhanced][open]::details-content {
+      opacity: 1;
+    }
+  }
   .volunteer-application-contents .volunteer-draft-save-status {
     justify-content: flex-start;
     @apply text-sm;
@@ -615,12 +656,11 @@ body:has(
     white-space: nowrap;
   }
   .volunteer-contents a {
-    min-height: 3rem;
-    padding-block: 0.625rem;
+    min-height: 2.75rem;
+    padding-block: 0.5rem;
     @apply text-base/[inherit];
   }
   .volunteer-contents-dropdown a {
-    @apply text-lg/[inherit];
     font-weight: normal;
   }
 }
@@ -957,7 +997,10 @@ body:has(
 .volunteer-date-input[data-date-time][aria-invalid="true"]::before {
   border-inline-start-color: #f87171;
 }
-.volunteer-team-option {
+.volunteer-team-option,
+.volunteer-certification-options > label,
+.volunteer-training-options > label,
+.volunteer-referral-options > label {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
@@ -971,14 +1014,23 @@ body:has(
     background-color 150ms,
     border-color 150ms;
 }
-.volunteer-team-option:hover:not(:has(input:disabled)) {
+.volunteer-team-option:hover:not(:has(input:disabled)),
+.volunteer-certification-options > label:hover:not(:has(input:disabled)),
+.volunteer-training-options > label:hover:not(:has(input:disabled)),
+.volunteer-referral-options > label:hover:not(:has(input:disabled)) {
   border-color: #a1a1aa;
 }
-.volunteer-team-option:has(input:checked) {
+.volunteer-team-option:has(input:checked),
+.volunteer-certification-options > label:has(input:checked),
+.volunteer-training-options > label:has(input:checked),
+.volunteer-referral-options > label:has(input:checked) {
   border-color: #4169e1;
   background: #16214a;
 }
-.volunteer-team-option:has(input:focus-visible) {
+.volunteer-team-option:has(input:focus-visible),
+.volunteer-certification-options > label:has(input:focus-visible),
+.volunteer-training-options > label:has(input:focus-visible),
+.volunteer-referral-options > label:has(input:focus-visible) {
   outline: 3px solid #4169e1;
   outline-offset: 0.1875rem;
 }
@@ -992,6 +1044,17 @@ body:has(
 .volunteer-team-option input {
   margin-top: 0.1875rem;
   cursor: inherit;
+}
+.volunteer-certification-options > label > input,
+.volunteer-training-options > label > input,
+.volunteer-referral-options > label > input {
+  cursor: inherit;
+}
+.volunteer-certification-options > label > span,
+.volunteer-training-options > label > span,
+.volunteer-referral-options > label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .volunteer-team-content {
   display: flex;
@@ -1031,6 +1094,14 @@ body:has(
   margin-bottom: 0.5rem;
   font-weight: normal;
 }
+/* Keep this question hierarchy limited to Training and safety. */
+.volunteer-relevant-training > legend {
+  color: #fafafa;
+  line-height: 1.5;
+}
+.volunteer-relevant-training + .volunteer-relevant-training {
+  margin-top: 1rem;
+}
 .volunteer-event-type-options {
   display: flex;
   flex-wrap: wrap;
@@ -1054,6 +1125,11 @@ body:has(
   /* Pad the touch target evenly without moving controls off the first line. */
   padding-block: 0.625rem;
   cursor: pointer;
+}
+.volunteer-certification-options > label,
+.volunteer-training-options > label,
+.volunteer-referral-options > label {
+  padding: 0.625rem;
 }
 .volunteer-recurrence-label {
   display: flex;
@@ -1084,11 +1160,12 @@ body:has(
 }
 /* Keep the entire follow-up field in the option's text column. */
 .volunteer-certification-options > [data-other-training],
+.volunteer-training-options > [data-training-detail-for],
 .volunteer-training-options > [data-other-relevant-training],
 .volunteer-training-options > [data-other-relevant-experience],
 .volunteer-referral-sources > [data-other-referral] {
   margin-inline-start: calc(
-    var(--volunteer-check-size) + var(--volunteer-check-gap)
+    0.625rem + 1px + var(--volunteer-check-size) + 0.75rem
   );
 }
 .volunteer-setting {
@@ -1141,7 +1218,6 @@ body:has(
 }
 .volunteer-notice a {
   color: #a5b4fc;
-  text-decoration: underline;
 }
 .volunteer-actions,
 .volunteer-filters {
@@ -1227,9 +1303,6 @@ body:has(
   line-height: 1.6;
   cursor: pointer;
 }
-.volunteer-conduct-confirmation input {
-  margin-top: 0.25rem;
-}
 .volunteer-back-link {
   display: flex;
   align-items: center;
@@ -1241,13 +1314,10 @@ body:has(
   border-radius: 0.25rem;
   color: #a1a1aa;
   @apply text-base;
-  text-decoration: none;
-  text-underline-offset: 0.25rem;
   transition: color 150ms;
 }
 .volunteer-back-link:is(:hover, :focus-visible) {
   color: white;
-  text-decoration: underline;
 }
 .volunteer-back-link:focus-visible {
   outline: 2px solid #a5b4fc;
@@ -1273,10 +1343,15 @@ body:has(
   min-width: min(16.25rem, 100%);
 }
 .volunteer-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   width: 100%;
   margin-bottom: 1.5rem;
 }
 .volunteer-search-field {
+  flex: 1;
+  min-width: min(15rem, 100%);
   display: block;
   position: relative;
 }
@@ -1293,19 +1368,206 @@ body:has(
 .volunteer-portal .volunteer-search input {
   padding-left: 2.75rem;
 }
+.volunteer-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: var(--volunteer-border);
+  border-radius: 0.5rem;
+}
+.volunteer-table-scroll:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 0.25rem;
+}
+.volunteer-table {
+  width: 100%;
+  min-width: 48rem;
+  border-collapse: collapse;
+  text-align: left;
+  @apply text-base;
+}
+.volunteer-table :is(th, td) {
+  padding: 1rem;
+  vertical-align: top;
+  border-bottom: var(--volunteer-border);
+  overflow-wrap: normal;
+}
+.volunteer-table thead {
+  background: #171a20;
+}
+.volunteer-table th {
+  font-weight: normal;
+}
+.volunteer-table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+.volunteer-table tbody tr {
+  background: #0c0d10;
+}
+[data-row-navigation] .volunteer-table tbody tr {
+  cursor: pointer;
+}
+.volunteer-table tbody tr:is(:hover, :focus-within) {
+  background: #16214a;
+}
+.volunteer-table th[scope="row"] {
+  min-width: 12rem;
+  overflow-wrap: anywhere;
+}
+.volunteer-table a {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 2.75rem;
+  margin-block: -0.5rem;
+  color: #c7d2fe;
+}
+.volunteer-table a:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 0.25rem;
+}
+.volunteer-table-detail {
+  display: block;
+  margin-top: 0.375rem;
+  color: #a1a1aa;
+  @apply text-sm;
+}
+.volunteer-table-approved {
+  color: #4ade80;
+}
+@media (width < 64rem) {
+  .volunteer-table {
+    /* Keep long names from squeezing the other columns into broken words.
+       Only the labelled, keyboard-focusable table region scrolls sideways. */
+    min-width: 52rem;
+    table-layout: fixed;
+  }
+  .volunteer-table :is(th, td) {
+    padding: 0.75rem;
+  }
+  .volunteer-table thead th:nth-child(1) {
+    width: 27%;
+  }
+  .volunteer-table thead th:nth-child(2) {
+    width: 22%;
+  }
+  .volunteer-table thead th:nth-child(3) {
+    width: 23%;
+  }
+  .volunteer-table thead th:nth-child(4) {
+    width: 18%;
+  }
+  .volunteer-table thead th:nth-child(5) {
+    width: 10%;
+  }
+}
+[data-volunteer-profile] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto var(--contents-bar-height, 4.875rem) auto;
+}
+[data-volunteer-profile-overview] {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  margin-bottom: 2rem;
+}
+[data-volunteer-profile] > .volunteer-contents {
+  grid-column: 1;
+  grid-row: 2 / -1;
+  top: var(--contents-sticky-offset, var(--site-header-height));
+  background: #0c0d10;
+}
+[data-volunteer-profile] > .volunteer-contents::before {
+  background: #0c0d10;
+}
+[data-volunteer-profile] .volunteer-contents-bar {
+  padding-block: 0.5rem 1rem;
+}
+[data-volunteer-profile] .volunteer-contents-dropdown {
+  max-height: max(
+    0rem,
+    calc(
+      var(--contents-viewport-height, 100dvh) -
+        var(--contents-sticky-offset, var(--site-header-height)) -
+        var(--contents-bar-height, 4.875rem)
+    )
+  );
+}
+[data-volunteer-profile] .volunteer-contents-sidebar h2 {
+  @apply text-base;
+}
+[data-volunteer-profile-body] {
+  grid-column: 1;
+  grid-row: 3;
+  min-width: 0;
+}
+[data-volunteer-profile] :is([id], input, select, button) {
+  scroll-margin-top: calc(
+    var(--contents-scroll-offset, calc(var(--site-header-height) + 8.5rem)) +
+      1rem
+  );
+}
+[data-volunteer-profile-panel]
+  > .volunteer-profile-section
+  + .volunteer-profile-section {
+  margin-top: 2rem;
+}
+[data-volunteer-profile-panel] + [data-volunteer-profile-panel] {
+  margin-top: 2rem;
+}
 .volunteer-profile-controls {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  margin-top: 1.5rem;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: var(--volunteer-border);
 }
 .volunteer-profile-controls .volunteer-form + .volunteer-form {
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
 }
-.volunteer-dialog > [data-profile-dialog-content] > div > h2 {
+.volunteer-dialog [data-volunteer-profile-overview] > h2 {
   @apply text-2xl;
+}
+@media (min-width: 64rem) {
+  [data-volunteer-profile] {
+    grid-template-columns: minmax(0, 1fr) 13rem;
+    grid-template-rows: auto auto;
+    column-gap: 2rem;
+  }
+  [data-volunteer-profile] > .volunteer-contents {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    top: calc(
+      var(--contents-sticky-offset, var(--site-header-height)) + 1.5rem
+    );
+  }
+  [data-volunteer-profile-body] {
+    grid-row: 2;
+  }
+}
+/* A dialog stays compact even on a wide screen, and scrolls below its own header. */
+.volunteer-profile-dialog [data-volunteer-profile] {
+  --contents-sticky-offset: 0px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto var(--contents-bar-height, 4.875rem) auto;
+  column-gap: 0;
+}
+.volunteer-profile-dialog [data-volunteer-profile] > .volunteer-contents {
+  grid-column: 1;
+  grid-row: 2 / -1;
+  top: 0;
+}
+.volunteer-profile-dialog [data-volunteer-profile-body] {
+  grid-row: 3;
+}
+.volunteer-profile-dialog .volunteer-contents-menu {
+  display: block;
+}
+.volunteer-profile-dialog .volunteer-contents-sidebar {
+  display: none;
 }
 .volunteer-events {
   margin-top: 3rem;
@@ -1373,19 +1635,16 @@ body:has(
 .volunteer-event-card h3 {
   @apply text-2xl;
 }
-.volunteer-series-occurrences,
-.volunteer-series-settings {
+.volunteer-series-occurrences {
   margin-top: 1.25rem;
   border-top: 1px solid #3f3f46;
   padding-top: 1rem;
 }
-.volunteer-series-occurrences > summary,
-.volunteer-series-settings > summary {
+.volunteer-series-occurrences > summary {
   cursor: pointer;
   color: #d4d4d8;
 }
-.volunteer-series-occurrences > .volunteer-event-list,
-.volunteer-series-settings > summary + .volunteer-form {
+.volunteer-series-occurrences > .volunteer-event-list {
   margin-top: 1rem;
 }
 .volunteer-event-card p {
@@ -1395,7 +1654,6 @@ body:has(
   line-height: 1.65;
 }
 .volunteer-event-card a:not(.btn) {
-  text-decoration: underline;
   color: #c7d2fe;
 }
 .volunteer-event-card .volunteer-spots {
@@ -1436,29 +1694,104 @@ body:has(
   border-top: 1px solid #27272a;
   padding-top: 0.5rem;
 }
-.volunteer-roster summary {
+.volunteer-roster > summary {
   cursor: pointer;
   color: #d4d4d8;
   min-height: 2.75rem;
   width: fit-content;
   align-content: center;
 }
-.volunteer-roster li {
+.event-roster-table {
+  width: 100%;
+  margin-top: 0.75rem;
+  table-layout: fixed;
+  border: var(--volunteer-border);
+  border-radius: 0.5rem;
+  border-spacing: 0;
+  text-align: left;
+}
+.event-roster-table :is(th, td) {
+  padding: 0.625rem 0.75rem;
+  vertical-align: middle;
+  border-bottom: var(--volunteer-border);
+  font-weight: normal;
+  overflow-wrap: anywhere;
+}
+.event-roster-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+.event-roster-table tbody tr {
+  background: #0c0d10;
+}
+.event-roster-table tbody tr:nth-child(even) {
+  background: #171a20;
+}
+.event-roster-person {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid #27272a;
+  gap: 0.625rem;
 }
-.volunteer-roster li > div {
-  flex: 1;
-  min-width: min(10rem, 100%);
+.event-roster-name {
+  min-width: 0;
 }
-.volunteer-roster li span {
+.event-roster-status {
   display: block;
   @apply text-sm/[inherit];
   color: #a1a1aa;
+}
+.event-roster-orientation {
+  margin-top: 0.75rem;
+}
+.event-roster-orientation .btn {
+  max-width: 100%;
+  white-space: normal;
+}
+.event-roster-table .event-roster-actions {
+  width: 4rem;
+  padding: 0.375rem 0.625rem;
+  text-align: right;
+}
+.signup-menu-trigger {
+  @apply rounded-full hover:bg-zinc-500;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+}
+.signup-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0.375rem;
+  width: max-content;
+  max-width: calc(100vw - 1rem);
+  border: var(--volunteer-border);
+  border-radius: 0.5rem;
+  background: #171a20;
+  color: #f4f4f5;
+  box-shadow: 0 0.5rem 1.5rem #0008;
+}
+.signup-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  text-align: left;
+  cursor: pointer;
+}
+.signup-menu button:is(:hover, :focus-visible):not(:disabled) {
+  background: #16214a;
+}
+.signup-menu button:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: -2px;
+}
+.signup-menu button:disabled {
+  color: #a1a1aa;
+  cursor: default;
 }
 .volunteer-profile-dialog {
   height: min(50rem, calc(100dvh - 2rem));
@@ -1641,7 +1974,10 @@ body:has(
   .cloud-save-loading {
     animation: none;
   }
-  .volunteer-team-option {
+  .volunteer-team-option,
+  .volunteer-certification-options > label,
+  .volunteer-training-options > label,
+  .volunteer-referral-options > label {
     transition: none;
   }
 }

@@ -3,18 +3,27 @@ export interface ApplicationProgress {
   naloxoneCompletedAt: number | null;
   applicationApproved: boolean;
   applicationApprovedAt: number | null;
+  applicationRejectionReason?: string | null;
+  discordRequired?: boolean;
+  discordCompletedAt?: number | null;
 }
 
 /** Application completion is separate from orientation booking and attendance. */
 export function isApplicationComplete(
   progress: Pick<
     ApplicationProgress,
-    "submittedAt" | "naloxoneCompletedAt" | "applicationApproved"
+    | "submittedAt"
+    | "naloxoneCompletedAt"
+    | "applicationApproved"
+    | "discordRequired"
+    | "discordCompletedAt"
   >,
 ): boolean {
   return (
     progress.submittedAt !== null &&
     progress.naloxoneCompletedAt !== null &&
+    // Discord connection is temporarily disabled; retain recorded milestones.
+    // (!progress.discordRequired || progress.discordCompletedAt != null) &&
     progress.applicationApproved
   );
 }
@@ -28,6 +37,9 @@ export async function loadApplicationProgress(
       `SELECT p.registered_at AS submittedAt,
         p.naloxone_completed_at AS naloxoneCompletedAt,
         v.registration_approved AS applicationApproved,
+        v.application_rejection_reason AS applicationRejectionReason,
+        (p.user_id IS NULL OR EXISTS(SELECT 1 FROM discord_requirement WHERE user_id=u.id)) AS discordRequired,
+        (SELECT completed_at FROM discord_link WHERE user_id=u.id) AS discordCompletedAt,
         (SELECT max(a.created_at) FROM audit_log a
           WHERE a.subject_id=u.id AND a.action='approval_changed'
           AND EXISTS (SELECT 1 FROM json_each(a.changed_fields)
@@ -38,14 +50,18 @@ export async function loadApplicationProgress(
     )
     .bind(userId)
     .first<
-      Omit<ApplicationProgress, "applicationApproved"> & {
+      Omit<ApplicationProgress, "applicationApproved" | "discordRequired"> & {
         applicationApproved: number | null;
+        discordRequired: number;
       }
     >();
   return {
     submittedAt: row?.submittedAt ?? null,
     naloxoneCompletedAt: row?.naloxoneCompletedAt ?? null,
     applicationApproved: Boolean(row?.applicationApproved),
+    applicationRejectionReason: row?.applicationRejectionReason ?? null,
+    discordRequired: Boolean(row?.discordRequired),
+    discordCompletedAt: row?.discordCompletedAt ?? null,
     // approved_at belongs to patrol approval. Only an application-status audit
     // can date this milestone; legacy approvals without one stay undated.
     applicationApprovedAt: row?.applicationApproved

@@ -47,36 +47,45 @@ const date = new Intl.DateTimeFormat("en-CA", {
   data-includes-orientation={String(includesOrientation)}
   hidden={!matchesEventFilter(filter, true, includesOrientation)}
 >
-  <div data-series-summary>
-    <h3>
-      Every {
-        series.intervalWeeks === 1 ? "week" : `${series.intervalWeeks} weeks`
-      } on {weekday}
-    </h3>
-    <p>
-      {series.includesOrientation ? "Orientation + Patrol" : "Patrol"}
-      {series.hidden || !series.open ? " · Public visibility off" : ""}
-    </p>
-    <p>Starting on {date}</p>
-    <p>{formatTimeInput(series.localTime)}</p>
-    <p>
-      Meeting at {
-        series.meetingPointUrl ? (
-          <a href={series.meetingPointUrl} target="_blank" rel="noreferrer">
-            {series.meetingPoint}
-          </a>
-        ) : (
-          series.meetingPoint
-        )
+  <div class="volunteer-event-top">
+    <div data-series-summary>
+      <h3>
+        Every {
+          series.intervalWeeks === 1 ? "week" : `${series.intervalWeeks} weeks`
+        } on {weekday}
+      </h3>
+      <p>
+        {series.includesOrientation ? "Orientation + Patrol" : "Patrol"}
+        {series.hidden || !series.open ? " · Public visibility off" : ""}
+      </p>
+      <p>Starting on {date}</p>
+      <p>{formatTimeInput(series.localTime)}</p>
+      <p>
+        Meeting at {
+          series.meetingPointUrl ? (
+            <a href={series.meetingPointUrl} target="_blank" rel="noreferrer">
+              {series.meetingPoint}
+            </a>
+          ) : (
+            series.meetingPoint
+          )
+        }
+      </p>
+      {
+        series.stoppedFrom ? (
+          <p class="volunteer-hidden">Stopped from {series.stoppedFrom}</p>
+        ) : series.endDate ? (
+          <p>Through {series.endDate}</p>
+        ) : null
       }
-    </p>
-    {
-      series.stoppedFrom ? (
-        <p class="volunteer-hidden">Stopped from {series.stoppedFrom}</p>
-      ) : series.endDate ? (
-        <p>Through {series.endDate}</p>
-      ) : null
-    }
+    </div>
+    <button
+      class="btn btn-quiet"
+      type="button"
+      data-show-dialog={`series-editor-${series.id}`}
+      aria-haspopup="dialog"
+      aria-controls={`series-editor-${series.id}`}>Edit series</button
+    >
   </div>
   <details
     class="volunteer-series-occurrences"

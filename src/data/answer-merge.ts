@@ -10,7 +10,12 @@ export const answerGroups = [
     "certificationExpiry",
     "experience",
   ],
-  ["training", "otherTraining"],
+  [
+    "training",
+    "expiredFirstAidDetails",
+    "crisisInterventionDetails",
+    "otherTraining",
+  ],
   ["relevantExperience", "otherExperience"],
   ["heardAboutUsSources", "heardAboutUsOther"],
 ] as const;

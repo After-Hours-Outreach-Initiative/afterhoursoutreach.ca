@@ -1,0 +1,23 @@
+---
+import { env } from "cloudflare:workers";
+import WarningIcon from "@/components/icons/WarningIcon.astro";
+import { loadDiscordStatus } from "@/server/discord/status";
+
+interface Props {
+  userId: string;
+}
+const { userId } = Astro.props;
+const status = await loadDiscordStatus(env, userId);
+---
+
+{
+  status.discordId === null && (
+    <p class="volunteer-notice flex items-start gap-3" role="status">
+      <WarningIcon class="mt-1.5 size-5 shrink-0 text-amber-300" />
+      <a href="/volunteer/account#account-discord-heading">
+        Please connect your discord account to get your roles and channel access
+        in our server
+      </a>
+    </p>
+  )
+}

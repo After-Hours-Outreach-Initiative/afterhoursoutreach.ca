@@ -4,6 +4,7 @@ import { afterEach, beforeEach, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   account: vi.fn(),
   save: vi.fn(),
+  confirm: vi.fn(),
   rate: vi.fn(),
   job: vi.fn(),
   statements: vi.fn(() => []),
@@ -18,6 +19,9 @@ vi.mock("cloudflare:workers", () => ({
 vi.mock("@/server/auth", () => ({ forwardCookies: vi.fn() }));
 vi.mock("@/server/db/access", () => ({ accountContext: mocks.account }));
 vi.mock("@/server/db/profiles", () => ({ saveProfile: mocks.save }));
+vi.mock("@/server/db/naloxone", () => ({
+  confirmNaloxoneCompletion: mocks.confirm,
+}));
 vi.mock("@/server/db/rate-limits", () => ({ takeRateLimit: mocks.rate }));
 vi.mock("@/server/db/submission-notifications", () => ({
   submissionNotificationStatements: () => mocks.statements,
@@ -26,6 +30,7 @@ vi.mock("@/server/submission-notifications", () => ({
   runSubmissionNotificationJob: mocks.job,
 }));
 import { POST } from "../src/pages/api/v1/account/profile";
+import { POST as confirmNaloxone } from "../src/pages/api/v1/account/naloxone";
 
 beforeEach(() => {
   mocks.account.mockResolvedValue({
@@ -38,6 +43,10 @@ beforeEach(() => {
     answers: {},
   });
   mocks.job.mockResolvedValue({ failed: 1 }); // Catch-safe delivery result, not a save failure.
+  mocks.confirm.mockResolvedValue({
+    completedAt: 123,
+    reviewOperationId: "winning-operation",
+  });
 });
 afterEach(() => {
   vi.clearAllMocks();
@@ -70,11 +79,22 @@ function invoke(
   } as Parameters<typeof POST>[0]);
 }
 
-test("successful first submission passes a transactional intent hook and schedules a bounded, separate job", async () => {
-  const background: Promise<unknown>[] = [];
-  const response = await invoke("submit", (promise) => {
-    background.push(promise);
-  });
+function invokeConfirmation(waitUntil = (_promise: Promise<unknown>) => {}) {
+  return confirmNaloxone({
+    request: new Request(
+      "https://afterhoursoutreach.ca/api/v1/account/naloxone",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: "applicant", completed: true }),
+      },
+    ),
+    locals: { cfContext: { waitUntil } },
+  } as Parameters<typeof confirmNaloxone>[0]);
+}
+
+test("successful initial form submission never enqueues or schedules organizer email", async () => {
+  const response = await invoke("submit");
   assert.equal(response.status, 200);
   const body = (await response.json()) as {
     firstSubmitted: boolean;
@@ -85,6 +105,19 @@ test("successful first submission passes a transactional intent hook and schedul
   assert.equal(mocks.save.mock.calls[0][1], "applicant");
   assert.equal(
     mocks.save.mock.calls[0][3].firstSubmissionStatements,
+    undefined,
+  );
+  assert.equal(mocks.job.mock.calls.length, 0);
+});
+
+test("review entry passes a transactional intent hook and schedules a bounded, separate job", async () => {
+  const background: Promise<unknown>[] = [];
+  const response = await invokeConfirmation((promise) => {
+    background.push(promise);
+  });
+  assert.equal(response.status, 200);
+  assert.equal(
+    mocks.confirm.mock.calls[0][3].reviewStatements,
     mocks.statements,
   );
   assert.deepEqual(mocks.job.mock.calls[0][1], {
@@ -96,14 +129,14 @@ test("successful first submission passes a transactional intent hook and schedul
   await Promise.all(background);
 });
 
-test("waitUntil scheduling failures cannot turn a committed submission into an error response or leak details", async () => {
+test("waitUntil scheduling failures cannot turn committed review entry into an error response or leak details", async () => {
   const log = vi.spyOn(console, "error").mockImplementation(() => {});
-  const response = await invoke("submit", () => {
+  const response = await invokeConfirmation(() => {
     throw new Error("private address and answers");
   });
   assert.equal(response.status, 200);
-  const body = (await response.json()) as { firstSubmitted: boolean };
-  assert.equal(body.firstSubmitted, true);
+  const body = (await response.json()) as { completedAt: number };
+  assert.equal(body.completedAt, 123);
   assert.deepEqual(log.mock.calls, [
     [
       JSON.stringify({
@@ -114,7 +147,7 @@ test("waitUntil scheduling failures cannot turn a committed submission into an e
   ]);
 });
 
-test("profile edits and duplicate submissions do not start organizer notification jobs", async () => {
+test("profile edits, duplicate submissions and repeated course confirmations do not start notification jobs", async () => {
   for (const intent of ["submit", "edit"] as const) {
     mocks.save.mockResolvedValue({
       firstSubmitted: false,
@@ -129,5 +162,7 @@ test("profile edits and duplicate submissions do not start organizer notificatio
       intent === "submit" ? "/events" : "/volunteer/account",
     );
   }
+  mocks.confirm.mockResolvedValue({ completedAt: 123 });
+  assert.equal((await invokeConfirmation()).status, 200);
   assert.equal(mocks.job.mock.calls.length, 0);
 });

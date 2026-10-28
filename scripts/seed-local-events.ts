@@ -5,12 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { request } from "@playwright/test";
 import { unstable_readConfig as readConfig } from "wrangler";
-import {
-  localAccountFixtures,
-  localAccountUserId,
-} from "./local-account-fixtures";
-import { fixtureUserId, localEventFixtures } from "./local-event-fixtures";
-import { localAuthenticatorCode } from "../src/dev/server/authenticator-code";
+import { localAccountFixtures } from "./local-account-fixtures";
+import { localEventFixtures } from "./local-event-fixtures";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 // The browser-test harness selects its broader fixtures in a disposable copy.
@@ -92,30 +88,12 @@ try {
     await unlink(file);
     await rmdir(directory);
   }
-  const post = async (path: string, data: object) => {
-    const result = await client.post(path, { data });
-    if (!result.ok())
-      throw new Error(`Local organizer setup failed at ${path}.`);
-    return result.json();
-  };
-  await post("/api/v1/auth/dev/switch-user", {
-    userId: testFixtures
-      ? fixtureUserId("robin")
-      : localAccountUserId("organizer"),
+  // The dev-only seeder prepares an existing enrolled fixture without exposing
+  // public enrollment or sharing setup secrets with this CLI's HTTP client.
+  const enrolled = await client.post("/api/v1/auth/dev/seed-accounts", {
+    data: testFixtures ? { testFixtures: true } : {},
   });
-  const current = await (await client.get("/api/v1/auth/get-session")).json();
-  if (!current?.user?.twoFactorEnabled) {
-    // Enroll through the real auth backend; never fake the enabled flag or
-    // commit an authenticator secret. View as handles verified dev sessions.
-    const setup = await post("/api/v1/auth/two-factor/enable", {
-      method: "totp",
-    });
-    const key = new URL(setup.totpURI).searchParams.get("secret")!;
-    await post("/api/v1/auth/two-factor/verify-totp", {
-      code: localAuthenticatorCode(key),
-    });
-  }
-  await post("/api/v1/auth/sign-out", {});
+  if (!enrolled.ok()) throw new Error("Local organizer setup failed.");
   console.log(
     testFixtures
       ? "Local D1 test events and sample accounts are ready. Choose Robin Vance in View as for organizer tools."

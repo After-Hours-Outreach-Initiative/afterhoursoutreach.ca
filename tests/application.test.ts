@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import {
+  applicationTeamOptions,
   latestApplicationBirthDate,
   normalizeCertifications,
   outreachRequiredError,
@@ -7,6 +8,7 @@ import {
   trainingOptions,
   experienceOptions,
   normalizeTrainingAnswers,
+  trainingDetailOptions,
 } from "../src/data/application";
 import { profileSchema } from "../src/server/db/profiles";
 import {
@@ -17,12 +19,25 @@ import { profileAnswerRows } from "../src/data/profile-answers";
 
 const birthDateSchema = profileSchema.shape.birthDate;
 
+test("team choices offer Outreach and Medic while saved retired answers remain readable", () => {
+  expect(applicationTeamOptions.map((option) => option.value)).toEqual([
+    "outreach",
+    "medic",
+  ]);
+  const section = profileFormSections().find(
+    (section) => section.key === "team-interests",
+  )!;
+  expect(
+    profileAnswerRows(section, { teams: ["outreach", "non-patrol"] })[0].value,
+  ).toEqual(["Outreach", "Non-patrol support"]);
+});
+
 test("training and experience offer separate, exact choices", () => {
   expect(trainingOptions.map((option) => option.label)).toEqual([
     "Naloxone administration training",
     "Basic First Aid, Emergency First Aid, Standard First Aid, or CPR certification",
-    "Expired first-aid certification (specify under Other)",
-    "Crisis intervention and de-escalation training (specify under Other)",
+    "Expired first-aid certification",
+    "Crisis intervention and de-escalation training",
     "Mental Health First Aid or Psychological First Aid",
     "Other",
     "No relevant training",
@@ -50,6 +65,8 @@ test("legacy combined answers split without inventing missing answers or losing 
   };
   const normalized = normalizeTrainingAnswers(original);
   expect(normalized).toEqual({
+    expiredFirstAidDetails: "",
+    crisisInterventionDetails: "",
     training: ["naloxone-administration", "other"],
     otherTraining:
       "Original combined Other details\nCertified naloxone trainer",
@@ -151,6 +168,71 @@ test("both questions require an answer, exclusive None and conditional Other det
   expect(rows.find((row) => row.name === "otherExperience")).toMatchObject({
     value: "Details",
     hidden: false,
+  });
+});
+
+test("each selected training follow-up requires its own bounded details and keeps legacy Other text separate", () => {
+  const answers = {
+    ...draftProfileValues(applicationDraftAnswersSchema.parse({})),
+    firstName: "Sample",
+    lastName: "Volunteer",
+    phone: "6045550100",
+    birthDate: "1990-01-01",
+    emergencyName: "Contact",
+    emergencyPhone: "6045550101",
+    emergencyRelationship: "Friend",
+    heardAboutUsSources: ["internet"],
+    motivation: "Help my community",
+    teams: ["outreach"],
+    relevantExperience: ["none"],
+    training: trainingDetailOptions.map((option) => option.value),
+    otherTraining: "Original shared details",
+    expiredFirstAidDetails: " Expired OFA Level 2 ",
+    crisisInterventionDetails: " Crisis prevention course ",
+  };
+  const section = profileFormSections().find(
+    (section) => section.key === "training-and-safety",
+  )!;
+  for (const option of trainingDetailOptions) {
+    for (const details of [undefined, " \t ", "x".repeat(2001)])
+      expect(
+        profileSchema.safeParse({ ...answers, [option.name]: details }).success,
+      ).toBe(false);
+    expect(
+      profileSchema.safeParse({
+        ...answers,
+        training: ["none"],
+        [option.name]: "x".repeat(2001),
+      }).success,
+    ).toBe(true);
+    const parsed = profileSchema.parse(answers);
+    expect(parsed[option.name]).toBe(answers[option.name].trim());
+    expect(
+      profileAnswerRows(section, parsed).find(
+        (row) => row.name === option.name,
+      ),
+    ).toMatchObject({ value: parsed[option.name], hidden: false });
+    expect(
+      profileAnswerRows(section, { ...parsed, training: ["none"] }).find(
+        (row) => row.name === option.name,
+      )?.hidden,
+    ).toBe(true);
+  }
+  const legacy = normalizeTrainingAnswers({
+    training: ["expired-first-aid", "crisis-intervention", "other"],
+    otherTraining: answers.otherTraining,
+  });
+  expect(legacy.otherTraining).toBe(answers.otherTraining);
+  expect(legacy.expiredFirstAidDetails).toBe("");
+  expect(legacy.crisisInterventionDetails).toBe("");
+  const {
+    heardAboutUs: _heard,
+    certification: _certification,
+    ...draft
+  } = answers;
+  expect(applicationDraftAnswersSchema.parse(draft)).toMatchObject({
+    expiredFirstAidDetails: answers.expiredFirstAidDetails,
+    crisisInterventionDetails: answers.crisisInterventionDetails,
   });
 });
 

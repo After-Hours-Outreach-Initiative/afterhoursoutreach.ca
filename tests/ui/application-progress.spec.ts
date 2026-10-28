@@ -332,19 +332,18 @@ for (const width of [390, 1280]) {
       name: "Outreach",
       exact: true,
     });
-    const support = form.getByRole("checkbox", {
-      name: "Non-patrol support",
+    const medic = form.getByRole("checkbox", {
+      name: "Medic",
       exact: true,
     });
     await expect(outreach).not.toBeChecked();
     await expect(outreach).toBeEnabled();
     await expect(outreach).toHaveAttribute("required", "");
     await expect(form.locator('[name="teams"][required]')).toHaveCount(1);
-    await support.check();
+    await medic.check();
     await expectComplete(page, "team-interests", false);
+    await medic.uncheck();
     await outreach.check();
-    await expectComplete(page, "team-interests", true);
-    await support.uncheck();
     await expectComplete(page, "team-interests", true);
     await form.locator('[name="training"][value="none"]').check();
     await expectComplete(page, "training-and-safety", false);

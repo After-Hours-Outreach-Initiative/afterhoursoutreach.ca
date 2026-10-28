@@ -4,6 +4,8 @@ import {
   motivationWordLimitError,
   trainingRequiredError,
   trainingExclusiveError,
+  trainingDetailOptions,
+  requiresTrainingDetails,
   experienceRequiredError,
   experienceExclusiveError,
   profileFormSections,
@@ -190,13 +192,16 @@ export function initRelevantTraining(element: HTMLFormElement) {
     const feedback = section?.querySelector<HTMLElement>(
       `[data-error="${name}"] span`,
     );
-    const details = section.querySelector<HTMLElement>(
-      experience
-        ? "[data-other-relevant-experience]"
-        : "[data-other-relevant-training]",
-    );
-    const input = details?.querySelector<HTMLTextAreaElement>("textarea");
-    if (!first || !other || !none || !details || !input) continue;
+    const detailFields = [
+      ...section.querySelectorAll<HTMLElement>("[data-training-detail-for]"),
+    ].map((details) => ({
+      details,
+      choice: choices.find(
+        (choice) => choice.value === details.dataset.trainingDetailFor,
+      )!,
+      input: details.querySelector<HTMLTextAreaElement>("textarea")!,
+    }));
+    if (!first || !other || !none) continue;
     const update = () => {
       const selected = choices.filter((choice) => choice.checked);
       const required =
@@ -212,14 +217,26 @@ export function initRelevantTraining(element: HTMLFormElement) {
             : "";
       first.setCustomValidity(error);
       if (feedback) feedback.textContent = error || requiredError;
-      details.hidden = !other.checked;
-      input.required = other.checked;
-      input.readOnly = !other.checked;
-      input.setCustomValidity(
-        other.checked && !input.value.trim()
-          ? `Describe your other relevant ${experience ? "experience" : "training"}.`
-          : "",
-      );
+      const previous = JSON.parse(
+        element.dataset.profileBaseline ?? "null",
+      ) as ApplicationAnswers | null;
+      for (const { details, choice, input } of detailFields) {
+        const option = trainingDetailOptions.find(
+          (option) => option.name === input.name,
+        );
+        details.hidden = !choice.checked;
+        choice.setAttribute("aria-expanded", String(choice.checked));
+        input.required =
+          choice.checked &&
+          (!option || requiresTrainingDetails(option, previous));
+        input.readOnly = !choice.checked;
+        input.setCustomValidity(
+          input.required && !input.value.trim()
+            ? (option?.message ??
+                `Describe your other relevant ${experience ? "experience" : "training"}.`)
+            : "",
+        );
+      }
     };
     const updateSelection = (event: Event) => {
       const target = event.target;
@@ -389,6 +406,9 @@ export function initAccountFormChanges(element: HTMLFormElement) {
   // the complete saved payload explicitly: the API is not a section/PATCH API.
   for (const { fields } of sections) fields.disabled = false;
   let saved = new FormData(element);
+  // Retired team choices have no editor control; unrelated saves retain them.
+  saved.delete("teams");
+  for (const team of baseline.teams) saved.append("teams", team);
   // Legacy non-Medic profiles may have multiple saved certifications that the
   // single-choice editor cannot represent. Unrelated section saves retain them.
   saved.delete("certifications");

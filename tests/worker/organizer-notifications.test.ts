@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
+import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { profileWriteBody } from "../helpers/profile-write";
 
 const origin = "https://afterhoursoutreach.ca";
@@ -58,6 +59,12 @@ describe(
         .bind(organizer.id, Date.now())
         .run();
       organizer.cookie = await signIn(organizer.email);
+      await send(
+        "/api/v1/account/naloxone",
+        { userId: volunteer.id, completed: true },
+        volunteer.cookie,
+      );
+      await seedVerifiedDiscordMembership(DB, volunteer.id);
     });
     const send = async (
       path: string,

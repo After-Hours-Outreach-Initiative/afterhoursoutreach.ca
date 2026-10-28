@@ -1,6 +1,5 @@
 ---
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
-import VolunteerProfileDialog from "@/components/volunteer/VolunteerProfileDialog.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
 import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/db/access";
@@ -13,6 +12,7 @@ export const prerender = false;
 let team: Awaited<ReturnType<typeof listVolunteers>> = {
   rows: [],
   hasMore: false,
+  allApplicantsCount: 0,
   awaitingApprovalCount: 0,
 };
 let lock = "";
@@ -92,7 +92,11 @@ try {
               data-volunteer-filter="all"
               aria-pressed={approval === "all" ? "true" : "false"}
             >
-              All applicants
+              <span>
+                All (
+                <span data-all-applicants-count>{team.allApplicantsCount}</span>
+                )
+              </span>
             </button>
             <button
               class="volunteer-filter"
@@ -129,58 +133,76 @@ try {
                 placeholder="Search by name"
               />
             </label>
-            <noscript>
-              <button class="btn btn-outline mt-3" type="submit">
-                Search
-              </button>
-            </noscript>
+            <button class="btn btn-outline" type="submit">
+              Search
+            </button>
           </form>
           <div data-volunteer-results>
-            <ul class="volunteer-event-list">
-              {team.rows.map((person) => (
-                <li class="volunteer-event-card">
-                  <div class="volunteer-event-top">
-                    <div>
-                      <h3>{person.name}</h3>
-                      <p>
-                        {person.role === "organizer"
-                          ? "Organizer"
-                          : "Volunteer"}{" "}
-                        · {person.orientations} orientations completed
-                      </p>
-                      <p>
-                        {person.applicationApproved
-                          ? "Application approved"
-                          : "Application awaiting approval"}
-                        {person.role === "organizer" &&
-                          " · Event access through organizer role"}
-                      </p>
-                      <p>
-                        <span
-                          class:list={{
-                            "volunteer-spots": Boolean(person.patrolApproved),
-                          }}
+            <div
+              class="volunteer-table-scroll"
+              role="region"
+              aria-label="Volunteer table"
+              tabindex="0"
+            >
+              <table class="volunteer-table">
+                <caption class="sr-only">
+                  Volunteer applicants and access status
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Name and role</th>
+                    <th scope="col">Application</th>
+                    <th scope="col">Patrol access</th>
+                    <th scope="col">Orientations completed</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {team.rows.map((person) => (
+                    <tr data-volunteer-row>
+                      <th scope="row">
+                        <a
+                          href={`/manage/volunteers/${encodeURIComponent(person.id)}?returnTo=${encodeURIComponent(listUrl)}`}
+                          data-volunteer-profile-link
                         >
-                          {person.patrolApproved
-                            ? "Approved for patrols"
-                            : "Not approved for patrols"}
+                          {person.name}
+                        </a>
+                        <span class="volunteer-table-detail">
+                          {person.role === "organizer"
+                            ? "Organizer"
+                            : "Volunteer"}
                         </span>
-                        {!person.active && " · Inactive"}
-                      </p>
-                    </div>
-                    <a
-                      class="btn btn-quiet"
-                      href={`/manage/volunteers/${encodeURIComponent(person.id)}?returnTo=${encodeURIComponent(listUrl)}`}
-                      data-volunteer-profile-link
-                    >
-                      {person.applicationApproved
-                        ? "View profile and approval"
-                        : "Review application and approval"}
-                    </a>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      </th>
+                      <td>
+                        {person.applicationApproved
+                          ? "Approved"
+                          : person.applicationRejectionReason
+                            ? "Rejected"
+                            : "Awaiting approval"}
+                        {person.role === "organizer" && (
+                          <span class="volunteer-table-detail">
+                            Event access through organizer role
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        class:list={{
+                          "volunteer-table-approved": Boolean(
+                            person.patrolApproved,
+                          ),
+                        }}
+                      >
+                        {person.patrolApproved
+                          ? "Approved for patrols"
+                          : "Not approved for patrols"}
+                      </td>
+                      <td>{person.orientations}</td>
+                      <td>{person.active ? "Active" : "Inactive"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {!team.rows.length && (
               <p class="volunteer-notice">
                 {approval === "awaiting"
@@ -224,11 +246,11 @@ try {
             hidden
           />
         </section>
-        <VolunteerProfileDialog />
       </>
     )
   }
 </AccountLayout>
 <script>
-  import "@/scripts/volunteer";
+  import { initVolunteerBrowser } from "@/scripts/volunteer-browser";
+  initVolunteerBrowser();
 </script>

@@ -5,6 +5,8 @@ import { authClient } from "../../scripts/auth-client";
 import { accountErrorMessage } from "../../scripts/account-forms";
 import {
   developmentAccountStatus,
+  developmentPresetStatus,
+  accountStatePersona,
   manualAccountGroups,
   manualAccountPresets,
   manualAccountPresetIds,
@@ -59,6 +61,7 @@ export async function initAccountSwitcher() {
   );
   let busy = true;
   let currentUserId: string | null = null;
+  let currentAccountName: string | null = null;
   let progress: DevelopmentUsers["applicationProgress"] = null;
   let pendingDelete: HTMLButtonElement | undefined;
   const showDeleteConfirmation = (
@@ -95,6 +98,8 @@ export async function initAccountSwitcher() {
   const updateSteps = () => {
     const submitted = progress?.submittedAt != null;
     const naloxone = progress?.naloxoneCompletedAt != null;
+    const discord =
+      !progress?.discordRequired || progress?.discordCompletedAt != null;
     for (const button of steps) {
       const step = button.dataset.applicationStep;
       const completed =
@@ -102,7 +107,10 @@ export async function initAccountSwitcher() {
           ? submitted
           : step === "naloxone"
             ? naloxone
-            : Boolean(progress?.applicationApproved);
+            : step === "discord"
+              ? discord
+              : Boolean(progress?.applicationApproved);
+      // Discord connection is temporarily disabled: omit && (step === "discord" || discord).
       const available =
         step === "form" ||
         (step === "naloxone" ? submitted : submitted && naloxone);
@@ -303,6 +311,7 @@ export async function initAccountSwitcher() {
       users.push(...result.users);
       after = result.next;
       currentUserId = result.currentUserId;
+      currentAccountName = result.currentAccountName;
       progress = result.applicationProgress;
     } while (after);
     const personaOrder = new Map(
@@ -357,9 +366,19 @@ export async function initAccountSwitcher() {
         profileButton(
           newApplicationPersona,
           "Not applied",
-          "Start a new empty application",
+          "Reset the temporary test account to an empty application",
         ),
       );
+    for (const preset of manualAccountPresets)
+      groups
+        .get(preset.group)!
+        .buttons.appendChild(
+          profileButton(
+            accountStatePersona(preset.key),
+            preset.label,
+            `Reset test state · ${developmentPresetStatus(preset)}`,
+          ),
+        );
     for (const user of users) {
       const label =
         user.id === "local-account-user-not-applied" &&
@@ -368,12 +387,13 @@ export async function initAccountSwitcher() {
           : user.name || "Not yet applied";
       const button = profileButton(
         user.id,
-        manualAccountPresets.find(({ id }) => id === user.id)?.label ?? label,
+        label,
         `${user.email}${user.role === "organizer" ? " · Organizer" : ""} · ${developmentAccountStatus(user.state)}`,
       );
-      const preset = manualAccountPresets.find(({ id }) => id === user.id);
-      if (preset) {
-        groups.get(preset.group)!.buttons.appendChild(button);
+      if (manualAccountPresetIds.includes(user.id)) {
+        // Preserve old preset identities and any progressed applications without
+        // presenting them as reusable state launchers or allowing their deletion.
+        accounts.appendChild(button);
         continue;
       }
       const row = document.createElement("div");
@@ -419,7 +439,9 @@ export async function initAccountSwitcher() {
     if (stepAccount)
       stepAccount.textContent = current
         ? `Current account: ${current.name || current.email}`
-        : "Choose an account to use these shortcuts.";
+        : currentUserId
+          ? `Current temporary test account: ${currentAccountName ?? "Test account"}`
+          : "Choose an account to use these shortcuts.";
     profiles
       .querySelectorAll<HTMLButtonElement>("[data-switch-user]")
       .forEach((button) =>

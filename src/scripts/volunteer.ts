@@ -5,8 +5,19 @@ import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
 import { chooseNotification } from "./notification-choice";
-import { confirmEventDeletion } from "./event-deletion";
+import { confirmSeriesDeletion } from "./event-deletion";
 import { initDateInputs, readDateInputs } from "./date-input";
+import {
+  disposeVolunteerProfileContents,
+  initVolunteerProfileContents,
+} from "./volunteer-profile-contents";
+import { initSignupMenus } from "./signup-menu";
+import {
+  initBulkEvents,
+  syncBulkEventSelection,
+  clearBulkEventSelection,
+  bulkEventAction,
+} from "./event-bulk";
 import {
   initRecurrenceControls,
   recurringSaveAction,
@@ -15,11 +26,6 @@ import {
   syncSeriesControls,
   eventEmailPrompt,
 } from "./event-recurrence";
-import {
-  cancelVolunteerSearch,
-  initVolunteerBrowser,
-  syncVolunteerBrowser,
-} from "./volunteer-browser";
 import {
   actionEmailNeedsFeedback,
   showActionEmailFeedback,
@@ -49,6 +55,16 @@ function initEventDates(root: Document | HTMLElement) {
       step.disabled = false;
   }
 }
+
+function initVolunteerControls(root: Document | HTMLElement) {
+  for (const group of root.querySelectorAll<HTMLElement>(
+    "[data-volunteer-controls]:not([data-submitting])",
+  ))
+    for (const control of group.querySelectorAll<
+      HTMLElement & { disabled: boolean }
+    >("[data-volunteer-control]"))
+      control.disabled = false;
+}
 // Compare against the server HTML, not transient loading/filter/expanded state.
 const renderedCards = new WeakMap<HTMLElement, string>();
 let deferredEventRefresh = false;
@@ -56,6 +72,8 @@ let refreshDeferredEvents = () => {};
 for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
   renderedCards.set(card, card.outerHTML);
 initEventDates(document);
+initVolunteerProfileContents();
+initSignupMenus();
 
 function applyEventFilter(root: HTMLElement, type: string) {
   const selected = eventFilter(type, root.dataset.eventView === "manage");
@@ -70,7 +88,7 @@ function applyEventFilter(root: HTMLElement, type: string) {
     ) ?? []) {
       card.hidden = !matchesEventFilter(
         selected,
-        Boolean(card.dataset.seriesCard),
+        Boolean(card.dataset.seriesCard || card.dataset.eventSeries),
         card.dataset.includesOrientation === "true",
       );
       if (!card.hidden) visible++;
@@ -86,6 +104,7 @@ function applyEventFilter(root: HTMLElement, type: string) {
       String(button.dataset.eventFilter === selected),
     );
   syncEventCalendar(root);
+  syncBulkEventSelection(root);
 }
 
 document
@@ -93,6 +112,7 @@ document
   .forEach((root) => {
     const applyFilter = (type: string) => applyEventFilter(root, type);
     syncEventCalendar(root);
+    initBulkEvents(root);
     root.addEventListener("click", (event) => {
       handleEventCalendarClick(root, event);
       if (!(event.target instanceof Element)) return;
@@ -217,9 +237,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     "[data-series-occurrences] > summary",
   )
     ? "[data-series-occurrences] > summary"
-    : focused?.matches("[data-live-series] > summary")
-      ? "[data-live-series] > summary"
-      : null;
+    : null;
   const focusedEventSummary = [
     ".volunteer-roster > summary",
     ".public-event-roster > summary",
@@ -236,7 +254,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   let added: HTMLElement | undefined;
   const protectedEvent = (card: HTMLElement) =>
     Boolean(
-      card.querySelector("dialog[open]") ||
+      card.querySelector("dialog[open], [data-signup-menu]:popover-open") ||
       [
         ...card.querySelectorAll<HTMLFormElement>(
           'form[data-submitting="true"]',
@@ -247,6 +265,14 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     card.dataset.seriesCard
       ? `series:${card.dataset.seriesCard}`
       : `event:${card.dataset.liveEvent}`;
+  // A date can move between sections (or out of a series group) as it starts.
+  // Reuse its roster expansion state, and never duplicate an open editor.
+  const existingEvents = new Map(
+    [...root.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
+      key(card),
+      card,
+    ]),
+  );
   const syncList = (list: HTMLElement, nextList: HTMLElement) => {
     const previous = new Map(
       [...list.children]
@@ -257,8 +283,14 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     for (const updated of nextList.children) {
       if (!(updated instanceof HTMLElement)) continue;
       const id = key(updated);
-      let card = previous.get(id);
+      let card =
+        previous.get(id) ??
+        (!updated.dataset.seriesCard ? existingEvents.get(id) : undefined);
       previous.delete(id);
+      if (card && card.parentElement !== list && protectedEvent(card)) {
+        deferredEventRefresh = true;
+        continue;
+      }
       if (updated.dataset.seriesCard) {
         if (!card) {
           card = document.importNode(updated, true);
@@ -308,11 +340,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           availability.replaceWith(document.importNode(nextAvailability, true));
         // Signup counts can change while an editor is open. Refresh only email
         // eligibility; leave the organizer's fields, reason and scope draft intact.
-        for (const selector of [
-          "[data-event-save]",
-          "[data-event-cancel]",
-          "[data-event-delete]",
-        ]) {
+        for (const selector of ["[data-event-save]", "[data-event-cancel]"]) {
           const form = card.querySelector(selector);
           const nextForm = updated.querySelector(selector);
           if (!form || !nextForm) continue;
@@ -349,21 +377,36 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       position = card.nextElementSibling;
     }
     for (const card of previous.values()) {
-      if (
-        protectedEvent(card) ||
-        (card.querySelector("[data-live-series][open]") &&
-          !card.contains(element ?? null))
-      )
-        deferredEventRefresh = true;
+      if (protectedEvent(card)) deferredEventRefresh = true;
       else card.remove();
     }
   };
   syncList(list, refreshed.querySelector("[data-event-list]")!);
-  const pastList = root.querySelector<HTMLElement>("[data-past-event-list]");
+  let pastList = root.querySelector<HTMLElement>("[data-past-event-list]");
   const nextPastList = refreshed.querySelector<HTMLElement>(
     "[data-past-event-list]",
   );
+  // History is omitted when empty, but can appear or disappear during polling.
+  if (!pastList && nextPastList) {
+    const section = document.importNode(nextPastList.closest("section")!, true);
+    pastList = section.querySelector<HTMLElement>("[data-past-event-list]")!;
+    // Reconcile cards normally so an occurrence keeps its expanded roster.
+    pastList.replaceChildren();
+    root.insertBefore(section, list.closest("section")!.nextSibling);
+  } else if (pastList && !nextPastList) {
+    pastList.closest("section")!.remove();
+  }
   if (pastList && nextPastList) syncList(pastList, nextPastList);
+  // Adopt authoritative counts after polling/actions without replacing a
+  // focused filter button or counting nested occurrences as extra series.
+  for (const count of root.querySelectorAll<HTMLElement>(
+    "[data-event-filter-count]",
+  )) {
+    const updated = refreshed.querySelector(
+      `[data-event-filter-count="${count.dataset.eventFilterCount}"]`,
+    );
+    if (updated) count.textContent = updated.textContent;
+  }
   for (const selector of [
     "[data-empty-events]",
     "[data-event-limit]",
@@ -390,32 +433,33 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
             (card) => card.dataset.seriesCard === seriesId,
           )
         : added;
-    const seriesForm = ["data-series-save", "data-series-occurrence"].find(
-      (attribute) => element?.hasAttribute(attribute),
-    );
     const selector =
-      element?.matches("[data-live-signup]") ||
-      (!element && focused?.closest("[data-live-signup]"))
-        ? '[data-live-signup] button[type="submit"]'
-        : seriesForm
-          ? `[${seriesForm}] button[type="submit"]`
-          : element?.matches("[data-event-save]")
-            ? card?.dataset.seriesCard
-              ? "[data-series-occurrences] > summary"
-              : "[data-show-dialog]"
-            : !element && focusedSeriesSummary
-              ? focusedSeriesSummary
-              : !element && focusedEventSummary
-                ? focusedEventSummary
-                : !element &&
-                    focused instanceof HTMLElement &&
-                    focused.dataset.showDialog
-                  ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
-                  : ".volunteer-roster summary";
+      !element && focused?.matches("[data-bulk-event]")
+        ? "[data-bulk-event]"
+        : element?.matches("[data-live-signup]") ||
+            (!element && focused?.closest("[data-live-signup]"))
+          ? '[data-live-signup] button[type="submit"]'
+          : element?.matches("[data-series-occurrence]")
+            ? '[data-series-occurrence] button[type="submit"]'
+            : element?.matches("[data-series-save]")
+              ? `[data-show-dialog="series-editor-${CSS.escape(seriesId ?? "")}"]`
+              : element?.matches("[data-event-save], [data-event-cancel]")
+                ? card?.dataset.seriesCard
+                  ? "[data-series-occurrences] > summary"
+                  : "[data-show-dialog]"
+                : !element && focusedSeriesSummary
+                  ? focusedSeriesSummary
+                  : !element && focusedEventSummary
+                    ? focusedEventSummary
+                    : !element &&
+                        focused instanceof HTMLElement &&
+                        focused.dataset.showDialog
+                      ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+                      : ".volunteer-roster summary";
     (card && !card.hidden
       ? !element && focused === focusedCard
         ? card
-        : card.querySelector<HTMLElement>(selector)
+        : (card.querySelector<HTMLElement>(selector) ?? card)
       : null
     )?.focus({ preventScroll: true });
     if (document.activeElement === document.body)
@@ -431,7 +475,6 @@ async function refreshEvents(element: HTMLFormElement) {
 }
 
 async function refreshVolunteer(element: HTMLFormElement) {
-  cancelVolunteerSearch();
   const userId = element.querySelector<HTMLInputElement>(
     'input[name="userId"]',
   )!.value;
@@ -444,27 +487,42 @@ async function refreshVolunteer(element: HTMLFormElement) {
     onProfilePage ? Promise.resolve(null) : loadActionPage(hostUrl),
   ]);
   const replacement = actionFragment(page, "[data-volunteer-profile]");
+  initVolunteerControls(replacement);
+  const applicationOpen = profile.querySelector<HTMLDetailsElement>(
+    "[data-submitted-application] details",
+  )?.open;
+  const nextApplication = replacement.querySelector<HTMLDetailsElement>(
+    "[data-submitted-application] details",
+  );
+  if (nextApplication && applicationOpen) nextApplication.open = true;
   // Keep the dialog itself (and its scroll position) open; replace all status
   // forms together so their versions and hidden checkbox values stay in sync.
   const dialog = element.closest<HTMLDialogElement>("dialog");
-  const scroll = dialog?.scrollTop;
+  const scrollContainer = dialog?.querySelector<HTMLElement>(
+    "[data-profile-dialog-content]",
+  );
+  const scroll = scrollContainer?.scrollTop;
   const active = document.activeElement;
   const restoreFocus = element.contains(active) || active === document.body;
   const selector = element.matches("[data-organizer-role]")
     ? '[data-organizer-role] select[name="role"]'
-    : element.hasAttribute("data-submit-on-change")
-      ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
-      : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
+    : element.matches("[data-organizer-rejection]")
+      ? '[data-organizer-status][data-access-kind="application"] button[type="submit"]'
+      : element.hasAttribute("data-submit-on-change")
+        ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
+        : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
   if (profile.isConnected && (!dialog || dialog.open)) {
+    disposeVolunteerProfileContents(profile);
     profile.replaceWith(replacement);
-    if (dialog && scroll !== undefined) dialog.scrollTop = scroll;
+    initVolunteerProfileContents(replacement, true);
+    if (scrollContainer && scroll !== undefined)
+      scrollContainer.scrollTop = scroll;
     if (restoreFocus)
       replacement
         .querySelector<HTMLElement>(selector)
         ?.focus({ preventScroll: true });
   }
   if (host && location.href === hostUrl) {
-    syncVolunteerBrowser(host);
     syncEvents(host);
   }
 }
@@ -525,7 +583,7 @@ if (eventBrowser) {
         const needsDeferredRefresh =
           deferredEventRefresh &&
           !eventBrowser.querySelector(
-            'dialog[open], [data-live-series][open], form[data-submitting="true"]',
+            'dialog[open], [data-signup-menu]:popover-open, [data-live-series][open], form[data-submitting="true"]',
           );
         if (
           !forceRefresh &&
@@ -613,9 +671,8 @@ if (eventBrowser) {
     (event) => {
       if (
         deferredEventRefresh &&
-        event.target instanceof HTMLDetailsElement &&
-        event.target.matches("[data-live-series]") &&
-        !event.target.open
+        event.target instanceof HTMLElement &&
+        event.target.matches("[data-signup-menu]:not(:popover-open)")
       )
         refreshDeferredEvents();
     },
@@ -627,7 +684,7 @@ if (eventBrowser) {
       if (
         deferredEventRefresh &&
         event.target instanceof HTMLDialogElement &&
-        event.target.closest("[data-live-event]")
+        event.target.closest("[data-live-event], [data-live-series]")
       )
         refreshDeferredEvents();
     },
@@ -651,6 +708,12 @@ function form(
       element.closest<HTMLElement>("[data-volunteer-controls], dialog") ??
       element;
     if (scope.dataset.submitting) return;
+    if (element.matches("[data-bulk-event-save]")) {
+      syncBulkEventSelection(
+        element.closest<HTMLElement>("[data-event-browser]")!,
+      );
+      if (!element.reportValidity()) return;
+    }
     if (element.matches("[data-event-save], [data-series-save]")) {
       initEventDates(element);
       readDateInputs(element);
@@ -671,19 +734,23 @@ function form(
     const loading = element.querySelector<HTMLElement>("[data-action-loading]");
     const label = button?.textContent;
     const loadingLabel = loading?.textContent;
-    const resultTitle = element.matches("[data-event-delete]")
-      ? "Deleted"
-      : element.matches("[data-series-save]")
-        ? "Patrol series saved"
-        : element.matches("[data-event-save]")
-          ? "Event saved"
-          : element.matches("[data-event-cancel]")
-            ? "Event cancelled"
-            : element.matches("[data-manage-signup]")
-              ? "Registration changed"
-              : element.matches("[data-organizer-role]")
-                ? "Account role saved"
-                : "Volunteer access saved";
+    const resultTitle = element.matches("[data-bulk-event-save]")
+      ? "Selected events saved"
+      : element.matches("[data-event-delete]")
+        ? "Deleted"
+        : element.matches("[data-series-save]")
+          ? "Patrol series saved"
+          : element.matches("[data-event-save]")
+            ? "Event saved"
+            : element.matches("[data-event-cancel]")
+              ? "Event cancelled"
+              : element.matches("[data-manage-signup]")
+                ? "Registration changed"
+                : element.matches("[data-organizer-role]")
+                  ? "Account role saved"
+                  : element.matches("[data-organizer-rejection]")
+                    ? "Application rejected"
+                    : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -693,10 +760,14 @@ function form(
     try {
       if (
         element.matches("[data-event-delete]") &&
-        !(await confirmEventDeletion(element.dataset.eventDelete ?? "event"))
+        !(await confirmSeriesDeletion())
       )
         return;
-      let notify: boolean | undefined;
+      let notify: boolean | undefined = element.matches(
+        "[data-organizer-rejection]",
+      )
+        ? true
+        : undefined;
       const prompt = eventEmailPrompt(
         values,
         element.dataset.emailPrompt,
@@ -730,7 +801,10 @@ function form(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...body(values),
-          ...(notify === undefined ? {} : { notify }),
+          ...(notify === undefined ||
+          element.matches("[data-organizer-rejection]")
+            ? {}
+            : { notify }),
         }),
       });
       const result: EmailActionResult = await response.json();
@@ -794,6 +868,8 @@ function form(
       }
       delete element.dataset.submitting;
       delete scope.dataset.submitting;
+      const browser = element.closest<HTMLElement>("[data-event-browser]");
+      if (browser) syncBulkEventSelection(browser);
       initRecurrenceControls(
         element.closest<HTMLElement>("[data-event-browser]") ?? element,
       );
@@ -811,6 +887,22 @@ function form(
   });
 }
 const str = (values: FormData, key: string) => String(values.get(key) ?? "");
+form(
+  "[data-bulk-event-save]",
+  "/api/v1/events/action",
+  bulkEventAction,
+  async (element) => {
+    const root = element.closest<HTMLElement>("[data-event-browser]")!;
+    element.closest<HTMLDialogElement>("dialog")!.close();
+    clearBulkEventSelection(root);
+    root.querySelector<HTMLElement>("[data-bulk-count]")!.textContent =
+      "Selected events saved. Selection cleared.";
+    await refreshEvents(element);
+    root.querySelector<HTMLElement>("[data-bulk-count]")!.textContent =
+      "Selected events saved. Selection cleared.";
+    root.querySelector<HTMLButtonElement>("[data-bulk-select-all]")?.focus();
+  },
+);
 form("[data-live-signup]", "/api/v1/events/action", (v) => ({
   action: str(v, "action"),
   id: str(v, "id"),
@@ -901,6 +993,17 @@ form(
   refreshVolunteer,
 );
 form(
+  "[data-organizer-rejection]",
+  "/api/v1/organizer/action",
+  (v) => ({
+    action: "reject-application",
+    userId: str(v, "userId"),
+    version: Number(v.get("version")),
+    reason: str(v, "reason"),
+  }),
+  refreshVolunteer,
+);
+form(
   "[data-organizer-role]",
   "/api/v1/organizer/action",
   (v) => ({
@@ -981,6 +1084,7 @@ if (profileDialog && profileContent) {
     // A rapid reopen (even followed by another close) owns its own cleanup.
     if (profileDialog.open || pending !== closingRequest) return;
     pending = undefined;
+    disposeVolunteerProfileContents(profileContent);
     profileContent.replaceChildren();
     profileContent.removeAttribute("aria-busy");
     profileContent.scrollTop = 0;
@@ -1003,6 +1107,7 @@ if (profileDialog && profileContent) {
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
+    disposeVolunteerProfileContents(profileContent);
     if (loadingTemplate)
       profileContent.replaceChildren(loadingTemplate.content.cloneNode(true));
     else profileContent.textContent = "Loading";
@@ -1024,7 +1129,9 @@ if (profileDialog && profileContent) {
         await response.text(),
         "text/html",
       );
-      const content = page.querySelector("[data-volunteer-profile]");
+      const content = page.querySelector<HTMLElement>(
+        "[data-volunteer-profile]",
+      );
       if (!content) throw new Error("The volunteer profile is unavailable.");
       if (!controller.signal.aborted && profileDialog.open) {
         const loading = profileContent.querySelector<HTMLElement>(
@@ -1032,6 +1139,7 @@ if (profileDialog && profileContent) {
         );
         const loadingHeight = profileContent.clientHeight;
         const profile = document.importNode(content, true);
+        initVolunteerControls(profile);
         const animate = !window.matchMedia("(prefers-reduced-motion: reduce)")
           .matches;
         if (animate) {
@@ -1048,6 +1156,7 @@ if (profileDialog && profileContent) {
           });
         }
         profileContent.replaceChildren(profile);
+        initVolunteerProfileContents(profile);
         if (loading && animate) {
           // Keep the outgoing loader in place as the full profile grows below it.
           loading.style.height = `${loadingHeight}px`;
@@ -1078,8 +1187,6 @@ if (profileDialog && profileContent) {
   });
 }
 
-initVolunteerBrowser();
-
 document.addEventListener("click", (event) => {
   const dialog = event.target;
   if (
@@ -1092,6 +1199,7 @@ document.addEventListener("click", (event) => {
     dialog.getAttribute("aria-busy") === "true"
   )
     return;
+  if (dialog.id === "bulk-event-editor" && dialog.dataset.submitting) return;
   const bounds = dialog.getBoundingClientRect();
   if (
     event.clientX < bounds.left ||
@@ -1101,3 +1209,6 @@ document.addEventListener("click", (event) => {
   )
     dialog.close();
 });
+
+// Never expose actions before submit/change handlers and email consent are ready.
+initVolunteerControls(document);

@@ -22,6 +22,31 @@ export default defineConfig({
   session: false,
   integrations: [
     {
+      name: "local-ui-playground",
+      hooks: {
+        "astro:config:setup": ({ command, injectRoute }) => {
+          // Register no routes or playground imports in either hosted build.
+          if (command !== "dev") return;
+          injectRoute({
+            pattern: "/dev/ui",
+            entrypoint: new URL(
+              "./src/dev/ui/Playground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
+            pattern: "/dev/ui/discord",
+            entrypoint: new URL(
+              "./src/dev/ui/DiscordPreview.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+        },
+      },
+    },
+    {
       name: "private-build-secrets",
       hooks: {
         "astro:build:done": async ({ dir }) => {

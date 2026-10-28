@@ -45,7 +45,7 @@ export default defineConfig({
     localDashboard(),
     react(),
     starlight({
-      title: "After Hours Outreach docs",
+      title: "AHOI Docs",
       customCss: ["./src/styles/layout.css", "./src/styles/diagrams.css"],
       // Pagefind needs a build; this reader only uses the development server.
       pagefind: false,
@@ -56,6 +56,7 @@ export default defineConfig({
           label: "Application workflows",
           items: [
             { label: "Accounts", slug: "accounts" },
+            { label: "Discord", slug: "discord" },
             { label: "Events", slug: "events" },
             { label: "Email previews", slug: "emails" },
           ],

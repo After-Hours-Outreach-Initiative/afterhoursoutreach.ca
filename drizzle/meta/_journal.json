@@ -141,6 +141,41 @@
       "when": 1792825292642,
       "tag": "0019_separate_training_experience",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1793152833759,
+      "tag": "0020_discord_connect",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1793163895706,
+      "tag": "0021_account_deletion",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1793219904630,
+      "tag": "0022_training_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1793220676726,
+      "tag": "0023_editable_patrol_schedule_defaults",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1793229465812,
+      "tag": "0024_application_rejection",
+      "breakpoints": true
     }
   ]
 }

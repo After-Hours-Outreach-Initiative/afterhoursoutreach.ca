@@ -39,6 +39,7 @@ import { RequestError } from "../src/server/http";
 import {
   listVolunteers,
   setVolunteerStatus,
+  rejectApplication,
   viewVolunteerProfile,
   volunteerPageSize,
 } from "../src/server/db/volunteers";
@@ -54,8 +55,14 @@ import {
   deleteLocalAccount,
 } from "../src/dev/server/local-accounts";
 import { completeLocalApplicationStep } from "../src/dev/server/application-steps";
+import { resetAccountState } from "../src/dev/server/account-states";
 import { listLocalAccounts } from "../src/dev/server/account-list";
-import { manualAccountPresets, localAccountUserId } from "../src/dev/accounts";
+import {
+  manualAccountPresets,
+  localAccountUserId,
+  developmentPresetStatus,
+  developmentAccountStatus,
+} from "../src/dev/accounts";
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -176,6 +183,12 @@ test("development application shortcuts preserve snapshots and advance without e
     statusError(409),
   );
   await completeLocalApplicationStep(env.DB, actor, "naloxone");
+  // Discord connection is temporarily disabled.
+  // await assert.rejects(
+  //   completeLocalApplicationStep(env.DB, actor, "review"),
+  //   statusError(409),
+  // );
+  // await completeLocalApplicationStep(env.DB, actor, "discord");
   await completeLocalApplicationStep(env.DB, actor, "review");
   const progress = await loadApplicationProgress(env.DB, actor.id);
   assert.ok(isApplicationComplete(progress));
@@ -183,7 +196,8 @@ test("development application shortcuts preserve snapshots and advance without e
   const auditCount = await env.DB.prepare(
     "SELECT count(*) FROM audit_log",
   ).first("count(*)");
-  for (const step of ["form", "naloxone", "review"] as const)
+  assert.equal(progress.discordCompletedAt, null);
+  for (const step of ["form", "naloxone", /* "discord", */ "review"] as const)
     await completeLocalApplicationStep(env.DB, actor, step);
   assert.deepEqual(await loadApplicationProgress(env.DB, actor.id), progress);
   assert.deepEqual(await loadSubmittedApplication(env.DB, actor.id), original);
@@ -388,7 +402,7 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
 
-test("application queue counts all submitted unapproved applications independently of search, pages and profile views", async () => {
+test("application queue counts submitted unapproved applications matching search independently of pages and profile views", async () => {
   const actor: Actor = {
     ...(await draftActor("queue-organizer")),
     role: "organizer",
@@ -457,11 +471,15 @@ test("application queue counts all submitted unapproved applications independent
     new Set([...first.rows, ...second.rows].map((row) => row.id)).size,
     count,
   );
-  for (const search of ["pending-02", "no match", "approved"])
+  for (const [search, expected] of [
+    ["pending-02", 1],
+    ["no match", 0],
+    ["approved", 0],
+  ] as const)
     assert.equal(
       (await listVolunteers(env.DB, actor, search, 0, "awaiting"))
         .awaitingApprovalCount,
-      count,
+      expected,
     );
   assert.deepEqual(
     (await listVolunteers(env.DB, actor, "approved", 0, "awaiting")).rows,
@@ -496,6 +514,10 @@ test("application queue counts all submitted unapproved applications independent
     await env.DB.prepare("SELECT action FROM audit_log").first("action"),
     "profile_viewed",
   );
+  // This queue test models legacy submissions without newly required milestones.
+  await env.DB.prepare(
+    "DELETE FROM discord_requirement WHERE user_id='pending-02'",
+  ).run();
   const approval = await setVolunteerStatus(env.DB, actor, {
     userId: "pending-02",
     version: 0,
@@ -526,6 +548,7 @@ test("application queue counts all submitted unapproved applications independent
     approvalEmails[0].subject,
     "Your volunteer application is approved",
   );
+  assert.ok(approvalEmails[0].text.includes(`approved by ${actor.name}!`));
   assert.match(approvalEmails[0].text, /Thanks for joining us/);
   assert.match(
     approvalEmails[0].text,
@@ -589,7 +612,7 @@ test("application queue counts all submitted unapproved applications independent
     "awaiting",
   );
   assert.deepEqual(after.rows, []);
-  assert.equal(after.awaitingApprovalCount, count - 1);
+  assert.equal(after.awaitingApprovalCount, 0);
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
       .applicationApproved,
@@ -624,7 +647,7 @@ test("application queue counts all submitted unapproved applications independent
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting"))
       .awaitingApprovalCount,
-    count,
+    1,
   );
   for (const denied of [
     { ...actor, role: "volunteer" as const },
@@ -649,8 +672,42 @@ test("application queue counts all submitted unapproved applications independent
     0,
     "awaiting",
   );
-  assert.equal(organizerQueue.awaitingApprovalCount, count + 1);
+  assert.equal(organizerQueue.awaitingApprovalCount, 1);
   assert.equal(organizerQueue.rows[0].id, actor.id);
+  const rejection = {
+    userId: "pending-02",
+    version: (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
+      .updatedAt,
+    reason: "We cannot accommodate your availability.",
+  };
+  const decision = await rejectApplication(env.DB, actor, rejection);
+  assert.equal(
+    (await loadApplicationProgress(env.DB, rejection.userId))
+      .applicationRejectionReason,
+    rejection.reason,
+  );
+  assert.equal(
+    (await listVolunteers(env.DB, actor, rejection.userId, 0, "awaiting"))
+      .awaitingApprovalCount,
+    0,
+  );
+  const localDelivery = await deliverNotifications(
+    { ...env, APP_ENV: "local" },
+    decision.operation,
+    async () => {
+      throw new Error("Local rejection must not call a provider");
+    },
+  );
+  assert.equal(localDelivery.simulated, 1);
+  const rejectionPayload = JSON.parse(
+    (await env.DB.prepare(
+      "SELECT payload FROM event_notification_batch WHERE operation_id=?",
+    )
+      .bind(decision.operation)
+      .first<string>("payload"))!,
+  );
+  assert.ok(rejectionPayload[0].text.includes(rejection.reason));
+  assert.deepEqual(rejectionPayload[0].to, ["pending-02@example.org"]);
   await env.DB.prepare("DELETE FROM session WHERE id=?")
     .bind(actor.sessionId)
     .run();
@@ -658,6 +715,20 @@ test("application queue counts all submitted unapproved applications independent
     viewVolunteerProfile(env.DB, actor, "pending-02"),
     statusError(403),
   ); // A stale organizer actor cannot disclose email or application answers.
+  await assert.rejects(
+    rejectApplication(env.DB, actor, {
+      ...rejection,
+      userId: "pending-03",
+      version: 0,
+    }),
+    statusError(409),
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT application_rejection_reason FROM volunteer_status WHERE user_id='pending-03'",
+    ).first("application_rejection_reason"),
+    null,
+  );
 });
 
 const completeAnswers = () =>
@@ -992,13 +1063,16 @@ test("durable first-submission intent failures roll back answers and side effect
   );
 });
 
-test("application progress uses milestone dates, not patrol approval or unrelated updates", async () => {
+test("application progress and organizer attribution use application audits, not patrol approval or unrelated updates", async () => {
   const actor = await draftActor();
   assert.deepEqual(await loadApplicationProgress(env.DB, actor.id), {
     submittedAt: null,
     naloxoneCompletedAt: null,
     applicationApproved: false,
     applicationApprovedAt: null,
+    applicationRejectionReason: null,
+    discordRequired: true,
+    discordCompletedAt: null,
   });
   await saveProfile(env.DB, actor.id, {
     ...completeAnswers(),
@@ -1007,6 +1081,10 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   const submission = await loadSubmittedApplication(env.DB, actor.id);
   assert.ok(submission);
   const confirmedAt = Date.now();
+  // Model a grandfathered profile; new Discord milestones are covered separately.
+  await env.DB.prepare("DELETE FROM discord_requirement WHERE user_id=?")
+    .bind(actor.id)
+    .run();
   await env.DB.batch([
     env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?").bind(
       actor.id,
@@ -1024,20 +1102,65 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   assert.equal(undated.naloxoneCompletedAt, confirmedAt);
   assert.equal(undated.applicationApproved, true);
   assert.equal(undated.applicationApprovedAt, null);
+  const reviewer: Actor = {
+    ...actor,
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+  };
+  assert.equal(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy,
+    null,
+  ); // Never infer a legacy application approver from patrol approved_by.
   assert.equal(isApplicationComplete(undated), true);
   assert.equal(
     isApplicationComplete({ ...undated, applicationApproved: false }),
     false,
   );
+  const approver = await draftActor("application-approver");
+  await env.DB.prepare(
+    "UPDATE user SET role='organizer',name='Application Organizer' WHERE id=?",
+  )
+    .bind(approver.id)
+    .run();
   await env.DB.prepare(
     `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-      VALUES ('application-approval', ?, ?, 'approval_changed', '["applicationApproved"]', 2000),
+      VALUES ('application-approval', ?, ?, 'approval_changed', '["registrationApproved"]', 2000),
         ('patrol-approval', ?, ?, 'approval_changed', '["patrolApproved"]', 3000)`,
   )
-    .bind(actor.id, actor.id, actor.id, actor.id)
+    .bind(approver.id, actor.id, actor.id, actor.id)
     .run();
   const dated = await loadApplicationProgress(env.DB, actor.id);
   assert.equal(dated.applicationApprovedAt, 2000);
+  assert.deepEqual(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy,
+    {
+      id: approver.id,
+      name: "Application Organizer",
+      email: "application-approver@example.org",
+      approvedAt: 2000,
+    },
+  ); // A later, different patrol approver must not replace the application approver.
+  assert.equal("applicationApprovedBy" in dated, false);
+  assert.equal(
+    "applicationApprovedBy" in (await loadProfile(env.DB, actor.id))!,
+    false,
+  );
+  await assert.rejects(
+    viewVolunteerProfile(
+      env.DB,
+      {
+        ...reviewer,
+        role: "volunteer",
+        applicationApproved: true,
+        applicationComplete: true,
+      },
+      actor.id,
+    ),
+    statusError(403),
+  );
   assert.equal(isApplicationComplete(dated), true);
   assert.equal(isApplicationComplete({ ...dated, submittedAt: null }), false);
   assert.equal(
@@ -1052,11 +1175,30 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   const revoked = await loadApplicationProgress(env.DB, actor.id);
   assert.equal(revoked.applicationApproved, false);
   assert.equal(revoked.applicationApprovedAt, null);
+  assert.equal(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy,
+    null,
+  );
   assert.equal(isApplicationComplete(revoked), false);
   assert.equal(
     isApplicationComplete({ ...revoked, applicationApproved: true }),
     true,
   );
+  await setVolunteerStatus(env.DB, reviewer, {
+    userId: actor.id,
+    version: 5678,
+    active: true,
+    applicationApproved: true,
+    patrolApproved: true,
+  });
+  const reapproved = (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+    ?.applicationApprovedBy;
+  assert.equal(reapproved?.id, reviewer.id);
+  assert.equal(
+    reapproved?.approvedAt,
+    (await loadApplicationProgress(env.DB, actor.id)).applicationApprovedAt,
+  ); // Reapproval uses the latest applicationApproved audit, not the old approver.
 });
 
 test("orientees only see orientation events and rosters; patrol approval and organizers retain full access", async () => {
@@ -1121,6 +1263,7 @@ test("orientees only see orientation events and rosters; patrol approval and org
   )
     .bind(actor.id)
     .run();
+  await completeLocalApplicationStep(env.DB, actor, "discord");
   const orientee = {
     ...incompleteOrientee,
     naloxoneCompleted: true,
@@ -1744,6 +1887,168 @@ test("manual presets resolve real application completion, event access and roste
     false,
   );
   assert.deepEqual(await loadSubmittedApplication(env.DB, changed.id), before);
+});
+
+test("state buttons reset one temporary account without accumulating saved accounts or changing saved work", async () => {
+  const saved = await draftActor("saved-account");
+  await saveProfile(env.DB, saved.id, {
+    ...completeAnswers(),
+    codeOfConductAccepted: true,
+  });
+  const original = await loadSubmittedApplication(env.DB, saved.id);
+  const slot = crypto.randomUUID();
+  const id = await resetAccountState(env.DB, "draft", slot);
+  const firstDraft = await loadApplicationDraftState(env.DB, id);
+  assert.ok(firstDraft.draft);
+  const sessionId = "temporary-session";
+  await env.DB.prepare(
+    "INSERT INTO session (id,user_id,token,expires_at,created_at,updated_at) VALUES (?,?,?,?,0,0)",
+  )
+    .bind(sessionId, id, sessionId, Date.now() + 60_000)
+    .run();
+  const actor: Actor = { ...saved, id, sessionId };
+  for (const step of ["form", "naloxone", "discord", "review"] as const)
+    await completeLocalApplicationStep(env.DB, actor, step);
+  assert.ok(isApplicationComplete(await loadApplicationProgress(env.DB, id)));
+  const count = await env.DB.prepare("SELECT count(*) AS n FROM user").first(
+    "n",
+  );
+  for (let attempt = 0; attempt < 5; attempt++) {
+    assert.equal(await resetAccountState(env.DB, "draft", slot), id);
+    assert.equal(await loadProfile(env.DB, id), null);
+    const reset = await loadApplicationDraftState(env.DB, id);
+    assert.ok(reset.draft);
+    assert.notEqual(reset.generation, firstDraft.generation);
+    assert.equal(reset.draft.answers.firstName, "Casey");
+    assert.equal(
+      await env.DB.prepare("SELECT count(*) AS n FROM user").first("n"),
+      count,
+    );
+    assert.deepEqual(
+      (await listLocalAccounts(env.DB)).users.map((user) => user.id),
+      [saved.id],
+    );
+  }
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM session WHERE user_id=?")
+      .bind(id)
+      .first("n"),
+    0,
+  );
+  assert.deepEqual(await loadSubmittedApplication(env.DB, saved.id), original);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM event_notification").first(
+      "n",
+    ),
+    0,
+  );
+});
+
+test("every reusable state resolves its declared milestones, permissions and attendance without creating more identities", async () => {
+  const slot = crypto.randomUUID();
+  let id = "";
+  for (const preset of [...manualAccountPresets, ...manualAccountPresets]) {
+    const next = await resetAccountState(env.DB, preset.key, slot);
+    if (id) assert.equal(next, id);
+    else id = next;
+    const progress = await loadApplicationProgress(env.DB, id);
+    assert.equal(progress.submittedAt !== null, !preset.draft, preset.key);
+    assert.equal(
+      progress.naloxoneCompletedAt !== null,
+      preset.naloxoneCompleted,
+      preset.key,
+    );
+    assert.equal(
+      progress.applicationApproved,
+      preset.applicationApproved,
+      preset.key,
+    );
+    const row = await env.DB.prepare(
+      `SELECT u.role,v.active,v.patrol_approved,
+      EXISTS(SELECT 1 FROM application_draft WHERE user_id=u.id) AS hasDraft,
+      EXISTS(SELECT 1 FROM orientation_completion WHERE user_id=u.id) AS orientationCompleted,
+      EXISTS(SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id WHERE s.user_id=u.id
+        AND s.status='confirmed' AND e.starts_at>?) AS orientationBooked,
+      EXISTS(SELECT 1 FROM json_each(p.teams) WHERE value='medic') AS medicSelected
+      FROM user u LEFT JOIN volunteer_status v ON v.user_id=u.id LEFT JOIN profile p ON p.user_id=u.id WHERE u.id=?`,
+    )
+      .bind(Date.now(), id)
+      .first<{
+        role: string;
+        active: number | null;
+        patrol_approved: number | null;
+        hasDraft: number;
+        orientationCompleted: number;
+        orientationBooked: number;
+        medicSelected: number;
+      }>();
+    assert.ok(row);
+    assert.equal(row.role, preset.role, preset.key);
+    assert.equal(
+      Boolean(row.orientationCompleted),
+      preset.orientation === "completed",
+      preset.key,
+    );
+    assert.equal(
+      Boolean(row.orientationBooked),
+      preset.orientation === "booked",
+      preset.key,
+    );
+    const actual = developmentAccountStatus({
+      ...progress,
+      hasDraft: Boolean(row.hasDraft),
+      active: Boolean(row.active),
+      patrolApproved: Boolean(row.patrol_approved),
+      orientationCompleted: Boolean(row.orientationCompleted),
+      orientationBooked: Boolean(row.orientationBooked),
+      medicSelected: Boolean(row.medicSelected),
+      medicEligible: Boolean(
+        row.medicSelected &&
+        row.patrol_approved &&
+        row.orientationCompleted &&
+        row.active &&
+        progress.applicationApproved,
+      ),
+      twoFactorEnabled: false,
+    });
+    assert.equal(actual, developmentPresetStatus(preset), preset.key);
+    assert.equal(
+      await env.DB.prepare("SELECT count(*) AS n FROM user").first("n"),
+      2,
+    );
+    assert.deepEqual((await listLocalAccounts(env.DB)).users, []);
+  }
+  await resetAccountState(env.DB, "not-applied", slot);
+  assert.equal(await loadApplicationDraft(env.DB, id), null);
+  assert.equal(await loadProfile(env.DB, id), null);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM user").first("n"),
+    2,
+  );
+});
+
+test("browser sandboxes are separate and reserved ID collisions cannot reset saved accounts", async () => {
+  const a = crypto.randomUUID(),
+    b = crypto.randomUUID();
+  const [first, second] = await Promise.all([
+    resetAccountState(env.DB, "draft", a),
+    resetAccountState(env.DB, "applied", b),
+  ]);
+  assert.notEqual(first, second);
+  assert.ok(await loadApplicationDraft(env.DB, first));
+  assert.ok(await loadProfile(env.DB, second));
+  const collision = crypto.randomUUID(),
+    saved = await draftActor(`local-state-${collision}`);
+  await assert.rejects(
+    resetAccountState(env.DB, "draft", collision),
+    statusError(409),
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM session WHERE user_id=?")
+      .bind(saved.id)
+      .first("n"),
+    1,
+  );
 });
 
 test("development account state listing paginates without exposing draft answers or submission snapshots", async () => {

@@ -1,51 +1,38 @@
 ---
-import type { PublicRosterRow } from "@/server/db/events";
+import type { EventRow, PublicRosterRow } from "@/server/db/events";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
+import EventRosterSummary from "./EventRosterSummary.astro";
 interface Props {
+  event: EventRow;
   roster: PublicRosterRow[];
 }
-const { roster } = Astro.props;
+const { event, roster } = Astro.props;
 ---
 
 <details class="public-event-roster">
-  <summary>Volunteers ({roster.length})</summary>
-  {roster.length === 0 && <p>No volunteers registered yet.</p>}
-  <ul hidden={roster.length === 0}>
-    {
-      roster.map((person) => (
-        <li>
-          <>
-            <AttendeeAvatar category={person.category} />
-            <span>{person.name}</span>
-          </>
-        </li>
-      ))
-    }
-  </ul>
+  <EventRosterSummary count={roster.length} event={event} />
+  <table class="event-roster-table">
+    <caption class="sr-only">Registered volunteers</caption>
+    <thead class="sr-only"><tr><th scope="col">Volunteer</th></tr></thead>
+    <tbody>
+      {
+        roster.map((person) => (
+          <tr>
+            <th scope="row">
+              <div class="event-roster-person">
+                <AttendeeAvatar category={person.category} />
+                <span>{person.name}</span>
+              </div>
+            </th>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
 </details>
 
 <style>
   .public-event-roster {
     margin-top: 0.5rem;
-  }
-  summary {
-    cursor: pointer;
-    min-height: 2.75rem;
-    padding-block: 0.5rem;
-    align-content: center;
-    width: fit-content;
-  }
-  ul {
-    list-style: none;
-    margin: 0.75rem 0 0;
-    padding: 0;
-    display: grid;
-    gap: 0.5rem;
-  }
-  li {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    overflow-wrap: anywhere;
   }
 </style>

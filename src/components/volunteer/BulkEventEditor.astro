@@ -1,0 +1,193 @@
+---
+import DialogHeader from "@/components/DialogHeader.astro";
+import FieldError from "@/components/FieldError.astro";
+---
+
+<div
+  class="volunteer-bulk-actions"
+  data-bulk-actions
+  role="group"
+  aria-label="Select events to edit"
+>
+  <p data-bulk-count role="status" aria-live="polite" aria-atomic="true">
+    0 selected
+  </p>
+  <button class="btn btn-quiet" type="button" data-bulk-select-all
+    >Select all shown</button
+  >
+  <button class="btn btn-quiet" type="button" data-bulk-clear disabled
+    >Clear selection</button
+  >
+  <button
+    class="btn btn-primary"
+    type="button"
+    data-bulk-open
+    aria-haspopup="dialog"
+    aria-controls="bulk-event-editor"
+    disabled>Bulk edit</button
+  >
+</div>
+<dialog
+  id="bulk-event-editor"
+  class="dialog-pop dialog-frame volunteer-dialog"
+  aria-labelledby="bulk-event-heading"
+  aria-describedby="bulk-event-scope"
+>
+  <DialogHeader id="bulk-event-heading" title="Bulk edit events" />
+  <div class="dialog-body">
+    <p id="bulk-event-scope">
+      Only the selected existing events and occurrences will change, not entire
+      recurring series. Each date and time stays unchanged. Unchosen fields stay
+      unchanged.
+    </p>
+    <details class="volunteer-roster">
+      <summary data-bulk-summary>Selected events</summary>
+      <ul data-bulk-targets></ul>
+    </details>
+    <form
+      id="bulk-event-save"
+      class="volunteer-form"
+      data-bulk-event-save
+      data-email-prompt="bulk"
+      action="/api/v1/events/action"
+      method="post"
+    >
+      <input type="hidden" name="selection" />
+      <div class="volunteer-fields">
+        <div class="volunteer-field">
+          <label class="volunteer-check"
+            ><input type="checkbox" data-bulk-enable="meetingPoint" /><span
+              >Change meeting point</span
+            ></label
+          >
+          <label class="sr-only" for="bulk-meeting-point">Meeting point</label>
+          <input
+            id="bulk-meeting-point"
+            name="meetingPoint"
+            required
+            maxlength="500"
+            pattern={String.raw`.*\S.*`}
+            aria-describedby="error-bulk-meeting-point"
+            disabled
+          />
+          <FieldError
+            field="bulk-meeting-point"
+            message="Enter a meeting point (up to 500 characters)."
+          />
+        </div>
+        <div class="volunteer-field">
+          <label class="volunteer-check"
+            ><input type="checkbox" data-bulk-enable="meetingPointUrl" /><span
+              >Change map link</span
+            ></label
+          >
+          <label class="sr-only" for="bulk-map-link">Map link</label>
+          <input
+            id="bulk-map-link"
+            name="meetingPointUrl"
+            type="url"
+            maxlength="2048"
+            pattern="https://.*"
+            placeholder="https://"
+            aria-describedby="bulk-map-help error-bulk-map-link"
+            disabled
+          />
+          <p id="bulk-map-help" class="volunteer-help">
+            Leave blank to remove the map links.
+          </p>
+          <FieldError
+            field="bulk-map-link"
+            message="Enter a valid HTTPS map link, or leave blank to remove it."
+          />
+        </div>
+        <div class="volunteer-field">
+          <label class="volunteer-check"
+            ><input type="checkbox" data-bulk-enable="spots" /><span
+              >Change volunteer spots</span
+            ></label
+          >
+          <label class="sr-only" for="bulk-spots">Volunteer spots</label>
+          <input
+            id="bulk-spots"
+            name="spots"
+            type="number"
+            min="2"
+            max="100"
+            step="1"
+            required
+            aria-describedby="bulk-capacity-help error-bulk-spots"
+            disabled
+          />
+          <FieldError
+            field="bulk-spots"
+            message="Enter a whole number from 2 to 100 (at least 4 with orientation)."
+          />
+        </div>
+        <label class="volunteer-field"
+          >Includes orientation
+          <select name="includesOrientation"
+            ><option value="">Leave unchanged</option><option value="true"
+              >Includes orientation</option
+            ><option value="false">Patrol only</option></select
+          >
+        </label>
+        <label class="volunteer-field"
+          >Registration
+          <select name="open"
+            ><option value="">Leave unchanged</option><option value="true"
+              >Open</option
+            ><option value="false">Closed</option></select
+          >
+        </label>
+        <label class="volunteer-field"
+          >Public visibility
+          <select name="hidden"
+            ><option value="">Leave unchanged</option><option value="false"
+              >Visible</option
+            ><option value="true">Hidden</option></select
+          >
+        </label>
+      </div>
+      <p id="bulk-capacity-help" class="volunteer-help">
+        Capacity and orientation must work for every selected event and its
+        registrations: at least 2 spots, or 4 with orientation. Existing
+        reserved-place and orientation policies still apply. If any event
+        conflicts, none are saved.
+      </p>
+      <p data-bulk-stale role="alert" hidden>
+        The selection changed while this dialog was open. Close it, review the
+        events and select again before saving.
+      </p>
+      <p data-form-message role="status" hidden></p>
+    </form>
+  </div>
+  <div class="dialog-footer">
+    <button
+      class="btn btn-primary"
+      type="submit"
+      form="bulk-event-save"
+      data-loading-label="Saving…"
+      disabled>Save selected events</button
+    >
+    <button class="btn btn-quiet" type="button" data-dismiss-dialog
+      >Cancel</button
+    >
+  </div>
+</dialog>
+
+<style>
+  .volunteer-bulk-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+  }
+  [data-bulk-targets] {
+    padding-left: 1.5em;
+    list-style: disc;
+  }
+  #bulk-event-scope {
+    margin-bottom: 1rem;
+  }
+</style>

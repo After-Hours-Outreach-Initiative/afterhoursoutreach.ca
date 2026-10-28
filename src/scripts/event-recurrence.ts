@@ -94,8 +94,12 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     const heading = form.querySelector<HTMLElement>(
       "[data-event-cancel-heading]",
     );
+    const policy = form.querySelector<HTMLElement>(
+      "[data-event-cancel-policy]",
+    );
     if (!reason || !input) continue;
     const update = () => {
+      if (policy) policy.hidden = new FormData(form).get("scope") === "future";
       reason.hidden = !eventEmailPrompt(
         new FormData(form),
         form.dataset.emailPrompt,
@@ -172,23 +176,18 @@ export function syncSeriesControls(
   updatedCard: HTMLElement,
   element?: HTMLFormElement,
 ) {
-  const current = card.querySelector<HTMLDetailsElement>("[data-live-series]")!;
+  const current = card.querySelector<HTMLDialogElement>("[data-live-series]")!;
   const updated =
-    updatedCard.querySelector<HTMLDetailsElement>("[data-live-series]")!;
+    updatedCard.querySelector<HTMLDialogElement>("[data-live-series]")!;
   if (current.dataset.seriesVersion === updated.dataset.seriesVersion)
     return false;
-  const savedSettings =
-    current.contains(element ?? null) &&
-    element?.matches("[data-series-save], [data-event-delete]");
   if (
-    (current.open && !savedSettings) ||
+    current.open ||
     [...current.querySelectorAll('[data-submitting="true"]')].some(
       (form) => form !== element,
     )
   )
     return true;
-  const replacement = document.importNode(updated, true);
-  replacement.open = current.open;
-  current.replaceWith(replacement);
+  current.replaceWith(document.importNode(updated, true));
   return false;
 }

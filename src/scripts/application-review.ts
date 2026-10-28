@@ -1,8 +1,9 @@
 import {
-  applicationTeamOptions,
+  savedTeamOptions,
   certificationOptions,
   heardAboutUsOptions,
   trainingOptions,
+  trainingDetailOptions,
   experienceOptions,
 } from "../data/application";
 import { clearFormMessage } from "./account-forms";
@@ -25,6 +26,9 @@ export function applicationSubmissionValues(
   }
   if (!values.getAll("training").includes("other"))
     values.set("otherTraining", "");
+  for (const option of trainingDetailOptions)
+    if (!values.getAll("training").includes(option.value))
+      values.set(option.name, "");
   if (!values.getAll("relevantExperience").includes("other"))
     values.set("otherExperience", "");
   if (!values.getAll("heardAboutUsSources").includes("other"))
@@ -151,6 +155,12 @@ export function initApplicationReview(element: HTMLFormElement) {
       "other-training": values.getAll("training").includes("other"),
       "other-experience": values.getAll("relevantExperience").includes("other"),
       "other-referral": values.getAll("heardAboutUsSources").includes("other"),
+      ...Object.fromEntries(
+        trainingDetailOptions.map((option) => [
+          option.value,
+          values.getAll("training").includes(option.value),
+        ]),
+      ),
     };
     for (const row of review.querySelectorAll<HTMLElement>(
       "[data-review-condition]",
@@ -158,7 +168,7 @@ export function initApplicationReview(element: HTMLFormElement) {
       row.hidden = !conditions[row.dataset.reviewCondition!];
     const choices: Record<string, readonly { value: string; label: string }[]> =
       {
-        teams: applicationTeamOptions,
+        teams: savedTeamOptions,
         certifications: certificationOptions,
         training: trainingOptions,
         relevantExperience: experienceOptions,

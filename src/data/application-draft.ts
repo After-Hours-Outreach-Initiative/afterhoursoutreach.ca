@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  applicationTeamOptions,
+  savedTeamOptions,
   certificationOptions,
   heardAboutUsOptions,
   trainingOptions,
@@ -9,6 +9,7 @@ import {
   experienceExclusiveError,
   normalizeTrainingAnswers,
   otherTrainingMaxLength,
+  trainingDetailsMaxLength,
   type ApplicationAnswers,
 } from "./application";
 
@@ -54,7 +55,7 @@ export const applicationDraftAnswersSchema = z.preprocess(
     heardAboutUsSources: choices(heardAboutUsOptions),
     heardAboutUsOther: text(),
     motivation: text(16_384),
-    teams: choices(applicationTeamOptions),
+    teams: choices(savedTeamOptions),
     certifications: choices(certificationOptions),
     certificationExpiry: text(),
     experience: text(2000),
@@ -63,6 +64,8 @@ export const applicationDraftAnswersSchema = z.preprocess(
       trainingExclusiveError,
     ),
     otherTraining: text(otherTrainingMaxLength),
+    expiredFirstAidDetails: text(trainingDetailsMaxLength),
+    crisisInterventionDetails: text(trainingDetailsMaxLength),
     relevantExperience: choices(experienceOptions).refine(
       (values) => !values.includes("none") || values.length === 1,
       experienceExclusiveError,

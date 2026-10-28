@@ -4,6 +4,7 @@ import { test } from "vitest";
 import { chromium, expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
+import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { profileWriteBody } from "../helpers/profile-write";
 import { sampleAnswers } from "../helpers/local-account";
 import { addCalendarDays, vancouverInput } from "../../src/data/event-time";
@@ -101,16 +102,47 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
           "SELECT mode,status,payload FROM application_submission_notification",
         ).all()
       ).results,
-      Array.from({ length: 6 }, () => ({
-        mode: "preview",
-        status: "suppressed",
-        payload: null,
-      })),
+      [], // Initial form submission is silent even in Preview.
     );
     await DB.prepare("INSERT INTO organizer_bootstrap VALUES (1,?,?)")
       .bind(organizer.id, Date.now())
       .run();
     organizer.cookie = await signIn(organizer.email);
+    await ok(
+      await send(
+        "/api/v1/organizer/action",
+        {
+          action: "status",
+          userId: applicant.id,
+          version: 0,
+          active: true,
+          applicationApproved: true,
+          patrolApproved: false,
+        },
+        organizer.cookie,
+      ),
+      409,
+    );
+    await ok(
+      await send(
+        "/api/v1/account/naloxone",
+        { userId: applicant.id, completed: true },
+        applicant.cookie,
+      ),
+    );
+    assert.deepEqual(
+      (
+        await DB.prepare(
+          "SELECT mode,status,payload FROM application_submission_notification",
+        ).all()
+      ).results,
+      Array.from({ length: 3 }, () => ({
+        mode: "preview",
+        status: "suppressed",
+        payload: null,
+      })),
+    );
+    await seedVerifiedDiscordMembership(DB, applicant.id);
 
     const context = await browser.newContext();
     await context.addCookies(
@@ -149,22 +181,32 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       "2",
     );
     await page.locator("[data-volunteer-search]").fill("Sample Applicant");
-    await expect(page.locator("[data-volunteer-results] li")).toHaveCount(1);
+    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
+      1,
+    );
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
-      "2",
+      "1",
     );
     await page.locator("[data-volunteer-profile-link]").click();
-    const dialog = page.locator("[data-volunteer-profile-dialog]");
-    await dialog
+    await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
+    await expect(
+      page.getByRole("button", {
+        name: "Revoke application approval",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
-      "1",
+      "0",
     );
-    await expect(page.locator("[data-volunteer-results] li")).toHaveCount(0);
+    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
+      0,
+    );
     assert.equal(new URL(page.url()).searchParams.get("approval"), "awaiting");
     assert.equal(
       await DB.prepare("SELECT count(*) n FROM event_notification").first("n"),
@@ -205,7 +247,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       await DB.prepare(
         "SELECT count(*) n FROM application_submission_notification",
       ).first("n"),
-      6,
+      3,
     );
     await DB.prepare(
       "UPDATE volunteer_status SET patrol_approved=1,approved_by=?,approved_at=? WHERE user_id=?",
@@ -255,9 +297,11 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
     await page.goto(
       `${origin}/manage/events?occurrence=${encodeURIComponent(farId)}`,
     );
-    await expect(page.locator(`[data-live-event="${farId}"]`)).toContainText(
-      "Outside the volunteer signup window",
-    );
+    const farCard = page.locator(`[data-live-event="${farId}"]`);
+    await expect(farCard).toBeVisible();
+    await expect(
+      farCard.getByRole("button", { name: "Edit", exact: true }),
+    ).toBeEnabled();
     const version = () =>
       DB.prepare("SELECT updated_at FROM patrol_series WHERE id=?")
         .bind(created.id)

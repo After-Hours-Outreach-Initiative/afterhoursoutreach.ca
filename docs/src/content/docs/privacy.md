@@ -65,7 +65,15 @@ unrestricted organizer access.
   who can see roster names.
 - Volunteers can edit ongoing profile answers at `/volunteer/account`, but there
   is no self-service account deletion flow. Do not describe one as available.
-- Discord account linking is deferred, not an implemented collection practice.
+- Discord linking stores one unique Discord ID/username, consent/completion and
+  membership-check times, and minimal durable sync state. It requires explicit
+  consent and only the `identify guilds.join` OAuth scopes. The join token is
+  encrypted until successful joining/verification or expiry; refresh tokens are
+  discarded. Discord receives eligibility-derived role changes, not profile
+  answers. Server members may see membership and the three managed roles. New
+  applicants require linking; existing volunteers retain website access without it.
+  See [Discord](/discord/) for correction/consent-withdrawal handling. Coordinate
+  public-policy notification and privacy review before production activation.
 - The retention schedule below is a proposal, not an implemented purge schedule.
 
 ## Privacy page

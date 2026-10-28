@@ -4,18 +4,20 @@ import { APIError } from "better-auth/api";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
+import AccountDeleteSettings from "@/components/volunteer/AccountDeleteSettings.astro";
+// Discord connection is temporarily disabled; keep the integration for later.
+// import DiscordConnection from "@/components/volunteer/DiscordConnection.astro";
+// import DiscordConnectionNotice from "@/components/volunteer/DiscordConnectionNotice.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
 import {
   isApplicationComplete,
   loadApplicationProgress,
 } from "@/server/db/application-progress";
 import PageContents from "@/components/volunteer/PageContents.astro";
-import FieldError from "@/components/FieldError.astro";
 import { accountGreeting } from "@/data/account-navigation";
 import { contactEmail } from "@/data/site";
 import {
   authBindingsForRequest,
-  authenticatorFreshAge,
   createAuth,
   forwardCookies,
   readAccountSession,
@@ -26,6 +28,7 @@ import {
   loadFirstCompletedOrientation,
 } from "@/server/db/profiles";
 import { createDatabase } from "@/server/db";
+import { accountDeletionFreshAge } from "@/server/db/account-deletion";
 import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
@@ -52,7 +55,7 @@ let active = false;
 let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
 let sessionsNeedSignIn = false;
 let emailNeedsSignIn = false;
-let factorNeedsSignIn = false;
+let deletionNeedsSignIn = false;
 if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");
 try {
   const auth = createAuth(authBindingsForRequest(env, Astro.request));
@@ -67,7 +70,6 @@ try {
   )
     return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/account");
   values = await loadProfile(env.DB, current.user.id);
-  if (!values) return Astro.redirect("/apply");
   submission = await loadSubmittedApplication(env.DB, current.user.id);
   applicationProgress = await loadApplicationProgress(env.DB, current.user.id);
   accountCreatedAt = current.user.createdAt;
@@ -83,9 +85,9 @@ try {
     Date.now() - current.session.createdAt.getTime() >=
       sessionConfig.freshAge * 1000;
   currentId = current.session.id;
-  factorNeedsSignIn =
+  deletionNeedsSignIn =
     Date.now() - current.session.createdAt.getTime() >=
-    authenticatorFreshAge * 1000;
+    accountDeletionFreshAge * 1000;
   twoFactorEnabled = Boolean(current.user.twoFactorEnabled);
   organizer = current.user.role === "organizer";
   const status = await createDatabase(env.DB).query.volunteerStatus.findFirst({
@@ -125,6 +127,17 @@ const completedMilestones = [
     heading: "Naloxone 101 completion",
     completedAt: applicationProgress.naloxoneCompletedAt,
   },
+  /* Discord connection is temporarily disabled.
+  ...(applicationProgress.discordRequired ||
+  applicationProgress.discordCompletedAt != null
+    ? [
+        {
+          heading: "Discord connection verified",
+          completedAt: applicationProgress.discordCompletedAt ?? null,
+        },
+      ]
+    : []),
+  */
   {
     heading: "Application approved",
     completedAt: applicationProgress.applicationApprovedAt,
@@ -132,12 +145,12 @@ const completedMilestones = [
 ];
 const contents = [
   { id: "account-profile-heading", heading: "Your profile" },
-  ...profileFormSections().map((section) => ({
+  ...(values ? profileFormSections() : []).map((section) => ({
     id: `account-profile-${section.key}`,
     heading: section.heading,
     nested: true,
   })),
-  ...(applicationComplete
+  ...(applicationComplete || applicationProgress.applicationRejectionReason
     ? [
         {
           id: "submitted-application-heading",
@@ -147,18 +160,24 @@ const contents = [
     : []),
   { id: "account-settings-heading", heading: "Account settings" },
   { id: "account-email-heading", heading: "Email address", nested: true },
+  // { id: "account-discord-heading", heading: "Discord", nested: true },
   {
     id: "account-factor-heading",
     heading: "Two-factor authentication",
     nested: true,
   },
-  { id: "account-sessions-heading", heading: "Sessions", nested: true },
+  {
+    id: "account-sessions-heading",
+    heading: "Signed in browsers",
+    nested: true,
+  },
+  { id: "account-delete-heading", heading: "Delete account", nested: true },
 ];
 ---
 
 <AccountLayout
   title="Your account"
-  description="Edit your volunteer profile and manage your sessions."
+  description="Edit your volunteer profile and manage your signed in browsers."
   signedIn
   organizer={organizer}
   name={values ? applicationDisplayName(values) : undefined}
@@ -166,6 +185,11 @@ const contents = [
   email={email}
 >
   <h1 slot="heading" class="mb-6 text-2xl md:text-4xl">Account</h1>
+  {
+    /* Discord connection is temporarily disabled.
+  {applicationComplete && <DiscordConnectionNotice {userId} />}
+  */
+  }
   <div data-account-contents-flow>
     <PageContents
       entries={contents}
@@ -174,7 +198,7 @@ const contents = [
     />
     <div data-account-contents-body>
       {
-        !active && (
+        values && !active && (
           <p class="volunteer-notice" role="status">
             Your volunteer account is inactive. Contact an organizer at{" "}
             <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore
@@ -216,10 +240,20 @@ const contents = [
             </div>
           </dl>
         </div>
-        <AccountProfileForm values={values} userId={userId} />
+        {
+          values ? (
+            <AccountProfileForm values={values} userId={userId} />
+          ) : (
+            <p>
+              You have not submitted a volunteer application.{" "}
+              <a href="/apply">Continue your application</a>.
+            </p>
+          )
+        }
       </section>
       {
-        applicationComplete && (
+        (applicationComplete ||
+          applicationProgress.applicationRejectionReason) && (
           <section
             class="volunteer-panel"
             aria-labelledby="submitted-application-heading"
@@ -227,6 +261,14 @@ const contents = [
             <h2 id="submitted-application-heading" data-contents-section>
               Volunteer Application
             </h2>
+            {applicationProgress.applicationRejectionReason && (
+              <div class="volunteer-notice" data-application-rejection>
+                <p>Application rejected</p>
+                <p class="mt-2 whitespace-pre-wrap">
+                  Reason: {applicationProgress.applicationRejectionReason}
+                </p>
+              </div>
+            )}
             {submission ? (
               <SubmittedApplication submission={submission} embedded />
             ) : (
@@ -235,28 +277,30 @@ const contents = [
                 answers were not captured for this account.
               </p>
             )}
-            <div class="account-profile-summary mt-6">
-              <dl>
-                {completedMilestones.map((milestone) => (
-                  <div>
-                    <dt>{milestone.heading}</dt>
-                    <dd>
-                      {milestone.completedAt !== null ? (
-                        <time
-                          datetime={new Date(
-                            milestone.completedAt,
-                          ).toISOString()}
-                        >
-                          {accountDate.format(milestone.completedAt)}
-                        </time>
-                      ) : (
-                        "Date not recorded"
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
+            {applicationComplete && (
+              <div class="account-profile-summary mt-6">
+                <dl>
+                  {completedMilestones.map((milestone) => (
+                    <div>
+                      <dt>{milestone.heading}</dt>
+                      <dd>
+                        {milestone.completedAt !== null ? (
+                          <time
+                            datetime={new Date(
+                              milestone.completedAt,
+                            ).toISOString()}
+                          >
+                            {accountDate.format(milestone.completedAt)}
+                          </time>
+                        ) : (
+                          "Date not recorded"
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
           </section>
         )
       }
@@ -265,208 +309,37 @@ const contents = [
           Account settings
         </h2>
         <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />
-        <div class="volunteer-setting" data-factor-settings>
+        {
+          /* Discord connection is temporarily disabled.
+        <div class="volunteer-setting">
+          <div class="w-full">
+            <h3 id="account-discord-heading" data-contents-section>Discord</h3>
+            <DiscordConnection
+              {userId}
+              canConnect={!applicationProgress.discordRequired ||
+                applicationProgress.naloxoneCompletedAt !== null}
+              required={applicationProgress.discordRequired}
+            />
+          </div>
+        </div>
+        */
+        }
+        <div
+          class="volunteer-setting account-setting-unavailable"
+          data-factor-settings
+          aria-disabled="true"
+        >
           <div>
             <h3 id="account-factor-heading" data-contents-section>
               Two-factor authentication
             </h3>
+            <p>Coming soon.</p>
             {
-              twoFactorEnabled ? (
-                <>
-                  <p role="status">
-                    Your authenticator is enabled. It is required each time you
-                    sign in.
-                  </p>
-                  <details class="mt-6">
-                    <summary>Remove or replace your authenticator</summary>
-                    <p class="mt-4">
-                      To use a different app, first remove your current
-                      authenticator, then set up and verify the new one.
-                      Two-factor protection will be off in between, even if you
-                      leave setup unfinished. Your old app and backup codes will
-                      stop working, and other devices will be signed out. Keep
-                      your current app until removal is confirmed.
-                    </p>
-                    <p class="mt-4">
-                      You need a code from your current app to remove it. Backup
-                      codes cannot authorize removal.
-                    </p>
-                    {factorNeedsSignIn ? (
-                      <form
-                        data-sign-out
-                        action="/api/v1/auth/sign-out"
-                        method="post"
-                        class="mt-6"
-                      >
-                        <p>
-                          Sign in again before removing your authenticator. A
-                          sign-in within the last ten minutes is required.
-                        </p>
-                        <button class="btn btn-outline mt-4" type="submit">
-                          Sign out to sign in again
-                        </button>
-                        <p data-form-message role="status" hidden />
-                      </form>
-                    ) : (
-                      <form
-                        data-disable-factor
-                        class="volunteer-form volunteer-small mt-6"
-                        action="/api/v1/auth/two-factor/disable"
-                        method="post"
-                      >
-                        <div class="volunteer-field">
-                          <label for="factor-remove-code">
-                            Current authenticator code{" "}
-                            <span class="volunteer-required" aria-hidden="true">
-                              *
-                            </span>
-                          </label>
-                          <input
-                            id="factor-remove-code"
-                            name="code"
-                            inputmode="numeric"
-                            autocomplete="one-time-code"
-                            pattern="[0-9]{6}"
-                            maxlength="6"
-                            aria-describedby="error-factor-remove-code"
-                            required
-                          />
-                          <FieldError
-                            field="factor-remove-code"
-                            message="Enter a six-digit code from your current app."
-                          />
-                        </div>
-                        <label class="volunteer-check">
-                          <input name="confirm" type="checkbox" required />
-                          <span>
-                            I understand that two-factor protection will be off
-                            until I verify a new authenticator.
-                          </span>
-                        </label>
-                        <p
-                          data-form-message
-                          role="status"
-                          aria-live="polite"
-                          hidden
-                        />
-                        <button
-                          class="btn btn-outline"
-                          type="submit"
-                          data-loading-label="Removing…"
-                        >
-                          Confirm and remove authenticator
-                        </button>
-                      </form>
-                    )}
-                  </details>
-                </>
-              ) : factorNeedsSignIn ? (
-                <form
-                  data-sign-out
-                  action="/api/v1/auth/sign-out"
-                  method="post"
-                  class="mt-6"
-                >
-                  <p>
-                    Sign in again to set up an authenticator. A sign-in within
-                    the last ten minutes is required.
-                  </p>
-                  <button class="btn btn-outline mt-4" type="submit">
-                    Sign out to sign in again
-                  </button>
-                  <p data-form-message role="status" hidden />
-                </form>
-              ) : (
-                <>
-                  <p>
-                    Add an authenticator app for extra sign-in protection. This
-                    is optional for both volunteers and organizers.
-                  </p>
-                  <form
-                    data-enable-factor
-                    class="volunteer-form mt-6"
-                    action="/api/v1/auth/two-factor/enable"
-                    method="post"
-                  >
-                    <p
-                      data-form-message
-                      role="status"
-                      aria-live="polite"
-                      hidden
-                    />
-                    <button
-                      class="btn btn-outline"
-                      type="submit"
-                      data-loading-label="Setting up…"
-                    >
-                      Set up an authenticator
-                    </button>
-                  </form>
-                  <div data-factor-setup class="mt-8" hidden>
-                    <div data-factor-qr class="mb-6" hidden>
-                      <p>Scan this QR code with your authenticator app:</p>
-                      <img
-                        data-factor-qr-image
-                        class="mt-4 block h-auto max-w-full"
-                        width="256"
-                        height="256"
-                        alt="QR code for authenticator setup"
-                      />
-                    </div>
-                    <p data-factor-qr-error role="status" hidden>
-                      The QR code could not be displayed. Use the setup key
-                      below instead.
-                    </p>
-                    <p>You can enter this setup key manually:</p>
-                    <code data-factor-key class="break-all" />
-                    <p class="mt-6">
-                      Save these one-use backup codes somewhere safe:
-                    </p>
-                    <pre data-backup-codes class="mt-4" />
-                    <form
-                      data-confirm-factor
-                      class="volunteer-form volunteer-small mt-8"
-                      action="/api/v1/auth/two-factor/verify-totp"
-                      method="post"
-                    >
-                      <div class="volunteer-field">
-                        <label for="factor-setup-code">
-                          Authenticator code{" "}
-                          <span class="volunteer-required" aria-hidden="true">
-                            *
-                          </span>
-                        </label>
-                        <input
-                          id="factor-setup-code"
-                          name="code"
-                          aria-describedby="error-factor-setup-code"
-                          inputmode="numeric"
-                          autocomplete="one-time-code"
-                          pattern="[0-9]{6}"
-                          maxlength="6"
-                          required
-                        />
-                        <FieldError
-                          field="factor-setup-code"
-                          message="Enter a six-digit code."
-                        />
-                      </div>
-                      <p
-                        data-form-message
-                        role="status"
-                        aria-live="polite"
-                        hidden
-                      />
-                      <button
-                        class="btn btn-primary"
-                        type="submit"
-                        data-loading-label="Verifying…"
-                      >
-                        Verify and enable
-                      </button>
-                    </form>
-                  </div>
-                </>
+              twoFactorEnabled && (
+                <p role="status">
+                  Your authenticator is enabled. It is required each time you
+                  sign in.
+                </p>
               )
             }
           </div>
@@ -474,7 +347,7 @@ const contents = [
         <div class="volunteer-setting" data-account-sessions>
           <div class="w-full">
             <h3 id="account-sessions-heading" data-contents-section>
-              Sessions
+              Signed in browsers
             </h3>
             {
               sessionsNeedSignIn && (
@@ -484,7 +357,9 @@ const contents = [
                   method="post"
                   class="mt-6"
                 >
-                  <p>Sign in again to view and manage your active sessions.</p>
+                  <p>
+                    Sign in again to view and manage your signed in browsers.
+                  </p>
                   <button class="btn btn-outline mt-4" type="submit">
                     Sign out to sign in again
                   </button>
@@ -499,8 +374,8 @@ const contents = [
                     <div>
                       <span>
                         {entry.id === currentId
-                          ? "This device"
-                          : entry.userAgent || "Another device"}
+                          ? "This browser"
+                          : entry.userAgent || "Another browser"}
                       </span>
                       <span class="volunteer-help">
                         Last active:{" "}
@@ -519,9 +394,9 @@ const contents = [
                         <button
                           class="btn btn-outline"
                           type="submit"
-                          data-loading-label="Ending session…"
+                          data-loading-label="Signing out…"
                         >
-                          End session
+                          Sign out of session
                         </button>
                         <p data-form-message role="status" hidden />
                       </form>
@@ -532,6 +407,7 @@ const contents = [
             </ul>
           </div>
         </div>
+        <AccountDeleteSettings {userId} needsSignIn={deletionNeedsSignIn} />
       </section>
     </div>
   </div>

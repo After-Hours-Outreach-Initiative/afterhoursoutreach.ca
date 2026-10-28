@@ -9,6 +9,7 @@ import { confirmNaloxoneCompletion } from "../../server/db/naloxone";
 import { saveProfile } from "../../server/db/profiles";
 import { RequestError } from "../../server/http";
 import type { DevelopmentApplicationStep } from "../accounts";
+import { simulateDiscordConnection } from "./discord";
 
 /** Local-only shortcuts: keep normal submission validation and immutable snapshots. */
 export async function completeLocalApplicationStep(
@@ -20,7 +21,6 @@ export async function completeLocalApplicationStep(
     const sample = sampleProfileFixtures("local", Date.now()).find(
       (person) => person.key === "casey",
     )!;
-    // No notification callback: sample submissions must never queue real emails.
     await saveProfile(
       db,
       actor.id,
@@ -30,6 +30,7 @@ export async function completeLocalApplicationStep(
     return;
   }
   if (step === "naloxone") {
+    // No review callback: development shortcuts do not queue organizer emails.
     await confirmNaloxoneCompletion(db, actor, {
       userId: actor.id,
       completed: true,
@@ -43,6 +44,21 @@ export async function completeLocalApplicationStep(
       409,
       "Submit the application and complete Naloxone 101 first.",
     );
+  if (step === "discord") {
+    if (progress.discordCompletedAt == null)
+      await simulateDiscordConnection(db, actor, {
+        userId: actor.id,
+        consent: true,
+        outcome: "authorize",
+      });
+    return;
+  }
+  // Discord connection is temporarily disabled.
+  // if (progress.discordRequired && progress.discordCompletedAt == null)
+  //   throw new RequestError(
+  //     409,
+  //     "Complete the simulated Discord connection first.",
+  //   );
   if (progress.applicationApproved) return;
   const now = Date.now();
   // This deliberate development-only approval bypass changes only this account's

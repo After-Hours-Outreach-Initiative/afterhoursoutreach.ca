@@ -18,7 +18,7 @@ const allowed = new Map([
   ["/email-otp/change-email", "POST"],
   ["/get-session", "GET"],
   ["/sign-out", "POST"],
-  ["/two-factor/enable", "POST"],
+  // Enrollment is paused; existing authenticators and backup codes still work.
   ["/two-factor/disable", "POST"],
   ["/two-factor/verify-totp", "POST"],
   ["/two-factor/verify-backup-code", "POST"],
@@ -66,6 +66,15 @@ export const ALL: APIRoute = async ({ request, clientAddress }) => {
         );
         if (typeof body === "object" && body && "trustDevice" in body)
           throw new RequestError(400, "Trusted devices are not supported.");
+        if (path === "/two-factor/verify-totp") {
+          const current = await auth.api.getSession({
+            headers: request.headers,
+          });
+          // A stale setup page must not activate a pending enrollment. Signed-out
+          // challenges still use the plugin's normal verifier and lockout.
+          if (current && !current.user.twoFactorEnabled)
+            throw new RequestError(403, "Authenticator setup is coming soon.");
+        }
       }
       input = new Request(request.url, {
         method: request.method,

@@ -1,0 +1,201 @@
+.ui-playground {
+  max-width: 90rem;
+  margin-inline: auto;
+  padding: 2.5rem 1.5rem 5rem;
+  color-scheme: dark;
+}
+.ui-playground [hidden] {
+  display: none !important;
+}
+.ui-playground h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+.ui-playground h2 {
+  font-size: 1.75rem;
+}
+.ui-playground h3 {
+  font-size: 1.125rem;
+}
+.ui-playground p {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #b8bbc5;
+}
+.ui-playground a {
+  color: #b9c8ff;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.ui-page-header p,
+.ui-section > p {
+  margin-top: 0.5rem;
+}
+.ui-page-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+.ui-section {
+  margin-top: 3rem;
+  scroll-margin-top: 1.5rem;
+}
+.ui-section-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.ui-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid #3f3f46;
+  border-radius: 0.75rem;
+  background: #11141b;
+}
+.ui-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ui-controls :is(input:not([type="checkbox"], [type="hidden"]), select) {
+  min-width: 0;
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid #52525b;
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  background: #080a10;
+  color: #f4f4f5;
+  font: inherit;
+}
+.ui-controls input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
+  accent-color: #4169e1;
+}
+.ui-toggles {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+}
+.ui-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.ui-username-field {
+  grid-column: span 2;
+}
+.ui-input-action {
+  display: flex;
+  gap: 0.5rem;
+}
+.ui-input-action .btn {
+  flex: 0 0 auto;
+  padding-inline: 0.75rem;
+}
+.ui-preview-toolbar {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-block: 1.25rem 0.75rem;
+}
+.ui-preview-toolbar a {
+  flex-shrink: 0;
+}
+.ui-preview-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #52525b;
+  border-radius: 0.625rem;
+  background: #1b1f29;
+}
+.ui-live-preview {
+  display: block;
+  max-width: none;
+  margin-inline: auto;
+  border: 0;
+  background: #000;
+}
+.ui-simulation-status {
+  margin-block: 0.75rem;
+}
+.ui-fixture-details {
+  border: 1px solid #3f3f46;
+  border-radius: 0.5rem;
+}
+.ui-fixture-details summary {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+.ui-fixture-details pre {
+  max-height: 22rem;
+  overflow: auto;
+  padding: 1rem;
+  border-top: 1px solid #3f3f46;
+  font-size: 0.875rem;
+}
+.ui-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+.ui-gallery-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #3f3f46;
+  border-radius: 0.75rem;
+  background: #11141b;
+}
+.ui-gallery-description {
+  padding: 1.25rem;
+}
+.ui-gallery-description p {
+  margin-block: 0.5rem 0.75rem;
+}
+.ui-gallery-card iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #3f3f46;
+  background: #000;
+}
+@media (width < 70rem) {
+  .ui-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ui-username-field {
+    grid-column: 1 / -1;
+  }
+}
+@media (width < 45rem) {
+  .ui-playground {
+    padding: 1.5rem 0.75rem 3rem;
+  }
+  .ui-section-heading,
+  .ui-preview-toolbar {
+    flex-direction: column;
+  }
+  .ui-controls,
+  .ui-gallery {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ui-controls {
+    padding: 1rem;
+  }
+  .ui-input-action {
+    flex-wrap: wrap;
+  }
+  .ui-toggles {
+    padding-block: 0.5rem;
+  }
+}

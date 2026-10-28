@@ -16,8 +16,13 @@ import { profile } from "../../server/db/schema";
 import { loadApplicationProgress } from "../../server/db/application-progress";
 import { RequestError, safeReturnTo } from "../../server/http";
 import type { AuthBindings } from "../../server/auth";
-import { newApplicationPersona } from "../accounts";
-import { createDisposableAccount, deleteLocalAccount } from "./local-accounts";
+import {
+  accountStatePersona,
+  manualAccountPresets,
+  newApplicationPersona,
+} from "../accounts";
+import { deleteLocalAccount } from "./local-accounts";
+import { resetAccountState } from "./account-states";
 import { listLocalAccounts } from "./account-list";
 
 export function developmentAccounts(bindings: AuthBindings) {
@@ -53,6 +58,7 @@ export function developmentAccounts(bindings: AuthBindings) {
           return ctx.json({
             ...accounts,
             currentUserId: current?.user.id ?? null,
+            currentAccountName: current?.user.name ?? null,
             applicationProgress: current
               ? await loadApplicationProgress(bindings.DB, current.user.id)
               : null,
@@ -64,13 +70,13 @@ export function developmentAccounts(bindings: AuthBindings) {
         {
           method: "POST",
           requireHeaders: true,
-          body: z.strictObject({}),
+          body: z.strictObject({ testFixtures: z.literal(true).optional() }),
         },
         async (ctx) => {
           requireLocal(ctx.request);
           const { seedLocalAccounts } = await import("./seed-accounts");
           try {
-            await seedLocalAccounts(bindings);
+            await seedLocalAccounts(bindings, ctx.body.testFixtures);
           } catch (error) {
             throw new APIError("SERVICE_UNAVAILABLE", {
               message:
@@ -99,12 +105,39 @@ export function developmentAccounts(bindings: AuthBindings) {
         },
         async (ctx) => {
           requireLocal(ctx.request);
-          // Each selection gets its own empty, visible, deletable D1 identity.
-          // Never clear/reuse the old Not applied fixture: it may be submitted.
-          const userId =
-            ctx.body.userId === newApplicationPersona
-              ? await createDisposableAccount(bindings.DB)
-              : ctx.body.userId;
+          const state = manualAccountPresets.find(
+            (preset) => accountStatePersona(preset.key) === ctx.body.userId,
+          );
+          let userId = ctx.body.userId;
+          if (userId === newApplicationPersona || state) {
+            const cookie = ctx.context.createAuthCookie("development_state");
+            const saved = await ctx.getSignedCookie(
+              cookie.name,
+              ctx.context.secret,
+            );
+            const parsed = z.uuid().safeParse(saved);
+            const slot = parsed.success ? parsed.data : crypto.randomUUID();
+            try {
+              userId = await resetAccountState(
+                bindings.DB,
+                state?.key ?? "not-applied",
+                slot,
+              );
+            } catch (error) {
+              if (error instanceof RequestError)
+                throw new APIError(
+                  error.status === 409 ? "CONFLICT" : "BAD_REQUEST",
+                  { message: error.message },
+                );
+              throw error;
+            }
+            await ctx.setSignedCookie(
+              cookie.name,
+              slot,
+              ctx.context.secret,
+              cookie.attributes,
+            );
+          }
           const person = userId
             ? await ctx.context.internalAdapter.findUserById(userId)
             : null;
@@ -140,7 +173,7 @@ export function developmentAccounts(bindings: AuthBindings) {
             where: eq(profile.user_id, person.id),
             columns: { user_id: true },
           });
-          let next = safeReturnTo(ctx.body.returnTo);
+          let next = state ? "/volunteer" : safeReturnTo(ctx.body.returnTo);
           if (!applicationSubmitted) next = "/apply";
           else if (/^\/apply\/?(?:\?|$)/.test(next))
             next = "/volunteer/account";
@@ -159,7 +192,7 @@ export function developmentAccounts(bindings: AuthBindings) {
           requireHeaders: true,
           body: z.strictObject({
             userId: z.string().min(1).max(200),
-            step: z.enum(["form", "naloxone", "review"]),
+            step: z.enum(["form", "naloxone", "discord", "review"]),
           }),
         },
         async (ctx) => {

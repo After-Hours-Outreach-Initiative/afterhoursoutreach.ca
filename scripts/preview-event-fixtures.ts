@@ -3,6 +3,7 @@ import { nowMsSql } from "../src/server/db/sql";
 import {
   sampleProfileFixtures,
   sampleProfileStatement,
+  sampleDiscordExemption,
 } from "./sample-profile-fixtures";
 
 export const previewUserId = (key: string) => `preview-fixture-user-${key}`;
@@ -29,6 +30,7 @@ export function previewEventFixtures(now = Date.now()) {
       VALUES (${id}, ${quote(person.name)}, ${quote(person.email)}, ${now}, ${now})
       ON CONFLICT(id) DO NOTHING`);
     statements.push(sampleProfileStatement(person, now));
+    statements.push(sampleDiscordExemption(person));
     statements.push(`INSERT INTO volunteer_status (user_id, active, registration_approved, updated_at)
       SELECT ${id}, ${person.key === "jamie" ? 0 : 1}, 1, ${now}
       WHERE EXISTS (SELECT 1 FROM user WHERE id = ${id} AND email = ${quote(person.email)})

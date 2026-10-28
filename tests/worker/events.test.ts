@@ -3,10 +3,12 @@ import { profileWriteBody } from "../helpers/profile-write";
 import { existsSync } from "node:fs";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
-import { chromium, expect, type Locator } from "@playwright/test";
+import { chromium, expect, type Locator, type Route } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { fillDateInput } from "../helpers/date-input";
 import { createSignInOTP } from "../helpers/email-otp";
+// Discord connection is temporarily disabled.
+// import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { totpFromSetupKey } from "../helpers/totp";
 import { hashAuthValue } from "../../src/server/db/rate-limits";
 
@@ -338,7 +340,7 @@ describe(
         );
       });
 
-      test("application approval and Naloxone completion gate orientations independently of patrol approval", async () => {
+      test("application approval and Naloxone gate orientations without Discord while linking is paused", async () => {
         for (const person of [alice, bob]) {
           const page = await ok(
             await send("/volunteer", undefined, person.cookie),
@@ -379,12 +381,19 @@ describe(
             ),
             409,
           );
-          await DB.prepare(
-            "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",
-          )
-            .bind(Date.now(), person.id)
-            .run();
+          await ok(await status(person.id, true, false), 409);
+          await ok(
+            await send(
+              "/api/v1/account/naloxone",
+              { userId: person.id, completed: true },
+              person.cookie,
+            ),
+          );
           await ok(await send("/api/v1/events", undefined, person.cookie), 403);
+          // Discord connection is temporarily disabled.
+          // await ok(await status(person.id, true, false), 409);
+          // await seedVerifiedDiscordMembership(DB, person.id);
+          // await ok(await send("/api/v1/events", undefined, person.cookie), 403);
           await ok(await status(person.id, true, false));
           const events = await ok(
             await send("/api/v1/events", undefined, person.cookie),
@@ -1098,6 +1107,34 @@ describe(
               body: Buffer.from(await response.arrayBuffer()),
             });
           });
+          let releaseScripts!: () => void;
+          const scriptsReady = new Promise<void>((resolve) => {
+            releaseScripts = resolve;
+          });
+          const holdScripts = async (route: Route) => {
+            await scriptsReady;
+            await route.fallback();
+          };
+          await page.route("**/_astro/*.js", holdScripts);
+          try {
+            await page.goto(`${origin}/manage/volunteers/${alice.id}`, {
+              waitUntil: "commit",
+            });
+            await expect(page.getByLabel("Account role")).toBeDisabled();
+            await expect(
+              page.getByLabel("Active volunteer", { exact: true }),
+            ).toBeDisabled();
+            await expect(
+              page.getByRole("button", {
+                name: "Approve for patrols",
+                exact: true,
+              }),
+            ).toBeDisabled();
+          } finally {
+            releaseScripts();
+            await page.unroute("**/_astro/*.js", holdScripts);
+          }
+          await expect(page.getByLabel("Account role")).toBeEnabled();
           await page.goto(`${origin}/events`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           const nav = page.locator(".mobile-nav");
@@ -1119,82 +1156,42 @@ describe(
           await page.waitForURL(`${origin}/manage/volunteers?q=Sample+Alice`);
           await page
             .locator("[data-volunteer-results]")
+            .getByRole("link", { name: "Sample Alice", exact: true })
+            .waitFor();
+          await page
+            .getByRole("link", { name: "Sample Alice", exact: true })
+            .click();
+          const profileView = page.locator("[data-volunteer-profile]");
+          await profileView
             .getByRole("heading", { name: "Sample Alice", exact: true })
             .waitFor();
-          const profileDialog = page.getByRole("dialog", {
-            name: "Volunteer profile",
-            exact: true,
-          });
-          const profilePane = profileDialog.locator(
-            "[data-profile-dialog-content]",
-          );
-          let releaseProfile!: () => void;
-          const profileGate = new Promise<void>((resolve) => {
-            releaseProfile = resolve;
-          });
-          const profilePattern = `**/manage/volunteers/${alice.id}*`;
-          await page.route(profilePattern, async (route) => {
-            await profileGate;
-            await route.fallback();
-          });
-          try {
-            await page
-              .getByRole("link", {
-                name: "View profile and approval",
-                exact: true,
-              })
-              .click();
-            await expect(profilePane).toHaveAttribute("aria-busy", "true");
-            await expect(
-              profilePane.getByText("Loading", {
-                exact: true,
-              }),
-            ).toBeVisible();
-            await expect(
-              profileDialog.getByRole("button", {
-                name: "Close volunteer profile",
-                exact: true,
-              }),
-            ).toBeVisible();
-          } finally {
-            releaseProfile();
-          }
-          await profileDialog
-            .getByRole("heading", { name: "Sample Alice", exact: true })
-            .waitFor();
-          await page.unroute(profilePattern);
-          await expect(profilePane).not.toHaveAttribute("aria-busy", "true");
           await expect(
-            profilePane.locator(".volunteer-profile-loading"),
-          ).toHaveCount(0);
-          await profileDialog
+            profileView.getByLabel("Active volunteer", { exact: true }),
+          ).toBeEnabled();
+          await profileView
             .getByLabel("Active volunteer", { exact: true })
             .focus();
           await page.keyboard.press("Tab");
-          await expect(profileDialog.getByLabel("Account role")).toBeFocused();
-          await profileDialog.locator(".dialog-body").evaluate((popup) => {
-            popup.scrollTop = 80;
-          });
-          assert.match(
-            await profileDialog.innerText(),
-            /PRIVATE HEALTH ANSWER/,
-          );
-          assert.match(page.url(), /\/volunteers\?q=Sample\+Alice$/);
+          await expect(profileView.getByLabel("Account role")).toBeFocused();
+          assert.match(await profileView.innerText(), /PRIVATE HEALTH ANSWER/);
+          await expect(
+            page.getByRole("link", { name: "Back to volunteers" }),
+          ).toHaveAttribute("href", "/manage/volunteers?q=Sample+Alice");
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
-            form: profileDialog.locator(
+            form: profileView.locator(
               '[data-organizer-status][data-access-kind="patrol"]',
             ),
             notify: true,
             trigger: () =>
-              profileDialog
+              profileView
                 .getByRole("button", {
                   name: "Approve for patrols",
                   exact: true,
                 })
                 .click(),
             updated: () =>
-              profileDialog
+              profileView
                 .getByRole("button", {
                   name: "Revoke patrol approval",
                   exact: true,
@@ -1203,10 +1200,10 @@ describe(
             loadingLabel: "Sending…",
             pending: async () => {
               await expect(
-                profileDialog.getByLabel("Active volunteer", { exact: true }),
+                profileView.getByLabel("Active volunteer", { exact: true }),
               ).toBeDisabled();
               await expect(
-                profileDialog.getByLabel("Account role"),
+                profileView.getByLabel("Account role"),
               ).toBeDisabled();
             },
           });
@@ -1227,13 +1224,8 @@ describe(
           await accessEmailResult
             .getByRole("button", { name: "Close", exact: true })
             .click();
-          await expect(profileDialog).toBeVisible();
-          assert.equal(
-            await profileDialog
-              .locator(".dialog-body")
-              .evaluate((popup) => popup.scrollTop),
-            80,
-          );
+          await expect(profileView).toBeVisible();
+          await page.getByRole("link", { name: "Back to volunteers" }).click();
           await expect(
             page
               .locator("[data-volunteer-results]")
@@ -1278,31 +1270,26 @@ describe(
           await page.goto(`${origin}/manage/volunteers?q=Sample+Alice`);
           await page
             .getByRole("link", {
-              name: "View profile and approval",
+              name: "Sample Alice",
               exact: true,
             })
             .click();
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
-            form: profileDialog.locator("[data-organizer-role]"),
+            form: profileView.locator("[data-organizer-role]"),
             trigger: () =>
-              profileDialog
-                .getByLabel("Account role")
-                .selectOption("organizer"),
+              profileView.getByLabel("Account role").selectOption("organizer"),
             updated: async () => {
               await expect(
-                profileDialog.getByLabel("Account role"),
+                profileView.getByLabel("Account role"),
               ).toBeEnabled();
-              await expect(
-                profileDialog.getByLabel("Account role"),
-              ).toHaveValue("organizer");
+              await expect(profileView.getByLabel("Account role")).toHaveValue(
+                "organizer",
+              );
             },
             loadingLabel: "Saving…",
           });
-          await expect(profileDialog).toBeVisible();
-          await expect(page.locator("[data-volunteer-results]")).toContainText(
-            "Organizer",
-          );
+          await expect(profileView).toBeVisible();
           assert.equal(
             (
               await DB.prepare("SELECT role FROM user WHERE id=?")
@@ -1313,17 +1300,15 @@ describe(
           );
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
-            form: profileDialog.locator("[data-organizer-role]"),
+            form: profileView.locator("[data-organizer-role]"),
             trigger: () =>
-              profileDialog
-                .getByLabel("Account role")
-                .selectOption("volunteer"),
+              profileView.getByLabel("Account role").selectOption("volunteer"),
             updated: () =>
-              expect(profileDialog.getByLabel("Account role")).toBeEnabled(),
+              expect(profileView.getByLabel("Account role")).toBeEnabled(),
             loadingLabel: "Saving…",
           });
-          await expect(profileDialog).toBeVisible();
-          const activeForm = profileDialog.locator(
+          await expect(profileView).toBeVisible();
+          const activeForm = profileView.locator(
             "[data-organizer-status][data-submit-on-change]",
           );
           await page.route("**/api/v1/organizer/action", (route) =>
@@ -1336,7 +1321,7 @@ describe(
             endpoint: "/api/v1/organizer/action",
             form: activeForm,
             trigger: () =>
-              profileDialog
+              profileView
                 .getByLabel("Active volunteer", { exact: true })
                 .uncheck(),
             updated: () =>
@@ -1346,10 +1331,10 @@ describe(
             loadingLabel: "Saving…",
           });
           await expect(
-            profileDialog.getByLabel("Active volunteer", { exact: true }),
+            profileView.getByLabel("Active volunteer", { exact: true }),
           ).toBeChecked();
           await expect(
-            profileDialog.getByLabel("Active volunteer", { exact: true }),
+            profileView.getByLabel("Active volunteer", { exact: true }),
           ).toBeEnabled();
           await page.unroute("**/api/v1/organizer/action");
           alice.cookie = await signIn(alice.email);
@@ -1527,7 +1512,7 @@ describe(
             exact: true,
           });
           await filters
-            .getByRole("button", { name: "Orientations", exact: true })
+            .getByRole("button", { name: /^Orientations \(\d+\)$/ })
             .click();
           assert.equal(
             await page
@@ -1537,16 +1522,12 @@ describe(
               .count(),
             0,
           );
-          await filters
-            .getByRole("button", { name: "All", exact: true })
-            .click();
+          await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
           assert.equal(
             await page.locator("[data-live-event][hidden]").count(),
             0,
           );
-          await filters
-            .getByRole("button", { name: "All", exact: true })
-            .click();
+          await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
           assert.equal(
             await page.evaluate(
               () => document.documentElement.scrollWidth <= innerWidth,
@@ -1604,7 +1585,7 @@ describe(
             exact: true,
           });
           await volunteerFilters
-            .getByRole("button", { name: "All", exact: true })
+            .getByRole("button", { name: /^All \(\d+\)$/ })
             .click();
           await changeSpot("join", () =>
             card.getByText("Registered", { exact: true }).waitFor(),
@@ -1617,11 +1598,11 @@ describe(
           ).toBeFocused();
           await expect(page).toHaveURL(/\/events$/);
           await volunteerFilters
-            .getByRole("button", { name: "Orientations", exact: true })
+            .getByRole("button", { name: /^Orientations \(\d+\)$/ })
             .click();
           await expect(card).toBeHidden();
           await volunteerFilters
-            .getByRole("button", { name: "All", exact: true })
+            .getByRole("button", { name: /^All \(\d+\)$/ })
             .click();
           await expect(card).toBeVisible();
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
@@ -1634,8 +1615,9 @@ describe(
           routeCookie = organizer.cookie;
           await page.goto(`${origin}/manage/events`);
           await card.locator(".volunteer-roster > summary").click();
+          await card.locator("[data-signup-menu-trigger]").click();
           await card
-            .getByRole("button", { name: "Move or remove", exact: true })
+            .getByRole("menuitem", { name: "Move volunteer", exact: true })
             .click();
           const signupDialog = page.getByRole("dialog", {
             name: "Change a registration",
@@ -1659,9 +1641,7 @@ describe(
                 })
                 .click(),
             updated: async () => {
-              await expect(
-                card.locator(".volunteer-roster > summary"),
-              ).toHaveText("Volunteers (0)");
+              await expect(card.locator(".volunteer-roster")).toHaveCount(0);
               await expect(
                 destinationCard.locator(".volunteer-roster > summary"),
               ).toHaveText("Volunteers (1)");
@@ -1713,13 +1693,11 @@ describe(
           await registrationEmailResult
             .getByRole("button", { name: "Close", exact: true })
             .click();
-          await expect(card.locator(".volunteer-roster")).toHaveAttribute(
-            "open",
-            "",
-          );
+          await expect(card.locator(".volunteer-roster")).toHaveCount(0);
           await destinationCard.locator(".volunteer-roster > summary").click();
+          await destinationCard.locator("[data-signup-menu-trigger]").click();
           await destinationCard
-            .getByRole("button", { name: "Move or remove", exact: true })
+            .getByRole("menuitem", { name: "Move volunteer", exact: true })
             .click();
           await signupDialog.getByLabel("Destination").selectOption(sourceId);
           await inPlaceAction(page, {
@@ -1737,13 +1715,15 @@ describe(
                 card.locator(".volunteer-roster > summary"),
               ).toHaveText("Volunteers (1)");
               await expect(
-                destinationCard.locator(".volunteer-roster > summary"),
-              ).toHaveText("Volunteers (0)");
+                destinationCard.locator(".volunteer-roster"),
+              ).toHaveCount(0);
             },
             loadingLabel: "Saving…",
           });
+          await card.locator(".volunteer-roster > summary").click();
+          await card.locator("[data-signup-menu-trigger]").click();
           await card
-            .getByRole("button", { name: "Move or remove", exact: true })
+            .getByRole("menuitem", { name: "Remove volunteer", exact: true })
             .click();
           await signupDialog
             .getByLabel("Reason (optional)")
@@ -1759,7 +1739,7 @@ describe(
                 })
                 .click(),
             updated: () =>
-              card.getByText("Volunteers (0)", { exact: true }).waitFor(),
+              expect(card.locator(".volunteer-roster")).toHaveCount(0),
             loadingLabel: "Saving…",
           });
           assert.equal(await signupDialog.isVisible(), false);
@@ -1807,8 +1787,7 @@ describe(
           await changeSpot("cancel", () => card.waitFor({ state: "detached" }));
           await expect(
             volunteerFilters.getByRole("button", {
-              name: "All",
-              exact: true,
+              name: /^All \(\d+\)$/,
             }),
           ).toBeFocused();
           await account.click();

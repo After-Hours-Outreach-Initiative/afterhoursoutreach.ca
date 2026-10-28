@@ -29,6 +29,8 @@ test("API routes use the v1 prefix and retain private headers on workers.dev", a
       ["account/application-draft", "GET", 401],
       ["account/application-draft", "PUT", 401],
       ["account/session", "POST", 401],
+      ["account/discord", "GET", 401],
+      ["account/discord", "POST", 401],
       ["events/action", "POST", 401],
       ["organizer/action", "POST", 401],
     ] as const) {

@@ -2,6 +2,7 @@ import { vancouverInput, vancouverInstant } from "../src/data/event-time";
 import {
   sampleProfileFixtures,
   sampleProfileStatement,
+  sampleDiscordExemption,
 } from "./sample-profile-fixtures";
 
 export const fixtureUserId = (key: string) => `local-fixture-user-${key}`;
@@ -27,6 +28,7 @@ export function localEventFixtures(now = Date.now()) {
       VALUES (${id}, ${quote(person.name)}, ${quote(person.email)}, 1, ${quote(organizer ? "organizer" : "volunteer")}, ${now}, ${now})
       ON CONFLICT(id) DO NOTHING`);
     statements.push(sampleProfileStatement(person, now));
+    statements.push(sampleDiscordExemption(person));
     statements.push(`INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at)
       SELECT ${id}, ${person.key === "jamie" ? 0 : 1}, 1, ${approved ? 1 : 0},
       ${approved ? robin : "NULL"}, ${approved ? now : "NULL"}, ${now}

@@ -382,7 +382,7 @@ for (const root of [16, 20, 24]) {
         const roster = card.locator(".volunteer-roster");
         await roster.locator("summary").click();
         await expect(roster).toHaveAttribute("open", "");
-        await expect(roster.locator(":scope > ul > li").first()).toBeVisible();
+        await expect(roster.locator("tbody tr").first()).toBeVisible();
         expect(
           await card.evaluate((element) => {
             const bounds = element.getBoundingClientRect();
@@ -390,7 +390,7 @@ for (const root of [16, 20, 24]) {
               overflow: element.scrollWidth > element.clientWidth + 1,
               outside: [
                 ...element.querySelectorAll(
-                  ".volunteer-event-top > div, .volunteer-roster > ul > li, .volunteer-roster > ul > li > div, .volunteer-roster > ul > li > button",
+                  ".volunteer-event-top > div, .volunteer-roster tbody tr, .event-roster-person, .signup-menu-trigger",
                 ),
               ]
                 .filter((child) => {

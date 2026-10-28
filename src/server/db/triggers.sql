@@ -137,12 +137,11 @@ BEGIN
       'series_occurrence_created', '["seriesId","occurrenceDate"]', NEW.created_at);
 END;
 --> statement-breakpoint
-CREATE TRIGGER patrol_series_schedule_immutable
-BEFORE UPDATE OF id, first_date, local_time, interval_weeks, time_zone ON patrol_series
-WHEN NEW.id IS NOT OLD.id OR NEW.first_date IS NOT OLD.first_date OR NEW.local_time IS NOT OLD.local_time
-  OR NEW.interval_weeks IS NOT OLD.interval_weeks OR NEW.time_zone IS NOT OLD.time_zone
+CREATE TRIGGER patrol_series_identity_immutable
+BEFORE UPDATE OF id, first_date, time_zone ON patrol_series
+WHEN NEW.id IS NOT OLD.id OR NEW.first_date IS NOT OLD.first_date OR NEW.time_zone IS NOT OLD.time_zone
 BEGIN
-  SELECT RAISE(ABORT, 'patrol_series_schedule_immutable');
+  SELECT RAISE(ABORT, 'patrol_series_identity_immutable');
 END;
 --> statement-breakpoint
 CREATE TRIGGER signup_confirm_update
@@ -375,4 +374,116 @@ WHEN NEW.id IS NOT OLD.id OR NEW.operation_id IS NOT OLD.operation_id
   OR NEW.created_at IS NOT OLD.created_at
 BEGIN
   SELECT RAISE(ABORT, 'application_submission_notification_immutable');
+END;
+--> statement-breakpoint
+
+CREATE TRIGGER discord_required_on_submission AFTER INSERT ON profile
+BEGIN
+  INSERT OR IGNORE INTO discord_requirement (user_id) VALUES (NEW.user_id);
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_status_changed AFTER UPDATE OF active, registration_approved, patrol_approved ON volunteer_status
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_status_created AFTER INSERT ON volunteer_status
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_status_deleted AFTER DELETE ON volunteer_status
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_role_changed AFTER UPDATE OF role ON user
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_team_changed AFTER UPDATE OF teams ON profile
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_profile_deleted AFTER DELETE ON profile
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_orientation_created AFTER INSERT ON orientation_completion
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_orientation_deleted AFTER DELETE ON orientation_completion
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_orientation_changed AFTER UPDATE ON orientation_completion
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id IN (OLD.user_id, NEW.user_id);
+END;
+--> statement-breakpoint
+
+-- Reauthorization may refresh consent/tokens, but never silently swap identities.
+CREATE TRIGGER discord_identity_immutable BEFORE UPDATE OF user_id, discord_id, guild_id ON discord_link
+WHEN NEW.user_id IS NOT OLD.user_id OR NEW.discord_id IS NOT OLD.discord_id OR NEW.guild_id IS NOT OLD.guild_id
+BEGIN
+  SELECT RAISE(ABORT, 'discord_identity_immutable');
+END;
+--> statement-breakpoint
+
+-- Delete sign-in access atomically, without destroying records subject to the
+-- privacy policy's decision-record/legal-hold retention. Existing organizer
+-- demotion protection also applies to the initiating UPDATE of user.role.
+CREATE TRIGGER account_deleted AFTER UPDATE OF deleted_at ON user
+WHEN OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+BEGIN
+  DELETE FROM session WHERE user_id=NEW.id;
+  DELETE FROM account WHERE user_id=NEW.id;
+  DELETE FROM two_factor WHERE user_id=NEW.id;
+  DELETE FROM verification WHERE value=NEW.id
+    OR identifier='sign-in-otp-' || lower(OLD.email)
+    OR instr(identifier, 'change-email-otp-' || lower(OLD.email) || '-')=1;
+  DELETE FROM application_draft WHERE user_id=NEW.id;
+  DELETE FROM application_draft_generation WHERE user_id=NEW.id;
+  DELETE FROM discord_oauth WHERE user_id=NEW.id;
+  UPDATE volunteer_status SET active=0,updated_at=NEW.deleted_at WHERE user_id=NEW.id;
+  UPDATE signup SET status='cancelled',updated_at=NEW.deleted_at
+    WHERE user_id=NEW.id AND status='confirmed'
+      AND event_id IN (SELECT id FROM event WHERE starts_at>NEW.deleted_at);
+  -- Frozen batches cannot be edited/regrouped safely after a possible send.
+  -- Stop the whole affected batch; never resend it with a new payload/key.
+  UPDATE event_notification_batch SET status='cancelled',lease_token=NULL,lease_until=NULL
+    WHERE status IN ('pending','sending') AND id IN
+      (SELECT batch_id FROM event_notification WHERE user_id=NEW.id);
+  DELETE FROM event_notification WHERE user_id=NEW.id AND batch_id IS NULL AND status='pending';
+  UPDATE application_submission_notification SET status='expired',lease_token=NULL,lease_until=NULL
+    WHERE user_id=NEW.id AND status IN ('pending','sending');
+  UPDATE medic_certification_notification SET status='cancelled',delivery_payload=NULL,lease_token=NULL,lease_until=NULL
+    WHERE user_id=NEW.id AND status IN ('pending','sending');
+  -- Retain only the identity needed for durable managed-role removal. The sync
+  -- worker discards this link once roles are removed (or membership is absent).
+  UPDATE discord_link SET username='Deleted account',join_token=NULL,token_expires_at=NULL,
+    observed_roles=NULL,checked_at=NULL,version=version+1,next_attempt_at=0 WHERE user_id=NEW.id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER deleted_account_immutable BEFORE UPDATE ON user WHEN OLD.deleted_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'account_deleted');
+END;
+--> statement-breakpoint
+CREATE TRIGGER deleted_account_no_session BEFORE INSERT ON session
+WHEN EXISTS (SELECT 1 FROM user WHERE id=NEW.user_id AND deleted_at IS NOT NULL)
+BEGIN
+  SELECT RAISE(ABORT, 'account_deleted');
+END;
+--> statement-breakpoint
+CREATE TRIGGER deleted_account_no_reactivation BEFORE UPDATE OF active ON volunteer_status
+WHEN NEW.active=1 AND EXISTS (SELECT 1 FROM user WHERE id=NEW.user_id AND deleted_at IS NOT NULL)
+BEGIN
+  SELECT RAISE(ABORT, 'account_deleted');
 END;

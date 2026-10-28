@@ -4,8 +4,7 @@ import { existsSync } from "node:fs";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { chromium, expect } from "@playwright/test";
-import jsQR from "jsqr";
-import sharp from "sharp";
+import { createAuth } from "../../src/server/auth";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
 import { totpFromSetupKey } from "../helpers/totp";
@@ -423,6 +422,7 @@ describe(
       const trainingAnswers = {
         ...answers,
         training: ["naloxone-administration", "crisis-intervention", "other"],
+        crisisInterventionDetails: "Crisis prevention certification",
         otherTraining: "Crisis intervention course",
         codeOfConductAccepted: true,
       };
@@ -745,7 +745,7 @@ describe(
       );
     });
 
-    test("account application information appears after the three application milestones without orientation signup and stays read-only", async () => {
+    test("account application information appears after three milestones without Discord or orientation signup and stays read-only", async () => {
       await DB.prepare(
         "UPDATE profile SET naloxone_completed_at=1000 WHERE user_id=?",
       )
@@ -762,6 +762,22 @@ describe(
       )
         .bind(current.user.id)
         .run();
+      const withoutDiscord = await send(
+        "/volunteer/account",
+        undefined,
+        cookie,
+      );
+      // Discord linking is paused: approved applicants need no connection.
+      assert.match(
+        await withoutDiscord.text(),
+        /id="submitted-application-heading"/,
+      );
+      await DB.prepare(
+        `INSERT INTO discord_link (user_id,discord_id,username,guild_id,consented_at,completed_at,member_verified_at,next_attempt_at)
+        VALUES (?,'200000000000000001','Verified test identity','100000000000000002',1500,1500,1500,0)`,
+      )
+        .bind(current.user.id)
+        .run();
       const page = await send("/volunteer/account", undefined, cookie);
       assert.equal(page.status, 200);
       const html = await page.text();
@@ -775,6 +791,10 @@ describe(
       );
       assert.match(html, /Naloxone 101 completion/);
       assert.match(html, /Application approved/);
+      assert.doesNotMatch(
+        html,
+        /account-discord-heading|data-discord-connection|Discord connection verified/,
+      );
       assert.match(html, /Date not recorded/);
       assert.doesNotMatch(html, /Orientation registered/);
       assert.doesNotMatch(
@@ -823,6 +843,9 @@ describe(
       ) VALUES (?, 'Legacy current name', '604-555-0100', '1995-04-12',
         'Contact', '604-555-0101', 'Friend', 'Friend', 'Legacy motivation', '[]', '', '', 1, 1)`,
       )
+        .bind(legacy.user.id)
+        .run();
+      await DB.prepare("DELETE FROM discord_requirement WHERE user_id=?")
         .bind(legacy.user.id)
         .run();
       const edited = await send(
@@ -1008,7 +1031,7 @@ describe(
         const html = await page.text();
         assert.match(html, /Sign in again to view and manage/);
         assert.match(html, /data-account-profile/);
-        assert.doesNotMatch(html, /data-end-session|This device/);
+        assert.doesNotMatch(html, /data-end-session|This browser/);
       } finally {
         await DB.prepare("UPDATE session SET created_at=? WHERE id=?")
           .bind(original!.createdAt, current.session.id)
@@ -1128,6 +1151,43 @@ describe(
       ).json()) as typeof current;
       assert.equal(after.user.id, before.user.id);
       assert.equal(after.session.id, before.session.id);
+      // Discord linking is paused: neither linked nor unlinked accounts get UI.
+      const unlinkedCookie = await signIn(
+        "worker-unlinked-discord@example.org",
+      );
+      const discordPage = await (
+        await send("/volunteer/account", undefined, unlinkedCookie)
+      ).text();
+      // assert.match(discordPage, /Discord connection is coming soon\./);
+      assert.doesNotMatch(
+        discordPage,
+        /account-discord-heading|data-discord-connection|data-discord-connect|Discord connection is coming soon|Authorize AHOI Bot/,
+      );
+      const previousDiscord = await DB.prepare(
+        "SELECT * FROM discord_link WHERE user_id=?",
+      )
+        .bind(before.user.id)
+        .first();
+      const simulated = await send(
+        "/api/v1/account/discord",
+        {
+          userId: before.user.id,
+          consent: true,
+          outcome: "authorize",
+        },
+        cookie,
+      );
+      assert.equal(simulated.status, 503);
+      assert.equal(
+        ((await simulated.json()) as { message: string }).message,
+        "Discord connection is coming soon.",
+      );
+      assert.deepEqual(
+        await DB.prepare("SELECT * FROM discord_link WHERE user_id=?")
+          .bind(before.user.id)
+          .first(),
+        previousDiscord,
+      );
       assert.equal(
         (await send("/api/v1/auth/dev/seed-accounts", {}, cookie)).status,
         404,
@@ -1366,10 +1426,13 @@ describe(
             form: sessionForm,
             trigger: () =>
               sessionForm
-                .getByRole("button", { name: "End session", exact: true })
+                .getByRole("button", {
+                  name: "Sign out of session",
+                  exact: true,
+                })
                 .click(),
             updated: () => expect(sessionForm).toHaveCount(0),
-            loadingLabel: "Ending session…",
+            loadingLabel: "Signing out…",
           });
           await expect(page.getByLabel("Preferred name")).toHaveValue(
             changedName,
@@ -1687,7 +1750,7 @@ describe(
       const signedOut = await send("/volunteer/sign-in", undefined, cookie);
       assert.doesNotMatch(await signedOut.text(), /data-account-menu/);
     });
-    test("the Worker encrypts authenticator data and requires a second factor after email sign-in", async () => {
+    test("the Worker pauses authenticator setup and preserves existing two-factor sign-ins", async () => {
       const email = "worker-factor@example.org";
       const initialCookie = await signIn(email);
       const application = await send(
@@ -1696,61 +1759,66 @@ describe(
         initialCookie,
       );
       assert.equal(application.status, 200, await application.clone().text());
-      let setup: {
+      assert.equal(
+        (
+          await send(
+            "/api/v1/auth/two-factor/enable",
+            { method: "totp" },
+            initialCookie,
+          )
+        ).status,
+        404,
+      );
+      const account = await send(
+        "/volunteer/account",
+        undefined,
+        initialCookie,
+      );
+      const html = await account.text();
+      assert.match(html, /Coming soon\./);
+      assert.match(html, /data-factor-settings[^>]*aria-disabled="true"/);
+      assert.doesNotMatch(
+        html,
+        /data-enable-factor|data-confirm-factor|data-disable-factor/,
+      );
+
+      // Seed a pre-existing enrollment through the auth service, never by
+      // reopening the public setup endpoint or bypassing sign-in verification.
+      const auth = createAuth({
+        DB,
+        APP_ENV: "production",
+        AUTH_BASE_URL: origin,
+        BETTER_AUTH_SECRET: secret,
+        RESEND_API_KEY: "",
+      });
+      const seed = (path: string, body: object) =>
+        auth.handler(
+          new Request(`${origin}/api/v1/auth${path}`, {
+            method: "POST",
+            headers: {
+              origin,
+              cookie: initialCookie,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(body),
+          }),
+        );
+      const enabled = await seed("/two-factor/enable", { method: "totp" });
+      assert.equal(enabled.status, 200, await enabled.clone().text());
+      const setup = (await enabled.json()) as {
         totpURI: string;
         backupCodes: string[];
       };
-      const browser = await chromium.launch({
-        executablePath:
-          process.env.CHROMIUM_PATH ??
-          (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-      });
-      try {
-        const page = await browser.newPage();
-        // Exercise the production bundle and CSP, not only Vite's dev renderer.
-        await page.route("**/*", async (route) => {
-          const request = route.request();
-          if (new URL(request.url()).origin !== origin) return route.abort();
-          const response = await worker.fetch(request.url(), {
-            method: request.method(),
-            headers: { ...(await request.allHeaders()), cookie: initialCookie },
-            body: request.postData() ?? undefined,
-          });
-          await route.fulfill({
-            status: response.status,
-            headers: Object.fromEntries(response.headers),
-            body: Buffer.from(await response.arrayBuffer()),
-          });
-        });
-        await page.goto(`${origin}/volunteer/account`);
-        const enabled = page.waitForResponse((response) =>
-          response.url().endsWith("/two-factor/enable"),
-        );
-        await page
-          .getByRole("button", { name: "Set up an authenticator" })
-          .click();
-        setup = await (await enabled).json();
-        const qr = page.getByRole("img", {
-          name: "QR code for authenticator setup",
-        });
-        await expect(qr).toBeVisible();
-        const { data, info } = await sharp(await qr.screenshot())
-          .ensureAlpha()
-          .raw()
-          .toBuffer({ resolveWithObject: true });
-        assert.equal(
-          jsQR(new Uint8ClampedArray(data), info.width, info.height)?.data,
-          setup.totpURI,
-        );
-      } finally {
-        await browser.close();
-      }
       const key = new URL(setup.totpURI).searchParams.get("secret")!;
-      const confirmed = await send(
+      const paused = await send(
         "/api/v1/auth/two-factor/verify-totp",
         { code: totpFromSetupKey(key) },
         initialCookie,
       );
+      assert.equal(paused.status, 403);
+      const confirmed = await seed("/two-factor/verify-totp", {
+        code: totpFromSetupKey(key),
+      });
       assert.equal(confirmed.status, 200, await confirmed.clone().text());
       const confirmedCookie = confirmed.headers
         .getSetCookie()
@@ -1761,6 +1829,18 @@ describe(
         await send("/api/v1/auth/get-session", undefined, confirmedCookie)
       ).json()) as { session: { twoFactorVerified: boolean } };
       assert.equal(factorSession.session.twoFactorVerified, true);
+      const enrolledPage = await send(
+        "/volunteer/account",
+        undefined,
+        confirmedCookie,
+      );
+      const enrolledHTML = await enrolledPage.text();
+      assert.match(enrolledHTML, /Your authenticator is enabled\./);
+      assert.match(enrolledHTML, /Coming soon\./);
+      assert.doesNotMatch(
+        enrolledHTML,
+        /data-enable-factor|data-confirm-factor|data-disable-factor/,
+      );
       const encrypted = await DB.prepare(
         "SELECT secret, backup_codes FROM two_factor",
       ).all();
@@ -1816,6 +1896,23 @@ describe(
         await send("/api/v1/auth/get-session", undefined, verifiedCookie)
       ).json()) as { session: { twoFactorVerified: boolean } };
       assert.equal(result.session.twoFactorVerified, true);
+      await send("/api/v1/auth/sign-out", {}, verifiedCookie);
+      const totpProof = await createSignInOTP(DB, secret, email);
+      const totpPending = await send(
+        "/api/v1/auth/sign-in/email-otp",
+        totpProof,
+      );
+      const totpCookie = totpPending.headers
+        .getSetCookie()
+        .filter((value) => !value.includes("Max-Age=0"))
+        .map((value) => value.split(";")[0])
+        .join("; ");
+      const totpVerified = await send(
+        "/api/v1/auth/two-factor/verify-totp",
+        { code: totpFromSetupKey(key) },
+        totpCookie,
+      );
+      assert.equal(totpVerified.status, 200, await totpVerified.clone().text());
     });
     afterAll(async () => {
       try {

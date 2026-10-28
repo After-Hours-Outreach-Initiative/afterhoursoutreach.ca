@@ -1,0 +1,78 @@
+---
+import DiscordIcon from "@/components/icons/DiscordIcon.astro";
+import {
+  discordConnectionDescription,
+  discordConnectionMessage,
+  type DiscordConnectionStatus,
+} from "@/data/discord-connection";
+
+interface Props {
+  status: DiscordConnectionStatus;
+  canConnect?: boolean;
+  required?: boolean;
+  result?: string | null;
+}
+
+const {
+  status,
+  canConnect = true,
+  required = false,
+  result = null,
+} = Astro.props;
+const description = discordConnectionDescription(status, required, canConnect);
+const notice = discordConnectionMessage(status);
+---
+
+<div
+  class="min-w-0 wrap-anywhere"
+  data-discord-connection
+  data-discord-user={status.userId}
+  data-discord-required={String(required)}
+  data-discord-can-connect={String(canConnect)}
+>
+  <p data-discord-description hidden={!description}>
+    {description}
+  </p>
+  {
+    result && result !== "connected" && (
+      <p class="volunteer-notice" role="status">
+        {result}
+      </p>
+    )
+  }
+  <p
+    class="mt-4 text-white"
+    data-discord-identity
+    tabindex="-1"
+    hidden={!status.username}
+  >
+    Connected as <strong class="font-bold" data-discord-username
+      >{status.username ? `@${status.username}` : ""}</strong
+    >
+  </p>
+  <p
+    class="mt-4"
+    data-discord-status
+    role="status"
+    hidden={!status.configured || !notice}
+  >
+    {notice}
+  </p>
+  {
+    status.configured && canConnect && (
+      <form
+        class="volunteer-form mt-4"
+        data-discord-connect
+        hidden={Boolean(status.username && !status.needsReconnect)}
+      >
+        <p data-discord-message role="status" hidden />
+        <button class="btn btn-primary" type="submit">
+          <DiscordIcon class="btn-icon fill-current" />
+          <span data-discord-connect-label>
+            {status.needsReconnect ? "Reconnect Discord" : "Connect Discord"}
+          </span>
+        </button>
+      </form>
+    )
+  }
+</div>

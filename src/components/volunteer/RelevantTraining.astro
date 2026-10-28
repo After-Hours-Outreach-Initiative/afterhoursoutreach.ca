@@ -4,6 +4,8 @@ import {
   trainingOptions,
   trainingQuestion,
   trainingRequiredError,
+  trainingDetailOptions,
+  requiresTrainingDetails,
   experienceOptions,
   experienceQuestion,
   experienceRequiredError,
@@ -16,8 +18,14 @@ interface Props {
   values?: ApplicationAnswers | null;
   required?: boolean;
   experience?: boolean;
+  application?: boolean;
 }
-const { values, required = true, experience = false } = Astro.props;
+const {
+  values,
+  required = true,
+  experience = false,
+  application = false,
+} = Astro.props;
 const name = experience ? "relevantExperience" : "training";
 const otherName = experience ? "otherExperience" : "otherTraining";
 const options = experience ? experienceOptions : trainingOptions;
@@ -25,9 +33,10 @@ const question = experience ? experienceQuestion : trainingQuestion;
 const requiredError = experience
   ? experienceRequiredError
   : trainingRequiredError;
-const otherTrainingField = applicationFields.find(
-  (field) => field.name === otherName,
-)!;
+const detailOptions = [
+  ...(!experience ? trainingDetailOptions : []),
+  { value: "other", name: otherName },
+];
 ---
 
 <fieldset
@@ -49,34 +58,59 @@ const otherTrainingField = applicationFields.find(
   </legend>
   <div class="volunteer-training-options volunteer-choice-options">
     {
-      options.map((option, index) => (
-        <>
-          {option.value === "none" && (
-            <div class="volunteer-training-divider" aria-hidden="true">
-              or
-            </div>
-          )}
-          <label class="volunteer-check">
-            <input
-              type="checkbox"
-              name={name}
-              value={option.value}
-              checked={values?.[name].includes(option.value)}
-              required={required && index === 0 && !values?.[name].length}
-              aria-describedby={`error-${name}`}
-            />
-            <span>{option.label}</span>
-          </label>
-          {option.value === "other" && (
-            <AccountProfileField
-              field={otherTrainingField}
-              values={values}
-              active={values?.[name].includes("other") ?? false}
-              hideLabel
-            />
-          )}
-        </>
-      ))
+      options.map((option, index) => {
+        const detail = detailOptions.find(
+          (detail) => detail.value === option.value,
+        );
+        const field =
+          detail &&
+          applicationFields.find((field) => field.name === detail.name);
+        const specificDetail = trainingDetailOptions.find(
+          (detail) => detail.value === option.value,
+        );
+        return (
+          <>
+            {option.value === "none" && (
+              <div class="volunteer-training-divider" aria-hidden="true">
+                OR
+              </div>
+            )}
+            <label class="volunteer-check">
+              <input
+                type="checkbox"
+                name={name}
+                value={option.value}
+                checked={values?.[name].includes(option.value)}
+                required={required && index === 0 && !values?.[name].length}
+                aria-describedby={`error-${name}`}
+                aria-controls={field ? `profile-${field.name}` : undefined}
+                aria-expanded={
+                  field
+                    ? Boolean(values?.[name].includes(option.value))
+                    : undefined
+                }
+              />
+              <span>{option.label}</span>
+            </label>
+            {field && (
+              <AccountProfileField
+                field={field}
+                values={values}
+                active={values?.[name].includes(option.value) ?? false}
+                required={
+                  !specificDetail ||
+                  requiresTrainingDetails(
+                    specificDetail,
+                    application ? null : values,
+                  )
+                }
+                trainingDetailFor={option.value}
+                hideLabel
+              />
+            )}
+          </>
+        );
+      })
     }
   </div>
   <FieldError field={name} message={requiredError} />

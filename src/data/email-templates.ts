@@ -77,7 +77,7 @@ export function signInEmailContent(email: SignInEmailInput): EmailContent {
 // These two messages are composed inside atomic SQL writes. Sharing their text
 // templates keeps previews accurate without moving transactional reads into JS.
 export const applicationSubmittedTemplate = {
-  subject: "New volunteer application submitted",
+  subject: "Volunteer application ready for review",
   text: "Applicant: {{applicant}}\nSubmitted: {{submittedAt}}\nOrganizer review (authorized organizer sign-in required): {{reviewUrl}}",
 } satisfies EmailContent;
 
@@ -133,6 +133,7 @@ interface VolunteerAccess {
 export function volunteerAccessEmail(
   { active, applicationApproved, patrolApproved }: VolunteerAccess,
   applicationApprovalChanged: boolean,
+  approvingOrganizerName?: string,
 ): EmailContent {
   const nextStep = !active
     ? `Your volunteer account is currently inactive. Please contact an organizer at ${contactEmail} to restore access before registering for events.`
@@ -153,7 +154,7 @@ export function volunteerAccessEmail(
     };
   return {
     subject: "Your volunteer application is approved",
-    text: `Your volunteer application is approved! Thanks for joining us and supporting our community.\n\n${nextStep}`,
+    text: `Your volunteer application is approved${approvingOrganizerName ? ` by ${approvingOrganizerName}` : ""}! Thanks for joining us and supporting our community.\n\n${nextStep}`,
   };
 }
 
@@ -163,6 +164,13 @@ export function roleChangedEmail(
   return {
     subject: "Your account role changed",
     text: `Your role is now ${role}. Sign in again to continue.`,
+  };
+}
+
+export function applicationRejectedEmail(reason: string): EmailContent {
+  return {
+    subject: "Your volunteer application was not approved",
+    text: `Thank you for applying to volunteer with After Hours Outreach. Your application was not approved.\n\nReason: ${reason}\n\nYou can view this decision in your application on the Volunteer page. If you have questions, contact ${contactEmail}.`,
   };
 }
 

@@ -9,6 +9,21 @@ Cloudflare Workers.
 pnpm install
 ```
 
+## Local UI playground
+
+Run `pnpm dev`, then open <http://localhost:4321/dev/ui> or choose **UI playground**
+in the local **DEV panel** (Alt+Z).
+
+Discord is the first component: browse its state gallery or use the interactive
+preview to try fictional inputs, delayed responses, and success/error flows at
+different viewport sizes. Scenario URLs can be bookmarked or shared locally.
+Developer controls simulate background status updates without adding a refresh
+button to the actual component.
+The playground needs no sign-in and never changes accounts, writes to the
+database, or calls Discord. Its routes and simulations are excluded from both
+production and hosted preview builds. Add future component examples under
+`src/dev/ui/`.
+
 ## Local documentation
 
 Browse the project guides in a separate Astro + Starlight development server:
@@ -44,6 +59,11 @@ it. Navigation and page contents are available in dev; build-dependent full-text
 search is intentionally disabled. Benchmark data stays in `docs/benchmarks/`.
 
 ## Tests
+
+Discord account linking and role synchronization require a dedicated bot,
+server/role IDs, and private secrets. See the [Discord setup and operations guide](docs/src/content/docs/discord.md)
+before enabling new applications. Email sign-in is unchanged; existing volunteers
+retain access without a Discord link.
 
 Run `pnpm test` for Vitest unit and Cloudflare runtime tests, or
 `pnpm test:watch` during development. Built-Worker and Playwright commands are

@@ -17,10 +17,28 @@ the **Cloudflare Workers and Pages** GitHub app; there is no checked-in GitHub
 Actions deployment workflow. Successful GitHub checks confirm production builds
 for `main` and preview builds for `feat/patrol-scheduling-mockup`.
 
-The manual commands below are a separate supported deployment path. The full
-automatic branch rules and exact CI commands are managed in Cloudflare and have
-not been verified. See [System architecture](/system-architecture/#git-triggered-builds)
-for the confirmed connection and where to inspect its settings.
+Workers Builds uses separate build and deploy steps:
+
+| Target     | Build command        | Deploy command        |
+| ---------- | -------------------- | --------------------- |
+| Production | `pnpm build`         | `pnpm deploy`         |
+| Preview    | `pnpm build:preview` | `pnpm deploy:preview` |
+
+Use the same two steps for manual deployments. Deploy scripts do not rebuild;
+run the matching build first so its generated Wrangler configuration and assets
+are current. Builds do not change remote databases or deploy Workers.
+
+Both deploy scripts apply pending migrations to their guarded database target
+before uploading the Worker. A migration failure stops deployment. Production
+also runs `pnpm db:check` to validate the generated migration history. Keep
+migrations compatible with the currently deployed Worker: migration and Worker
+deployment are not atomic, and rolling back Worker code does not undo migrations.
+Destructive schema changes and data backfills need a separately reviewed rollout.
+
+Manage these CI settings with `cf` using its separate OAuth login; keep application
+builds/deployments on the existing Astro and Wrangler scripts. Updating CI commands
+does not deploy anything; script changes take effect when the built branch contains
+them. Do not trigger a production build merely to validate configuration changes.
 
 ## Branch previews
 
@@ -40,8 +58,8 @@ migration records. Reapply `pnpm db:migrate:preview` afterward. Seeding and
 organizer bootstrap remain separate, explicit operations; no command resets
 databases automatically. Never use this process for production data.
 
-Run `pnpm deploy:preview` to build, migrate the preview database, and run
-`wrangler preview`. The preview name defaults to the Git branch.
+Run `pnpm build:preview` followed by `pnpm deploy:preview` to build, migrate the
+preview database, and run `wrangler preview`. The preview name defaults to the Git branch.
 `pnpm preview` remains local Astro previewing.
 
 After migrations, run `pnpm db:seed:preview` to add six synthetic volunteers,
@@ -63,7 +81,7 @@ database has no organizer yet. Volunteer-management pages remain organizer-only.
 `pnpm build` includes all account and event features for production. There is no
 account feature flag or preview-host restriction. `pnpm build:preview` uses the
 same application with a preview banner and a separate output directory; preview
-mode does not gate any features. Development account controls and simulated
+mode disables Discord connections and role-sync side effects. Development account controls and simulated
 emails are excluded from both builds.
 
 Sign-in URLs use `AUTH_BASE_URL` when configured, otherwise the request origin.
@@ -72,6 +90,10 @@ to use their own URL. Forwarded-host headers are never used. Account pages keep
 their CSP, no-store, and noindex protections in all deployed builds; public
 production pages can be indexed and cached.
 Account secrets: `BETTER_AUTH_SECRET`, `RESEND_API_KEY`.
+Discord additionally needs private client/bot/encryption secrets and the server
+and three role IDs documented in [Discord setup](/discord/#dedicated-bot-and-server-setup).
+Blank IDs disable Discord without affecting email sign-in; configure before
+accepting new applications. No production Discord credentials belong in previews.
 Use `wrangler preview base-config secret put NAME` for new previews, or
 `wrangler preview secret put NAME --name BRANCH` for an existing preview.
 Account secrets are configured in Previews Base. Email requests remain rate limited.
@@ -80,12 +102,13 @@ Account secrets are configured in Previews Base. Email requests remain rate limi
 endpoints using a local Worker and test database. See [testing.md](/testing/)
 for the Vitest projects and browser-test commands.
 
-Production: `pnpm deploy`. The developer controls when to deploy; there is no
-custom pre-deployment gate. Before doing so, replace the placeholder production
-D1 ID in `wrangler.jsonc`, apply its migrations, configure the account secrets,
-and finish the privacy-policy review. Never point production at the shared
-preview database. Builds and tests do not deploy anything. Preview deployments
-never deploy production code.
+Production: `pnpm build` followed by `pnpm deploy`. The deploy script applies
+guarded production migrations before deploying `dist/server/wrangler.json`.
+Before doing so, verify the dedicated production D1 binding in `wrangler.jsonc`,
+configure the account secrets, and finish the privacy-policy review. These launch
+approvals remain the developer's responsibility, not an automated script gate.
+Never point production at the shared preview database. Builds and tests do not
+deploy anything. Preview deployments never deploy production code.
 The separate `afterhoursoutreach-ca-staging` Worker and `staging.afterhoursoutreach.ca`
 domain were retired after live preview checks; the shared D1 database was retained.
 
@@ -130,9 +153,10 @@ Worker directly. Trigger changes can take up to 15 minutes to propagate.
   Events, especially pending backlog and expired delivery counts. Inspect only
   status/count fields when diagnosing; do not export recipient/payload fields.
 
-Before production deployment, apply generated migrations to the **actual production
-D1** (the checked-in ID is still a placeholder), configure `BETTER_AUTH_SECRET` and
-`RESEND_API_KEY`, and verify the Resend sender/domain. No new secrets or services
+Before production deployment, verify the dedicated production D1 binding,
+configure `BETTER_AUTH_SECRET` and `RESEND_API_KEY`, and verify the Resend
+sender/domain. `pnpm deploy` applies generated migrations to the guarded
+production database before uploading the Worker. No new secrets or services
 are needed. Local/dev and `APP_ENV != production` (including branch previews)
 skip the job without sending or consuming notifications; automated tests inject a
 mock provider against isolated D1. No remote migration, deployment, or real email

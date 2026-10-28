@@ -3,6 +3,9 @@ import type { EventRow, RosterRow } from "@/server/db/events";
 import { formatEventDate } from "@/data/event-time";
 import FieldError from "@/components/FieldError.astro";
 import DialogHeader from "@/components/DialogHeader.astro";
+import EllipsisIcon from "@/components/icons/EllipsisIcon.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import TrashIcon from "@/components/icons/TrashIcon.astro";
 
 interface Props {
   signup: RosterRow;
@@ -12,10 +15,49 @@ const { signup, destinations } = Astro.props;
 ---
 
 <button
-  class="btn btn-quiet"
+  class="btn btn-quiet signup-menu-trigger"
   type="button"
-  data-show-dialog={`signup-editor-${signup.id}`}>Move or remove</button
+  id={`signup-menu-trigger-${signup.id}`}
+  data-signup-menu-trigger
+  popovertarget={`signup-menu-${signup.id}`}
+  aria-controls={`signup-menu-${signup.id}`}
+  aria-haspopup="menu"
+  aria-expanded="false"
+  aria-label={`Registration actions for ${signup.name}`}
+  title={`Registration actions for ${signup.name}`}
 >
+  <EllipsisIcon class="size-5" />
+</button>
+<div
+  id={`signup-menu-${signup.id}`}
+  class="signup-menu"
+  popover="auto"
+  role="menu"
+  aria-labelledby={`signup-menu-trigger-${signup.id}`}
+  data-signup-menu
+>
+  <button
+    type="button"
+    role="menuitem"
+    tabindex="-1"
+    data-show-dialog={`signup-editor-${signup.id}`}
+    data-signup-change="move"
+    disabled={destinations.length === 0}
+  >
+    <ArrowRightIcon class="size-5" />
+    Move volunteer
+  </button>
+  <button
+    type="button"
+    role="menuitem"
+    tabindex="-1"
+    data-show-dialog={`signup-editor-${signup.id}`}
+    data-signup-change="remove"
+  >
+    <TrashIcon class="size-5" />
+    Remove volunteer
+  </button>
+</div>
 <dialog
   class="dialog-pop dialog-frame volunteer-dialog"
   id={`signup-editor-${signup.id}`}

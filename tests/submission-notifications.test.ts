@@ -5,6 +5,7 @@ import { createTestHarness } from "wrangler";
 import type { AuthBindings } from "../src/server/auth";
 import type { Actor } from "../src/server/db/access";
 import { saveApplicationDraft } from "../src/server/db/application-drafts";
+import { confirmNaloxoneCompletion } from "../src/server/db/naloxone";
 import {
   loadProfile,
   loadSubmittedApplication,
@@ -88,12 +89,14 @@ const answers = {
   experience: "Private experience",
   training: ["none"],
   otherTraining: "",
+  expiredFirstAidDetails: "",
+  crisisInterventionDetails: "",
   relevantExperience: ["none"],
   otherExperience: "",
   certificationExpiry: "",
   medicalConditions: "Private health answer",
 };
-const submit = (config = bindings(), input = answers) =>
+const submitForm = (input = answers) =>
   saveProfile(
     db,
     actor.id,
@@ -101,9 +104,20 @@ const submit = (config = bindings(), input = answers) =>
     {
       actor,
       intent: "submit",
-      firstSubmissionStatements: submissionNotificationStatements(config),
     },
   );
+const confirm = (config = bindings()) =>
+  confirmNaloxoneCompletion(
+    db,
+    actor,
+    { userId: actor.id, completed: true },
+    { reviewStatements: submissionNotificationStatements(config) },
+  );
+const submit = async (config = bindings(), input = answers) => {
+  const saved = await submitForm(input);
+  const confirmed = await confirm(config);
+  return { ...saved, operationId: confirmed.reviewOperationId };
+};
 interface Row {
   id: string;
   user_id: string;
@@ -216,7 +230,7 @@ beforeEach(async () => {
   };
 });
 
-test("only the winning first submission transaction records exactly three private fixed-mailbox intents", async () => {
+test("form submission is silent; only the winning review transition records three private fixed-mailbox intents", async () => {
   const network = vi.spyOn(globalThis, "fetch");
   await saveApplicationDraft(db, actor, {
     userId: actor.id,
@@ -227,11 +241,18 @@ test("only the winning first submission transaction records exactly three privat
   });
   assert.equal(await count("application_submission_notification"), 0);
   const result = await Promise.all([
-    submit(bindings(), { ...answers, preferredName: "Winning name A" }),
-    submit(bindings(), { ...answers, preferredName: "Winning name B" }),
+    submitForm({ ...answers, preferredName: "Winning name A" }),
+    submitForm({ ...answers, preferredName: "Winning name B" }),
   ]);
   assert.equal(result.filter((saved) => saved.firstSubmitted).length, 1);
-  const winner = result.find((saved) => saved.firstSubmitted)!;
+  assert.equal(await count("application_submission_notification"), 0);
+  const provider = vi.fn(accepted);
+  await deliverSubmissionNotifications(bindings(), {}, provider);
+  assert.equal(provider.mock.calls.length, 0);
+  const confirmations = await Promise.all([confirm(), confirm()]);
+  assert.equal(confirmations.filter((row) => row.reviewOperationId).length, 1);
+  const winner = confirmations.find((row) => row.reviewOperationId)!;
+  assert.equal(confirmations[0].completedAt, confirmations[1].completedAt);
   const snapshot = (await loadSubmittedApplication(db, actor.id))!;
   const pending = await rows();
   assert.deepEqual(
@@ -240,7 +261,7 @@ test("only the winning first submission transaction records exactly three privat
   );
   assert.equal(await count("user"), 1); // No organizer mailbox has a site account.
   for (const row of pending) {
-    assert.equal(row.operation_id, winner.operationId);
+    assert.equal(row.operation_id, winner.reviewOperationId);
     assert.equal(row.mode, "production");
     assert.equal(row.status, "pending");
     assert.equal(row.first_attempt_at, null);
@@ -252,7 +273,7 @@ test("only the winning first submission transaction records exactly three privat
       "to",
     ]);
     assert.deepEqual(payload.to, [row.recipient]);
-    assert.equal(payload.subject, "New volunteer application submitted");
+    assert.equal(payload.subject, "Volunteer application ready for review");
     assert.equal(
       payload.text,
       `Applicant: ${snapshot.answers.preferredName}\nSubmitted: ${snapshot.submittedAt}\nOrganizer review (authorized organizer sign-in required): https://afterhoursoutreach.ca/manage/volunteers/applicant`,
@@ -263,7 +284,8 @@ test("only the winning first submission transaction records exactly three privat
     );
   }
   assert.equal(network.mock.calls.length, 0); // No network inside the save hook.
-  await submit(); // Lost-response retry must not write any effects.
+  await submitForm(); // Lost-response retries must not write any effects.
+  assert.equal((await confirm()).reviewOperationId, undefined);
   const baseline = (await loadProfile(db, actor.id))!;
   await saveProfile(
     db,
@@ -273,7 +295,6 @@ test("only the winning first submission transaction records exactly three privat
       actor,
       intent: "edit",
       baseline,
-      firstSubmissionStatements: submissionNotificationStatements(bindings()),
     },
   );
   assert.deepEqual(await rows(), pending);
@@ -285,44 +306,37 @@ test("only the winning first submission transaction records exactly three privat
   ); // The notification link grants no access to the applicant or other volunteers.
 });
 
-test("notification write failure rolls back the profile, audit, name, status, and draft deletion", async () => {
-  await saveApplicationDraft(db, actor, {
-    userId: actor.id,
-    version: 1,
-    revision: null,
-    generation: null,
-    answers: { firstName: "Kept draft" },
-  });
+test("notification write failure rolls back course confirmation and its audit, leaving the submitted form intact", async () => {
+  await submitForm();
+  const snapshot = await loadSubmittedApplication(db, actor.id);
+  const audits = await count("audit_log");
   await db
     .prepare(
       `CREATE TRIGGER fail_second_recipient BEFORE INSERT ON application_submission_notification
     WHEN NEW.recipient='info@afterhoursoutreach.ca' BEGIN SELECT RAISE(ABORT,'test outbox failure'); END`,
     )
     .run();
-  await assert.rejects(submit(), /test outbox failure/);
-  for (const table of [
-    "profile",
-    "audit_log",
-    "volunteer_status",
-    "application_submission_notification",
-  ])
-    assert.equal(await count(table), 0);
-  assert.equal(await count("application_draft"), 1);
+  await assert.rejects(confirm(), /test outbox failure/);
+  assert.equal(await count("application_submission_notification"), 0);
+  assert.equal(await count("audit_log"), audits);
+  assert.deepEqual(await loadSubmittedApplication(db, actor.id), snapshot);
   assert.equal(
-    await db.prepare("SELECT name FROM user").first("name"),
-    "Original account name",
+    await db
+      .prepare("SELECT naloxone_completed_at FROM profile")
+      .first("naloxone_completed_at"),
+    null,
   );
   await db.prepare("DROP TRIGGER fail_second_recipient").run();
-  assert.equal((await submit()).firstSubmitted, true);
+  assert.ok((await confirm()).reviewOperationId);
   assert.equal(await count("application_submission_notification"), 3);
 });
 
 test("guard losers, invalid consent, discarded drafts, and stale sessions cannot queue notifications", async () => {
+  await assert.rejects(confirm()); // Course completion cannot precede the form.
   await assert.rejects(
     saveProfile(db, actor.id, answers, {
       actor,
       intent: "submit",
-      firstSubmissionStatements: submissionNotificationStatements(bindings()),
     }),
   );
   await assert.rejects(
@@ -334,41 +348,26 @@ test("guard losers, invalid consent, discarded drafts, and stale sessions cannot
         actor,
         intent: "submit",
         draft: { revision: crypto.randomUUID(), generation: null },
-        firstSubmissionStatements: submissionNotificationStatements(bindings()),
       },
     ),
   );
-  await db.prepare("DELETE FROM session").run();
-  await assert.rejects(submit());
   assert.equal(await count("profile"), 0);
+  await submitForm();
+  await db.prepare("DELETE FROM session").run();
+  await assert.rejects(confirm());
   assert.equal(await count("application_submission_notification"), 0);
 });
 
-test("frozen metadata comes from the stored submission, not callback arguments or mutable account/profile values", async () => {
-  const queue = submissionNotificationStatements(bindings());
-  await saveProfile(
-    db,
-    actor.id,
-    { ...answers, preferredName: "", codeOfConductAccepted: true },
-    {
-      actor,
-      intent: "submit",
-      firstSubmissionStatements: (context) =>
-        queue({
-          ...context,
-          submission: {
-            ...context.submission,
-            answers: { ...answers, preferredName: "Forged callback value" },
-          },
-        }),
-    },
-  );
-  const original = await rows();
-  assert.match(original[0].payload!, /Applicant: Sample Middle Applicant/);
+test("frozen metadata comes from the stored submission, not mutable account/profile values at review time", async () => {
+  await submitForm({ ...answers, preferredName: "" });
   await db
     .prepare("UPDATE user SET name='Changed',email='changed@example.org'")
     .run();
   await db.prepare("UPDATE profile SET preferred_name='Changed'").run();
+  await confirm();
+  const original = await rows();
+  assert.match(original[0].payload!, /Applicant: Sample Middle Applicant/);
+  await confirm();
   assert.deepEqual(await rows(), original);
   for (const assignment of [
     "payload='changed'",
@@ -383,6 +382,52 @@ test("frozen metadata comes from the stored submission, not callback arguments o
         .run(),
       /application_submission_notification_immutable/,
     );
+});
+
+test("legacy initial-form intents are suppressed, never backfilled or replaced at review entry", async () => {
+  const saved = await submitForm();
+  for (const [index, recipient] of submissionNotificationRecipients.entries()) {
+    await db
+      .prepare(
+        `INSERT INTO application_submission_notification
+        (id,operation_id,user_id,recipient,mode,payload,status,next_attempt_at,created_at)
+        VALUES (?,?,?,?,'production','{}',?,0,0)`,
+      )
+      .bind(
+        `legacy-${index}`,
+        saved.operationId,
+        actor.id,
+        recipient,
+        ["pending", "sending", "sent"][index],
+      )
+      .run();
+  }
+  const provider = vi.fn(accepted);
+  // Even direct claims cannot revive old initial-form mail.
+  assert.equal(
+    await claimSubmissionNotification(
+      db,
+      "legacy-0",
+      "production",
+      "owner",
+      Date.now(),
+    ),
+    null,
+  );
+  await deliverSubmissionNotifications(bindings(), {}, provider);
+  const legacy = await rows();
+  assert.equal(legacy.filter((row) => row.status === "suppressed").length, 2);
+  assert.equal(legacy.filter((row) => row.status === "sent").length, 1);
+  await confirm();
+  await confirm();
+  await deliverSubmissionNotifications(bindings(), {}, provider);
+  assert.deepEqual(await rows(), legacy);
+  // Already-completed legacy applicants without any ledger are not backfilled.
+  await db.prepare("DELETE FROM application_submission_notification").run();
+  assert.equal((await confirm()).reviewOperationId, undefined);
+  assert.deepEqual(await rows(), []);
+  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(await budgetCount(), 0);
 });
 
 test("production acceptance is per-recipient, bounded, duplicate-safe under concurrent drains, and shares quota", async () => {
@@ -633,6 +678,7 @@ test("budget reservation and outbox mark are one D1 transaction; rollover reserv
   const row = (await rows())[0];
   const day = emailPolicy.budgetWindowMs;
   const now = Math.floor(Date.now() / day) * day + day - 3_600_000;
+  await ready(); // The fixed rollover clock can precede the real current hour.
   assert.ok(
     await claimSubmissionNotification(db, row.id, "production", "owner", now),
   );

@@ -1,15 +1,14 @@
 ---
-import {
-  formatApplicationSubmittedTime,
-  type SubmittedApplication,
-} from "@/data/application";
+import type { ComponentProps } from "astro/types";
+import { formatApplicationSubmittedTime } from "@/data/application";
 import ApplicationSummary from "./ApplicationSummary.astro";
 
 interface Props {
-  submission: SubmittedApplication | null;
+  submission: ComponentProps<typeof ApplicationSummary> | null;
   embedded?: boolean;
+  idPrefix?: string;
 }
-const { submission, embedded = false } = Astro.props;
+const { submission, embedded = false, idPrefix } = Astro.props;
 ---
 
 {
@@ -34,7 +33,7 @@ const { submission, embedded = false } = Astro.props;
         <summary class="cursor-pointer text-indigo-300 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4">
           View submitted application
         </summary>
-        <ApplicationSummary {...submission} />
+        <ApplicationSummary {...submission} {idPrefix} />
       </details>
     </section>
   )

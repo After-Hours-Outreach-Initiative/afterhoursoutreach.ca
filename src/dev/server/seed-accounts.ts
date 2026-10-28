@@ -7,7 +7,10 @@ import { assertDatabaseReady } from "../../server/db/readiness";
 import { RequestError } from "../../server/http";
 import { localAuthenticatorCode } from "./authenticator-code";
 
-export async function seedLocalAccounts(bindings: AuthBindings) {
+export async function seedLocalAccounts(
+  bindings: AuthBindings,
+  testFixtures = false,
+) {
   try {
     await assertDatabaseReady(bindings.DB);
   } catch {
@@ -16,18 +19,24 @@ export async function seedLocalAccounts(bindings: AuthBindings) {
       "Apply local migrations with pnpm db:migrate:local, then try seeding again.",
     );
   }
-  await bindings.DB.batch(
-    localAccountFixtures().map((sql) => bindings.DB.prepare(sql)),
-  );
-  const organizerId = localAccountUserId("organizer");
+  if (!testFixtures)
+    await bindings.DB.batch(
+      localAccountFixtures().map((sql) => bindings.DB.prepare(sql)),
+    );
+  // Both targets are fixed fictional fixtures, never a caller-supplied account.
+  const organizerId = testFixtures
+    ? "local-fixture-user-robin"
+    : localAccountUserId("organizer");
+  const organizerEmail = testFixtures
+    ? "robin.local@example.org"
+    : "organizer.local@example.org";
   const organizer = await bindings.DB.prepare(
     "SELECT email, two_factor_enabled AS enabled FROM user WHERE id=?",
   )
     .bind(organizerId)
     .first<{ email: string; enabled: number }>();
   // Preserve changed identities and already-enrolled authenticators on reseeding.
-  if (organizer?.email !== "organizer.local@example.org" || organizer.enabled)
-    return;
+  if (organizer?.email !== organizerEmail || organizer.enabled) return;
 
   // Use an isolated server-side cookie jar. Never switch the caller's account,
   // return an enrollment secret, or leave a setup session behind.
