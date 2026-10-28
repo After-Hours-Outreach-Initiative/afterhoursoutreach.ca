@@ -376,3 +376,62 @@ WHEN NEW.id IS NOT OLD.id OR NEW.operation_id IS NOT OLD.operation_id
 BEGIN
   SELECT RAISE(ABORT, 'application_submission_notification_immutable');
 END;
+--> statement-breakpoint
+
+CREATE TRIGGER discord_required_on_submission AFTER INSERT ON profile
+BEGIN
+  INSERT OR IGNORE INTO discord_requirement (user_id) VALUES (NEW.user_id);
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_status_changed AFTER UPDATE OF active, registration_approved, patrol_approved ON volunteer_status
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_status_created AFTER INSERT ON volunteer_status
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_status_deleted AFTER DELETE ON volunteer_status
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_role_changed AFTER UPDATE OF role ON user
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_team_changed AFTER UPDATE OF teams ON profile
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_profile_deleted AFTER DELETE ON profile
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_orientation_created AFTER INSERT ON orientation_completion
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_orientation_deleted AFTER DELETE ON orientation_completion
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER discord_orientation_changed AFTER UPDATE ON orientation_completion
+BEGIN
+  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id IN (OLD.user_id, NEW.user_id);
+END;
+--> statement-breakpoint
+
+-- Reauthorization may refresh consent/tokens, but never silently swap identities.
+CREATE TRIGGER discord_identity_immutable BEFORE UPDATE OF user_id, discord_id, guild_id ON discord_link
+WHEN NEW.user_id IS NOT OLD.user_id OR NEW.discord_id IS NOT OLD.discord_id OR NEW.guild_id IS NOT OLD.guild_id
+BEGIN
+  SELECT RAISE(ABORT, 'discord_identity_immutable');
+END;

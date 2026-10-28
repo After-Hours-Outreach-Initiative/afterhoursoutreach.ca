@@ -8,6 +8,11 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+After creating or regenerating a database migration, run `pnpm db:migrate:local`
+before handing off the change so the local development database matches the code.
+Tests using isolated databases do not replace this step. Apply migrations only
+locally unless a remote migration or deployment is explicitly requested.
+
 Do not write or run tests for the documentation site (`docs/`), including
 browser/Playwright tests for its diagrams or editing controls.
 

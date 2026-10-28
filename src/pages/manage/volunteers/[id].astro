@@ -18,6 +18,8 @@ import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro";
 import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
+import { loadDiscordStatus } from "@/server/discord/status";
+import { loadApplicationProgress } from "@/server/db/application-progress";
 import "@/styles/volunteer.css";
 export const prerender = false;
 let profile;
@@ -54,6 +56,8 @@ try {
 }
 if (!profile || !person)
   return new Response("Volunteer not found", { status: 404 });
+const discord = await loadDiscordStatus(env, person.id);
+const progress = await loadApplicationProgress(env.DB, person.id);
 ---
 
 <AccountLayout
@@ -86,6 +90,18 @@ if (!profile || !person)
                   ? "Completion not confirmed"
                   : `Completion confirmed ${formatApplicationSubmittedTime(new Date(profile.naloxoneCompletedAt).toISOString())}`
               }
+            </dd>
+          </div>
+          <div>
+            <dt>Discord</dt>
+            <dd>
+              {
+                !progress.discordRequired
+                  ? "Linking not required for this existing volunteer. "
+                  : "Required before application approval. "
+              }{discord.username ? `${discord.username}: ` : ""}{
+                discord.connection
+              }. {discord.sync}.
             </dd>
           </div>
         </dl>

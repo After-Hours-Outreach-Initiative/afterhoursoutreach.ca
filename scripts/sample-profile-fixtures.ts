@@ -214,3 +214,11 @@ export function sampleProfileStatement(
   FROM user u WHERE u.id = ${quote(person.id)} AND u.email = ${quote(person.email)}
     AND NOT EXISTS (SELECT 1 FROM profile p WHERE p.user_id = u.id AND p.submitted_application IS NOT NULL)`;
 }
+
+/** Existing-volunteer sample personas exercise grandfathered access, not OAuth. */
+export function sampleDiscordExemption(
+  person: ReturnType<typeof sampleProfileFixtures>[number],
+) {
+  return `DELETE FROM discord_requirement WHERE user_id=${quote(person.id)}
+    AND EXISTS(SELECT 1 FROM user WHERE id=${quote(person.id)} AND email=${quote(person.email)})`;
+}

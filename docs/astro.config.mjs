@@ -56,6 +56,7 @@ export default defineConfig({
           label: "Application workflows",
           items: [
             { label: "Accounts", slug: "accounts" },
+            { label: "Discord", slug: "discord" },
             { label: "Events", slug: "events" },
             { label: "Email previews", slug: "emails" },
           ],

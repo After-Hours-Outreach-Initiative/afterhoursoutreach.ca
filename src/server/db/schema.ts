@@ -117,6 +117,75 @@ export const authRateLimit = sqliteTable(
   (table) => [index("auth_rate_limit_expiry").on(table.expires_at)],
 );
 
+// Only profiles submitted after this feature is installed receive a requirement.
+// Absence deliberately grandfathers existing volunteers, without inventing consent.
+export const discordRequirement = sqliteTable("discord_requirement", {
+  user_id: text()
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+});
+
+export const discordOAuth = sqliteTable("discord_oauth", {
+  state_hash: text().primaryKey(),
+  user_id: text()
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+  session_id: text().notNull(),
+  browser_hash: text().notNull(),
+  verifier: text().notNull(),
+  origin: text().notNull(),
+  expires_at: timestamp().notNull(),
+});
+
+// The link is also a durable, coalescing outbox. Workers always derive roles
+// from live website records; queued payloads never contain stale eligibility.
+export const discordLink = sqliteTable(
+  "discord_link",
+  {
+    user_id: text()
+      .primaryKey()
+      .references(() => user.id),
+    discord_id: text().notNull().unique(),
+    username: text().notNull(),
+    guild_id: text().notNull(),
+    consented_at: timestamp().notNull(),
+    completed_at: timestamp(),
+    member_verified_at: timestamp(),
+    observed_roles: text({ mode: "json" }).$type<string[]>(),
+    member_ready: integer({ mode: "boolean" }).notNull().default(false),
+    checked_at: timestamp(),
+    join_token: text(), // AES-GCM ciphertext, discarded after verified membership.
+    token_expires_at: timestamp(),
+    version: integer().notNull().default(1),
+    synced_version: integer().notNull().default(0),
+    next_attempt_at: timestamp().notNull(),
+    attempts: integer().notNull().default(0),
+    last_synced_at: timestamp(),
+    last_error: text(), // Fixed public error code only; never provider bodies.
+  },
+  (table) => [index("discord_link_due").on(table.next_attempt_at)],
+);
+
+// One distributed lease for the dedicated bot. Rate-limit cooldowns survive
+// crashes and apply across routes, isolates, and scheduled/request invocations.
+export const discordWorker = sqliteTable(
+  "discord_worker",
+  {
+    id: integer().primaryKey(),
+    lease_token: text(),
+    lease_until: timestamp()
+      .notNull()
+      .default(sql`0`),
+    not_before: timestamp()
+      .notNull()
+      .default(sql`0`),
+    request_window: integer().notNull().default(0),
+    request_count: integer().notNull().default(0),
+  },
+  (table) => [check("discord_worker_singleton", sql`${table.id} = 1`)],
+);
+
 // A draft is private to its owner and never counts as a submitted profile.
 export const applicationDraft = sqliteTable("application_draft", {
   user_id: text()

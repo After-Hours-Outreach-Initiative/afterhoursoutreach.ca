@@ -45,6 +45,11 @@ search is intentionally disabled. Benchmark data stays in `docs/benchmarks/`.
 
 ## Tests
 
+Discord account linking and role synchronization require a dedicated bot,
+server/role IDs, and private secrets. See the [Discord setup and operations guide](docs/src/content/docs/discord.md)
+before enabling new applications. Email sign-in is unchanged; existing volunteers
+retain access without a Discord link.
+
 Run `pnpm test` for Vitest unit and Cloudflare runtime tests, or
 `pnpm test:watch` during development. Built-Worker and Playwright commands are
 documented in the [testing guide](docs/src/content/docs/testing.md).

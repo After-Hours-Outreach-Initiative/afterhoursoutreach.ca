@@ -3,7 +3,8 @@ import type { ApplicationProgress } from "../server/db/application-progress";
 // A virtual choice, never the ID of a fixture or a saved application.
 export const newApplicationPersona = "new-application";
 
-export type DevelopmentApplicationStep = "form" | "naloxone" | "review";
+export type DevelopmentApplicationStep =
+  "form" | "naloxone" | "discord" | "review";
 
 export const manualAccountGroups = [
   { key: "application", label: "Application" },
@@ -109,7 +110,11 @@ export function isManualAccountPreset(userId: string) {
 
 export interface DevelopmentAccountState extends Pick<
   ApplicationProgress,
-  "submittedAt" | "naloxoneCompletedAt" | "applicationApproved"
+  | "submittedAt"
+  | "naloxoneCompletedAt"
+  | "applicationApproved"
+  | "discordRequired"
+  | "discordCompletedAt"
 > {
   hasDraft: boolean;
   active: boolean;
@@ -128,9 +133,11 @@ export function developmentAccountStatus(state: DevelopmentAccountState) {
   const labels = [
     state.naloxoneCompletedAt === null
       ? "Naloxone 101 incomplete"
-      : !state.applicationApproved
-        ? "Awaiting application approval"
-        : "Application complete",
+      : state.discordRequired && state.discordCompletedAt == null
+        ? "Discord connection incomplete"
+        : !state.applicationApproved
+          ? "Awaiting application approval"
+          : "Application complete",
   ];
   if (!state.active) labels.push("Inactive");
   if (state.naloxoneCompletedAt === null && !state.applicationApproved)

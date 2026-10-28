@@ -43,6 +43,32 @@ export async function completeLocalApplicationStep(
       409,
       "Submit the application and complete Naloxone 101 first.",
     );
+  if (step === "discord") {
+    // Deliberately fictional local-only membership. Its non-snowflake guild can
+    // never be selected by the real sync job; no provider call or token exists.
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO discord_link
+      (user_id,discord_id,username,guild_id,consented_at,completed_at,member_verified_at,next_attempt_at)
+      SELECT ?,?,'Simulated local Discord','local-only',?,?,?,? WHERE ${writePermission()}`,
+      )
+      .bind(
+        actor.id,
+        `local:${actor.id}`,
+        Date.now(),
+        Date.now(),
+        Date.now(),
+        Date.now(),
+        ...permissionValues(actor),
+      )
+      .run();
+    return;
+  }
+  if (progress.discordRequired && progress.discordCompletedAt == null)
+    throw new RequestError(
+      409,
+      "Complete the simulated Discord connection first.",
+    );
   if (progress.applicationApproved) return;
   const now = Date.now();
   // This deliberate development-only approval bypass changes only this account's

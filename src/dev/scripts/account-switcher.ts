@@ -95,6 +95,8 @@ export async function initAccountSwitcher() {
   const updateSteps = () => {
     const submitted = progress?.submittedAt != null;
     const naloxone = progress?.naloxoneCompletedAt != null;
+    const discord =
+      !progress?.discordRequired || progress?.discordCompletedAt != null;
     for (const button of steps) {
       const step = button.dataset.applicationStep;
       const completed =
@@ -102,10 +104,14 @@ export async function initAccountSwitcher() {
           ? submitted
           : step === "naloxone"
             ? naloxone
-            : Boolean(progress?.applicationApproved);
+            : step === "discord"
+              ? discord
+              : Boolean(progress?.applicationApproved);
       const available =
         step === "form" ||
-        (step === "naloxone" ? submitted : submitted && naloxone);
+        (step === "naloxone"
+          ? submitted
+          : submitted && naloxone && (step === "discord" || discord));
       button.disabled = busy || !currentUserId || !available || completed;
       const status = button.querySelector<HTMLElement>("[data-step-status]");
       if (status) status.textContent = completed ? "Completed" : "";

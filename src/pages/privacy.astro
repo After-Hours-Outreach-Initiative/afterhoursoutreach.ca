@@ -20,7 +20,7 @@ const account = await loadAccountNavigation(
   <section class="bg-black px-6 py-20">
     <div class="mx-auto max-w-3xl">
       <h1 class="text-blue">Privacy policy</h1>
-      <p class="mt-6">Effective October 23, 2026.</p>
+      <p class="mt-6">Effective October 27, 2026.</p>
       <p class="mt-6">
         After Hours Outreach Society ("we", "us") operates this website and its
         volunteer portal. This policy describes information handled through
@@ -71,6 +71,15 @@ const account = await loadAccountNavigation(
           and its time support coordination, eligibility, and accountability. Notification
           records can include recipients, subjects, message text, delivery attempts,
           and status.
+        </li>
+        <li>
+          <strong>Discord connection.</strong> With your explicit consent we link
+          one Discord ID and username to your volunteer account, join our server,
+          verify membership, and synchronize Volunteer, Organizer, and Medic roles
+          from website eligibility. We keep consent and completion times, membership
+          checks, and synchronization status/retry records. Discord linking is required
+          after Naloxone 101 and before review for new applications; existing volunteers
+          keep website access without linking. Email sign-in is unchanged.
         </li>
         <li>
           <strong>Technical and authentication records.</strong> Hosting receives
@@ -218,12 +227,40 @@ const account = await loadAccountNavigation(
         without storing message content or sending to the organizer inboxes.
       </p>
       <p class="mt-6">
+        Discord authorization requests only identity and permission to join our
+        server, not your Discord email, messages, contacts, or other servers.
+        The dedicated bot receives your Discord ID and the eligibility-based
+        role changes; we do not send profile answers, medical details, or
+        emergency contacts to Discord. Server members may see your membership
+        and assigned roles, including Medic or Organizer status. Discord
+        processes this information under its own
+        <a
+          href="https://discord.com/privacy"
+          class="underline underline-offset-4">privacy policy</a
+        >, potentially outside Canada. We store the join access token encrypted
+        only until joining/membership verification succeeds or the token
+        expires; refresh tokens are not retained. Role sync uses the private bot
+        credential, not a retained user access token. A ten-minute HttpOnly
+        browser cookie and single-use authorization record protect the
+        connection process.
+      </p>
+      <p class="mt-6">
+        Deactivation or revoked application approval removes all three synced
+        roles; reactivation restores eligible roles. Other roles and server
+        membership are preserved. Leaving the server does not automatically
+        rejoin you without fresh consent. Contact us to correct a link, remove
+        it, or withdraw consent; an organizer must first arrange removal of
+        synced roles, then remove the link. We retain the link and minimal
+        synchronization state while needed for these purposes, subject to the
+        retention schedule and decision-record requirements below. Discord-side
+        records require separate handling.
+      </p>
+      <p class="mt-6">
         Some public pages connect to Shopify’s image CDN, including donation
         product images; those requests disclose connection information such as
         your IP address to that provider. Donation and social links lead to
         separate services such as GoFundMe and Discord, whose own practices
-        apply when you visit them. The portal does not currently link a Discord
-        identity to your account. This policy does not describe those services’
+        apply when you visit them. This policy does not describe those services’
         records or all information the Society may receive outside this portal.
       </p>
       <p class="mt-6">

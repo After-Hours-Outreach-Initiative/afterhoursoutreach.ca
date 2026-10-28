@@ -81,7 +81,7 @@ database has no organizer yet. Volunteer-management pages remain organizer-only.
 `pnpm build` includes all account and event features for production. There is no
 account feature flag or preview-host restriction. `pnpm build:preview` uses the
 same application with a preview banner and a separate output directory; preview
-mode does not gate any features. Development account controls and simulated
+mode disables Discord connections and role-sync side effects. Development account controls and simulated
 emails are excluded from both builds.
 
 Sign-in URLs use `AUTH_BASE_URL` when configured, otherwise the request origin.
@@ -90,6 +90,10 @@ to use their own URL. Forwarded-host headers are never used. Account pages keep
 their CSP, no-store, and noindex protections in all deployed builds; public
 production pages can be indexed and cached.
 Account secrets: `BETTER_AUTH_SECRET`, `RESEND_API_KEY`.
+Discord additionally needs private client/bot/encryption secrets and the server
+and three role IDs documented in [Discord setup](/discord/#dedicated-bot-and-server-setup).
+Blank IDs disable Discord without affecting email sign-in; configure before
+accepting new applications. No production Discord credentials belong in previews.
 Use `wrangler preview base-config secret put NAME` for new previews, or
 `wrangler preview secret put NAME --name BRANCH` for an existing preview.
 Account secrets are configured in Previews Base. Email requests remain rate limited.

@@ -745,7 +745,7 @@ describe(
       );
     });
 
-    test("account application information appears after the three application milestones without orientation signup and stays read-only", async () => {
+    test("account application information appears after all four application milestones without orientation signup and stays read-only", async () => {
       await DB.prepare(
         "UPDATE profile SET naloxone_completed_at=1000 WHERE user_id=?",
       )
@@ -759,6 +759,21 @@ describe(
       );
       await DB.prepare(
         "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+      )
+        .bind(current.user.id)
+        .run();
+      const awaitingDiscord = await send(
+        "/volunteer/account",
+        undefined,
+        cookie,
+      );
+      assert.doesNotMatch(
+        await awaitingDiscord.text(),
+        /id="submitted-application-heading"/,
+      );
+      await DB.prepare(
+        `INSERT INTO discord_link (user_id,discord_id,username,guild_id,consented_at,completed_at,member_verified_at,next_attempt_at)
+        VALUES (?,'200000000000000001','Verified test identity','100000000000000002',1500,1500,1500,0)`,
       )
         .bind(current.user.id)
         .run();
@@ -823,6 +838,9 @@ describe(
       ) VALUES (?, 'Legacy current name', '604-555-0100', '1995-04-12',
         'Contact', '604-555-0101', 'Friend', 'Friend', 'Legacy motivation', '[]', '', '', 1, 1)`,
       )
+        .bind(legacy.user.id)
+        .run();
+      await DB.prepare("DELETE FROM discord_requirement WHERE user_id=?")
         .bind(legacy.user.id)
         .run();
       const edited = await send(

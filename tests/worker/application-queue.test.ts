@@ -64,6 +64,9 @@ test("organizers review submitted applications with a global queue count and per
         ).bind(id, pendingIds.includes(id) ? 0 : 1),
       ]);
     }
+    // Queue/list compatibility for grandfathered submitted applicants. New
+    // applicants' prerequisites are exercised by the Discord application tests.
+    await DB.prepare("DELETE FROM discord_requirement").run();
     await DB.prepare(
       "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='approved'",
     ).run();

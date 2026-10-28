@@ -10,7 +10,10 @@ import { profile, volunteerStatus } from "./schema";
 import { accountGreeting } from "../../data/account-navigation";
 import { contactEmail } from "../../data/site";
 import { RequestError, requireSameOrigin } from "../http";
-import { isApplicationComplete } from "./application-progress";
+import {
+  isApplicationComplete,
+  loadApplicationProgress,
+} from "./application-progress";
 
 export async function accountContext(
   bindings: AuthBindings,
@@ -56,12 +59,9 @@ export async function accountContext(
       twoFactorEnabled: person.twoFactorEnabled,
       twoFactorVerified: current.session.twoFactorVerified,
       applicationSubmitted: Boolean(application),
-      applicationComplete: isApplicationComplete({
-        submittedAt: application?.registered_at?.getTime() ?? null,
-        naloxoneCompletedAt:
-          application?.naloxone_completed_at?.getTime() ?? null,
-        applicationApproved: status?.registration_approved ?? false,
-      }),
+      applicationComplete: isApplicationComplete(
+        await loadApplicationProgress(bindings.DB, person.id),
+      ),
       naloxoneCompleted: Boolean(application?.naloxone_completed_at),
       active: status?.active ?? false,
       applicationApproved: status?.registration_approved ?? false,
@@ -116,7 +116,10 @@ export function requireVolunteer(actor: Actor | null): asserts actor is Actor {
     !actor.patrolApproved &&
     actor.role !== "organizer"
   )
-    throw new RequestError(403, "Complete Naloxone 101 before viewing events.");
+    throw new RequestError(
+      403,
+      "Complete Naloxone 101 and the required Discord connection before viewing events.",
+    );
   if (actor.twoFactorEnabled && !actor.twoFactorVerified)
     throw new RequestError(403, "Sign in with your authenticator to continue.");
 }

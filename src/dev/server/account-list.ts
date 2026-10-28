@@ -12,6 +12,8 @@ interface AccountRow {
   role: "volunteer" | "organizer";
   submittedAt: number | null;
   naloxoneCompletedAt: number | null;
+  discordRequired: number;
+  discordCompletedAt: number | null;
   applicationApproved: number | null;
   active: number | null;
   patrolApproved: number | null;
@@ -29,6 +31,8 @@ export async function listLocalAccounts(db: Env["DB"], after?: string) {
     .prepare(
       `SELECT u.id, u.name, u.email, u.role,
     p.registered_at AS submittedAt, p.naloxone_completed_at AS naloxoneCompletedAt,
+    EXISTS(SELECT 1 FROM discord_requirement WHERE user_id=u.id) AS discordRequired,
+    (SELECT completed_at FROM discord_link WHERE user_id=u.id) AS discordCompletedAt,
     v.registration_approved AS applicationApproved, v.active, v.patrol_approved AS patrolApproved,
     u.two_factor_enabled AS twoFactorEnabled,
     EXISTS (SELECT 1 FROM application_draft WHERE user_id=u.id) AS hasDraft,
@@ -52,6 +56,8 @@ export async function listLocalAccounts(db: Env["DB"], after?: string) {
       state: {
         submittedAt: row.submittedAt,
         naloxoneCompletedAt: row.naloxoneCompletedAt,
+        discordRequired: Boolean(row.discordRequired),
+        discordCompletedAt: row.discordCompletedAt,
         applicationApproved: Boolean(row.applicationApproved),
         active: Boolean(row.active),
         patrolApproved: Boolean(row.patrolApproved),

@@ -5,6 +5,7 @@ import { approvedMedicSql } from "../src/server/db/sql";
 import {
   sampleProfileFixtures,
   sampleProfileStatement,
+  sampleDiscordExemption,
 } from "./sample-profile-fixtures";
 
 export { localAccountUserId } from "../src/dev/accounts";
@@ -147,6 +148,7 @@ export function localAccountFixtures(now = Date.now()) {
         naloxoneCompletedAt: preset.naloxoneCompleted ? naloxoneAt : null,
       }),
     );
+    statements.push(sampleDiscordExemption(person));
     statements.push(`INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at)
       SELECT ${id}, ${Number(preset.active)}, ${Number(preset.applicationApproved)}, ${Number(preset.patrolApproved)},
       ${preset.patrolApproved ? organizer : "NULL"}, ${preset.patrolApproved ? approvedAt : "NULL"}, ${now}

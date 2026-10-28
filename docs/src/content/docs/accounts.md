@@ -54,7 +54,13 @@ record. Existing and synthetic profiles are not backfilled with invented consent
 The additive `code_of_conduct` migration must be applied before deploying this
 change; it preserves existing accounts and profile answers.
 
-After applying, volunteers wait for an organizer to approve their application
+After submitting the form, new applicants confirm Naloxone 101 completion, then
+**Connect Discord** with consent to join the server. A separate membership check,
+including any Discord Membership Screening, must succeed before the step completes.
+Existing submitted profiles are exempt from linking and retain website access.
+See [Discord](/discord/) for role eligibility, security, retries, and setup.
+
+Volunteers then wait for an organizer to approve their application
 from **Volunteers → View profile and approval → Approve application**. Until then,
 they can edit their account but cannot view events or sign up for orientations.
 Pending applications appear first in the volunteer list. Organizers retain event
@@ -136,7 +142,7 @@ view referral answers and the remaining profile answers.
 | Emergency contact phone                                   | Yes                                                  |
 | Emergency contact relationship                            | Yes                                                  |
 | How did you find out about us                             | At least one choice; short detail required for Other |
-| Please tell us what motivates you volunteer with us?       | Yes                                                  |
+| Please tell us what motivates you volunteer with us?      | Yes                                                  |
 | Teams (outreach, medic, non-patrol)                       | Yes                                                  |
 | Highest medical certification                             | Yes                                                  |
 | Other training and experience, and other                  | Yes                                                  |
@@ -172,9 +178,12 @@ Certification uploads, expiry reminders, and volunteer hours are deferred.
 
 ### Discord
 
-Discord account linking is deferred. A future optional link could grant a
-patrol-approved Discord role based on organizer approval on the website; the
-website remains the source of truth for patrol access.
+Email sign-in is unchanged. The linked identity is not a social sign-in method.
+One Discord identity can belong to only one website account, and an account cannot
+silently swap Discord identities. Consent authorizes automatic server joining and
+role synchronization by a new dedicated bot. Only Volunteer, Organizer, and Medic
+roles are managed; there is no Outreach or separate patrol-approved role.
+See [Discord](/discord/) for the complete workflow and operational requirements.
 
 ## Two factor for organizers
 

@@ -92,7 +92,12 @@ test("DEV panel separates states from saved accounts and completes each applicat
   ).toBe(403);
   expect((await post("another-account", "form")).status()).toBe(409);
 
-  for (const [index, step] of ["form", "naloxone", "review"].entries()) {
+  for (const [index, step] of [
+    "form",
+    "naloxone",
+    "discord",
+    "review",
+  ].entries()) {
     const panel = await openLocalAccountSwitcher(page);
     const button = panel.locator(`[data-application-step="${step}"]`);
     await expect(button).toBeEnabled();
@@ -100,12 +105,29 @@ test("DEV panel separates states from saved accounts and completes each applicat
       await expect(
         panel.locator('[data-application-step="naloxone"]'),
       ).toBeDisabled();
-    if (index < 2)
+    if (index < 3)
       await expect(
         panel.locator('[data-application-step="review"]'),
       ).toBeDisabled();
     await button.click();
     await expect(page).toHaveURL(/\/volunteer$/);
+    if (index === 0) {
+      const tracker = page.locator("[data-application-tracker]");
+      await expect(
+        tracker.locator("[data-application-progress-step]"),
+      ).toHaveCount(4);
+      await expect(
+        tracker.locator('[data-application-progress-step="discord"]'),
+      ).toHaveAttribute("data-state", "upcoming");
+    }
+    if (index === 1)
+      await expect(
+        page.locator('[data-application-progress-step="discord"]'),
+      ).toHaveAttribute("data-state", "current");
+    if (index === 2)
+      await expect(
+        page.locator('[data-application-progress-step="review"]'),
+      ).toHaveAttribute("data-state", "current");
     const refreshed = await openLocalAccountSwitcher(page);
     await expect(
       refreshed.locator(`[data-application-step="${step}"]`),

@@ -77,8 +77,10 @@ records in one transaction. Existing database protections block deletion of the
 last active organizer and accounts referenced by organizer-owned records; an error
 is shown and no records are changed when deletion is blocked.
 
-**Application steps** has three shortcuts for the signed-in account: submit a
-sample application, complete Naloxone 101, and approve the application. Each
+**Application steps** has four shortcuts for the signed-in account: submit a
+sample application, complete Naloxone 101, simulate a Discord connection, and
+approve the application. The simulated link uses a fictional `local-only` server
+with no token or Discord API call; it cannot be processed by the real sync job. Each
 button enables after its prerequisite and shows Completed afterward. Step 1 uses
 fictional seed answers and normal submission validation, never replaces an
 existing submission, and clears its draft. The shortcuts send no email and do
@@ -113,7 +115,10 @@ the new Form submitted and Ready for orientation labels. Preset definitions,
 ordering, categories and deletion protection share `src/dev/accounts.ts`.
 
 Submitted profiles use realistic fictional answers, immutable application
-snapshots, Code of Conduct acknowledgement, and milestone dates. The command
+snapshots, Code of Conduct acknowledgement, and milestone dates. Submitted sample
+personas model existing volunteers exempt from Discord linking, rather than
+inventing real OAuth consent. Fresh disposable applications use the four-step flow.
+See [Discord](/discord/) for configuration and isolation. The command
 also adds an open patrol with orientation, an open regular patrol, and a hidden
 past orientation with attendance. It does not reset the database, remove users,
 restore cancelled bookings or discarded drafts, or overwrite subsequent edits.

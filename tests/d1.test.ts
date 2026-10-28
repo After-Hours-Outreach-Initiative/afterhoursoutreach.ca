@@ -176,6 +176,11 @@ test("development application shortcuts preserve snapshots and advance without e
     statusError(409),
   );
   await completeLocalApplicationStep(env.DB, actor, "naloxone");
+  await assert.rejects(
+    completeLocalApplicationStep(env.DB, actor, "review"),
+    statusError(409),
+  );
+  await completeLocalApplicationStep(env.DB, actor, "discord");
   await completeLocalApplicationStep(env.DB, actor, "review");
   const progress = await loadApplicationProgress(env.DB, actor.id);
   assert.ok(isApplicationComplete(progress));
@@ -183,7 +188,7 @@ test("development application shortcuts preserve snapshots and advance without e
   const auditCount = await env.DB.prepare(
     "SELECT count(*) FROM audit_log",
   ).first("count(*)");
-  for (const step of ["form", "naloxone", "review"] as const)
+  for (const step of ["form", "naloxone", "discord", "review"] as const)
     await completeLocalApplicationStep(env.DB, actor, step);
   assert.deepEqual(await loadApplicationProgress(env.DB, actor.id), progress);
   assert.deepEqual(await loadSubmittedApplication(env.DB, actor.id), original);
@@ -496,6 +501,10 @@ test("application queue counts all submitted unapproved applications independent
     await env.DB.prepare("SELECT action FROM audit_log").first("action"),
     "profile_viewed",
   );
+  // This queue test models legacy submissions without newly required milestones.
+  await env.DB.prepare(
+    "DELETE FROM discord_requirement WHERE user_id='pending-02'",
+  ).run();
   const approval = await setVolunteerStatus(env.DB, actor, {
     userId: "pending-02",
     version: 0,
@@ -999,6 +1008,8 @@ test("application progress uses milestone dates, not patrol approval or unrelate
     naloxoneCompletedAt: null,
     applicationApproved: false,
     applicationApprovedAt: null,
+    discordRequired: true,
+    discordCompletedAt: null,
   });
   await saveProfile(env.DB, actor.id, {
     ...completeAnswers(),
@@ -1007,6 +1018,10 @@ test("application progress uses milestone dates, not patrol approval or unrelate
   const submission = await loadSubmittedApplication(env.DB, actor.id);
   assert.ok(submission);
   const confirmedAt = Date.now();
+  // Model a grandfathered profile; new Discord milestones are covered separately.
+  await env.DB.prepare("DELETE FROM discord_requirement WHERE user_id=?")
+    .bind(actor.id)
+    .run();
   await env.DB.batch([
     env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?").bind(
       actor.id,
@@ -1121,6 +1136,7 @@ test("orientees only see orientation events and rosters; patrol approval and org
   )
     .bind(actor.id)
     .run();
+  await completeLocalApplicationStep(env.DB, actor, "discord");
   const orientee = {
     ...incompleteOrientee,
     naloxoneCompleted: true,

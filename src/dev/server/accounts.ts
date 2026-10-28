@@ -159,7 +159,7 @@ export function developmentAccounts(bindings: AuthBindings) {
           requireHeaders: true,
           body: z.strictObject({
             userId: z.string().min(1).max(200),
-            step: z.enum(["form", "naloxone", "review"]),
+            step: z.enum(["form", "naloxone", "discord", "review"]),
           }),
         },
         async (ctx) => {

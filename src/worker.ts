@@ -1,4 +1,6 @@
 import { handle } from "@astrojs/cloudflare/handler";
+import { discordCron } from "./server/discord/config";
+import { runDiscordJob } from "./server/discord/sync";
 import {
   runSubmissionNotificationJob,
   submissionDeliveryCron,
@@ -12,6 +14,7 @@ import {
 export default {
   fetch: handle,
   async scheduled(controller, bindings) {
+    if (controller.cron === discordCron) await runDiscordJob(bindings);
     // Independent catch-safe job: one notification family must not starve another.
     if (controller.cron === submissionDeliveryCron)
       await runSubmissionNotificationJob(bindings);

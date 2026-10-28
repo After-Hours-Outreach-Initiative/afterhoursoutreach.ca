@@ -4,6 +4,7 @@ import { APIError } from "better-auth/api";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
+import DiscordConnection from "@/components/volunteer/DiscordConnection.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
 import {
   isApplicationComplete,
@@ -125,6 +126,15 @@ const completedMilestones = [
     heading: "Naloxone 101 completion",
     completedAt: applicationProgress.naloxoneCompletedAt,
   },
+  ...(applicationProgress.discordRequired ||
+  applicationProgress.discordCompletedAt != null
+    ? [
+        {
+          heading: "Discord connection verified",
+          completedAt: applicationProgress.discordCompletedAt ?? null,
+        },
+      ]
+    : []),
   {
     heading: "Application approved",
     completedAt: applicationProgress.applicationApprovedAt,
@@ -147,6 +157,7 @@ const contents = [
     : []),
   { id: "account-settings-heading", heading: "Account settings" },
   { id: "account-email-heading", heading: "Email address", nested: true },
+  { id: "account-discord-heading", heading: "Discord", nested: true },
   {
     id: "account-factor-heading",
     heading: "Two-factor authentication",
@@ -265,6 +276,17 @@ const contents = [
           Account settings
         </h2>
         <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />
+        <div class="volunteer-setting">
+          <div class="w-full">
+            <h3 id="account-discord-heading" data-contents-section>Discord</h3>
+            <DiscordConnection
+              {userId}
+              canConnect={!applicationProgress.discordRequired ||
+                applicationProgress.naloxoneCompletedAt !== null}
+              required={applicationProgress.discordRequired}
+            />
+          </div>
+        </div>
         <div class="volunteer-setting" data-factor-settings>
           <div>
             <h3 id="account-factor-heading" data-contents-section>

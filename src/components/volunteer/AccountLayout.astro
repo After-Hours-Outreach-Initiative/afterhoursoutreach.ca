@@ -137,7 +137,7 @@ const account =
                       >
                         Step 1 submits fictional sample answers.
                         Already-submitted answers are never replaced. No emails
-                        are sent.
+                        are sent. Discord membership is simulated locally only.
                       </p>
                       <div
                         class="grid gap-2"
@@ -147,7 +147,8 @@ const account =
                         {[
                           ["form", "1. Submit sample application"],
                           ["naloxone", "2. Complete Naloxone 101"],
-                          ["review", "3. Approve application"],
+                          ["discord", "3. Simulate Discord connection"],
+                          ["review", "4. Approve application"],
                         ].map(([step, label]) => (
                           <button
                             class="btn btn-quiet flex-wrap justify-between text-left"
