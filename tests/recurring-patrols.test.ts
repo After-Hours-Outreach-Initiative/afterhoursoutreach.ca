@@ -23,6 +23,7 @@ import {
   materializePatrolOccurrence,
   patrolOccurrenceId,
   saveEvent,
+  bulkSaveEvents,
   savePatrolSeries,
   updatePatrolSeriesFrom,
   stopPatrolSeries,
@@ -213,6 +214,158 @@ test("fortnightly October 20/November 3/November 17 preserve local wall time; De
       first - 1,
     ).occurrences.map((event) => event.date),
     ["2026-10-20", "2026-11-03"],
+  );
+});
+
+test("bulk event edits guard all versions/permissions and roll back policy conflicts, audits and mail", async () => {
+  const series = await savePatrolSeries(db, organizer, input());
+  const rows = await all(series.id);
+  const selection = rows
+    .slice(0, 2)
+    .map((row) => ({ id: row.id, version: row.updatedAt }));
+  const snapshot = async () =>
+    (await db.prepare("SELECT * FROM event ORDER BY id").all()).results;
+  const before = await snapshot();
+  const audits = (await count("event_audit"))!;
+  await changeSignup(db, alice, selection[1].id, "join");
+  // One selected event cannot fit its booking plus reserved medic places.
+  await assert.rejects(
+    bulkSaveEvents(
+      db,
+      organizer,
+      { selection, changes: { spots: 2, meetingPoint: "Must roll back" } },
+      true,
+    ),
+    status(409),
+  );
+  assert.deepEqual(await snapshot(), before);
+  assert.equal(await count("event_audit"), audits + 1); // signup audit only
+  assert.equal(await count("event_notification"), 0);
+  // Race AFTER the initial read: a stale unchanged target must block the others.
+  const racing = (write: () => Promise<unknown>) =>
+    new Proxy(db, {
+      get(target, key) {
+        if (key === "batch")
+          return async (statements: D1PreparedStatement[]) => {
+            await write();
+            return target.batch(statements);
+          };
+        const value = Reflect.get(target, key);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  const stale = racing(async () => {
+    await db
+      .prepare("UPDATE event SET updated_at=updated_at+1 WHERE id=?")
+      .bind(selection[1].id)
+      .run();
+  });
+  await assert.rejects(
+    bulkSaveEvents(
+      stale,
+      organizer,
+      { selection, changes: { meetingPoint: "Must not save" } },
+      true,
+    ),
+    status(409),
+  );
+  assert.equal(
+    (await findEvent(db, selection[0].id)).meetingPoint,
+    "Meeting point",
+  );
+  assert.equal(await count("event_audit"), audits + 1);
+  assert.equal(await count("event_notification"), 0);
+  selection[1].version++;
+  const revoked = racing(async () => {
+    await db
+      .prepare("UPDATE session SET expires_at=0 WHERE id=?")
+      .bind(organizer.sessionId)
+      .run();
+  });
+  await assert.rejects(
+    bulkSaveEvents(revoked, organizer, {
+      selection,
+      changes: { hidden: true },
+    }),
+    status(409),
+  );
+  assert.equal((await findEvent(db, selection[0].id)).hidden, 0);
+  assert.equal(await count("event_audit"), audits + 1);
+});
+
+test("bulk event edits change only chosen existing occurrences, preserve dates/templates, and use a retryable notification operation", async () => {
+  const series = await savePatrolSeries(db, organizer, input());
+  const rows = await all(series.id);
+  const selection = rows
+    .slice(0, 2)
+    .map((row) => ({ id: row.id, version: row.updatedAt }));
+  await changeSignup(db, alice, selection[0].id, "join");
+  await changeSignup(db, alice, selection[1].id, "join");
+  const templates = await listPatrolTemplates(db, organizer, series.id);
+  const changes = {
+    meetingPoint: "Shared meeting point",
+    meetingPointUrl: "",
+    open: false,
+    hidden: true,
+  };
+  for (const invalid of [
+    { selection: [], changes },
+    { selection: [selection[0], selection[0]], changes },
+    {
+      selection: Array.from({ length: 101 }, (_, i) => ({
+        id: `event-${i}`,
+        version: 0,
+      })),
+      changes,
+    },
+    { selection, changes: {} },
+    { selection, changes: { startsAt: new Date().toISOString() } },
+  ])
+    await assert.rejects(bulkSaveEvents(db, organizer, invalid), status(400));
+  await assert.rejects(
+    bulkSaveEvents(db, alice, { selection, changes }),
+    status(403),
+  );
+  const result = await bulkSaveEvents(
+    db,
+    organizer,
+    { selection, changes },
+    true,
+  );
+  assert.ok(
+    await db
+      .prepare("SELECT id FROM event_audit WHERE id=?")
+      .bind(result.operation)
+      .first(),
+  );
+  assert.equal(
+    await db
+      .prepare(
+        "SELECT count(*) AS n FROM event_notification WHERE operation_id=?",
+      )
+      .bind(result.operation)
+      .first("n"),
+    2,
+  );
+  for (const row of rows) {
+    const after = await findEvent(db, row.id);
+    assert.equal(after.startsAt, row.startsAt);
+    assert.equal(after.spots, row.spots);
+    assert.equal(after.includesOrientation, row.includesOrientation);
+    assert.equal(
+      after.meetingPoint,
+      selection.some((target) => target.id === row.id)
+        ? changes.meetingPoint
+        : row.meetingPoint,
+    );
+  }
+  assert.deepEqual(
+    await listPatrolTemplates(db, organizer, series.id),
+    templates,
+  );
+  await assert.rejects(
+    bulkSaveEvents(db, organizer, { selection, changes: { spots: 8 } }),
+    status(409),
   );
 });
 

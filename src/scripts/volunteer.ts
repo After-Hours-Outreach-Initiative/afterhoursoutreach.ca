@@ -10,6 +10,12 @@ import { initDateInputs, readDateInputs } from "./date-input";
 import { initVolunteerProfileTabs } from "./volunteer-profile-tabs";
 import { initSignupMenus } from "./signup-menu";
 import {
+  initBulkEvents,
+  syncBulkEventSelection,
+  clearBulkEventSelection,
+  bulkEventAction,
+} from "./event-bulk";
+import {
   initRecurrenceControls,
   recurringSaveAction,
   recurringCancelAction,
@@ -85,6 +91,7 @@ function applyEventFilter(root: HTMLElement, type: string) {
       String(button.dataset.eventFilter === selected),
     );
   syncEventCalendar(root);
+  syncBulkEventSelection(root);
 }
 
 document
@@ -92,6 +99,7 @@ document
   .forEach((root) => {
     const applyFilter = (type: string) => applyEventFilter(root, type);
     syncEventCalendar(root);
+    initBulkEvents(root);
     root.addEventListener("click", (event) => {
       handleEventCalendarClick(root, event);
       if (!(event.target instanceof Element)) return;
@@ -383,26 +391,28 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           )
         : added;
     const selector =
-      element?.matches("[data-live-signup]") ||
-      (!element && focused?.closest("[data-live-signup]"))
-        ? '[data-live-signup] button[type="submit"]'
-        : element?.matches("[data-series-occurrence]")
-          ? '[data-series-occurrence] button[type="submit"]'
-          : element?.matches("[data-series-save]")
-            ? `[data-show-dialog="series-editor-${CSS.escape(seriesId ?? "")}"]`
-            : element?.matches("[data-event-save], [data-event-cancel]")
-              ? card?.dataset.seriesCard
-                ? "[data-series-occurrences] > summary"
-                : "[data-show-dialog]"
-              : !element && focusedSeriesSummary
-                ? focusedSeriesSummary
-                : !element && focusedEventSummary
-                  ? focusedEventSummary
-                  : !element &&
-                      focused instanceof HTMLElement &&
-                      focused.dataset.showDialog
-                    ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
-                    : ".volunteer-roster summary";
+      !element && focused?.matches("[data-bulk-event]")
+        ? "[data-bulk-event]"
+        : element?.matches("[data-live-signup]") ||
+            (!element && focused?.closest("[data-live-signup]"))
+          ? '[data-live-signup] button[type="submit"]'
+          : element?.matches("[data-series-occurrence]")
+            ? '[data-series-occurrence] button[type="submit"]'
+            : element?.matches("[data-series-save]")
+              ? `[data-show-dialog="series-editor-${CSS.escape(seriesId ?? "")}"]`
+              : element?.matches("[data-event-save], [data-event-cancel]")
+                ? card?.dataset.seriesCard
+                  ? "[data-series-occurrences] > summary"
+                  : "[data-show-dialog]"
+                : !element && focusedSeriesSummary
+                  ? focusedSeriesSummary
+                  : !element && focusedEventSummary
+                    ? focusedEventSummary
+                    : !element &&
+                        focused instanceof HTMLElement &&
+                        focused.dataset.showDialog
+                      ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+                      : ".volunteer-roster summary";
     (card && !card.hidden
       ? !element && focused === focusedCard
         ? card
@@ -645,6 +655,12 @@ function form(
       element.closest<HTMLElement>("[data-volunteer-controls], dialog") ??
       element;
     if (scope.dataset.submitting) return;
+    if (element.matches("[data-bulk-event-save]")) {
+      syncBulkEventSelection(
+        element.closest<HTMLElement>("[data-event-browser]")!,
+      );
+      if (!element.reportValidity()) return;
+    }
     if (element.matches("[data-event-save], [data-series-save]")) {
       initEventDates(element);
       readDateInputs(element);
@@ -665,19 +681,21 @@ function form(
     const loading = element.querySelector<HTMLElement>("[data-action-loading]");
     const label = button?.textContent;
     const loadingLabel = loading?.textContent;
-    const resultTitle = element.matches("[data-event-delete]")
-      ? "Deleted"
-      : element.matches("[data-series-save]")
-        ? "Patrol series saved"
-        : element.matches("[data-event-save]")
-          ? "Event saved"
-          : element.matches("[data-event-cancel]")
-            ? "Event cancelled"
-            : element.matches("[data-manage-signup]")
-              ? "Registration changed"
-              : element.matches("[data-organizer-role]")
-                ? "Account role saved"
-                : "Volunteer access saved";
+    const resultTitle = element.matches("[data-bulk-event-save]")
+      ? "Selected events saved"
+      : element.matches("[data-event-delete]")
+        ? "Deleted"
+        : element.matches("[data-series-save]")
+          ? "Patrol series saved"
+          : element.matches("[data-event-save]")
+            ? "Event saved"
+            : element.matches("[data-event-cancel]")
+              ? "Event cancelled"
+              : element.matches("[data-manage-signup]")
+                ? "Registration changed"
+                : element.matches("[data-organizer-role]")
+                  ? "Account role saved"
+                  : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -788,6 +806,8 @@ function form(
       }
       delete element.dataset.submitting;
       delete scope.dataset.submitting;
+      const browser = element.closest<HTMLElement>("[data-event-browser]");
+      if (browser) syncBulkEventSelection(browser);
       initRecurrenceControls(
         element.closest<HTMLElement>("[data-event-browser]") ?? element,
       );
@@ -805,6 +825,22 @@ function form(
   });
 }
 const str = (values: FormData, key: string) => String(values.get(key) ?? "");
+form(
+  "[data-bulk-event-save]",
+  "/api/v1/events/action",
+  bulkEventAction,
+  async (element) => {
+    const root = element.closest<HTMLElement>("[data-event-browser]")!;
+    element.closest<HTMLDialogElement>("dialog")!.close();
+    clearBulkEventSelection(root);
+    root.querySelector<HTMLElement>("[data-bulk-count]")!.textContent =
+      "Selected events saved. Selection cleared.";
+    await refreshEvents(element);
+    root.querySelector<HTMLElement>("[data-bulk-count]")!.textContent =
+      "Selected events saved. Selection cleared.";
+    root.querySelector<HTMLButtonElement>("[data-bulk-select-all]")?.focus();
+  },
+);
 form("[data-live-signup]", "/api/v1/events/action", (v) => ({
   action: str(v, "action"),
   id: str(v, "id"),
@@ -1087,6 +1123,7 @@ document.addEventListener("click", (event) => {
     dialog.getAttribute("aria-busy") === "true"
   )
     return;
+  if (dialog.id === "bulk-event-editor" && dialog.dataset.submitting) return;
   const bounds = dialog.getBoundingClientRect();
   if (
     event.clientX < bounds.left ||

@@ -69,10 +69,31 @@ const blocked =
   <div class="volunteer-event-layout">
     <div class="volunteer-event-info">
       {
+        organizer && future && !event.cancelledAt && (
+          <label class="volunteer-check volunteer-event-selection">
+            <input
+              type="checkbox"
+              data-bulk-event={event.id}
+              data-bulk-version={event.updatedAt}
+              data-bulk-label={`${formatEventDate(event.startsAt)} · ${event.meetingPoint}${event.seriesId ? " (occurrence)" : ""}`}
+            />
+            <span>
+              Select
+              <span class="sr-only">
+                {" "}
+                {formatEventDate(event.startsAt)} at {event.meetingPoint}
+              </span>
+            </span>
+          </label>
+        )
+      }
+      {
         event.cancelledAt ? (
           <p class="volunteer-hidden">Cancelled</p>
-        ) : event.hidden || !event.open ? (
+        ) : event.hidden ? (
           <p class="volunteer-hidden">Public visibility off</p>
+        ) : !event.open ? (
+          <p class="volunteer-hidden">Registration closed</p>
         ) : null
       }
       <h3>{formatEventDate(event.startsAt)}</h3>
@@ -208,6 +229,9 @@ const blocked =
   .volunteer-event-info {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+  .volunteer-event-selection {
+    margin-bottom: 0.75rem;
   }
   .volunteer-event-info h3 {
     font-size: 1.25rem;

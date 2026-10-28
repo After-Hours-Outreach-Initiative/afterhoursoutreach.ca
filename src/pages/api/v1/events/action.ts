@@ -7,6 +7,8 @@ import { takeRateLimit } from "@/server/db/rate-limits";
 import { readJson, RequestError, errorResponse } from "@/server/http";
 import {
   saveEvent,
+  bulkSaveEvents,
+  bulkEventSchema,
   cancelEvent,
   deleteEvent,
   deletePatrolSeries,
@@ -26,6 +28,10 @@ import { orientationCapacityMessage } from "@/server/db/policy";
 const id = z.string().min(1).max(200);
 const reason = z.string().trim().max(1000).default("");
 const inputSchema = z.discriminatedUnion("action", [
+  bulkEventSchema.extend({
+    action: z.literal("bulk-save"),
+    notify: z.boolean().default(false),
+  }),
   z.strictObject({
     action: z.enum(["delete-event", "delete-series"]),
     id,
@@ -114,6 +120,17 @@ export const POST: APIRoute = async ({ request }) => {
     );
     let result: { operation?: string; message: string; id?: string };
     switch (input.action) {
+      case "bulk-save":
+        result = await bulkSaveEvents(
+          env.DB,
+          actor,
+          {
+            selection: input.selection,
+            changes: input.changes,
+          },
+          input.notify,
+        );
+        break;
       case "delete-event":
         result = await deleteEvent(
           env.DB,

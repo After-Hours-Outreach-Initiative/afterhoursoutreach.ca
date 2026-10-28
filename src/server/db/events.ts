@@ -52,24 +52,24 @@ export {
   type PatrolSeriesRow,
 } from "./patrol-series";
 
-export const eventSchema = z
-  .strictObject({
-    // Accept old clients during rollout; includesOrientation is the public model.
-    type: z.enum(["patrol", "orientation"]).optional(),
-    includesOrientation: z.boolean().optional(),
-    startsAt: z.iso.datetime({ offset: true }),
-    meetingPoint: z.string().trim().min(1).max(500),
-    meetingPointUrl: z.union([
-      z.literal(""),
-      z
-        .url()
-        .max(2048)
-        .refine((value) => new URL(value).protocol === "https:"),
-    ]),
-    spots: z.number().int().min(1).max(100),
-    open: z.boolean(),
-    hidden: z.boolean(),
-  })
+const eventFieldsSchema = z.strictObject({
+  // Accept old clients during rollout; includesOrientation is the public model.
+  type: z.enum(["patrol", "orientation"]).optional(),
+  includesOrientation: z.boolean().optional(),
+  startsAt: z.iso.datetime({ offset: true }),
+  meetingPoint: z.string().trim().min(1).max(500),
+  meetingPointUrl: z.union([
+    z.literal(""),
+    z
+      .url()
+      .max(2048)
+      .refine((value) => new URL(value).protocol === "https:"),
+  ]),
+  spots: z.number().int().min(1).max(100),
+  open: z.boolean(),
+  hidden: z.boolean(),
+});
+export const eventSchema = eventFieldsSchema
   .refine(
     (value) =>
       value.includesOrientation !== undefined || value.type !== undefined,
@@ -82,6 +82,31 @@ export const eventSchema = z
     message: orientationCapacityMessage,
     path: ["spots"],
   });
+export const bulkEventSchema = z.strictObject({
+  selection: z
+    .array(
+      z.strictObject({
+        id: z.string().min(1).max(200),
+        version: z.number().int().nonnegative(),
+      }),
+    )
+    .min(1)
+    .max(100)
+    .refine((rows) => new Set(rows.map((row) => row.id)).size === rows.length),
+  changes: eventFieldsSchema
+    .pick({
+      meetingPoint: true,
+      meetingPointUrl: true,
+      spots: true,
+      includesOrientation: true,
+      open: true,
+      hidden: true,
+    })
+    .partial()
+    .refine((changes) =>
+      Object.values(changes).some((value) => value !== undefined),
+    ),
+});
 export interface EventRow {
   id: string;
   type: "patrol" | "orientation";
@@ -443,6 +468,167 @@ export async function saveEvent(
       if (old.seriesId) await ensurePatrolOccurrences(db, old.seriesId);
     }
     return { operation, message: "Event saved." };
+  } catch (error) {
+    return databaseWriteError(error);
+  }
+}
+
+/** One transaction for existing snapshots only; never changes dates or templates.
+ * The audit insert is gated on EVERY selected version and current permission.
+ * Event policy triggers abort the batch (including audits/mail) on any conflict. */
+export async function bulkSaveEvents(
+  db: Env["DB"],
+  actor: Actor,
+  input: unknown,
+  notify = false,
+) {
+  requireOrganizer(actor);
+  const parsed = bulkEventSchema.safeParse(input);
+  if (!parsed.success)
+    throw new RequestError(
+      400,
+      "Select 1–100 distinct events and choose supported fields to change.",
+    );
+  const { selection, changes } = parsed.data;
+  const oldRows = (
+    await db
+      .prepare(
+        `SELECT ${eventColumns} FROM event e
+    WHERE e.id IN (SELECT json_extract(value,'$.id') FROM json_each(?))`,
+      )
+      .bind(JSON.stringify(selection))
+      .all<EventRow>()
+  ).results;
+  const oldById = new Map(oldRows.map((row) => [row.id, row]));
+  const operation = crypto.randomUUID();
+  const now = Date.now();
+  let changedCount = 0;
+  const updates = selection.map((selected) => {
+    const old = oldById.get(selected.id);
+    if (
+      !old ||
+      old.cancelledAt ||
+      old.startsAt <= now ||
+      old.updatedAt !== selected.version
+    )
+      throw new RequestError(
+        409,
+        "A selected event changed or is no longer editable. Reload and select again. No events were saved.",
+      );
+    const next = {
+      ...old,
+      includesOrientation:
+        changes.includesOrientation ?? Boolean(old.includesOrientation),
+      spots: changes.spots ?? old.spots,
+    };
+    if (!validOrientationCapacity(next))
+      throw new RequestError(400, orientationCapacityMessage);
+    const fields = Object.keys(changes).filter((key) => {
+      const value = changes[key as keyof typeof changes];
+      const normalized =
+        typeof value === "boolean"
+          ? Number(value)
+          : key === "meetingPointUrl"
+            ? value || null
+            : value;
+      return value !== undefined && old[key as keyof EventRow] !== normalized;
+    });
+    const auditId = fields.length
+      ? changedCount++ === 0
+        ? operation
+        : `${operation}:${old.id}`
+      : null;
+    const content = eventChangedEmail(
+      {
+        ...old,
+        includesOrientation: Number(next.includesOrientation),
+        meetingPoint: changes.meetingPoint ?? old.meetingPoint,
+      },
+      changes.open ?? Boolean(old.open),
+    );
+    return {
+      ...selected,
+      fields,
+      auditId,
+      subject: content.subject,
+      body: content.text,
+    };
+  });
+  const snapshots = JSON.stringify(updates);
+  // JSON keeps a full 100-event selection below D1's bound-parameter limit.
+  const guard = `${writePermission(true)} AND
+    (SELECT count(*) FROM event e JOIN json_each(?) j ON e.id = json_extract(j.value,'$.id')
+      WHERE e.updated_at = json_extract(j.value,'$.version')
+        AND e.cancelled_at IS NULL AND e.starts_at > ${nowMsSql}
+        AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id=e.id AND a.action='deleted')
+        AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id=e.series_id AND a.action='deleted')) = ?`;
+  const guardValues = () => [
+    ...permissionValues(actor),
+    snapshots,
+    selection.length,
+  ];
+  const columns = {
+    meetingPoint: "meeting_point",
+    meetingPointUrl: "meeting_point_url",
+    spots: "spots",
+    includesOrientation: "includes_orientation",
+    open: "open",
+    hidden: "hidden",
+  };
+  const entries = Object.entries(changes).filter(
+    ([, value]) => value !== undefined,
+  );
+  try {
+    const results = await db.batch<{ valid?: number }>([
+      db.prepare(`SELECT (${guard}) AS valid`).bind(...guardValues()),
+      db
+        .prepare(
+          `INSERT INTO event_audit (id,event_id,actor_id,action,changed_fields,created_at)
+        SELECT json_extract(j.value,'$.auditId'),json_extract(j.value,'$.id'),?,'updated',json_extract(j.value,'$.fields'),?
+        FROM json_each(?) j WHERE json_extract(j.value,'$.auditId') IS NOT NULL AND ${guard}`,
+        )
+        .bind(actor.id, now, snapshots, ...guardValues()),
+      db
+        .prepare(
+          `UPDATE event SET ${entries.map(([key]) => `${columns[key as keyof typeof columns]} = ?`).join(", ")}, updated_at=max(updated_at+1,?)
+        WHERE id IN (SELECT json_extract(j.value,'$.id') FROM json_each(?) j
+          JOIN event_audit a ON a.id=json_extract(j.value,'$.auditId'))`,
+        )
+        .bind(
+          ...entries.map(([key, value]) =>
+            typeof value === "boolean"
+              ? Number(value)
+              : key === "meetingPointUrl"
+                ? value || null
+                : value,
+          ),
+          now,
+          snapshots,
+        ),
+      db
+        .prepare(
+          `INSERT INTO event_notification (id,operation_id,user_id,subject,body,created_at,delivery_to)
+        SELECT lower(hex(randomblob(16))),?,s.user_id,json_extract(j.value,'$.subject'),json_extract(j.value,'$.body'),?,u.email
+        FROM json_each(?) j JOIN event_audit a ON a.id=json_extract(j.value,'$.auditId')
+        JOIN signup s ON s.event_id=a.event_id AND s.status='confirmed'
+        JOIN user u ON u.id=s.user_id AND u.email_verified=1 WHERE ?=1`,
+        )
+        .bind(operation, now, snapshots, Number(notify)),
+    ]);
+    if (
+      !results[0].results[0]?.valid ||
+      results[1].meta.changes !== changedCount
+    )
+      throw new RequestError(
+        409,
+        "A selected event or your organizer authorization changed. Reload and select again. No events were saved.",
+      );
+    return {
+      ...(changedCount ? { operation } : {}),
+      message: changedCount
+        ? `${changedCount} selected ${changedCount === 1 ? "event" : "events"} saved. Dates and recurring series settings were kept.`
+        : "No event changes.",
+    };
   } catch (error) {
     return databaseWriteError(error);
   }

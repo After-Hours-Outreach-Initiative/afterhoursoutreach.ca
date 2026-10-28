@@ -12,6 +12,7 @@ import AccountLayout from "./AccountLayout.astro";
 import EventCard from "./EventCard.astro";
 import EventCalendar from "./EventCalendar.astro";
 import EventEditor from "./EventEditor.astro";
+import BulkEventEditor from "./BulkEventEditor.astro";
 import PatrolSeriesCard from "./PatrolSeriesCard.astro";
 import {
   eventFilter,
@@ -296,6 +297,7 @@ const hasVisiblePastEvents = pastEvents.some((event) =>
               </button>
             ))}
           </form>
+          {manage && <BulkEventEditor />}
           <div class:list={{ "volunteer-event-schedule": !manage }}>
             {!manage && (
               <EventCalendar
