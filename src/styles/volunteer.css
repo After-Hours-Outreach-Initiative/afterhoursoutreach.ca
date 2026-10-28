@@ -309,7 +309,7 @@ body:has(
   overflow: hidden;
 }
 .volunteer-medic-details-content {
-  padding-block: 0.75rem;
+  padding-block: 2rem 0.75rem;
 }
 .volunteer-medic-note,
 [data-profile-team-training]:not(
@@ -972,7 +972,10 @@ body:has(
 .volunteer-date-input[data-date-time][aria-invalid="true"]::before {
   border-inline-start-color: #f87171;
 }
-.volunteer-team-option {
+.volunteer-team-option,
+.volunteer-certification-options > label,
+.volunteer-training-options > label,
+.volunteer-referral-options > label {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
@@ -986,14 +989,23 @@ body:has(
     background-color 150ms,
     border-color 150ms;
 }
-.volunteer-team-option:hover:not(:has(input:disabled)) {
+.volunteer-team-option:hover:not(:has(input:disabled)),
+.volunteer-certification-options > label:hover:not(:has(input:disabled)),
+.volunteer-training-options > label:hover:not(:has(input:disabled)),
+.volunteer-referral-options > label:hover:not(:has(input:disabled)) {
   border-color: #a1a1aa;
 }
-.volunteer-team-option:has(input:checked) {
+.volunteer-team-option:has(input:checked),
+.volunteer-certification-options > label:has(input:checked),
+.volunteer-training-options > label:has(input:checked),
+.volunteer-referral-options > label:has(input:checked) {
   border-color: #4169e1;
   background: #16214a;
 }
-.volunteer-team-option:has(input:focus-visible) {
+.volunteer-team-option:has(input:focus-visible),
+.volunteer-certification-options > label:has(input:focus-visible),
+.volunteer-training-options > label:has(input:focus-visible),
+.volunteer-referral-options > label:has(input:focus-visible) {
   outline: 3px solid #4169e1;
   outline-offset: 0.1875rem;
 }
@@ -1007,6 +1019,17 @@ body:has(
 .volunteer-team-option input {
   margin-top: 0.1875rem;
   cursor: inherit;
+}
+.volunteer-certification-options > label > input,
+.volunteer-training-options > label > input,
+.volunteer-referral-options > label > input {
+  cursor: inherit;
+}
+.volunteer-certification-options > label > span,
+.volunteer-training-options > label > span,
+.volunteer-referral-options > label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .volunteer-team-content {
   display: flex;
@@ -1046,6 +1069,14 @@ body:has(
   margin-bottom: 0.5rem;
   font-weight: normal;
 }
+/* Keep this question hierarchy limited to Training and safety. */
+.volunteer-relevant-training > legend {
+  color: #fafafa;
+  line-height: 1.5;
+}
+.volunteer-relevant-training + .volunteer-relevant-training {
+  margin-top: 1rem;
+}
 .volunteer-event-type-options {
   display: flex;
   flex-wrap: wrap;
@@ -1069,6 +1100,11 @@ body:has(
   /* Pad the touch target evenly without moving controls off the first line. */
   padding-block: 0.625rem;
   cursor: pointer;
+}
+.volunteer-certification-options > label,
+.volunteer-training-options > label,
+.volunteer-referral-options > label {
+  padding: 0.625rem;
 }
 .volunteer-recurrence-label {
   display: flex;
@@ -1103,7 +1139,7 @@ body:has(
 .volunteer-training-options > [data-other-relevant-experience],
 .volunteer-referral-sources > [data-other-referral] {
   margin-inline-start: calc(
-    var(--volunteer-check-size) + var(--volunteer-check-gap)
+    0.625rem + 1px + var(--volunteer-check-size) + 0.75rem
   );
 }
 .volunteer-setting {
@@ -1656,7 +1692,10 @@ body:has(
   .cloud-save-loading {
     animation: none;
   }
-  .volunteer-team-option {
+  .volunteer-team-option,
+  .volunteer-certification-options > label,
+  .volunteer-training-options > label,
+  .volunteer-referral-options > label {
     transition: none;
   }
 }
