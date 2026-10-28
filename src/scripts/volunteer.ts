@@ -5,7 +5,7 @@ import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
 import { chooseNotification } from "./notification-choice";
-import { confirmEventDeletion } from "./event-deletion";
+import { confirmSeriesDeletion } from "./event-deletion";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
   disposeVolunteerProfileTabs,
@@ -326,11 +326,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           availability.replaceWith(document.importNode(nextAvailability, true));
         // Signup counts can change while an editor is open. Refresh only email
         // eligibility; leave the organizer's fields, reason and scope draft intact.
-        for (const selector of [
-          "[data-event-save]",
-          "[data-event-cancel]",
-          "[data-event-delete]",
-        ]) {
+        for (const selector of ["[data-event-save]", "[data-event-cancel]"]) {
           const form = card.querySelector(selector);
           const nextForm = updated.querySelector(selector);
           if (!form || !nextForm) continue;
@@ -732,7 +728,7 @@ function form(
     try {
       if (
         element.matches("[data-event-delete]") &&
-        !(await confirmEventDeletion(element.dataset.eventDelete ?? "event"))
+        !(await confirmSeriesDeletion())
       )
         return;
       let notify: boolean | undefined;

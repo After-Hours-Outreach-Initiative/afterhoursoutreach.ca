@@ -132,6 +132,7 @@ export const POST: APIRoute = async ({ request }) => {
         );
         break;
       case "delete-event":
+        // Legacy clients receive exactly the same history-safe cancellation.
         result = await deleteEvent(
           env.DB,
           actor,

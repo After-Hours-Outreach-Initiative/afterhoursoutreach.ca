@@ -94,8 +94,12 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     const heading = form.querySelector<HTMLElement>(
       "[data-event-cancel-heading]",
     );
+    const policy = form.querySelector<HTMLElement>(
+      "[data-event-cancel-policy]",
+    );
     if (!reason || !input) continue;
     const update = () => {
+      if (policy) policy.hidden = new FormData(form).get("scope") === "future";
       reason.hidden = !eventEmailPrompt(
         new FormData(form),
         form.dataset.emailPrompt,

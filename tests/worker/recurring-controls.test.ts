@@ -668,8 +668,8 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       editor.locator("[data-event-save], [data-event-cancel]"),
     ).toHaveCount(0);
     await expect(
-      editor.getByRole("button", { name: "Delete occurrence", exact: true }),
-    ).toBeEnabled();
+      editor.getByRole("button", { name: /Delete|Cancel event/ }),
+    ).toHaveCount(0);
     await editor.getByRole("button", { name: "Close", exact: true }).click();
     await expect(
       uiGroup.getByRole("button", { name: "Open occurrence", exact: true }),
@@ -704,26 +704,13 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await organizerPage.reload();
     await expect(uiCard).toBeVisible();
     await expect(uiGroup).toHaveCount(1);
-    // Cancelled dates remain removable, without deleting the other occurrences.
+    // Cancelled dates are read-only; no second action can hide their history.
     await uiCard.getByRole("button", { name: "Edit", exact: true }).click();
-    await uiCard
-      .getByRole("button", { name: "Delete occurrence", exact: true })
-      .click();
-    const confirmation = organizerPage.getByRole("dialog", {
-      name: "Delete occurrence?",
-      exact: true,
-    });
-    await confirmation
-      .getByRole("button", { name: "Keep", exact: true })
-      .click();
+    await expect(
+      editor.getByRole("button", { name: /Delete|Cancel event/ }),
+    ).toHaveCount(0);
+    await editor.getByRole("button", { name: "Close", exact: true }).click();
     await expect(uiCard).toBeVisible();
-    await uiCard
-      .getByRole("button", { name: "Delete occurrence", exact: true })
-      .click();
-    await confirmation
-      .getByRole("button", { name: "Delete", exact: true })
-      .click();
-    await expect(uiCard).toHaveCount(0);
     await expect(uiGroup).toHaveCount(1);
     expect(
       await DB.prepare("SELECT count(*) n FROM event WHERE id=?")

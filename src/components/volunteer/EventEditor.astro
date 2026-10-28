@@ -96,6 +96,12 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
           </h3>
           <input type="hidden" name="id" value={event.id} />
           <input type="hidden" name="version" value={event.updatedAt} />
+          <p class="volunteer-help" data-event-cancel-policy>
+            If anyone has ever registered, this event will be kept as cancelled
+            with registration and attendance history. Otherwise, it will be
+            removed{event.seriesId ? " from listings" : ""}.
+            {event.seriesId && " The rest of the series will continue."}
+          </p>
           {series && (
             <>
               <input type="hidden" name="seriesId" value={series.id} />
@@ -149,30 +155,12 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
       )
     }
     {
-      event && (
-        <>
-          {!editable && (
-            <p>
-              {event.cancelledAt
-                ? "This event is cancelled."
-                : "This event has ended."}
-            </p>
-          )}
-          <form
-            id={`${dialogId}-delete`}
-            data-event-delete={event.seriesId ? "occurrence" : "event"}
-            data-email-prompt={
-              editable && event.confirmed > 0 ? "event-cancel" : undefined
-            }
-            action="/api/v1/events/action"
-            method="post"
-          >
-            <input type="hidden" name="action" value="delete-event" />
-            <input type="hidden" name="id" value={event.id} />
-            <input type="hidden" name="version" value={event.updatedAt} />
-            <p data-form-message role="status" hidden />
-          </form>
-        </>
+      event && !editable && (
+        <p>
+          {event.cancelledAt
+            ? "This event is cancelled. Registration and attendance history is kept."
+            : "This event has ended. Registration and attendance history is kept."}
+        </p>
       )
     }
   </div>
@@ -199,18 +187,6 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
           data-loading-label="Cancelling…"
         >
           Cancel event
-        </button>
-      )
-    }
-    {
-      event && (
-        <button
-          class="btn btn-red"
-          type="submit"
-          form={`${dialogId}-delete`}
-          data-loading-label="Deleting…"
-        >
-          {event.seriesId ? "Delete occurrence" : "Delete event"}
         </button>
       )
     }

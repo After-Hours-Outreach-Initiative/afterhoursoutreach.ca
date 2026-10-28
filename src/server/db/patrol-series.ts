@@ -556,7 +556,7 @@ export async function materializePatrolOccurrence(
     .first<{ id: string; deleted: number }>();
   if (existing) {
     if (existing.deleted)
-      throw new RequestError(409, "This occurrence was deleted.");
+      throw new RequestError(409, "This occurrence was cancelled and removed.");
     const result = await db
       .prepare(
         `UPDATE patrol_series SET generation_until = generation_until

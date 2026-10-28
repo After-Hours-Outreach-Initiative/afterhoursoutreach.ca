@@ -63,7 +63,7 @@ async function expectStableExit(dialog: Locator) {
   for (const frame of frames) expect(frame).toEqual(before);
 }
 
-test("event and series edit dialogs keep deletion available for ended and cancelled events", async ({
+test("event dialogs offer only cancellation for future events and keep ended history read-only", async ({
   page,
   baseURL,
 }) => {
@@ -127,6 +127,9 @@ test("event and series edit dialogs keep deletion available for ended and cancel
     });
   }
   await page.reload();
+  for (const id of [standaloneId, occurrenceId]) {
+    await expect(page.locator(`[data-live-event="${id}"]`)).toHaveCount(0);
+  }
   const group = page.locator(`[data-series-card="${series.id}"]`);
   const seriesButton = group.getByRole("button", {
     name: "Edit series",
@@ -163,8 +166,6 @@ test("event and series edit dialogs keep deletion available for ended and cancel
   for (const [id, editable, recurring] of [
     ["local-fixture-event-orientation", true, false],
     ["local-fixture-event-past-orientation", false, false],
-    [standaloneId, false, false],
-    [occurrenceId, false, true],
     [activeOccurrenceId, true, true],
   ] as const) {
     const card = page.locator(`[data-live-event="${id}"]`);
@@ -191,20 +192,15 @@ test("event and series edit dialogs keep deletion available for ended and cancel
         dialog.locator('[data-event-cancel] [name="scope"]'),
       ).toHaveValue("occurrence");
     }
-    const remove = dialog.getByRole("button", {
-      name: recurring ? "Delete occurrence" : "Delete event",
-      exact: true,
-    });
-    await remove.click();
-    const confirmation = page.getByRole("dialog", {
-      name: recurring ? "Delete occurrence?" : "Delete event?",
-      exact: true,
-    });
-    await confirmation
-      .getByRole("button", { name: "Keep", exact: true })
-      .click();
-    await expect(dialog).toBeVisible();
-    await expect(remove).toBeFocused();
+    await expect(dialog.getByRole("button", { name: /Delete/ })).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Cancel event", exact: true }),
+    ).toHaveCount(editable ? 1 : 0);
+    if (editable) {
+      await expect(dialog.locator("[data-event-cancel-policy]")).toContainText(
+        "If anyone has ever registered",
+      );
+    }
     await page.keyboard.press("Escape");
     await expect(edit).toBeFocused();
   }
@@ -214,16 +210,6 @@ test("event and series edit dialogs keep deletion available for ended and cancel
       return new Set(ids).size === ids.length;
     }),
   ).toBe(true);
-  const cancelled = page.locator(`[data-live-event="${standaloneId}"]`);
-  await cancelled.getByRole("button", { name: "Edit", exact: true }).click();
-  await cancelled
-    .getByRole("button", { name: "Delete event", exact: true })
-    .click();
-  await page
-    .getByRole("dialog", { name: "Delete event?", exact: true })
-    .getByRole("button", { name: "Delete", exact: true })
-    .click();
-  await expect(cancelled).toHaveCount(0);
   await seriesButton.click();
   await settings
     .getByRole("button", { name: "Delete series", exact: true })
