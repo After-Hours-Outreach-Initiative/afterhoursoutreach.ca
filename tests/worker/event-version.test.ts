@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
+import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { profileWriteBody } from "../helpers/profile-write";
 import { sampleAnswers } from "../helpers/local-account";
 
@@ -126,6 +127,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     )
       .bind(attendee.id)
       .run();
+    await seedVerifiedDiscordMembership(DB, attendee.id);
     const approvedVersion = await listingVersion(attendee.cookie);
     expect(await signedInNext()).toBe(approvedVersion);
 

@@ -3,10 +3,11 @@ import { profileWriteBody } from "../helpers/profile-write";
 import { existsSync } from "node:fs";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
-import { chromium, expect, type Locator } from "@playwright/test";
+import { chromium, expect, type Locator, type Route } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { fillDateInput } from "../helpers/date-input";
 import { createSignInOTP } from "../helpers/email-otp";
+import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { totpFromSetupKey } from "../helpers/totp";
 import { hashAuthValue } from "../../src/server/db/rate-limits";
 
@@ -338,7 +339,7 @@ describe(
         );
       });
 
-      test("application approval and Naloxone completion gate orientations independently of patrol approval", async () => {
+      test("application approval, Naloxone and verified Discord membership gate orientations independently of patrol approval", async () => {
         for (const person of [alice, bob]) {
           const page = await ok(
             await send("/volunteer", undefined, person.cookie),
@@ -379,11 +380,17 @@ describe(
             ),
             409,
           );
-          await DB.prepare(
-            "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",
-          )
-            .bind(Date.now(), person.id)
-            .run();
+          await ok(await status(person.id, true, false), 409);
+          await ok(
+            await send(
+              "/api/v1/account/naloxone",
+              { userId: person.id, completed: true },
+              person.cookie,
+            ),
+          );
+          await ok(await send("/api/v1/events", undefined, person.cookie), 403);
+          await ok(await status(person.id, true, false), 409);
+          await seedVerifiedDiscordMembership(DB, person.id);
           await ok(await send("/api/v1/events", undefined, person.cookie), 403);
           await ok(await status(person.id, true, false));
           const events = await ok(
@@ -1098,6 +1105,34 @@ describe(
               body: Buffer.from(await response.arrayBuffer()),
             });
           });
+          let releaseScripts!: () => void;
+          const scriptsReady = new Promise<void>((resolve) => {
+            releaseScripts = resolve;
+          });
+          const holdScripts = async (route: Route) => {
+            await scriptsReady;
+            await route.fallback();
+          };
+          await page.route("**/_astro/*.js", holdScripts);
+          try {
+            await page.goto(`${origin}/manage/volunteers/${alice.id}`, {
+              waitUntil: "commit",
+            });
+            await expect(page.getByLabel("Account role")).toBeDisabled();
+            await expect(
+              page.getByLabel("Active volunteer", { exact: true }),
+            ).toBeDisabled();
+            await expect(
+              page.getByRole("button", {
+                name: "Approve for patrols",
+                exact: true,
+              }),
+            ).toBeDisabled();
+          } finally {
+            releaseScripts();
+            await page.unroute("**/_astro/*.js", holdScripts);
+          }
+          await expect(page.getByLabel("Account role")).toBeEnabled();
           await page.goto(`${origin}/events`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           const nav = page.locator(".mobile-nav");
@@ -1128,6 +1163,9 @@ describe(
           await profileView
             .getByRole("heading", { name: "Sample Alice", exact: true })
             .waitFor();
+          await expect(
+            profileView.getByLabel("Active volunteer", { exact: true }),
+          ).toBeEnabled();
           await profileView
             .getByLabel("Active volunteer", { exact: true })
             .focus();

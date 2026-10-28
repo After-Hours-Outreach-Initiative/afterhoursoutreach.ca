@@ -52,6 +52,16 @@ function initEventDates(root: Document | HTMLElement) {
       step.disabled = false;
   }
 }
+
+function initVolunteerControls(root: Document | HTMLElement) {
+  for (const group of root.querySelectorAll<HTMLElement>(
+    "[data-volunteer-controls]:not([data-submitting])",
+  ))
+    for (const control of group.querySelectorAll<
+      HTMLElement & { disabled: boolean }
+    >("[data-volunteer-control]"))
+      control.disabled = false;
+}
 // Compare against the server HTML, not transient loading/filter/expanded state.
 const renderedCards = new WeakMap<HTMLElement, string>();
 let deferredEventRefresh = false;
@@ -444,6 +454,7 @@ async function refreshVolunteer(element: HTMLFormElement) {
     onProfilePage ? Promise.resolve(null) : loadActionPage(hostUrl),
   ]);
   const replacement = actionFragment(page, "[data-volunteer-profile]");
+  initVolunteerControls(replacement);
   initVolunteerProfileTabs(
     replacement,
     profile.querySelector<HTMLElement>(
@@ -1064,6 +1075,7 @@ if (profileDialog && profileContent) {
         );
         const loadingHeight = profileContent.clientHeight;
         const profile = document.importNode(content, true);
+        initVolunteerControls(profile);
         initVolunteerProfileTabs(profile);
         const animate = !window.matchMedia("(prefers-reduced-motion: reduce)")
           .matches;
@@ -1133,3 +1145,6 @@ document.addEventListener("click", (event) => {
   )
     dialog.close();
 });
+
+// Never expose actions before submit/change handlers and email consent are ready.
+initVolunteerControls(document);

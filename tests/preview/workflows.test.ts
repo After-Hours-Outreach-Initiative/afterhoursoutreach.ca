@@ -4,6 +4,7 @@ import { test } from "vitest";
 import { chromium, expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
+import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { profileWriteBody } from "../helpers/profile-write";
 import { sampleAnswers } from "../helpers/local-account";
 import { addCalendarDays, vancouverInput } from "../../src/data/event-time";
@@ -111,6 +112,29 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       .bind(organizer.id, Date.now())
       .run();
     organizer.cookie = await signIn(organizer.email);
+    await ok(
+      await send(
+        "/api/v1/organizer/action",
+        {
+          action: "status",
+          userId: applicant.id,
+          version: 0,
+          active: true,
+          applicationApproved: true,
+          patrolApproved: false,
+        },
+        organizer.cookie,
+      ),
+      409,
+    );
+    await ok(
+      await send(
+        "/api/v1/account/naloxone",
+        { userId: applicant.id, completed: true },
+        applicant.cookie,
+      ),
+    );
+    await seedVerifiedDiscordMembership(DB, applicant.id);
 
     const context = await browser.newContext();
     await context.addCookies(
@@ -265,9 +289,11 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
     await page.goto(
       `${origin}/manage/events?occurrence=${encodeURIComponent(farId)}`,
     );
-    await expect(page.locator(`[data-live-event="${farId}"]`)).toContainText(
-      "Outside the volunteer signup window",
-    );
+    const farCard = page.locator(`[data-live-event="${farId}"]`);
+    await expect(farCard).toBeVisible();
+    await expect(
+      farCard.getByRole("button", { name: "Edit", exact: true }),
+    ).toBeEnabled();
     const version = () =>
       DB.prepare("SELECT updated_at FROM patrol_series WHERE id=?")
         .bind(created.id)

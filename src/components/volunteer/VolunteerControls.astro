@@ -40,6 +40,8 @@ const { person } = Astro.props;
       class:list={["btn", person.applicationApproved ? "btn-red" : "btn-green"]}
       type="submit"
       data-loading-label="Saving…"
+      data-volunteer-control
+      disabled
       >{
         person.applicationApproved
           ? "Revoke application approval"
@@ -80,6 +82,8 @@ const { person } = Astro.props;
       class:list={["btn", person.patrolApproved ? "btn-red" : "btn-green"]}
       type="submit"
       data-loading-label="Saving…"
+      data-volunteer-control
+      disabled
       >{
         person.patrolApproved ? "Revoke patrol approval" : "Approve for patrols"
       }</button
@@ -113,6 +117,8 @@ const { person } = Astro.props;
         type="checkbox"
         name="active"
         checked={Boolean(person.active)}
+        data-volunteer-control
+        disabled
       />Active volunteer</label
     >
     <p data-form-message role="status" hidden></p>
@@ -138,7 +144,7 @@ const { person } = Astro.props;
     <input type="hidden" name="userId" value={person.id} />
     <label class="volunteer-field"
       >Account role
-      <select name="role">
+      <select name="role" data-volunteer-control disabled>
         <option value="volunteer" selected={person.role === "volunteer"}
           >Volunteer</option
         >

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { chromium, expect as browserExpect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
+import { seedVerifiedDiscordMembership } from "../helpers/discord";
 import { sampleAnswers } from "../helpers/local-account";
 import { profileWriteBody } from "../helpers/profile-write";
 
@@ -200,6 +201,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
   });
 
   test("the built Worker renders concurrent authenticated requests without empty pages", async () => {
+    await seedVerifiedDiscordMembership(DB, owner.id);
     await DB.batch([
       DB.prepare(
         "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",

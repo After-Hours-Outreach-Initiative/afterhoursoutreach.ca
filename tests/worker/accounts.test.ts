@@ -1145,8 +1145,13 @@ describe(
       ).json()) as typeof current;
       assert.equal(after.user.id, before.user.id);
       assert.equal(after.session.id, before.session.id);
+      // Earlier steps linked the shared account; use an unlinked account to
+      // check the unconfigured placeholder rather than its connected identity.
+      const unlinkedCookie = await signIn(
+        "worker-unlinked-discord@example.org",
+      );
       const discordPage = await (
-        await send("/volunteer/account", undefined, cookie)
+        await send("/volunteer/account", undefined, unlinkedCookie)
       ).text();
       assert.match(discordPage, /Discord connection is coming soon\./);
       assert.doesNotMatch(
