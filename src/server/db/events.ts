@@ -160,8 +160,28 @@ const eventColumns = `
   e.meeting_point AS meetingPoint, e.meeting_point_url AS meetingPointUrl,
   e.spots, e.open, e.hidden,
   e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
+const confirmedSignupsSql = `(SELECT count(*) FROM signup
+  WHERE event_id = e.id AND status = 'confirmed')`;
 
 export { eventDescription } from "../../data/email-templates";
+
+/** Anonymous homepage summary: no locations, rosters, IDs or viewer state. */
+export async function listUpcomingPublicEvents(db: Env["DB"]) {
+  await ensurePatrolOccurrences(db);
+  const rows = await db
+    .prepare(
+      `SELECT e.starts_at AS startsAt, e.spots, ${confirmedSignupsSql} AS confirmed
+      FROM event e
+      WHERE e.starts_at > ${nowMsSql} AND e.cancelled_at IS NULL
+        AND e.hidden = 0 AND (e.series_id IS NOT NULL OR e.open = 1)
+        AND ${recurringSignupWindowSql()}
+        AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
+        AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')
+      ORDER BY e.starts_at ASC, e.id ASC LIMIT 2`,
+    )
+    .all<Pick<EventRow, "startsAt" | "spots" | "confirmed">>();
+  return rows.results;
+}
 
 // Completion does not grant patrol approval. Organizers and patrol-approved
 // volunteers retain full visibility, including legacy approvals without attendance.
@@ -200,8 +220,7 @@ export async function listEvents(
       AND future.cancelled_at IS NULL AND future.starts_at > ${nowMsSql}
       AND s.status = 'confirmed'`;
   const select = `SELECT ${eventColumns},
-    (SELECT count(*) FROM signup
-      WHERE event_id = e.id AND status = 'confirmed') AS confirmed,
+    ${confirmedSignupsSql} AS confirmed,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
       AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) AS orientationConfirmed,
     EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = ?) AS orientationCompleted,
