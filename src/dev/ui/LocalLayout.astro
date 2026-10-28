@@ -1,0 +1,29 @@
+---
+import { Font } from "astro:assets";
+import "../../styles/tailwind.css";
+
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+Astro.response.headers.set("Cache-Control", "no-store");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+---
+
+<!doctype html>
+<html lang="en" class="bg-ink">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <Font cssVariable="--font-public-sans" preload />
+    <title>{title} | Local UI playground</title>
+  </head>
+  <body
+    class="m-0 min-h-dvh bg-ink font-body text-base leading-relaxed text-zinc-100 antialiased"
+  >
+    <slot />
+  </body>
+</html>

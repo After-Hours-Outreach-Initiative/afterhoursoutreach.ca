@@ -9,6 +9,19 @@ Cloudflare Workers.
 pnpm install
 ```
 
+## Local UI playground
+
+Run `pnpm dev`, then open <http://localhost:4321/dev/ui> or choose **UI playground**
+in the local **DEV panel** (Alt+Z).
+
+Discord is the first component: browse its state gallery or use the interactive
+preview to try fictional inputs, delayed responses, and success/error flows at
+different viewport sizes. Scenario URLs can be bookmarked or shared locally.
+The playground needs no sign-in and never changes accounts, writes to the
+database, or calls Discord. Its routes and simulations are excluded from both
+production and hosted preview builds. Add future component examples under
+`src/dev/ui/`.
+
 ## Local documentation
 
 Browse the project guides in a separate Astro + Starlight development server:

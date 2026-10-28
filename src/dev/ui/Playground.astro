@@ -1,0 +1,242 @@
+---
+import LocalLayout from "./LocalLayout.astro";
+import {
+  discordScenarios,
+  getDiscordScenario,
+  previewQuery,
+  readPreviewOptions,
+} from "./fixtures";
+import "./playground.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const options = readPreviewOptions(Astro.url.searchParams);
+const selected = getDiscordScenario(options.scenario);
+const frameUrl = `/dev/ui/discord?${previewQuery(options)}`;
+---
+
+<LocalLayout title="Discord">
+  <main class="ui-playground" data-ui-playground>
+    <header class="ui-page-header">
+      <h1>UI playground</h1>
+      <p>
+        Local only. Fictional fixtures, with no account, database, or Discord
+        requests.
+      </p>
+      <nav aria-label="Playground sections">
+        <a href="#simulator">Discord simulator</a>
+        <a href="#gallery">State gallery ({discordScenarios.length})</a>
+      </nav>
+    </header>
+
+    <section
+      id="simulator"
+      class="ui-section"
+      aria-labelledby="simulator-heading"
+    >
+      <div class="ui-section-heading">
+        <div>
+          <h2 id="simulator-heading">Discord</h2>
+          <p>
+            Use the real connection controls in the preview. Results are
+            simulated in memory.
+          </p>
+        </div>
+        <button type="button" class="btn btn-quiet" data-ui-reset
+          >Reset simulator</button
+        >
+      </div>
+
+      <form class="ui-controls" action="/dev/ui" method="get" data-ui-controls>
+        <label class="ui-field ui-scenario-field">
+          Scenario
+          <select name="scenario" data-ui-scenario>
+            {
+              discordScenarios.map((scenario) => (
+                <option
+                  value={scenario.id}
+                  selected={scenario.id === options.scenario}
+                >
+                  {scenario.label}
+                </option>
+              ))
+            }
+          </select>
+        </label>
+        <label class="ui-field">
+          Preview size
+          <select name="size">
+            <option value="desktop" selected={options.size === "desktop"}
+              >Desktop · 1024 px</option
+            >
+            <option value="narrow" selected={options.size === "narrow"}
+              >Narrow · 360 px</option
+            >
+          </select>
+        </label>
+        <label class="ui-field">
+          Response latency (ms)
+          <input
+            name="latency"
+            type="number"
+            min="0"
+            max="5000"
+            step="100"
+            value={options.latency}
+          />
+        </label>
+        <div class="ui-toggles">
+          <input name="required" type="hidden" value="0" />
+          <label
+            ><input
+              name="required"
+              type="checkbox"
+              value="1"
+              checked={options.required}
+            /> Required step</label
+          >
+          <input name="eligible" type="hidden" value="0" />
+          <label
+            ><input
+              name="eligible"
+              type="checkbox"
+              value="1"
+              checked={options.eligible}
+            /> Prior steps complete</label
+          >
+        </div>
+        <div class="ui-field ui-username-field">
+          <label for="fake-discord-username">Fictional username</label>
+          <div class="ui-input-action">
+            <input
+              id="fake-discord-username"
+              name="username"
+              type="text"
+              maxlength="160"
+              value={options.username}
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" class="btn btn-quiet" data-ui-long-name
+              >Use long name</button
+            >
+          </div>
+        </div>
+        <label class="ui-field">
+          Connect result
+          <select name="connect">
+            <option value="authorize" selected={options.connect === "authorize"}
+              >Authorize successfully</option
+            >
+            <option value="cancel" selected={options.connect === "cancel"}
+              >Cancel authorization</option
+            >
+            <option value="failure" selected={options.connect === "failure"}
+              >Connection failure</option
+            >
+            <option value="screening" selected={options.connect === "screening"}
+              >Server rules required</option
+            >
+            <option value="expired" selected={options.connect === "expired"}
+              >Authorization expires</option
+            >
+          </select>
+        </label>
+        <label class="ui-field">
+          Refresh result
+          <select name="refresh">
+            <option value="success" selected={options.refresh === "success"}
+              >Membership and roles synchronized</option
+            >
+            <option value="pause" selected={options.refresh === "pause"}
+              >Pause / rate limited</option
+            >
+            <option value="error" selected={options.refresh === "error"}
+              >Status request fails</option
+            >
+            <option value="reconnect" selected={options.refresh === "reconnect"}
+              >Membership missing / reconnect</option
+            >
+            <option value="pending" selected={options.refresh === "pending"}
+              >Roles still pending</option
+            >
+          </select>
+        </label>
+        <noscript
+          ><button type="submit" class="btn btn-primary"
+            >Apply preview settings</button
+          ></noscript
+        >
+      </form>
+
+      <div class="ui-preview-toolbar">
+        <p data-ui-scenario-description>{selected.description}</p>
+        <a href={frameUrl} target="_blank" rel="noopener" data-ui-open-preview
+          >Open isolated preview</a
+        >
+      </div>
+      <div
+        class="ui-preview-scroll"
+        tabindex="0"
+        aria-label="Preview viewport; scroll horizontally for desktop width"
+      >
+        <iframe
+          class="ui-live-preview"
+          data-ui-live-preview
+          src={frameUrl}
+          title="Interactive Discord preview"
+          width={options.size === "narrow" ? 360 : 1024}
+          height="480"></iframe>
+      </div>
+      <p class="ui-simulation-status" role="status" data-ui-simulation-status>
+        Ready: {selected.label}
+      </p>
+      <details class="ui-fixture-details">
+        <summary>Inspect fictional state</summary>
+        <pre data-ui-state>{JSON.stringify(selected.status, null, 2)}</pre>
+      </details>
+    </section>
+
+    <section id="gallery" class="ui-section" aria-labelledby="gallery-heading">
+      <h2 id="gallery-heading">State gallery</h2>
+      <p>
+        Every supported connection state, rendered by the same component.
+        Gallery controls are inert; inspect a state to try it.
+      </p>
+      <div class="ui-gallery">
+        {
+          discordScenarios.map((scenario) => {
+            const query = previewQuery({
+              ...options,
+              scenario: scenario.id,
+              eligible: scenario.eligible !== false,
+            });
+            return (
+              <article class="ui-gallery-card">
+                <div class="ui-gallery-description">
+                  <h3>{scenario.label}</h3>
+                  <p>{scenario.description}</p>
+                  <a
+                    href={`/dev/ui?${query}#simulator`}
+                    data-ui-inspect={scenario.id}
+                  >
+                    Inspect {scenario.label.toLowerCase()}
+                  </a>
+                </div>
+                <iframe
+                  src={`/dev/ui/discord?${query}&gallery=1`}
+                  title={`${scenario.label} — inert component example`}
+                  loading="lazy"
+                  tabindex="-1"
+                  width="420"
+                  height="390"
+                />
+              </article>
+            );
+          })
+        }
+      </div>
+    </section>
+  </main>
+</LocalLayout>
+
+<script src="./playground.ts"></script>

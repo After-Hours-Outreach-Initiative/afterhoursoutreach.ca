@@ -1,3 +1,5 @@
+import { updateDiscordConnection } from "./discord-connection";
+
 document.addEventListener("submit", async (event) => {
   const form = event.target;
   if (
@@ -79,31 +81,7 @@ async function refresh(root: HTMLElement) {
     const data = statusSchema.parse(body);
     if (data.userId !== root.dataset.discordUser)
       throw new Error("Your account changed. Reload this page.");
-    const identity = root.querySelector<HTMLElement>(
-      "[data-discord-identity]",
-    )!;
-    identity.hidden = !data.username;
-    identity.textContent = data.username
-      ? `${data.memberVerifiedAt !== null ? "Connected" : "Linked"} as ${data.username}.`
-      : "";
-    status.hidden = !data.configured || !data.username;
-    status.textContent = data.username
-      ? `${data.connection.replace(/\.$/, "")}. ${data.sync.replace(/\.$/, "")}.`
-      : "";
-    root.querySelector<HTMLButtonElement>("[data-discord-refresh]")!.hidden =
-      !data.configured || !data.username;
-    const form = root.querySelector<HTMLFormElement>("[data-discord-connect]");
-    if (form) {
-      const focused = form.contains(document.activeElement);
-      form.hidden =
-        !data.configured || Boolean(data.username && !data.needsReconnect);
-      form.querySelector<HTMLElement>(
-        "[data-discord-connect-label]",
-      )!.textContent = data.needsReconnect
-        ? "Reconnect Discord"
-        : "Connect Discord";
-      if (form.hidden && focused) identity.focus({ preventScroll: true });
-    }
+    updateDiscordConnection(root, data);
   } catch (error) {
     status.hidden = false;
     status.textContent =
@@ -140,7 +118,9 @@ const statusSchema = z.object({
   username: z.string().nullable(),
   discordId: z.string().nullable(),
   needsReconnect: z.boolean(),
+  completedAt: z.number().nullable().default(null),
   memberVerifiedAt: z.number().nullable(),
+  lastSyncedAt: z.number().nullable().default(null),
   connection: z.string(),
   sync: z.string(),
 });

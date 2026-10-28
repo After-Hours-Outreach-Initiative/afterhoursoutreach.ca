@@ -1,7 +1,7 @@
 ---
 import { env } from "cloudflare:workers";
 import { loadDiscordStatus } from "@/server/discord/status";
-import DiscordIcon from "@/components/icons/DiscordIcon.astro";
+import DiscordConnectionView from "./DiscordConnectionView.astro";
 interface Props {
   userId: string;
   canConnect?: boolean;
@@ -16,70 +16,5 @@ const status = import.meta.env.DEV
 const result = Astro.url.searchParams.get("discord");
 ---
 
-<div
-  class="min-w-0 wrap-anywhere"
-  data-discord-connection
-  data-discord-user={userId}
->
-  <p>
-    {
-      !status.configured
-        ? "Discord connection is coming soon."
-        : required
-          ? "Connect Discord to access our volunteer channels once you’re approved."
-          : "Connect Discord to keep your volunteer channel access up to date. This is optional."
-    }
-  </p>
-  {
-    result && (
-      <p class="volunteer-notice" role="status">
-        {result === "connected"
-          ? "Discord linked. Checking membership and volunteer access."
-          : result}
-      </p>
-    )
-  }
-  <p class="mt-4" data-discord-identity tabindex="-1" hidden={!status.username}>
-    {
-      status.username
-        ? `${status.memberVerifiedAt !== null ? "Connected" : "Linked"} as ${status.username}.`
-        : ""
-    }
-  </p>
-  <p
-    class="mt-4"
-    data-discord-status
-    role="status"
-    hidden={!status.configured || !status.username}
-  >
-    {
-      status.username
-        ? `${status.connection.replace(/\.$/, "")}. ${status.sync.replace(/\.$/, "")}.`
-        : ""
-    }
-  </p>
-  {
-    status.configured && canConnect && (
-      <form
-        class="volunteer-form mt-4"
-        data-discord-connect
-        hidden={Boolean(status.username && !status.needsReconnect)}
-      >
-        <p data-discord-message role="status" hidden />
-        <button class="btn btn-primary" type="submit">
-          <DiscordIcon class="btn-icon fill-current" />
-          <span data-discord-connect-label>
-            {status.needsReconnect ? "Reconnect Discord" : "Connect Discord"}
-          </span>
-        </button>
-      </form>
-    )
-  }
-  <button
-    type="button"
-    class="btn btn-outline mt-4"
-    data-discord-refresh
-    hidden={!status.configured || !status.username}>Refresh status</button
-  >
-</div>
+<DiscordConnectionView {status} {canConnect} {required} {result} />
 <script src="../../scripts/discord.ts"></script>
