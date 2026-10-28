@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { profileWriteBody } from "../helpers/profile-write";
+import { social } from "../../src/data/site";
 import {
   accountStatePersona,
   manualAccountPresets,
@@ -116,6 +117,23 @@ test("DEV panel separates states from saved accounts and completes each applicat
     await expect(page).toHaveURL(/\/volunteer$/);
     if (index === 0) {
       const tracker = page.locator("[data-application-tracker]");
+      const portal = page.locator("[data-event-browser]");
+      const invite = portal.getByRole("link", {
+        name: "Join Discord",
+        exact: true,
+      });
+      await expect(portal).toContainText(
+        "Join our Discord for the most up to date information.",
+      );
+      await expect(invite).toHaveAttribute("href", social.discord);
+      await expect(invite).toHaveAttribute("target", "_blank");
+      await expect(invite).toHaveAttribute("rel", "noreferrer");
+      await expect(
+        portal.getByRole("link", {
+          name: "Manage Discord connection",
+          exact: true,
+        }),
+      ).toHaveCount(0);
       await expect(
         tracker.locator("[data-application-progress-step]"),
       ).toHaveCount(4);

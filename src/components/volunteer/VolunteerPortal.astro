@@ -29,7 +29,7 @@ import {
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
-import { contactEmail } from "@/data/site";
+import { contactEmail, social } from "@/data/site";
 import "@/styles/volunteer.css";
 
 interface Props {
@@ -225,16 +225,17 @@ const hasVisiblePastEvents = pastEvents.some((event) =>
       !eventAccess && (
         <>
           <p class="mt-12 max-w-3xl text-zinc-300">
-            Connect your Discord identity through your account. Joining with an
-            invite alone does not complete the required application step.
+            Join our Discord for the most up to date information.
           </p>
           <div class="mt-6 flex flex-wrap gap-3.5 max-sm:flex-col">
             <a
               class="btn btn-primary"
-              href="/volunteer/account#account-discord-heading"
+              href={social.discord}
+              target="_blank"
+              rel="noreferrer"
             >
               <DiscordIcon class="btn-icon fill-current" />
-              Manage Discord connection
+              Join Discord
             </a>
           </div>
         </>
