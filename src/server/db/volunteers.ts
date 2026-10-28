@@ -60,6 +60,7 @@ export async function listVolunteers(
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
       WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
+        AND u.deleted_at IS NULL
         AND (? = 'all' OR v.registration_approved = 0)
       ORDER BY v.registration_approved, name, u.id
       LIMIT ? OFFSET ?`,
@@ -69,7 +70,7 @@ export async function listVolunteers(
       `SELECT count(*) AS count FROM user u
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
-      WHERE v.registration_approved = 0`,
+      WHERE v.registration_approved = 0 AND u.deleted_at IS NULL`,
     ),
   ])) as [D1Result<VolunteerRow>, D1Result<{ count: number }>];
   return {
@@ -87,7 +88,7 @@ export function findVolunteer(db: Env["DB"], actor: Actor, userId: string) {
         v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
       FROM user u JOIN profile p ON p.user_id=u.id
-      JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=?`,
+      JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=? AND u.deleted_at IS NULL`,
     )
     .bind(userId)
     .first<VolunteerRow>();
@@ -101,7 +102,9 @@ export async function viewVolunteerProfile(
 ) {
   requireOrganizer(actor);
   const subject = await db
-    .prepare("SELECT user_id FROM profile WHERE user_id=?")
+    .prepare(
+      "SELECT user_id FROM profile p JOIN user u ON u.id=p.user_id WHERE p.user_id=? AND u.deleted_at IS NULL",
+    )
     .bind(userId)
     .first();
   if (!subject) throw new RequestError(404, "Volunteer not found.");
@@ -139,7 +142,7 @@ export async function viewVolunteerProfile(
           p.naloxone_completed_at AS naloxoneCompletedAt,
           p.submitted_application AS submission
         FROM profile p JOIN user u ON u.id = p.user_id
-        WHERE p.user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
+        WHERE p.user_id = ? AND u.deleted_at IS NULL AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
       )
       .bind(userId, accessId),
   ]);

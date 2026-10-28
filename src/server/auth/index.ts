@@ -70,7 +70,12 @@ interface AuthServices {
   sendEmail: (email: SignInEmail) => Promise<void | SignInEmail>;
 }
 
-const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254));
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email().max(254))
+  .refine((email) => !email.endsWith("@account.invalid"));
 const requestSchema = z.strictObject({
   email: emailSchema,
   type: z.literal("sign-in"),

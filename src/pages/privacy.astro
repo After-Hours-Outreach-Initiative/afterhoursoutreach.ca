@@ -249,11 +249,14 @@ const account = await loadAccountNavigation(
         roles; reactivation restores eligible roles. Other roles and server
         membership are preserved. Leaving the server does not automatically
         rejoin you without fresh consent. Contact us to correct a link, remove
-        it, or withdraw consent; an organizer must first arrange removal of
-        synced roles, then remove the link. We retain the link and minimal
-        synchronization state while needed for these purposes, subject to the
-        retention schedule and decision-record requirements below. Discord-side
-        records require separate handling.
+        it, or withdraw consent. Deleting your website sign-in account queues
+        removal of all website-managed roles and then removes the link when
+        synchronization succeeds (or server membership is absent). Failed role
+        removal is retried; the minimal Discord identity remains until it
+        succeeds. We retain the link and minimal synchronization state while
+        needed for these purposes, subject to the retention schedule and
+        decision-record requirements below. Discord-side records require
+        separate handling.
       </p>
       <p class="mt-6">
         Some public pages connect to Shopify’s image CDN, including donation
@@ -294,9 +297,8 @@ const account = await loadAccountNavigation(
         Our Privacy officer is responsible for administering the following
         schedule through manual reviews and deletion, as well as handling
         individual requests through the contact below. There is no general
-        automated cleanup or self-service account deletion. The periods below
-        are our retention rules, not a claim that deletion happens
-        automatically.
+        automated retention cleanup. The periods below are our retention rules,
+        not a claim that deletion happens automatically.
       </p>
       <ul class="mt-6 list-disc space-y-4 pl-6">
         <li>
@@ -380,10 +382,33 @@ const account = await loadAccountNavigation(
         > and change your email through verification. Legal names, birth date, and
         the original submission cannot be changed through the profile editor; contact
         us about corrections. Corrections to retained original submissions need separate
-        handling rather than only changing the current profile. There is no self-service
-        account deletion. We explain the outcome of deletion or consent-withdrawal
-        requests, including any information that must be kept, why, and the effect
-        on participation. These requests are not a promise of immediate erasure.
+        handling rather than only changing the current profile.
+      </p>
+      <p class="mt-6">
+        You can permanently delete your sign-in account under Account settings
+        in <a
+          href="/volunteer/account#account-delete-heading"
+          class="underline underline-offset-4">Your account</a
+        >. This requires a sign-in within ten minutes, your current email
+        address, and explicit confirmation. It removes all sessions, sign-in
+        credentials, authenticator records, and account drafts, replaces the
+        sign-in identity, cancels upcoming signups, and stops queued
+        notifications. Messages already sent or sending cannot be recalled. A
+        frozen email batch containing your address is stopped as a whole to
+        avoid unsafe or duplicate retries. Signing in with your former email
+        later creates a separate new account; it does not restore your
+        application, approvals, or history.
+      </p>
+      <p class="mt-6">
+        Account deletion does not erase submitted applications, retained profile
+        details, event and decision history, or delivery records. Deleted
+        accounts are removed from the volunteer management list and profile
+        views. Retained records remain subject to the retention schedule,
+        decision-record minimums, and legal holds above. Our Privacy officer
+        handles further removal requests and explains what must be kept and why.
+        Browser copies on other devices, inboxes, provider records, and backups
+        require separate handling; clear this site's browser data on each
+        device. Deletion is not a promise of immediate or universal erasure.
       </p>
       <p class="mt-6">
         Our Privacy officer investigates privacy complaints. You may also

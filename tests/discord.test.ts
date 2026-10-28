@@ -20,6 +20,7 @@ import {
   loadApplicationProgress,
 } from "../src/server/db/application-progress";
 import { setVolunteerStatus } from "../src/server/db/volunteers";
+import { deleteOwnAccount } from "../src/server/db/account-deletion";
 import { RequestError } from "../src/server/http";
 import {
   loadLocalDiscordStatus,
@@ -157,6 +158,59 @@ async function due() {
     "UPDATE discord_worker SET not_before=0,request_window=0,request_count=0",
   ).run();
 }
+
+test("deleted accounts retain retryable Discord removal until all managed roles are gone, without kicking or rejoining", async () => {
+  for (const member of [true, false]) {
+    const actor = await person(member ? "deleted-member" : "deleted-nonmember");
+    await link(actor);
+    await env.DB.prepare("UPDATE session SET created_at=? WHERE id=?")
+      .bind(Date.now(), actor.sessionId)
+      .run();
+    await deleteOwnAccount(
+      env.DB,
+      { userId: actor.id, sessionId: actor.sessionId },
+      {
+        userId: actor.id,
+        email: `${actor.id}@example.org`,
+        confirm: true,
+      },
+    );
+    await processDiscordSync(
+      config,
+      async () => new Response(null, { status: 503 }),
+    );
+    assert.ok(
+      await env.DB.prepare("SELECT user_id FROM discord_link WHERE user_id=?")
+        .bind(actor.id)
+        .first(),
+    );
+    await due();
+    const discord = discordServer(
+      [...Object.values(managedRoles(config)), "unrelated-role"],
+      member,
+    );
+    await processDiscordSync(config, discord.send);
+    assert.equal(
+      await env.DB.prepare("SELECT user_id FROM discord_link WHERE user_id=?")
+        .bind(actor.id)
+        .first(),
+      null,
+    );
+    assert.deepEqual(
+      discord.state.roles,
+      member
+        ? ["unrelated-role"]
+        : [...Object.values(managedRoles(config)), "unrelated-role"],
+    );
+    assert.ok(
+      discord.state.calls.every(
+        (call) =>
+          call.method === "GET" ||
+          (call.method === "DELETE" && call.path.includes("/roles/")),
+      ),
+    );
+  }
+});
 
 test("Discord uses only the three allowed roles, all gated by active application approval", () => {
   const roles = managedRoles(config),

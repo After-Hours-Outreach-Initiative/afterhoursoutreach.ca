@@ -148,6 +148,13 @@
       "when": 1793152833759,
       "tag": "0020_discord_connect",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1793163895706,
+      "tag": "0021_account_deletion",
+      "breakpoints": true
     }
   ]
 }

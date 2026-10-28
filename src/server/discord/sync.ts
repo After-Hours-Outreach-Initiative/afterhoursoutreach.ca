@@ -29,6 +29,7 @@ export function eligibleRoles(
 }
 
 interface Link extends Eligibility {
+  deleted_at: number | null;
   user_id: string;
   discord_id: string;
   guild_id: string;
@@ -197,7 +198,7 @@ export async function processDiscordSync(
     for (let calls = 0; calls < 20 && Date.now() - started < 20_000; calls++) {
       const link = await db
         .prepare(
-          `SELECT d.*,coalesce(v.active,0) AS active,
+          `SELECT d.*,u.deleted_at,CASE WHEN u.deleted_at IS NULL THEN coalesce(v.active,0) ELSE 0 END AS active,
         CASE WHEN p.user_id IS NOT NULL THEN coalesce(v.registration_approved,0) ELSE 0 END AS approved,
         u.role='organizer' AS organizer,coalesce(v.patrol_approved,0) AS patrol,
         EXISTS(SELECT 1 FROM json_each(p.teams) WHERE value='medic') AS medic,
@@ -217,6 +218,15 @@ export async function processDiscordSync(
         ) {
           const response = await api(memberPath);
           if (response.status === 404) {
+            if (link.deleted_at !== null) {
+              await checkpoint(
+                "DELETE FROM discord_link WHERE user_id=? AND version=?",
+                link.user_id,
+                link.version,
+              );
+              processed++;
+              continue;
+            }
             if (link.join_token && (link.token_expires_at ?? 0) > Date.now()) {
               // Joining is authorized only by the explicit, short-lived consent.
               const access_token = await decryptToken(
@@ -224,7 +234,23 @@ export async function processDiscordSync(
                 link.join_token,
                 `${link.user_id}:${link.discord_id}:${link.guild_id}`,
               );
-              const joined = await api(memberPath, "PUT", { access_token });
+              const joined = await api(
+                memberPath,
+                "PUT",
+                { access_token },
+                async () =>
+                  Boolean(
+                    (
+                      await checkpoint(
+                        `UPDATE discord_link SET observed_roles=NULL WHERE user_id=? AND version=? AND join_token=?
+                  AND EXISTS (SELECT 1 FROM user WHERE id=discord_link.user_id AND deleted_at IS NULL)`,
+                        link.user_id,
+                        link.version,
+                        link.join_token,
+                      )
+                    ).meta.changes,
+                  ),
+              );
               if (joined.status === 404)
                 throw new Retry("membership_missing", Date.now() + 3_600_000);
               // Discard the credential after a successful join. A separate GET
@@ -310,6 +336,15 @@ export async function processDiscordSync(
             link.user_id,
             link.version,
           );
+          continue;
+        }
+        if (link.deleted_at !== null) {
+          await checkpoint(
+            "DELETE FROM discord_link WHERE user_id=? AND version=?",
+            link.user_id,
+            link.version,
+          );
+          processed++;
           continue;
         }
         await checkpoint(

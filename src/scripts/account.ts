@@ -459,6 +459,18 @@ form("[data-end-session]", async (element, values) => {
     );
 });
 
+form("[data-delete-account]", async (element, values) => {
+  const userId = element.dataset.deleteUserId!;
+  const result = await post("/api/v1/account/delete", {
+    userId,
+    email: String(values.get("email") ?? ""),
+    confirm: values.get("confirm") === "on",
+  });
+  // Deletion intentionally discards unsynced answers too, unlike signing out.
+  clearApplicationDraft(userId);
+  location.replace(result.next ?? "/volunteer/sign-in?deleted");
+});
+
 form("[data-enable-factor]", async (element) => {
   const result = await authClient.twoFactor.enable({ method: "totp" });
   if (result.method !== "totp" || !result.totpURI || !result.backupCodes)

@@ -43,8 +43,8 @@ export async function countNotifications(db: Env["DB"], operation: string) {
       `SELECT
     count(CASE WHEN n.status IN ('sent','local') THEN 1 END) AS sent,
     count(CASE WHEN n.status = 'local' THEN 1 END) AS simulated,
-    count(CASE WHEN n.status IN ('pending','sending') AND coalesce(b.created_at,n.created_at) > ? AND delivery_to IS NOT NULL THEN 1 END) AS pending,
-    count(CASE WHEN n.status IN ('pending','sending') AND (coalesce(b.created_at,n.created_at) <= ? OR delivery_to IS NULL) THEN 1 END) AS expired
+    count(CASE WHEN n.status IN ('pending','sending') AND coalesce(b.status,'pending')!='cancelled' AND coalesce(b.created_at,n.created_at) > ? AND delivery_to IS NOT NULL THEN 1 END) AS pending,
+    count(CASE WHEN n.status IN ('pending','sending') AND (b.status='cancelled' OR coalesce(b.created_at,n.created_at) <= ? OR delivery_to IS NULL) THEN 1 END) AS expired
     FROM event_notification n LEFT JOIN event_notification_batch b ON b.id=n.batch_id WHERE n.operation_id=?`,
     )
     .bind(cutoff, cutoff, operation)
@@ -191,7 +191,7 @@ export async function uncertainNotifications(db: Env["DB"], operation: string) {
     (await db
       .prepare(
         `SELECT count(*) AS n FROM event_notification n JOIN event_notification_batch b ON b.id=n.batch_id
-    WHERE n.operation_id=? AND n.status IN ('pending','sending') AND (b.outcome='unconfirmed' OR b.status='sending')`,
+    WHERE n.operation_id=? AND n.status IN ('pending','sending') AND b.status!='cancelled' AND (b.outcome='unconfirmed' OR b.status='sending')`,
       )
       .bind(operation)
       .first<number>("n")) ?? 0

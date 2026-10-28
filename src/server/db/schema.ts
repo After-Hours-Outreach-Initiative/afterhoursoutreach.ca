@@ -28,6 +28,8 @@ export const user = sqliteTable(
     two_factor_enabled: integer({ mode: "boolean" }).notNull().default(false),
     created_at: timestamp().notNull(),
     updated_at: timestamp().notNull(),
+    // Irreversible sign-in deletion; referenced decision/history records remain.
+    deleted_at: timestamp(),
   },
   (table) => [
     check("user_role", sql`${table.role} IN ('volunteer', 'organizer')`),
@@ -526,7 +528,7 @@ export const eventNotificationBatch = sqliteTable(
     id: text().primaryKey(),
     operation_id: text().notNull(),
     payload: text().notNull(),
-    status: text({ enum: ["pending", "sending", "sent", "local"] })
+    status: text({ enum: ["pending", "sending", "sent", "local", "cancelled"] })
       .notNull()
       .default("pending"),
     outcome: text({ enum: ["failed", "unconfirmed"] }),

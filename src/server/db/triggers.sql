@@ -435,3 +435,56 @@ WHEN NEW.user_id IS NOT OLD.user_id OR NEW.discord_id IS NOT OLD.discord_id OR N
 BEGIN
   SELECT RAISE(ABORT, 'discord_identity_immutable');
 END;
+--> statement-breakpoint
+
+-- Delete sign-in access atomically, without destroying records subject to the
+-- privacy policy's decision-record/legal-hold retention. Existing organizer
+-- demotion protection also applies to the initiating UPDATE of user.role.
+CREATE TRIGGER account_deleted AFTER UPDATE OF deleted_at ON user
+WHEN OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+BEGIN
+  DELETE FROM session WHERE user_id=NEW.id;
+  DELETE FROM account WHERE user_id=NEW.id;
+  DELETE FROM two_factor WHERE user_id=NEW.id;
+  DELETE FROM verification WHERE value=NEW.id
+    OR identifier='sign-in-otp-' || lower(OLD.email)
+    OR instr(identifier, 'change-email-otp-' || lower(OLD.email) || '-')=1;
+  DELETE FROM application_draft WHERE user_id=NEW.id;
+  DELETE FROM application_draft_generation WHERE user_id=NEW.id;
+  DELETE FROM discord_oauth WHERE user_id=NEW.id;
+  UPDATE volunteer_status SET active=0,updated_at=NEW.deleted_at WHERE user_id=NEW.id;
+  UPDATE signup SET status='cancelled',updated_at=NEW.deleted_at
+    WHERE user_id=NEW.id AND status='confirmed'
+      AND event_id IN (SELECT id FROM event WHERE starts_at>NEW.deleted_at);
+  -- Frozen batches cannot be edited/regrouped safely after a possible send.
+  -- Stop the whole affected batch; never resend it with a new payload/key.
+  UPDATE event_notification_batch SET status='cancelled',lease_token=NULL,lease_until=NULL
+    WHERE status IN ('pending','sending') AND id IN
+      (SELECT batch_id FROM event_notification WHERE user_id=NEW.id);
+  DELETE FROM event_notification WHERE user_id=NEW.id AND batch_id IS NULL AND status='pending';
+  UPDATE application_submission_notification SET status='expired',lease_token=NULL,lease_until=NULL
+    WHERE user_id=NEW.id AND status IN ('pending','sending');
+  UPDATE medic_certification_notification SET status='cancelled',delivery_payload=NULL,lease_token=NULL,lease_until=NULL
+    WHERE user_id=NEW.id AND status IN ('pending','sending');
+  -- Retain only the identity needed for durable managed-role removal. The sync
+  -- worker discards this link once roles are removed (or membership is absent).
+  UPDATE discord_link SET username='Deleted account',join_token=NULL,token_expires_at=NULL,
+    observed_roles=NULL,checked_at=NULL,version=version+1,next_attempt_at=0 WHERE user_id=NEW.id;
+END;
+--> statement-breakpoint
+CREATE TRIGGER deleted_account_immutable BEFORE UPDATE ON user WHEN OLD.deleted_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'account_deleted');
+END;
+--> statement-breakpoint
+CREATE TRIGGER deleted_account_no_session BEFORE INSERT ON session
+WHEN EXISTS (SELECT 1 FROM user WHERE id=NEW.user_id AND deleted_at IS NOT NULL)
+BEGIN
+  SELECT RAISE(ABORT, 'account_deleted');
+END;
+--> statement-breakpoint
+CREATE TRIGGER deleted_account_no_reactivation BEFORE UPDATE OF active ON volunteer_status
+WHEN NEW.active=1 AND EXISTS (SELECT 1 FROM user WHERE id=NEW.user_id AND deleted_at IS NOT NULL)
+BEGIN
+  SELECT RAISE(ABORT, 'account_deleted');
+END;

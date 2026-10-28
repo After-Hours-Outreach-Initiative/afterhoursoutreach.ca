@@ -32,5 +32,14 @@ if (env.BETTER_AUTH_SECRET) {
   title="Sign in"
   description="Sign in or create your volunteer account with an email link or code."
 >
+  {
+    Astro.url.searchParams.has("deleted") && (
+      <p class="volunteer-notice" role="status">
+        Your sign-in account has been deleted and all devices have been signed
+        out. Retained volunteer records are handled under our{" "}
+        <a href="/privacy">privacy policy</a>.
+      </p>
+    )
+  }
   <SignInPanel />
 </AccountLayout>

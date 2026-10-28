@@ -46,7 +46,7 @@ export async function listLocalAccounts(db: Env["DB"], after?: string) {
     EXISTS (SELECT 1 FROM json_each(coalesce(p.teams, '[]')) WHERE value='medic') AS medicSelected,
     ${approvedMedicSql("u.id")} AS medicEligible
     FROM user u LEFT JOIN profile p ON p.user_id=u.id LEFT JOIN volunteer_status v ON v.user_id=u.id
-     WHERE (? IS NULL OR u.id>?)
+     WHERE u.deleted_at IS NULL AND (? IS NULL OR u.id>?)
        AND NOT EXISTS(SELECT 1 FROM account a WHERE a.user_id=u.id AND a.provider_id=?)
      ORDER BY u.id LIMIT 101`,
     )

@@ -15,6 +15,17 @@ const simulationSchema = z.strictObject({
   outcome: z.enum(["authorize", "screening", "unavailable"]),
 });
 
+/** Normal deletion flow, fictional links only; imported solely in DEV builds. */
+export async function simulateDeletedDiscord(db: Env["DB"], userId: string) {
+  await db
+    .prepare(
+      `DELETE FROM discord_link WHERE user_id=? AND guild_id='local-only'
+    AND EXISTS (SELECT 1 FROM user WHERE id=discord_link.user_id AND deleted_at IS NOT NULL)`,
+    )
+    .bind(userId)
+    .run();
+}
+
 /** Called only through DEV-gated imports; never receives or creates credentials. */
 export async function simulateDiscordConnection(
   db: Env["DB"],

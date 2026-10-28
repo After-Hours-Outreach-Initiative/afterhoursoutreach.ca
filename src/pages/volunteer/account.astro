@@ -4,6 +4,7 @@ import { APIError } from "better-auth/api";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
+import AccountDeleteSettings from "@/components/volunteer/AccountDeleteSettings.astro";
 import DiscordConnection from "@/components/volunteer/DiscordConnection.astro";
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
 import {
@@ -27,6 +28,7 @@ import {
   loadFirstCompletedOrientation,
 } from "@/server/db/profiles";
 import { createDatabase } from "@/server/db";
+import { accountDeletionFreshAge } from "@/server/db/account-deletion";
 import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
@@ -54,6 +56,7 @@ let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
 let sessionsNeedSignIn = false;
 let emailNeedsSignIn = false;
 let factorNeedsSignIn = false;
+let deletionNeedsSignIn = false;
 if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");
 try {
   const auth = createAuth(authBindingsForRequest(env, Astro.request));
@@ -68,7 +71,6 @@ try {
   )
     return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/account");
   values = await loadProfile(env.DB, current.user.id);
-  if (!values) return Astro.redirect("/apply");
   submission = await loadSubmittedApplication(env.DB, current.user.id);
   applicationProgress = await loadApplicationProgress(env.DB, current.user.id);
   accountCreatedAt = current.user.createdAt;
@@ -87,6 +89,9 @@ try {
   factorNeedsSignIn =
     Date.now() - current.session.createdAt.getTime() >=
     authenticatorFreshAge * 1000;
+  deletionNeedsSignIn =
+    Date.now() - current.session.createdAt.getTime() >=
+    accountDeletionFreshAge * 1000;
   twoFactorEnabled = Boolean(current.user.twoFactorEnabled);
   organizer = current.user.role === "organizer";
   const status = await createDatabase(env.DB).query.volunteerStatus.findFirst({
@@ -142,7 +147,7 @@ const completedMilestones = [
 ];
 const contents = [
   { id: "account-profile-heading", heading: "Your profile" },
-  ...profileFormSections().map((section) => ({
+  ...(values ? profileFormSections() : []).map((section) => ({
     id: `account-profile-${section.key}`,
     heading: section.heading,
     nested: true,
@@ -164,6 +169,7 @@ const contents = [
     nested: true,
   },
   { id: "account-sessions-heading", heading: "Sessions", nested: true },
+  { id: "account-delete-heading", heading: "Delete account", nested: true },
 ];
 ---
 
@@ -185,7 +191,7 @@ const contents = [
     />
     <div data-account-contents-body>
       {
-        !active && (
+        values && !active && (
           <p class="volunteer-notice" role="status">
             Your volunteer account is inactive. Contact an organizer at{" "}
             <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore
@@ -227,7 +233,16 @@ const contents = [
             </div>
           </dl>
         </div>
-        <AccountProfileForm values={values} userId={userId} />
+        {
+          values ? (
+            <AccountProfileForm values={values} userId={userId} />
+          ) : (
+            <p>
+              You have not submitted a volunteer application.{" "}
+              <a href="/apply">Continue your application</a>.
+            </p>
+          )
+        }
       </section>
       {
         applicationComplete && (
@@ -554,6 +569,7 @@ const contents = [
             </ul>
           </div>
         </div>
+        <AccountDeleteSettings {userId} needsSignIn={deletionNeedsSignIn} />
       </section>
     </div>
   </div>
