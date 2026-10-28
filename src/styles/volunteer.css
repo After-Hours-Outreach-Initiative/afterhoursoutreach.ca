@@ -1374,7 +1374,7 @@ body:has(
   padding: 1rem;
   vertical-align: top;
   border-bottom: var(--volunteer-border);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .volunteer-table thead {
   background: #171a20;
@@ -1396,10 +1396,12 @@ body:has(
 }
 .volunteer-table th[scope="row"] {
   min-width: 12rem;
+  overflow-wrap: anywhere;
 }
 .volunteer-table a {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   min-height: 2.75rem;
   margin-block: -0.5rem;
   color: #c7d2fe;
@@ -1416,6 +1418,32 @@ body:has(
 }
 .volunteer-table-approved {
   color: #4ade80;
+}
+@media (width < 64rem) {
+  .volunteer-table {
+    /* Keep long names from squeezing the other columns into broken words.
+       Only the labelled, keyboard-focusable table region scrolls sideways. */
+    min-width: 52rem;
+    table-layout: fixed;
+  }
+  .volunteer-table :is(th, td) {
+    padding: 0.75rem;
+  }
+  .volunteer-table thead th:nth-child(1) {
+    width: 27%;
+  }
+  .volunteer-table thead th:nth-child(2) {
+    width: 22%;
+  }
+  .volunteer-table thead th:nth-child(3) {
+    width: 23%;
+  }
+  .volunteer-table thead th:nth-child(4) {
+    width: 18%;
+  }
+  .volunteer-table thead th:nth-child(5) {
+    width: 10%;
+  }
 }
 .volunteer-profile-tabs {
   display: flex;
