@@ -1,23 +1,27 @@
 ---
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+import type { EventRow } from "@/server/db/events";
+import EventAttendance from "./EventAttendance.astro";
 
 interface Props {
   count: number;
+  event: EventRow;
 }
-const { count } = Astro.props;
+const { count, event } = Astro.props;
 ---
 
 <summary class="event-roster-toggle">
   <span>Volunteers ({count})</span>
   <ChevronDownIcon class="event-roster-chevron size-5 shrink-0" />
+  <EventAttendance event={event} />
 </summary>
 
 <style>
   .event-roster-toggle {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
+    gap: 0.5rem 1rem;
     width: 100%;
     min-height: 3rem;
     padding: 0.75rem 1rem;
@@ -27,6 +31,9 @@ const { count } = Astro.props;
     color: #e4e4e7;
     cursor: pointer;
     list-style: none;
+  }
+  .event-roster-toggle > :global(.event-attendance) {
+    grid-column: 1 / -1;
   }
   .event-roster-toggle::-webkit-details-marker {
     display: none;

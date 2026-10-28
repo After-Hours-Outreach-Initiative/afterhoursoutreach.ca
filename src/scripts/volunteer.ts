@@ -426,7 +426,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     (card && !card.hidden
       ? !element && focused === focusedCard
         ? card
-        : card.querySelector<HTMLElement>(selector)
+        : (card.querySelector<HTMLElement>(selector) ?? card)
       : null
     )?.focus({ preventScroll: true });
     if (document.activeElement === document.body)

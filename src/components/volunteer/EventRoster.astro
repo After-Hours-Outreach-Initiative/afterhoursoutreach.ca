@@ -14,9 +14,8 @@ const { event, roster, future, destinations } = Astro.props;
 ---
 
 <details class="volunteer-roster">
-  <EventRosterSummary count={roster.length} />
-  {roster.length === 0 && <p>No volunteers registered yet.</p>}
-  <table class="event-roster-table" hidden={roster.length === 0}>
+  <EventRosterSummary count={roster.length} event={event} />
+  <table class="event-roster-table">
     <caption class="sr-only">Registered volunteers</caption>
     <thead class="sr-only">
       <tr>
@@ -79,3 +78,10 @@ const { event, roster, future, destinations } = Astro.props;
     </tbody>
   </table>
 </details>
+
+<style>
+  .volunteer-roster {
+    border-top: 0;
+    padding-top: 0;
+  }
+</style>

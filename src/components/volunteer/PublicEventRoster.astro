@@ -1,17 +1,17 @@
 ---
-import type { PublicRosterRow } from "@/server/db/events";
+import type { EventRow, PublicRosterRow } from "@/server/db/events";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
 interface Props {
+  event: EventRow;
   roster: PublicRosterRow[];
 }
-const { roster } = Astro.props;
+const { event, roster } = Astro.props;
 ---
 
 <details class="public-event-roster">
-  <EventRosterSummary count={roster.length} />
-  {roster.length === 0 && <p>No volunteers registered yet.</p>}
-  <table class="event-roster-table" hidden={roster.length === 0}>
+  <EventRosterSummary count={roster.length} event={event} />
+  <table class="event-roster-table">
     <caption class="sr-only">Registered volunteers</caption>
     <thead class="sr-only"><tr><th scope="col">Volunteer</th></tr></thead>
     <tbody>
@@ -34,7 +34,5 @@ const { roster } = Astro.props;
 <style>
   .public-event-roster {
     margin-top: 0.5rem;
-    border-top: 1px solid #27272a;
-    padding-top: 0.5rem;
   }
 </style>

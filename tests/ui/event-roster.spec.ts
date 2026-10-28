@@ -6,7 +6,7 @@ import {
   openLocalAccountSwitcher,
 } from "../helpers/local-account";
 
-test("empty volunteer rosters stay accessible and collapse avatar space through first/last signup updates", async ({
+test("empty volunteer rosters reserve no space through first/last signup updates", async ({
   page,
   browser,
   baseURL,
@@ -76,16 +76,19 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
       card.locator(".volunteer-roster, .public-event-roster");
     const geometry = (card: Locator) =>
       card.evaluate((element) => {
-        const bounds = (selector: string) =>
-          element.querySelector(selector)!.getBoundingClientRect();
         const top = element.getBoundingClientRect().top;
         return {
           height: element.getBoundingClientRect().height,
           rowHeight:
             element.querySelector(".event-avatar-row")?.getBoundingClientRect()
               .height ?? 0,
-          actionTop: bounds(".volunteer-actions").top - top,
-          summaryTop: bounds("details > summary").top - top,
+          actionTop:
+            element.querySelector(".volunteer-actions")!.getBoundingClientRect()
+              .top - top,
+          rosterHeight:
+            element
+              .querySelector(".volunteer-roster, .public-event-roster")
+              ?.getBoundingClientRect().height ?? 0,
         };
       });
     const initial = [];
@@ -95,23 +98,11 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
         card.locator(".event-avatar-row .attendee-avatar"),
       ).toHaveCount(0);
       await expect(card.locator(".event-attendance")).toHaveCount(0);
-      await expect(roster(card).locator("summary")).toHaveText(
-        "Volunteers (0)",
-      );
+      await expect(roster(card)).toHaveCount(0);
       const before = await geometry(card);
       expect(before.rowHeight).toBe(0);
+      expect(before.rosterHeight).toBe(0);
       initial.push(before);
-      const summary = roster(card).locator("summary");
-      await summary.focus();
-      await summary.press("Enter");
-      await expect(
-        roster(card).getByText("No volunteers registered yet."),
-      ).toBeVisible();
-      await expect(
-        roster(card).getByRole("table", { includeHidden: true }),
-      ).toBeHidden();
-      await summary.press("Space");
-      await expect(roster(card)).not.toHaveAttribute("open");
     }
     const setRegistration = async (action: "join" | "cancel") => {
       const response = await page.request.post("/api/v1/events/action", {
@@ -129,13 +120,17 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
         },
       );
       await expect(
-        card.locator(".event-avatar-row .attendee-avatar"),
+        roster(card).locator("summary .event-avatar-row .attendee-avatar"),
       ).toHaveCount(1);
+      await expect(
+        card.locator(".volunteer-event-layout .event-attendance"),
+      ).toHaveCount(0);
       await expect(roster(card)).not.toHaveAttribute("open");
       const registered = await geometry(card);
       expect(registered.rowHeight).toBe(24);
       expect(registered.height).toBeGreaterThan(initial[index].height);
-      expect(registered.summaryTop).toBeGreaterThan(initial[index].summaryTop);
+      expect(registered.rosterHeight).toBeGreaterThan(0);
+      expect(registered.actionTop).toBe(initial[index].actionTop);
       await roster(card).locator("summary").focus();
       await roster(card).locator("summary").press("Enter");
       await expect(roster(card).locator("tbody tr")).toHaveCount(1);
@@ -145,21 +140,11 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
     }
     await setRegistration("cancel");
     for (const [index, card] of cards.entries()) {
-      await expect(roster(card).locator("summary")).toHaveText(
-        "Volunteers (0)",
-        {
-          timeout: 15_000,
-        },
-      );
-      await expect(roster(card)).toHaveAttribute("open", "");
-      await expect(roster(card).locator("summary")).toBeFocused();
-      await expect(
-        roster(card).getByText("No volunteers registered yet."),
-      ).toBeVisible();
+      await expect(roster(card)).toHaveCount(0, { timeout: 15_000 });
+      await expect(card).toBeFocused();
       await expect(
         card.locator(".event-avatar-row .attendee-avatar"),
       ).toHaveCount(0);
-      await roster(card).locator("summary").press("Space");
       expect(await geometry(card)).toEqual(initial[index]);
     }
     // Form submissions use the same server-rendered empty state as live polling.
@@ -188,10 +173,17 @@ test("empty volunteer rosters stay accessible and collapse avatar space through 
             ).toEqual({ lines: 1, buttonOverflow: false, pageOverflow: false });
           }
         },
-        updated: () =>
-          expect(roster(publicCard).locator("summary")).toHaveText(
-            `Volunteers (${joining ? 1 : 0})`,
-          ),
+        updated: async () => {
+          if (joining) {
+            await expect(roster(publicCard).locator("summary")).toHaveText(
+              "Volunteers (1)",
+            );
+            await expect(
+              roster(publicCard).locator("summary .attendee-avatar"),
+            ).toHaveCount(1);
+          } else await expect(roster(publicCard)).toHaveCount(0);
+          await expect(button).toBeFocused();
+        },
       });
     }
     await expect(
@@ -285,7 +277,10 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
             (element: HTMLDetailsElement) => element.open,
           ))
         ) {
-          await expect(summary.locator("svg")).toHaveCSS("transform", "none");
+          await expect(summary.locator(".event-roster-chevron")).toHaveCSS(
+            "transform",
+            "none",
+          );
           await summary.click({
             position: {
               x: await summary.evaluate((element) => element.clientWidth - 20),
@@ -302,6 +297,8 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           const avatar = (selector: string) =>
             element.querySelector(selector)!.getBoundingClientRect().height;
           const summary = element.querySelector("details > summary")!;
+          const title = summary.querySelector(":scope > span")!;
+          const avatars = summary.querySelector(".event-avatar-row")!;
           return {
             avatars: [
               avatar(".event-avatar-row .attendee-avatar"),
@@ -311,7 +308,14 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
             summaryWidth: summary.getBoundingClientRect().width,
             rosterWidth: summary.parentElement!.getBoundingClientRect().width,
             summaryHeight: summary.getBoundingClientRect().height,
-            chevron: getComputedStyle(summary.querySelector("svg")!).transform,
+            avatarsBelowTitle:
+              avatars.getBoundingClientRect().top >=
+              title.getBoundingClientRect().bottom,
+            rosterBorderTop: getComputedStyle(summary.parentElement!)
+              .borderTopWidth,
+            chevron: getComputedStyle(
+              summary.querySelector(".event-roster-chevron")!,
+            ).transform,
             overflow: document.documentElement.scrollWidth > innerWidth,
           };
         });
@@ -319,6 +323,8 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         expect(layout.stripes).toEqual(["rgb(12, 13, 16)", "rgb(23, 26, 32)"]);
         expect(layout.summaryWidth).toBe(layout.rosterWidth);
         expect(layout.summaryHeight).toBeGreaterThanOrEqual(48);
+        expect(layout.avatarsBelowTitle).toBe(true);
+        expect(layout.rosterBorderTop).toBe("0px");
         expect(layout.chevron).toBe("matrix(-1, 0, 0, -1, 0, 0)");
         expect(layout.overflow).toBe(false);
         await summary.focus();
