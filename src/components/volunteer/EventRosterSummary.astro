@@ -33,7 +33,12 @@ const { count, event } = Astro.props;
     list-style: none;
   }
   .event-roster-toggle > :global(.event-attendance) {
-    grid-column: 1 / -1;
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .event-roster-toggle > :global(.event-roster-chevron) {
+    grid-column: 2;
+    grid-row: 1 / 3;
   }
   .event-roster-toggle::-webkit-details-marker {
     display: none;

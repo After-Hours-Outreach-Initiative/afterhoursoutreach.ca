@@ -299,6 +299,9 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           const summary = element.querySelector("details > summary")!;
           const title = summary.querySelector(":scope > span")!;
           const avatars = summary.querySelector(".event-avatar-row")!;
+          const chevron = summary.querySelector(".event-roster-chevron")!;
+          const summaryBounds = summary.getBoundingClientRect();
+          const chevronBounds = chevron.getBoundingClientRect();
           return {
             avatars: [
               avatar(".event-avatar-row .attendee-avatar"),
@@ -311,11 +314,15 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
             avatarsBelowTitle:
               avatars.getBoundingClientRect().top >=
               title.getBoundingClientRect().bottom,
+            avatarsLeftOfChevron:
+              avatars.getBoundingClientRect().right <= chevronBounds.left,
+            chevronCenterOffset:
+              chevronBounds.top +
+              chevronBounds.height / 2 -
+              (summaryBounds.top + summaryBounds.height / 2),
             rosterBorderTop: getComputedStyle(summary.parentElement!)
               .borderTopWidth,
-            chevron: getComputedStyle(
-              summary.querySelector(".event-roster-chevron")!,
-            ).transform,
+            chevron: getComputedStyle(chevron).transform,
             overflow: document.documentElement.scrollWidth > innerWidth,
           };
         });
@@ -324,6 +331,8 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         expect(layout.summaryWidth).toBe(layout.rosterWidth);
         expect(layout.summaryHeight).toBeGreaterThanOrEqual(48);
         expect(layout.avatarsBelowTitle).toBe(true);
+        expect(layout.avatarsLeftOfChevron).toBe(true);
+        expect(Math.abs(layout.chevronCenterOffset)).toBeLessThan(1);
         expect(layout.rosterBorderTop).toBe("0px");
         expect(layout.chevron).toBe("matrix(-1, 0, 0, -1, 0, 0)");
         expect(layout.overflow).toBe(false);
