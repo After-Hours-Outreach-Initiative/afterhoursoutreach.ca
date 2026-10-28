@@ -273,6 +273,7 @@ test("local Discord simulation preserves consent and screening, then reconciles 
   const pending = await loadLocalDiscordStatus(config, actor.id);
   assert.equal(pending.configured, true);
   assert.equal(pending.completedAt, null);
+  assert.equal(pending.needsReconnect, false);
   assert.match(pending.connection, /Accept the server rules/);
   assert.equal(
     (await loadApplicationProgress(env.DB, actor.id)).discordCompletedAt,
@@ -282,6 +283,7 @@ test("local Discord simulation preserves consent and screening, then reconciles 
   await simulateDiscordConnection(env.DB, actor, input);
   const connected = await loadLocalDiscordStatus(config, actor.id);
   assert.ok(connected.completedAt);
+  assert.equal(connected.needsReconnect, false);
   assert.match(connected.sync, /Roles synchronized/);
   const local = () =>
     env.DB.prepare("SELECT * FROM discord_link WHERE user_id=?")
@@ -801,10 +803,9 @@ test("leaving never causes an unconsented rejoin and expired join tokens are era
     server.state.calls.map(({ method }) => method),
     ["GET"],
   );
-  assert.match(
-    (await loadDiscordStatus(config, actor.id)).connection,
-    /Reconnect/,
-  );
+  const missing = await loadDiscordStatus(config, actor.id);
+  assert.match(missing.connection, /Reconnect/);
+  assert.equal(missing.needsReconnect, true);
   await link(actor);
   await env.DB.prepare("UPDATE discord_link SET token_expires_at=0").run();
   await due();
@@ -832,6 +833,7 @@ test("bot permission failures are durable and previews never contact Discord", a
   assert.equal(calls, 1);
   const status = await loadDiscordStatus(config, actor.id);
   assert.match(status.sync, /temporarily unavailable/);
+  assert.equal(status.needsReconnect, false);
   assert.equal(
     JSON.stringify(status).includes("private provider detail"),
     false,

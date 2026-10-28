@@ -39,8 +39,12 @@ const result = Astro.url.searchParams.get("discord");
       </p>
     )
   }
-  <p class="mt-4" data-discord-identity hidden={!status.username}>
-    {status.username ? `Connected as ${status.username}.` : ""}
+  <p class="mt-4" data-discord-identity tabindex="-1" hidden={!status.username}>
+    {
+      status.username
+        ? `${status.memberVerifiedAt !== null ? "Connected" : "Linked"} as ${status.username}.`
+        : ""
+    }
   </p>
   <p
     class="mt-4"
@@ -56,11 +60,17 @@ const result = Astro.url.searchParams.get("discord");
   </p>
   {
     status.configured && canConnect && (
-      <form class="volunteer-form mt-4" data-discord-connect>
+      <form
+        class="volunteer-form mt-4"
+        data-discord-connect
+        hidden={Boolean(status.username && !status.needsReconnect)}
+      >
         <p data-discord-message role="status" hidden />
         <button class="btn btn-primary" type="submit">
           <DiscordIcon class="btn-icon fill-current" />
-          {status.username ? "Reconnect Discord" : "Connect Discord"}
+          <span data-discord-connect-label>
+            {status.needsReconnect ? "Reconnect Discord" : "Connect Discord"}
+          </span>
         </button>
       </form>
     )

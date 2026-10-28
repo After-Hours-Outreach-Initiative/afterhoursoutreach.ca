@@ -84,7 +84,7 @@ async function refresh(root: HTMLElement) {
     )!;
     identity.hidden = !data.username;
     identity.textContent = data.username
-      ? `Connected as ${data.username}.`
+      ? `${data.memberVerifiedAt !== null ? "Connected" : "Linked"} as ${data.username}.`
       : "";
     status.hidden = !data.configured || !data.username;
     status.textContent = data.username
@@ -92,6 +92,18 @@ async function refresh(root: HTMLElement) {
       : "";
     root.querySelector<HTMLButtonElement>("[data-discord-refresh]")!.hidden =
       !data.configured || !data.username;
+    const form = root.querySelector<HTMLFormElement>("[data-discord-connect]");
+    if (form) {
+      const focused = form.contains(document.activeElement);
+      form.hidden =
+        !data.configured || Boolean(data.username && !data.needsReconnect);
+      form.querySelector<HTMLElement>(
+        "[data-discord-connect-label]",
+      )!.textContent = data.needsReconnect
+        ? "Reconnect Discord"
+        : "Connect Discord";
+      if (form.hidden && focused) identity.focus({ preventScroll: true });
+    }
   } catch (error) {
     status.hidden = false;
     status.textContent =
@@ -127,6 +139,8 @@ const statusSchema = z.object({
   configured: z.boolean(),
   username: z.string().nullable(),
   discordId: z.string().nullable(),
+  needsReconnect: z.boolean(),
+  memberVerifiedAt: z.number().nullable(),
   connection: z.string(),
   sync: z.string(),
 });

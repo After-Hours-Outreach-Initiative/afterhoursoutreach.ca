@@ -47,6 +47,7 @@ export async function loadDiscordStatus(env: DiscordBindings, userId: string) {
     configured,
     username: row?.username ?? null,
     discordId: row?.discord_id ?? null,
+    needsReconnect: row?.last_error === "membership_missing",
     completedAt: row?.completed_at ?? null,
     memberVerifiedAt: row?.member_verified_at ?? null,
     lastSyncedAt: row?.last_synced_at ?? null,
