@@ -30,7 +30,7 @@ export function databaseWriteError(error: unknown): never {
   if (message.includes("orientation_edit_conflict"))
     throw new RequestError(
       409,
-      "These changes conflict with existing registrations or completion history. Keep two medic places and, with orientation, two orientee places reserved (maximum four orientees). Retain orientation where booked volunteers need it.",
+      "These changes conflict with existing registrations or completion history. Keep two medic places and, with orientation, two places reserved for new volunteers (maximum four new volunteers). Retain orientation where booked volunteers need it.",
     );
   if (message.includes("orientation_signup_limit"))
     throw new RequestError(409, orientationSignupLimitMessage);

@@ -86,7 +86,7 @@ test("manual presets cover application, orientation, patrol, medic and access st
         ["draft", 0, 1, 0, 0, 0, 0, 0, 0, 0, "volunteer"],
         ["inactive", 1, 0, 1, 1, 0, 0, 0, 0, 0, "volunteer"],
         ["medic", 1, 0, 1, 1, 1, 1, 1, 0, 1, "volunteer"],
-        ["medic-orientee", 1, 0, 1, 1, 1, 0, 0, 0, 0, "volunteer"],
+        ["medic-new-volunteer", 1, 0, 1, 1, 1, 0, 0, 0, 0, "volunteer"],
         ["organizer", 1, 0, 1, 1, 1, 1, 0, 0, 0, "organizer"],
         ["orientation-booked", 1, 0, 1, 1, 1, 0, 0, 1, 0, "volunteer"],
         ["orientation-completed", 1, 0, 1, 1, 1, 0, 1, 0, 0, "volunteer"],

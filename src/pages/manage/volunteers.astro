@@ -107,7 +107,7 @@ try {
               aria-pressed={approval === "awaiting" ? "true" : "false"}
             >
               <span>
-                Awaiting approval (
+                Ready for review (
                 <span data-awaiting-approval-count>
                   {team.awaitingApprovalCount}
                 </span>
@@ -170,7 +170,7 @@ try {
                         <span class="volunteer-table-detail">
                           {person.role === "organizer"
                             ? "Organizer"
-                            : "Volunteer"}
+                            : "Outreach Volunteer"}
                         </span>
                       </th>
                       <td>
@@ -178,7 +178,9 @@ try {
                           ? "Approved"
                           : person.applicationRejectionReason
                             ? "Rejected"
-                            : "Awaiting approval"}
+                            : person.applicationReadyForReview
+                              ? "Ready for review"
+                              : "Application in progress"}
                         {person.role === "organizer" && (
                           <span class="volunteer-table-detail">
                             Event access through organizer role
@@ -207,10 +209,10 @@ try {
               <p class="volunteer-notice">
                 {approval === "awaiting"
                   ? offset > 0
-                    ? "No applications awaiting approval on this page. Return to the previous page."
+                    ? "No applications ready for review on this page. Return to the previous page."
                     : search
-                      ? "No applications awaiting approval match your search."
-                      : "No applications are awaiting approval."
+                      ? "No applications ready for review match your search."
+                      : "No applications are ready for review."
                   : "No volunteer applicants match your search."}
               </p>
             )}

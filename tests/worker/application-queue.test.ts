@@ -63,12 +63,9 @@ test("organizers review submitted applications with search-aware filter counts a
         ).bind(id, pendingIds.includes(id) ? 0 : 1),
       ]);
     }
-    // Queue/list compatibility for grandfathered submitted applicants. New
-    // applicants' prerequisites are exercised by the Discord application tests.
+    // Ready applicants have completed their steps before organizer review.
     await DB.prepare("DELETE FROM discord_requirement").run();
-    await DB.prepare(
-      "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='approved'",
-    ).run();
+    await DB.prepare("UPDATE profile SET naloxone_completed_at=0").run();
     const submittedAt = "2026-09-15T18:30:00.000Z";
     await DB.prepare(
       "UPDATE profile SET registered_at=?, code_of_conduct_version='2026-09-01', code_of_conduct_accepted_at=? WHERE user_id='applicant-50'",
@@ -261,7 +258,7 @@ test("organizers review submitted applications with search-aware filter counts a
       name: /^All \(\d+\)$/,
     });
     const awaitingApproval = filters.getByRole("button", {
-      name: /^Awaiting approval/,
+      name: /^Ready for review/,
     });
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(
@@ -307,19 +304,65 @@ test("organizers review submitted applications with search-aware filter counts a
     });
     await expect(page.getByRole("tab")).toHaveCount(0);
     await expect(
-      page.locator(
-        '[data-volunteer-profile-panel="application"] + [data-volunteer-controls]',
-      ),
+      page.getByRole("region", { name: "Volunteer progression", exact: true }),
     ).toBeVisible();
+    const progression = page.locator("[data-volunteer-progression]");
+    await expect(progression.locator("h3")).toHaveText([
+      "Applicant",
+      "New volunteer",
+      "Outreach Volunteer",
+    ]);
+    await expect(progression.getByText(/^(Current|Upcoming)$/)).toHaveCount(0);
+    const currentCard = progression.locator(
+      '[data-progression-stage][aria-current="step"]',
+    );
+    const applicationProgress = progression.locator(
+      "[data-application-progress-mini]",
+    );
+    await expect(
+      applicationProgress.locator(".application-progress-mini-title"),
+    ).toHaveText(["Application form", "Naloxone 101", "Application review"]);
+    await expect(
+      applicationProgress.locator('[data-application-mini-step="form"]'),
+    ).toHaveAttribute("data-state", "complete");
+    await expect(
+      applicationProgress.locator('[data-application-mini-step="naloxone"]'),
+    ).toHaveAttribute("data-state", "complete");
+    await expect(currentCard).toHaveCSS("background-color", "rgb(20, 36, 59)");
+    await expect(
+      progression
+        .locator('[data-progression-stage][data-state="upcoming"]')
+        .first(),
+    ).toHaveCSS("background-color", "rgb(17, 19, 24)");
+    await expect(currentCard).toHaveAttribute(
+      "data-progression-stage",
+      "applicant",
+    );
+    await expect(
+      progression.locator('[data-progression-stage][data-state="upcoming"]'),
+    ).toHaveCount(2);
+    await expect(
+      progression.locator(
+        '[data-progression-stage][data-state="upcoming"] .progression-description',
+      ),
+    ).toHaveCount(2);
+    await expect(
+      progression.locator(
+        '[data-progression-stage][data-state="upcoming"] :is(button, a)',
+      ),
+    ).toHaveCount(0);
     await expect(profile).toHaveCount(0);
     await expect(
       application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByText("Application awaiting approval", { exact: true }),
+      page.locator("[data-volunteer-profile-overview] > p").first(),
+    ).toHaveText("Ready for review");
+    await expect(
+      applicationProgress.getByText("Ready for review", { exact: true }),
     ).toBeVisible();
     await expect(page.locator("[data-application-current-step]")).toHaveText(
-      "Complete Naloxone 101",
+      "Application review",
     );
     await expect(application).toBeVisible();
     await expect(
@@ -384,12 +427,45 @@ test("organizers review submitted applications with search-aware filter counts a
     await results.locator("tbody tr").first().locator("td").first().click();
     await expect(page).toHaveURL(`${origin}${profileHref}`);
     await DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id='applicant-50'",
+    ).run();
+    await page.reload();
+    await expect(
+      page.locator("[data-volunteer-profile-overview] > p").first(),
+    ).toHaveText("Application in progress");
+    await expect(
+      applicationProgress.locator('[data-application-mini-step="naloxone"]'),
+    ).toHaveAttribute("data-state", "current");
+    await expect(
+      applicationProgress.getByText("Ready for review", { exact: true }),
+    ).toHaveCount(0);
+    const inProgressList = await get("/manage/volunteers?q=applicant-50");
+    const inProgressHtml = await inProgressList.text();
+    assert.match(inProgressHtml, /Application in progress/);
+    assert.match(inProgressHtml, /data-awaiting-approval-count>0</);
+    const reviewQueue = await get(
+      "/manage/volunteers?q=applicant-50&approval=awaiting",
+    );
+    assert.doesNotMatch(await reviewQueue.text(), /data-volunteer-row/);
+    await DB.prepare(
       "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='applicant-50'",
     ).run();
     await page.reload();
+    await expect(
+      page.locator("[data-volunteer-profile-overview] > p").first(),
+    ).toHaveText("Ready for review");
+    await expect(
+      applicationProgress.getByText("Ready for review", { exact: true }),
+    ).toBeVisible();
     await expect(page.locator("[data-application-current-step]")).toHaveText(
       "Application review",
     );
+    await expect(
+      applicationProgress.locator('[data-application-mini-step="naloxone"]'),
+    ).toHaveAttribute("data-state", "complete");
+    await expect(
+      applicationProgress.locator('[data-application-mini-step="review"]'),
+    ).toHaveAttribute("data-state", "current");
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
@@ -402,8 +478,24 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(application).toBeVisible();
     await expect(profile).toBeVisible();
     await expect(page.locator("[data-application-current-step]")).toHaveText(
-      "Application approved",
+      "New volunteer",
     );
+    await expect(currentCard).toHaveAttribute(
+      "data-progression-stage",
+      "new-volunteer",
+    );
+    await expect(progression.locator("[data-orientation-status]")).toHaveText(
+      "Orientation not completed",
+    );
+    await expect(
+      applicationProgress.locator('[data-state="complete"]'),
+    ).toHaveCount(3);
+    await expect(
+      progression.getByRole("button", {
+        name: "Approve for patrols",
+        exact: true,
+      }),
+    ).toBeEnabled();
     await expect(profile.getByRole("heading").first()).toHaveText("Profile");
     const submittedDetails = application.locator("details");
     await expect(submittedDetails).not.toHaveAttribute("open");
@@ -414,6 +506,125 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(
       application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
     ).toBeVisible();
+    // An organizer can approve patrols before any orientation is booked, without
+    // recording attendance that has not happened.
+    const approvePatrols = progression.getByRole("button", {
+      name: "Approve for patrols",
+      exact: true,
+    });
+    await approvePatrols.click();
+    await page
+      .getByRole("button", { name: "Save without email", exact: true })
+      .click();
+    await expect(currentCard.locator("h3")).toHaveText("Outreach Volunteer");
+    await expect(progression.locator("[data-orientation-status]")).toHaveText(
+      "Orientation not completed",
+    );
+    assert.equal(
+      await DB.prepare(
+        "SELECT count(*) AS n FROM orientation_completion WHERE user_id='applicant-50'",
+      ).first("n"),
+      0,
+    );
+    await page
+      .getByRole("button", { name: "Revoke patrol approval", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Save without email", exact: true })
+      .click();
+    await expect(approvePatrols).toBeEnabled();
+    await DB.batch([
+      DB.prepare(
+        `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+        VALUES ('queue-orientation','patrol',1,?,'Queue orientation',8,'organizer',0,0)`,
+      ).bind(Date.now() + 86_400_000),
+      DB.prepare(
+        "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('queue-signup','queue-orientation','applicant-50',0,0)",
+      ),
+    ]);
+    await page.reload();
+    await expect(progression).toContainText("Queue orientation");
+    await expect(
+      progression.getByRole("button", {
+        name: "Approve for patrols",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await DB.prepare(
+      "UPDATE event SET starts_at=0 WHERE id='queue-orientation'",
+    ).run();
+    await DB.prepare(
+      `UPDATE profile SET teams='["medic"]' WHERE user_id='applicant-50'`,
+    ).run();
+    await DB.prepare(
+      "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES ('queue-completion','applicant-50','queue-orientation','organizer',1)",
+    ).run();
+    await page.reload();
+    await expect(progression.locator("[data-orientation-status]")).toHaveText(
+      "Orientation completed",
+    );
+    await expect(progression.locator("[data-orientation-event]")).toContainText(
+      "Queue orientation",
+    );
+    await expect(approvePatrols).toBeEnabled();
+    await expect(progression.getByRole("button")).toHaveCount(1);
+    for (const width of [320, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width);
+    }
+    await approvePatrols.click();
+    await page
+      .getByRole("button", { name: "Cancel change", exact: true })
+      .click();
+    await expect(approvePatrols).toBeEnabled();
+    assert.equal(
+      await DB.prepare(
+        "SELECT count(*) AS n FROM orientation_completion WHERE user_id='applicant-50'",
+      ).first("n"),
+      1,
+    );
+    await approvePatrols.click();
+    await page
+      .getByRole("button", { name: "Save without email", exact: true })
+      .click();
+    await expect(currentCard).toHaveAttribute(
+      "data-progression-stage",
+      "approved",
+    );
+    await expect(
+      progression.locator('[data-progression-stage][data-state="complete"]'),
+    ).toHaveCount(2);
+    await expect(
+      progression.locator(
+        '[data-progression-stage][data-state="complete"] .progression-marker svg',
+      ),
+    ).toHaveCount(2);
+    await expect(currentCard).toHaveCSS("background-color", "rgb(20, 36, 59)");
+    await expect(currentCard.locator("h3")).toHaveText("Medic");
+    await expect(page.locator("[data-application-current-step]")).toHaveText(
+      "Medic",
+    );
+    await expect(
+      page.getByRole("button", { name: "Revoke patrol approval", exact: true }),
+    ).toBeFocused();
+    const recorded = await DB.prepare(
+      "SELECT v.patrol_approved, o.marked_by, o.marked_at, v.approved_at FROM volunteer_status v JOIN orientation_completion o ON o.user_id=v.user_id WHERE v.user_id='applicant-50'",
+    ).first();
+    assert.equal(recorded?.patrol_approved, 1);
+    assert.equal(recorded?.marked_by, "organizer");
+    assert.equal(recorded?.marked_at, 1);
+    assert.ok(Number(recorded?.approved_at) > 1);
+    await expect(progression.locator("[data-orientation-event]")).toContainText(
+      "Queue orientation",
+    );
+    assert.equal(
+      await DB.prepare(
+        "SELECT count(*) AS n FROM event_notification WHERE user_id='applicant-50'",
+      ).first("n"),
+      0,
+    );
     await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(count).toHaveText("52");
     await expect(allCount).toHaveText("53");
@@ -464,7 +675,7 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(search).toHaveValue("approved");
     await search.fill("no match");
     await expect(
-      results.getByText("No applications awaiting approval match your search."),
+      results.getByText("No applications ready for review match your search."),
     ).toBeVisible();
     await expect(count).toHaveText("0");
     await expect(allCount).toHaveText("0");
@@ -507,7 +718,7 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(
       plain.getByRole("button", { name: "All (1)", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
-    await plain.getByRole("button", { name: "Awaiting approval (1)" }).click();
+    await plain.getByRole("button", { name: "Ready for review (1)" }).click();
     await plain.locator("[data-volunteer-profile-link]").click();
     await expect(
       plain.getByRole("heading", { name: "Profile", exact: true }),
@@ -541,7 +752,7 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(
       results.getByText(
-        "No applications awaiting approval on this page. Return to the previous page.",
+        "No applications ready for review on this page. Return to the previous page.",
       ),
     ).toBeVisible();
     expect(page.url()).toBe(restoredListUrl);
@@ -555,7 +766,7 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(count).toHaveText("0");
     await expect(allCount).toHaveText("55");
     await expect(
-      results.getByText("No applications are awaiting approval."),
+      results.getByText("No applications are ready for review."),
     ).toBeVisible();
 
     const postAction = (body: object, auth = cookie, requestOrigin = origin) =>

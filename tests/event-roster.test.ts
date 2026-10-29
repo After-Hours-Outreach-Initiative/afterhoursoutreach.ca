@@ -9,6 +9,6 @@ test("public rosters use first names and last initials, with an abbreviated lega
     "Legacy P.",
   );
   expect(publicAttendeeName(null, null, "OneName")).toBe("O.");
-  expect(publicAttendeeName(null, null, " ")).toBe("Volunteer");
+  expect(publicAttendeeName(null, null, " ")).toBe("Outreach Volunteer");
   expect(publicAttendeeName("Élodie", "李", "Ignored")).toBe("Élodie 李.");
 });

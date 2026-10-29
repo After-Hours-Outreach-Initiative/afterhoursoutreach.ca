@@ -167,7 +167,7 @@ test("organizer profile contents reveal application details on the page and in d
             '[data-volunteer-profile-panel="application"]',
           )!;
           const controls = element.querySelector<HTMLElement>(
-            "[data-volunteer-controls]",
+            ".volunteer-profile-controls",
           )!;
           return (
             controls.getBoundingClientRect().top -

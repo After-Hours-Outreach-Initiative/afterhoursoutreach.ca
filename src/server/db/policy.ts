@@ -64,22 +64,22 @@ export function availableSignupSpots(
   confirmed: number,
 ) {
   const orientation = eventIncludesOrientation(event);
-  const orientee = orientation && !event.orientationCompleted;
-  const medic = !orientee && Boolean(event.medicEligible);
+  const newVolunteer = orientation && !event.orientationCompleted;
+  const medic = !newVolunteer && Boolean(event.medicEligible);
   const medics = event.medicConfirmed ?? 0;
-  const orientees = event.orientationConfirmed ?? 0;
+  const newVolunteers = event.orientationConfirmed ?? 0;
   // Try successive additions in the viewer's mutually exclusive category. Each
   // addition must leave room for BOTH categories' outstanding reservations.
   let available = 0;
   for (let added = 1; added <= event.spots - confirmed; added++) {
-    const afterOrientees = orientees + (orientee ? added : 0);
-    if (orientee && afterOrientees > 4) break;
+    const afterNewVolunteers = newVolunteers + (newVolunteer ? added : 0);
+    if (newVolunteer && afterNewVolunteers > 4) break;
     const outstandingMedics = Math.max(0, 2 - medics - (medic ? added : 0));
-    const outstandingOrientees = orientation
-      ? Math.max(0, 2 - afterOrientees)
+    const outstandingNewVolunteers = orientation
+      ? Math.max(0, 2 - afterNewVolunteers)
       : 0;
     if (
-      confirmed + added + outstandingMedics + outstandingOrientees >
+      confirmed + added + outstandingMedics + outstandingNewVolunteers >
       event.spots
     )
       break;

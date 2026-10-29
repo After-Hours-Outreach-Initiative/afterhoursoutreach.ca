@@ -8,24 +8,29 @@ export interface ApplicationProgress {
   discordCompletedAt?: number | null;
 }
 
-/** Application completion is separate from orientation booking and attendance. */
-export function isApplicationComplete(
+/** Only the applicant's steps are prerequisites for organizer review. */
+export function isApplicationReadyForReview(
   progress: Pick<
     ApplicationProgress,
     | "submittedAt"
     | "naloxoneCompletedAt"
-    | "applicationApproved"
     | "discordRequired"
     | "discordCompletedAt"
   >,
 ): boolean {
   return (
-    progress.submittedAt !== null &&
-    progress.naloxoneCompletedAt !== null &&
+    progress.submittedAt !== null && progress.naloxoneCompletedAt !== null
     // Discord connection is temporarily disabled; retain recorded milestones.
-    // (!progress.discordRequired || progress.discordCompletedAt != null) &&
-    progress.applicationApproved
+    // && (!progress.discordRequired || progress.discordCompletedAt != null)
   );
+}
+
+/** Application completion is separate from orientation booking and attendance. */
+export function isApplicationComplete(
+  progress: Parameters<typeof isApplicationReadyForReview>[0] &
+    Pick<ApplicationProgress, "applicationApproved">,
+): boolean {
+  return isApplicationReadyForReview(progress) && progress.applicationApproved;
 }
 
 export async function loadApplicationProgress(

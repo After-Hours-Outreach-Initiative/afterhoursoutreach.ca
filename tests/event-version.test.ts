@@ -67,7 +67,9 @@ test("view versions detect capacity, signups, visibility and access changes with
     },
     {
       ...publicRoster,
-      people: [{ ...publicRoster.people[0], category: "volunteer" as const }],
+      people: [
+        { ...publicRoster.people[0], category: "outreach-volunteer" as const },
+      ],
     },
   ]) {
     expect(
@@ -135,7 +137,9 @@ test("view versions detect capacity, signups, visibility and access changes with
       userId: "attendee",
       name: "Attendee",
       completed: 0,
-      category: "volunteer" as const,
+      patrolApproved: 0,
+      statusVersion: 0,
+      category: "outreach-volunteer" as const,
     },
   ];
   const rosterVersion = await eventViewVersion([event], organizer, roster);
@@ -143,6 +147,8 @@ test("view versions detect capacity, signups, visibility and access changes with
     { id: "replacement-signup", userId: "replacement-attendee" },
     { name: "Updated name" },
     { completed: 1 },
+    { patrolApproved: 1 },
+    { statusVersion: 1 },
     { category: "medic" as const },
   ]) {
     const updated = [{ ...roster[0], ...change }];

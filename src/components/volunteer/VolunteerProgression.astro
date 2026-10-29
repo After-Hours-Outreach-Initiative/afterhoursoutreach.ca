@@ -1,0 +1,204 @@
+---
+import type {
+  VolunteerOrientation,
+  VolunteerRow,
+} from "@/server/db/volunteers";
+import CheckIcon from "@/components/icons/CheckIcon.astro";
+import VolunteerAccessAction from "./VolunteerAccessAction.astro";
+import ApplicationProgressMini from "./ApplicationProgressMini.astro";
+import type { ApplicationProgress } from "@/server/db/application-progress";
+import { formatEventDate } from "@/data/event-time";
+
+interface Props {
+  person: VolunteerRow;
+  orientation: VolunteerOrientation | null;
+  completedOrientation: VolunteerOrientation | null;
+  progress: ApplicationProgress;
+  medic: boolean;
+}
+const { person, orientation, completedOrientation, progress, medic } =
+  Astro.props;
+const current = !person.applicationApproved
+  ? 0
+  : !person.patrolApproved
+    ? 1
+    : 2;
+const orientationEvent = completedOrientation ?? orientation;
+const steps = [
+  {
+    title: "Applicant",
+    description: "Review the application and required training.",
+  },
+  {
+    title: "New volunteer",
+    description: "Review readiness for outreach patrols.",
+  },
+  {
+    title: medic ? "Medic" : "Outreach Volunteer",
+    description: "Approved to participate in patrols in this role.",
+  },
+];
+---
+
+<section
+  class="volunteer-progression"
+  data-volunteer-progression
+  data-volunteer-controls
+  aria-labelledby="volunteer-progression-heading"
+>
+  <h2 id="volunteer-progression-heading" data-contents-section>
+    Volunteer progression
+  </h2>
+  <ol
+    class="volunteer-progression-list"
+    role="list"
+    aria-label="Volunteer progression"
+  >
+    {
+      steps.map((step, index) => (
+        <li
+          class="volunteer-progression-step"
+          data-progression-stage={
+            index === 0
+              ? "applicant"
+              : index === 1
+                ? "new-volunteer"
+                : "approved"
+          }
+          data-state={
+            index < current
+              ? "complete"
+              : index === current
+                ? "current"
+                : "upcoming"
+          }
+          aria-current={index === current ? "step" : undefined}
+        >
+          <div class="progression-content">
+            <div class="progression-heading">
+              <span class="progression-marker" aria-hidden="true">
+                {index < current ? <CheckIcon class="size-5" /> : index + 1}
+              </span>
+              <h3>{step.title}</h3>
+            </div>
+            <p class="progression-description">{step.description}</p>
+            {index === 0 && (
+              <>
+                <ApplicationProgressMini {progress} />
+                {current === 0 && (
+                  <>
+                    <div class="volunteer-progression-actions">
+                      <a
+                        class="btn btn-outline"
+                        href="#volunteer-application-heading"
+                      >
+                        Review application
+                      </a>
+                      <VolunteerAccessAction {person} kind="application" />
+                    </div>
+                    {!person.applicationRejectionReason && (
+                      <details class="volunteer-progression-rejection">
+                        <summary class="cursor-pointer text-red-300 underline underline-offset-4">
+                          Reject application
+                        </summary>
+                        <form
+                          class="volunteer-form mt-4"
+                          data-organizer-rejection
+                          action="/api/v1/organizer/action"
+                          method="post"
+                        >
+                          <input
+                            type="hidden"
+                            name="userId"
+                            value={person.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="version"
+                            value={person.updatedAt}
+                          />
+                          <label class="volunteer-field">
+                            Reason for rejection
+                            <textarea
+                              name="reason"
+                              required
+                              maxlength="2000"
+                              rows="4"
+                              data-volunteer-control
+                              disabled
+                            />
+                          </label>
+                          <p class="volunteer-help">
+                            This reason will be emailed to the applicant and
+                            shown in their application.
+                          </p>
+                          <p data-form-message role="status" hidden />
+                          <button
+                            class="btn btn-red"
+                            type="submit"
+                            data-loading-label="Sending…"
+                            data-volunteer-control
+                            disabled
+                          >
+                            Reject application and email reason
+                          </button>
+                        </form>
+                      </details>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+            {index === 1 && (
+              <>
+                <p class="progression-status" data-orientation-status>
+                  {completedOrientation
+                    ? "Orientation completed"
+                    : "Orientation not completed"}
+                </p>
+                {orientationEvent && (
+                  <p class="progression-status" data-orientation-event>
+                    {!completedOrientation && "Registered orientation: "}
+                    <time
+                      datetime={new Date(
+                        orientationEvent.startsAt,
+                      ).toISOString()}
+                    >
+                      {formatEventDate(orientationEvent.startsAt)}
+                    </time>{" "}
+                    · {orientationEvent.meetingPoint}
+                  </p>
+                )}
+                {current >= 1 && (
+                  <p class="progression-status">
+                    {person.patrolApproved
+                      ? "Patrol access approved"
+                      : "Awaiting patrol approval"}
+                  </p>
+                )}
+                {!person.active && (
+                  <p class="progression-status">Volunteer account inactive</p>
+                )}
+                {current === 1 && (
+                  <div class="volunteer-progression-actions">
+                    <VolunteerAccessAction {person} kind="patrol" />
+                  </div>
+                )}
+              </>
+            )}
+            {index === 2 && current === 2 && (
+              <div class="volunteer-progression-actions">
+                <a
+                  class="btn btn-outline"
+                  href="#volunteer-organizer-controls-heading"
+                >
+                  Manage volunteer
+                </a>
+              </div>
+            )}
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+</section>

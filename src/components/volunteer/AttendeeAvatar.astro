@@ -5,7 +5,7 @@ interface Props {
   decorative?: boolean;
 }
 const { category, decorative = false } = Astro.props;
-const label = `${category === "medic" ? "Approved medic" : category === "orientee" ? "Orientee" : "Volunteer"}: registered`;
+const label = `${category === "medic" ? "Approved medic" : category === "new-volunteer" ? "New volunteer" : "Outreach Volunteer"}: registered`;
 ---
 
 <span
@@ -41,14 +41,5 @@ const label = `${category === "medic" ? "Approved medic" : category === "oriente
   svg {
     width: 100%;
     height: 100%;
-  }
-  .attendee-medic {
-    color: #b91c1c;
-  }
-  .attendee-volunteer {
-    color: #15803d;
-  }
-  .attendee-orientee {
-    color: #1d4ed8;
   }
 </style>

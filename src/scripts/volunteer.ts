@@ -705,6 +705,7 @@ function form(
       return;
     event.preventDefault();
     const scope =
+      element.closest<HTMLElement>("[data-volunteer-profile]") ??
       element.closest<HTMLElement>("[data-volunteer-controls], dialog") ??
       element;
     if (scope.dataset.submitting) return;
@@ -982,14 +983,21 @@ form("[data-manage-signup]", "/api/v1/events/action", (v) => ({
 form(
   "[data-organizer-status]",
   "/api/v1/organizer/action",
-  (v) => ({
-    action: "status",
-    userId: str(v, "userId"),
-    version: Number(v.get("version")),
-    active: v.has("active"),
-    applicationApproved: v.has("applicationApproved"),
-    patrolApproved: v.has("patrolApproved"),
-  }),
+  (v) =>
+    v.has("approvePatrols")
+      ? {
+          action: "approve-patrols",
+          userId: str(v, "userId"),
+          version: Number(v.get("version")),
+        }
+      : {
+          action: "status",
+          userId: str(v, "userId"),
+          version: Number(v.get("version")),
+          active: v.has("active"),
+          applicationApproved: v.has("applicationApproved"),
+          patrolApproved: v.has("patrolApproved"),
+        },
   refreshVolunteer,
 );
 form(
@@ -1014,9 +1022,10 @@ form(
   refreshVolunteer,
 );
 form("[data-organizer-orientation]", "/api/v1/organizer/action", (v) => ({
-  action: "orientation",
+  action: "approve-patrols",
   userId: str(v, "userId"),
   eventId: str(v, "eventId"),
+  version: Number(v.get("version")),
 }));
 document.addEventListener("change", (event) => {
   if (!(event.target instanceof Element)) return;

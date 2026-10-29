@@ -1,0 +1,91 @@
+---
+import {
+  isApplicationReadyForReview,
+  type ApplicationProgress,
+} from "@/server/db/application-progress";
+import CheckIcon from "@/components/icons/CheckIcon.astro";
+
+interface Props {
+  progress: ApplicationProgress;
+}
+const { progress } = Astro.props;
+const steps = [
+  {
+    key: "form",
+    title: "Application form",
+    completed: progress.submittedAt !== null,
+    completedAt: progress.submittedAt,
+    status: progress.submittedAt !== null ? "Submitted" : "Not submitted",
+  },
+  {
+    key: "naloxone",
+    title: "Naloxone 101",
+    completed: progress.naloxoneCompletedAt !== null,
+    completedAt: progress.naloxoneCompletedAt,
+    status:
+      progress.naloxoneCompletedAt !== null ? "Completed" : "Not completed",
+  },
+  {
+    key: "review",
+    title: "Application review",
+    completed: progress.applicationApproved,
+    completedAt: progress.applicationApprovedAt,
+    status: progress.applicationApproved
+      ? "Approved"
+      : progress.applicationRejectionReason
+        ? "Rejected"
+        : isApplicationReadyForReview(progress)
+          ? "Ready for review"
+          : "Not reviewed",
+  },
+];
+const current = steps.findIndex((step) => !step.completed);
+const dates = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Vancouver",
+  dateStyle: "medium",
+});
+---
+
+<ol
+  class="application-progress-mini"
+  role="list"
+  aria-label="Application progress"
+  data-application-progress-mini
+>
+  {
+    steps.map((step, index) => (
+      <li
+        data-application-mini-step={step.key}
+        data-state={
+          step.key === "review" && progress.applicationRejectionReason
+            ? "rejected"
+            : step.completed
+              ? "complete"
+              : index === current
+                ? "current"
+                : "upcoming"
+        }
+        aria-current={index === current ? "step" : undefined}
+      >
+        <span class="application-progress-mini-marker" aria-hidden="true">
+          {step.completed ? <CheckIcon class="size-4" /> : index + 1}
+        </span>
+        <span class="application-progress-mini-label">
+          <span class="application-progress-mini-title">{step.title}</span>
+          <span class="application-progress-mini-status">
+            {step.status}
+            {step.completed && step.completedAt !== null && (
+              <>
+                {" "}
+                ·{" "}
+                <time datetime={new Date(step.completedAt).toISOString()}>
+                  {dates.format(step.completedAt)}
+                </time>
+              </>
+            )}
+          </span>
+        </span>
+      </li>
+    ))
+  }
+</ol>

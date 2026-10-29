@@ -178,7 +178,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       page.locator('[aria-label="Preview environment"]'),
     ).toBeVisible();
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
-      "2",
+      "1",
     );
     await page.locator("[data-volunteer-search]").fill("Sample Applicant");
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(

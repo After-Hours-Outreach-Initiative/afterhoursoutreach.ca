@@ -56,7 +56,7 @@ const preset = (
     group: AccountGroup;
   };
 
-// IDs of the original presets stay stable; labels describe the current model.
+// Preset keys also identify seeded accounts; retired IDs remain protected below.
 export const manualAccountPresets = [
   preset("draft", "Draft application", "application", {
     sampleKey: "casey",
@@ -69,7 +69,7 @@ export const manualAccountPresets = [
     naloxoneCompleted: false,
     applicationApproved: false,
   }),
-  preset("awaiting-review", "Awaiting review", "application", {
+  preset("awaiting-review", "Ready for review", "application", {
     sampleKey: "casey",
     applicationApproved: false,
   }),
@@ -80,10 +80,10 @@ export const manualAccountPresets = [
   preset("orientation-completed", "Orientation completed", "orientation", {
     orientation: "completed",
   }),
-  preset("medic-orientee", "Medic awaiting orientation", "orientation", {
+  preset("medic-new-volunteer", "Medic awaiting orientation", "orientation", {
     sampleKey: "dana",
   }),
-  preset("patrol", "Patrol volunteer", "volunteers", {
+  preset("patrol", "Outreach Volunteer", "volunteers", {
     orientation: "completed",
     patrolApproved: true,
   }),
@@ -108,7 +108,12 @@ export const manualAccountPresetIds: readonly string[] =
   manualAccountPresets.map(({ id }) => id);
 
 export function isManualAccountPreset(userId: string) {
-  return manualAccountPresetIds.includes(userId);
+  // Keep a previously seeded identity protected; renaming the preset must not
+  // make saved fixture edits eligible for deletion or reset its stored history.
+  return (
+    manualAccountPresetIds.includes(userId) ||
+    userId === "local-account-user-medic-orientee"
+  );
 }
 
 export interface DevelopmentAccountState extends Pick<

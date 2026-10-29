@@ -142,7 +142,7 @@ function capacityPeople(prefix: string, count: number, completed = false) {
   });
 }
 
-test("medic and orientee reservations are exclusive, dynamic and freed by cancellation", () => {
+test("medic and new volunteer reservations are exclusive, dynamic and freed by cancellation", () => {
   db.exec("UPDATE event SET spots=6 WHERE id='orientation'");
   const medics = capacityPeople("medic", 3, true);
   const newbies = capacityPeople("new-medic", 3);
@@ -151,7 +151,7 @@ test("medic and orientee reservations are exclusive, dynamic and freed by cancel
     db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
       id,
     );
-  // These medics have no completion and occupy ONLY the two orientee places.
+  // These medics have no completion and occupy ONLY the two new volunteer places.
   for (const id of newbies.slice(0, 2)) signUp(id, "orientation", id);
   for (const id of general.slice(0, 2)) signUp(id, "orientation", id);
   for (const id of [newbies[2], general[2]])
@@ -183,7 +183,7 @@ test("medic and orientee reservations are exclusive, dynamic and freed by cancel
     /signup_places_reserved/,
   );
   db.prepare("UPDATE signup SET status='confirmed' WHERE id=?").run(newbies[0]);
-  // Extra medics AND extra orientees can share capacity beyond the reserved four.
+  // Extra medics AND extra new volunteers can share capacity beyond the reserved four.
   db.exec("UPDATE event SET spots=8 WHERE id='orientation'");
   signUp(medics[2], "orientation", medics[2]);
   signUp(newbies[2], "orientation", newbies[2]);

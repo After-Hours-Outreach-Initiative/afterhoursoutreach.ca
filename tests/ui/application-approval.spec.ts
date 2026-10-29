@@ -107,9 +107,7 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(naloxone.locator(".application-progress-status")).toHaveCount(
       0,
     );
-    await expect(review.locator(".application-progress-status")).toHaveText(
-      "Pending approval",
-    );
+    await expect(review.locator(".application-progress-status")).toHaveCount(0);
     for (const paragraph of await tracker.locator("p").all()) {
       await expect(paragraph).toHaveCSS("font-size", "16px");
     }
@@ -148,6 +146,9 @@ test("pending applications poll every minute, then approval restores five-second
       .getByRole("button", { name: "Confirm completion", exact: true })
       .click();
     await expect(review).toHaveAttribute("open");
+    await expect(review.locator(".application-progress-status")).toHaveText(
+      "Ready for review",
+    );
     await expectCompletedStep(naloxone);
     await expect(formStep).toHaveAttribute("open");
     await expect(submittedApplication.locator("details")).toHaveAttribute(
@@ -216,7 +217,8 @@ test("pending applications poll every minute, then approval restores five-second
     );
     await volunteer.clock.runFor(1);
     await expect.poll(() => checks).toBe(2);
-    await expect(volunteer).toHaveURL(/\/events\?type=orientation$/);
+    // Approval refreshes the portal in place; it retains the current route.
+    await expect(volunteer).toHaveURL(/\/volunteer\?type=orientation$/);
     await expect(volunteer.locator('header a[href="/events"]')).toHaveText([
       "Events",
       "Events",
@@ -313,7 +315,7 @@ test("pending applications poll every minute, then approval restores five-second
   }
 });
 
-test("approval preserves the course draft, expanded snapshot and focus until confirmation", async ({
+test("an in-progress application preserves its course draft and focus until confirmation makes it ready for review", async ({
   page,
   browser,
   baseURL,
@@ -366,12 +368,36 @@ test("approval preserves the course draft, expanded snapshot and focus until con
     await expect(
       page.getByRole("link", { name: "Manage events", exact: true }),
     ).toBeVisible();
-    await approveLocalApplication(page.request, baseURL!, account.id);
+    const profile = await page.request.get(`/manage/volunteers/${account.id}`);
+    const profileHtml = await profile.text();
+    expect(profileHtml).toContain("Application in progress");
+    const blockedApproval = await page.request.post(
+      "/api/v1/organizer/action",
+      {
+        headers: { origin: baseURL! },
+        data: {
+          action: "status",
+          userId: account.id,
+          version: Number(
+            profileHtml.match(/name="version" value="(\d+)"/)?.[1],
+          ),
+          active: true,
+          applicationApproved: true,
+          patrolApproved: false,
+        },
+      },
+    );
+    expect(blockedApproval.status()).toBe(409);
+    expect(await blockedApproval.text()).toContain(
+      "must complete Naloxone 101",
+    );
     await volunteer.clock.runFor(60_000);
     await expect.poll(() => checks).toBe(2);
-    await expectCompletedStep(
-      tracker.locator('[data-application-progress-step="review"]'),
-    );
+    const review = tracker.locator('[data-application-progress-step="review"]');
+    await expect(review).toHaveAttribute("data-state", "upcoming");
+    await expect(
+      review.getByText("Ready for review", { exact: true }),
+    ).toHaveCount(0);
     await expect(naloxone).toHaveAttribute("data-state", "current");
     const approvedCourseLink = naloxone.getByRole("link", {
       name: "Take Naloxone 101",
@@ -395,7 +421,7 @@ test("approval preserves the course draft, expanded snapshot and focus until con
     const courseSummary = naloxone.locator(":scope > summary");
     await courseSummary.click();
     await courseSummary.focus();
-    await volunteer.clock.runFor(5_000);
+    await volunteer.clock.runFor(60_000);
     await expect.poll(() => checks).toBe(3);
     await expect(naloxone).not.toHaveAttribute("open");
     await expect(courseSummary).toBeFocused();
@@ -404,8 +430,19 @@ test("approval preserves the course draft, expanded snapshot and focus until con
     await tracker
       .getByRole("button", { name: "Confirm completion", exact: true })
       .click();
+    await expect(review).toHaveAttribute("data-state", "current");
+    await expect(
+      review.getByText("Ready for review", { exact: true }),
+    ).toBeVisible();
+    await expect(naloxone).toHaveAttribute("data-state", "complete");
+    await expect(volunteer.locator("[data-event-list]")).toHaveCount(0);
+    expect(
+      await (await page.request.get(`/manage/volunteers/${account.id}`)).text(),
+    ).toContain("Ready for review");
+    await approveLocalApplication(page.request, baseURL!, account.id);
+    await volunteer.clock.runFor(60_000);
     await expect(tracker).toHaveCount(0);
-    await expect(volunteer).toHaveURL(/\/events$/);
+    await expect(volunteer).toHaveURL(/\/volunteer$/);
     await expect(volunteer.locator('header a[href="/events"]')).toHaveText([
       "Events",
       "Events",

@@ -98,7 +98,7 @@ test("availability and block reasons use orientation completion, total capacity 
   );
 });
 
-test("dynamic reservations share extras but never consume outstanding places; first-time medics are orientees only", () => {
+test("dynamic reservations share extras but never consume outstanding places; first-time medics are new volunteers only", () => {
   const base = {
     ...event,
     includesOrientation: true,

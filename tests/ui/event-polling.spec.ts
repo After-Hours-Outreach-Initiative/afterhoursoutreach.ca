@@ -528,7 +528,10 @@ test("filter counts track grouped series, polling, actions and past events", asy
     [before[0] + 3, before[1] + 1, before[2] + 2, before[3] + 2].map(String),
   );
   await pastOccurrence
-    .getByRole("button", { name: "Mark orientation completed", exact: true })
+    .getByRole("button", { name: "Approve for patrols", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Save without email", exact: true })
     .click();
   await expect(
     pastOccurrence.getByText("Orientation completed", { exact: true }),

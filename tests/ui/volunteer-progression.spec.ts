@@ -1,0 +1,183 @@
+import { expect, test, type Locator } from "@playwright/test";
+import {
+  createLocalAccount,
+  openLocalAccountSwitcher,
+} from "../helpers/local-account";
+
+async function expectReadableCards(progression: Locator) {
+  const cards = progression.locator("[data-progression-stage]");
+  await expect(cards).toHaveCount(3);
+  await expect(
+    cards.nth(1).getByRole("heading", { name: "New volunteer", exact: true }),
+  ).toBeVisible();
+  await expect(
+    cards
+      .nth(2)
+      .getByRole("heading", { name: "Outreach Volunteer", exact: true }),
+  ).toBeVisible();
+  await expect(progression.getByText(/^(Current|Upcoming)$/)).toHaveCount(0);
+  const mini = cards.nth(0).locator("[data-application-progress-mini]");
+  await expect(mini.locator(".application-progress-mini-title")).toHaveText([
+    "Application form",
+    "Naloxone 101",
+    "Application review",
+  ]);
+  await expect(mini.locator("button, a, input")).toHaveCount(0);
+  for (const row of await mini.locator("li").all()) {
+    await expect(row).toHaveCSS("display", "grid");
+    expect(
+      await row.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+    const label = row.locator(".application-progress-mini-label");
+    expect((await label.boundingBox())!.width).toBeGreaterThan(100);
+  }
+  await expect(cards.locator(".progression-heading").first()).toHaveCSS(
+    "display",
+    "flex",
+  );
+  const layout = await cards.evaluateAll((elements) =>
+    elements.map((card) => {
+      const bounds = card.getBoundingClientRect();
+      const paragraph = card.querySelector(".progression-description")!;
+      const description = paragraph.getBoundingClientRect();
+      const marker = card
+        .querySelector(".progression-marker")!
+        .getBoundingClientRect();
+      const heading = card.querySelector("h3")!.getBoundingClientRect();
+      return {
+        state: card.getAttribute("data-state"),
+        display: getComputedStyle(card).display,
+        background: getComputedStyle(card).backgroundColor,
+        top: bounds.top,
+        bottom: bounds.bottom,
+        width: bounds.width,
+        descriptionWidth: description.width,
+        descriptionLines:
+          description.height /
+          parseFloat(getComputedStyle(paragraph).lineHeight),
+        markerCenter: marker.top + marker.height / 2,
+        headingCenter: heading.top + heading.height / 2,
+        headingGap: heading.left - marker.right,
+        overflowing: card.scrollWidth > card.clientWidth,
+      };
+    }),
+  );
+  for (const [index, card] of layout.entries()) {
+    expect(card.display).toBe("block");
+    expect(card.descriptionWidth).toBeGreaterThan(card.width - 40);
+    expect(card.descriptionLines).toBeLessThanOrEqual(4);
+    expect(Math.abs(card.markerCenter - card.headingCenter)).toBeLessThan(1);
+    expect(card.headingGap).toBeGreaterThanOrEqual(12);
+    expect(card.overflowing).toBe(false);
+    expect(card.background).toBe(
+      card.state === "current"
+        ? "rgb(20, 36, 59)"
+        : card.state === "complete"
+          ? "rgb(16, 26, 20)"
+          : "rgb(17, 19, 24)",
+    );
+    if (index > 0)
+      expect(card.top - layout[index - 1].bottom).toBeGreaterThanOrEqual(12);
+  }
+}
+
+test("progression cards stay full-width and readable on profile pages and freshly opened event dialogs", async ({
+  page,
+  browser,
+  baseURL,
+}, testInfo) => {
+  test.skip(!baseURL?.startsWith("http://localhost:"));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+
+  // Open a dialog before ever visiting the profile page: its layout must not
+  // depend on component CSS previously loaded by a full-page navigation.
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto("/manage/events");
+    await expect(page.locator(".attendee-new-volunteer").first()).toHaveCSS(
+      "color",
+      "rgb(29, 78, 216)",
+    );
+    const roster = page.locator(
+      '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',
+    );
+    await roster.locator("summary").click();
+    await roster.locator("[data-volunteer-profile-link]").first().click();
+    const progression = page.locator(
+      "[data-volunteer-profile-dialog] [data-volunteer-progression]",
+    );
+    await expect(progression).toBeVisible();
+    await expectReadableCards(progression);
+    await expect(progression.locator("[data-orientation-status]")).toHaveText(
+      "Orientation not completed",
+    );
+    await expect(
+      progression.getByRole("button", {
+        name: "Approve for patrols",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await progression.screenshot({
+      path: testInfo.outputPath(`progression-dialog-${width}.png`),
+    });
+    await page
+      .getByRole("button", { name: "Close volunteer profile", exact: true })
+      .click();
+  }
+
+  const applicantContext = await browser.newContext();
+  try {
+    const applicant = await createLocalAccount(
+      applicantContext.request,
+      baseURL!,
+    );
+    for (const width of [320, 390, 1280]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`/manage/volunteers/${applicant.id}`);
+      const progression = page.locator("[data-volunteer-progression]");
+      await expectReadableCards(progression);
+      await expect(
+        page.locator("[data-volunteer-profile-overview] > p").first(),
+      ).toHaveText("Application in progress");
+      await expect(
+        progression.getByText("Ready for review", { exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        progression.getByRole("button", {
+          name: "Approve application",
+          exact: true,
+        }),
+      ).toBeEnabled();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width);
+      await progression.screenshot({
+        path: testInfo.outputPath(`progression-applicant-${width}.png`),
+      });
+      await progression
+        .getByText("Reject application", { exact: true })
+        .click();
+      const reason = progression.getByRole("textbox", {
+        name: "Reason for rejection",
+      });
+      await expect(reason).toBeVisible();
+      const card = progression.locator('[data-progression-stage="applicant"]');
+      const cardBounds = (await card.boundingBox())!;
+      const reasonBounds = (await reason.boundingBox())!;
+      expect(reasonBounds.x + reasonBounds.width).toBeLessThanOrEqual(
+        cardBounds.x + cardBounds.width,
+      );
+    }
+  } finally {
+    await applicantContext.close();
+  }
+});

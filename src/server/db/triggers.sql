@@ -32,7 +32,7 @@ BEGIN
   SELECT RAISE(ABORT, 'event_full')
   WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed')
     >= (SELECT spots FROM event WHERE id = NEW.event_id);
-  -- First-time medics are ONLY orientees; each signup occupies one total place.
+  -- First-time medics are ONLY new volunteers; each signup occupies one total place.
   SELECT RAISE(ABORT, 'orientation_places_full')
   WHERE EXISTS (SELECT 1 FROM event e WHERE e.id = NEW.event_id
       AND coalesce(e.includes_orientation, e.type = 'orientation'))
@@ -48,12 +48,12 @@ BEGIN
         WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
           AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
           AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS orientees
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS new_volunteers
     FROM (SELECT user_id FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed'
       UNION ALL SELECT NEW.user_id) booked
   ) counts
   WHERE e.id = NEW.event_id AND counts.total + max(0, 2 - counts.medics)
-    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > e.spots;
+    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, 2 - counts.new_volunteers) ELSE 0 END > e.spots;
   -- Closed/hidden bookings still reserve a spot; past/cancelled events do not.
   SELECT RAISE(ABORT, 'orientation_signup_limit')
   WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
@@ -173,12 +173,12 @@ BEGIN
         WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
           AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
           AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS orientees
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS new_volunteers
     FROM (SELECT user_id FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id
       UNION ALL SELECT NEW.user_id) booked
   ) counts
   WHERE e.id = NEW.event_id AND counts.total + max(0, 2 - counts.medics)
-    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > e.spots;
+    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, 2 - counts.new_volunteers) ELSE 0 END > e.spots;
   SELECT RAISE(ABORT, 'orientation_signup_limit')
   WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
     AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
@@ -255,12 +255,12 @@ BEGIN
         WHERE p.user_id = s.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
           AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
           AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)), 0) AS orientees
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)), 0) AS new_volunteers
     FROM signup s WHERE s.event_id = OLD.id AND s.status = 'confirmed'
   ) counts
   WHERE counts.total + max(0, 2 - counts.medics)
-      + CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > NEW.spots
-    OR (coalesce(NEW.includes_orientation, NEW.type = 'orientation') AND counts.orientees > 4);
+      + CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN max(0, 2 - counts.new_volunteers) ELSE 0 END > NEW.spots
+    OR (coalesce(NEW.includes_orientation, NEW.type = 'orientation') AND counts.new_volunteers > 4);
   SELECT RAISE(ABORT, 'orientation_edit_conflict')
   WHERE NOT coalesce(NEW.includes_orientation, NEW.type = 'orientation')
     AND coalesce(OLD.includes_orientation, OLD.type = 'orientation') AND (

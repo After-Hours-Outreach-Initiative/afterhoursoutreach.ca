@@ -44,7 +44,8 @@ Volunteer application terminology does not rename deployed storage:
   not rewritten. Event registration records describe event spots, not applications.
 
 An application is complete after form submission, Naloxone 101 confirmation,
-required Discord connection, and application approval. `discord_requirement` is
+and application approval. Discord linking is temporarily disabled; its recorded
+requirements and milestones are retained. `discord_requirement` is
 inserted atomically only for profiles submitted after migration 0020; existing
 profiles are not backfilled and retain access without linking. `discord_link`
 is both the unique identity mapping and a durable, versioned role-sync outbox.
@@ -52,6 +53,16 @@ Eligibility triggers enqueue changes in the same transaction as website writes.
 See the [Discord operations guide](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/docs/src/content/docs/discord.md).
 Orientation signup and attendance are tracked separately;
 neither is an application-completion milestone or a substitute for patrol approval.
+Organizer volunteer profiles display Applicant, New volunteer, and Outreach Volunteer/Medic
+progression, with a compact application tracker and separate orientation status.
+Unapproved applications are **Application in progress** until form submission and
+Naloxone 101 confirmation are complete, then **Ready for review**. The review
+filter and its count include only ready, unrejected applications.
+**Approve for patrols** is available after application approval, without requiring
+orientation booking or completion. It does not infer attendance. When the same action
+is used from a past orientation roster with an explicit event, it also records that
+event's attendance in the version-guarded transaction. Both paths retain audit records
+and optional access emails, and do not alter the volunteer's active/inactive status.
 
 `profile.preferred_name` historically stored a combined full-or-preferred-name
 answer. The name-component migration adds nullable `first_name`, `middle_names`,
@@ -99,20 +110,23 @@ patrol. A medic must have `medic` in `profile.teams`, both authoritative organiz
 approvals (`registration_approved` and `patrol_approved`), and any
 `orientation_completion` record. No extra certification gate is imposed.
 
-Patrols with orientation also reserve two **orientee** places, with a maximum of
-four orientees and no minimum attendance. Anyone without a completion record,
-including a first-time medic or a patrol-approved first-timer, counts only as an
-orientee on these patrols. Each person occupies one place. Existing patrol approval
+Patrols with orientation also reserve two **new volunteer** places, with a maximum of
+four new volunteers and no minimum attendance. Anyone without a completion record,
+including a first-time medic or a patrol-approved first-timer, counts only as a
+new volunteer on these patrols. Each person occupies one place. Existing patrol approval
 still permits attending a regular patrol without completion, but never fills a
 medic reservation without completion.
 
-After a candidate is added, `total + max(0, 2 - medics) + outstandingOrientees`
-must not exceed capacity; `outstandingOrientees = max(0, 2 - orientees)` only when
-orientation is included. Extra medics and third/fourth orientees share the general
+After a candidate is added, `total + max(0, 2 - medics) + outstandingNewVolunteers`
+must not exceed capacity; `outstandingNewVolunteers = max(0, 2 - newVolunteers)` only when
+orientation is included. Extra medics and additional new volunteers share the general
 pool, without consuming the other category's outstanding reservations. Cancellations
 free the appropriate category. SQLite insert/update triggers enforce this atomically,
 including raw SQL, reactivation, reassignment and organizer moves (failed moves roll
 back cancellation, audits and notifications).
+
+`0025_new_volunteer_terminology.sql` renames the internal reservation aliases to
+`new_volunteers`; eligibility rules and existing records are unchanged.
 
 New or edited events, series and templates need capacity two, or four with
 orientation. Apply `0017_medic_orientee_reservations.sql` before deploying this code.
@@ -162,7 +176,8 @@ Application-approved volunteers with neither an `orientation_completion` record
 nor current `patrol_approved` status may hold one confirmed upcoming orientation
 booking at a time. Approval dates do not determine who is new: older accounts
 without either status follow the same rule. A recorded completion or explicit
-patrol approval lifts this cap; completion still does not grant patrol approval.
+patrol approval lifts this cap. Historical completion alone does not grant patrol
+approval; the organizer's combined approval action records both milestones.
 Organizer role alone does not lift the cap (or grant patrol approval).
 
 Confirmed bookings for future, non-cancelled orientations count even when an

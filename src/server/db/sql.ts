@@ -5,12 +5,16 @@
 export const nowMsSql =
   "CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)";
 
+// Match isApplicationReadyForReview; Discord linking is temporarily disabled.
+export const applicationReadyForReviewSql =
+  "(p.registered_at IS NOT NULL AND p.naloxone_completed_at IS NOT NULL)";
+
 // Backend-owned aliases only. Null preserves deployed orientation events while
 // allowing an explicit override on both standalone and recurring patrols.
 export const includesOrientationSql = (alias = "e") =>
   `coalesce(${alias}.includes_orientation, ${alias}.type = 'orientation')`;
 
-// Mutually exclusive with orientee: a first-time medic never fills a medic place.
+// Mutually exclusive with new volunteers: a first-time medic never fills a medic place.
 // Use the existing authoritative approvals, not a client-selected signup category.
 export const approvedMedicSql = (userId: string) => `EXISTS (
   SELECT 1 FROM profile mp JOIN volunteer_status mv ON mv.user_id = mp.user_id

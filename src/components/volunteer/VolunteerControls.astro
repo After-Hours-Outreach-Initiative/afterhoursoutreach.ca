@@ -1,5 +1,6 @@
 ---
 import type { VolunteerRow } from "@/server/db/volunteers";
+import VolunteerAccessAction from "./VolunteerAccessAction.astro";
 interface Props {
   person: VolunteerRow;
 }
@@ -14,138 +15,13 @@ const { person } = Astro.props;
   <h2 id="volunteer-organizer-controls-heading" data-contents-section>
     Organizer controls
   </h2>
-  <form
-    class="volunteer-form"
-    data-organizer-status
-    data-access-kind="application"
-    data-email-prompt="access"
-    action="/api/v1/organizer/action"
-    method="post"
-  >
-    <input type="hidden" name="userId" value={person.id} />
-    <input type="hidden" name="version" value={person.updatedAt} />
-    <input
-      type="checkbox"
-      name="active"
-      checked={Boolean(person.active)}
-      hidden
-    />
-    <input
-      type="checkbox"
-      name="patrolApproved"
-      checked={Boolean(person.patrolApproved)}
-      hidden
-    />
-    <input
-      type="checkbox"
-      name="applicationApproved"
-      checked={!person.applicationApproved}
-      hidden
-    />
-    <p data-form-message role="status" hidden></p>
-    <button
-      class:list={["btn", person.applicationApproved ? "btn-red" : "btn-green"]}
-      type="submit"
-      data-loading-label="Saving…"
-      data-volunteer-control
-      disabled
-      >{
-        person.applicationApproved
-          ? "Revoke application approval"
-          : "Approve application"
-      }</button
-    >
-  </form>
-  {
-    !person.applicationApproved && !person.applicationRejectionReason && (
-      <details>
-        <summary class="cursor-pointer text-red-300 underline underline-offset-4">
-          Reject application
-        </summary>
-        <form
-          class="volunteer-form mt-4"
-          data-organizer-rejection
-          action="/api/v1/organizer/action"
-          method="post"
-        >
-          <input type="hidden" name="userId" value={person.id} />
-          <input type="hidden" name="version" value={person.updatedAt} />
-          <label class="volunteer-field">
-            Reason for rejection
-            <textarea
-              name="reason"
-              required
-              maxlength="2000"
-              rows="4"
-              data-volunteer-control
-              disabled
-            />
-          </label>
-          <p class="volunteer-help">
-            This reason will be emailed to the applicant and shown in their
-            application.
-          </p>
-          <p data-form-message role="status" hidden />
-          <button
-            class="btn btn-red"
-            type="submit"
-            data-loading-label="Sending…"
-            data-volunteer-control
-            disabled
-          >
-            Reject application and email reason
-          </button>
-        </form>
-      </details>
-    )
-  }
   {
     Boolean(person.applicationApproved) && (
       <>
-        <form
-          class="volunteer-form"
-          data-organizer-status
-          data-access-kind="patrol"
-          data-email-prompt="access"
-          action="/api/v1/organizer/action"
-          method="post"
-        >
-          <input type="hidden" name="userId" value={person.id} />
-          <input type="hidden" name="version" value={person.updatedAt} />
-          <input
-            type="checkbox"
-            name="applicationApproved"
-            checked={Boolean(person.applicationApproved)}
-            hidden
-          />
-          <input
-            type="checkbox"
-            name="active"
-            checked={Boolean(person.active)}
-            hidden
-          />
-          <input
-            type="checkbox"
-            name="patrolApproved"
-            checked={!person.patrolApproved}
-            hidden
-          />
-          <p data-form-message role="status" hidden />
-          <button
-            class:list={[
-              "btn",
-              person.patrolApproved ? "btn-red" : "btn-green",
-            ]}
-            type="submit"
-            data-loading-label="Saving…"
-            data-volunteer-control
-            disabled
-          >
-            {person.patrolApproved
-              ? "Revoke patrol approval"
-              : "Approve for patrols"}
-          </button>
-        </form>
+        <VolunteerAccessAction {person} kind="application" />
+        {Boolean(person.patrolApproved) && (
+          <VolunteerAccessAction {person} kind="patrol" />
+        )}
         <form
           class="volunteer-form"
           data-organizer-status
@@ -207,7 +83,7 @@ const { person } = Astro.props;
             Account role
             <select name="role" data-volunteer-control disabled>
               <option value="volunteer" selected={person.role === "volunteer"}>
-                Volunteer
+                Outreach Volunteer
               </option>
               <option value="organizer" selected={person.role === "organizer"}>
                 Organizer

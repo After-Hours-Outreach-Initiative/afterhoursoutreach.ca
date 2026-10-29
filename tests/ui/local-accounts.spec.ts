@@ -145,7 +145,7 @@ test("DEV panel separates states from saved accounts and completes each applicat
       await expect(
         page
           .locator('[data-application-progress-step="review"]')
-          .getByText("Pending approval", { exact: true }),
+          .getByText("Ready for review", { exact: true }),
       ).toHaveCount(0);
     if (index === 1) {
       await expect(
@@ -154,7 +154,7 @@ test("DEV panel separates states from saved accounts and completes each applicat
       await expect(
         page
           .locator('[data-application-progress-step="review"]')
-          .getByText("Pending approval", { exact: true }),
+          .getByText("Ready for review", { exact: true }),
       ).toBeVisible();
     }
     const refreshed = await openLocalAccountSwitcher(page);
@@ -245,7 +245,7 @@ test("DEV panel seeds presets in place without changing the current account or d
   ).toContainText("Patrol approved");
   const orientation = profiles.locator('[data-account-category="orientation"]');
   await expect(
-    orientation.locator('[data-switch-user="new-state:medic-orientee"]'),
+    orientation.locator('[data-switch-user="new-state:medic-new-volunteer"]'),
   ).toContainText("Not medic eligible");
   await expect(
     orientation.locator('[data-switch-user="new-state:orientation-booked"]'),
@@ -629,7 +629,9 @@ test("Discord linking stays hidden while applications advance to review and appr
     page.locator('[data-application-progress-step="review"]'),
   ).toHaveAttribute("data-state", "current");
   await expect(
-    page.getByText("Pending approval", { exact: true }),
+    page
+      .locator('[data-application-progress-step="review"]')
+      .getByText("Ready for review", { exact: true }),
   ).toBeVisible();
   await expectNoDiscord();
   await page.goto("/volunteer/account");
@@ -808,7 +810,7 @@ test.skip("Discord application step stays brief outside the current step", async
   const review = page.locator('[data-application-progress-step="review"]');
   await expect(review).toHaveAttribute("data-state", "current");
   await expect(
-    review.getByText("Pending approval", { exact: true }),
+    review.getByText("Ready for review", { exact: true }),
   ).toBeVisible();
   await expect(discord).toHaveAttribute("data-state", "complete");
   await discord.locator(":scope > summary").click();
@@ -911,9 +913,9 @@ test.skip("Connect Discord locally simulates consent, cancellation, failure and 
   );
   await expect(discord.locator("[data-discord-description]")).toBeHidden();
   await expect(discord).toHaveAttribute("data-state", "current");
-  await expect(page.getByText("Pending approval", { exact: true })).toHaveCount(
-    0,
-  );
+  await expect(
+    review.getByText("Ready for review", { exact: true }),
+  ).toHaveCount(0);
   const pending = await (await page.request.get(endpoint)).json();
   expect(pending.completedAt).toBeNull();
   expect(pending.discordId).toBe(`local:${user.id}`);
@@ -932,7 +934,7 @@ test.skip("Connect Discord locally simulates consent, cancellation, failure and 
   const review = page.locator('[data-application-progress-step="review"]');
   await expect(review).toHaveAttribute("data-state", "current");
   await expect(
-    review.getByText("Pending approval", { exact: true }),
+    review.getByText("Ready for review", { exact: true }),
   ).toBeVisible();
   await discord.locator(":scope > summary").click();
   await discord

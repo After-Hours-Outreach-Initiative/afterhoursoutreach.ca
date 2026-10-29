@@ -6,27 +6,32 @@ interface Props {
 }
 const { event } = Astro.props;
 const medics = event.medicConfirmed;
-const orientees = event.includesOrientation ? event.orientationConfirmed : 0;
-const volunteers = Math.max(0, event.confirmed - medics - orientees);
+const newVolunteers = event.includesOrientation
+  ? event.orientationConfirmed
+  : 0;
+const outreachVolunteers = Math.max(
+  0,
+  event.confirmed - medics - newVolunteers,
+);
 ---
 
 {
-  medics + volunteers + orientees > 0 && (
+  medics + outreachVolunteers + newVolunteers > 0 && (
     <span class="event-attendance">
       <span class="event-attendance-row">
         <span
           class="event-avatar-row"
           role="group"
-          aria-label={`${medics} approved medics, ${volunteers} other volunteers and ${orientees} orientees registered`}
+          aria-label={`${medics} approved medics, ${outreachVolunteers} outreach volunteer${outreachVolunteers === 1 ? "" : "s"} and ${newVolunteers} new volunteer${newVolunteers === 1 ? "" : "s"} registered`}
         >
           {Array.from({ length: medics }, () => (
             <AttendeeAvatar category="medic" />
           ))}
-          {Array.from({ length: volunteers }, () => (
-            <AttendeeAvatar category="volunteer" />
+          {Array.from({ length: outreachVolunteers }, () => (
+            <AttendeeAvatar category="outreach-volunteer" />
           ))}
-          {Array.from({ length: orientees }, () => (
-            <AttendeeAvatar category="orientee" />
+          {Array.from({ length: newVolunteers }, () => (
+            <AttendeeAvatar category="new-volunteer" />
           ))}
         </span>
       </span>

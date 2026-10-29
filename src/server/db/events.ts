@@ -140,6 +140,8 @@ export interface RosterRow {
   userId: string;
   name: string;
   completed: number;
+  patrolApproved: number;
+  statusVersion: number;
   category: AttendeeCategory;
 }
 export interface PublicRosterRow {
@@ -183,8 +185,8 @@ export async function listUpcomingPublicEvents(db: Env["DB"]) {
   return rows.results;
 }
 
-// Completion does not grant patrol approval. Organizers and patrol-approved
-// volunteers retain full visibility, including legacy approvals without attendance.
+// Historical completion records alone do not grant patrol approval. Organizers and
+// patrol-approved volunteers retain full visibility, including legacy approvals.
 function volunteerEventVisibilitySql(actor: Actor | null) {
   return actor?.role === "organizer" || actor?.patrolApproved
     ? "1"
@@ -868,7 +870,7 @@ export async function listPublicRosters(
     p.first_name AS firstName, p.last_name AS lastName, ${profileDisplayNameSql} AS legacyName,
     CASE WHEN ${includesOrientationSql()} AND NOT EXISTS (
       SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id
-    ) THEN 'orientee' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'volunteer' END AS category
+    ) THEN 'new-volunteer' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'outreach-volunteer' END AS category
     FROM signup s JOIN event e ON e.id = s.event_id
     JOIN profile p ON p.user_id = s.user_id JOIN user u ON u.id = s.user_id
      WHERE s.status = 'confirmed' AND e.id IN (SELECT value FROM json_each(?))
@@ -932,13 +934,15 @@ export async function listRosters(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, ${profileDisplayNameSql} AS name,
         CASE WHEN ${includesOrientationSql()} AND NOT EXISTS (
           SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id
-        ) THEN 'orientee' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'volunteer' END AS category,
-        EXISTS(SELECT 1 FROM orientation_completion o
+        ) THEN 'new-volunteer' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'outreach-volunteer' END AS category,
+         v.patrol_approved AS patrolApproved, v.updated_at AS statusVersion,
+         EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
       FROM signup s
       JOIN event e ON e.id = s.event_id
       JOIN profile p ON p.user_id = s.user_id
-      JOIN user u ON u.id = s.user_id
+       JOIN user u ON u.id = s.user_id
+       JOIN volunteer_status v ON v.user_id = s.user_id
        WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'
        ORDER BY name
        LIMIT 20000`,

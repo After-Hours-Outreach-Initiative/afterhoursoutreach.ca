@@ -130,7 +130,7 @@ export function requireVolunteer(actor: Actor | null): asserts actor is Actor {
 }
 export function canViewEvents(actor: Actor | null): boolean {
   // Preserve existing patrol-approved volunteers and organizers, including legacy
-  // accounts without a self-reported course date. New orientees need all milestones.
+  // accounts without a self-reported course date. New volunteers need all milestones.
   return Boolean(
     actor?.applicationSubmitted &&
     actor.active &&

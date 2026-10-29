@@ -114,7 +114,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         empty,
       )
       .run();
-    // Three completed medics, three orientees (including a first-time medic),
+    // Three completed medics, three new volunteers (including a first-time medic),
     // then only real green attendees. The crowded event exercises scrolling at 100.
     for (let index = 0; index < 100; index++) {
       const id = `avatar-attendee-${index}`;
@@ -267,7 +267,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(card.locator(".event-attendance-row")).toHaveCount(1);
         await expect(card.locator(".event-avatar-row")).toHaveAttribute(
           "aria-label",
-          "3 approved medics, 2 other volunteers and 3 orientees registered",
+          "3 approved medics, 2 outreach volunteers and 3 new volunteers registered",
         );
         await expect(
           card.locator(".event-avatar-row .attendee-avatar"),
@@ -311,15 +311,21 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           card.locator(".event-avatar-row .attendee-medic"),
         ).toHaveCount(3);
         await expect(
-          card.locator(".event-avatar-row .attendee-volunteer"),
+          card.locator(".event-avatar-row .attendee-outreach-volunteer"),
         ).toHaveCount(2);
         await expect(
-          card.locator(".event-avatar-row .attendee-orientee"),
+          card.locator(".event-avatar-row .attendee-new-volunteer"),
         ).toHaveCount(3);
+        await expect(
+          card.locator(".event-avatar-row .attendee-new-volunteer").first(),
+        ).toHaveAttribute("aria-label", "New volunteer: registered");
+        await expect(
+          card.locator(".event-avatar-row .attendee-new-volunteer").first(),
+        ).toHaveAttribute("title", "New volunteer: registered");
         for (const [category, color] of [
           ["medic", "rgb(185, 28, 28)"],
-          ["volunteer", "rgb(21, 128, 61)"],
-          ["orientee", "rgb(29, 78, 216)"],
+          ["outreach-volunteer", "rgb(21, 128, 61)"],
+          ["new-volunteer", "rgb(29, 78, 216)"],
         ]) {
           const avatar = card
             .locator(`.event-avatar-row .attendee-${category} svg`)
@@ -341,7 +347,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             await expect(shape).toHaveCSS("stroke", "none");
           }
         }
-        await expect(card.locator(".event-orientee-box")).toHaveCount(0);
+        await expect(card.locator(".event-new-volunteer-box")).toHaveCount(0);
         const emptyCard = page.locator(`[data-live-event="${empty}"]`);
         const emptyRoster = emptyCard.locator(rosterSelector);
         await expect(emptyRoster).toHaveCount(0);
@@ -495,14 +501,12 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           await expect(
             roster.locator("tbody tr").first().locator(".attendee-medic"),
           ).toHaveCSS("color", "rgb(185, 28, 28)");
-          await expect(roster.locator(".attendee-volunteer").first()).toHaveCSS(
-            "color",
-            "rgb(21, 128, 61)",
-          );
-          await expect(roster.locator(".attendee-orientee").first()).toHaveCSS(
-            "color",
-            "rgb(29, 78, 216)",
-          );
+          await expect(
+            roster.locator(".attendee-outreach-volunteer").first(),
+          ).toHaveCSS("color", "rgb(21, 128, 61)");
+          await expect(
+            roster.locator(".attendee-new-volunteer").first(),
+          ).toHaveCSS("color", "rgb(29, 78, 216)");
           if (width === 1280) {
             await roster.locator("summary").focus();
             await DB.prepare(

@@ -176,6 +176,13 @@
       "when": 1793229465812,
       "tag": "0024_application_rejection",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1793256486661,
+      "tag": "0025_new_volunteer_terminology",
+      "breakpoints": true
     }
   ]
 }

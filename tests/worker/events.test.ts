@@ -800,7 +800,7 @@ describe(
         );
       });
 
-      test("orientation completion requires an actual past attendance and never approves patrols", async () => {
+      test("orientation completion requires actual past attendance and also approves patrols", async () => {
         const attendee = await DB.prepare(
           "SELECT user_id AS userId FROM signup WHERE event_id=? AND status='confirmed'",
         )
@@ -820,6 +820,13 @@ describe(
         );
         await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
           .bind(Date.now() - 1000, destination.id)
+          .run();
+        // The moved attendee may be the bootstrapped organizer, whose application
+        // has not needed review for event access. Set up this approval prerequisite.
+        await DB.prepare(
+          "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+        )
+          .bind(attendee!.userId)
           .run();
         await ok(
           await send(
@@ -852,6 +859,14 @@ describe(
               .bind(attendee!.userId)
               .first()
           )?.n,
+          1,
+        );
+        assert.equal(
+          await DB.prepare(
+            "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
+          )
+            .bind(attendee!.userId)
+            .first("patrol_approved"),
           1,
         );
       });
@@ -1067,6 +1082,19 @@ describe(
       });
 
       test("browser organizer and volunteer workflows save in place and remain usable on mobile", async () => {
+        // Alice needs actual attendance for the merged approval action.
+        await DB.prepare(
+          `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+          VALUES ('browser-orientation','orientation',?,'Browser orientation',8,?,0,0)`,
+        )
+          .bind(Date.now() + 86_400_000, organizer.id)
+          .run();
+        await ok(await status(alice.id, true, false));
+        await ok(await join("browser-orientation", alice.cookie));
+        await DB.prepare(
+          "UPDATE event SET starts_at=0 WHERE id='browser-orientation'",
+        ).run();
+        await ok(await status(alice.id, false, false));
         // Earlier API cases share this actor; give the browser its own action budget.
         const start = Math.floor(Date.now() / 60_000) * 60_000;
         const eventRateKey = await hashAuthValue(
@@ -1815,10 +1843,11 @@ describe(
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
             form: attendanceCard.locator("[data-organizer-orientation]"),
+            notify: false,
             trigger: () =>
               attendanceCard
                 .getByRole("button", {
-                  name: "Mark orientation completed",
+                  name: "Approve for patrols",
                   exact: true,
                 })
                 .click(),

@@ -530,7 +530,7 @@ function EventItem({
         </strong>{" "}
         registered · {number(event.medics)} medics
         {Boolean(event.includesOrientation) &&
-          ` · ${number(event.orientees)} orientees`}
+          ` · ${number(event.newVolunteers)} new volunteer${number(event.newVolunteers) === 1 ? "" : "s"}`}
       </p>
       <p className="ops-muted">
         {event.cancelledAt

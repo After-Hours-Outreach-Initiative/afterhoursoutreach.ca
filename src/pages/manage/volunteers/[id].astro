@@ -3,8 +3,11 @@ import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/db/access";
 import {
   findVolunteer,
+  findVolunteerOrientation,
+  findCompletedVolunteerOrientation,
   viewVolunteerProfile,
   type VolunteerRow,
+  type VolunteerOrientation,
 } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
@@ -20,15 +23,22 @@ import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro"
 import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
 import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
+import VolunteerProgression from "@/components/volunteer/VolunteerProgression.astro";
 import PageContents from "@/components/volunteer/PageContents.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import {
+  isApplicationReadyForReview,
+  loadApplicationProgress,
+} from "@/server/db/application-progress";
 // Discord connection is temporarily disabled.
 // import { loadDiscordStatus } from "@/server/discord/status";
-// import { loadApplicationProgress } from "@/server/db/application-progress";
 import "@/styles/volunteer.css";
 export const prerender = false;
 let profile;
 let person: VolunteerRow | null = null;
+let orientation: VolunteerOrientation | null = null;
+let completedOrientation: VolunteerOrientation | null = null;
+let applicationProgress: Awaited<ReturnType<typeof loadApplicationProgress>>;
 let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
@@ -51,6 +61,20 @@ try {
   accountEmail = email;
   profile = await viewVolunteerProfile(env.DB, actor, Astro.params.id ?? "");
   person = await findVolunteer(env.DB, actor, Astro.params.id ?? "");
+  applicationProgress = await loadApplicationProgress(
+    env.DB,
+    Astro.params.id ?? "",
+  );
+  completedOrientation = await findCompletedVolunteerOrientation(
+    env.DB,
+    actor,
+    Astro.params.id ?? "",
+  );
+  orientation = await findVolunteerOrientation(
+    env.DB,
+    actor,
+    Astro.params.id ?? "",
+  );
 } catch (error) {
   return new Response(
     error instanceof RequestError
@@ -62,9 +86,12 @@ try {
 if (!profile || !person)
   return new Response("Volunteer not found", { status: 404 });
 // const discord = await loadDiscordStatus(env, person.id);
-// const progress = await loadApplicationProgress(env.DB, person.id);
 const profileSections = profileFormSections();
+const medic =
+  profile.answers.teams.includes("medic") &&
+  (person.orientations > 0 || !person.patrolApproved);
 const contents = [
+  { id: "volunteer-progression-heading", heading: "Volunteer progression" },
   ...(person.applicationApproved
     ? [
         { id: "volunteer-profile-panel", heading: "Profile" },
@@ -81,7 +108,14 @@ const contents = [
     heading: section.heading,
     nested: true,
   })),
-  { id: "volunteer-organizer-controls-heading", heading: "Organizer controls" },
+  ...(person.applicationApproved
+    ? [
+        {
+          id: "volunteer-organizer-controls-heading",
+          heading: "Organizer controls",
+        },
+      ]
+    : []),
 ];
 ---
 
@@ -110,7 +144,9 @@ const contents = [
                 : "Application approved. Approving organizer not recorded."
               : person.applicationRejectionReason
                 ? "Application rejected"
-                : "Application awaiting approval"
+                : isApplicationReadyForReview(applicationProgress)
+                  ? "Ready for review"
+                  : "Application in progress"
           }
         </p>
         {
@@ -127,7 +163,11 @@ const contents = [
               <dd data-application-current-step>
                 {
                   person.applicationApproved
-                    ? "Application approved"
+                    ? person.patrolApproved
+                      ? medic
+                        ? "Medic"
+                        : "Outreach Volunteer"
+                      : "New volunteer"
                     : person.applicationRejectionReason
                       ? "Application rejected"
                       : profile.naloxoneCompletedAt === null
@@ -171,6 +211,13 @@ const contents = [
         idleHeading="Sections"
       />
       <div data-volunteer-profile-body>
+        <VolunteerProgression
+          {person}
+          {orientation}
+          {completedOrientation}
+          {medic}
+          progress={applicationProgress}
+        />
         {
           Boolean(person.applicationApproved) && (
             <section
@@ -241,7 +288,11 @@ const contents = [
             )
           }
         </section>
-        <VolunteerControls person={person} />
+        {
+          Boolean(person.applicationApproved) && (
+            <VolunteerControls person={person} />
+          )
+        }
       </div>
     </div>
   </section>

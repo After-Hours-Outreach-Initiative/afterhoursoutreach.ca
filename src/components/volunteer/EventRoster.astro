@@ -47,21 +47,27 @@ const { event, roster, future, destinations } = Astro.props;
               {Boolean(event.includesOrientation) &&
                 !future &&
                 !event.cancelledAt &&
-                !person.completed && (
+                (!person.completed || !person.patrolApproved) && (
                   <form
                     class="event-roster-orientation"
                     data-organizer-orientation
+                    data-email-prompt="access"
                     action="/api/v1/organizer/action"
                     method="post"
                   >
                     <input name="userId" type="hidden" value={person.userId} />
                     <input name="eventId" type="hidden" value={event.id} />
+                    <input
+                      name="version"
+                      type="hidden"
+                      value={person.statusVersion}
+                    />
                     <button
                       class="btn btn-outline"
                       type="submit"
                       data-loading-label="Saving…"
                     >
-                      Mark orientation completed
+                      Approve for patrols
                     </button>
                     <p data-form-message role="status" hidden />
                   </form>
