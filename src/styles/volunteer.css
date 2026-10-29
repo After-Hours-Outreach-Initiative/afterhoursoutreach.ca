@@ -187,6 +187,28 @@ body:has(
 .volunteer-email-reset:hover {
   color: white;
 }
+.volunteer-signin-history,
+.volunteer-signin-emails {
+  display: grid;
+  gap: 0.5rem;
+}
+.volunteer-signin-email {
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.volunteer-signin-forget {
+  justify-self: start;
+  min-height: 2.75rem;
+  color: #a1a1aa;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+.volunteer-signin-forget:hover {
+  color: white;
+}
 .volunteer-signin-panel > .btn,
 .volunteer-signin-panel .volunteer-form > .btn {
   width: 100%;

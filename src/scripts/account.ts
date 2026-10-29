@@ -1,6 +1,7 @@
 import { authClient, showSecondFactor } from "./auth-client";
 import { signOut } from "./sign-out";
 import { initEmailSignIn } from "./email-sign-in";
+import { rememberSuccessfulSignIn } from "./sign-in-history";
 import { loadActionPage } from "./action-page";
 import {
   applicationDisplayName,
@@ -169,6 +170,7 @@ function finish(result: object) {
   // The client plugin has already displayed the challenge. Do not navigate away.
   if ("twoFactorRedirect" in result && result.twoFactorRedirect === true)
     return;
+  rememberSuccessfulSignIn(result);
   location.assign(signInDestination);
 }
 

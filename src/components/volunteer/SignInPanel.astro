@@ -42,6 +42,21 @@ const ready = Boolean(
         disabled={!ready}
       />
       <FieldError field="email" message="Enter a valid email address." />
+      <div class="volunteer-signin-history" data-sign-in-history hidden>
+        <p class="volunteer-help" id="sign-in-history-label">
+          Previously signed in on this browser
+        </p>
+        <div
+          class="volunteer-signin-emails"
+          data-remembered-emails
+          role="group"
+          aria-labelledby="sign-in-history-label"
+        >
+        </div>
+        <button type="button" class="volunteer-signin-forget" data-forget-emails
+          >Forget saved emails</button
+        >
+      </div>
     </div>
     <p data-form-message role="status" aria-live="polite" hidden></p>
     <button
