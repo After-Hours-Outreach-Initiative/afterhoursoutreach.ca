@@ -108,7 +108,7 @@ establish the new baseline; failed saves remain retryable, and edits made while
 a save is pending stay unsaved. **Complete application** is unaffected.
 
 “How did you find out about us?”,
-“Please tell us what motivates you to volunteer with us?”, and the Code of
+“What motivates you to volunteer with us?”, and the Code of
 Conduct are editable only during application, not on the volunteer's profile.
 Organizers can view referral answers on profile pages/dialogs; motivation and
 the acknowledgement are not displayed there. The server preserves these
@@ -142,7 +142,7 @@ view referral answers and the remaining profile answers.
 | Emergency contact phone                                   | Yes                                                  |
 | Emergency contact relationship                            | Yes                                                  |
 | How did you find out about us                             | At least one choice; short detail required for Other |
-| Please tell us what motivates you to volunteer with us?      | Yes                                                  |
+| What motivates you to volunteer with us?                   | Yes                                                  |
 | Teams (outreach, medic, non-patrol)                       | Yes                                                  |
 | Highest medical certification                             | Yes                                                  |
 | Other training and experience, and other                  | Yes                                                  |

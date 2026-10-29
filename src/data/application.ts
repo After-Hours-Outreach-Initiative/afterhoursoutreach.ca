@@ -448,7 +448,7 @@ export const applicationFields = [
   {
     name: "motivation",
     section: "about-volunteering",
-    label: "Please tell us what motivates you to volunteer with us?",
+    label: "What motivates you to volunteer with us?",
     required: true,
     multiline: true,
     applicationOnly: true,
