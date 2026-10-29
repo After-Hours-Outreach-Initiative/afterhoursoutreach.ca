@@ -26,7 +26,8 @@ const dateFormat = new Intl.DateTimeFormat("en-CA", {
   day: "numeric",
   year: "numeric",
 });
-const canConfirmNaloxone = progress.submittedAt !== null;
+const canConfirmNaloxone =
+  progress.submittedAt !== null && progress.naloxoneCompletedAt === null;
 const steps = [
   {
     key: "form",

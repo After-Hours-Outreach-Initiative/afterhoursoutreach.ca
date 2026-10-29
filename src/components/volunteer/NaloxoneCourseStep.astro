@@ -25,50 +25,54 @@ const { userId, completedAt, canConfirm } = Astro.props;
     <ArrowUpRightIcon class="btn-icon" />
     <span class="sr-only">(opens in a new tab)</span>
   </a>
-  {
-    canConfirm && (
-      <form
-        class="volunteer-form mt-6"
-        data-naloxone-confirm
-        data-naloxone-user-id={userId}
-        action="/api/v1/account/naloxone"
-        method="post"
+  <form
+    class="volunteer-form mt-6"
+    data-naloxone-confirm
+    data-naloxone-user-id={userId}
+    action="/api/v1/account/naloxone"
+    method="post"
+  >
+    <fieldset
+      class="volunteer-form volunteer-profile-fields"
+      disabled={!canConfirm || completedAt !== null}
+    >
+      <legend class="sr-only">Confirm Naloxone 101 completion</legend>
+      <label class="volunteer-check">
+        <input
+          type="checkbox"
+          name="completed"
+          value="true"
+          required
+          checked={completedAt !== null}
+        />
+        <span>I confirm I have completed Naloxone 101.</span>
+      </label>
+      <p
+        class="text-base"
+        data-form-message
+        role="status"
+        aria-live="polite"
+        hidden={completedAt === null}
       >
-        <label class="volunteer-check">
-          <input
-            type="checkbox"
-            name="completed"
-            value="true"
-            required
-            checked={completedAt !== null}
-            disabled={completedAt !== null}
-          />
-          <span>I confirm I have completed Naloxone 101.</span>
-        </label>
-        <p
-          class="text-base"
-          data-form-message
-          role="status"
-          aria-live="polite"
-          hidden={completedAt === null}
-        >
-          Completion saved to your account.
-        </p>
-        <button
-          class="btn btn-primary"
-          type="submit"
-          data-loading-label="Saving…"
-          hidden={completedAt !== null}
-        >
-          Confirm completion
-        </button>
-      </form>
-    )
-  }
+        Completion saved to your account.
+      </p>
+      <button
+        class="btn btn-primary"
+        type="submit"
+        data-loading-label="Saving…"
+      >
+        Confirm completion
+      </button>
+    </fieldset>
+  </form>
 </section>
 
 <style>
   .volunteer-panel > p {
     margin: 0;
+  }
+  .volunteer-check:has(input:disabled) {
+    color: #a1a1aa;
+    cursor: not-allowed;
   }
 </style>
