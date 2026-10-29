@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const unexpectedRequests = new WeakMap<Page, string[]>();
-// A modal inside an iframe cannot scroll its ancestor document into view.
+// Keep the preview visible while exercising its notification dialogs.
 async function showPreview(page: Page) {
   await page
     .locator("[data-ui-profile-frame]")
@@ -39,6 +39,9 @@ test("organizer profile catalogue exposes every real profile state without accou
     .getByRole("link", { name: "Organizer profile", exact: true })
     .click();
   const preview = page.frameLocator("[data-ui-profile-frame]");
+  await expect(
+    page.getByRole("combobox", { name: "Presentation", exact: true }),
+  ).toHaveCount(0);
   const states: Record<string, string> = {
     "naloxone-pending": "Complete Naloxone 101",
     "ready-for-review": "Application review",
@@ -69,6 +72,9 @@ test("organizer profile catalogue exposes every real profile state without accou
       `"scenario": "${id}"`,
     );
     await expect(preview.locator("[data-volunteer-profile]")).toBeVisible();
+    await expect(
+      preview.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+    ).toHaveCount(0);
   }
   await page.getByRole("searchbox", { name: "Find a state" }).fill("medic");
   await expect(page.locator("[data-ui-profile-scenario]:visible")).toHaveCount(
@@ -89,6 +95,116 @@ test("organizer profile catalogue exposes every real profile state without accou
   await expect(preview.locator("[data-application-current-step]")).toHaveText(
     "Outreach Volunteer",
   );
+});
+
+test("switching profile states preserves preview scrolling and reset starts at the top", async ({
+  page,
+}) => {
+  await page.goto(
+    "/dev/ui/organizer-profile?scenario=outreach-volunteer&height=600",
+  );
+  const preview = page.frameLocator("[data-ui-profile-frame]");
+  const document = preview.locator("html");
+  await expect(preview.locator("[data-volunteer-profile]")).toBeVisible();
+  await document.evaluate((element) => {
+    element.setAttribute("data-test-document", "preserved");
+    window.scrollTo({ top: 900, behavior: "instant" });
+  });
+  await expect.poll(() => document.evaluate(() => window.scrollY)).toBe(900);
+
+  for (const id of ["medic", "organizer", "inactive"]) {
+    await page.locator(`[data-ui-profile-scenario="${id}"]`).click();
+    await expect(
+      preview.locator("[data-ui-organizer-preview]"),
+    ).toHaveAttribute("data-ui-scenario", id);
+    await expect.poll(() => document.evaluate(() => window.scrollY)).toBe(900);
+    await expect(document).toHaveAttribute("data-test-document", "preserved");
+  }
+
+  await page
+    .getByRole("button", { name: "Reset preview", exact: true })
+    .click();
+  await expect(page.locator("[data-ui-profile-frame]")).not.toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  await expect.poll(() => document.evaluate(() => window.scrollY)).toBe(0);
+  await expect(document).toHaveAttribute("data-test-document", "preserved");
+});
+
+test("state changes keep the current preview painted until its replacement is ready", async ({
+  page,
+}) => {
+  await page.goto(
+    "/dev/ui/organizer-profile?scenario=outreach-volunteer&height=600",
+  );
+  const preview = page.frameLocator("[data-ui-profile-frame]");
+  const root = preview.locator("[data-ui-organizer-preview]");
+  await expect(root).toHaveAttribute("data-ui-scenario", "outreach-volunteer");
+  const documents: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.isNavigationRequest() &&
+      new URL(request.url()).pathname.endsWith("/organizer-profile/preview")
+    )
+      documents.push(request.url());
+  });
+  let release!: () => void;
+  let requested!: () => void;
+  const responseHeld = new Promise<void>((resolve) => (release = resolve));
+  const requestStarted = new Promise<void>((resolve) => (requested = resolve));
+  await page.route("**/dev/ui/organizer-profile/preview?**", async (route) => {
+    if (
+      new URL(route.request().url()).searchParams.get("scenario") === "medic"
+    ) {
+      requested();
+      await responseHeld;
+    }
+    await route.continue();
+  });
+  await preview
+    .locator("html")
+    .evaluate(() => window.scrollTo({ top: 900, behavior: "instant" }));
+  await page.locator('[data-ui-profile-scenario="medic"]').click();
+  await requestStarted;
+  await expect(page.locator("[data-ui-profile-frame]")).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  await expect(root).toHaveAttribute("data-ui-scenario", "outreach-volunteer");
+  await expect(preview.locator("[data-volunteer-profile]")).toBeVisible();
+  expect(await preview.locator("html").evaluate(() => window.scrollY)).toBe(
+    900,
+  );
+  release();
+  await expect(root).toHaveAttribute("data-ui-scenario", "medic");
+  await expect
+    .poll(() => preview.locator("html").evaluate(() => window.scrollY))
+    .toBe(900);
+  expect(documents).toEqual([]);
+});
+
+test("failed state changes retain the existing preview and can be retried", async ({
+  page,
+}) => {
+  await page.goto("/dev/ui/organizer-profile?scenario=outreach-volunteer");
+  const preview = page.frameLocator("[data-ui-profile-frame]");
+  const root = preview.locator("[data-ui-organizer-preview]");
+  await expect(root).toHaveAttribute("data-ui-scenario", "outreach-volunteer");
+  await page.route("**/dev/ui/organizer-profile/preview?**", async (route) => {
+    if (new URL(route.request().url()).searchParams.get("scenario") === "medic")
+      await route.abort();
+    else await route.continue();
+  });
+  await page.locator('[data-ui-profile-scenario="medic"]').click();
+  await expect(page.locator("[data-ui-profile-status]")).toHaveText(
+    "Preview could not be updated. Try again.",
+  );
+  await expect(root).toHaveAttribute("data-ui-scenario", "outreach-volunteer");
+  await expect(preview.locator("[data-volunteer-profile]")).toBeVisible();
+  await page.unroute("**/dev/ui/organizer-profile/preview?**");
+  await page.locator('[data-ui-profile-scenario="medic"]').click();
+  await expect(root).toHaveAttribute("data-ui-scenario", "medic");
 });
 
 test("real organizer controls simulate confirmation, cancellation, success, errors and pending saves", async ({
@@ -265,33 +381,35 @@ test("active status, account roles and patrol access can be changed through the 
   );
 });
 
-test("dialog and page previews expose loading, unavailable, long and sparse layouts at mobile widths", async ({
+test("profile previews stay on the page at every viewport, including old dialog bookmarks", async ({
   page,
 }) => {
   test.setTimeout(60_000);
   await page.goto(
-    "/dev/ui/organizer-profile?scenario=profile-updated&viewport=320&content=long",
+    "/dev/ui/organizer-profile?scenario=profile-updated&viewport=320&content=long&surface=dialog",
   );
   const preview = page.frameLocator("[data-ui-profile-frame]");
-  for (const surface of ["dialog", "page"]) {
+  for (const width of ["320", "375", "1440"]) {
+    await page
+      .getByRole("combobox", { name: "Viewport width" })
+      .selectOption(width);
     await page
       .getByRole("combobox", { name: "Profile content" })
       .selectOption("long");
-    await page
-      .getByRole("combobox", { name: "Presentation" })
-      .selectOption(surface);
     await expect(preview.locator("[data-volunteer-profile]")).toBeVisible();
+    await expect(
+      preview.locator(
+        "[data-profile-preview-content] > [data-volunteer-profile]",
+      ),
+    ).toBeVisible();
+    await expect(
+      preview.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+    ).toHaveCount(0);
     expect(
       await preview
         .locator("html")
         .evaluate(() => document.documentElement.scrollWidth > innerWidth),
     ).toBe(false);
-    if (surface === "dialog")
-      expect(
-        await preview
-          .locator("[data-profile-dialog-content]")
-          .evaluate((element) => element.scrollWidth > element.clientWidth),
-      ).toBe(false);
     await page
       .getByRole("combobox", { name: "Loading state" })
       .selectOption("loading");
@@ -302,7 +420,9 @@ test("dialog and page previews expose loading, unavailable, long and sparse layo
       .getByRole("combobox", { name: "Loading state" })
       .selectOption("load-error");
     await expect(
-      preview.getByText("Could not load the profile.", { exact: false }),
+      preview.getByText("Volunteer profile is temporarily unavailable.", {
+        exact: true,
+      }),
     ).toBeVisible();
     await page
       .getByRole("combobox", { name: "Loading state" })

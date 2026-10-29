@@ -1,4 +1,19 @@
 import { expect, test } from "@playwright/test";
+import { openLocalAccountSwitcher } from "../helpers/local-account";
+
+test.beforeEach(async ({ page }) => {
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+  await page.goto("/manage/events");
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+});
 
 for (const [kind, description] of [
   [
@@ -17,7 +32,6 @@ for (const [kind, description] of [
   test(`${kind} email choice uses event registration wording`, async ({
     page,
   }) => {
-    await page.goto("/volunteer");
     await page.evaluate((promptKind) => {
       const form = document.createElement("form");
       form.setAttribute("data-manage-signup", "");
@@ -92,31 +106,30 @@ test("organizer email choice defaults to no email and cancellation restores cont
     version++;
     await route.fulfill({ json: { message: "Volunteer access saved." } });
   });
-  await page.route("**/manage/volunteers/test-email-choice", (route) =>
-    route.fulfill({
-      contentType: "text/html",
-      body: profile(),
-    }),
+  await page.route("**/manage/volunteers/local-fixture-user-robin", (route) =>
+    route.request().isNavigationRequest()
+      ? route.continue()
+      : route.fulfill({
+          contentType: "text/html",
+          body: profile(),
+        }),
   );
-  await page.goto("/volunteer");
+  await page.goto("/manage/volunteers/local-fixture-user-robin");
+  await expect(page.locator("[data-volunteer-control]").first()).toBeEnabled();
   await page.evaluate((html) => {
-    const dialog = document.createElement("dialog");
-    dialog.className = "volunteer-dialog";
-    dialog.setAttribute("aria-label", "Test volunteer profile");
-    dialog.innerHTML = html;
-    document.querySelector(".volunteer-wrap")!.appendChild(dialog);
-    dialog.showModal();
+    const replacement = document.createElement("div");
+    replacement.innerHTML = html;
+    document
+      .querySelector("[data-volunteer-profile]")!
+      .replaceWith(replacement.firstElementChild!);
     document.documentElement.dataset.testDocument = "optional-email";
   }, profile());
-  const profileDialog = page.getByRole("dialog", {
-    name: "Test volunteer profile",
-    exact: true,
-  });
+  const profilePage = page.locator("[data-volunteer-profile]");
   const choice = page.getByRole("dialog", {
     name: "Send an email?",
     exact: true,
   });
-  const active = profileDialog.getByLabel("Active volunteer", { exact: true });
+  const active = profilePage.getByLabel("Active volunteer", { exact: true });
   await active.uncheck();
   await expect(choice).toBeVisible();
   await expect(
@@ -138,15 +151,13 @@ test("organizer email choice defaults to no email and cancellation restores cont
   await expect(active).toBeEnabled();
   await expect(active).toBeChecked();
   await expect(active).toBeFocused();
-  await profileDialog.getByLabel("Account role").selectOption("organizer");
+  await profilePage.getByLabel("Account role").selectOption("organizer");
   await expect(choice).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(profileDialog.getByLabel("Account role")).toHaveValue(
-    "volunteer",
-  );
-  await expect(profileDialog.getByLabel("Account role")).toBeEnabled();
+  await expect(profilePage.getByLabel("Account role")).toHaveValue("volunteer");
+  await expect(profilePage.getByLabel("Account role")).toBeEnabled();
   expect(submissions).toEqual([]);
-  const approval = profileDialog.getByRole("button", {
+  const approval = profilePage.getByRole("button", {
     name: "Approve for patrols",
     exact: true,
   });
@@ -164,7 +175,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
     .getByRole("button", { name: "Save without email", exact: true })
     .click();
   await expect(
-    profileDialog.getByRole("button", {
+    profilePage.getByRole("button", {
       name: "Revoke patrol approval",
       exact: true,
     }),
@@ -183,7 +194,13 @@ test("organizer email choice defaults to no email and cancellation restores cont
   await expect(
     page.getByRole("dialog", { name: "Test email outcome", exact: true }),
   ).toHaveCount(0);
-  await expect(profileDialog).toBeVisible();
+  await expect(profilePage).toBeVisible();
+  await expect(page).toHaveURL(
+    /\/manage\/volunteers\/local-fixture-user-robin$/,
+  );
+  await expect(
+    page.getByRole("dialog", { name: /volunteer profile/i }),
+  ).toHaveCount(0);
   expect(
     await page.evaluate(() => document.documentElement.dataset.testDocument),
   ).toBe("optional-email");

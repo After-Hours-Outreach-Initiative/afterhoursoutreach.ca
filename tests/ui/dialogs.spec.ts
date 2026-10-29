@@ -241,7 +241,7 @@ test("event dialogs offer only cancellation for future events and keep ended his
   await expect(group).toHaveCount(0);
 });
 
-test("event and profile dialogs preserve their layout and content throughout the exit transition", async ({
+test("event dialogs preserve their exit layout and roster profiles navigate to pages", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -268,10 +268,16 @@ test("event and profile dialogs preserve their layout and content throughout the
       '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',
     );
     await roster.locator("summary").click();
-    await roster.locator("[data-volunteer-profile-link]").first().click();
-    const profile = page.locator("[data-volunteer-profile-dialog]");
-    await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
-    await expect(profile.locator(".volunteer-profile-loading")).toHaveCount(0);
+    const link = roster.locator("[data-volunteer-profile-link]").first();
+    const profileUrl = new URL((await link.getAttribute("href"))!, page.url())
+      .href;
+    await link.click();
+    await expect(page).toHaveURL(profileUrl);
+    await expect(
+      page.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+    ).toHaveCount(0);
+    const profile = page.locator("[data-volunteer-profile]");
+    await expect(profile).toBeVisible();
     const profilePanel = profile.getByRole("region", {
       name: "Profile",
       exact: true,
@@ -306,8 +312,6 @@ test("event and profile dialogs preserve their layout and content throughout the
       "Personal statement",
     ]);
     await expect(controls).toBeVisible();
-    await expectStableExit(profile);
-    await expect(profile.locator("[data-profile-dialog-content]")).toBeEmpty();
   }
 });
 
@@ -416,16 +420,15 @@ test("application dialogs keep their chrome visible while only their body scroll
     await registration.locator(".dialog-close").click();
   }
 
-  await page
+  const link = page
     .locator(".volunteer-roster[open] [data-volunteer-profile-link]")
-    .first()
-    .click();
-  const profile = page.getByRole("dialog", {
-    name: "Volunteer profile",
-    exact: true,
-  });
-  await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
-  await expectPinnedChrome(profile);
-  await expect(profile.locator(".dialog-footer")).toHaveCount(0);
-  await profile.locator(".dialog-close").click();
+    .first();
+  const profileUrl = new URL((await link.getAttribute("href"))!, page.url())
+    .href;
+  await link.click();
+  await expect(page).toHaveURL(profileUrl);
+  await expect(page.locator("[data-volunteer-profile]")).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+  ).toHaveCount(0);
 });

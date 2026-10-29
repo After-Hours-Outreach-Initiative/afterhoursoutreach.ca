@@ -97,17 +97,6 @@ const frameUrl = `${profilePreviewPath}?${profileQuery(options)}`;
         >
           <input type="hidden" name="scenario" value={options.scenario} />
           <label class="ui-field">
-            Presentation
-            <select name="surface">
-              <option value="dialog" selected={options.surface === "dialog"}
-                >Profile dialog</option
-              >
-              <option value="page" selected={options.surface === "page"}
-                >Full profile page</option
-              >
-            </select>
-          </label>
-          <label class="ui-field">
             Viewport width
             <select name="viewport">
               <option value="fit" selected={options.viewport === "fit"}

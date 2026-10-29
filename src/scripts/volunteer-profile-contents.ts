@@ -28,8 +28,6 @@ export function initVolunteerProfileContents(
     if (disposers.has(flow)) continue;
     const dispose = initPageContents(flow, {
       initialHash: refreshing ? "" : undefined,
-      scrollRoot:
-        flow.closest<HTMLElement>("[data-profile-dialog-content]") ?? undefined,
     });
     if (dispose) disposers.set(flow, dispose);
   }

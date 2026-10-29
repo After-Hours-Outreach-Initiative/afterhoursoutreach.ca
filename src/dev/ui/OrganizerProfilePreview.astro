@@ -1,7 +1,6 @@
 ---
 import LocalLayout from "./LocalLayout.astro";
 import VolunteerProfileView from "../../components/volunteer/VolunteerProfileView.astro";
-import VolunteerProfileDialog from "../../components/volunteer/VolunteerProfileDialog.astro";
 import {
   createProfileFixture,
   getProfileScenario,
@@ -28,34 +27,14 @@ const fixture = createProfileFixture(
     data-ui-phase={options.phase}
     data-ui-scenario={options.scenario}
   >
-    {
-      options.surface === "dialog" ? (
-        <>
-          <div class="ui-profile-preview-intro">
-            <p>Fictional volunteer profile</p>
-            <button
-              class="btn btn-outline"
-              type="button"
-              data-ui-profile-reopen
-            >
-              Open volunteer profile
-            </button>
-          </div>
-          <VolunteerProfileDialog>
-            {options.phase === "ready" && <VolunteerProfileView {...fixture} />}
-          </VolunteerProfileDialog>
-        </>
-      ) : (
-        <div class="volunteer-wrap">
-          <section
-            class="volunteer-panel ui-profile-page-panel"
-            data-profile-preview-content
-          >
-            {options.phase === "ready" && <VolunteerProfileView {...fixture} />}
-          </section>
-        </div>
-      )
-    }
+    <div class="volunteer-wrap">
+      <section
+        class="volunteer-panel ui-profile-page-panel"
+        data-profile-preview-content
+      >
+        {options.phase === "ready" && <VolunteerProfileView {...fixture} />}
+      </section>
+    </div>
   </main>
 </LocalLayout>
 

@@ -19,7 +19,6 @@ import {
   matchesEventFilter,
   groupManagementEvents,
 } from "@/data/event-browser";
-import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import ApplicationProgress from "./ApplicationProgress.astro";
 // Discord connection is temporarily disabled.
 // import DiscordConnectionNotice from "./DiscordConnectionNotice.astro";
@@ -457,7 +456,6 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
       )
     }
     {manage && <EventEditor />}
-    {organizer && <VolunteerProfileDialog />}
   </div>
   <noscript
     ><p class="volunteer-notice">

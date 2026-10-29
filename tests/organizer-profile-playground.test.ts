@@ -58,7 +58,6 @@ describe("organizer profile playground fixtures", () => {
     );
     expect(options).toEqual({
       scenario: "ready-for-review",
-      surface: "dialog",
       viewport: "fit",
       content: "standard",
       phase: "ready",
@@ -67,6 +66,9 @@ describe("organizer profile playground fixtures", () => {
       height: 1200,
     });
     expect(readProfileOptions(profileQuery(options))).toEqual(options);
+    expect(
+      readProfileOptions(new URLSearchParams({ surface: "dialog" })),
+    ).not.toHaveProperty("surface");
     expect(
       readProfileOptions(
         new URLSearchParams({ latency: "-100", height: "-20" }),

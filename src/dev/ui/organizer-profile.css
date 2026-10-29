@@ -89,15 +89,38 @@
   --site-header-height: 0px;
   min-height: 100dvh;
 }
-.ui-profile-preview-intro {
-  display: grid;
-  justify-items: start;
-  gap: 1rem;
-  padding: 1.5rem;
-}
 .ui-profile-page-panel {
   position: relative;
   min-height: 22rem;
+}
+.ui-profile-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #0c0d10;
+  color: #a1a1aa;
+}
+.ui-profile-loading-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid #52525b;
+  border-top-color: #d4d4d8;
+  border-radius: 50%;
+  animation: ui-profile-loading 800ms linear infinite;
+}
+@keyframes ui-profile-loading {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-profile-loading-icon {
+    animation: none;
+  }
 }
 @media (width < 64rem) {
   .ui-profile-workspace {

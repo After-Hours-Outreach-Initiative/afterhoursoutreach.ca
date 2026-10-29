@@ -95,7 +95,7 @@ for (const width of [390, 1280]) {
   }
 }
 
-test("organizer profile contents reveal application details on the page and in dialogs", async ({
+test("profile pages opened directly or from rosters keep section navigation", async ({
   page,
   baseURL,
 }) => {
@@ -111,18 +111,25 @@ test("organizer profile contents reveal application details on the page and in d
 
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const dialog of [false, true]) {
-      if (dialog) {
+    for (const fromRoster of [false, true]) {
+      if (fromRoster) {
         await page.goto("/manage/events");
         const roster = page.locator(
           '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',
         );
         await roster.locator("summary").click();
-        await roster.locator("[data-volunteer-profile-link]").first().click();
+        const link = roster.locator("[data-volunteer-profile-link]").first();
+        const href = new URL((await link.getAttribute("href"))!, page.url())
+          .href;
+        await link.click();
+        await expect(page).toHaveURL(href);
       } else {
         await page.goto("/manage/volunteers/local-fixture-user-robin");
       }
       const profile = page.locator("[data-volunteer-profile]");
+      await expect(
+        page.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+      ).toHaveCount(0);
       await expect(profile.getByRole("tablist")).toHaveCount(0);
       await expect(
         profile.getByRole("heading", { name: "Profile", exact: true }),
@@ -181,24 +188,13 @@ test("organizer profile contents reveal application details on the page and in d
         await expect(menu).not.toHaveAttribute("open");
         await expect(menu.locator("summary")).toBeFocused();
       }
-      if (dialog) {
-        await expect(
-          page.locator("[data-volunteer-profile-dialog]"),
-        ).toBeVisible();
-        await page
-          .getByRole("button", { name: "Close volunteer profile" })
-          .click();
-      } else {
-        await page.reload();
-        await expect(
-          profile.locator(
-            '[data-volunteer-profile-panel="application"] details',
-          ),
-        ).toHaveAttribute("open");
-        await expect(
-          profile.locator("#volunteer-emergency-contact"),
-        ).toBeInViewport({ ratio: 1 });
-      }
+      await page.reload();
+      await expect(
+        profile.locator('[data-volunteer-profile-panel="application"] details'),
+      ).toHaveAttribute("open");
+      await expect(
+        profile.locator("#volunteer-emergency-contact"),
+      ).toBeInViewport({ ratio: 1 });
     }
   }
 });

@@ -190,10 +190,7 @@ test("organizers review submitted applications with search-aware filter counts a
         eventHtml,
         /data-event-save|data-live-series|data-manage-signup|volunteer-roster/,
       );
-      assert.equal(
-        eventHtml.includes("data-volunteer-profile-dialog"),
-        auth === cookie,
-      );
+      assert.doesNotMatch(eventHtml, /data-volunteer-profile-dialog/);
     }
     const response = await get(listPath);
     assert.equal(response.status, 200);
@@ -403,9 +400,9 @@ test("organizers review submitted applications with search-aware filter counts a
     // The table scrolls within the viewport on small screens. Modifier clicks on
     // ordinary cells do not hijack the native profile link's browsing behavior.
     await page.setViewportSize({ width: 320, height: 640 });
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth),
-    ).toBe(320);
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBe(320);
     const tableRegion = results.getByRole("region", {
       name: "Volunteer table",
     });

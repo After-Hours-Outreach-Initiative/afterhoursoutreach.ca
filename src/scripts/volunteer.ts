@@ -475,17 +475,8 @@ async function refreshEvents(element: HTMLFormElement) {
 }
 
 async function refreshVolunteer(element: HTMLFormElement) {
-  const userId = element.querySelector<HTMLInputElement>(
-    'input[name="userId"]',
-  )!.value;
   const profile = element.closest<HTMLElement>("[data-volunteer-profile]")!;
-  const hostUrl = location.href;
-  const profileUrl = `/manage/volunteers/${encodeURIComponent(userId)}`;
-  const onProfilePage = location.pathname === profileUrl;
-  const [page, host] = await Promise.all([
-    loadActionPage(profileUrl),
-    onProfilePage ? Promise.resolve(null) : loadActionPage(hostUrl),
-  ]);
+  const page = await loadActionPage();
   const replacement = actionFragment(page, "[data-volunteer-profile]");
   initVolunteerControls(replacement);
   const applicationOpen = profile.querySelector<HTMLDetailsElement>(
@@ -495,13 +486,7 @@ async function refreshVolunteer(element: HTMLFormElement) {
     "[data-submitted-application] details",
   );
   if (nextApplication && applicationOpen) nextApplication.open = true;
-  // Keep the dialog itself (and its scroll position) open; replace all status
-  // forms together so their versions and hidden checkbox values stay in sync.
-  const dialog = element.closest<HTMLDialogElement>("dialog");
-  const scrollContainer = dialog?.querySelector<HTMLElement>(
-    "[data-profile-dialog-content]",
-  );
-  const scroll = scrollContainer?.scrollTop;
+  // Replace all status forms together to keep versions and hidden values in sync.
   const active = document.activeElement;
   const restoreFocus = element.contains(active) || active === document.body;
   const selector = element.matches("[data-organizer-role]")
@@ -511,19 +496,14 @@ async function refreshVolunteer(element: HTMLFormElement) {
       : element.hasAttribute("data-submit-on-change")
         ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
         : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
-  if (profile.isConnected && (!dialog || dialog.open)) {
+  if (profile.isConnected) {
     disposeVolunteerProfileContents(profile);
     profile.replaceWith(replacement);
     initVolunteerProfileContents(replacement, true);
-    if (scrollContainer && scroll !== undefined)
-      scrollContainer.scrollTop = scroll;
     if (restoreFocus)
       replacement
         .querySelector<HTMLElement>(selector)
         ?.focus({ preventScroll: true });
-  }
-  if (host && location.href === hostUrl) {
-    syncEvents(host);
   }
 }
 
@@ -1069,132 +1049,6 @@ document.addEventListener("click", (event) => {
     }
   }
 });
-
-const profileDialog = document.querySelector<HTMLDialogElement>(
-  "[data-volunteer-profile-dialog]",
-);
-const profileContent = profileDialog?.querySelector<HTMLElement>(
-  "[data-profile-dialog-content]",
-);
-if (profileDialog && profileContent) {
-  const loadingTemplate = profileDialog.querySelector<HTMLTemplateElement>(
-    "[data-profile-dialog-loading]",
-  );
-  let pending: AbortController | undefined;
-  profileDialog.addEventListener("close", async () => {
-    if (profileDialog.open) return;
-    const closingRequest = pending;
-    closingRequest?.abort();
-    // The native close event precedes the visible exit. Wait only for the
-    // dialog's own transitions, not animations inside the fetched profile.
-    await Promise.allSettled(
-      profileDialog.getAnimations().map((animation) => animation.finished),
-    );
-    // A rapid reopen (even followed by another close) owns its own cleanup.
-    if (profileDialog.open || pending !== closingRequest) return;
-    pending = undefined;
-    disposeVolunteerProfileContents(profileContent);
-    profileContent.replaceChildren();
-    profileContent.removeAttribute("aria-busy");
-    profileContent.scrollTop = 0;
-  });
-  document.addEventListener("click", async (event) => {
-    if (
-      !(event.target instanceof Element) ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    )
-      return;
-    const link = event.target.closest<HTMLAnchorElement>(
-      "[data-volunteer-profile-link]",
-    );
-    if (!link) return;
-    event.preventDefault();
-    pending?.abort();
-    const controller = new AbortController();
-    pending = controller;
-    disposeVolunteerProfileContents(profileContent);
-    if (loadingTemplate)
-      profileContent.replaceChildren(loadingTemplate.content.cloneNode(true));
-    else profileContent.textContent = "Loading";
-    profileContent.setAttribute("aria-busy", "true");
-    profileContent.scrollTop = 0;
-    profileDialog.showModal();
-    try {
-      // The normal private page still authenticates, checks organizer access,
-      // and records the profile view before returning any answers.
-      const response = await fetch(link.href, {
-        credentials: "same-origin",
-        signal: controller.signal,
-      });
-      if (!response.ok || response.redirected)
-        throw new Error(
-          "Could not load the profile. Check your organizer session and try again.",
-        );
-      const page = new DOMParser().parseFromString(
-        await response.text(),
-        "text/html",
-      );
-      const content = page.querySelector<HTMLElement>(
-        "[data-volunteer-profile]",
-      );
-      if (!content) throw new Error("The volunteer profile is unavailable.");
-      if (!controller.signal.aborted && profileDialog.open) {
-        const loading = profileContent.querySelector<HTMLElement>(
-          ".volunteer-profile-loading",
-        );
-        const loadingHeight = profileContent.clientHeight;
-        const profile = document.importNode(content, true);
-        initVolunteerControls(profile);
-        const animate = !window.matchMedia("(prefers-reduced-motion: reduce)")
-          .matches;
-        if (animate) {
-          profile.setAttribute("data-profile-entering", "");
-          const finishEntering = (event: Event) => {
-            if (event.target === profile)
-              profile.removeAttribute("data-profile-entering");
-          };
-          profile.addEventListener("animationend", finishEntering, {
-            once: true,
-          });
-          profile.addEventListener("animationcancel", finishEntering, {
-            once: true,
-          });
-        }
-        profileContent.replaceChildren(profile);
-        initVolunteerProfileContents(profile);
-        if (loading && animate) {
-          // Keep the outgoing loader in place as the full profile grows below it.
-          loading.style.height = `${loadingHeight}px`;
-          loading.style.bottom = "auto";
-          loading.setAttribute("aria-hidden", "true");
-          loading.dataset.fading = "true";
-          const removeLoading = (event: Event) => {
-            if (event.target === loading) loading.remove();
-          };
-          loading.addEventListener("animationend", removeLoading, {
-            once: true,
-          });
-          loading.addEventListener("animationcancel", removeLoading, {
-            once: true,
-          });
-          profileContent.appendChild(loading);
-        }
-      }
-    } catch (error) {
-      if (!controller.signal.aborted)
-        profileContent.textContent =
-          error instanceof Error
-            ? error.message
-            : "The volunteer profile is unavailable.";
-    } finally {
-      if (pending === controller) profileContent.removeAttribute("aria-busy");
-    }
-  });
-}
 
 document.addEventListener("click", (event) => {
   const dialog = event.target;

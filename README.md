@@ -18,8 +18,8 @@ playground. Account controls load only when the panel is opened.
 Choose a website part from the playground navigation:
 
 - **Organizer profile**: inspect application review, rejection, orientation,
-  volunteer/medic access, organizer roles, and historical records. Switch between
-  the actual profile dialog and full-page view, try long or sparse answers, and
+  volunteer/medic access, organizer roles, and historical records. Preview
+  the profile page at different sizes, try long or sparse answers, and
   simulate loading, failed saves, conflicts, pending actions, and email failures.
 - **Discord connection**: browse the state gallery or try fictional inputs,
   delayed responses, and success/error flows. Developer controls simulate

@@ -180,7 +180,6 @@ export const profileOutcomes = [
 
 export interface ProfilePreviewOptions {
   scenario: string;
-  surface: "dialog" | "page";
   viewport: (typeof profileViewports)[number];
   content: (typeof profileContents)[number];
   phase: (typeof profilePhases)[number];
@@ -220,7 +219,6 @@ export function readProfileOptions(
   const height = Number(params.get("height") ?? 800);
   return {
     scenario: getProfileScenario(params.get("scenario")).id,
-    surface: params.get("surface") === "page" ? "page" : "dialog",
     viewport:
       profileViewports.find((value) => value === params.get("viewport")) ??
       "fit",

@@ -13,6 +13,7 @@ import {
   profileStateQuery,
   readProfileOptions,
   readProfileState,
+  type ProfilePreviewOptions,
   type ProfileSimulationState,
 } from "./organizer-profile-fixtures";
 
@@ -22,14 +23,11 @@ function initializeProfileSimulator() {
     "[data-ui-organizer-preview]",
   );
   const content = host?.querySelector<HTMLElement>(
-    "[data-profile-dialog-content], [data-profile-preview-content]",
+    "[data-profile-preview-content]",
   );
   if (!host || !content) return;
   const root = host;
   const reader = content;
-  const dialog = root.querySelector<HTMLDialogElement>(
-    "[data-volunteer-profile-dialog]",
-  );
   let options = readProfileOptions(new URLSearchParams(location.search));
   let current =
     readProfileState(new URLSearchParams(location.search)) ??
@@ -37,6 +35,10 @@ function initializeProfileSimulator() {
   let phase: string = options.phase;
   let busy = false;
   let modified = false;
+  let revision = 0;
+  let lastConfiguration = -1;
+  let generation = 0;
+  let pendingRender: AbortController | undefined;
 
   function report() {
     root.dataset.uiPhase = phase;
@@ -46,6 +48,7 @@ function initializeProfileSimulator() {
         channel: profileChannel,
         type: "state",
         query: profileQuery(options).toString(),
+        revision,
         phase,
         modified,
         state: {
@@ -67,50 +70,150 @@ function initializeProfileSimulator() {
     initVolunteerProfileContents(reader);
   }
   function showLoadState() {
+    reader.removeAttribute("aria-busy");
     if (options.phase === "loading") {
-      const template = root.querySelector<HTMLTemplateElement>(
-        "[data-profile-dialog-loading]",
-      );
-      if (template) reader.replaceChildren(template.content.cloneNode(true));
-      else {
-        const loading = document.createElement("div");
-        loading.className = "volunteer-profile-loading";
-        loading.setAttribute("role", "status");
-        const icon = document.createElement("span");
-        icon.className = "volunteer-profile-loading-icon";
-        icon.setAttribute("aria-hidden", "true");
-        const label = document.createElement("span");
-        label.textContent = "Loading";
-        loading.appendChild(icon);
-        loading.appendChild(label);
-        reader.replaceChildren(loading);
-      }
+      const loading = document.createElement("div");
+      loading.className = "ui-profile-loading";
+      loading.setAttribute("role", "status");
+      const icon = document.createElement("span");
+      icon.className = "ui-profile-loading-icon";
+      icon.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.textContent = "Loading";
+      loading.appendChild(icon);
+      loading.appendChild(label);
+      reader.replaceChildren(loading);
       reader.setAttribute("aria-busy", "true");
     } else if (options.phase === "load-error") {
-      reader.textContent =
-        "Could not load the profile. Check your organizer session and try again.";
+      reader.textContent = "Volunteer profile is temporarily unavailable.";
     } else enableControls();
+  }
+
+  async function loadPreview(
+    nextOptions: ProfilePreviewOptions,
+    nextState?: ProfileSimulationState,
+    signal?: AbortSignal,
+  ) {
+    const query = nextState
+      ? profileStateQuery(nextOptions, nextState)
+      : profileQuery(nextOptions);
+    const response = await fetch(`${profilePreviewPath}?${query}`, {
+      credentials: "omit",
+      cache: "no-store",
+      signal,
+    });
+    if (!response.ok)
+      throw new Error("The fictional preview could not be refreshed.");
+    const page = new DOMParser().parseFromString(
+      await response.text(),
+      "text/html",
+    );
+    const content = page.querySelector<HTMLElement>(
+      "[data-profile-preview-content]",
+    );
+    if (!content) throw new Error("The fictional profile is unavailable.");
+    return { content: document.importNode(content, true), title: page.title };
+  }
+
+  async function configure(
+    next: ProfilePreviewOptions,
+    nextRevision: number,
+    replace: boolean,
+    resetScroll: boolean,
+  ) {
+    if (nextRevision < lastConfiguration) return;
+    if (nextRevision === lastConfiguration) {
+      if (!pendingRender) report();
+      return;
+    }
+    lastConfiguration = nextRevision;
+    const needsReplacement =
+      replace ||
+      next.scenario !== options.scenario ||
+      next.content !== options.content ||
+      next.phase !== options.phase;
+    pendingRender?.abort();
+    pendingRender = undefined;
+    if (!needsReplacement) {
+      options = next;
+      revision = nextRevision;
+      history.replaceState(
+        null,
+        "",
+        `${profilePreviewPath}?${profileQuery(options)}`,
+      );
+      report();
+      return;
+    }
+    generation++;
+    for (const dialog of root.querySelectorAll<HTMLDialogElement>(
+      "dialog[open]",
+    ))
+      dialog.close();
+    const controller = new AbortController();
+    pendingRender = controller;
+    try {
+      // Keep the current document and content painted until the replacement is ready.
+      const replacement = await loadPreview(next, undefined, controller.signal);
+      if (controller.signal.aborted || pendingRender !== controller) return;
+      const position = {
+        left: resetScroll ? 0 : scrollX,
+        top: resetScroll ? 0 : scrollY,
+      };
+      const expanded =
+        !resetScroll &&
+        reader.querySelector<HTMLDetailsElement>(
+          "[data-submitted-application] details",
+        )?.open;
+      const nextApplication =
+        replacement.content.querySelector<HTMLDetailsElement>(
+          "[data-submitted-application] details",
+        );
+      if (expanded && nextApplication) nextApplication.open = true;
+      disposeVolunteerProfileContents(reader);
+      reader.replaceChildren(...replacement.content.childNodes);
+      options = next;
+      revision = nextRevision;
+      current = profileSimulationState(createProfileFixture(options));
+      phase = options.phase;
+      modified = false;
+      busy = false;
+      root.dataset.uiScenario = options.scenario;
+      document.title = replacement.title;
+      history.replaceState(
+        null,
+        "",
+        `${profilePreviewPath}?${profileQuery(options)}`,
+      );
+      showLoadState();
+      window.scrollTo({ ...position, behavior: "instant" });
+      report();
+    } catch {
+      if (!controller.signal.aborted)
+        window.parent.postMessage(
+          {
+            channel: profileChannel,
+            type: "error",
+            query: profileQuery(next).toString(),
+            revision: nextRevision,
+          },
+          location.origin,
+        );
+    } finally {
+      if (pendingRender === controller) pendingRender = undefined;
+    }
   }
 
   async function refreshProfile(
     next: ProfileSimulationState,
     selector: string,
+    actionGeneration: number,
   ) {
     // Re-render only fictional props through the same Astro view. This route never
     // loads authentication, private profiles, a database, or organizer APIs.
-    const response = await fetch(
-      `${profilePreviewPath}?${profileStateQuery({ ...options, phase: "ready" }, next)}`,
-      { credentials: "omit", cache: "no-store" },
-    );
-    if (!response.ok)
-      throw new Error(
-        "The fictional preview could not be refreshed. Reset the preview to try again.",
-      );
-    const page = new DOMParser().parseFromString(
-      await response.text(),
-      "text/html",
-    );
-    const replacement = page.querySelector<HTMLElement>(
+    const page = await loadPreview({ ...options, phase: "ready" }, next);
+    if (actionGeneration !== generation) return false;
+    const replacement = page.content.querySelector<HTMLElement>(
       "[data-volunteer-profile]",
     );
     if (!replacement) throw new Error("The fictional profile is unavailable.");
@@ -124,18 +227,24 @@ function initializeProfileSimulator() {
       "[data-submitted-application] details",
     );
     if (expanded && nextApplication) nextApplication.open = true;
-    const scroll = reader.scrollTop;
     disposeVolunteerProfileContents(profile);
     profile.replaceWith(document.importNode(replacement, true));
     current = next;
     modified = true;
     enableControls();
-    reader.scrollTop = scroll;
     reader.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
+    return true;
   }
 
   async function act(form: HTMLFormElement) {
-    if (busy || options.phase !== "ready" || !form.reportValidity()) return;
+    if (
+      busy ||
+      pendingRender ||
+      options.phase !== "ready" ||
+      !form.reportValidity()
+    )
+      return;
+    const actionGeneration = generation;
     busy = true;
     const values = new FormData(form);
     const profile = form.closest<HTMLElement>("[data-volunteer-profile]")!;
@@ -164,6 +273,7 @@ function initializeProfileSimulator() {
         phase = "choosing-notification";
         report();
         const choice = await chooseNotification(form.dataset.emailPrompt);
+        if (actionGeneration !== generation) return;
         if (choice === null) {
           form.reset();
           phase = "cancelled";
@@ -195,6 +305,7 @@ function initializeProfileSimulator() {
       await new Promise((resolve) =>
         window.setTimeout(resolve, options.latency),
       );
+      if (actionGeneration !== generation) return;
       if (outcome === "failure")
         throw new Error("The change could not be saved. Please try again.");
       if (outcome === "conflict")
@@ -232,7 +343,7 @@ function initializeProfileSimulator() {
         throw new Error(
           "The applicant must complete Naloxone 101 before approval.",
         );
-      await refreshProfile(next, selector);
+      if (!(await refreshProfile(next, selector, actionGeneration))) return;
       phase =
         outcome === "email-failure" && notify ? "saved-email-failed" : "saved";
       if (phase === "saved-email-failed")
@@ -249,6 +360,7 @@ function initializeProfileSimulator() {
           },
         );
     } catch (error) {
+      if (actionGeneration !== generation) return;
       phase = "save-error";
       if (form.hasAttribute("data-submit-on-change")) form.reset();
       if (message) {
@@ -269,9 +381,9 @@ function initializeProfileSimulator() {
         form.removeAttribute("aria-busy");
         delete form.dataset.submitting;
         delete profile.dataset.submitting;
-        busy = false;
+        if (actionGeneration === generation) busy = false;
       }
-      report();
+      if (actionGeneration === generation) report();
     }
   }
 
@@ -288,20 +400,6 @@ function initializeProfileSimulator() {
         ?.requestSubmit();
   });
   root.addEventListener("click", (event) => {
-    if (!(event.target instanceof Element)) return;
-    event.target
-      .closest("[data-dismiss-dialog]")
-      ?.closest<HTMLDialogElement>("dialog")
-      ?.close();
-    if (
-      event.target.closest("[data-ui-profile-reopen]") &&
-      dialog &&
-      !dialog.open
-    ) {
-      dialog.showModal();
-      phase = options.phase;
-      report();
-    }
     if (event.target instanceof HTMLDialogElement) {
       const bounds = event.target.getBoundingClientRect();
       if (
@@ -313,32 +411,26 @@ function initializeProfileSimulator() {
         event.target.close();
     }
   });
-  dialog?.addEventListener("close", () => {
-    phase = "closed";
-    report();
-  });
   window.addEventListener("message", (event: MessageEvent) => {
     if (
       event.origin !== location.origin ||
       event.source !== window.parent ||
       event.data?.channel !== profileChannel ||
       event.data.type !== "configure" ||
-      typeof event.data.query !== "string"
+      typeof event.data.query !== "string" ||
+      !Number.isSafeInteger(event.data.revision) ||
+      event.data.revision < 0
     )
       return;
     const next = readProfileOptions(new URLSearchParams(event.data.query));
-    if (
-      next.scenario !== options.scenario ||
-      next.surface !== options.surface ||
-      next.content !== options.content ||
-      next.phase !== options.phase
-    )
-      return;
-    options = next;
-    report();
+    void configure(
+      next,
+      event.data.revision,
+      event.data.replace === true,
+      event.data.resetScroll === true,
+    );
   });
   showLoadState();
-  dialog?.showModal();
   report();
 }
 

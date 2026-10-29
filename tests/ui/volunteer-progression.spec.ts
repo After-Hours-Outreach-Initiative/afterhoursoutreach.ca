@@ -83,7 +83,7 @@ async function expectReadableCards(progression: Locator) {
   }
 }
 
-test("progression cards stay full-width and readable on profile pages and freshly opened event dialogs", async ({
+test("roster links open profile pages with readable progression cards", async ({
   page,
   browser,
   baseURL,
@@ -98,8 +98,6 @@ test("progression cards stay full-width and readable on profile pages and freshl
     .click();
   await expect(page.locator("[data-event-list]")).toBeVisible();
 
-  // Open a dialog before ever visiting the profile page: its layout must not
-  // depend on component CSS previously loaded by a full-page navigation.
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/manage/events");
@@ -111,10 +109,17 @@ test("progression cards stay full-width and readable on profile pages and freshl
       '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',
     );
     await roster.locator("summary").click();
-    await roster.locator("[data-volunteer-profile-link]").first().click();
-    const progression = page.locator(
-      "[data-volunteer-profile-dialog] [data-volunteer-progression]",
-    );
+    const profileLink = roster.locator("[data-volunteer-profile-link]").first();
+    const profileUrl = new URL(
+      (await profileLink.getAttribute("href"))!,
+      page.url(),
+    ).href;
+    await profileLink.click();
+    await expect(page).toHaveURL(profileUrl);
+    await expect(
+      page.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+    ).toHaveCount(0);
+    const progression = page.locator("[data-volunteer-progression]");
     await expect(progression).toBeVisible();
     await expectReadableCards(progression);
     await expect(progression.locator("[data-orientation-status]")).toHaveText(
@@ -127,11 +132,10 @@ test("progression cards stay full-width and readable on profile pages and freshl
       }),
     ).toBeEnabled();
     await progression.screenshot({
-      path: testInfo.outputPath(`progression-dialog-${width}.png`),
+      path: testInfo.outputPath(`progression-roster-profile-${width}.png`),
     });
-    await page
-      .getByRole("button", { name: "Close volunteer profile", exact: true })
-      .click();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/manage\/events$/);
   }
 
   const applicantContext = await browser.newContext();

@@ -187,7 +187,7 @@ names, not sensitive answers.
 
 Account and organizer mutations show loading states and update the affected
 server-rendered controls, lists, and delivery counts without reloading the page.
-Volunteer profile dialogs stay open, and session/authenticator changes preserve
+Volunteer profiles always open as pages. Session/authenticator changes preserve
 unsaved profile answers. If a change revokes the current session or organizer
 access, the browser still navigates to sign-in or the volunteer portal.
 

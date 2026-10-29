@@ -34,6 +34,9 @@ function initializeProfilePlayground() {
     ),
   ];
   let options = readProfileOptions(new URLSearchParams(location.search));
+  let revision = 0;
+  let replacePending = false;
+  let resetScrollPending = false;
 
   const configure = () =>
     preview.contentWindow?.postMessage(
@@ -41,10 +44,16 @@ function initializeProfilePlayground() {
         channel: profileChannel,
         type: "configure",
         query: profileQuery(options).toString(),
+        revision,
+        replace: replacePending,
+        resetScroll: resetScrollPending,
       },
       location.origin,
     );
-  function update(reload: boolean, push = false) {
+  function update(replace: boolean, push = false, resetScroll = false) {
+    revision++;
+    replacePending ||= replace;
+    resetScrollPending ||= resetScroll;
     const params = new URLSearchParams();
     new FormData(controls).forEach((value, name) => {
       if (typeof value === "string") params.append(name, value);
@@ -70,12 +79,12 @@ function initializeProfilePlayground() {
       "ui-profile-frame-fit",
       options.viewport === "fit",
     );
-    if (reload) {
+    if (replacePending) {
       status.textContent = `Loading: ${selected.label}`;
       preview.inert = true;
       preview.setAttribute("aria-busy", "true");
-      preview.src = open.href;
-    } else configure();
+    }
+    configure();
   }
   for (const link of links)
     link.addEventListener("click", (event) => {
@@ -102,11 +111,11 @@ function initializeProfilePlayground() {
       event.target instanceof HTMLSelectElement
     ))
       return;
-    update(["surface", "content", "phase"].includes(event.target.name));
+    update(["content", "phase"].includes(event.target.name));
   });
   document
     .querySelector("[data-ui-profile-reset]")
-    ?.addEventListener("click", () => update(true));
+    ?.addEventListener("click", () => update(true, false, true));
   document
     .querySelector("[data-ui-profile-copy]")
     ?.addEventListener("click", async () => {
@@ -154,18 +163,23 @@ function initializeProfilePlayground() {
       event.origin !== location.origin ||
       event.source !== preview.contentWindow ||
       event.data?.channel !== profileChannel ||
-      event.data.type !== "state" ||
+      event.data.revision !== revision ||
       event.data.query !== profileQuery(options).toString()
     )
       return;
+    if (event.data.type !== "state" && event.data.type !== "error") return;
+    preview.inert = false;
+    preview.removeAttribute("aria-busy");
+    if (event.data.type === "error") {
+      status.textContent = "Preview could not be updated. Try again.";
+      return;
+    }
+    replacePending = false;
+    resetScrollPending = false;
     status.textContent = `Simulation: ${String(event.data.phase).replaceAll("-", " ")}${event.data.modified ? " · fictional changes only" : ""}`;
     state.textContent = JSON.stringify(event.data.state, null, 2);
   });
-  preview.addEventListener("load", () => {
-    preview.inert = false;
-    preview.removeAttribute("aria-busy");
-    configure();
-  });
+  preview.addEventListener("load", configure);
   configure();
 }
 
