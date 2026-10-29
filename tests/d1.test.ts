@@ -2199,6 +2199,15 @@ test("manual presets resolve real application completion, event access and roste
   assert.ok(await loadApplicationDraft(env.DB, localAccountUserId("draft")));
   assert.equal(actors.get("organizer")!.applicationApproved, true);
   assert.equal(actors.get("organizer")!.patrolApproved, true);
+  const volunteers = await listVolunteers(env.DB, actors.get("organizer")!);
+  assert.deepEqual(
+    ["medic-new-volunteer", "medic", "patrol"].map(
+      (key) =>
+        volunteers.rows.find(({ id }) => id === localAccountUserId(key))!
+          .category,
+    ),
+    ["new-volunteer", "medic", "outreach-volunteer"],
+  );
   await changeSignup(
     env.DB,
     actors.get("organizer")!,

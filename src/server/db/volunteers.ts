@@ -22,12 +22,14 @@ import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
 import {
   applicationReadyForReviewSql,
+  approvedMedicSql,
   includesOrientationSql,
   nowMsSql,
   profileDisplayNameSql,
   profileFullNameSql,
 } from "./sql";
 import type { VolunteerApprovalFilter } from "../../data/volunteer-list";
+import type { AttendeeCategory } from "../../data/event-roster";
 
 export interface VolunteerRow {
   id: string;
@@ -67,6 +69,9 @@ export async function listVolunteers(
         `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         ${applicationReadyForReviewSql} AS applicationReadyForReview,
+        CASE WHEN NOT EXISTS (
+          SELECT 1 FROM orientation_completion o WHERE o.user_id = u.id
+        ) THEN 'new-volunteer' WHEN ${approvedMedicSql("u.id")} THEN 'medic' ELSE 'outreach-volunteer' END AS category,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       ${applicantsSql}
         AND (? = 'all' OR (${readyForReviewSql}))
@@ -82,7 +87,7 @@ export async function listVolunteers(
       )
       .bind(query),
   ])) as [
-    D1Result<VolunteerRow>,
+    D1Result<VolunteerRow & { category: AttendeeCategory }>,
     D1Result<{ allApplicantsCount: number; awaitingApprovalCount: number }>,
   ];
   return {

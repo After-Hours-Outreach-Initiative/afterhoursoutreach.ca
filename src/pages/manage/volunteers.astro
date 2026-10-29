@@ -1,5 +1,6 @@
 ---
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import AttendeeAvatar from "@/components/volunteer/AttendeeAvatar.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
 import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/db/access";
@@ -161,17 +162,25 @@ try {
                   {team.rows.map((person) => (
                     <tr data-volunteer-row>
                       <th scope="row">
-                        <a
-                          href={`/manage/volunteers/${encodeURIComponent(person.id)}?returnTo=${encodeURIComponent(listUrl)}`}
-                          data-volunteer-profile-link
-                        >
-                          {person.name}
-                        </a>
-                        <span class="volunteer-table-detail">
-                          {person.role === "organizer"
-                            ? "Organizer"
-                            : "Outreach Volunteer"}
-                        </span>
+                        <div class="volunteer-table-person">
+                          <AttendeeAvatar
+                            category={person.category}
+                            decorative
+                          />
+                          <div class="volunteer-table-name">
+                            <a
+                              href={`/manage/volunteers/${encodeURIComponent(person.id)}?returnTo=${encodeURIComponent(listUrl)}`}
+                              data-volunteer-profile-link
+                            >
+                              {person.name}
+                            </a>
+                            <span class="volunteer-table-detail">
+                              {person.role === "organizer"
+                                ? "Organizer"
+                                : "Outreach Volunteer"}
+                            </span>
+                          </div>
+                        </div>
                       </th>
                       <td>
                         {person.applicationApproved
