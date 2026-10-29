@@ -2,6 +2,7 @@
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import FacebookIcon from "@/components/icons/FacebookIcon.astro";
 import LinkedInIcon from "@/components/icons/LinkedInIcon.astro";
+import MapPinIcon from "@/components/icons/MapPinIcon.astro";
 import {
   contactEmail,
   contactPhone,
@@ -93,6 +94,15 @@ const links = siteNavigation(signedIn, organizer, eventAccess);
             ></path>
           </svg>
           {contactPhone}</a
+        >
+        <a
+          class="inline-flex items-center gap-2.5 hover:text-white"
+          href="https://www.google.com/maps/search/?api=1&query=312+Main+St+Vancouver"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <MapPinIcon class="size-[1.25em] shrink-0 text-blue" />
+          312 Main St</a
         >
       </nav>
     </div>
