@@ -3,6 +3,7 @@ import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
 import upcomingEventsPhoto from "@/assets/upcoming-events.png";
+import CalendarIcon from "@/components/icons/CalendarIcon.astro";
 import { env } from "cloudflare:workers";
 import { loadAccountNavigation } from "@/server/account-navigation";
 import { listUpcomingPublicEvents } from "@/server/db/events";
@@ -64,7 +65,7 @@ const [account, upcomingEvents] = await Promise.all([
   </section>
 
   <section
-    class="border-t border-zinc-800 bg-ink text-white"
+    class="bg-black text-white"
     id="upcoming-events"
     aria-labelledby="upcoming-events-heading"
   >
@@ -88,18 +89,18 @@ const [account, upcomingEvents] = await Promise.all([
         <h2 id="upcoming-events-heading">Upcoming events</h2>
         {
           upcomingEvents?.length ? (
-            <ul class="mt-8 divide-y divide-zinc-700 border-y border-zinc-700">
+            <ul class="mt-8 grid gap-4.5">
               {upcomingEvents.map((event) => (
-                <li class="flex flex-col gap-2 py-6">
-                  <time
-                    class="text-xl font-medium"
-                    datetime={new Date(event.startsAt).toISOString()}
-                  >
-                    {formatEventDate(event.startsAt)}
-                  </time>
-                  <span class="text-base text-zinc-400">
+                <li class="min-w-0 rounded-lg border border-zinc-700 p-4 text-zinc-100 [overflow-wrap:anywhere]">
+                  <h3 class="flex items-start gap-3 text-xl leading-[1.4]">
+                    <CalendarIcon class="mt-[0.2em] size-[1em] shrink-0 text-blue" />
+                    <time datetime={new Date(event.startsAt).toISOString()}>
+                      {formatEventDate(event.startsAt)}
+                    </time>
+                  </h3>
+                  <p class="mt-1 text-base leading-normal text-zinc-400">
                     {event.confirmed} of {event.spots} spots taken
-                  </span>
+                  </p>
                 </li>
               ))}
             </ul>
