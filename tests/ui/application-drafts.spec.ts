@@ -743,7 +743,7 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(upcomingCourse).toHaveAttribute("data-state", "upcoming");
   await upcomingCourse.locator("summary").click();
   const courseDescription =
-    "Naloxone 101 is an online course that teaches you how to recognize and respond to an opioid overdose, and how to administer naloxone. It takes about 1 hour to complete";
+    "Naloxone 101 is an online course that teaches you how to recognize and respond to an opioid overdose, and how to administer naloxone. It takes about 1 hour to complete.";
   await expect(upcomingCourse.locator("[data-naloxone-step] > p")).toHaveText(
     courseDescription,
   );
