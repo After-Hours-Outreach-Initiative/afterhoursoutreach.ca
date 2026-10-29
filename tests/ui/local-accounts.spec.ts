@@ -123,7 +123,7 @@ test("DEV panel separates states from saved accounts and completes each applicat
         exact: true,
       });
       await expect(portal).toContainText(
-        "Join our Discord for the most up to date information.",
+        "Join our Discord for the most up-to-date information.",
       );
       await expect(invite).toHaveAttribute("href", social.discord);
       await expect(invite).toHaveAttribute("target", "_blank");
