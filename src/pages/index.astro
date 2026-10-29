@@ -2,6 +2,7 @@
 import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
 import outreachTeam from "@/assets/outreach-team.jpg";
+import upcomingEventsPhoto from "@/assets/upcoming-events.png";
 import { env } from "cloudflare:workers";
 import { loadAccountNavigation } from "@/server/account-navigation";
 import { listUpcomingPublicEvents } from "@/server/db/events";
@@ -70,15 +71,17 @@ const [account, upcomingEvents] = await Promise.all([
     <div
       class="mx-auto grid w-full max-w-site items-center gap-10 px-6 py-24 max-sm:px-4 max-sm:py-18 lg:grid-cols-2 lg:gap-16"
     >
-      {/* Replace this decorative placeholder with an outreach photo. */}
-      <img
-        class="aspect-4/3 w-full rounded-2xl border border-zinc-800 object-cover"
-        src="/upcoming-events-placeholder.svg"
-        alt=""
-        width="960"
-        height="720"
+      <Image
+        class="aspect-4/3 w-full rounded-2xl border border-zinc-800 object-cover object-bottom"
+        src={upcomingEventsPhoto}
+        alt="Outreach volunteers carrying backpacks as they walk through the Downtown Eastside at night."
+        width={960}
+        height={720}
+        fit="cover"
+        position="bottom"
+        widths={[480, 960, 1440]}
+        sizes="(min-width: 1024px) 50vw, 100vw"
         loading="lazy"
-        decoding="async"
       />
 
       <div class="min-w-0">
