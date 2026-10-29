@@ -168,7 +168,7 @@ const contents = [
   },
   {
     id: "account-sessions-heading",
-    heading: "Signed in browsers",
+    heading: "Signed-in browsers",
     nested: true,
   },
   { id: "account-delete-heading", heading: "Delete account", nested: true },
@@ -177,7 +177,7 @@ const contents = [
 
 <AccountLayout
   title="Your account"
-  description="Edit your volunteer profile and manage your signed in browsers."
+  description="Edit your volunteer profile and manage your signed-in browsers."
   signedIn
   organizer={organizer}
   name={values ? applicationDisplayName(values) : undefined}
@@ -347,7 +347,7 @@ const contents = [
         <div class="volunteer-setting" data-account-sessions>
           <div class="w-full">
             <h3 id="account-sessions-heading" data-contents-section>
-              Signed in browsers
+              Signed-in browsers
             </h3>
             {
               sessionsNeedSignIn && (
@@ -358,7 +358,7 @@ const contents = [
                   class="mt-6"
                 >
                   <p>
-                    Sign in again to view and manage your signed in browsers.
+                    Sign in again to view and manage your signed-in browsers.
                   </p>
                   <button class="btn btn-outline mt-4" type="submit">
                     Sign out to sign in again

@@ -718,7 +718,7 @@ test("account contents navigate profile and settings sections on desktop and mob
     ).toHaveCount(0);
     for (const [id, heading] of [
       ["account-profile-emergency-contact", "Emergency contact"],
-      ["account-sessions-heading", "Signed in browsers"],
+      ["account-sessions-heading", "Signed-in browsers"],
     ]) {
       if (width < 1024) await summary.click();
       const link = contents.getByRole("link", { name: heading, exact: true });
@@ -3714,7 +3714,7 @@ test("signed-in browser cards stay framed after reload and removal", async ({
   }
   await expect(
     sessions.getByRole("heading", {
-      name: "Signed in browsers",
+      name: "Signed-in browsers",
       exact: true,
     }),
   ).toBeFocused();
