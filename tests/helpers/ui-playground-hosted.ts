@@ -16,17 +16,28 @@ export async function assertHostedUiPlaygroundAbsent(configPath: string) {
   try {
     await server.listen();
     const worker = server.getWorker();
-    for (const path of ["/dev/ui", "/dev/ui/discord?scenario=connected"]) {
+    for (const path of [
+      "/dev/ui",
+      "/dev/ui/discord?scenario=connected",
+      "/dev/ui/organizer-profile",
+      "/dev/ui/organizer-profile/preview?scenario=organizer",
+    ]) {
       const response = await worker.fetch(`${origin}${path}`, {
         redirect: "manual",
       });
       assert.equal(response.status, 404, path);
     }
-    const signIn = await worker.fetch(`${origin}/volunteer/sign-in`, {
-      redirect: "manual",
-    });
-    assert.equal(signIn.status, 200);
-    assert.doesNotMatch(await signIn.text(), /UI playground/);
+    for (const path of ["/", "/about", "/volunteer/sign-in"]) {
+      const response = await worker.fetch(`${origin}${path}`, {
+        redirect: "manual",
+      });
+      assert.equal(response.status, 200, path);
+      assert.doesNotMatch(
+        await response.text(),
+        /UI playground|DEV panel|data-account-switcher/,
+        path,
+      );
+    }
   } finally {
     await server.close();
   }

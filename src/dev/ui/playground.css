@@ -36,6 +36,23 @@
   gap: 1.5rem;
   margin-top: 1rem;
 }
+.ui-component-nav a {
+  padding: 0.625rem 1rem;
+  border: 1px solid #52525b;
+  border-radius: 0.5rem;
+  text-decoration: none;
+}
+.ui-component-nav a[aria-current="page"] {
+  border-color: #818cf8;
+  background: #16214a;
+  color: white;
+}
+.ui-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
 .ui-section {
   margin-top: 3rem;
   scroll-margin-top: 1.5rem;

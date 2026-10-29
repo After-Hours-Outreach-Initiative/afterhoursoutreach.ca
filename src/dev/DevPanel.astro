@@ -1,0 +1,177 @@
+---
+import CodeIcon from "@/components/icons/CodeIcon.astro";
+import DialogHeader from "@/components/DialogHeader.astro";
+---
+
+{
+  import.meta.env.DEV && (
+    <Fragment>
+      <button
+        class="fixed right-4 bottom-4 z-40 flex size-11 items-center justify-center rounded-lg border border-zinc-600 bg-ink text-amber-300 hover:border-white"
+        type="button"
+        data-open-account-switcher
+        aria-label="DEV panel"
+        title="DEV panel (Alt+Z)"
+        aria-keyshortcuts="Alt+Z"
+        aria-haspopup="dialog"
+        aria-controls="development-account-dialog"
+        aria-expanded="false"
+        hidden
+      >
+        <CodeIcon class="size-5" />
+      </button>
+      <dialog
+        id="development-account-dialog"
+        class="dialog-pop dialog-frame"
+        data-account-switcher
+        aria-labelledby="development-account-dialog-heading"
+      >
+        <DialogHeader
+          id="development-account-dialog-heading"
+          title="DEV panel"
+          closeLabel="Close DEV panel"
+          closeAttributes={{ "data-close-account-switcher": "" }}
+        />
+        <div class="dialog-body">
+          <div class="flex flex-col gap-6">
+            <div
+              class="grid gap-6"
+              data-view-as
+              role="group"
+              aria-label="View as"
+              aria-busy="true"
+            >
+              <section class="account-profile-switcher">
+                <h3 class="text-lg" id="development-states-heading">
+                  Account states
+                </h3>
+                <p class="text-sm leading-[1.6] text-zinc-400">
+                  State buttons reset a temporary test account. Choosing a state
+                  discards its previous test progress without adding saved
+                  accounts. Existing accounts are kept separately.
+                </p>
+                <div
+                  class="grid gap-3"
+                  data-account-states
+                  role="group"
+                  aria-labelledby="development-states-heading"
+                >
+                  <button
+                    class="btn btn-quiet account-profile-button"
+                    type="button"
+                    data-switch-user=""
+                    aria-pressed="false"
+                    disabled
+                  >
+                    Visitor
+                  </button>
+                </div>
+                <button
+                  class="btn btn-outline justify-self-start"
+                  type="button"
+                  data-seed-accounts
+                  aria-describedby="development-seed-description"
+                  disabled
+                >
+                  Seed local accounts
+                </button>
+                <p
+                  class="text-sm leading-[1.6] text-zinc-400"
+                  id="development-seed-description"
+                >
+                  Add grouped application, orientation, volunteer, and access
+                  presets with sample events. Existing edits are preserved;
+                  unchanged old presets are upgraded.
+                </p>
+              </section>
+              <section class="account-profile-switcher border-t border-zinc-700 pt-6">
+                <h3 class="text-lg" id="development-steps-heading">
+                  Application steps
+                </h3>
+                <p
+                  class="text-sm leading-[1.6] text-zinc-400"
+                  data-step-account
+                >
+                  Choose an account to use these shortcuts.
+                </p>
+                <p
+                  class="text-sm leading-[1.6] text-zinc-400"
+                  id="development-steps-description"
+                >
+                  Step 1 submits fictional sample answers. Already-submitted
+                  answers are never replaced. No emails are sent.
+                  {/* Discord connection is temporarily disabled. Discord membership is simulated locally only. */}
+                </p>
+                <div
+                  class="grid gap-2"
+                  role="group"
+                  aria-labelledby="development-steps-heading"
+                >
+                  {[
+                    ["form", "1. Submit sample application"],
+                    ["naloxone", "2. Complete Naloxone 101"],
+                    // Discord connection is temporarily disabled.
+                    // ["discord", "3. Simulate Discord connection"],
+                    // ["review", "4. Approve application"],
+                    ["review", "3. Approve application"],
+                  ].map(([step, label]) => (
+                    <button
+                      class="btn btn-quiet flex-wrap justify-between text-left"
+                      type="button"
+                      data-application-step={step}
+                      aria-describedby="development-steps-description"
+                      disabled
+                    >
+                      <span>{label}</span>
+                      <span class="account-profile-detail" data-step-status />
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section class="account-profile-switcher border-t border-zinc-700 pt-6">
+                <h3 class="text-lg" id="development-accounts-heading">
+                  Existing accounts
+                </h3>
+                <div
+                  class="account-profile-buttons"
+                  data-existing-accounts
+                  role="group"
+                  aria-labelledby="development-accounts-heading"
+                />
+                <p
+                  class="text-sm leading-[1.6] text-zinc-400"
+                  data-empty-accounts
+                  hidden
+                >
+                  No saved accounts yet.
+                </p>
+              </section>
+            </div>
+            <p data-switch-message role="status" hidden />
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <a class="btn btn-outline" href="/dev/ui">
+            UI playground
+          </a>
+          <a
+            class="btn btn-quiet"
+            href="/volunteer/sign-in"
+            data-create-account
+          >
+            Create an account
+          </a>
+        </div>
+      </dialog>
+    </Fragment>
+  )
+}
+
+<script>
+  // Standalone previews get the panel without adding controls to embedded examples.
+  if (import.meta.env.DEV && window.self === window.top) {
+    void import("./scripts/account-switcher").then(({ initAccountSwitcher }) =>
+      initAccountSwitcher(),
+    );
+  }
+</script>

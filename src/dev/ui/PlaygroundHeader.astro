@@ -1,0 +1,31 @@
+---
+interface Props {
+  active: "discord" | "organizer-profile";
+}
+const { active } = Astro.props;
+const examples = [
+  {
+    id: "organizer-profile",
+    label: "Organizer profile",
+    href: "/dev/ui/organizer-profile",
+  },
+  { id: "discord", label: "Discord connection", href: "/dev/ui" },
+];
+---
+
+<header class="ui-page-header">
+  <h1>UI playground</h1>
+  <p>Local previews with fictional data.</p>
+  <nav class="ui-component-nav" aria-label="Website parts">
+    {
+      examples.map((example) => (
+        <a
+          href={example.href}
+          aria-current={active === example.id ? "page" : undefined}
+        >
+          {example.label}
+        </a>
+      ))
+    }
+  </nav>
+</header>

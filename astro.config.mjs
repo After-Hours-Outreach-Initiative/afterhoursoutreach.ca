@@ -43,6 +43,22 @@ export default defineConfig({
             ),
             prerender: false,
           });
+          injectRoute({
+            pattern: "/dev/ui/organizer-profile",
+            entrypoint: new URL(
+              "./src/dev/ui/OrganizerProfilePlayground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
+            pattern: "/dev/ui/organizer-profile/preview",
+            entrypoint: new URL(
+              "./src/dev/ui/OrganizerProfilePreview.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
         },
       },
     },

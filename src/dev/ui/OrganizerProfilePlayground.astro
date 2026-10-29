@@ -1,0 +1,244 @@
+---
+import LocalLayout from "./LocalLayout.astro";
+import PlaygroundHeader from "./PlaygroundHeader.astro";
+import {
+  getProfileScenario,
+  organizerProfileScenarios,
+  profilePreviewPath,
+  profileQuery,
+  profileWorkspacePath,
+  readProfileOptions,
+} from "./organizer-profile-fixtures";
+import "./playground.css";
+import "./organizer-profile.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const options = readProfileOptions(Astro.url.searchParams);
+const selected = getProfileScenario(options.scenario);
+const groups = [
+  ...new Set(organizerProfileScenarios.map((scenario) => scenario.group)),
+];
+const frameUrl = `${profilePreviewPath}?${profileQuery(options)}`;
+---
+
+<LocalLayout title="Organizer profile">
+  <main class="ui-playground ui-profile-playground" data-ui-profile-playground>
+    <PlaygroundHeader active="organizer-profile" />
+    <div class="ui-section-heading ui-section">
+      <div>
+        <h2>Organizer profile</h2>
+      </div>
+      <button type="button" class="btn btn-quiet" data-ui-profile-reset
+        >Reset preview</button
+      >
+    </div>
+
+    <div class="ui-profile-workspace">
+      <aside class="ui-state-catalog" aria-label="Profile states">
+        <div class="ui-state-catalog-heading">
+          <h3>States <span>({organizerProfileScenarios.length})</span></h3>
+          <label class="ui-field">
+            Find a state
+            <input
+              type="search"
+              data-ui-state-search
+              placeholder="Search states"
+              autocomplete="off"
+            />
+          </label>
+        </div>
+        {
+          groups.map((group) => (
+            <section data-ui-state-group>
+              <h4>{group}</h4>
+              <div class="ui-state-links">
+                {organizerProfileScenarios
+                  .filter((scenario) => scenario.group === group)
+                  .map((scenario) => (
+                    <a
+                      href={`${profileWorkspacePath}?${profileQuery({ ...options, scenario: scenario.id })}`}
+                      data-ui-profile-scenario={scenario.id}
+                      aria-current={
+                        selected.id === scenario.id ? "true" : undefined
+                      }
+                    >
+                      <span>{scenario.label}</span>
+                      <span>{scenario.description}</span>
+                    </a>
+                  ))}
+              </div>
+            </section>
+          ))
+        }
+        <p data-ui-state-empty hidden>No matching states.</p>
+      </aside>
+
+      <section
+        class="ui-profile-inspector"
+        aria-labelledby="ui-profile-preview-heading"
+      >
+        <div class="ui-section-heading">
+          <div>
+            <h3 id="ui-profile-preview-heading" data-ui-profile-title>
+              {selected.label}
+            </h3>
+            <p data-ui-profile-description>{selected.description}</p>
+          </div>
+          <a href={frameUrl} target="_blank" rel="noopener" data-ui-profile-open
+            >Open isolated preview</a
+          >
+        </div>
+
+        <form
+          class="ui-controls ui-profile-controls"
+          action={profileWorkspacePath}
+          method="get"
+          data-ui-profile-controls
+        >
+          <input type="hidden" name="scenario" value={options.scenario} />
+          <label class="ui-field">
+            Presentation
+            <select name="surface">
+              <option value="dialog" selected={options.surface === "dialog"}
+                >Profile dialog</option
+              >
+              <option value="page" selected={options.surface === "page"}
+                >Full profile page</option
+              >
+            </select>
+          </label>
+          <label class="ui-field">
+            Viewport width
+            <select name="viewport">
+              <option value="fit" selected={options.viewport === "fit"}
+                >Fit available space</option
+              >
+              <option value="1440" selected={options.viewport === "1440"}
+                >Wide desktop · 1440 px</option
+              >
+              <option value="1024" selected={options.viewport === "1024"}
+                >Desktop · 1024 px</option
+              >
+              <option value="768" selected={options.viewport === "768"}
+                >Tablet · 768 px</option
+              >
+              <option value="375" selected={options.viewport === "375"}
+                >Mobile · 375 px</option
+              >
+              <option value="320" selected={options.viewport === "320"}
+                >Small mobile · 320 px</option
+              >
+            </select>
+          </label>
+          <label class="ui-field">
+            Viewport height (px)
+            <input
+              type="number"
+              name="height"
+              min="360"
+              max="1200"
+              step="20"
+              value={options.height}
+            />
+          </label>
+          <label class="ui-field">
+            Profile content
+            <select name="content">
+              <option value="standard" selected={options.content === "standard"}
+                >Typical answers</option
+              >
+              <option value="long" selected={options.content === "long"}
+                >Long names and detailed answers</option
+              >
+              <option value="minimal" selected={options.content === "minimal"}
+                >Optional fields empty</option
+              >
+            </select>
+          </label>
+          <label class="ui-field">
+            Loading state
+            <select name="phase">
+              <option value="ready" selected={options.phase === "ready"}
+                >Profile loaded</option
+              >
+              <option value="loading" selected={options.phase === "loading"}
+                >Loading (paused)</option
+              >
+              <option
+                value="load-error"
+                selected={options.phase === "load-error"}
+                >Profile unavailable</option
+              >
+            </select>
+          </label>
+          <label class="ui-field">
+            Action result
+            <select name="outcome">
+              <option value="success" selected={options.outcome === "success"}
+                >Save successfully</option
+              >
+              <option value="failure" selected={options.outcome === "failure"}
+                >Save fails</option
+              >
+              <option value="conflict" selected={options.outcome === "conflict"}
+                >Conflicting update</option
+              >
+              <option
+                value="email-failure"
+                selected={options.outcome === "email-failure"}
+                >Saved, email fails</option
+              >
+              <option value="pending" selected={options.outcome === "pending"}
+                >Saving (paused)</option
+              >
+            </select>
+          </label>
+          <label class="ui-field">
+            Response latency (ms)
+            <input
+              type="number"
+              name="latency"
+              min="0"
+              max="5000"
+              step="100"
+              value={options.latency}
+            />
+          </label>
+          <div class="ui-field ui-profile-actions">
+            <button type="button" class="btn btn-quiet" data-ui-profile-copy
+              >Copy scenario link</button
+            >
+            <button type="submit" class="btn btn-outline">Apply settings</button
+            >
+          </div>
+        </form>
+
+        <div
+          class="ui-preview-scroll"
+          tabindex="0"
+          aria-label="Profile preview viewport; scroll horizontally for wider sizes"
+        >
+          <iframe
+            class:list={[
+              "ui-profile-frame",
+              { "ui-profile-frame-fit": options.viewport === "fit" },
+            ]}
+            data-ui-profile-frame
+            src={frameUrl}
+            title="Interactive organizer profile preview"
+            width={options.viewport === "fit" ? "100%" : options.viewport}
+            height={options.height}></iframe>
+        </div>
+        <p class="ui-simulation-status" role="status" data-ui-profile-status>
+          Ready: {selected.label}
+        </p>
+        <details class="ui-fixture-details">
+          <summary>Inspect fictional state</summary>
+          <pre data-ui-profile-state>{JSON.stringify(options, null, 2)}</pre>
+        </details>
+      </section>
+    </div>
+  </main>
+</LocalLayout>
+
+<script src="./organizer-profile-playground.ts"></script>

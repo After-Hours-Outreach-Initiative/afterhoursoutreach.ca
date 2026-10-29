@@ -1,0 +1,110 @@
+.ui-profile-playground {
+  max-width: none;
+}
+.ui-profile-workspace {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+  margin-top: 2rem;
+}
+.ui-state-catalog {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  border: 1px solid #3f3f46;
+  border-radius: 0.625rem;
+  background: #0c0d10;
+}
+.ui-state-catalog-heading {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+.ui-state-catalog-heading input {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid #52525b;
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  background: #080a10;
+  color: #f4f4f5;
+}
+.ui-state-catalog h4 {
+  padding: 1rem 1.25rem 0.5rem;
+  border-top: 1px solid #27272a;
+  font-size: 1rem;
+}
+.ui-state-links {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0 0.75rem 1rem;
+}
+.ui-state-links a {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  color: #e4e4e7;
+  text-decoration: none;
+}
+.ui-state-links a:hover {
+  background: #171a20;
+}
+.ui-state-links a[aria-current="true"] {
+  border-color: #818cf8;
+  background: #16214a;
+}
+.ui-state-links a span:last-child {
+  color: #a1a1aa;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.ui-state-catalog > p {
+  padding: 1rem;
+}
+.ui-profile-inspector {
+  min-width: 0;
+}
+.ui-profile-controls {
+  margin-bottom: 1.5rem;
+}
+.ui-profile-actions {
+  justify-content: end;
+}
+.ui-profile-frame {
+  display: block;
+  max-width: none;
+  margin-inline: auto;
+  border: 0;
+  background: #050608;
+}
+.ui-profile-frame-fit {
+  width: 100%;
+}
+.ui-profile-preview {
+  --site-header-height: 0px;
+  min-height: 100dvh;
+}
+.ui-profile-preview-intro {
+  display: grid;
+  justify-items: start;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+.ui-profile-page-panel {
+  position: relative;
+  min-height: 22rem;
+}
+@media (width < 64rem) {
+  .ui-profile-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ui-state-catalog {
+    position: static;
+    max-height: 22rem;
+  }
+}

@@ -35,12 +35,6 @@ import {
   showFormMessage as message,
 } from "./account-forms";
 
-if (import.meta.env.DEV) {
-  void import("../dev/scripts/account-switcher").then(
-    ({ initAccountSwitcher }) => initAccountSwitcher(),
-  );
-}
-
 const applicationDrafts = new WeakMap<
   HTMLFormElement,
   NonNullable<ReturnType<typeof initApplicationDraft>>

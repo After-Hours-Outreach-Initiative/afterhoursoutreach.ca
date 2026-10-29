@@ -1,5 +1,6 @@
 ---
 import LocalLayout from "./LocalLayout.astro";
+import PlaygroundHeader from "./PlaygroundHeader.astro";
 import {
   discordScenarios,
   getDiscordScenario,
@@ -16,17 +17,11 @@ const frameUrl = `/dev/ui/discord?${previewQuery(options)}`;
 
 <LocalLayout title="Discord">
   <main class="ui-playground" data-ui-playground>
-    <header class="ui-page-header">
-      <h1>UI playground</h1>
-      <p>
-        Local only. Fictional fixtures, with no account, database, or Discord
-        requests.
-      </p>
-      <nav aria-label="Playground sections">
-        <a href="#simulator">Discord simulator</a>
-        <a href="#gallery">State gallery ({discordScenarios.length})</a>
-      </nav>
-    </header>
+    <PlaygroundHeader active="discord" />
+    <nav class="ui-section-nav" aria-label="Playground sections">
+      <a href="#simulator">Discord simulator</a>
+      <a href="#gallery">State gallery ({discordScenarios.length})</a>
+    </nav>
 
     <section
       id="simulator"

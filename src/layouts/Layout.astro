@@ -1,6 +1,7 @@
 ---
 import Footer from "@/components/Footer.astro";
 import Header from "@/components/Header.astro";
+import DevPanel from "@/dev/DevPanel.astro";
 import type { ComponentProps } from "astro/types";
 import { Font } from "astro:assets";
 import "@/styles/tailwind.css";
@@ -79,6 +80,7 @@ const {
       organizer={account.organizer}
       eventAccess={account.eventAccess}
     />
+    <DevPanel />
   </body>
 </html>
 

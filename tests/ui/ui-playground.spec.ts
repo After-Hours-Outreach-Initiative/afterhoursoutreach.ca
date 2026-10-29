@@ -22,7 +22,13 @@ test("local Discord playground renders real controls and simulates without APIs"
   });
 
   await page.goto("/dev/ui?scenario=not-connected&latency=0");
+  await expect(
+    page.getByRole("button", { name: "DEV panel", exact: true }),
+  ).toBeVisible();
   const preview = page.frameLocator("[data-ui-live-preview]");
+  await expect(
+    preview.getByRole("button", { name: "DEV panel", exact: true }),
+  ).toBeHidden();
   const root = preview.locator("[data-discord-connection]");
   const identity = root.locator("[data-discord-identity]");
   const strongUsername = identity.locator("strong[data-discord-username]");

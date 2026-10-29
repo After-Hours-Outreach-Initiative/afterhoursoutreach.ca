@@ -12,7 +12,7 @@ import DialogHeader from "@/components/DialogHeader.astro";
     title="Volunteer profile"
     closeLabel="Close volunteer profile"
   />
-  <div class="dialog-body" data-profile-dialog-content></div>
+  <div class="dialog-body" data-profile-dialog-content><slot /></div>
   <template data-profile-dialog-loading>
     <div class="volunteer-profile-loading" role="status">
       <span class="volunteer-profile-loading-icon" aria-hidden="true"></span>

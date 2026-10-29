@@ -1,0 +1,220 @@
+---
+import type {
+  viewVolunteerProfile,
+  VolunteerRow,
+  VolunteerOrientation,
+} from "@/server/db/volunteers";
+import {
+  applicationDisplayName,
+  formatApplicationSubmittedTime,
+  profileFormSections,
+  submittedApplicationSections,
+} from "@/data/application";
+import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro";
+import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
+import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.astro";
+import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
+import VolunteerProgression from "@/components/volunteer/VolunteerProgression.astro";
+import PageContents from "@/components/volunteer/PageContents.astro";
+import {
+  isApplicationReadyForReview,
+  type ApplicationProgress,
+} from "@/server/db/application-progress";
+interface Props {
+  profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
+  person: VolunteerRow;
+  orientation: VolunteerOrientation | null;
+  completedOrientation: VolunteerOrientation | null;
+  progress: ApplicationProgress;
+}
+const { profile, person, orientation, completedOrientation, progress } =
+  Astro.props;
+const profileSections = profileFormSections();
+const medic =
+  profile.answers.teams.includes("medic") &&
+  (person.orientations > 0 || !person.patrolApproved);
+const contents = [
+  { id: "volunteer-progression-heading", heading: "Volunteer progression" },
+  ...(person.applicationApproved
+    ? [
+        { id: "volunteer-profile-panel", heading: "Profile" },
+        ...profileSections.map((section) => ({
+          id: `volunteer-current-${section.key}`,
+          heading: section.heading,
+          nested: true,
+        })),
+      ]
+    : []),
+  { id: "volunteer-application-panel", heading: "Application" },
+  ...submittedApplicationSections.map((section) => ({
+    id: `volunteer-${section.key}`,
+    heading: section.heading,
+    nested: true,
+  })),
+  ...(person.applicationApproved
+    ? [
+        {
+          id: "volunteer-organizer-controls-heading",
+          heading: "Organizer controls",
+        },
+      ]
+    : []),
+];
+---
+
+<div data-volunteer-profile>
+  <div data-volunteer-profile-overview>
+    <h2>{applicationDisplayName(profile.answers)}</h2>
+    <p>
+      {
+        person.applicationApproved
+          ? profile.applicationApprovedBy
+            ? `Application approved by ${profile.applicationApprovedBy.name} (${profile.applicationApprovedBy.email}) on ${formatApplicationSubmittedTime(new Date(profile.applicationApprovedBy.approvedAt).toISOString())}`
+            : "Application approved. Approving organizer not recorded."
+          : person.applicationRejectionReason
+            ? "Application rejected"
+            : isApplicationReadyForReview(progress)
+              ? "Ready for review"
+              : "Application in progress"
+      }
+    </p>
+    {
+      person.applicationRejectionReason && (
+        <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
+          Reason: {person.applicationRejectionReason}
+        </p>
+      )
+    }
+    <div class="account-profile-summary mt-8" data-naloxone-review>
+      <dl>
+        <div>
+          <dt>Current step</dt>
+          <dd data-application-current-step>
+            {
+              person.applicationApproved
+                ? person.patrolApproved
+                  ? medic
+                    ? "Medic"
+                    : "Outreach Volunteer"
+                  : "New volunteer"
+                : person.applicationRejectionReason
+                  ? "Application rejected"
+                  : profile.naloxoneCompletedAt === null
+                    ? "Complete Naloxone 101"
+                    : "Application review"
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>Naloxone 101</dt>
+          <dd>
+            {
+              profile.naloxoneCompletedAt === null
+                ? "Completion not confirmed"
+                : `Completion confirmed ${formatApplicationSubmittedTime(new Date(profile.naloxoneCompletedAt).toISOString())}`
+            }
+          </dd>
+        </div>
+        {
+          /* Discord connection is temporarily disabled.
+            <div>
+              <dt>Discord</dt>
+              <dd>
+                {
+                  !progress.discordRequired
+                    ? "Linking not required for this existing volunteer. "
+                    : "Required before application approval. "
+                }{discord.username ? `${discord.username}: ` : ""}{
+                  discord.connection
+                }. {discord.sync}.
+              </dd>
+            </div>
+            */
+        }
+      </dl>
+    </div>
+  </div>
+  <PageContents entries={contents} heading="Sections" idleHeading="Sections" />
+  <div data-volunteer-profile-body>
+    <VolunteerProgression
+      {person}
+      {orientation}
+      {completedOrientation}
+      {medic}
+      {progress}
+    />
+    {
+      Boolean(person.applicationApproved) && (
+        <section
+          id="volunteer-profile-panel"
+          data-volunteer-profile-panel="profile"
+          aria-labelledby="volunteer-profile-heading"
+        >
+          <h2 id="volunteer-profile-heading" data-contents-section>
+            Profile
+          </h2>
+          <div class="account-profile-summary mt-6 mb-8">
+            <dl>
+              <div>
+                <dt>Email</dt>
+                <dd>{profile.email}</dd>
+              </div>
+            </dl>
+          </div>
+          {profileSections.map((section) => (
+            <section class="volunteer-profile-section">
+              <h3
+                id={`volunteer-current-${section.key}`}
+                class="volunteer-profile-heading mb-6"
+                data-contents-section
+              >
+                {section.heading}
+              </h3>
+              <AccountProfileAnswers
+                section={section}
+                values={profile.answers}
+              />
+            </section>
+          ))}
+        </section>
+      )
+    }
+    <section
+      id="volunteer-application-panel"
+      data-volunteer-profile-panel="application"
+      data-submitted-application={person.applicationApproved ? undefined : ""}
+      aria-labelledby="volunteer-application-heading"
+    >
+      <h2 id="volunteer-application-heading" data-contents-section>
+        Application
+      </h2>
+      {
+        !profile.submission && (
+          <p class="volunteer-help mt-4">
+            The original submitted application was not recorded. These details
+            use the current profile.
+          </p>
+        )
+      }
+      {
+        person.applicationApproved ? (
+          <SubmittedApplication
+            submission={profile.submission ?? profile}
+            embedded
+            idPrefix="volunteer"
+          />
+        ) : (
+          <ApplicationSummary
+            {...(profile.submission ?? profile)}
+            idPrefix="volunteer"
+          />
+        )
+      }
+    </section>
+    {
+      Boolean(person.applicationApproved) && (
+        <VolunteerControls person={person} />
+      )
+    }
+  </div>
+</div>
