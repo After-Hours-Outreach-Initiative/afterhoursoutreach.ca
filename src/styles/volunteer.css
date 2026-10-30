@@ -28,7 +28,8 @@ body:has(
   [data-application],
   [data-account-contents-flow],
   [data-volunteer-profile],
-  [data-event-calendar]
+  [data-event-calendar],
+  [data-volunteer-browser]
 ) {
   overflow-x: clip;
 }
@@ -1390,29 +1391,14 @@ body:has(
 .volunteer-portal .volunteer-search input {
   padding-left: 2.75rem;
 }
-.volunteer-table-scroll {
+.volunteer-table-frame {
   max-width: 100%;
-  /* Bound both axes so sticky headers follow this accessible scroll region. */
-  max-height: max(
-    12rem,
-    calc(
-      100dvh -
-        var(--site-header-rendered-height, var(--site-header-height, 0px)) -
-        12rem
-    )
-  );
-  overflow: auto;
-  scroll-padding-block-start: 3rem;
+  /* Leave overflow visible so the page scrolls and headers stick to its viewport. */
   border: var(--volunteer-border);
   border-radius: 0.5rem;
 }
-.volunteer-table-scroll:focus-visible {
-  outline: 3px solid #a5b4fc;
-  outline-offset: 0.25rem;
-}
 .volunteer-table {
   width: 100%;
-  min-width: 40rem;
   /* Separate borders stay attached to sticky header cells while scrolling. */
   border-collapse: separate;
   border-spacing: 0;
@@ -1423,14 +1409,21 @@ body:has(
   padding: 1rem;
   vertical-align: top;
   border-bottom: var(--volunteer-border);
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
 }
 .volunteer-table thead th {
   position: sticky;
-  top: 0;
+  top: var(--site-header-rendered-height, var(--site-header-height, 0px));
   z-index: 1;
   padding-block: 0.5rem;
   background: #171a20;
+  box-shadow: 0 -1px #3f3f46;
+}
+.volunteer-table thead th:first-child {
+  border-top-left-radius: 0.4375rem;
+}
+.volunteer-table thead th:last-child {
+  border-top-right-radius: 0.4375rem;
 }
 .volunteer-table th {
   font-weight: normal;
@@ -1438,18 +1431,20 @@ body:has(
 .volunteer-table tbody tr:last-child :is(th, td) {
   border-bottom: 0;
 }
-.volunteer-table tbody tr {
+.volunteer-table tbody tr:last-child > :first-child {
+  border-bottom-left-radius: 0.4375rem;
+}
+.volunteer-table tbody tr:last-child > :last-child {
+  border-bottom-right-radius: 0.4375rem;
+}
+.volunteer-table tbody :is(th, td) {
   background: #0c0d10;
 }
 [data-row-navigation] .volunteer-table tbody tr {
   cursor: pointer;
 }
-.volunteer-table tbody tr:is(:hover, :focus-within) {
+.volunteer-table tbody tr:is(:hover, :focus-within) > :is(th, td) {
   background: #16214a;
-}
-.volunteer-table th[scope="row"] {
-  min-width: 12rem;
-  overflow-wrap: anywhere;
 }
 .volunteer-table a {
   display: inline-flex;
@@ -1468,7 +1463,7 @@ body:has(
   text-decoration: none;
 }
 .volunteer-table .volunteer-table-sort:focus-visible {
-  /* Keep the focus ring inside the compact header and its scroll boundary. */
+  /* Keep the focus ring inside the compact header. */
   outline-offset: -3px;
 }
 .volunteer-table-sort-icon {
@@ -1499,8 +1494,7 @@ body:has(
 }
 @media (width < 64rem) {
   .volunteer-table {
-    /* Keep long names from squeezing the other columns into broken words.
-       Only the labelled, keyboard-focusable table region scrolls sideways. */
+    /* Share narrow screens between columns; long text wraps within its cell. */
     table-layout: fixed;
   }
   .volunteer-table :is(th, td) {
@@ -1516,9 +1510,22 @@ body:has(
     width: 32%;
   }
 }
+@media (width < 40rem) {
+  .volunteer-table :is(th, td) {
+    padding-inline: 0.5rem;
+  }
+  .volunteer-table thead th:nth-child(1) {
+    width: 36%;
+  }
+  .volunteer-table thead th:nth-child(n + 2) {
+    width: 32%;
+  }
+  .volunteer-table a.volunteer-table-sort {
+    gap: 0.375rem;
+  }
+}
 .application-table {
-  min-width: 26rem;
-  table-layout: auto;
+  table-layout: fixed;
 }
 .application-table thead th:nth-child(-n + 2) {
   width: 50%;
