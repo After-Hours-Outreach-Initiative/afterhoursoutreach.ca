@@ -77,7 +77,7 @@ for (const width of [1280, 375]) {
                     ? "[data-account-menu-name]"
                     : "[data-account-greeting]",
                 ),
-              ).toHaveText("Dana Whitfield");
+              ).toHaveText("Dana W.");
               for (const discord of await header
                 .locator("[data-header-discord]")
                 .all())
@@ -87,7 +87,7 @@ for (const width of [1280, 375]) {
               await expect(
                 header.getByRole("link", { name: "Join Discord", exact: true }),
               ).toBeVisible();
-              expect(await response!.text()).not.toContain("Dana Whitfield");
+              expect(await response!.text()).not.toContain("Dana W.");
             }
           }
         }
@@ -113,7 +113,7 @@ test("public headers need no browser-side session lookup", async ({
   for (const reload of [false, true]) {
     const response = reload ? await page.reload() : await page.goto("/about");
     expect(await response!.text()).toContain(
-      'aria-label="Account for Dana Whitfield"',
+      'aria-label="Account for Dana W."',
     );
     await expect(page.locator("[data-header-account]")).toBeVisible();
   }
@@ -257,7 +257,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       account.locator(
         mobile ? "[data-account-menu-name]" : "[data-account-greeting]",
       ),
-    ).toHaveText("Dana Whitfield");
+    ).toHaveText("Dana W.");
     for (const discord of await header.locator("[data-header-discord]").all())
       await expect(discord).toBeHidden();
     await expect(
@@ -334,7 +334,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       account.locator(
         mobile ? "[data-account-menu-name]" : "[data-account-greeting]",
       ),
-    ).toHaveText("Robin Vance");
+    ).toHaveText("Robin V.");
     await expect(account.locator("[data-account-email]")).toHaveText(
       "robin.local@example.org",
     );
@@ -369,11 +369,9 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await accountToggle.click();
       await expect(accountToggle).toHaveAttribute("aria-expanded", "true");
       await expect(toggle).toHaveAttribute("aria-expanded", "false");
-      await expect(accountToggle).toHaveAccessibleName(
-        "Account for Robin Vance",
-      );
+      await expect(accountToggle).toHaveAccessibleName("Account for Robin V.");
       await expect(account.locator("[data-account-menu-name]")).toHaveText(
-        "Robin Vance",
+        "Robin V.",
       );
       const dropdownBox = await account
         .locator(".header-account-dropdown")
@@ -402,7 +400,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       "14px",
     );
     const identity = card.getByRole("link", {
-      name: "Robin Vance robin.local@example.org",
+      name: "Robin V. robin.local@example.org",
       exact: true,
     });
     await expect(identity).toHaveAttribute("href", "/volunteer/account");
@@ -668,7 +666,7 @@ for (const width of [1280, 375]) {
   });
 }
 
-test("account greeting uses the preferred name or first name and updates after saving", async ({
+test("account greeting uses the preferred first name or first name plus last initial and updates after saving", async ({
   page,
   baseURL,
 }) => {
@@ -684,24 +682,25 @@ test("account greeting uses the preferred name or first name and updates after s
   await page.goto("/volunteer/account");
   const greeting = page.locator("[data-account-greeting]");
   const cardNames = page.locator("[data-account-menu-name]");
-  await expect(greeting).toHaveText(sampleAnswers.firstName);
-  await expect(cardNames).toHaveText([
-    sampleAnswers.preferredName,
-    sampleAnswers.preferredName,
-  ]);
+  await expect(greeting).toHaveText("Database V.");
+  await expect(cardNames).toHaveText(["Database V.", "Database V."]);
   await page.getByRole("button", { name: "Edit personal info" }).click();
-  await page.getByRole("textbox", { name: /^Preferred name/ }).fill("Tay");
+  await page
+    .getByRole("textbox", { name: /^Preferred first name/ })
+    .fill("Tay");
   await page.getByRole("button", { name: "Save", exact: true }).first().click();
-  await expect(greeting).toHaveText("Tay");
-  await expect(cardNames).toHaveText(["Tay", "Tay"]);
+  await expect(greeting).toHaveText("Tay V.");
+  await expect(cardNames).toHaveText(["Tay V.", "Tay V."]);
   await expect(
     page.locator("[data-account-menu] > summary"),
-  ).toHaveAccessibleName("Account for Tay");
+  ).toHaveAccessibleName("Account for Tay V.");
   const responsePage = await page.goto("/");
-  await expect(greeting).toHaveText("Tay");
-  await expect(cardNames).toHaveText(["Tay", "Tay"]);
+  await expect(greeting).toHaveText("Tay V.");
+  await expect(cardNames).toHaveText(["Tay V.", "Tay V."]);
   expect(responsePage!.headers()["cache-control"]).toBe("no-store");
-  expect(await responsePage!.text()).toContain('aria-label="Account for Tay"');
+  expect(await responsePage!.text()).toContain(
+    'aria-label="Account for Tay V."',
+  );
 });
 
 test("organizer Volunteers heading matches the Events heading", async ({

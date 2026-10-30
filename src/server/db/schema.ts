@@ -219,7 +219,7 @@ export const profile = sqliteTable("profile", {
   middle_names: text(),
   last_name: text(),
   // Legacy profiles retain their original full-or-preferred-name answer here.
-  // New profiles may leave this empty and use their full name for display.
+  // Optional preferred first name; display adds the surname initial.
   preferred_name: text().notNull(),
   pronouns: text(),
   phone: text().notNull(),

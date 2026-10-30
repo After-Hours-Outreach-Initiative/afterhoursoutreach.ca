@@ -276,7 +276,7 @@ test("form submission is silent; only the winning review transition records thre
     assert.equal(payload.subject, "Volunteer application ready for review");
     assert.equal(
       payload.text,
-      `Applicant: ${snapshot.answers.preferredName}\nSubmitted: ${snapshot.submittedAt}\nOrganizer review (authorized organizer sign-in required): https://afterhoursoutreach.ca/volunteers/applicant`,
+      `Applicant: ${snapshot.answers.preferredName} A.\nSubmitted: ${snapshot.submittedAt}\nOrganizer review (authorized organizer sign-in required): https://afterhoursoutreach.ca/volunteers/applicant`,
     );
     assert.doesNotMatch(
       row.payload!,
@@ -366,7 +366,7 @@ test("frozen metadata comes from the stored submission, not mutable account/prof
   await db.prepare("UPDATE profile SET preferred_name='Changed'").run();
   await confirm();
   const original = await rows();
-  assert.match(original[0].payload!, /Applicant: Sample Middle Applicant/);
+  assert.match(original[0].payload!, /Applicant: Sample A\./);
   await confirm();
   assert.deepEqual(await rows(), original);
   for (const assignment of [

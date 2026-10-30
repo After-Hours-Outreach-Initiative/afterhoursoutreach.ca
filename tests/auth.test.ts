@@ -1215,7 +1215,7 @@ test("profile edits preserve unsplit legacy names and birthdays without revalida
   const session = await auth.api.getSession({
     headers: new Headers({ cookie }),
   });
-  assert.equal(session?.user.name, "Renamed Volunteer");
+  assert.equal(session?.user.name, "Renamed V.");
   assert.deepEqual(await loadSubmittedApplication(bindings.DB, id), submission);
   await saveProfile(bindings.DB, id, {
     ...editable,

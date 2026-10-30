@@ -32,7 +32,6 @@ import { accountDeletionFreshAge } from "@/server/db/account-deletion";
 import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
-  applicationDisplayName,
   profileFormSections,
   type ApplicationAnswers,
 } from "@/data/application";
@@ -47,6 +46,7 @@ const accountDate = new Intl.DateTimeFormat("en-CA", {
   dateStyle: "long",
 });
 let email = "";
+let legacyName = "";
 let userId = "";
 let currentId = "";
 let twoFactorEnabled = false;
@@ -78,6 +78,7 @@ try {
     current.user.id,
   );
   email = current.user.email;
+  legacyName = current.user.name;
   userId = current.user.id;
   const { sessionConfig } = await auth.$context;
   emailNeedsSignIn =
@@ -180,8 +181,8 @@ const contents = [
   description="Edit your volunteer profile and manage your signed-in browsers."
   signedIn
   organizer={organizer}
-  name={values ? applicationDisplayName(values) : undefined}
-  greetingName={accountGreeting(values)}
+  name={accountGreeting(values, legacyName)}
+  greetingName={accountGreeting(values, legacyName)}
   email={email}
 >
   <h1 slot="heading" class="mb-6 text-2xl md:text-4xl">Account</h1>

@@ -432,7 +432,7 @@ test("profile previews stay on the page at every viewport, including old dialog 
       .getByRole("combobox", { name: "Profile content" })
       .selectOption("minimal");
     await expect(
-      preview.getByRole("heading", { name: "Alex Rivera", exact: true }),
+      preview.getByRole("heading", { name: "Alex R.", exact: true }),
     ).toBeVisible();
   }
 });

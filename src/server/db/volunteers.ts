@@ -26,6 +26,7 @@ import {
   includesOrientationSql,
   medicMarkSql,
   nowMsSql,
+  personDisplayNameSql,
   profileDisplayNameSql,
   profileFullNameSql,
 } from "./sql";
@@ -275,8 +276,14 @@ export async function viewVolunteerProfile(
     // Historical approvals without such an audit deliberately stay unattributed.
     db
       .prepare(
-        `SELECT approver.id, approver.name, approver.email, a.created_at AS approvedAt
+        `SELECT approver.id, ${personDisplayNameSql({
+          firstName: "approver_profile.first_name",
+          lastName: "approver_profile.last_name",
+          preferredName: "approver_profile.preferred_name",
+          legacyName: "approver.name",
+        })} AS name, approver.email, a.created_at AS approvedAt
         FROM audit_log a JOIN user approver ON approver.id=a.actor_id
+        LEFT JOIN profile approver_profile ON approver_profile.user_id=approver.id
         JOIN volunteer_status v ON v.user_id=a.subject_id
         WHERE a.subject_id=? AND v.registration_approved=1
           AND a.action='approval_changed'

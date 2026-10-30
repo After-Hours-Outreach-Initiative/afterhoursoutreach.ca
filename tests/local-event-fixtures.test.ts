@@ -183,7 +183,7 @@ test("manual presets cover application, orientation, patrol, medic and access st
       assert.deepEqual(profileSchema.parse(snapshot.answers), snapshot.answers);
       assert.equal(snapshot.email, row.email);
       assert.equal(snapshot.answers.preferredName, row.preferred_name);
-      assert.equal(row.preferred_name, row.name);
+      assert.equal(row.preferred_name, snapshot.answers.firstName);
       assert.equal(
         snapshot.submittedAt,
         new Date(now - 14 * 86_400_000).toISOString(),

@@ -107,7 +107,7 @@ export function createEventCardFixture(
     eventCardScenarios[0];
   const actor: Actor = {
     id: "ui-event-viewer",
-    name: "Morgan Park",
+    name: "Morgan P.",
     sessionId: "ui-fictional-session",
     role: "volunteer",
     twoFactorEnabled: false,

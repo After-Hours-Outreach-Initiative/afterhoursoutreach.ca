@@ -1,4 +1,5 @@
 import { isCalendarDate } from "./date-input";
+import { personDisplayName } from "./person-name";
 
 export interface ApplicationAnswers {
   firstName: string;
@@ -53,13 +54,7 @@ export function applicationDisplayName(
     "firstName" | "middleNames" | "lastName" | "preferredName"
   >,
 ): string {
-  return (
-    answers.preferredName.trim() ||
-    [answers.firstName, answers.middleNames, answers.lastName]
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .join(" ")
-  );
+  return personDisplayName(answers);
 }
 
 export const outreachRequiredError =
@@ -347,10 +342,9 @@ export const applicationFields = [
   {
     name: "preferredName",
     section: "personal-info",
-    label: "Preferred name",
+    label: "Preferred first name",
     required: false,
     autocomplete: "nickname",
-    help: "If provided, this is the name shown in your account and event rosters.",
   },
   {
     name: "pronouns",

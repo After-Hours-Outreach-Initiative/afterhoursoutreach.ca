@@ -8,17 +8,29 @@ import {
 } from "../src/server/db/access";
 import { isApplicationComplete } from "../src/server/db/application-progress";
 
-test("account greeting preserves preferred names and falls back to the first name", () => {
-  expect(accountGreeting({ firstName: "Alex", preferredName: "  AJ  " })).toBe(
-    "AJ",
-  );
+test("account greeting uses preferred first name or first name plus last initial", () => {
   expect(
-    accountGreeting({ firstName: "Mary", preferredName: "Mary Jane" }),
-  ).toBe("Mary Jane");
-  expect(accountGreeting({ firstName: "  Taylor  ", preferredName: " " })).toBe(
-    "Taylor",
-  );
-  expect(accountGreeting(undefined, "Jamie Park")).toBe("Jamie");
+    accountGreeting({
+      firstName: "Alex",
+      lastName: "Rivera",
+      preferredName: "  AJ  ",
+    }),
+  ).toBe("AJ R.");
+  expect(
+    accountGreeting({
+      firstName: "Mary",
+      lastName: "Jones",
+      preferredName: "Mary Jane",
+    }),
+  ).toBe("Mary Jane J.");
+  expect(
+    accountGreeting({
+      firstName: "  Taylor  ",
+      lastName: "Park",
+      preferredName: " ",
+    }),
+  ).toBe("Taylor P.");
+  expect(accountGreeting(undefined, "Jamie Park")).toBe("Jamie P.");
   expect(accountGreeting()).toBe("Account");
 });
 

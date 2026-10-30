@@ -5,10 +5,7 @@ import {
   registrationChangedEmail,
   type EmailContent,
 } from "../../data/email-templates";
-import {
-  publicAttendeeName,
-  type AttendeeCategory,
-} from "../../data/event-roster";
+import type { AttendeeCategory } from "../../data/event-roster";
 import type { Actor } from "./access";
 import {
   requireOrganizer,
@@ -176,12 +173,6 @@ export interface PublicRoster {
   people: PublicRosterRow[];
   // Opaque membership digest catches swaps even when abbreviated names match.
   version: string;
-}
-interface AttendeeNameRow {
-  firstName: string | null;
-  lastName: string | null;
-  preferredName: string | null;
-  legacyName: string;
 }
 const eventColumns = `
   e.id, CASE WHEN ${includesOrientationSql()} THEN 'orientation' ELSE 'patrol' END AS type,
@@ -919,8 +910,7 @@ export async function listPublicRosters(
   const rows = await db
     .prepare(
       `SELECT s.id AS membership, s.user_id AS attendeeIdentity, s.event_id AS eventId,
-    p.first_name AS firstName, p.last_name AS lastName, p.preferred_name AS preferredName,
-    ${profileDisplayNameSql} AS legacyName,
+    coalesce(nullif(${profileDisplayNameSql}, ''), 'Outreach Volunteer') AS name,
     ${attendeeCategorySql("s.user_id")} AS category,
     ${medicMarkSql("s.user_id")} AS medicMark
     FROM signup s JOIN event e ON e.id = s.event_id
@@ -939,22 +929,14 @@ export async function listPublicRosters(
     // One JSON binding keeps a full 100-event page below D1's 100-parameter limit.
     .bind(JSON.stringify(ids), actor.id, actor.id)
     .all<
-      AttendeeNameRow & {
+      PublicRosterRow & {
         membership: string;
         attendeeIdentity: string;
-        eventId: string;
-        category: AttendeeCategory;
-        medicMark: number;
       }
     >();
   const people = rows.results.map((row) => ({
     eventId: row.eventId,
-    name: publicAttendeeName(
-      row.firstName,
-      row.lastName,
-      row.legacyName,
-      row.preferredName,
-    ),
+    name: row.name,
     category: row.category,
     medicMark: row.medicMark,
   }));
@@ -990,8 +972,7 @@ export async function listRosters(
   const rows = await db
     .prepare(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, s.created_at AS registeredAt,
-        p.first_name AS firstName, p.last_name AS lastName, p.preferred_name AS preferredName,
-        ${profileDisplayNameSql} AS legacyName,
+        coalesce(nullif(${profileDisplayNameSql}, ''), 'Outreach Volunteer') AS name,
         ${attendeeCategorySql("s.user_id")} AS category,
         ${medicMarkSql("s.user_id")} AS medicMark,
          v.patrol_approved AS patrolApproved, v.updated_at AS statusVersion,
@@ -1003,17 +984,12 @@ export async function listRosters(
        JOIN user u ON u.id = s.user_id
        JOIN volunteer_status v ON v.user_id = s.user_id
        WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'
-       ORDER BY legacyName
+       ORDER BY name COLLATE NOCASE, s.id
        LIMIT 20000`,
     )
     .bind(JSON.stringify(ids))
-    .all<Omit<RosterRow, "name"> & AttendeeNameRow>();
-  return rows.results.map(
-    ({ firstName, lastName, preferredName, legacyName, ...person }) => ({
-      ...person,
-      name: publicAttendeeName(firstName, lastName, legacyName, preferredName),
-    }),
-  );
+    .all<RosterRow>();
+  return rows.results;
 }
 
 export async function manageSignup(

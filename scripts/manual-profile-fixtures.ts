@@ -21,7 +21,7 @@ export function manualProfileFixture(
       firstName,
       middleNames: "",
       lastName: surname.join(" ") || "Sample",
-      preferredName: preset.name,
+      preferredName: firstName,
       teams: preset.sampleKey === "dana" ? ["outreach", "medic"] : ["outreach"],
       phone: `604-555-${phone.toString().padStart(4, "0")}`,
       emergencyPhone: `604-555-${(phone + 1).toString().padStart(4, "0")}`,

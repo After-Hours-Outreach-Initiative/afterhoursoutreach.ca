@@ -1,6 +1,9 @@
 import type { ComponentProps } from "astro/types";
 import type VolunteerProfileView from "../../components/volunteer/VolunteerProfileView.astro";
-import type { ApplicationAnswers } from "../../data/application";
+import {
+  applicationDisplayName,
+  type ApplicationAnswers,
+} from "../../data/application";
 import { codeOfConductVersion } from "../../data/code-of-conduct";
 
 export type ProfileFixture = ComponentProps<typeof VolunteerProfileView>;
@@ -300,7 +303,7 @@ export function createProfileFixture(
     firstName: "Alex",
     middleNames: "Jordan",
     lastName: "Rivera",
-    preferredName: "Alex Rivera",
+    preferredName: "Alex",
     pronouns: "they/them",
     phone: "604-555-0142",
     birthDate: "1994-06-18",
@@ -327,8 +330,7 @@ export function createProfileFixture(
     medicalConditions: "No accommodations requested.",
   };
   if (options.content === "long") {
-    answers.preferredName =
-      "Alexandria Jordan Rivera-Montgomery (Alex) — fictional layout example";
+    answers.preferredName = "Alexandria Jordan Marie Jacqueline";
     answers.emergencyName =
       "Samira Jacqueline Rivera-Montgomery, primary emergency contact";
     answers.emergencyRelationship = "Sibling and designated emergency contact";
@@ -406,7 +408,7 @@ export function createProfileFixture(
   return {
     person: {
       id: "ui-fictional-volunteer",
-      name: answers.preferredName || `${answers.firstName} ${answers.lastName}`,
+      name: applicationDisplayName(answers),
       role: state?.role ?? (scenario.organizer ? "organizer" : "volunteer"),
       active: Number(state?.active ?? !scenario.inactive),
       applicationApproved: Number(approved),
@@ -432,7 +434,7 @@ export function createProfileFixture(
         approved && approvedAt !== null
           ? {
               id: "ui-fictional-organizer",
-              name: "Morgan Chen",
+              name: "Morgan C.",
               email: "morgan.organizer@example.org",
               approvedAt,
             }

@@ -1332,7 +1332,7 @@ test("application shows all required errors and saves after they are corrected",
   for (const field of ["firstName", "middleNames", "lastName"] as const)
     await expect(form.locator(`[name="${field}"]`)).toBeEditable();
   await expect(
-    page.getByRole("textbox", { name: /^Preferred name/ }),
+    page.getByRole("textbox", { name: /^Preferred first name/ }),
   ).toHaveValue(sampleAnswers.preferredName);
   await expect(
     page.getByRole("region", { name: "Code of Conduct", exact: true }),
@@ -1349,7 +1349,7 @@ test("application shows all required errors and saves after they are corrected",
   ).toBeDisabled();
   // Editing reuses validation and returns to saved text without a success message.
   await page
-    .getByRole("textbox", { name: /^Preferred name/ })
+    .getByRole("textbox", { name: /^Preferred first name/ })
     .fill("Updated volunteer");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   const saved = form.locator('[data-profile-answer="preferredName"] dd');
@@ -1364,7 +1364,7 @@ test("application shows all required errors and saves after they are corrected",
   await page.reload();
   await page.getByRole("button", { name: "Edit personal info" }).click();
   await expect(
-    page.getByRole("textbox", { name: /^Preferred name/ }),
+    page.getByRole("textbox", { name: /^Preferred first name/ }),
   ).toHaveValue("Updated volunteer");
 });
 
@@ -2743,10 +2743,10 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   ).toBeVisible();
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(page.locator("[data-account-menu-name]").first()).toHaveText(
-    "Changed first Changed middle Changed last",
+    "Changed first C.",
   );
   await expect(page.locator("[data-account-greeting]")).toHaveText(
-    "Changed first",
+    "Changed first C.",
   );
   await expect(answer("firstName")).toHaveText("Changed first");
   await expect(answer("middleNames")).toHaveText("Changed middle");
@@ -2970,7 +2970,7 @@ test("email changes verify the new address in place and preserve unsaved profile
   await page.goto("/volunteer/account");
   await page.getByRole("button", { name: "Edit personal info" }).click();
   const name = page.getByRole("textbox", {
-    name: /^Preferred name/,
+    name: /^Preferred first name/,
   });
   await name.fill("Unsaved email-change draft");
   const request = page.locator("[data-email-change-request]");
@@ -3732,7 +3732,7 @@ test("authenticator sign-in shows native inline code errors", async ({
   await page.goto("/volunteer/account");
   await page.getByRole("button", { name: "Edit personal info" }).click();
   const name = page.getByRole("textbox", {
-    name: /^Preferred name/,
+    name: /^Preferred first name/,
   });
   await name.fill("Unsaved authenticator draft");
   await expect(page.locator("[data-factor-settings]")).toContainText(

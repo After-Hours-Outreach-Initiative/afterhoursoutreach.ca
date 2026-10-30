@@ -269,7 +269,7 @@ describe(
       assert.equal(updated.profile?.first_name, "Changed");
       assert.equal(updated.profile?.middle_names, "Middle");
       assert.equal(updated.profile?.last_name, "Name");
-      assert.equal(updated.user?.name, "Changed Middle Name");
+      assert.equal(updated.user?.name, "Changed N.");
       assert.equal(
         updated.profile?.submitted_application,
         saved.profile?.submitted_application,
@@ -277,7 +277,7 @@ describe(
       const session = (await (
         await send("/api/v1/auth/get-session", undefined, ageCookie)
       ).json()) as { user: { name: string } };
-      assert.equal(session.user.name, "Changed Middle Name");
+      assert.equal(session.user.name, "Changed N.");
     });
 
     test("applications require explicit Outreach and leave optional teams optional without rewriting legacy edits", async () => {
@@ -1398,7 +1398,7 @@ describe(
           (
             await menu.locator("[data-account-menu-name]").textContent()
           )?.trim(),
-          answers.preferredName,
+          `${answers.preferredName} V.`,
         );
         await menu.locator("summary").click();
         assert.equal(
@@ -1409,7 +1409,7 @@ describe(
         );
         await menu.locator("summary").click();
         const changedName = "Worker Updated Volunteer";
-        await page.getByLabel("Preferred name").fill(changedName);
+        await page.getByLabel("Preferred first name").fill(changedName);
         await page
           .getByLabel(
             "Medical conditions/allergies/anything else we should know",
@@ -1434,7 +1434,7 @@ describe(
             updated: () => expect(sessionForm).toHaveCount(0),
             loadingLabel: "Signing out…",
           });
-          await expect(page.getByLabel("Preferred name")).toHaveValue(
+          await expect(page.getByLabel("Preferred first name")).toHaveValue(
             changedName,
           );
           await expect(
@@ -1477,7 +1477,7 @@ describe(
           (
             await menu.locator("[data-account-menu-name]").textContent()
           )?.trim(),
-          changedName,
+          `${changedName} V.`,
         );
         await page.reload();
         const submittedApplication = page.locator(
@@ -1696,8 +1696,8 @@ describe(
           answers.preferredName,
         );
         await expect(newPage.locator("[data-account-menu-name]")).toHaveText([
-          answers.preferredName,
-          answers.preferredName,
+          `${answers.preferredName} V.`,
+          `${answers.preferredName} V.`,
         ]);
         assert.equal(newPage.url(), `${origin}/volunteer/account`);
         await expect(

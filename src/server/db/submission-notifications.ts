@@ -7,6 +7,7 @@ import { emailTextSql } from "./email-text";
 import type { NaloxoneCompletionOptions } from "./naloxone";
 import { emailPolicy } from "./policy";
 import { hashAuthValue } from "./rate-limits";
+import { personDisplayNameSql } from "./sql";
 
 export const submissionNotificationRecipients = [
   "ivan.zheng@afterhoursoutreach.ca",
@@ -47,13 +48,14 @@ export function submissionNotificationStatements(
             'to',json_array(?),
             'subject',?,
             'text',${emailTextSql(applicationSubmittedTemplate.text, {
-              applicant: `replace(replace(coalesce(
-                nullif(trim(json_extract(submitted_application,'$.answers.preferredName')),''),
-                trim(json_extract(submitted_application,'$.answers.firstName') || ' ' ||
-                  CASE WHEN json_extract(submitted_application,'$.answers.middleNames') != ''
-                    THEN json_extract(submitted_application,'$.answers.middleNames') || ' ' ELSE '' END ||
-                  json_extract(submitted_application,'$.answers.lastName'))
-              ),char(13),' '),char(10),' ')`,
+              applicant: `replace(replace(${personDisplayNameSql({
+                firstName:
+                  "json_extract(submitted_application,'$.answers.firstName')",
+                lastName:
+                  "json_extract(submitted_application,'$.answers.lastName')",
+                preferredName:
+                  "json_extract(submitted_application,'$.answers.preferredName')",
+              })},char(13),' '),char(10),' ')`,
               submittedAt:
                 "json_extract(submitted_application,'$.submittedAt')",
               reviewUrl: "?",

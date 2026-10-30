@@ -38,13 +38,57 @@ export const attendeeCategorySql = (userId: string) =>
   `CASE WHEN ${newVolunteerSql(userId)} THEN 'new-volunteer'
     WHEN ${approvedMedicSql(userId)} THEN 'medic' ELSE 'outreach-volunteer' END`;
 
-// Queries using profile alias p and user alias u. Match applicationDisplayName.
+// Keep full names available for directory searches, not standard display.
 export const profileFullNameSql = `trim(coalesce(p.first_name, '') || ' ' ||
   CASE WHEN coalesce(p.middle_names, '') <> '' THEN p.middle_names || ' ' ELSE '' END ||
   coalesce(p.last_name, ''))`;
 
-// Preserve legacy combined answers, falling back to the account display name.
-export const profileDisplayNameSql = `coalesce(
-  nullif(trim(p.preferred_name), ''), nullif(${profileFullNameSql}, ''),
-  u.name
-)`;
+// Match personDisplayName, including JS trim/whitespace and Unicode code points.
+const nameWhitespace = [
+  9, 10, 11, 12, 13, 32, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198,
+  8199, 8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288, 65279,
+];
+const trimNameSql = (value: string) =>
+  `trim(coalesce(${value}, ''), char(${nameWhitespace.join(",")}))`;
+
+/** Backend-owned expressions only. Legacy combined names are a last resort. */
+export function personDisplayNameSql({
+  firstName = "NULL",
+  lastName = "NULL",
+  preferredName = "NULL",
+  legacyName = "''",
+}: {
+  firstName?: string;
+  lastName?: string;
+  preferredName?: string;
+  legacyName?: string;
+}) {
+  const legacyWords = nameWhitespace
+    .filter((code) => code !== 32)
+    .reduce(
+      (sql, code) => `replace(${sql}, char(${code}), ' ')`,
+      "display_legacy",
+    );
+  return `(WITH display_parts AS (
+    SELECT coalesce(nullif(${trimNameSql(preferredName)}, ''), ${trimNameSql(firstName)}) AS display_given,
+      ${trimNameSql(lastName)} AS display_surname, ${trimNameSql(legacyName)} AS display_legacy
+  ), display_words AS (
+    SELECT value, key FROM display_parts,
+      json_each('[' || replace(json_quote(${legacyWords}), ' ', '","') || ']')
+    WHERE value <> ''
+  ) SELECT CASE WHEN display_given <> '' OR display_surname <> '' THEN
+      display_given || CASE WHEN display_given <> '' AND display_surname <> '' THEN ' ' ELSE '' END ||
+      CASE WHEN display_surname <> '' THEN substr(display_surname, 1, 1) || '.' ELSE '' END
+    ELSE coalesce((SELECT value FROM display_words ORDER BY key LIMIT 1), '') ||
+      CASE WHEN (SELECT count(*) FROM display_words) > 1 THEN
+        ' ' || substr((SELECT value FROM display_words ORDER BY key DESC LIMIT 1), 1, 1) || '.'
+      ELSE '' END
+    END FROM display_parts)`;
+}
+
+export const profileDisplayNameSql = personDisplayNameSql({
+  firstName: "p.first_name",
+  lastName: "p.last_name",
+  preferredName: "p.preferred_name",
+  legacyName: "u.name",
+});

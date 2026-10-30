@@ -67,10 +67,14 @@ and optional access emails, and do not alter the volunteer's active/inactive sta
 `profile.preferred_name` historically stored a combined full-or-preferred-name
 answer. The name-component migration adds nullable `first_name`, `middle_names`,
 and `last_name`, without modifying existing answers. New applications require
-first and last names; `preferred_name` may be empty. Profile saves synchronize
-`user.name` to the preferred name or assembled full name in the same transaction.
-Legacy profiles may retain their unsplit answer until the volunteer supplies both
-first and last names. No names are inferred or backfilled.
+first and last names; `preferred_name` is labelled **Preferred first name** and
+may be empty. Display names use the preferred first name (otherwise first name)
+and surname initial with a period, excluding middle names. Multiword preferred
+first names are preserved. Profile saves synchronize `user.name` to this display
+format in the same transaction; reads use current profile fields, not stale
+account display names. Full names remain searchable in organizer directories.
+Existing preferred values, including unsplit combined names, remain unchanged.
+No names are inferred, cleaned up, or backfilled.
 
 Referral multi-selects use nullable `heard_about_us_sources` (JSON) and
 `heard_about_us_other` (short text) columns. The original `heard_about_us`

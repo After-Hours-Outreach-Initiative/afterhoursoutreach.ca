@@ -1197,14 +1197,14 @@ describe(
           await page.waitForURL(`${origin}/volunteers?q=Sample+Alice`);
           await page
             .locator("[data-volunteer-results]")
-            .getByRole("link", { name: "Sample Alice", exact: true })
+            .getByRole("link", { name: "Sample Alice V.", exact: true })
             .waitFor();
           await page
-            .getByRole("link", { name: "Sample Alice", exact: true })
+            .getByRole("link", { name: "Sample Alice V.", exact: true })
             .click();
           const profileView = page.locator("[data-volunteer-profile]");
           await profileView
-            .getByRole("heading", { name: "Sample Alice", exact: true })
+            .getByRole("heading", { name: "Sample Alice V.", exact: true })
             .waitFor();
           await expect(
             profileView.getByLabel("Active volunteer", { exact: true }),
@@ -1311,7 +1311,7 @@ describe(
           await page.goto(`${origin}/volunteers?q=Sample+Alice`);
           await page
             .getByRole("link", {
-              name: "Sample Alice",
+              name: "Sample Alice V.",
               exact: true,
             })
             .click();

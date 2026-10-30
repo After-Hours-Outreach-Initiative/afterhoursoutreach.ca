@@ -625,11 +625,11 @@ test("account navigation and profile controls are usable on desktop and mobile",
         .getByRole("button", { name: "Open navigation", exact: true })
         .click();
       await expect(menu.locator("[data-account-menu-name]")).toHaveText(
-        user.name,
+        `${user.name} V.`,
       );
     } else {
       await expect(menu.locator("summary")).toHaveAccessibleName(
-        `Account for ${user.name}`,
+        `Account for ${user.name} V.`,
       );
       await menu.locator("summary").click();
     }
@@ -660,7 +660,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(
       form.getByRole("group", { name: "Personal statement", exact: true }),
     ).toHaveCount(0);
-    const name = page.getByLabel("Preferred name", { exact: false });
+    const name = page.getByLabel("Preferred first name", { exact: false });
     await expect(name).toHaveValue(sampleAnswers.preferredName);
     await expect(name).toBeEditable();
     for (const heading of await form.getByRole("heading", { level: 3 }).all()) {

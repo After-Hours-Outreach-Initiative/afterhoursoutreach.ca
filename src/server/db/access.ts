@@ -8,6 +8,7 @@ import type { AuthBindings } from "../auth";
 import { createDatabase } from ".";
 import { profile, volunteerStatus } from "./schema";
 import { accountGreeting } from "../../data/account-navigation";
+import { personDisplayName } from "../../data/person-name";
 import { contactEmail } from "../../data/site";
 import { RequestError, requireSameOrigin } from "../http";
 import {
@@ -45,15 +46,21 @@ export async function accountContext(
     where: eq(profile.user_id, person.id),
     columns: {
       first_name: true,
+      last_name: true,
       preferred_name: true,
       registered_at: true,
       naloxone_completed_at: true,
     },
   });
+  const names = {
+    firstName: application?.first_name,
+    lastName: application?.last_name,
+    preferredName: application?.preferred_name,
+  };
   return {
     actor: {
       id: person.id,
-      name: person.name,
+      name: personDisplayName(names, person.name),
       sessionId: current.session.id,
       role: person.role,
       twoFactorEnabled: person.twoFactorEnabled,
@@ -71,13 +78,7 @@ export async function accountContext(
       patrolApproved: status?.patrol_approved ?? false,
     },
     email: person.email,
-    greetingName: accountGreeting(
-      {
-        firstName: application?.first_name,
-        preferredName: application?.preferred_name,
-      },
-      person.name,
-    ),
+    greetingName: accountGreeting(names, person.name),
     headers,
     bindings: scoped,
   };

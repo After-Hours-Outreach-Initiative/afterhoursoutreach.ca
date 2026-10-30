@@ -61,7 +61,7 @@ export async function resetAccountState(
     id,
     name,
     email: `${id}@example.invalid`,
-    answers: { ...sample.answers, preferredName: name },
+    answers: { ...sample.answers },
   };
   const helperSample = samples.find((person) => person.key === "robin")!;
   const helper = {
@@ -71,7 +71,9 @@ export async function resetAccountState(
     email: `${organizer}@example.invalid`,
     answers: {
       ...helperSample.answers,
-      preferredName: "State setup organizer",
+      firstName: "State setup",
+      lastName: "Organizer",
+      preferredName: "State setup",
     },
   };
   const submittedAt = now - 14 * 86_400_000,

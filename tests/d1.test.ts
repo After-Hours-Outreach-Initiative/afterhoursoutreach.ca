@@ -3,6 +3,9 @@ import { test } from "vitest";
 import { env } from "cloudflare:workers";
 import { localEventFixtures } from "../scripts/local-event-fixtures";
 import { localAccountFixtures } from "../scripts/local-account-fixtures";
+import { personDisplayName } from "../src/data/person-name";
+import { applicationDisplayName } from "../src/data/application";
+import { personDisplayNameSql } from "../src/server/db/sql";
 import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
 import {
@@ -68,6 +71,51 @@ import {
   developmentPresetStatus,
   developmentAccountStatus,
 } from "../src/dev/accounts";
+
+test("JS and SQL share preferred first name plus Unicode last initial formatting without changing answers", async () => {
+  for (const [firstName, lastName, preferredName, legacyName, expected] of [
+    ["Alexandra", "Montgomery", "Alex", "Stale Full Name", "Alex M."],
+    ["Alexandra", "Montgomery", "", "Stale Full Name", "Alexandra M."],
+    ["Mary", "Jones", "Mary  Jane", "Ignored", "Mary  Jane J."],
+    ["Élodie", "\t李\u00a0", " \u2003", "Ignored", "Élodie 李."],
+    ["Alex", "𠮷田", "Alex Montgomery", "Ignored", "Alex Montgomery 𠮷."],
+    [null, null, "Multiword Preferred", "Ignored", "Multiword Preferred"],
+    ["First", null, "", "Ignored Surname", "First"],
+    [null, "Surname", null, "Ignored Name", "S."],
+    [null, null, null, " Legacy\tMiddle\u00a0Surname ", "Legacy S."],
+    [null, null, null, "OneName", "OneName"],
+    [null, null, null, " ", ""],
+  ]) {
+    const names = { firstName, lastName, preferredName };
+    assert.equal(personDisplayName(names, legacyName!), expected);
+    if (firstName)
+      assert.equal(
+        applicationDisplayName({
+          firstName,
+          lastName: lastName ?? "",
+          preferredName: preferredName ?? "",
+          middleNames: "Marie",
+        }),
+        expected,
+      );
+    const sql = personDisplayNameSql({
+      firstName: "input.firstName",
+      lastName: "input.lastName",
+      preferredName: "input.preferredName",
+      legacyName: "input.legacyName",
+    });
+    assert.equal(
+      await env.DB.prepare(
+        `WITH input AS (
+      SELECT ? AS firstName, ? AS lastName, ? AS preferredName, ? AS legacyName
+    ) SELECT ${sql} AS name FROM input`,
+      )
+        .bind(firstName, lastName, preferredName, legacyName)
+        .first("name"),
+      expected,
+    );
+  }
+});
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -1649,6 +1697,14 @@ test("application progress and organizer attribution use application audits, not
     false,
   );
   const approver = await draftActor("application-approver");
+  await saveProfile(env.DB, approver.id, {
+    ...completeAnswers(),
+    firstName: "Alexandra",
+    middleNames: "Marie",
+    lastName: "Montgomery",
+    preferredName: "Alex",
+    codeOfConductAccepted: true,
+  });
   await env.DB.prepare(
     "UPDATE user SET role='organizer',name='Application Organizer' WHERE id=?",
   )
@@ -1668,7 +1724,7 @@ test("application progress and organizer attribution use application audits, not
       ?.applicationApprovedBy,
     {
       id: approver.id,
-      name: "Application Organizer",
+      name: "Alex M.",
       email: "application-approver@example.org",
       approvedAt: 2000,
     },
@@ -2448,7 +2504,7 @@ test("submission atomically removes drafts; failed submissions retain them and l
     await env.DB.prepare("SELECT name FROM user WHERE id=?")
       .bind(actor.id)
       .first("name"),
-    "Changed first Changed middle Changed last",
+    "Changed first C.",
   );
   const organizer: Actor = {
     ...(await draftActor("snapshot-reviewer")),
@@ -2471,6 +2527,11 @@ test("submission atomically removes drafts; failed submissions retain them and l
     .run();
   const review = await viewVolunteerProfile(env.DB, organizer, actor.id);
   assert.deepEqual(review?.answers, latest);
+  const directory = await listApplications(env.DB, organizer, "Changed last");
+  assert.equal(
+    directory.rows.find(({ id }) => id === actor.id)?.name,
+    "Changed first C.",
+  );
   assert.deepEqual(review?.submission, submission);
   assert.deepEqual(
     await loadSubmittedApplication(env.DB, actor.id),

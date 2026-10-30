@@ -1,5 +1,6 @@
 import type { ComponentProps } from "astro/types";
 import type VolunteerDirectory from "../../components/volunteer/VolunteerDirectory.astro";
+import { personDisplayName } from "../../data/person-name";
 import {
   directoryListState,
   directoryListUrl,
@@ -115,15 +116,15 @@ const names = [
   "Sam Williams",
   "Taylor Nguyen",
 ];
-const longNames = [
-  "Alexandria Jordan Rivera-Montgomery (Alex)",
-  "Avery-James Chen-Williams de la Cruz",
+const longPreferredNames = [
+  "Alexandria Jordan Marie Jacqueline",
+  "Avery-James Dominique",
   "CaseyWithAnUnusuallyLongUnbrokenFictionalPreferredName",
-  "Jordan Amara Singh-Robertson",
-  "Morgan Élodie Park-Lefèvre",
-  "Riley Samira Ahmed-Montgomery",
-  "Sam Jacqueline Williams-Rivera",
-  "Taylor Minh-Anh Nguyen-Chen",
+  "Jordan Amara",
+  "Morgan Élodie",
+  "Riley Samira",
+  "Sam Jacqueline",
+  "Taylor Minh-Anh",
 ];
 const applicationProfiles = [
   "naloxone-pending",
@@ -180,6 +181,7 @@ export function createTableFixture(
     throw new Error("UI fixtures are local-development only.");
   const applications = kind === "applications";
   const profiles = new Map<string, string>();
+  const searchNames = new Map<string, string>();
   const count =
     options.scenario === "empty"
       ? 0
@@ -203,9 +205,15 @@ export function createTableFixture(
       applications &&
       ["ready-for-review", "medic-applicant"].includes(profile) &&
       options.scenario !== "none-ready";
-    const name = (options.scenario === "long-names" ? longNames : names)[
-      variant
-    ]!;
+    const fullName = names[variant]!;
+    const [firstName, lastName] = fullName.split(" ");
+    const name = personDisplayName({
+      firstName,
+      lastName,
+      preferredName:
+        options.scenario === "long-names" ? longPreferredNames[variant] : "",
+    });
+    searchNames.set(id, fullName);
     return {
       id,
       name:
@@ -240,7 +248,7 @@ export function createTableFixture(
     };
   });
   const matching = rows.filter((person) =>
-    compareSearch(person.name, state.search),
+    compareSearch(`${person.name} ${searchNames.get(person.id)}`, state.search),
   );
   const awaiting = matching.filter(
     (person) =>
