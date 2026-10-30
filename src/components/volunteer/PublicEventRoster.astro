@@ -26,7 +26,7 @@ const { event, roster } = Astro.props;
                   medicMark={Boolean(person.medicMark)}
                 />
                 <span class="event-roster-name">
-                  {person.name}
+                  <span>{person.name}</span>
                   {person.category === "new-volunteer" && (
                     <>
                       {" "}

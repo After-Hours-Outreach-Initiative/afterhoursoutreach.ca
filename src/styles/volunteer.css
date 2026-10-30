@@ -1936,6 +1936,13 @@ body:has(
   gap: 0.625rem;
 }
 .event-roster-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  min-width: 0;
+}
+.event-roster-name > :first-child {
   min-width: 0;
 }
 .event-roster-status {
