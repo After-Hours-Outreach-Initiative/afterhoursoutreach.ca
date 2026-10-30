@@ -6,9 +6,7 @@ interface Props {
 }
 const { event } = Astro.props;
 const medics = event.medicConfirmed;
-const newVolunteers = event.includesOrientation
-  ? event.orientationConfirmed
-  : 0;
+const newVolunteers = event.newVolunteerConfirmed;
 const outreachVolunteers = Math.max(
   0,
   event.confirmed - medics - newVolunteers,

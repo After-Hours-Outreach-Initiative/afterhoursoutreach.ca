@@ -20,7 +20,9 @@ import {
 import { RequestError } from "../http";
 import {
   approvedMedicSql,
+  attendeeCategorySql,
   includesOrientationSql,
+  newVolunteerSql,
   nowMsSql,
   profileDisplayNameSql,
 } from "./sql";
@@ -123,7 +125,7 @@ export interface EventRow {
   cancelledAt: number | null;
   updatedAt: number;
   confirmed: number;
-  orientationConfirmed: number;
+  newVolunteerConfirmed: number;
   medicConfirmed: number;
   medicEligible: number;
   orientationCompleted: number;
@@ -224,7 +226,7 @@ export async function listEvents(
   const select = `SELECT ${eventColumns},
     ${confirmedSignupsSql} AS confirmed,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
-      AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) AS orientationConfirmed,
+      AND ${newVolunteerSql("s.user_id")}) AS newVolunteerConfirmed,
     EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = ?) AS orientationCompleted,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
       AND ${approvedMedicSql("s.user_id")}) AS medicConfirmed,
@@ -242,7 +244,6 @@ export async function listEvents(
     (${includesOrientationSql()} AND EXISTS(
       SELECT 1 FROM volunteer_status v
       WHERE v.user_id = ? AND v.patrol_approved = 0
-        AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = v.user_id)
         AND EXISTS(
           SELECT 1 FROM signup s JOIN event booked ON booked.id = s.event_id
           WHERE s.user_id = v.user_id AND s.status = 'confirmed'
@@ -306,7 +307,9 @@ export async function listEvents(
   const rows = await statement.all<EventRow>();
   return rows.results.map((row) => ({
     ...row,
-    availableSpots: availableSignupSpots(row, row.confirmed),
+    availableSpots: availableSignupSpots(row, row.confirmed, {
+      patrolApproved: actor?.patrolApproved ?? false,
+    }),
   }));
 }
 export async function findEvent(db: Env["DB"], id: string) {
@@ -868,9 +871,7 @@ export async function listPublicRosters(
     .prepare(
       `SELECT s.id AS membership, s.user_id AS attendeeIdentity, s.event_id AS eventId,
     p.first_name AS firstName, p.last_name AS lastName, ${profileDisplayNameSql} AS legacyName,
-    CASE WHEN ${includesOrientationSql()} AND NOT EXISTS (
-      SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id
-    ) THEN 'new-volunteer' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'outreach-volunteer' END AS category
+    ${attendeeCategorySql("s.user_id")} AS category
     FROM signup s JOIN event e ON e.id = s.event_id
     JOIN profile p ON p.user_id = s.user_id JOIN user u ON u.id = s.user_id
      WHERE s.status = 'confirmed' AND e.id IN (SELECT value FROM json_each(?))
@@ -932,9 +933,7 @@ export async function listRosters(
   const rows = await db
     .prepare(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, ${profileDisplayNameSql} AS name,
-        CASE WHEN ${includesOrientationSql()} AND NOT EXISTS (
-          SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id
-        ) THEN 'new-volunteer' WHEN ${approvedMedicSql("s.user_id")} THEN 'medic' ELSE 'outreach-volunteer' END AS category,
+        ${attendeeCategorySql("s.user_id")} AS category,
          v.patrol_approved AS patrolApproved, v.updated_at AS statusVersion,
          EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed

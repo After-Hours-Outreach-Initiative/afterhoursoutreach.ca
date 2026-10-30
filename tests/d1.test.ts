@@ -9,6 +9,7 @@ import {
   changeSignup,
   listEvents,
   listPublicRosters,
+  listRosters,
   manageSignup,
 } from "../src/server/db/events";
 import { orientationSignupLimitMessage } from "../src/server/db/policy";
@@ -265,9 +266,12 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     const actor = {
       ...(await draftActor(id)),
       applicationSubmitted: true,
+      applicationComplete: true,
+      naloxoneCompleted: true,
+      naloxoneCompletedAt: 0,
       active: true,
       applicationApproved: true,
-      patrolApproved: true,
+      patrolApproved: !id.startsWith("new-volunteer"),
     };
     await env.DB.batch([
       env.DB.prepare(
@@ -276,10 +280,12 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
         VALUES (?, 'Alice', 'PrivateSurname', 'PRIVATE FULL NAME', 'PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None',0,0)`,
       ).bind(id, id.startsWith("medic") ? '["medic"]' : "[]"),
       env.DB.prepare(
-        "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,1,'organizer',0,0)",
-      ).bind(id),
+        "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,?,'organizer',0,0)",
+      ).bind(id, Number(actor.patrolApproved)),
     ]);
-    if (!id.startsWith("new-volunteer"))
+    // Deliberately record attendance only for unapproved volunteers: neither
+    // attendance nor its absence may determine these categories.
+    if (id.startsWith("new-volunteer"))
       await env.DB.prepare(
         "INSERT INTO orientation_completion VALUES (?,?, 'history','organizer',0)",
       )
@@ -309,7 +315,7 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     await listEvents(env.DB, people[0], undefined, "volunteer")
   ).find((row) => row.id === "target")!;
   assert.deepEqual(
-    [target.confirmed, target.medicConfirmed, target.orientationConfirmed],
+    [target.confirmed, target.medicConfirmed, target.newVolunteerConfirmed],
     [5, 2, 2],
   );
   const roster = await listPublicRosters(env.DB, people[0], [
@@ -394,6 +400,140 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     statusError(409),
   );
   await changeSignup(env.DB, newVolunteer, "target", "join");
+});
+
+test("manual approvals recolour existing signups consistently without inventing attendance", async () => {
+  const actors: Actor[] = [];
+  for (const id of ["organizer", "blue", "attended", "green", "red"]) {
+    const actor: Actor = {
+      ...(await draftActor(id)),
+      role: id === "organizer" ? "organizer" : "volunteer",
+      applicationSubmitted: true,
+      applicationComplete: true,
+      naloxoneCompleted: true,
+      active: true,
+      applicationApproved: true,
+    };
+    if (id === "organizer")
+      await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+        .bind(id)
+        .run();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,
+        emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,
+        motivation,teams,medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+        VALUES (?,?,'Volunteer',?,'555','2000-01-01','Contact','555','Friend','Friend','Help',?,'None','None',0,0,0)`,
+      ).bind(id, id, id, id === "red" ? '["medic"]' : '["outreach"]'),
+      env.DB.prepare(
+        "INSERT INTO volunteer_status (user_id,registration_approved,updated_at) VALUES (?,1,0)",
+      ).bind(id),
+    ]);
+    actors.push(actor);
+  }
+  const [organizer, ...volunteers] = actors;
+  for (const id of ["history", "november-patrol", "other-orientation"])
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES (?,'orientation',?,'Meeting point',8,'organizer',0,0)`,
+    )
+      .bind(id, id === "history" ? 0 : Date.now() + 86_400_000)
+      .run();
+  for (const actor of volunteers)
+    await changeSignup(env.DB, actor, "november-patrol", "join");
+  const before = await listPublicRosters(env.DB, organizer, [
+    "november-patrol",
+  ]);
+  assert.deepEqual(
+    before.people.map(({ category }) => category),
+    Array(4).fill("new-volunteer"),
+  );
+
+  await env.DB.prepare(
+    "INSERT INTO orientation_completion VALUES ('attendance','attended','history','organizer',0)",
+  ).run();
+  assert.deepEqual(
+    await listPublicRosters(env.DB, organizer, ["november-patrol"]),
+    before,
+  );
+  const attendedEvents = await listEvents(env.DB, volunteers[1]);
+  assert.equal(
+    attendedEvents.find(({ id }) => id === "other-orientation")
+      ?.orientationSignupBlocked,
+    1,
+  );
+  await assert.rejects(
+    changeSignup(env.DB, volunteers[1], "other-orientation", "join"),
+    statusError(409),
+  );
+
+  for (const userId of ["green", "red"])
+    await approveForPatrols(env.DB, organizer, { userId, version: 0 });
+  const target = (await listEvents(env.DB, organizer)).find(
+    ({ id }) => id === "november-patrol",
+  )!;
+  assert.deepEqual(
+    [target.confirmed, target.newVolunteerConfirmed, target.medicConfirmed],
+    [4, 2, 1],
+  );
+  const publicRoster = await listPublicRosters(env.DB, organizer, [target.id]);
+  assert.notEqual(publicRoster.version, before.version);
+  const expected = {
+    blue: "new-volunteer",
+    attended: "new-volunteer",
+    green: "outreach-volunteer",
+    red: "medic",
+  };
+  const roster = await listRosters(env.DB, organizer, [target.id]);
+  assert.deepEqual(
+    Object.fromEntries(
+      roster.map(({ userId, category }) => [userId, category]),
+    ),
+    expected,
+  );
+  const listed = (await listVolunteers(env.DB, organizer)).rows.filter(
+    ({ id }) => id !== organizer.id,
+  );
+  assert.deepEqual(
+    Object.fromEntries(listed.map(({ id, category }) => [id, category])),
+    expected,
+  );
+  assert.deepEqual(
+    publicRoster.people.map(({ category }) => category).sort(),
+    Object.values(expected).sort(),
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM orientation_completion WHERE user_id IN ('green','red')",
+    ).first("n"),
+    0,
+  );
+
+  await env.DB.prepare("DELETE FROM orientation_completion").run();
+  assert.deepEqual(
+    await listPublicRosters(env.DB, organizer, [target.id]),
+    publicRoster,
+  );
+  const red = { ...volunteers[3], patrolApproved: true };
+  assert.equal(
+    (await listEvents(env.DB, red)).find(({ id }) => id === "other-orientation")
+      ?.medicEligible,
+    1,
+  );
+  await changeSignup(env.DB, red, "other-orientation", "join");
+  await env.DB.prepare(
+    "UPDATE profile SET teams='[\"outreach\"]' WHERE user_id='red'",
+  ).run();
+  assert.equal(
+    (await listRosters(env.DB, organizer, [target.id])).find(
+      ({ userId }) => userId === "red",
+    )?.category,
+    "outreach-volunteer",
+  );
+  assert.notEqual(
+    (await listPublicRosters(env.DB, organizer, [target.id])).version,
+    publicRoster.version,
+  );
 });
 
 const draftInput = (actor: Actor, revision: string | null = null) => ({
@@ -2389,7 +2529,6 @@ test("every reusable state resolves its declared milestones, permissions and att
       medicEligible: Boolean(
         row.medicSelected &&
         row.patrol_approved &&
-        row.orientationCompleted &&
         row.active &&
         progress.applicationApproved,
       ),

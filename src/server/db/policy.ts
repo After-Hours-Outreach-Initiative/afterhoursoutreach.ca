@@ -16,22 +16,20 @@ export interface SignupEvent {
   startsAt: Date;
   open: boolean;
   spots: number;
-  orientationConfirmed?: number;
+  newVolunteerConfirmed?: number;
   medicConfirmed?: number;
-  // Server-derived: team selection, both organizer approvals and completion.
+  // Server-derived: team selection and both manual organizer approvals.
   medicEligible?: boolean | number;
-  // Whether the current volunteer has ANY recorded orientation completion.
-  orientationCompleted?: boolean | number;
   orientationSignupBlocked?: boolean;
 }
 
 export const orientationSignupLimitMessage =
-  "You can book one upcoming orientation at a time until your first orientation is marked completed. Unregister from your current orientation before choosing another.";
+  "You can book one upcoming orientation at a time until an organizer approves you for patrols. Unregister from your current orientation before choosing another.";
 
 export const orientationFullMessage =
-  "All four places for volunteers who have not completed orientation are booked.";
+  "All four new volunteer places are booked.";
 export const orientationReservedMessage =
-  "The remaining places are reserved for approved medics or volunteers who have not completed orientation.";
+  "The remaining places are reserved for approved medics or new volunteers awaiting patrol approval.";
 
 export const orientationCapacityMessage =
   "Patrols need at least 2 total volunteer spots, or 4 when including orientation, to preserve reserved places.";
@@ -56,18 +54,18 @@ export function availableSignupSpots(
     | "type"
     | "includesOrientation"
     | "spots"
-    | "orientationConfirmed"
-    | "orientationCompleted"
+    | "newVolunteerConfirmed"
     | "medicConfirmed"
     | "medicEligible"
   >,
   confirmed: number,
+  volunteer: Pick<SignupVolunteer, "patrolApproved">,
 ) {
   const orientation = eventIncludesOrientation(event);
-  const newVolunteer = orientation && !event.orientationCompleted;
+  const newVolunteer = orientation && !volunteer.patrolApproved;
   const medic = !newVolunteer && Boolean(event.medicEligible);
   const medics = event.medicConfirmed ?? 0;
-  const newVolunteers = event.orientationConfirmed ?? 0;
+  const newVolunteers = event.newVolunteerConfirmed ?? 0;
   // Try successive additions in the viewer's mutually exclusive category. Each
   // addition must leave room for BOTH categories' outstanding reservations.
   let available = 0;
@@ -119,10 +117,10 @@ export function eventSignupBlockReason(
   if (!includesOrientation && !volunteer.patrolApproved)
     return "Organizer approval is required to register for patrols.";
   if (confirmed >= event.spots) return "This event is full.";
-  if (!availableSignupSpots(event, confirmed))
+  if (!availableSignupSpots(event, confirmed, volunteer))
     return includesOrientation &&
-      !event.orientationCompleted &&
-      (event.orientationConfirmed ?? 0) >= 4
+      !volunteer.patrolApproved &&
+      (event.newVolunteerConfirmed ?? 0) >= 4
       ? orientationFullMessage
       : orientationReservedMessage;
   if (includesOrientation && event.orientationSignupBlocked)

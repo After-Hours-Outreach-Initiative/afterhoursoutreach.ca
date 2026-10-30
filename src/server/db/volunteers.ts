@@ -22,7 +22,7 @@ import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
 import {
   applicationReadyForReviewSql,
-  approvedMedicSql,
+  attendeeCategorySql,
   includesOrientationSql,
   nowMsSql,
   profileDisplayNameSql,
@@ -69,9 +69,7 @@ export async function listVolunteers(
         `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         ${applicationReadyForReviewSql} AS applicationReadyForReview,
-        CASE WHEN NOT EXISTS (
-          SELECT 1 FROM orientation_completion o WHERE o.user_id = u.id
-        ) THEN 'new-volunteer' WHEN ${approvedMedicSql("u.id")} THEN 'medic' ELSE 'outreach-volunteer' END AS category,
+        ${attendeeCategorySql("u.id")} AS category,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       ${applicantsSql}
         AND (? = 'all' OR (${readyForReviewSql}))

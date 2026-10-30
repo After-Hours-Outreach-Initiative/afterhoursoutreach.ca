@@ -267,7 +267,7 @@ describe(
       await ok(await send("/manage/volunteers"), 302);
     });
 
-    const createEvent = async (type = "orientation", spots = 4) => {
+    const createEvent = async (type = "orientation", spots = 5) => {
       const data = eventInput(type, spots);
       await ok(
         await send(
@@ -724,13 +724,34 @@ describe(
 
       test("move rollback preserves source signup when destination is full", async () => {
         const signedUp = await DB.prepare(
-          "SELECT id,user_id AS userId FROM signup WHERE event_id=? AND status='confirmed'",
+          "SELECT id,user_id AS userId FROM signup WHERE event_id=? AND user_id=? AND status='confirmed'",
         )
-          .bind(orientation.id)
+          .bind(orientation.id, organizer.id)
           .first<{ id: string; userId: string }>();
-        const other = signedUp!.userId === alice.id ? bob : alice;
-        await ok(await join(destination.id, alice.cookie));
-        await ok(await join(destination.id, bob.cookie));
+        // Fill the destination's four real places, respecting both manual
+        // progression categories instead of treating approved volunteers as new.
+        for (const [index, medic] of [true, true, false, false].entries()) {
+          const id = `destination-attendee-${index}`;
+          await DB.batch([
+            DB.prepare(
+              "INSERT INTO user (id,name,email,created_at,updated_at) VALUES (?,'Destination attendee',?,0,0)",
+            ).bind(id, `${id}@example.org`),
+            DB.prepare(
+              `INSERT INTO profile (user_id,preferred_name,phone,birth_date,emergency_contact_name,
+              emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,
+              medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+              SELECT ?,'Destination attendee',phone,birth_date,emergency_contact_name,
+              emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,?,
+              medical_certification,training_experience,0,0,0 FROM profile WHERE user_id=?`,
+            ).bind(id, medic ? '["medic"]' : '["outreach"]', alice.id),
+            DB.prepare(
+              "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,?,?,0,0)",
+            ).bind(id, Number(medic), organizer.id),
+            DB.prepare(
+              "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES (?,?,?,0,0)",
+            ).bind(id, destination.id, id),
+          ]);
+        }
         await ok(
           await send(
             "/api/v1/events/action",
@@ -756,17 +777,13 @@ describe(
         await ok(
           await send(
             "/api/v1/events/action",
-            { action: "cancel", id: destination.id },
-            other.cookie,
-          ),
-        );
-        // Free the original attendee's destination signup as well, then move.
-        const attendee = signedUp!.userId === alice.id ? alice : bob;
-        await ok(
-          await send(
-            "/api/v1/events/action",
-            { action: "cancel", id: destination.id },
-            attendee.cookie,
+            {
+              action: "manage-signup",
+              id: "destination-attendee-3",
+              reason: "",
+              notify: false,
+            },
+            organizer.cookie,
           ),
         );
         await ok(

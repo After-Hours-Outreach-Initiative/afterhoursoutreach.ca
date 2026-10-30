@@ -14,6 +14,13 @@ an organizer marks each person who attended as completed. Patrol signups require
 explicit organizer approval. Completing orientation is the most common path to
 approval, but is not required and does not automatically grant approval.
 
+Progression and avatar colours follow manual approval everywhere: volunteers awaiting
+patrol approval are blue, patrol-approved outreach volunteers are green, and
+patrol-approved medic-team volunteers are red. Recorded orientation attendance never
+changes a category, medic eligibility, or reserved-place counts. Volunteers awaiting
+patrol approval may hold one upcoming orientation booking; only patrol approval lifts
+that limit, even if attendance has already been recorded.
+
 Orientations use the same cards, edit view, and volunteer list as patrols.
 
 ## Event list

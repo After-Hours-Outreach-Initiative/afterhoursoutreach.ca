@@ -61,81 +61,102 @@ test("an existing first-orientation booking shows the cancellation/rebooking rea
   );
 });
 
-test("availability and block reasons use orientation completion, total capacity and category limits", () => {
+test("availability and block reasons use manual approval, total capacity and category limits", () => {
   const patrol = {
     ...event,
     includesOrientation: true,
-    orientationConfirmed: 0,
-    orientationCompleted: true,
+    newVolunteerConfirmed: 0,
     medicConfirmed: 2,
   };
-  assert.equal(availableSignupSpots(patrol, 6), 0);
+  const newVolunteer = { ...volunteer, patrolApproved: false };
+  assert.equal(availableSignupSpots(patrol, 6, volunteer), 0);
   assert.equal(
     signupBlockReason(volunteer, patrol, 6, now),
     orientationReservedMessage,
   );
-  assert.equal(
-    availableSignupSpots({ ...patrol, orientationCompleted: false }, 6),
-    2,
-  );
+  assert.equal(availableSignupSpots(patrol, 6, newVolunteer), 2);
   const newFull = {
     ...patrol,
-    orientationConfirmed: 4,
+    newVolunteerConfirmed: 4,
     medicConfirmed: 0,
-    orientationCompleted: false,
   };
   assert.equal(
-    signupBlockReason(volunteer, newFull, 4, now),
+    signupBlockReason(newVolunteer, newFull, 4, now),
     orientationFullMessage,
   );
+  assert.equal(availableSignupSpots(newFull, 4, volunteer), 2);
   assert.equal(
-    availableSignupSpots({ ...newFull, orientationCompleted: true }, 4),
-    2,
-  );
-  assert.equal(
-    availableSignupSpots({ ...patrol, orientationConfirmed: 2 }, 8),
+    availableSignupSpots({ ...patrol, newVolunteerConfirmed: 2 }, 8, volunteer),
     0,
   );
 });
 
-test("dynamic reservations share extras but never consume outstanding places; first-time medics are new volunteers only", () => {
+test("dynamic reservations use approval even for medics with no attendance", () => {
   const base = {
     ...event,
     includesOrientation: true,
-    orientationCompleted: true,
-    orientationConfirmed: 0,
+    newVolunteerConfirmed: 0,
     medicConfirmed: 0,
     medicEligible: false,
   };
-  assert.equal(availableSignupSpots(base, 0), 4);
-  assert.equal(availableSignupSpots({ ...base, medicEligible: true }, 0), 6);
+  assert.equal(availableSignupSpots(base, 0, volunteer), 4);
   assert.equal(
-    availableSignupSpots(
-      { ...base, orientationCompleted: false, medicEligible: true },
-      0,
-    ),
+    availableSignupSpots({ ...base, medicEligible: true }, 0, volunteer),
+    6,
+  );
+  assert.equal(
+    availableSignupSpots({ ...base, medicEligible: true }, 0, {
+      ...volunteer,
+      patrolApproved: false,
+    }),
     4,
   );
   assert.equal(
-    availableSignupSpots({ ...base, orientationConfirmed: 3 }, 3),
+    availableSignupSpots({ ...base, newVolunteerConfirmed: 3 }, 3, volunteer),
     3,
   );
-  assert.equal(availableSignupSpots({ ...base, medicConfirmed: 3 }, 3), 3);
   assert.equal(
-    availableSignupSpots({ ...base, orientationConfirmed: 4 }, 6),
+    availableSignupSpots({ ...base, medicConfirmed: 3 }, 3, volunteer),
+    3,
+  );
+  assert.equal(
+    availableSignupSpots({ ...base, newVolunteerConfirmed: 4 }, 6, volunteer),
     0,
   );
   assert.equal(
-    availableSignupSpots({ ...base, includesOrientation: false }, 6),
+    availableSignupSpots({ ...base, includesOrientation: false }, 6, volunteer),
     0,
   );
   assert.equal(
     availableSignupSpots(
       { ...base, includesOrientation: false, medicEligible: true },
       6,
+      volunteer,
     ),
     2,
   );
+});
+
+test("attendance alone neither advances progression nor changes reserved-place availability", () => {
+  for (const orientationCompleted of [false, true]) {
+    const historicalEvent = {
+      ...event,
+      includesOrientation: true,
+      newVolunteerConfirmed: 4,
+      medicConfirmed: 0,
+      orientationCompleted,
+    };
+    assert.equal(
+      signupBlockReason(
+        { ...volunteer, patrolApproved: false },
+        historicalEvent,
+        4,
+        now,
+      ),
+      orientationFullMessage,
+    );
+    assert.equal(availableSignupSpots(historicalEvent, 4, volunteer), 2);
+  }
 });
 
 test("pending applications cannot sign up for any event; organizers retain access", () => {

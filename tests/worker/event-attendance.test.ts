@@ -114,8 +114,8 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         empty,
       )
       .run();
-    // Three completed medics, three new volunteers (including a first-time medic),
-    // then only real green attendees. The crowded event exercises scrolling at 100.
+    // Three approved medics, three unapproved volunteers (including medic interest),
+    // then approved green attendees. Only the unapproved volunteers have attendance.
     for (let index = 0; index < 100; index++) {
       const id = `avatar-attendee-${index}`;
       await DB.batch([
@@ -128,7 +128,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           index < 3 || index === 3,
         ),
       ]);
-      if (index < 3 || index >= 6)
+      if (index >= 3 && index < 6)
         await DB.prepare(
           "INSERT INTO orientation_completion VALUES (?,?, 'history',?,0)",
         )
@@ -144,6 +144,14 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES (?,?,?,0,0)",
         )
           .bind(`booked-${index}`, booked, id)
+          .run();
+      // Approval permits both bookings; revoking it preserves those historical
+      // spots while immediately changing their category, even with attendance.
+      if (index >= 3 && index < 6)
+        await DB.prepare(
+          "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id=?",
+        )
+          .bind(id)
           .run();
     }
     const html = await (await send("/events", viewer.cookie)).text();

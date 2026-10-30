@@ -57,7 +57,7 @@ test("organizer profile catalogue exposes every real profile state without accou
     "historic-approval": "New volunteer",
     "legacy-application": "Outreach Volunteer",
     "profile-updated": "Outreach Volunteer",
-    "legacy-patrol": "Outreach Volunteer",
+    "legacy-patrol": "Medic",
   };
   await expect(page.locator("[data-ui-profile-scenario]")).toHaveCount(15);
   for (const [id, step] of Object.entries(states)) {
@@ -93,7 +93,7 @@ test("organizer profile catalogue exposes every real profile state without accou
     page.getByRole("combobox", { name: "Viewport width" }),
   ).toHaveValue("375");
   await expect(preview.locator("[data-application-current-step]")).toHaveText(
-    "Outreach Volunteer",
+    "Medic",
   );
 });
 

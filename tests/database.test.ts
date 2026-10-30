@@ -85,8 +85,8 @@ test("first-orientation cap covers inserts, reactivation and reassignment but al
   );
 });
 
-test("patrol approval or recorded completion lifts the cap; existing excess bookings are preserved", () => {
-  // Leave room for a completed volunteer as well as the reserved first-timer places.
+test("only manual patrol approval lifts the cap; attendance and existing excess bookings do not", () => {
+  // Leave room for an approved volunteer as well as reserved new volunteer places.
   db.exec("UPDATE event SET spots=5 WHERE id='orientation'");
   anotherOrientation();
   approve("alice");
@@ -109,10 +109,20 @@ test("patrol approval or recorded completion lifts the cap; existing excess book
   db.exec(
     "INSERT INTO orientation_completion VALUES ('completion', 'alice', 'other-orientation', 'organizer', 0)",
   );
-  signUp("oriented", "orientation", "alice");
+  assert.throws(
+    () => signUp("oriented", "orientation", "alice"),
+    /orientation_signup_limit/,
+  );
+  approve("alice");
+  signUp("approved-again", "orientation", "alice");
 });
 
-function capacityPeople(prefix: string, count: number, completed = false) {
+function capacityPeople(
+  prefix: string,
+  count: number,
+  approved = false,
+  completed = false,
+) {
   db.exec(`INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
     SELECT 'history','orientation',0,'Past patrol',8,'organizer',0,0
     WHERE NOT EXISTS(SELECT 1 FROM event WHERE id='history')`);
@@ -132,8 +142,7 @@ function capacityPeople(prefix: string, count: number, completed = false) {
     db.prepare(
       "INSERT INTO volunteer_status (user_id,registration_approved,updated_at) VALUES (?,1,0)",
     ).run(id);
-    // Patrol approval must NOT make someone an orientation-completed volunteer.
-    approve(id);
+    if (approved) approve(id);
     if (completed)
       db.prepare(
         "INSERT INTO orientation_completion VALUES (?,?, 'history','organizer',0)",
@@ -145,13 +154,13 @@ function capacityPeople(prefix: string, count: number, completed = false) {
 test("medic and new volunteer reservations are exclusive, dynamic and freed by cancellation", () => {
   db.exec("UPDATE event SET spots=6 WHERE id='orientation'");
   const medics = capacityPeople("medic", 3, true);
-  const newbies = capacityPeople("new-medic", 3);
+  const newbies = capacityPeople("new-medic", 3, false, true);
   const general = capacityPeople("general", 3, true);
   for (const id of [...medics, ...newbies])
     db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
       id,
     );
-  // These medics have no completion and occupy ONLY the two new volunteer places.
+  // Completed attendance does not approve these medic-team volunteers for patrols.
   for (const id of newbies.slice(0, 2)) signUp(id, "orientation", id);
   for (const id of general.slice(0, 2)) signUp(id, "orientation", id);
   for (const id of [newbies[2], general[2]])
@@ -195,7 +204,7 @@ test("medic and new volunteer reservations are exclusive, dynamic and freed by c
 });
 
 test("medic team alone or completion without patrol approval cannot fill a medic reservation", () => {
-  const medics = capacityPeople("medic", 2, true);
+  const medics = capacityPeople("medic", 2, true, true);
   for (const id of medics)
     db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
       id,
@@ -345,14 +354,16 @@ test("four first-timers maximum also guards reactivation, moves and attendee rea
     () => db.exec("UPDATE signup SET status='confirmed' WHERE id='reactivate'"),
     /orientation_places_full/,
   );
-  signUp("move", "patrol", people[4]);
+  // A move from another orientation cannot bypass the new-volunteer cap.
+  anotherOrientation();
+  signUp("move", "other-orientation", people[4]);
   assert.throws(
     () => db.exec("UPDATE signup SET event_id='orientation' WHERE id='move'"),
     /orientation_places_full/,
   );
   assert.equal(
     db.prepare("SELECT event_id FROM signup WHERE id='move'").get()?.event_id,
-    "patrol",
+    "other-orientation",
   );
   const completed = capacityPeople("completed", 1, true)[0];
   signUp("swap", "orientation", completed);
@@ -362,6 +373,7 @@ test("four first-timers maximum also guards reactivation, moves and attendee rea
     /orientation_places_full/,
   );
   db.prepare("UPDATE signup SET status='cancelled' WHERE id=?").run(people[0]);
+  db.exec("UPDATE signup SET status='cancelled' WHERE id='move'");
   db.exec("UPDATE signup SET status='confirmed' WHERE id='reactivate'");
 });
 
@@ -377,7 +389,7 @@ test("orientation toggles and capacity edits reject incompatible bookings and pr
     /event_minimum_capacity/,
   );
   db.exec("UPDATE event SET spots=8 WHERE id='patrol'");
-  const completed = capacityPeople("completed", 7, true);
+  const completed = capacityPeople("completed", 7, true, true);
   for (const id of completed.slice(0, 2))
     db.prepare("UPDATE profile SET teams='[\"medic\"]' WHERE user_id=?").run(
       id,
@@ -416,6 +428,7 @@ test("orientation toggles and capacity edits reject incompatible bookings and pr
 });
 
 test("application approval is required for orientation inserts, reactivation and moves", () => {
+  db.exec("UPDATE event SET spots=5 WHERE id='orientation'");
   db.exec(
     "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='alice'",
   );
@@ -444,6 +457,7 @@ test("application approval is required for orientation inserts, reactivation and
 });
 
 test("approval is independent of orientation completion", () => {
+  db.exec("UPDATE event SET spots=5 WHERE id='orientation'");
   assert.throws(
     () => signUp("before", "patrol", "alice"),
     /signup_not_eligible/,

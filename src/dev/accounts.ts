@@ -188,8 +188,7 @@ export function developmentPresetStatus(
       preset.sampleKey === "dana" &&
       preset.active &&
       preset.applicationApproved &&
-      preset.patrolApproved &&
-      preset.orientation === "completed",
+      preset.patrolApproved,
     twoFactorEnabled: false,
   });
 }

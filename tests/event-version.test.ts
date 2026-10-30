@@ -20,7 +20,7 @@ test("view versions detect capacity, signups, visibility and access changes with
     cancelledAt: null,
     updatedAt: 1,
     confirmed: 0,
-    orientationConfirmed: 0,
+    newVolunteerConfirmed: 0,
     medicConfirmed: 0,
     medicEligible: 0,
     orientationCompleted: 0,
@@ -85,7 +85,7 @@ test("view versions detect capacity, signups, visibility and access changes with
   for (const update of [
     { confirmed: 1 },
     { includesOrientation: 0 },
-    { orientationConfirmed: 1 },
+    { newVolunteerConfirmed: 1 },
     { orientationCompleted: 1 },
     { availableSpots: 0 },
     { futureConfirmed: 1 },

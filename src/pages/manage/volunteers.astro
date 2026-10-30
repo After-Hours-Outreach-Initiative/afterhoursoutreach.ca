@@ -177,7 +177,11 @@ try {
                             <span class="volunteer-table-detail">
                               {person.role === "organizer"
                                 ? "Organizer"
-                                : "Outreach Volunteer"}
+                                : person.category === "new-volunteer"
+                                  ? "New volunteer"
+                                  : person.category === "medic"
+                                    ? "Medic"
+                                    : "Outreach Volunteer"}
                             </span>
                           </div>
                         </div>

@@ -1,7 +1,7 @@
 import { vancouverInput, vancouverInstant } from "../src/data/event-time";
 import { applicationDraftAnswersSchema } from "../src/data/application-draft";
 import { localAccountUserId, manualAccountPresets } from "../src/dev/accounts";
-import { approvedMedicSql } from "../src/server/db/sql";
+import { approvedMedicSql, newVolunteerSql } from "../src/server/db/sql";
 import {
   sampleProfileFixtures,
   sampleProfileStatement,
@@ -204,16 +204,15 @@ export function localAccountFixtures(now = Date.now()) {
         AND v.active=1 AND v.registration_approved=1
         AND p.naloxone_completed_at IS NOT NULL
         AND EXISTS (SELECT 1 FROM user WHERE id=${id} AND email=${email})
-        AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id=${id})
-        AND (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed'
-          AND NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id=s.user_id))<4
+        AND (v.patrol_approved=1 OR (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed'
+          AND ${newVolunteerSql("s.user_id")})<4)
         AND (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed')+1
-          + max(0,2-(SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed' AND ${approvedMedicSql("s.user_id")}))
-          + max(0,1-(SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed'
-            AND NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id=s.user_id)))<=e.spots
-        AND NOT EXISTS (SELECT 1 FROM signup s JOIN event booked ON booked.id=s.event_id
+          + max(0,2-(SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed' AND ${approvedMedicSql("s.user_id")})-CASE WHEN ${approvedMedicSql(id)} THEN 1 ELSE 0 END)
+          + max(0,2-(SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed'
+            AND ${newVolunteerSql("s.user_id")})-CASE WHEN ${newVolunteerSql(id)} THEN 1 ELSE 0 END)<=e.spots
+        AND (v.patrol_approved=1 OR NOT EXISTS (SELECT 1 FROM signup s JOIN event booked ON booked.id=s.event_id
           WHERE s.user_id=${id} AND s.status='confirmed' AND booked.cancelled_at IS NULL
-          AND booked.starts_at>${now} AND coalesce(booked.includes_orientation, booked.type='orientation'))
+          AND booked.starts_at>${now} AND coalesce(booked.includes_orientation, booked.type='orientation')))
         AND NOT EXISTS (SELECT 1 FROM signup WHERE id=${signup})
         AND NOT EXISTS (SELECT 1 FROM signup WHERE user_id=${id} AND event_id=${target} AND status='confirmed')`);
   }

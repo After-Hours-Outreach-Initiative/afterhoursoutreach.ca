@@ -785,6 +785,7 @@ test("legacy deletion uses versioned cancellation and keeps registered occurrenc
 test("past events reject cancellation and legacy deletion; series removal preserves attendance and unrelated data", async () => {
   const series = await savePatrolSeries(db, organizer, {
     ...input(),
+    spots: 5,
     includesOrientation: true,
   });
   const [past, future] = await all(series.id);
@@ -1740,6 +1741,7 @@ test("bulk capacity violations roll back template, event/audit changes, notifica
 test("revoking patrol approval preserves orientation bookings but cancels regular patrol bookings", async () => {
   const orientationSeries = await savePatrolSeries(db, organizer, {
     ...input(),
+    spots: 5,
     includesOrientation: true,
   });
   const patrolSeries = await savePatrolSeries(db, organizer, input());

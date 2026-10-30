@@ -32,13 +32,13 @@ BEGIN
   SELECT RAISE(ABORT, 'event_full')
   WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed')
     >= (SELECT spots FROM event WHERE id = NEW.event_id);
-  -- First-time medics are ONLY new volunteers; each signup occupies one total place.
+  -- Volunteers awaiting patrol approval are new, regardless of attendance or team.
   SELECT RAISE(ABORT, 'orientation_places_full')
   WHERE EXISTS (SELECT 1 FROM event e WHERE e.id = NEW.event_id
       AND coalesce(e.includes_orientation, e.type = 'orientation'))
-    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = NEW.user_id AND v.patrol_approved = 1)
     AND (SELECT count(*) FROM signup s WHERE s.event_id = NEW.event_id AND s.status = 'confirmed'
-      AND NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) >= 4;
+      AND NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1)) >= 4;
   -- Count the candidate as well as existing bookings, then leave room for every
   -- outstanding reservation. Extras of either category share the general pool.
   SELECT RAISE(ABORT, 'signup_places_reserved')
@@ -46,9 +46,8 @@ BEGIN
     SELECT count(*) AS total,
       coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
         WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
-          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
-          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS new_volunteers
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic'))), 0) AS medics,
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = booked.user_id AND v.patrol_approved = 1)), 0) AS new_volunteers
     FROM (SELECT user_id FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed'
       UNION ALL SELECT NEW.user_id) booked
   ) counts
@@ -58,7 +57,6 @@ BEGIN
   SELECT RAISE(ABORT, 'orientation_signup_limit')
   WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
     AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
-    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
     AND EXISTS (
       SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
       WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
@@ -163,17 +161,16 @@ BEGIN
   SELECT RAISE(ABORT, 'orientation_places_full')
   WHERE EXISTS (SELECT 1 FROM event e WHERE e.id = NEW.event_id
       AND coalesce(e.includes_orientation, e.type = 'orientation'))
-    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = NEW.user_id AND v.patrol_approved = 1)
     AND (SELECT count(*) FROM signup s WHERE s.event_id = NEW.event_id AND s.status = 'confirmed' AND s.id != OLD.id
-      AND NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) >= 4;
+      AND NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1)) >= 4;
   SELECT RAISE(ABORT, 'signup_places_reserved')
   FROM event e CROSS JOIN (
     SELECT count(*) AS total,
       coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
         WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
-          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
-          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS new_volunteers
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic'))), 0) AS medics,
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = booked.user_id AND v.patrol_approved = 1)), 0) AS new_volunteers
     FROM (SELECT user_id FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id
       UNION ALL SELECT NEW.user_id) booked
   ) counts
@@ -182,7 +179,6 @@ BEGIN
   SELECT RAISE(ABORT, 'orientation_signup_limit')
   WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
     AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
-    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
     AND EXISTS (
       SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
       WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
@@ -253,9 +249,8 @@ BEGIN
     SELECT count(*) AS total,
       coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
         WHERE p.user_id = s.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
-          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
-          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)), 0) AS new_volunteers
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic'))), 0) AS medics,
+      coalesce(sum(NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1)), 0) AS new_volunteers
     FROM signup s WHERE s.event_id = OLD.id AND s.status = 'confirmed'
   ) counts
   WHERE counts.total + max(0, 2 - counts.medics)
@@ -412,22 +407,6 @@ BEGIN
   UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
 END;
 --> statement-breakpoint
-CREATE TRIGGER discord_orientation_created AFTER INSERT ON orientation_completion
-BEGIN
-  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
-END;
---> statement-breakpoint
-CREATE TRIGGER discord_orientation_deleted AFTER DELETE ON orientation_completion
-BEGIN
-  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
-END;
---> statement-breakpoint
-CREATE TRIGGER discord_orientation_changed AFTER UPDATE ON orientation_completion
-BEGIN
-  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id IN (OLD.user_id, NEW.user_id);
-END;
---> statement-breakpoint
-
 -- Reauthorization may refresh consent/tokens, but never silently swap identities.
 CREATE TRIGGER discord_identity_immutable BEFORE UPDATE OF user_id, discord_id, guild_id ON discord_link
 WHEN NEW.user_id IS NOT OLD.user_id OR NEW.discord_id IS NOT OLD.discord_id OR NEW.guild_id IS NOT OLD.guild_id

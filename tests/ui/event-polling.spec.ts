@@ -316,7 +316,7 @@ test("other viewers see signups and cancellations through polling without losing
     );
     await expect(
       card(viewer).getByText(
-        "The remaining places are reserved for approved medics or volunteers who have not completed orientation.",
+        "The remaining places are reserved for approved medics or new volunteers awaiting patrol approval.",
         { exact: true },
       ),
     ).toHaveCount(1);

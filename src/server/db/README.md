@@ -107,15 +107,16 @@ apply it before deploying code that reads the new setting.
 
 Total capacity includes everyone, with two **medic** places reserved on every
 patrol. A medic must have `medic` in `profile.teams`, both authoritative organizer
-approvals (`registration_approved` and `patrol_approved`), and any
-`orientation_completion` record. No extra certification gate is imposed.
+approvals (`registration_approved` and `patrol_approved`). Orientation attendance
+is not a role requirement. No extra certification gate is imposed.
 
 Patrols with orientation also reserve two **new volunteer** places, with a maximum of
-four new volunteers and no minimum attendance. Anyone without a completion record,
-including a first-time medic or a patrol-approved first-timer, counts only as a
-new volunteer on these patrols. Each person occupies one place. Existing patrol approval
-still permits attending a regular patrol without completion, but never fills a
-medic reservation without completion.
+four new volunteers and no minimum attendance. Anyone without manual patrol approval,
+including someone with recorded orientation attendance or medic team interest,
+counts only as a new volunteer. Patrol-approved volunteers are outreach volunteers
+or approved medics regardless of attendance. Each person occupies one place.
+The same categories drive event counts, public/organizer rosters, volunteer-list
+avatars, profile progression, capacity reservations, and Discord Medic eligibility.
 
 After a candidate is added, `total + max(0, 2 - medics) + outstandingNewVolunteers`
 must not exceed capacity; `outstandingNewVolunteers = max(0, 2 - newVolunteers)` only when
@@ -127,6 +128,9 @@ back cancellation, audits and notifications).
 
 `0025_new_volunteer_terminology.sql` renames the internal reservation aliases to
 `new_volunteers`; eligibility rules and existing records are unchanged.
+`0026_manual_volunteer_progression.sql` switches category and booking-limit triggers
+to manual patrol approval and removes attendance-driven Discord sync triggers.
+It preserves all existing profiles, approvals, attendance and signups.
 
 New or edited events, series and templates need capacity two, or four with
 orientation. Apply `0017_medic_orientee_reservations.sql` before deploying this code.
@@ -155,11 +159,11 @@ enforced in both queries, not by browser filters or supplied event IDs. Organize
 and patrol-approved volunteers retain full event visibility under the existing
 open/hidden/time-window rules, even without recorded orientation attendance.
 
-`listEvents` includes effective `includesOrientation`, `orientationConfirmed`
-(confirmed volunteers without any completion), `medicConfirmed` (approved,
-completed medics), `medicEligible` (the viewer's medic eligibility),
-`orientationCompleted` (the viewer's completion status), and category-aware `availableSpots`.
-`signupBlockReason` accepts these same values and explains full categories or
+`listEvents` includes effective `includesOrientation`, `newVolunteerConfirmed`
+(confirmed volunteers awaiting patrol approval), `medicConfirmed` (manually approved
+medics), `medicEligible` (the viewer's medic eligibility),
+`orientationCompleted` (attendance history only), and category-aware `availableSpots`.
+`signupBlockReason` accepts the manual approval and category counts and explains full categories or
 reserved places. Availability is capacity-only; the eligibility/booking-limit
 reason must still be checked. Both counts and viewer status participate in the
 existing view-version polling. `listPublicRosters` separately authorizes approved
@@ -172,12 +176,11 @@ abbreviated legacy fallback. No private profile answers or profile links are ren
 
 ## First-orientation booking limit
 
-Application-approved volunteers with neither an `orientation_completion` record
-nor current `patrol_approved` status may hold one confirmed upcoming orientation
-booking at a time. Approval dates do not determine who is new: older accounts
-without either status follow the same rule. A recorded completion or explicit
-patrol approval lifts this cap. Historical completion alone does not grant patrol
-approval; the organizer's combined approval action records both milestones.
+Application-approved volunteers without current `patrol_approved` status may hold
+one confirmed upcoming orientation booking at a time. Account age and recorded
+attendance do not determine who is new. Only explicit manual patrol approval lifts
+this cap; orientation completion alone neither advances progression nor lifts it.
+The organizer's combined roster approval action explicitly records both milestones.
 Organizer role alone does not lift the cap (or grant patrol approval).
 
 Confirmed bookings for future, non-cancelled orientations count even when an

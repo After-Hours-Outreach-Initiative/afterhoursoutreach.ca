@@ -30,9 +30,7 @@ interface Props {
 const { profile, person, orientation, completedOrientation, progress } =
   Astro.props;
 const profileSections = profileFormSections();
-const medic =
-  profile.answers.teams.includes("medic") &&
-  (person.orientations > 0 || !person.patrolApproved);
+const medic = profile.answers.teams.includes("medic");
 const contents = [
   { id: "volunteer-progression-heading", heading: "Volunteer progression" },
   ...(person.applicationApproved

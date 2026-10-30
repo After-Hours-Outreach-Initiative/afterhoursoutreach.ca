@@ -223,13 +223,12 @@ test("Discord uses only the three allowed roles, all gated by active application
       approved: 1,
       organizer: 1,
       medic: 1,
-      orientations: 1,
       patrol: 1,
     };
   assert.deepEqual(eligibleRoles(base, roles), Object.values(roles));
   for (const field of ["active", "approved"] as const)
     assert.deepEqual(eligibleRoles({ ...base, [field]: 0 }, roles), []);
-  for (const field of ["medic", "orientations", "patrol"] as const)
+  for (const field of ["medic", "patrol"] as const)
     assert.deepEqual(eligibleRoles({ ...base, [field]: 0 }, roles), [
       roles.volunteer,
       roles.organizer,
@@ -326,6 +325,36 @@ test("local Discord simulation preserves consent and screening, then reconciles 
     "local-volunteer",
   ]);
   assert.equal((await local())!.version, (await local())!.synced_version);
+  await person("organizer", true);
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=1,approved_by='organizer',approved_at=1 WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
+  await loadLocalDiscordStatus(config, actor.id);
+  assert.deepEqual(JSON.parse((await local())!.observed_roles), [
+    "local-volunteer",
+    "local-medic",
+  ]);
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM orientation_completion",
+    ).first("n"),
+    0,
+  );
+  // Reconcile already-synced simulations created under the old attendance rule.
+  const syncedVersion = (await local())!.version;
+  await env.DB.prepare(
+    "UPDATE discord_link SET observed_roles='[\"local-volunteer\"]' WHERE user_id=?",
+  )
+    .bind(actor.id)
+    .run();
+  await loadLocalDiscordStatus(config, actor.id);
+  assert.equal((await local())!.version, syncedVersion);
+  assert.deepEqual(JSON.parse((await local())!.observed_roles), [
+    "local-volunteer",
+    "local-medic",
+  ]);
   await env.DB.prepare("UPDATE volunteer_status SET active=0 WHERE user_id=?")
     .bind(actor.id)
     .run();
@@ -710,13 +739,34 @@ test("website changes automatically remove and restore eligible roles without to
   await due();
   await processDiscordSync(config, server.send);
   assert.equal(server.state.roles.length, 4);
+  const versionBeforeAttendance = await env.DB.prepare(
+    "SELECT version FROM discord_link WHERE user_id='alice'",
+  ).first("version");
   await env.DB.prepare("DELETE FROM orientation_completion").run();
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT version FROM discord_link WHERE user_id='alice'",
+    ).first("version"),
+    versionBeforeAttendance,
+  );
+  await due();
+  await processDiscordSync(config, server.send);
+  assert.equal(server.state.roles.includes(config.DISCORD_MEDIC_ROLE_ID), true);
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id='alice'",
+  ).run();
   await due();
   await processDiscordSync(config, server.send);
   assert.equal(
     server.state.roles.includes(config.DISCORD_MEDIC_ROLE_ID),
     false,
   );
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=1 WHERE user_id='alice'",
+  ).run();
+  await due();
+  await processDiscordSync(config, server.send);
+  assert.equal(server.state.roles.includes(config.DISCORD_MEDIC_ROLE_ID), true);
   await env.DB.prepare(
     "UPDATE user SET role='volunteer' WHERE id='alice'",
   ).run();
@@ -725,6 +775,7 @@ test("website changes automatically remove and restore eligible roles without to
   assert.deepEqual(server.state.roles, [
     unrelated,
     config.DISCORD_VOLUNTEER_ROLE_ID,
+    config.DISCORD_MEDIC_ROLE_ID,
   ]);
   assert.equal(server.state.member, true);
   assert.ok(
@@ -734,7 +785,7 @@ test("website changes automatically remove and restore eligible roles without to
   );
 });
 
-test("team edits, status deletion and orientation transfer enqueue reconciliation in the same transaction", async () => {
+test("team edits and manual status changes enqueue reconciliation in the same transaction", async () => {
   const actor = await person();
   await link(actor);
   const before = await env.DB.prepare(

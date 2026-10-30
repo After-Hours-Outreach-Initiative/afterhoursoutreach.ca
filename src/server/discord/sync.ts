@@ -11,7 +11,6 @@ export interface Eligibility {
   approved: number;
   organizer: number;
   medic: number;
-  orientations: number;
   patrol: number;
 }
 export function eligibleRoles(
@@ -22,9 +21,7 @@ export function eligibleRoles(
   return [
     roles.volunteer,
     ...(person.organizer ? [roles.organizer] : []),
-    ...(person.medic && person.patrol && person.orientations
-      ? [roles.medic]
-      : []),
+    ...(person.medic && person.patrol ? [roles.medic] : []),
   ];
 }
 
@@ -201,8 +198,7 @@ export async function processDiscordSync(
           `SELECT d.*,u.deleted_at,CASE WHEN u.deleted_at IS NULL THEN coalesce(v.active,0) ELSE 0 END AS active,
         CASE WHEN p.user_id IS NOT NULL THEN coalesce(v.registration_approved,0) ELSE 0 END AS approved,
         u.role='organizer' AS organizer,coalesce(v.patrol_approved,0) AS patrol,
-        EXISTS(SELECT 1 FROM json_each(p.teams) WHERE value='medic') AS medic,
-        EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id=d.user_id) AS orientations
+        EXISTS(SELECT 1 FROM json_each(p.teams) WHERE value='medic') AS medic
         FROM discord_link d JOIN user u ON u.id=d.user_id
         LEFT JOIN profile p ON p.user_id=d.user_id LEFT JOIN volunteer_status v ON v.user_id=d.user_id
         WHERE d.guild_id=? AND d.next_attempt_at<=? ORDER BY d.next_attempt_at,d.user_id LIMIT 1`,
