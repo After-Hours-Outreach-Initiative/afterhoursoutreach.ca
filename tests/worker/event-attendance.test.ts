@@ -365,16 +365,26 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             };
           });
           expect(bounds.artwork).toEqual(bounds.viewBox);
-          await expect(avatar.locator("linearGradient")).toHaveCount(0);
-          if (category === "new-volunteer")
+          const gradient = avatar.locator("linearGradient");
+          let fill = "currentColor";
+          if (category === "new-volunteer") {
+            fill = `url(#${await gradient.getAttribute("id")})`;
+            await expect(gradient).toHaveAttribute(
+              "data-avatar-decoration",
+              "new-gradient-horizontal",
+            );
             await expect(
               avatar.locator('[data-avatar-decoration="new-dot"]'),
-            ).toHaveCSS("fill", "rgb(34, 197, 94)");
+            ).toHaveCount(0);
+          } else {
+            await expect(gradient).toHaveCount(0);
+          }
           for (const tag of ["circle", "path"]) {
             const shape = avatar.locator(`:scope > ${tag}`).first();
-            await expect(shape).toHaveAttribute("fill", "currentColor");
+            await expect(shape).toHaveAttribute("fill", fill);
             await expect(shape).toHaveAttribute("stroke", "none");
-            await expect(shape).toHaveCSS("fill", color);
+            if (category !== "new-volunteer")
+              await expect(shape).toHaveCSS("fill", color);
             await expect(shape).toHaveCSS("stroke", "none");
           }
         }

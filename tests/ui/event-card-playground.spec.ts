@@ -234,10 +234,12 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     ),
   ).toHaveCount(1);
   await expect(
-    avatars.locator('[data-avatar-decoration="new-dot"]'),
+    avatars.locator('[data-avatar-decoration="new-gradient-horizontal"]'),
   ).toHaveCount(4);
   await expect(
-    avatars.locator('linearGradient, [data-avatar-decoration="new-outline"]'),
+    avatars.locator(
+      '[data-avatar-decoration="new-dot"], [data-avatar-decoration="new-outline"]',
+    ),
   ).toHaveCount(0);
   const medicSymbol = avatars
     .locator('[data-avatar-decoration="medic-cross"]')
@@ -257,18 +259,21 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   for (const category of ["medic", "outreach-volunteer", "new-volunteer"]) {
     const avatar = avatars.locator(`.attendee-${category}`).first();
     await expect(avatar).toHaveCSS("color", "rgb(65, 105, 225)");
-    for (const shape of ["circle", "path"]) {
-      await expect(avatar.locator(`svg > ${shape}`).first()).toHaveCSS(
-        "fill",
-        "rgb(65, 105, 225)",
-      );
-    }
+    if (category !== "new-volunteer")
+      for (const shape of ["circle", "path"]) {
+        await expect(avatar.locator(`svg > ${shape}`).first()).toHaveCSS(
+          "fill",
+          "rgb(65, 105, 225)",
+        );
+      }
   }
   await page.getByRole("checkbox", { name: "Expand all rosters" }).check();
   await expect(card.locator("details")).toHaveAttribute("open", "");
   await expect(card.getByRole("row")).toHaveCount(9);
   await expect(
-    card.locator('.event-roster-person [data-avatar-decoration="new-dot"]'),
+    card.locator(
+      '.event-roster-person [data-avatar-decoration="new-gradient-horizontal"]',
+    ),
   ).toHaveCount(4);
   await expect(card.locator(".event-roster-new-badge")).toHaveText([
     "New",
