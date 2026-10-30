@@ -19,7 +19,9 @@ export const manualAccountGroups = [
 type AccountGroup = (typeof manualAccountGroups)[number]["key"];
 interface PresetState {
   sampleKey: "casey" | "alex" | "dana" | "jamie" | "robin";
+  name: string;
   draft: boolean;
+  rejected: boolean;
   naloxoneCompleted: boolean;
   applicationApproved: boolean;
   orientation: "none" | "booked" | "completed";
@@ -28,11 +30,15 @@ interface PresetState {
   role: "volunteer" | "organizer";
 }
 
-export const localAccountUserId = (key: string) => `local-account-user-${key}`;
+// A new identity generation keeps older, edited samples as saved accounts rather
+// than borrowing their histories for a different fictional person.
+export const localAccountUserId = (key: string) =>
+  `local-account-v2-user-${key}`;
 const preset = (
   key: string,
   label: string,
   group: AccountGroup,
+  name: string,
   state: Partial<PresetState> = {},
 ) =>
   ({
@@ -40,8 +46,10 @@ const preset = (
     id: localAccountUserId(key),
     label,
     group,
+    name,
     sampleKey: "alex",
     draft: false,
+    rejected: false,
     naloxoneCompleted: true,
     applicationApproved: true,
     orientation: "none",
@@ -58,49 +66,173 @@ const preset = (
 
 // Preset keys also identify seeded accounts; retired IDs remain protected below.
 export const manualAccountPresets = [
-  preset("draft", "Draft application", "application", {
+  preset("draft", "Draft application", "application", "Casey Brook", {
     sampleKey: "casey",
     draft: true,
     naloxoneCompleted: false,
     applicationApproved: false,
   }),
-  preset("applied", "Form submitted", "application", {
+  preset("applied", "Form submitted", "application", "Morgan Vale", {
     sampleKey: "casey",
     naloxoneCompleted: false,
     applicationApproved: false,
   }),
-  preset("awaiting-review", "Ready for review", "application", {
+  preset("awaiting-review", "Ready for review", "application", "Taylor Reed", {
     sampleKey: "casey",
     applicationApproved: false,
   }),
-  preset("accepted", "Ready for orientation", "orientation"),
-  preset("orientation-booked", "Orientation booked", "orientation", {
-    orientation: "booked",
-  }),
-  preset("orientation-completed", "Orientation completed", "orientation", {
-    orientation: "completed",
-  }),
-  preset("medic-new-volunteer", "Medic awaiting orientation", "orientation", {
+  preset("applied-medic", "Medic form submitted", "application", "Avery Moss", {
     sampleKey: "dana",
+    naloxoneCompleted: false,
+    applicationApproved: false,
   }),
-  preset("patrol", "Outreach Volunteer", "volunteers", {
-    orientation: "completed",
-    patrolApproved: true,
+  preset(
+    "awaiting-review-medic",
+    "Medic ready for review",
+    "application",
+    "Quinn Flores",
+    {
+      sampleKey: "dana",
+      applicationApproved: false,
+    },
+  ),
+  preset("rejected", "Application rejected", "application", "Riley Stone", {
+    sampleKey: "casey",
+    applicationApproved: false,
+    rejected: true,
   }),
-  preset("medic", "Medic", "volunteers", {
-    sampleKey: "dana",
-    orientation: "completed",
-    patrolApproved: true,
-  }),
-  preset("inactive", "Inactive", "access", {
+  preset(
+    "rejected-medic",
+    "Medic application rejected",
+    "application",
+    "Emerson Lake",
+    {
+      sampleKey: "dana",
+      applicationApproved: false,
+      rejected: true,
+    },
+  ),
+  preset("accepted", "Ready for orientation", "orientation", "Li"),
+  preset(
+    "orientation-booked",
+    "Orientation booked",
+    "orientation",
+    "Alexandra Madeleine de la Cruz-Worthington-Smythe",
+    {
+      orientation: "booked",
+    },
+  ),
+  preset(
+    "orientation-completed",
+    "Orientation completed",
+    "orientation",
+    "Sage Hart",
+    {
+      orientation: "completed",
+    },
+  ),
+  preset(
+    "medic-new-volunteer",
+    "Medic awaiting orientation",
+    "orientation",
+    "Jo",
+    {
+      sampleKey: "dana",
+      orientation: "booked",
+    },
+  ),
+  preset(
+    "patrol",
+    "Outreach Volunteer",
+    "volunteers",
+    "Alexanderthegreatesteverlastingunbrokenvolunteernamefortablewrapping",
+    {
+      orientation: "completed",
+      patrolApproved: true,
+    },
+  ),
+  preset(
+    "medic",
+    "Medic",
+    "volunteers",
+    "Gabriella Dominique Josephine Montgomery-Fitzgerald",
+    {
+      sampleKey: "dana",
+      orientation: "completed",
+      patrolApproved: true,
+    },
+  ),
+  preset("inactive", "Inactive new volunteer", "access", "Jamie Birch", {
     sampleKey: "jamie",
     active: false,
   }),
-  preset("organizer", "Organizer", "access", {
+  preset("inactive-new-medic", "Inactive new medic", "access", "Drew Finch", {
+    sampleKey: "dana",
+    active: false,
+  }),
+  preset(
+    "inactive-patrol",
+    "Inactive outreach volunteer",
+    "access",
+    "Rowan Gale",
+    {
+      patrolApproved: true,
+      active: false,
+    },
+  ),
+  preset("inactive-medic", "Inactive medic", "access", "Sky Marlow", {
+    sampleKey: "dana",
+    patrolApproved: true,
+    active: false,
+  }),
+  preset("organizer", "Organizer", "access", "Robin Ash", {
     sampleKey: "robin",
     role: "organizer",
     patrolApproved: true,
   }),
+  preset("organizer-medic", "Organizer medic", "access", "Nico Wren", {
+    sampleKey: "dana",
+    role: "organizer",
+    patrolApproved: true,
+  }),
+  preset(
+    "organizer-new",
+    "Organizer awaiting patrol approval",
+    "access",
+    "Sam Linden",
+    {
+      sampleKey: "robin",
+      role: "organizer",
+    },
+  ),
+  preset(
+    "organizer-new-medic",
+    "Organizer medic awaiting patrol approval",
+    "access",
+    "Adelaide Beatrice Clementine Saint-Clair-Montgomery",
+    {
+      sampleKey: "dana",
+      role: "organizer",
+    },
+  ),
+  preset("inactive-organizer", "Inactive organizer", "access", "Remy Elm", {
+    sampleKey: "robin",
+    role: "organizer",
+    patrolApproved: true,
+    active: false,
+  }),
+  preset(
+    "inactive-organizer-medic",
+    "Inactive organizer medic",
+    "access",
+    "Blair Cove",
+    {
+      sampleKey: "dana",
+      role: "organizer",
+      patrolApproved: true,
+      active: false,
+    },
+  ),
 ];
 
 // Only these exact manual preset IDs are protected, regardless of name or role.
@@ -112,7 +244,20 @@ export function isManualAccountPreset(userId: string) {
   // make saved fixture edits eligible for deletion or reset its stored history.
   return (
     manualAccountPresetIds.includes(userId) ||
-    userId === "local-account-user-medic-orientee"
+    [
+      "draft",
+      "applied",
+      "awaiting-review",
+      "accepted",
+      "orientation-booked",
+      "orientation-completed",
+      "medic-new-volunteer",
+      "medic-orientee",
+      "patrol",
+      "medic",
+      "inactive",
+      "organizer",
+    ].some((key) => userId === `local-account-user-${key}`)
   );
 }
 
@@ -121,6 +266,7 @@ export interface DevelopmentAccountState extends Pick<
   | "submittedAt"
   | "naloxoneCompletedAt"
   | "applicationApproved"
+  | "applicationRejectionReason"
   | "discordRequired"
   | "discordCompletedAt"
 > {
@@ -139,13 +285,15 @@ export function developmentAccountStatus(state: DevelopmentAccountState) {
   if (state.submittedAt === null)
     return state.hasDraft ? "Draft saved · Not submitted" : "Not submitted";
   const labels = [
-    state.naloxoneCompletedAt === null
-      ? "Naloxone 101 incomplete"
-      : state.discordRequired && state.discordCompletedAt == null
-        ? "Discord connection incomplete"
-        : !state.applicationApproved
-          ? "Awaiting application approval"
-          : "Application complete",
+    state.applicationRejectionReason
+      ? "Application rejected"
+      : state.naloxoneCompletedAt === null
+        ? "Naloxone 101 incomplete"
+        : state.discordRequired && state.discordCompletedAt == null
+          ? "Discord connection incomplete"
+          : !state.applicationApproved
+            ? "Awaiting application approval"
+            : "Application complete",
   ];
   if (!state.active) labels.push("Inactive");
   if (state.naloxoneCompletedAt === null && !state.applicationApproved)
@@ -176,6 +324,9 @@ export function developmentPresetStatus(
     submittedAt: preset.draft ? null : 0,
     naloxoneCompletedAt: preset.naloxoneCompleted ? 0 : null,
     applicationApproved: preset.applicationApproved,
+    applicationRejectionReason: preset.rejected
+      ? "Sample application declined after review."
+      : null,
     discordRequired: true,
     discordCompletedAt: preset.naloxoneCompleted ? 0 : null,
     hasDraft: preset.draft,

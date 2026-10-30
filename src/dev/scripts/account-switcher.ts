@@ -11,6 +11,7 @@ import {
   manualAccountGroups,
   manualAccountPresets,
   manualAccountPresetIds,
+  isManualAccountPreset,
   newApplicationPersona,
   type DevelopmentApplicationStep,
 } from "../accounts";
@@ -400,7 +401,7 @@ export function initAccountSwitcher() {
         label,
         `${user.email}${user.role === "organizer" ? " · Organizer" : ""} · ${developmentAccountStatus(user.state)}`,
       );
-      if (manualAccountPresetIds.includes(user.id)) {
+      if (isManualAccountPreset(user.id)) {
         // Preserve old preset identities and any progressed applications without
         // presenting them as reusable state launchers or allowing their deletion.
         accounts.appendChild(button);

@@ -2592,7 +2592,7 @@ test("new local applications preserve old fixtures; deletion protects only manua
   await env.DB.batch(localAccountFixtures().map((sql) => env.DB.prepare(sql)));
   // Renaming a preset cannot remove protection; ordinary names/roles above do not add it.
   await env.DB.prepare(
-    "UPDATE user SET name='Renamed preset' WHERE id LIKE 'local-account-user-%'",
+    "UPDATE user SET name='Renamed preset' WHERE id LIKE 'local-account-v2-user-%'",
   ).run();
   const snapshotTables = () =>
     Promise.all(
@@ -2639,7 +2639,7 @@ test("manual presets resolve real application completion, event access and roste
     const complete = isApplicationComplete(progress);
     assert.equal(
       complete,
-      !["draft", "applied", "awaiting-review"].includes(preset.key),
+      !preset.draft && preset.naloxoneCompleted && preset.applicationApproved,
       preset.label,
     );
     if (complete) {
@@ -2710,36 +2710,31 @@ test("manual presets resolve real application completion, event access and roste
   await changeSignup(
     env.DB,
     actors.get("organizer")!,
-    "local-account-event-patrol",
+    "local-account-v2-event-patrol",
     "join",
   );
   await changeSignup(
     env.DB,
     actors.get("organizer")!,
-    "local-account-event-patrol",
+    "local-account-v2-event-patrol",
     "cancel",
   );
   await changeSignup(
     env.DB,
     actors.get("medic")!,
-    "local-account-event-patrol",
+    "local-account-v2-event-patrol",
     "join",
   );
   await changeSignup(
     env.DB,
     actors.get("patrol")!,
-    "local-account-event-patrol",
+    "local-account-v2-event-patrol",
     "join",
   );
-  await changeSignup(
-    env.DB,
-    actors.get("medic-new-volunteer")!,
-    "local-account-event-orientation",
-    "join",
-  );
+  // Jo is already booked alongside the long-name orientation sample.
   const roster = await listPublicRosters(env.DB, actors.get("organizer")!, [
-    "local-account-event-patrol",
-    "local-account-event-orientation",
+    "local-account-v2-event-patrol",
+    "local-account-v2-event-orientation",
   ]);
   assert.deepEqual(roster.people.map(({ category }) => category).sort(), [
     "medic",

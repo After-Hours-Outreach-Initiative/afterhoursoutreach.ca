@@ -9,6 +9,7 @@ import {
   sampleProfileFixtures,
   sampleProfileStatement,
 } from "../../../scripts/sample-profile-fixtures";
+import { manualProfileFixture } from "../../../scripts/manual-profile-fixtures";
 
 /** Reuse one browser-owned sandbox, never a growing collection of saved accounts. */
 export async function resetAccountState(
@@ -51,15 +52,27 @@ export async function resetAccountState(
     );
 
   const samples = sampleProfileFixtures("local", now);
-  const sample = samples.find(
-    (person) => person.key === (preset?.sampleKey ?? "casey"),
-  )!;
-  const person = { ...sample, id, email: `${id}@example.invalid` };
+  const sample = preset
+    ? manualProfileFixture(preset, now)
+    : samples.find((person) => person.key === "casey")!;
+  const name = `${sample.name} (sandbox ${slot.slice(0, 8)})`;
+  const person = {
+    ...sample,
+    id,
+    name,
+    email: `${id}@example.invalid`,
+    answers: { ...sample.answers, preferredName: name },
+  };
   const helperSample = samples.find((person) => person.key === "robin")!;
   const helper = {
     ...helperSample,
     id: organizer,
+    name: "State setup organizer",
     email: `${organizer}@example.invalid`,
+    answers: {
+      ...helperSample.answers,
+      preferredName: "State setup organizer",
+    },
   };
   const submittedAt = now - 14 * 86_400_000,
     naloxoneAt = now - 13 * 86_400_000,
@@ -126,7 +139,7 @@ export async function resetAccountState(
       firstName: sample.answers.firstName,
       lastName: sample.answers.lastName,
       phone: sample.answers.phone,
-      teams: ["outreach"],
+      teams: sample.answers.teams,
     });
     statements.push(
       db
@@ -150,8 +163,8 @@ export async function resetAccountState(
       db
         .prepare(
           `INSERT INTO volunteer_status
-      (user_id,active,registration_approved,patrol_approved,approved_by,approved_at,updated_at)
-      VALUES (?,?,?,?,?,?,?)`,
+      (user_id,active,registration_approved,patrol_approved,approved_by,approved_at,application_rejection_reason,updated_at)
+      VALUES (?,?,?,?,?,?,?,?)`,
         )
         .bind(
           id,
@@ -160,6 +173,7 @@ export async function resetAccountState(
           Number(preset.patrolApproved),
           preset.patrolApproved ? organizer : null,
           preset.patrolApproved ? approvedAt : null,
+          preset.rejected ? "Sample application declined after review." : null,
           now,
         ),
     );

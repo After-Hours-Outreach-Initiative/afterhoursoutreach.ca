@@ -29,7 +29,7 @@ export async function seedLocalAccounts(
     : localAccountUserId("organizer");
   const organizerEmail = testFixtures
     ? "robin.local@example.org"
-    : "organizer.local@example.org";
+    : "organizer.v2.local@example.org";
   const organizer = await bindings.DB.prepare(
     "SELECT email, two_factor_enabled AS enabled FROM user WHERE id=?",
   )

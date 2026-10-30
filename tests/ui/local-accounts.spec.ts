@@ -206,7 +206,7 @@ test("DEV panel seeds presets in place without changing the current account or d
     );
     await expect(profiles).toHaveAttribute("aria-busy", "false");
     await expect(
-      profiles.locator('[data-switch-user^="local-account-user-"]'),
+      profiles.locator('[data-switch-user^="local-account-v2-user-"]'),
     ).toHaveCount(manualAccountPresets.length);
     await expect(seed).toBeEnabled();
   }
@@ -227,10 +227,10 @@ test("DEV panel seeds presets in place without changing the current account or d
       profiles.locator(`[data-switch-user="${preset.id}"]`),
     ).toBeVisible();
   for (const [key, count] of [
-    ["application", 4],
+    ["application", 8],
     ["orientation", 4],
     ["volunteers", 2],
-    ["access", 2],
+    ["access", 10],
   ] as const) {
     await expect(
       profiles.locator(`[data-account-category="${key}"] [data-switch-user]`),
@@ -264,7 +264,7 @@ test("DEV panel seeds presets in place without changing the current account or d
   // Verify actual authenticator enrollment using a separate request cookie jar.
   const switched = await request.post("/api/v1/auth/dev/switch-user", {
     headers: { origin: baseURL! },
-    data: { userId: "local-account-user-organizer" },
+    data: { userId: "local-account-v2-user-organizer" },
   });
   expect(switched.ok()).toBe(true);
   const organizer = await (
@@ -272,7 +272,7 @@ test("DEV panel seeds presets in place without changing the current account or d
   ).json();
   expect(organizer.user.twoFactorEnabled).toBe(true);
   await expect(
-    profiles.locator('[data-switch-user="local-account-user-organizer"]'),
+    profiles.locator('[data-switch-user="local-account-v2-user-organizer"]'),
   ).toContainText("Patrol approved");
   const accountPage = await (await request.get("/volunteer/account")).text();
   expect(accountPage.match(/data-session-row/g)).toHaveLength(1);
@@ -286,16 +286,16 @@ test("DEV panel seeds presets in place without changing the current account or d
   ] as const) {
     const switched = await request.post("/api/v1/auth/dev/switch-user", {
       headers: { origin: baseURL! },
-      data: { userId: `local-account-user-${key}` },
+      data: { userId: `local-account-v2-user-${key}` },
     });
     expect(switched.ok()).toBe(true);
     const portal = await (await request.get("/volunteer")).text();
     expect(portal.match(/data-application-tracker/g) ?? []).toHaveLength(0);
     expect(
-      portal.includes('data-live-event="local-account-event-orientation"'),
+      portal.includes('data-live-event="local-account-v2-event-orientation"'),
     ).toBe(key !== "inactive");
     expect(
-      portal.includes('data-live-event="local-account-event-patrol"'),
+      portal.includes('data-live-event="local-account-v2-event-patrol"'),
     ).toBe(patrolAccess);
   }
 });

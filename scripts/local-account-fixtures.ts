@@ -2,6 +2,9 @@ import { vancouverInput, vancouverInstant } from "../src/data/event-time";
 import { applicationDraftAnswersSchema } from "../src/data/application-draft";
 import { localAccountUserId, manualAccountPresets } from "../src/dev/accounts";
 import { approvedMedicSql, newVolunteerSql } from "../src/server/db/sql";
+import { manualProfileFixture } from "./manual-profile-fixtures";
+import { unchangedSampleProfileSql } from "./unchanged-sample-profile";
+import { localAccountCleanup } from "./local-account-cleanup";
 import {
   sampleProfileFixtures,
   sampleProfileStatement,
@@ -10,11 +13,11 @@ import {
 
 export { localAccountUserId } from "../src/dev/accounts";
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
-const eventId = (key: string) => `local-account-event-${key}`;
+const eventId = (key: string) => `local-account-v2-event-${key}`;
 
 /** Manual View as personas, separate from the broader automated-test fixtures. */
 export function localAccountFixtures(now = Date.now()) {
-  const statements: string[] = [];
+  const statements: string[] = localAccountCleanup(now);
   const people = sampleProfileFixtures("local", now);
   const organizer = quote(localAccountUserId("organizer"));
   const submittedAt = now - 14 * 86_400_000;
@@ -22,20 +25,20 @@ export function localAccountFixtures(now = Date.now()) {
   const approvedAt = now - 12 * 86_400_000;
   // Create every identity first: patrol approvals must reference a real organizer.
   for (const preset of manualAccountPresets) {
-    const person = people.find(({ key }) => key === preset.sampleKey)!;
+    const person = manualProfileFixture(preset, now);
     statements.push(`INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at)
-      VALUES (${quote(preset.id)}, ${quote(person.name)}, ${quote(`${preset.key}.local@example.org`)}, 1, ${quote(preset.role)}, ${now - 15 * 86_400_000}, ${now})
+      VALUES (${quote(preset.id)}, ${quote(person.name)}, ${quote(person.email)}, 1, ${quote(preset.role)}, ${now - 15 * 86_400_000}, ${now})
       ON CONFLICT(id) DO NOTHING`);
     if (preset.draft) {
       const answers = applicationDraftAnswersSchema.parse({
         firstName: person.answers.firstName,
         lastName: person.answers.lastName,
         phone: person.answers.phone,
-        teams: ["outreach"],
+        teams: person.answers.teams,
       });
       statements.push(`INSERT INTO application_draft (user_id, version, revision, answers, updated_at)
         SELECT ${quote(preset.id)}, 1, 'e261e220-743b-4d91-b5cd-5966407e1396', ${quote(JSON.stringify(answers))}, ${now}
-        WHERE changes()=1 AND EXISTS (SELECT 1 FROM user WHERE id=${quote(preset.id)} AND email=${quote(`${preset.key}.local@example.org`)})
+        WHERE changes()=1 AND EXISTS (SELECT 1 FROM user WHERE id=${quote(preset.id)} AND email=${quote(person.email)})
         AND NOT EXISTS (SELECT 1 FROM profile WHERE user_id=${quote(preset.id)})
         AND NOT EXISTS (SELECT 1 FROM application_draft_generation WHERE user_id=${quote(preset.id)})
         ON CONFLICT(user_id) DO NOTHING`);
@@ -43,12 +46,8 @@ export function localAccountFixtures(now = Date.now()) {
   }
   for (const preset of manualAccountPresets) {
     const id = quote(preset.id);
-    const email = `${preset.key}.local@example.org`;
-    const person = {
-      ...people.find(({ key }) => key === preset.sampleKey)!,
-      id: preset.id,
-      email,
-    };
+    const person = manualProfileFixture(preset, now);
+    const email = person.email;
     const identity = `EXISTS (SELECT 1 FROM user WHERE id=${id} AND email=${quote(email)})`;
     if (preset.draft) continue;
 
@@ -60,42 +59,12 @@ export function localAccountFixtures(now = Date.now()) {
       organizer: ["Organizer", 1, 1],
     }[preset.key];
     if (legacy) {
-      const repair = quote(`local-account-upgrade-${preset.key}`);
-      const a = person.answers;
-      const original = {
-        first_name: a.firstName,
-        middle_names: a.middleNames,
-        last_name: a.lastName,
-        preferred_name: a.preferredName,
-        pronouns: a.pronouns,
-        phone: a.phone,
-        birth_date: a.birthDate,
-        emergency_contact_name: a.emergencyName,
-        emergency_contact_phone: a.emergencyPhone,
-        emergency_contact_relationship: a.emergencyRelationship,
-        heard_about_us: a.heardAboutUs,
-        heard_about_us_sources: JSON.stringify(a.heardAboutUsSources),
-        heard_about_us_other: a.heardAboutUsOther,
-        motivation: a.motivation,
-        teams: JSON.stringify(a.teams),
-        medical_certification: a.certification,
-        medical_certifications: JSON.stringify(a.certifications),
-        medical_certification_expiry: a.certificationExpiry,
-        training_experience: a.experience,
-        relevant_training: JSON.stringify(a.training),
-        other_training: a.otherTraining,
-        relevant_experience: JSON.stringify(a.relevantExperience),
-        other_experience: a.otherExperience,
-        medical_conditions: a.medicalConditions,
+      const repair = quote(`local-account-v2-upgrade-${preset.key}`);
+      const oldPerson = {
+        ...people.find(({ key }) => key === preset.sampleKey)!,
+        email,
       };
-      const unchangedProfile = `p.updated_at=p.registered_at AND json_valid(p.submitted_application)
-        AND ${Object.entries(original)
-          .map(([column, value]) => `coalesce(p.${column}, '')=${quote(value)}`)
-          .join(" AND ")}
-        AND p.code_of_conduct_version=json_extract(p.submitted_application, '$.codeOfConductVersion')
-        AND p.code_of_conduct_accepted_at=p.registered_at
-        AND json_extract(p.submitted_application, '$.email')=u.email
-        AND json_extract(p.submitted_application, '$.answers')=${quote(JSON.stringify(person.answers))}`;
+      const unchangedProfile = `(${unchangedSampleProfileSql(person)} OR ${unchangedSampleProfileSql(oldPerson)})`;
       statements.push(`INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
         SELECT ${repair}, ${organizer}, ${id}, 'profile_updated', '["naloxoneCompletedAt"]', ${now}
         FROM user u JOIN profile p ON p.user_id=u.id JOIN volunteer_status v ON v.user_id=u.id
@@ -106,14 +75,14 @@ export function localAccountFixtures(now = Date.now()) {
         AND NOT EXISTS (SELECT 1 FROM audit_log WHERE subject_id=${id})
         AND NOT EXISTS (SELECT 1 FROM signup WHERE user_id=${id})
         AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id=${id})
-        AND EXISTS (SELECT 1 FROM user WHERE id=${organizer} AND email='organizer.local@example.org' AND role='organizer')
+        AND EXISTS (SELECT 1 FROM user WHERE id=${organizer} AND email='organizer.v2.local@example.org' AND role='organizer')
         ON CONFLICT(id) DO NOTHING`);
       statements.push(`UPDATE profile SET naloxone_completed_at=${now}
         WHERE user_id=${id} AND changes()=1 AND EXISTS (SELECT 1 FROM audit_log WHERE id=${repair})`);
       statements.push(`UPDATE volunteer_status SET registration_approved=1, updated_at=max(${now}, updated_at+1)
         WHERE user_id=${id} AND changes()=1 AND EXISTS (SELECT 1 FROM audit_log WHERE id=${repair})`);
       statements.push(`INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-        SELECT ${quote(`local-account-upgrade-approval-${preset.key}`)}, ${organizer}, ${id}, 'approval_changed', '["applicationApproved"]', ${now}
+        SELECT ${quote(`local-account-v2-upgrade-approval-${preset.key}`)}, ${organizer}, ${id}, 'approval_changed', '["applicationApproved"]', ${now}
         WHERE changes()=1 AND EXISTS (SELECT 1 FROM audit_log WHERE id=${repair})`);
 
       if (preset.key === "organizer") {
@@ -124,21 +93,21 @@ export function localAccountFixtures(now = Date.now()) {
           WHERE user_id=${organizer} AND patrol_approved=0 AND approved_by IS NULL AND approved_at IS NULL
           AND EXISTS (SELECT 1 FROM user u JOIN profile p ON p.user_id=u.id
             JOIN volunteer_status v ON v.user_id=u.id
-            WHERE u.id=${organizer} AND u.email='organizer.local@example.org' AND u.email_verified=1
+            WHERE u.id=${organizer} AND u.email='organizer.v2.local@example.org' AND u.email_verified=1
             AND u.role='organizer' AND u.name IN ('Organizer', ${quote(person.name)})
             AND v.active=1 AND v.registration_approved=1 AND p.naloxone_completed_at IS NOT NULL
             AND ${unchangedProfile}
             AND EXISTS (SELECT 1 FROM audit_log a WHERE a.subject_id=u.id AND a.actor_id=u.id
               AND a.action='approval_changed' AND a.changed_fields='["applicationApproved"]'
-              AND ((a.id='local-account-approval-organizer' AND v.updated_at=a.created_at+${12 * 86_400_000}
+              AND ((a.id='local-account-v2-approval-organizer' AND v.updated_at=a.created_at+${12 * 86_400_000}
                 AND p.registered_at=a.created_at-${2 * 86_400_000} AND p.naloxone_completed_at=a.created_at-${86_400_000})
-                OR (a.id='local-account-upgrade-approval-organizer' AND v.updated_at=a.created_at
+                OR (a.id='local-account-v2-upgrade-approval-organizer' AND v.updated_at=a.created_at
                   AND p.naloxone_completed_at=a.created_at))))
           AND NOT EXISTS (SELECT 1 FROM audit_log WHERE subject_id=${organizer}
             AND action IN ('profile_updated','approval_changed','active_changed','role_changed')
-            AND id NOT IN ('local-account-approval-organizer','local-account-upgrade-organizer','local-account-upgrade-approval-organizer'))`);
+            AND id NOT IN ('local-account-v2-approval-organizer','local-account-v2-upgrade-organizer','local-account-v2-upgrade-approval-organizer'))`);
         statements.push(`INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-          SELECT 'local-account-upgrade-patrol-organizer', ${organizer}, ${organizer},
+          SELECT 'local-account-v2-upgrade-patrol-organizer', ${organizer}, ${organizer},
           'approval_changed', '["patrolApproved"]', ${now} WHERE changes()=1`);
       }
     }
@@ -149,14 +118,14 @@ export function localAccountFixtures(now = Date.now()) {
       }),
     );
     statements.push(sampleDiscordExemption(person));
-    statements.push(`INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at)
+    statements.push(`INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, application_rejection_reason, updated_at)
       SELECT ${id}, ${Number(preset.active)}, ${Number(preset.applicationApproved)}, ${Number(preset.patrolApproved)},
-      ${preset.patrolApproved ? organizer : "NULL"}, ${preset.patrolApproved ? approvedAt : "NULL"}, ${now}
+      ${preset.patrolApproved ? organizer : "NULL"}, ${preset.patrolApproved ? approvedAt : "NULL"}, ${preset.rejected ? quote("Sample application declined after review.") : "NULL"}, ${now}
       WHERE ${identity} AND EXISTS (SELECT 1 FROM profile WHERE user_id=${id})
       AND NOT EXISTS (SELECT 1 FROM volunteer_status WHERE user_id=${id})`);
     if (preset.applicationApproved)
       statements.push(`INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-        SELECT ${quote(`local-account-approval-${preset.key}`)}, ${organizer}, ${id}, 'approval_changed',
+        SELECT ${quote(`local-account-v2-approval-${preset.key}`)}, ${organizer}, ${id}, 'approval_changed',
         ${quote(JSON.stringify(preset.patrolApproved ? ["applicationApproved", "patrolApproved"] : ["applicationApproved"]))}, ${approvedAt}
         WHERE changes()=1 AND ${identity} ON CONFLICT(id) DO NOTHING`);
   }
@@ -178,7 +147,7 @@ export function localAccountFixtures(now = Date.now()) {
       SELECT ${quote(eventId(key))}, 'patrol', ${Number(orientation)}, ${date(days, time)},
       ${quote(orientation ? "Strathcona Community Centre" : "Lord Strathcona Elementary School")}, 12, 1, 0, ${organizer}, ${now}, ${now}
       WHERE NOT EXISTS (SELECT 1 FROM event WHERE id=${quote(eventId(key))})
-      AND EXISTS (SELECT 1 FROM user WHERE id=${organizer} AND email='organizer.local@example.org' AND role='organizer')`);
+      AND EXISTS (SELECT 1 FROM user WHERE id=${organizer} AND email='organizer.v2.local@example.org' AND role='organizer')`);
   }
   const past = quote(eventId("past-orientation"));
   // Historical attendance is inserted only with its newly-created hidden event;
@@ -187,8 +156,8 @@ export function localAccountFixtures(now = Date.now()) {
     ({ orientation }) => orientation !== "none",
   )) {
     const id = quote(preset.id);
-    const email = quote(`${preset.key}.local@example.org`);
-    const signup = quote(`local-account-signup-${preset.key}`);
+    const email = quote(manualProfileFixture(preset, now).email);
+    const signup = quote(`local-account-v2-signup-${preset.key}`);
     const completed = preset.orientation === "completed";
     const target = completed ? past : quote(eventId("orientation"));
     statements.push(`INSERT INTO signup (id, user_id, event_id, created_at, updated_at)
@@ -222,10 +191,10 @@ export function localAccountFixtures(now = Date.now()) {
     ({ orientation }) => orientation === "completed",
   )) {
     statements.push(`INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
-      SELECT ${quote(`local-account-completion-${preset.key}`)}, ${quote(preset.id)}, ${past}, ${organizer}, ${date(-7, "18:00")}
+      SELECT ${quote(`local-account-v2-completion-${preset.key}`)}, ${quote(preset.id)}, ${past}, ${organizer}, ${date(-7, "18:00")}
       WHERE EXISTS (SELECT 1 FROM event WHERE id=${past} AND created_at=${now} AND updated_at=${now})
-      AND EXISTS (SELECT 1 FROM signup WHERE id=${quote(`local-account-signup-${preset.key}`)} AND status='confirmed')
-      AND EXISTS (SELECT 1 FROM user WHERE id=${quote(preset.id)} AND email=${quote(`${preset.key}.local@example.org`)})
+      AND EXISTS (SELECT 1 FROM signup WHERE id=${quote(`local-account-v2-signup-${preset.key}`)} AND status='confirmed')
+      AND EXISTS (SELECT 1 FROM user WHERE id=${quote(preset.id)} AND email=${quote(manualProfileFixture(preset, now).email)})
       ON CONFLICT(user_id, event_id) DO NOTHING`);
   }
   return statements;
