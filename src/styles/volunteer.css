@@ -1902,7 +1902,7 @@ body:has(
 .event-roster-table {
   width: 100%;
   margin: 0;
-  table-layout: fixed;
+  table-layout: auto;
   border: 1px solid var(--event-roster-open-border);
   border-top: 0;
   border-radius: 0 0 0.5rem 0.5rem;
