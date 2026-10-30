@@ -346,7 +346,7 @@ describe(
             await send("/volunteer", undefined, person.cookie),
           );
           const html = await page.text();
-          assert.match(html, /Application Form Submitted/);
+          assert.match(html, /Application Form\s*<\/span>/);
           assert.match(html, /data-application-awaiting-approval="true"/);
           assert.doesNotMatch(
             html,

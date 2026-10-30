@@ -668,7 +668,7 @@ describe(
       assert.equal(submittedProgress.status, 200);
       assert.match(
         await submittedProgress.text(),
-        /Application Form Submitted/,
+        /Application Form\s*<\/span>/,
       );
       const acknowledgement = await DB.prepare(
         "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",

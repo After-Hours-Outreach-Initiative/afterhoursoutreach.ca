@@ -119,8 +119,8 @@ test("pending applications poll every minute, then approval restores five-second
     const formToggle = formStep.locator(".application-progress-toggle");
     await expect(formToggle).toHaveCSS("transform", "none");
     await expect(formStep).not.toHaveAttribute("open");
-    await expect(formStep.locator(":scope > summary")).toContainText(
-      "Application Form Submitted",
+    await expect(formStep.locator(".application-progress-title")).toHaveText(
+      "Step 1: Application Form",
     );
     await expect(formStep.locator("summary svg").first()).toHaveAttribute(
       "aria-hidden",

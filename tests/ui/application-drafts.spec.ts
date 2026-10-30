@@ -832,11 +832,26 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   expect(result.draft).toBe(null);
   expect(result.submitted).toBe(true);
   await expect(
-    page.locator('[data-application-progress-step="form"] > summary'),
-  ).toContainText("Application Form Submitted");
-  // The already-open portal adopts the submitted title without navigation.
+    page.locator(
+      '[data-application-progress-step="form"] .application-progress-title',
+    ),
+  ).toHaveText("Step 1: Application Form");
+  // The already-open portal adopts completion without changing the title.
   await portal.clock.runFor(5_000);
-  await expect(formTitle).toHaveText("Step 1: Application Form Submitted");
+  await expect(formTitle).toHaveText("Step 1: Application Form");
+  const completedForm = portal.locator(
+    '[data-application-progress-step="form"]',
+  );
+  await expect(completedForm).toHaveAttribute("data-state", "complete");
+  await expect(
+    completedForm.locator(".application-progress-status"),
+  ).toHaveText(
+    /^Completed: (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}$/,
+  );
+  await expect(completedForm.locator("summary time")).toHaveAttribute(
+    "datetime",
+    /T.*Z$/,
+  );
   await expect(upcomingCourse).toHaveAttribute("data-state", "current");
   await expect(upcomingCheckbox).toBeEnabled();
   await expect(upcomingConfirm).toBeVisible();
