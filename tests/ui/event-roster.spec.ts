@@ -219,7 +219,7 @@ test("empty volunteer rosters reserve no space through first/last signup updates
       }
       await expect(
         roster(card).locator("summary > span:first-child"),
-      ).toHaveCSS("font-size", "12px");
+      ).toHaveCSS("font-size", "14px");
       await expect(
         roster(card).getByText("No volunteers registered yet."),
       ).toHaveCount(0);
