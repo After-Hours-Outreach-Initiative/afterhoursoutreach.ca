@@ -475,6 +475,14 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
                   exact: true,
                 })
                 .click();
+              if (!join)
+                await page
+                  .getByRole("dialog", {
+                    name: "Unregister from this event?",
+                    exact: true,
+                  })
+                  .getByRole("button", { name: "Unregister", exact: true })
+                  .click();
               await expect(
                 emptyCard.getByRole("button", {
                   name: join ? "Unregister" : "Register",

@@ -195,7 +195,17 @@ test("empty volunteer rosters reserve no space through first/last signup updates
       await inPlaceAction(viewer, {
         endpoint: "/api/v1/events/action",
         form: publicCard.locator("[data-live-signup]"),
-        trigger: () => button.click(),
+        trigger: async () => {
+          await button.click();
+          if (!joining)
+            await viewer
+              .getByRole("dialog", {
+                name: "Unregister from this event?",
+                exact: true,
+              })
+              .getByRole("button", { name: "Unregister", exact: true })
+              .click();
+        },
         loadingLabel: joining ? "Registering…" : "Unregistering…",
         pending: async () => {
           for (const width of [1280, 768, 375, 320]) {

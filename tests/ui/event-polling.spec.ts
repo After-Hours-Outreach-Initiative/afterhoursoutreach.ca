@@ -365,6 +365,10 @@ test("other viewers see signups and cancellations through polling without losing
     await card(attendee)
       .getByRole("button", { name: "Unregister", exact: true })
       .click();
+    await attendee
+      .getByRole("dialog", { name: "Unregister from this event?", exact: true })
+      .getByRole("button", { name: "Unregister", exact: true })
+      .click();
     await expect(
       card(attendee).getByText("Registered", { exact: true }),
     ).toHaveCount(0);

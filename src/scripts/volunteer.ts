@@ -6,6 +6,7 @@ import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
 import { chooseNotification } from "./notification-choice";
 import { confirmSeriesDeletion } from "./event-deletion";
+import { confirmEventUnregistration } from "./event-unregistration";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
   disposeVolunteerProfileContents,
@@ -740,6 +741,12 @@ function form(
     }
     let saved = false;
     try {
+      if (
+        element.matches("[data-live-signup]") &&
+        values.get("action") === "cancel" &&
+        !(await confirmEventUnregistration(element))
+      )
+        return;
       if (
         element.matches("[data-event-delete]") &&
         !(await confirmSeriesDeletion())

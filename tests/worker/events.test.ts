@@ -1615,8 +1615,17 @@ describe(
             inPlaceAction(page, {
               endpoint: "/api/v1/events/action",
               form: target.locator("[data-live-signup]"),
-              trigger: () =>
-                target.locator("[data-live-signup] button").click(),
+              trigger: async () => {
+                await target.locator("[data-live-signup] button").click();
+                if (action === "cancel")
+                  await page
+                    .getByRole("dialog", {
+                      name: "Unregister from this event?",
+                      exact: true,
+                    })
+                    .getByRole("button", { name: "Unregister", exact: true })
+                    .click();
+              },
               updated,
               loadingLabel:
                 action === "join" ? "Registering…" : "Unregistering…",

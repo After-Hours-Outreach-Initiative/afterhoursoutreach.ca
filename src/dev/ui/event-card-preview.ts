@@ -1,4 +1,5 @@
 import { eventCardChannel } from "./event-card-fixtures";
+import { confirmEventUnregistration } from "../../scripts/event-unregistration";
 
 if (import.meta.env.DEV) {
   const root = document.querySelector<HTMLElement>("[data-ui-event-preview]");
@@ -8,21 +9,42 @@ if (import.meta.env.DEV) {
 
   // Use the real forms but navigate only within the fictional preview. Its CSP
   // also blocks native form submissions if scripts fail to load.
-  document.addEventListener("submit", (event) => {
+  document.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.target;
     if (
       !(form instanceof HTMLFormElement) ||
-      !form.matches("[data-live-signup]")
+      !form.matches("[data-live-signup]") ||
+      form.dataset.submitting
     )
       return;
-    const url = new URL(location.href);
-    url.searchParams.set(
-      "registered",
-      new FormData(form).get("action") === "join" ? "1" : "0",
+    const action = new FormData(form).get("action");
+    const button = form.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
     );
-    url.searchParams.set("roster", roster?.open ? "open" : "closed");
-    location.replace(url.href);
+    form.dataset.submitting = "true";
+    if (button) button.disabled = true;
+    try {
+      if (action === "cancel") {
+        // A wide preview may be scrolled to its right-hand action. Reveal the
+        // confirmation controls inside the iframe before opening the modal.
+        window.frameElement?.scrollIntoView({
+          block: "center",
+          inline: "start",
+        });
+        if (!(await confirmEventUnregistration(form))) return;
+      }
+      const url = new URL(location.href);
+      url.searchParams.set("registered", action === "join" ? "1" : "0");
+      url.searchParams.set("roster", roster?.open ? "open" : "closed");
+      location.replace(url.href);
+    } finally {
+      delete form.dataset.submitting;
+      if (button) {
+        button.disabled = false;
+        button.focus({ preventScroll: true });
+      }
+    }
   });
   window.addEventListener("message", (event) => {
     if (

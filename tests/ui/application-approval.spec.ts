@@ -264,6 +264,10 @@ test("pending applications poll every minute, then approval restores five-second
     await orientation
       .getByRole("button", { name: "Unregister", exact: true })
       .click();
+    await volunteer
+      .getByRole("dialog", { name: "Unregister from this event?", exact: true })
+      .getByRole("button", { name: "Unregister", exact: true })
+      .click();
     await expect(tracker).toHaveCount(0);
     expect(
       (await volunteer.request.get(`${baseURL}/api/v1/events`)).status(),

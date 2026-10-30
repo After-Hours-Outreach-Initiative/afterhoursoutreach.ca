@@ -332,6 +332,10 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     mixed.getByRole("rowheader", { name: "Morgan P." }),
   ).toBeVisible();
   await mixed.getByRole("button", { name: "Unregister", exact: true }).click();
+  await mixed
+    .getByRole("dialog", { name: "Unregister from this event?", exact: true })
+    .getByRole("button", { name: "Unregister", exact: true })
+    .click();
   await expect(mixed.locator("[data-event-availability]")).toHaveText(
     "6 of 8 spots taken",
   );
@@ -352,12 +356,39 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   await oneLeft
     .getByRole("button", { name: "Unregister", exact: true })
     .click();
+  await oneLeft
+    .getByRole("dialog", { name: "Unregister from this event?", exact: true })
+    .getByRole("button", { name: "Unregister", exact: true })
+    .click();
   await expect(oneLeft.locator("[data-event-availability]")).toHaveText(
     "7 of 8 spots taken",
   );
 
   const registered = page.frameLocator('[data-ui-event-frame="registered"]');
   await registered
+    .getByRole("button", { name: "Unregister", exact: true })
+    .click();
+  const confirmation = registered.getByRole("dialog", {
+    name: "Unregister from this event?",
+    exact: true,
+  });
+  await expect(
+    confirmation.getByRole("button", { name: "Cancel", exact: true }),
+  ).toBeFocused();
+  await confirmation
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(registered.locator("[data-event-availability]")).toHaveText(
+    "Registered · 6 of 8 spots taken",
+  );
+  await expect(
+    registered.getByRole("button", { name: "Unregister", exact: true }),
+  ).toBeFocused();
+  await registered
+    .getByRole("button", { name: "Unregister", exact: true })
+    .click();
+  await confirmation
     .getByRole("button", { name: "Unregister", exact: true })
     .click();
   await expect(
