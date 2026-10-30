@@ -142,12 +142,14 @@ test("empty volunteer rosters reserve no space through first/last signup updates
       await expect(roster(card).locator("tbody tr")).toHaveCount(1);
       const disclosure = await roster(card).evaluate((element) => {
         const summary = element.querySelector("summary")!;
+        const frame = element.querySelector(".table-scroll-frame")!;
         const panel = element.querySelector("table")!;
         const triggerBounds = summary.getBoundingClientRect();
         const panelBounds = panel.getBoundingClientRect();
         return {
           gap: panelBounds.top - triggerBounds.bottom,
-          sameWidth: panelBounds.width === triggerBounds.width,
+          sameWidth:
+            frame.getBoundingClientRect().width === triggerBounds.width,
           joinedRadii: [
             getComputedStyle(summary).borderBottomLeftRadius,
             getComputedStyle(panel).borderTopLeftRadius,

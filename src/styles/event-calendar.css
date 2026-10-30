@@ -1,6 +1,7 @@
 .event-calendar {
   flex: 0 0 100%;
   width: 100%;
+  min-width: 0;
   max-width: 22rem;
   margin-inline: auto;
   padding: 0.75rem;
@@ -46,6 +47,8 @@
 }
 .event-calendar table {
   width: 100%;
+  /* Keep seven equal weekdays, with room for date controls and focus rings. */
+  min-width: 15.75rem;
   table-layout: fixed;
   border-collapse: collapse;
   text-align: center;
@@ -119,4 +122,8 @@
 .event-calendar button:focus-visible {
   outline: 3px solid #a5b4fc;
   outline-offset: 2px;
+}
+.event-calendar .table-scroll-frame :is(a, button):focus-visible {
+  /* Keep date-control focus rings clear of the scroll frame's clipped edges. */
+  outline-offset: -3px;
 }

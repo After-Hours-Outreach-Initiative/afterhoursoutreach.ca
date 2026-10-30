@@ -1,0 +1,30 @@
+---
+interface Props {
+  label: string;
+  class?: string;
+}
+const { label, class: className, ...rest } = Astro.props;
+---
+
+<div
+  class:list={["table-scroll-frame", className]}
+  role="region"
+  aria-label={label}
+  tabindex="0"
+  {...rest}
+>
+  <slot />
+</div>
+
+<style is:global>
+  .table-scroll-frame {
+    min-width: 0;
+    width: 100%;
+    /* No height limit: the page, not the table, scrolls vertically. */
+    overflow-x: auto;
+  }
+  .table-scroll-frame:focus-visible {
+    outline: 3px solid #a5b4fc;
+    outline-offset: 0.25rem;
+  }
+</style>

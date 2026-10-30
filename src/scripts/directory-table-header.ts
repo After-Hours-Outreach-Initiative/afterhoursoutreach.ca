@@ -1,6 +1,6 @@
 // Keep one semantic header, moving it only when horizontal overflow prevents
 // native page-sticky positioning. The frame always retains its full row height.
-export function initApplicationTableHeader(results: HTMLElement) {
+export function initDirectoryTableHeader(results: HTMLElement) {
   const siteHeader = document.querySelector<HTMLElement>(".site-header");
   let frame: HTMLElement | null;
   let table: HTMLTableElement | null;
@@ -14,7 +14,7 @@ export function initApplicationTableHeader(results: HTMLElement) {
     frame.dataset.horizontalOverflow = String(overflowing);
     frame.tabIndex = overflowing ? 0 : -1;
     if (!overflowing) {
-      head.style.removeProperty("--application-table-header-shift");
+      head.style.removeProperty("--directory-table-header-shift");
       return;
     }
     const bounds = table.getBoundingClientRect();
@@ -26,7 +26,7 @@ export function initApplicationTableHeader(results: HTMLElement) {
         bounds.height - head.getBoundingClientRect().height,
       ),
     );
-    head.style.setProperty("--application-table-header-shift", `${shift}px`);
+    head.style.setProperty("--directory-table-header-shift", `${shift}px`);
   };
   const schedule = () => {
     scheduled ??= requestAnimationFrame(update);
@@ -38,7 +38,7 @@ export function initApplicationTableHeader(results: HTMLElement) {
     observer.disconnect();
     if (scheduled !== undefined) cancelAnimationFrame(scheduled);
     scheduled = undefined;
-    frame = results.querySelector<HTMLElement>(".application-table-frame");
+    frame = results.querySelector<HTMLElement>(".volunteer-table-frame");
     table = frame?.querySelector<HTMLTableElement>("table") ?? null;
     head = table?.tHead ?? null;
     if (!frame || !table || !head) return;

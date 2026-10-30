@@ -1,5 +1,5 @@
 import { actionFragment } from "./action-page";
-import { initApplicationTableHeader } from "./application-table-header";
+import { initDirectoryTableHeader } from "./directory-table-header";
 
 export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   const root = document.querySelector<HTMLElement>("[data-volunteer-browser]");
@@ -16,8 +16,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   );
   if (!root || !search || !form || !results || !error) return;
   const people = filters ? "applications" : "volunteers";
-  const refreshTableHeader =
-    people === "applications" ? initApplicationTableHeader(results) : undefined;
+  const refreshTableHeader = initDirectoryTableHeader(results);
 
   root.dataset.rowNavigation = "true";
   results.addEventListener("click", (event) => {
@@ -58,7 +57,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
       : undefined;
     const focused = document.activeElement;
     const tableFrame = results.querySelector<HTMLElement>(
-      ".application-table-frame",
+      ".volunteer-table-frame",
     );
     const scrollLeft = tableFrame?.scrollLeft ?? 0;
     const focusedFilter =
@@ -70,9 +69,9 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
         ? focused.dataset.volunteerSort
         : undefined;
     results.replaceChildren(...nextResults.childNodes);
-    refreshTableHeader?.();
+    refreshTableHeader();
     const nextFrame = results.querySelector<HTMLElement>(
-      ".application-table-frame",
+      ".volunteer-table-frame",
     );
     if (nextFrame) {
       nextFrame.scrollLeft = scrollLeft;

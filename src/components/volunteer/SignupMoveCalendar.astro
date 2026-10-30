@@ -1,5 +1,6 @@
 ---
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import TableScrollFrame from "../TableScrollFrame.astro";
 import { signupMoveCalendar } from "@/data/signup-move-calendar";
 import type { EventRow } from "@/server/db/events";
 import "@/styles/event-calendar.css";
@@ -58,84 +59,86 @@ const weekdays = [
     Grey circle: current event (not selectable). Choose a circled date or a dot
     for another event that day.
   </p>
-  <table aria-describedby={`${id}-help`}>
-    <caption class="sr-only">Move destination calendar</caption>
-    <thead>
-      <tr
-        >{
-          weekdays.map((day) => (
-            <th scope="col" aria-label={day}>
-              <abbr title={day}>{day.slice(0, 1)}</abbr>
-            </th>
+  <TableScrollFrame label="Move destination calendar">
+    <table aria-describedby={`${id}-help`}>
+      <caption class="sr-only">Move destination calendar</caption>
+      <thead>
+        <tr
+          >{
+            weekdays.map((day) => (
+              <th scope="col" aria-label={day}>
+                <abbr title={day}>{day.slice(0, 1)}</abbr>
+              </th>
+            ))
+          }</tr
+        >
+      </thead>
+      <tbody data-signup-month-days>
+        {
+          calendar.weeks.map((week) => (
+            <tr>
+              {week.map((day) => (
+                <td data-signup-date={day.date}>
+                  {day.inMonth && (
+                    <>
+                      {day.current ? (
+                        <button
+                          type="button"
+                          class="signup-move-date"
+                          data-signup-current
+                          disabled
+                          aria-label={`${day.date} · Current event (not selectable)`}
+                          title="Current event (not selectable)"
+                        >
+                          <span class="event-calendar-day event-calendar-circle">
+                            {day.day}
+                          </span>
+                        </button>
+                      ) : day.events.length ? (
+                        <button
+                          type="button"
+                          class="signup-move-date"
+                          data-signup-destination={day.events[0].id}
+                          aria-label={day.events[0].description}
+                          aria-pressed="false"
+                          title={day.events[0].description}
+                        >
+                          <span class="event-calendar-day event-calendar-circle">
+                            {day.day}
+                          </span>
+                        </button>
+                      ) : (
+                        <span class="event-calendar-day">{day.day}</span>
+                      )}
+                      {(day.current ? day.events : day.events.slice(1)).length >
+                        0 && (
+                        <div class="event-calendar-extra-events">
+                          {(day.current ? day.events : day.events.slice(1)).map(
+                            (destination) => (
+                              <button
+                                type="button"
+                                data-signup-destination={destination.id}
+                                aria-label={destination.description}
+                                aria-pressed="false"
+                                title={destination.description}
+                              >
+                                <span
+                                  class="event-calendar-dot"
+                                  aria-hidden="true"
+                                />
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </td>
+              ))}
+            </tr>
           ))
-        }</tr
-      >
-    </thead>
-    <tbody data-signup-month-days>
-      {
-        calendar.weeks.map((week) => (
-          <tr>
-            {week.map((day) => (
-              <td data-signup-date={day.date}>
-                {day.inMonth && (
-                  <>
-                    {day.current ? (
-                      <button
-                        type="button"
-                        class="signup-move-date"
-                        data-signup-current
-                        disabled
-                        aria-label={`${day.date} · Current event (not selectable)`}
-                        title="Current event (not selectable)"
-                      >
-                        <span class="event-calendar-day event-calendar-circle">
-                          {day.day}
-                        </span>
-                      </button>
-                    ) : day.events.length ? (
-                      <button
-                        type="button"
-                        class="signup-move-date"
-                        data-signup-destination={day.events[0].id}
-                        aria-label={day.events[0].description}
-                        aria-pressed="false"
-                        title={day.events[0].description}
-                      >
-                        <span class="event-calendar-day event-calendar-circle">
-                          {day.day}
-                        </span>
-                      </button>
-                    ) : (
-                      <span class="event-calendar-day">{day.day}</span>
-                    )}
-                    {(day.current ? day.events : day.events.slice(1)).length >
-                      0 && (
-                      <div class="event-calendar-extra-events">
-                        {(day.current ? day.events : day.events.slice(1)).map(
-                          (destination) => (
-                            <button
-                              type="button"
-                              data-signup-destination={destination.id}
-                              aria-label={destination.description}
-                              aria-pressed="false"
-                              title={destination.description}
-                            >
-                              <span
-                                class="event-calendar-dot"
-                                aria-hidden="true"
-                              />
-                            </button>
-                          ),
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </td>
-            ))}
-          </tr>
-        ))
-      }
-    </tbody>
-  </table>
+        }
+      </tbody>
+    </table>
+  </TableScrollFrame>
 </div>

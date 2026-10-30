@@ -42,7 +42,7 @@ export function tableScenarios(kind: TableKind) {
       id: "long-names",
       label: "Long names",
       description:
-        "Long, hyphenated, and unbroken names for checking wrapping without page overflow at narrow widths.",
+        "Long, hyphenated, and unbroken names for checking horizontal table scrolling without wrapping or page overflow.",
     },
     {
       id: "paginated",

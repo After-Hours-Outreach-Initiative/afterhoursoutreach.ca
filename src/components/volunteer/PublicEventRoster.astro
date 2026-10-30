@@ -3,6 +3,7 @@ import type { EventRow, PublicRosterRow } from "@/server/db/events";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
 import NewVolunteerBadge from "./NewVolunteerBadge.astro";
+import TableScrollFrame from "../TableScrollFrame.astro";
 interface Props {
   event: EventRow;
   roster: PublicRosterRow[];
@@ -12,33 +13,35 @@ const { event, roster } = Astro.props;
 
 <details class="public-event-roster event-roster">
   <EventRosterSummary roster={roster} event={event} />
-  <table class="event-roster-table">
-    <caption class="sr-only">Registered volunteers</caption>
-    <thead class="sr-only"><tr><th scope="col">Volunteer</th></tr></thead>
-    <tbody>
-      {
-        roster.map((person) => (
-          <tr>
-            <th scope="row">
-              <div class="event-roster-person">
-                <AttendeeAvatar
-                  category={person.category}
-                  medicMark={Boolean(person.medicMark)}
-                />
-                <span class="event-roster-name">
-                  <span>{person.name}</span>
-                  {person.category === "new-volunteer" && (
-                    <>
-                      {" "}
-                      <NewVolunteerBadge />
-                    </>
-                  )}
-                </span>
-              </div>
-            </th>
-          </tr>
-        ))
-      }
-    </tbody>
-  </table>
+  <TableScrollFrame label="Registered volunteers">
+    <table class="event-roster-table">
+      <caption class="sr-only">Registered volunteers</caption>
+      <thead class="sr-only"><tr><th scope="col">Volunteer</th></tr></thead>
+      <tbody>
+        {
+          roster.map((person) => (
+            <tr>
+              <th scope="row">
+                <div class="event-roster-person">
+                  <AttendeeAvatar
+                    category={person.category}
+                    medicMark={Boolean(person.medicMark)}
+                  />
+                  <span class="event-roster-name">
+                    <span>{person.name}</span>
+                    {person.category === "new-volunteer" && (
+                      <>
+                        {" "}
+                        <NewVolunteerBadge />
+                      </>
+                    )}
+                  </span>
+                </div>
+              </th>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </TableScrollFrame>
 </details>

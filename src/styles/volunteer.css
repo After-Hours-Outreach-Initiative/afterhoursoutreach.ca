@@ -1392,8 +1392,6 @@ body:has(
   padding-left: 2.75rem;
 }
 .volunteer-table-frame {
-  max-width: 100%;
-  /* Leave overflow visible so the page scrolls and headers stick to its viewport. */
   border: var(--volunteer-border);
   border-radius: 0.5rem;
 }
@@ -1402,7 +1400,8 @@ body:has(
     var(--attendee-avatar-height, 1.5rem) * 14 / 19.5
   );
   --volunteer-table-person-gap: 0.625rem;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   /* Separate borders stay attached to the sticky header while scrolling. */
   border-collapse: separate;
   border-spacing: 0;
@@ -1413,11 +1412,12 @@ body:has(
   padding: 1rem;
   vertical-align: top;
   border-bottom: var(--volunteer-border);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 .volunteer-table thead {
-  position: sticky;
-  top: var(--site-header-rendered-height, var(--site-header-height, 0px));
+  /* Without the helper, keep all rows reachable in the horizontal scroll frame. */
+  position: relative;
+  top: 0;
   z-index: 1;
 }
 .volunteer-table thead::before {
@@ -1464,7 +1464,6 @@ body:has(
 .volunteer-table a {
   display: inline-flex;
   align-items: center;
-  max-width: 100%;
   min-height: 2.75rem;
   margin-block: -0.5rem;
   color: #c7d2fe;
@@ -1482,11 +1481,6 @@ body:has(
   padding-inline-start: calc(
     var(--volunteer-table-avatar-width) + var(--volunteer-table-person-gap)
   );
-  flex-wrap: wrap;
-  row-gap: 0;
-}
-.volunteer-table-sort > span {
-  min-width: 0;
 }
 .volunteer-table .volunteer-table-sort:focus-visible {
   /* Keep the focus ring inside the compact header. */
@@ -1514,93 +1508,43 @@ body:has(
 }
 .volunteer-table-name {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.375rem 0.5rem;
   min-width: 0;
   margin-block: -0.5rem;
 }
 .volunteer-table-name > a {
-  /* Compact the whole group, not individual links, so wrapped badges stay clear. */
+  /* Compact the whole name/badge group without changing its alignment. */
   margin-block: 0;
 }
 .volunteer-table-approved {
   color: #4ade80;
 }
 @media (width < 64rem) {
-  .volunteer-table {
-    /* Share narrow screens between columns; long text wraps within its cell. */
-    table-layout: fixed;
-  }
   .volunteer-table :is(th, td) {
     padding: 0.75rem;
-  }
-  .volunteer-table thead th:nth-child(1) {
-    width: 40%;
-  }
-  .volunteer-table thead th:nth-child(2) {
-    width: 28%;
-  }
-  .volunteer-table thead th:nth-child(3) {
-    width: 32%;
   }
 }
 @media (width < 40rem) {
   .volunteer-table :is(th, td) {
     padding-inline: 0.5rem;
   }
-  .volunteer-table thead th:nth-child(1) {
-    width: 36%;
-  }
-  .volunteer-table thead th:nth-child(n + 2) {
-    width: 32%;
-  }
   .volunteer-table a.volunteer-table-sort {
     gap: 0.375rem;
   }
 }
-.application-table {
-  min-width: 36rem;
-  table-layout: fixed;
-}
-.application-table-frame {
-  /* Unbounded height: only the page scrolls vertically. */
-  overflow-x: auto;
-}
-.application-table-frame:focus-visible {
-  outline: 3px solid #a5b4fc;
-  outline-offset: 0.25rem;
-}
-.application-table-frame thead {
-  /* Without the helper, keep every row reachable rather than sticking to the
-     horizontal scroll frame with the page header's vertical offset. */
-  position: relative;
-  top: 0;
-}
-.application-table-frame[data-horizontal-overflow="false"] {
+.volunteer-table-frame[data-horizontal-overflow="false"] {
   /* Use native page-sticky positioning whenever the whole table fits. */
   overflow: visible;
 }
-.application-table-frame[data-horizontal-overflow="false"] thead {
+.volunteer-table-frame[data-horizontal-overflow="false"] thead {
   position: sticky;
   top: var(--site-header-rendered-height, var(--site-header-height, 0px));
 }
-.application-table-frame[data-horizontal-overflow="true"] thead {
+.volunteer-table-frame[data-horizontal-overflow="true"] thead {
   /* Horizontal overflow traps native sticky positioning. Move the original
      header within the full-height frame instead; never clone its semantics. */
-  transform: translateY(var(--application-table-header-shift, 0px));
-}
-.application-table :is(th, td) {
-  padding-inline: 1rem;
-}
-.application-table thead th {
-  padding-block: 0.5rem;
-}
-.application-table thead th:first-child {
-  width: 62%;
-}
-.application-table thead th:last-child {
-  width: 38%;
+  transform: translateY(var(--directory-table-header-shift, 0px));
 }
 .application-table-progress {
   display: inline-block;
@@ -2005,7 +1949,8 @@ body:has(
   }
 }
 .event-roster-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   margin: 0;
   table-layout: auto;
   border: 1px solid var(--event-roster-open-border);
@@ -2022,7 +1967,6 @@ body:has(
   vertical-align: middle;
   border-bottom: var(--volunteer-border);
   font-weight: normal;
-  overflow-wrap: anywhere;
 }
 .event-roster-table > :is(thead, tbody) > tr > :first-child {
   /* Match the summary's left inset without changing the actions gutter. */
@@ -2041,10 +1985,10 @@ body:has(
   display: flex;
   align-items: center;
   gap: 0.625rem;
+  white-space: nowrap;
 }
 .event-roster-name {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 0.5rem;
   min-width: 0;
@@ -2054,6 +1998,7 @@ body:has(
 }
 .event-roster-status {
   display: block;
+  white-space: nowrap;
   @apply text-sm/[inherit];
   color: #a1a1aa;
 }
@@ -2061,8 +2006,7 @@ body:has(
   margin-top: 0.75rem;
 }
 .event-roster-orientation .btn {
-  max-width: 100%;
-  white-space: normal;
+  white-space: nowrap;
 }
 .event-roster-table .event-roster-actions {
   width: 4rem;

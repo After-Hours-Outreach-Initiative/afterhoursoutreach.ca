@@ -1,5 +1,6 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import TableScrollFrame from "@/components/TableScrollFrame.astro";
 import { organization } from "@/data/organization";
 import { env } from "cloudflare:workers";
 import { loadAccountNavigation } from "@/server/account-navigation";
@@ -136,40 +137,31 @@ const documents = [
         }. However, we operate under the alias After Hours Outreach Initiative.
       </p>
 
-      <table
-        class="mt-10 w-full max-w-3xl border border-zinc-700 text-left text-lg max-sm:block"
-        role="table"
-        aria-labelledby="non-profit-information-heading"
-      >
-        <tbody class="max-sm:block" role="rowgroup">
-          <tr class="border-b border-zinc-700 max-sm:block" role="row">
-            <th
-              class="p-6 align-top font-normal wrap-anywhere text-zinc-400 max-sm:block max-sm:pb-2"
-              role="rowheader"
-              scope="row">Incorporation number</th
-            >
-            <td
-              class="p-6 font-heading text-xl font-bold tracking-wide wrap-anywhere max-sm:block max-sm:pt-0"
-              role="cell"
-            >
-              {organization.incorporationNumber}
-            </td>
-          </tr>
-          <tr class="max-sm:block" role="row">
-            <th
-              class="p-6 align-top font-normal wrap-anywhere text-zinc-400 max-sm:block max-sm:pb-2"
-              role="rowheader"
-              scope="row">Business number</th
-            >
-            <td
-              class="p-6 font-heading text-xl font-bold tracking-wide wrap-anywhere max-sm:block max-sm:pt-0"
-              role="cell"
-            >
-              {organization.businessNumber}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <TableScrollFrame class="mt-10 max-w-3xl" label="Non-profit information">
+        <table
+          class="w-max min-w-full border border-zinc-700 text-left text-lg whitespace-nowrap"
+          aria-labelledby="non-profit-information-heading"
+        >
+          <tbody>
+            <tr class="border-b border-zinc-700">
+              <th class="p-6 align-top font-normal text-zinc-400" scope="row"
+                >Incorporation number</th
+              >
+              <td class="p-6 font-heading text-xl font-bold tracking-wide">
+                {organization.incorporationNumber}
+              </td>
+            </tr>
+            <tr>
+              <th class="p-6 align-top font-normal text-zinc-400" scope="row"
+                >Business number</th
+              >
+              <td class="p-6 font-heading text-xl font-bold tracking-wide">
+                {organization.businessNumber}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </TableScrollFrame>
     </div>
   </section>
   <section

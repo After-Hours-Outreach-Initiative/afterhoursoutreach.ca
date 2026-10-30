@@ -4,6 +4,7 @@ import NewVolunteerBadge from "./NewVolunteerBadge.astro";
 import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
 import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
+import TableScrollFrame from "../TableScrollFrame.astro";
 import {
   directoryListUrl,
   volunteerPageSize,
@@ -127,18 +128,11 @@ const columns = (
     <button class="btn btn-outline" type="submit">Search</button>
   </form>
   <div data-volunteer-results>
-    <div
-      class:list={[
-        "volunteer-table-frame",
-        { "application-table-frame": applications },
-      ]}
-      role="region"
-      aria-label={applications ? "Application table" : "Volunteer table"}
-      tabindex={applications ? "0" : undefined}
+    <TableScrollFrame
+      class="volunteer-table-frame"
+      label={applications ? "Application table" : "Volunteer table"}
     >
-      <table
-        class:list={["volunteer-table", { "application-table": applications }]}
-      >
+      <table class="volunteer-table">
         <caption class="sr-only">
           {
             applications
@@ -256,7 +250,7 @@ const columns = (
           }
         </tbody>
       </table>
-    </div>
+    </TableScrollFrame>
     {
       !people.rows.length && (
         <p class="volunteer-notice">
