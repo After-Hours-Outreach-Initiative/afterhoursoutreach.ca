@@ -26,11 +26,7 @@ export async function openLocalAccountSwitcher(page: Page) {
   });
   await expect(dialog).toBeVisible();
   // Keep the locator usable for selection assertions after navigation closes the dialog.
-  const profiles = page.getByRole("group", {
-    name: "View as",
-    exact: true,
-    includeHidden: true,
-  });
+  const profiles = page.locator("[data-account-switcher] [data-view-as]");
   await expect(profiles).toBeVisible();
   await expect(profiles).toHaveAttribute("aria-busy", "false");
   await expect(
