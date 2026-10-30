@@ -319,6 +319,12 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     [target.confirmed, target.medicConfirmed, target.newVolunteerConfirmed],
     [5, 2, 2],
   );
+  const registeredAt = Date.parse("2026-01-02T03:04:05.000Z");
+  await env.DB.prepare(
+    "UPDATE signup SET created_at=?, updated_at=? WHERE event_id='target' AND status='confirmed'",
+  )
+    .bind(registeredAt, registeredAt + 3_600_000)
+    .run();
   const roster = await listPublicRosters(env.DB, people[0], [
     "target",
     "history",
@@ -342,6 +348,10 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     ]),
     statusError(403),
   );
+  await assert.rejects(
+    listRosters(env.DB, people[0], ["target"]),
+    statusError(403),
+  );
   for (const [preferredName, expectedName] of [
     [" AJ ", "AJ P."],
     ["  ", "Alice P."],
@@ -360,6 +370,9 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     const organizerRoster = await listRosters(env.DB, organizer, ["target"]);
     assert.equal(organizerRoster.length, 5);
     assert.ok(organizerRoster.every(({ name }) => name === expectedName));
+    assert.ok(
+      organizerRoster.every((row) => row.registeredAt === registeredAt),
+    );
     assert.doesNotMatch(
       JSON.stringify(organizerRoster),
       /PrivateSurname|firstName|lastName|preferredName|legacyName/,

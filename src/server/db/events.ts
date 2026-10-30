@@ -142,6 +142,7 @@ export interface RosterRow {
   eventId: string;
   userId: string;
   name: string;
+  registeredAt: number;
   completed: number;
   patrolApproved: number;
   statusVersion: number;
@@ -950,7 +951,7 @@ export async function listRosters(
   const ids = eventIds.slice(0, 200);
   const rows = await db
     .prepare(
-      `SELECT s.id, s.event_id AS eventId, s.user_id AS userId,
+      `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, s.created_at AS registeredAt,
         p.first_name AS firstName, p.last_name AS lastName, p.preferred_name AS preferredName,
         ${profileDisplayNameSql} AS legacyName,
         ${attendeeCategorySql("s.user_id")} AS category,

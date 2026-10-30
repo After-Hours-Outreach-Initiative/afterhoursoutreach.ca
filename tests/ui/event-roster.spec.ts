@@ -134,6 +134,15 @@ test("empty volunteer rosters reserve no space through first/last signup updates
       await roster(card).locator("summary").focus();
       await roster(card).locator("summary").press("Enter");
       await expect(roster(card).locator("tbody tr")).toHaveCount(1);
+      const registrations = roster(card).locator(".event-roster-name time");
+      await expect(registrations).toHaveCount(index === 0 ? 1 : 0);
+      if (index === 0) {
+        await expect(registrations.first()).toContainText("Registered ");
+        await expect(registrations.first()).toHaveCSS("font-size", "14px");
+        await expect(
+          roster(card).locator(".event-roster-name a").first(),
+        ).toHaveCSS("font-size", "16px");
+      }
       await expect(
         roster(card).getByText("No volunteers registered yet."),
       ).toHaveCount(0);

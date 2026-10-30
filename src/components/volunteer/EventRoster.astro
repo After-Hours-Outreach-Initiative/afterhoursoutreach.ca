@@ -1,5 +1,6 @@
 ---
 import type { EventRow, RosterRow } from "@/server/db/events";
+import { formatEventDate } from "@/data/event-time";
 import SignupEditor from "./SignupEditor.astro";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
@@ -47,6 +48,12 @@ const { event, roster, future, destinations } = Astro.props;
                       <NewVolunteerBadge />
                     </>
                   )}
+                  <time
+                    class="event-roster-status"
+                    datetime={new Date(person.registeredAt).toISOString()}
+                  >
+                    Registered {formatEventDate(person.registeredAt)}
+                  </time>
                   {Boolean(person.completed) && (
                     <span class="event-roster-status">
                       Orientation completed
