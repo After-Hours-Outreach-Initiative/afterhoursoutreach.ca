@@ -1447,8 +1447,9 @@ body:has(
   outline: 3px solid #a5b4fc;
   outline-offset: 0.25rem;
 }
-.volunteer-table-sort {
+.volunteer-table a.volunteer-table-sort {
   gap: 0.5rem;
+  text-decoration: none;
 }
 .volunteer-table-sort-icon {
   width: 1rem;
