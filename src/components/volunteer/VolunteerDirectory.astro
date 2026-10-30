@@ -1,7 +1,7 @@
 ---
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
-import ChevronDownIcon from "../icons/ChevronDownIcon.astro";
+import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
 import {
   applicationListUrl,
   volunteerListUrl,
@@ -176,7 +176,7 @@ const columns = [
                         aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
                       >
                         {label}
-                        <ChevronDownIcon class="volunteer-table-sort-icon" />
+                        <ArrowRightIcon class="volunteer-table-sort-icon" />
                       </a>
                     </th>
                   );

@@ -1455,13 +1455,16 @@ body:has(
   width: 1rem;
   height: 1rem;
   flex-shrink: 0;
-  opacity: 0.5;
+  opacity: 0;
+  transform: rotate(-90deg);
 }
+.volunteer-table thead th:hover .volunteer-table-sort-icon,
+.volunteer-table-sort:focus-visible .volunteer-table-sort-icon,
 [aria-sort] .volunteer-table-sort-icon {
   opacity: 1;
 }
-[aria-sort="ascending"] .volunteer-table-sort-icon {
-  transform: rotate(180deg);
+[aria-sort="descending"] .volunteer-table-sort-icon {
+  transform: rotate(90deg);
 }
 .volunteer-table-person {
   display: flex;
