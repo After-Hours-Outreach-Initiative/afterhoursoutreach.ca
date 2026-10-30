@@ -36,7 +36,7 @@ const columns = (
   applications
     ? [
         { key: "name", label: "Name" },
-        { key: "progress", label: "Application Progress" },
+        { key: "progress", label: "Status" },
       ]
     : [
         { key: "name", label: "Name" },
@@ -128,9 +128,13 @@ const columns = (
   </form>
   <div data-volunteer-results>
     <div
-      class="volunteer-table-frame"
+      class:list={[
+        "volunteer-table-frame",
+        { "application-table-frame": applications },
+      ]}
       role="region"
       aria-label={applications ? "Application table" : "Volunteer table"}
+      tabindex={applications ? "0" : undefined}
     >
       <table
         class:list={["volunteer-table", { "application-table": applications }]}
@@ -138,7 +142,7 @@ const columns = (
         <caption class="sr-only">
           {
             applications
-              ? "Applicants and application progress"
+              ? "Applicants and status"
               : "Approved volunteers, roles, and patrol access"
           }
         </caption>

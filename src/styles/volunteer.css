@@ -1560,10 +1560,47 @@ body:has(
   }
 }
 .application-table {
+  min-width: 36rem;
   table-layout: fixed;
 }
-.application-table thead th:nth-child(-n + 2) {
-  width: 50%;
+.application-table-frame {
+  /* Unbounded height: only the page scrolls vertically. */
+  overflow-x: auto;
+}
+.application-table-frame:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 0.25rem;
+}
+.application-table-frame thead {
+  /* Without the helper, keep every row reachable rather than sticking to the
+     horizontal scroll frame with the page header's vertical offset. */
+  position: relative;
+  top: 0;
+}
+.application-table-frame[data-horizontal-overflow="false"] {
+  /* Use native page-sticky positioning whenever the whole table fits. */
+  overflow: visible;
+}
+.application-table-frame[data-horizontal-overflow="false"] thead {
+  position: sticky;
+  top: var(--site-header-rendered-height, var(--site-header-height, 0px));
+}
+.application-table-frame[data-horizontal-overflow="true"] thead {
+  /* Horizontal overflow traps native sticky positioning. Move the original
+     header within the full-height frame instead; never clone its semantics. */
+  transform: translateY(var(--application-table-header-shift, 0px));
+}
+.application-table :is(th, td) {
+  padding-inline: 1rem;
+}
+.application-table thead th {
+  padding-block: 0.5rem;
+}
+.application-table thead th:first-child {
+  width: 62%;
+}
+.application-table thead th:last-child {
+  width: 38%;
 }
 .application-table-progress {
   display: inline-block;

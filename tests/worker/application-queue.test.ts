@@ -401,7 +401,7 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(results.locator("tbody tr")).toHaveCount(3);
     await expect(results.getByRole("columnheader")).toHaveText([
       "Name",
-      "Application Progress",
+      "Status",
     ]);
     await expect(results.locator('[data-state="ready"]').first()).toHaveText(
       "Ready for review",
