@@ -644,7 +644,9 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
       has: page.locator('a[href^="/volunteers/avatar-attendee-3?"]'),
     });
     await expect(newMedicDirectoryRow).toHaveCount(1);
-    await expect(newMedicDirectoryRow).toContainText("New volunteer");
+    await expect(
+      newMedicDirectoryRow.locator(".event-roster-new-badge"),
+    ).toHaveText("New");
     await expect(
       newMedicDirectoryRow.locator(
         '.attendee-new-volunteer [data-avatar-decoration="medic-cross"]',

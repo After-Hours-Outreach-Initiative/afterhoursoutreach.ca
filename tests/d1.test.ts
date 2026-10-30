@@ -784,8 +784,8 @@ test("volunteer directory sorts names, displayed roles and patrol flags before a
   for (const [sort, direction, expected] of [
     ["name", "asc", ["outreach", "tie", "organizer", "medic", "new"]],
     ["name", "desc", ["new", "medic", "organizer", "outreach", "tie"]],
-    ["role", "asc", ["medic", "tie", "new", "organizer", "outreach"]],
-    ["role", "desc", ["outreach", "organizer", "tie", "new", "medic"]],
+    ["role", "asc", ["outreach", "medic", "tie", "new", "organizer"]],
+    ["role", "desc", ["organizer", "tie", "new", "medic", "outreach"]],
     ["patrol", "asc", ["tie", "organizer", "new", "outreach", "medic"]],
     ["patrol", "desc", ["outreach", "medic", "tie", "organizer", "new"]],
   ] as const) {
@@ -800,7 +800,7 @@ test("volunteer directory sorts names, displayed roles and patrol flags before a
     (await listVolunteers(env.DB, actor, "AL", 0, "role", "asc")).rows.map(
       ({ id }) => id,
     ),
-    ["tie", "outreach"],
+    ["outreach", "tie"],
   );
 });
 

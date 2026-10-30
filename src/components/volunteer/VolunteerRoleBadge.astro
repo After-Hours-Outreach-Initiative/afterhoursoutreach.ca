@@ -1,0 +1,43 @@
+---
+interface Props {
+  role: "new-volunteer" | "medic" | "organizer";
+}
+
+const { role } = Astro.props;
+const label =
+  role === "organizer" ? "Organizer" : role === "medic" ? "Medic" : "New";
+---
+
+<span
+  class:list={[
+    "volunteer-role-badge",
+    { "event-roster-new-badge": role === "new-volunteer" },
+  ]}
+  data-volunteer-role={role}>{label}</span
+>
+
+<style>
+  .volunteer-role-badge {
+    display: inline-block;
+    flex-shrink: 0;
+    border: 1px solid #166534;
+    border-radius: 9999px;
+    padding: 0.0625rem 0.375rem;
+    background: #10291b;
+    color: #86efac;
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .volunteer-role-badge[data-volunteer-role="medic"] {
+    border-color: #991b1b;
+    background: #2b1010;
+    color: #fca5a5;
+  }
+  .volunteer-role-badge[data-volunteer-role="organizer"] {
+    border-color: #6b21a8;
+    background: #24102e;
+    color: #d8b4fe;
+  }
+</style>

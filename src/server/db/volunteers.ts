@@ -110,9 +110,9 @@ async function listPeople(
       : "name COLLATE NOCASE"
     : sort === "role"
       ? `CASE WHEN u.role = 'organizer' THEN 'Organizer'
-          WHEN category = 'new-volunteer' THEN 'New volunteer'
+          WHEN category = 'new-volunteer' THEN 'New'
           WHEN category = 'medic' THEN 'Medic'
-          ELSE 'Outreach Volunteer' END COLLATE NOCASE`
+          ELSE '' END COLLATE NOCASE`
       : sort === "patrol"
         ? "v.patrol_approved"
         : "name COLLATE NOCASE";

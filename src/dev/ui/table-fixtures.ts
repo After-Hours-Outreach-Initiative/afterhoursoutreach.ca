@@ -145,10 +145,10 @@ function roleLabel(person: Person) {
   return person.role === "organizer"
     ? "Organizer"
     : person.category === "new-volunteer"
-      ? "New volunteer"
+      ? "New"
       : person.category === "medic"
         ? "Medic"
-        : "Outreach Volunteer";
+        : "";
 }
 
 function progressLabel(person: Person) {

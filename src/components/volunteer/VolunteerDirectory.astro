@@ -1,5 +1,7 @@
 ---
 import AttendeeAvatar from "./AttendeeAvatar.astro";
+import NewVolunteerBadge from "./NewVolunteerBadge.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
 import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
 import {
@@ -230,13 +232,13 @@ const columns = (
                 ) : (
                   <>
                     <td>
-                      {person.role === "organizer"
-                        ? "Organizer"
-                        : person.category === "new-volunteer"
-                          ? "New volunteer"
-                          : person.category === "medic"
-                            ? "Medic"
-                            : "Outreach Volunteer"}
+                      {person.role === "organizer" ? (
+                        <VolunteerRoleBadge role="organizer" />
+                      ) : person.category === "new-volunteer" ? (
+                        <NewVolunteerBadge />
+                      ) : person.category === "medic" ? (
+                        <VolunteerRoleBadge role="medic" />
+                      ) : null}
                     </td>
                     <td
                       class:list={{

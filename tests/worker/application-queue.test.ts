@@ -322,7 +322,7 @@ test("organizers review applications separately from approved volunteers with pe
         .getByRole("link", { name: "approved", exact: true }),
     ).toBeVisible();
     await expect(page.locator("[data-volunteer-results] tbody td")).toHaveText([
-      "New volunteer",
+      "New",
       "Not approved for patrols",
     ]);
     await expect(page.locator('[name="sort"]')).toHaveValue("patrol");
