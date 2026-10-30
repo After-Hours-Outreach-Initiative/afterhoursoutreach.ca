@@ -1,6 +1,5 @@
 ---
 import type { EventRow, RosterRow } from "@/server/db/events";
-import { formatEventDate } from "@/data/event-time";
 import SignupEditor from "./SignupEditor.astro";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
@@ -13,6 +12,15 @@ interface Props {
   destinations: EventRow[];
 }
 const { event, roster, future, destinations } = Astro.props;
+const registrationDateFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Vancouver",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
 ---
 
 <details class="volunteer-roster event-roster">
@@ -48,19 +56,17 @@ const { event, roster, future, destinations } = Astro.props;
                       <NewVolunteerBadge />
                     </>
                   )}
-                  <time
-                    class="event-roster-status"
-                    datetime={new Date(person.registeredAt).toISOString()}
-                  >
-                    Registered {formatEventDate(person.registeredAt)}
-                  </time>
-                  {Boolean(person.completed) && (
-                    <span class="event-roster-status">
-                      Orientation completed
-                    </span>
-                  )}
                 </div>
               </div>
+              <time
+                class="event-roster-status"
+                datetime={new Date(person.registeredAt).toISOString()}
+              >
+                Registered {registrationDateFormat.format(person.registeredAt)}
+              </time>
+              {Boolean(person.completed) && (
+                <span class="event-roster-status">Orientation completed</span>
+              )}
               {Boolean(event.includesOrientation) &&
                 !future &&
                 !event.cancelledAt &&

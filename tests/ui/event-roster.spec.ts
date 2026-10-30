@@ -166,7 +166,7 @@ test("empty volunteer rosters reserve no space through first/last signup updates
         matchingBorder: true,
         transition: index === 1 ? "0s" : "0.18s",
       });
-      const registrations = roster(card).locator(".event-roster-name time");
+      const registrations = roster(card).locator("time.event-roster-status");
       await expect(registrations).toHaveCount(index === 0 ? 1 : 0);
       if (index === 0) {
         const actionSpace = await roster(card)
@@ -183,11 +183,43 @@ test("empty volunteer rosters reserve no space through first/last signup updates
           });
         expect(actionSpace).toBeLessThan(1);
         await expect(registrations.first()).toContainText("Registered ");
+        await expect(registrations.first()).not.toContainText(
+          /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/,
+        );
         await expect(registrations.first()).toHaveCSS("font-size", "14px");
         await expect(
           roster(card).locator(".event-roster-name a").first(),
         ).toHaveCSS("font-size", "16px");
+        const registrationLayout = await roster(card)
+          .locator("tbody th")
+          .first()
+          .evaluate((cell) => {
+            const avatar = cell
+              .querySelector(".attendee-avatar")!
+              .getBoundingClientRect();
+            const person = cell
+              .querySelector(".event-roster-person")!
+              .getBoundingClientRect();
+            const name = cell
+              .querySelector(".event-roster-name")!
+              .getBoundingClientRect();
+            const timestamp = cell
+              .querySelector("time")!
+              .getBoundingClientRect();
+            return {
+              nameCenterOffset:
+                name.top + name.height / 2 - (avatar.top + avatar.height / 2),
+              timestampBelowPerson: timestamp.top >= person.bottom,
+              timestampLeftOffset: timestamp.left - avatar.left,
+            };
+          });
+        expect(Math.abs(registrationLayout.nameCenterOffset)).toBeLessThan(1);
+        expect(registrationLayout.timestampBelowPerson).toBe(true);
+        expect(registrationLayout.timestampLeftOffset).toBe(0);
       }
+      await expect(
+        roster(card).locator("summary > span:first-child"),
+      ).toHaveCSS("font-size", "12px");
       await expect(
         roster(card).getByText("No volunteers registered yet."),
       ).toHaveCount(0);
