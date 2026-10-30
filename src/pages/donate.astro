@@ -117,11 +117,24 @@ const equipmentNeeds = [
           </a>
         </div>
         <p class="mt-6 max-w-xl text-zinc-300">
-          You can also donate by e-transfer to <a
-            href="mailto:finance@afterhoursoutreach.ca"
-            class="underline underline-offset-4"
-            >finance@afterhoursoutreach.ca</a
-          >.
+          You can also donate by e-Transfer to <code
+            data-etransfer-email
+            class="rounded bg-panel-soft px-1.5 py-0.5 text-base break-all text-white"
+            >finance@afterhoursoutreach.ca</code
+          >
+          <button
+            type="button"
+            class="btn btn-quiet ml-2 align-middle"
+            data-copy-etransfer-email
+            aria-label="Copy e-Transfer email address"
+          >
+            Copy
+          </button>
+          <span
+            class="mt-2 block text-sm"
+            data-etransfer-copy-status
+            role="status"
+            aria-live="polite"></span>
         </p>
       </div>
 
@@ -230,3 +243,28 @@ const equipmentNeeds = [
     </div>
   </section>
 </Layout>
+
+<script>
+  const email = document
+    .querySelector<HTMLElement>("[data-etransfer-email]")
+    ?.textContent?.trim();
+  const copyButton = document.querySelector<HTMLButtonElement>(
+    "[data-copy-etransfer-email]",
+  );
+  const copyStatus = document.querySelector<HTMLElement>(
+    "[data-etransfer-copy-status]",
+  );
+
+  if (email && copyButton && copyStatus) {
+    copyButton.addEventListener("click", async () => {
+      copyStatus.textContent = "";
+      try {
+        await navigator.clipboard.writeText(email);
+        copyStatus.textContent = "e-Transfer email address copied.";
+      } catch {
+        copyStatus.textContent =
+          "Could not copy. Select and copy the email address above.";
+      }
+    });
+  }
+</script>
