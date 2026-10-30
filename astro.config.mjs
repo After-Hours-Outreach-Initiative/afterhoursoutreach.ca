@@ -2,6 +2,7 @@
 import { defineConfig, fontProviders } from "astro/config";
 import cloudflare from "@astrojs/cloudflare";
 import { chmod } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
 
@@ -83,6 +84,13 @@ export default defineConfig({
     },
   ],
   vite: {
+    // Check/sync/build must not replace dependencies used by the running dev Worker.
+    cacheDir: fileURLToPath(
+      new URL(
+        `./node_modules/.vite/${process.env.NODE_ENV === "production" ? "production" : "development"}/`,
+        import.meta.url,
+      ),
+    ),
     plugins: [tailwindcss()],
     // Discover account dependencies before a cold-start reload can reset a form.
     optimizeDeps: {
