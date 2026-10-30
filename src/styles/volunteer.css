@@ -1392,7 +1392,17 @@ body:has(
 }
 .volunteer-table-scroll {
   max-width: 100%;
-  overflow-x: auto;
+  /* Bound both axes so sticky headers follow this accessible scroll region. */
+  max-height: max(
+    12rem,
+    calc(
+      100dvh -
+        var(--site-header-rendered-height, var(--site-header-height, 0px)) -
+        12rem
+    )
+  );
+  overflow: auto;
+  scroll-padding-block-start: 3rem;
   border: var(--volunteer-border);
   border-radius: 0.5rem;
 }
@@ -1403,7 +1413,9 @@ body:has(
 .volunteer-table {
   width: 100%;
   min-width: 40rem;
-  border-collapse: collapse;
+  /* Separate borders stay attached to sticky header cells while scrolling. */
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
   @apply text-base;
 }
@@ -1413,7 +1425,11 @@ body:has(
   border-bottom: var(--volunteer-border);
   overflow-wrap: normal;
 }
-.volunteer-table thead {
+.volunteer-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-block: 0.5rem;
   background: #171a20;
 }
 .volunteer-table th {
@@ -1450,6 +1466,10 @@ body:has(
 .volunteer-table a.volunteer-table-sort {
   gap: 0.5rem;
   text-decoration: none;
+}
+.volunteer-table .volunteer-table-sort:focus-visible {
+  /* Keep the focus ring inside the compact header and its scroll boundary. */
+  outline-offset: -3px;
 }
 .volunteer-table-sort-icon {
   width: 1rem;
