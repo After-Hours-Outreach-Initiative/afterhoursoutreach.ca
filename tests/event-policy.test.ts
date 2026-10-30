@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { contactEmail } from "../src/data/site";
-import { rosterCapacitySummary } from "../src/data/event-limits";
 import {
   canViewVolunteerProfile,
   availableSignupSpots,
@@ -27,7 +26,7 @@ const volunteer: SignupVolunteer = {
   patrolApproved: true,
 };
 
-test("saved limits govern reservations, newcomer caps and roster summaries", () => {
+test("saved limits govern reservations and newcomer caps", () => {
   const custom = {
     ...event,
     includesOrientation: true,
@@ -48,14 +47,6 @@ test("saved limits govern reservations, newcomer caps and roster summaries", () 
       now,
     ),
     orientationFullMessage,
-  );
-  assert.equal(
-    rosterCapacitySummary({
-      ...custom,
-      medicConfirmed: 1,
-      newVolunteerConfirmed: 2,
-    }),
-    "Medics: 1 registered, 2 places reserved. New volunteers: 2/2 registered, 0 places reserved.",
   );
 });
 

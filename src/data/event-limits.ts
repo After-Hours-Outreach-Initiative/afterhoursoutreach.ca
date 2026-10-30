@@ -22,23 +22,3 @@ export function minimumEventSpots(
         : 0),
   );
 }
-
-export function rosterCapacitySummary(
-  event: Partial<EventLimits> & {
-    includesOrientation: boolean | number;
-    medicConfirmed: number;
-    newVolunteerConfirmed: number;
-  },
-) {
-  const limits = { ...defaultEventLimits, ...event };
-  const medics = Math.max(0, limits.minMedicSpots - event.medicConfirmed);
-  const newcomers = Math.max(
-    0,
-    limits.minNewVolunteerSpots - event.newVolunteerConfirmed,
-  );
-  return `Medics: ${event.medicConfirmed} registered, ${medics} ${medics === 1 ? "place" : "places"} reserved.${
-    event.includesOrientation
-      ? ` New volunteers: ${event.newVolunteerConfirmed}/${limits.maxNewVolunteers} registered, ${newcomers} ${newcomers === 1 ? "place" : "places"} reserved.`
-      : ""
-  }`;
-}

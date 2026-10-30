@@ -1,6 +1,5 @@
 ---
 import type { EventRow } from "@/server/db/events";
-import { rosterCapacitySummary } from "@/data/event-limits";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 interface Props {
   event: EventRow;
@@ -40,7 +39,6 @@ const outreachVolunteers = Math.max(
       </span>
     )
   }
-  <span class="volunteer-help">{rosterCapacitySummary(event)}</span>
 </span>
 
 <style>

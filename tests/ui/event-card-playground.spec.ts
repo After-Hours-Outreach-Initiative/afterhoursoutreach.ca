@@ -207,6 +207,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   );
   const full = page.frameLocator('[data-ui-event-frame="full"]');
   const card = full.locator(".volunteer-event-card");
+  await expect(card.locator("summary")).toHaveText("Volunteers (8)");
   await expect(card.locator("[data-event-availability]")).toHaveText(
     "Full · 8 of 8 spots taken",
   );
