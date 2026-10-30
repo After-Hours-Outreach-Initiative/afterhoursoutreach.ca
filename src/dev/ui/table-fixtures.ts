@@ -153,12 +153,12 @@ function roleLabel(person: Person) {
         : "";
 }
 
-function progressLabel(person: Person) {
+function progressOrder(person: Person) {
   return person.applicationRejectionReason
-    ? "Rejected"
+    ? 2
     : person.applicationReadyForReview
-      ? "Ready for review"
-      : "In Progress";
+      ? 0
+      : 1;
 }
 
 // SQLite's NOCASE collation folds ASCII only; match its directory sort and ties.
@@ -239,6 +239,10 @@ export function createTableFixture(
         applications && profile === "rejected"
           ? "Fictional application review decision."
           : null,
+      applicationCompletedAt:
+        !applications || ready || profile === "rejected"
+          ? Date.UTC(2026, 8, 15 + index, 18, 30)
+          : null,
       patrolApproved: Number(
         !applications && [0, 1, 2, 6, 7].includes(variant),
       ),
@@ -260,8 +264,14 @@ export function createTableFixture(
     const primary = (person: Person) =>
       applications
         ? state.sort === "progress"
-          ? progressLabel(person)
-          : person.name
+          ? progressOrder(person)
+          : state.sort === "role"
+            ? person.medicMark
+              ? "Medic"
+              : ""
+            : state.sort === "completed"
+              ? (person.applicationCompletedAt ?? -Infinity)
+              : person.name
         : state.sort === "role"
           ? roleLabel(person)
           : state.sort === "patrol"

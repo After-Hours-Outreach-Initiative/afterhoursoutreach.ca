@@ -73,11 +73,19 @@ test("organizers review applications separately from approved volunteers with pe
     await DB.prepare("DELETE FROM discord_requirement").run();
     await DB.prepare("UPDATE profile SET naloxone_completed_at=0").run();
     const submittedAt = "2026-09-15T18:30:00.000Z";
+    const completedAt = "2026-09-16T19:45:00.000Z";
     await DB.prepare(
-      "UPDATE profile SET registered_at=?, code_of_conduct_version='2026-09-01', code_of_conduct_accepted_at=? WHERE user_id='applicant-50'",
+      "UPDATE profile SET registered_at=?, naloxone_completed_at=?, code_of_conduct_version='2026-09-01', code_of_conduct_accepted_at=? WHERE user_id='applicant-50'",
     )
-      .bind(Date.parse(submittedAt), Date.parse(submittedAt))
+      .bind(
+        Date.parse(submittedAt),
+        Date.parse(completedAt),
+        Date.parse(submittedAt),
+      )
       .run();
+    await DB.prepare(
+      "UPDATE profile SET teams='[\"medic\"]' WHERE user_id='applicant-51'",
+    ).run();
     await DB.prepare(
       "INSERT INTO application_draft (user_id, version, revision, answers, updated_at) VALUES ('draft-only', 1, 'draft-revision', ?, 0)",
     )
@@ -215,7 +223,10 @@ test("organizers review applications separately from approved volunteers with pe
       const directory = await get(path);
       assert.equal(directory.status, 200);
       const directoryHtml = await directory.text();
-      assert.match(directoryHtml, /data-volunteer-profile-link>approved</);
+      assert.match(
+        directoryHtml,
+        /data-volunteer-profile-link[^>]*><span>approved</,
+      );
       assert.doesNotMatch(
         directoryHtml,
         /applicant-\d+|data-volunteer-filters|draft-only|account-only/,
@@ -344,24 +355,29 @@ test("organizers review applications separately from approved volunteers with pe
     );
     await page.goto(`${origin}/applications?q=applicant&offset=50`);
     const progressSort = page.locator('[data-volunteer-sort="progress"]');
+    await expect(progressSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
     await progressSort.focus();
     await page.keyboard.press("Enter");
     await expect(progressSort.locator("..")).toHaveAttribute(
       "aria-sort",
-      "ascending",
+      "descending",
     );
     await expect(progressSort).toBeFocused();
     expect(new URL(page.url()).searchParams.has("offset")).toBe(false);
     await progressSort.click();
     await expect(progressSort.locator("..")).toHaveAttribute(
       "aria-sort",
-      "descending",
+      "ascending",
     );
+    await progressSort.click();
     await expect(
       page.getByRole("link", { name: "Next applications" }),
     ).toHaveAttribute(
       "href",
-      "/applications?q=applicant&sort=progress&direction=desc&offset=50",
+      "/applications?q=applicant&direction=desc&offset=50",
     );
     await page.getByRole("button", { name: /^Ready for review/ }).click();
     await expect(progressSort.locator("..")).toHaveAttribute(
@@ -395,8 +411,21 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(results.locator("tbody tr")).toHaveCount(3);
     await expect(results.getByRole("columnheader")).toHaveText([
       "Name",
+      "Role",
       "Status",
+      "Completed",
     ]);
+    const completedTime = results.locator("tbody tr").first().locator("time");
+    await expect(completedTime).toHaveAttribute("datetime", completedAt);
+    await expect(completedTime).toHaveText(
+      formatApplicationSubmittedTime(completedAt),
+    );
+    await expect(results.locator("tbody th [data-volunteer-role]")).toHaveCount(
+      0,
+    );
+    await expect(
+      results.locator('tbody td [data-volunteer-role="medic"]'),
+    ).toHaveText("Medic");
     await expect(results.locator('[data-state="ready"]').first()).toHaveText(
       "Ready for review",
     );
@@ -604,8 +633,9 @@ test("organizers review applications separately from approved volunteers with pe
     );
     await expect(results.locator('[data-state="in-progress"]')).toHaveCSS(
       "color",
-      "rgb(253, 224, 71)",
+      "rgb(212, 212, 216)",
     );
+    await expect(results.locator("tbody time")).toHaveCount(0);
     await page.goto(`${origin}${profileHref}`);
     await DB.prepare(
       "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='applicant-50'",
@@ -779,7 +809,7 @@ test("organizers review applications separately from approved volunteers with pe
     const approvedDirectory = await get("/volunteers?q=applicant-50");
     assert.match(
       await approvedDirectory.text(),
-      /data-volunteer-profile-link>applicant-50</,
+      /data-volunteer-profile-link[^>]*><span>applicant-50</,
     );
     await expect(progression.locator("[data-orientation-event]")).toContainText(
       "Queue orientation",
@@ -902,7 +932,7 @@ test("organizers review applications separately from approved volunteers with pe
       plain.getByRole("link", { name: "Back to applications" }),
     ).toHaveAttribute(
       "href",
-      "/applications?q=applicant-52&approval=awaiting&sort=progress&direction=desc",
+      "/applications?q=applicant-52&approval=awaiting&direction=desc",
     );
     await plain.goto(`${origin}/volunteers?q=approved&offset=50`);
     await plain.locator('[data-volunteer-sort="patrol"]').click();

@@ -72,7 +72,7 @@ export async function listApplications(
   search = "",
   offset = 0,
   approval: VolunteerApprovalFilter = "all",
-  sort: ApplicationSort = "name",
+  sort: ApplicationSort = "progress",
   direction: VolunteerSortDirection = "asc",
 ) {
   return listPeople(db, actor, search, offset, true, approval, sort, direction);
@@ -99,16 +99,29 @@ async function listPeople(
         AND v.registration_approved = ${applications ? 0 : 1}`;
   const query = search.slice(0, 100);
   const readyForReviewSql = `v.registration_approved = 0 AND v.application_rejection_reason IS NULL AND ${applicationReadyForReviewSql}`;
-  // Match visible roles and progress labels (In Progress, Ready for review,
-  // Rejected in ascending order), not raw account flags or milestone counts.
+  // Application badges show submitted medic-team interest, not approval or
+  // patrol eligibility. Approved volunteers retain the shared roster mark.
+  const directoryMedicMarkSql = applications
+    ? "EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')"
+    : medicMarkSql("u.id");
+  // Completion dates the last applicant prerequisite, not account creation,
+  // organizer approval, or patrol signup. SQLite max keeps missing steps null.
+  const applicationCompletedAtSql =
+    "max(p.registered_at, p.naloxone_completed_at)";
+  // Ascending status order is ready, in progress, rejected; descending reverses
+  // those groups. Match visible role badges, not raw account flags.
   // Only backend-owned expressions and directions enter ORDER BY. Sort the
   // entire matching directory before pagination, with stable name/id ties.
   const sortSql = applications
     ? sort === "progress"
-      ? `CASE WHEN coalesce(v.application_rejection_reason, '') <> '' THEN 'Rejected'
-            WHEN ${applicationReadyForReviewSql} THEN 'Ready for review'
-            ELSE 'In Progress' END COLLATE NOCASE`
-      : "name COLLATE NOCASE"
+      ? `CASE WHEN coalesce(v.application_rejection_reason, '') <> '' THEN 2
+            WHEN ${applicationReadyForReviewSql} THEN 0
+            ELSE 1 END`
+      : sort === "role"
+        ? `CASE WHEN ${directoryMedicMarkSql} THEN 'Medic' ELSE '' END COLLATE NOCASE`
+        : sort === "completed"
+          ? "applicationCompletedAt"
+          : "name COLLATE NOCASE"
     : sort === "role"
       ? `CASE WHEN u.role = 'organizer' THEN 'Organizer'
           WHEN category = 'new-volunteer' THEN 'New'
@@ -118,17 +131,13 @@ async function listPeople(
         ? "v.patrol_approved"
         : "name COLLATE NOCASE";
   const orderSql = `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}, name COLLATE NOCASE, u.id`;
-  // Application badges show submitted medic-team interest, not approval or
-  // patrol eligibility. Approved volunteers retain the shared roster mark.
-  const directoryMedicMarkSql = applications
-    ? "EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')"
-    : medicMarkSql("u.id");
   const [rows, counts] = (await db.batch([
     db
       .prepare(
         `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         ${applicationReadyForReviewSql} AS applicationReadyForReview,
+        ${applicationCompletedAtSql} AS applicationCompletedAt,
         ${attendeeCategorySql("u.id")} AS category,
         ${directoryMedicMarkSql} AS medicMark,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
@@ -146,7 +155,13 @@ async function listPeople(
       )
       .bind(query),
   ])) as [
-    D1Result<VolunteerRow & { category: AttendeeCategory; medicMark: number }>,
+    D1Result<
+      VolunteerRow & {
+        category: AttendeeCategory;
+        medicMark: number;
+        applicationCompletedAt: number | null;
+      }
+    >,
     D1Result<{ allApplicantsCount: number; awaitingApprovalCount: number }>,
   ];
   return {

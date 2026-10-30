@@ -1550,8 +1550,8 @@ body:has(
   display: inline-block;
   padding: 0.25rem 0.625rem;
   border-radius: 0.375rem;
-  color: #fde047;
-  background: #422006;
+  color: #d4d4d8;
+  background: #27272a;
 }
 .application-table-progress[data-state="ready"] {
   color: #4ade80;

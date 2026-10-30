@@ -6,6 +6,7 @@ import SearchIcon from "../icons/SearchIcon.astro";
 import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
 import CompactPersonName from "./CompactPersonName.astro";
+import { formatApplicationSubmittedTime } from "../../data/application";
 import {
   directoryListUrl,
   volunteerPageSize,
@@ -38,7 +39,9 @@ const columns = (
   applications
     ? [
         { key: "name", label: "Name" },
+        { key: "role", label: "Role" },
         { key: "progress", label: "Status" },
+        { key: "completed", label: "Completed" },
       ]
     : [
         { key: "name", label: "Name" },
@@ -137,7 +140,7 @@ const columns = (
         <caption class="sr-only">
           {
             applications
-              ? "Applicants and status"
+              ? "Applicants, roles, status, and completion dates"
               : "Approved volunteers, roles, and patrol access"
           }
         </caption>
@@ -196,31 +199,50 @@ const columns = (
                         href={profileHref(person.id)}
                         data-volunteer-profile-link
                       />
-                      {applications && Boolean(person.medicMark) && (
-                        <VolunteerRoleBadge role="medic" />
-                      )}
                     </div>
                   </div>
                 </th>
                 {applications ? (
-                  <td>
-                    <span
-                      class="application-table-progress"
-                      data-state={
-                        person.applicationRejectionReason
-                          ? "rejected"
+                  <>
+                    <td>
+                      {Boolean(person.medicMark) && (
+                        <VolunteerRoleBadge role="medic" />
+                      )}
+                    </td>
+                    <td>
+                      <span
+                        class="application-table-progress"
+                        data-state={
+                          person.applicationRejectionReason
+                            ? "rejected"
+                            : person.applicationReadyForReview
+                              ? "ready"
+                              : "in-progress"
+                        }
+                      >
+                        {person.applicationRejectionReason
+                          ? "Rejected"
                           : person.applicationReadyForReview
-                            ? "ready"
-                            : "in-progress"
-                      }
-                    >
-                      {person.applicationRejectionReason
-                        ? "Rejected"
-                        : person.applicationReadyForReview
-                          ? "Ready for review"
-                          : "In Progress"}
-                    </span>
-                  </td>
+                            ? "Ready for review"
+                            : "In Progress"}
+                      </span>
+                    </td>
+                    <td>
+                      {person.applicationCompletedAt !== null ? (
+                        <time
+                          datetime={new Date(
+                            person.applicationCompletedAt,
+                          ).toISOString()}
+                        >
+                          {formatApplicationSubmittedTime(
+                            new Date(
+                              person.applicationCompletedAt,
+                            ).toISOString(),
+                          )}
+                        </time>
+                      ) : null}
+                    </td>
+                  </>
                 ) : (
                   <>
                     <td>

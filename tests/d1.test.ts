@@ -963,8 +963,8 @@ test("review queue counts only review-ready applications matching search indepen
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
     0,
   );
-  // Sort the full mixed-progress result before slicing pages, using visible
-  // labels and case-insensitive name/id ties even in descending order.
+  // Sort the full result before slicing pages, retaining case-insensitive
+  // name/id ties even when the status groups are reversed.
   await env.DB.batch([
     env.DB.prepare(
       "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id='pending-52'",
@@ -978,6 +978,18 @@ test("review queue counts only review-ready applications matching search indepen
     env.DB.prepare(
       "UPDATE profile SET preferred_name='alpha' WHERE user_id='pending-03'",
     ),
+    env.DB.prepare(
+      "UPDATE profile SET teams='[\"medic\"]' WHERE user_id IN ('pending-01', 'pending-52')",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET registered_at=2000, naloxone_completed_at=3000 WHERE user_id='pending-50'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET registered_at=4000, naloxone_completed_at=1000 WHERE user_id='pending-51'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=5000 WHERE user_id='pending-01'",
+    ),
   ]);
   const pending = ids.filter((id) => id.startsWith("pending-"));
   const ties = ["pending-02", "pending-03"];
@@ -986,11 +998,59 @@ test("review queue counts only review-ready applications matching search indepen
     ...ties,
     ...otherNames.filter((id) => !["pending-01", "pending-52"].includes(id)),
   ];
+  const earlyCompletions = reviewNames.filter(
+    (id) => !["pending-50", "pending-51"].includes(id),
+  );
+  const defaultPages = await Promise.all(
+    [0, volunteerPageSize].map((offset) =>
+      listApplications(env.DB, actor, "", offset),
+    ),
+  );
+  const defaultRows = defaultPages.flatMap(({ rows }) => rows);
+  assert.deepEqual(
+    defaultRows.map(({ id }) => id),
+    [...reviewNames, "pending-52", "pending-01"],
+  );
+  for (const [id, completedAt] of [
+    ["pending-00", 0],
+    ["pending-50", 3000],
+    ["pending-51", 4000],
+    ["pending-52", null],
+    ["pending-01", 5000],
+  ] as const)
+    assert.equal(
+      defaultRows.find((row) => row.id === id)?.applicationCompletedAt,
+      completedAt,
+    );
   for (const [sort, direction, expected] of [
     ["name", "asc", [...ties, ...otherNames]],
     ["name", "desc", [...otherNames.toReversed(), ...ties]],
-    ["progress", "asc", ["pending-52", ...reviewNames, "pending-01"]],
-    ["progress", "desc", ["pending-01", ...reviewNames, "pending-52"]],
+    ["progress", "asc", [...reviewNames, "pending-52", "pending-01"]],
+    ["progress", "desc", ["pending-01", "pending-52", ...reviewNames]],
+    ["role", "asc", [...reviewNames, "pending-01", "pending-52"]],
+    ["role", "desc", ["pending-01", "pending-52", ...reviewNames]],
+    [
+      "completed",
+      "asc",
+      [
+        "pending-52",
+        ...earlyCompletions,
+        "pending-50",
+        "pending-51",
+        "pending-01",
+      ],
+    ],
+    [
+      "completed",
+      "desc",
+      [
+        "pending-01",
+        "pending-51",
+        "pending-50",
+        ...earlyCompletions,
+        "pending-52",
+      ],
+    ],
   ] as const) {
     const pages = await Promise.all(
       [0, volunteerPageSize].map((offset) =>
@@ -1026,7 +1086,7 @@ test("review queue counts only review-ready applications matching search indepen
   );
   await env.DB.batch([
     env.DB.prepare(
-      "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='pending-52'",
+      "UPDATE profile SET registered_at=0, naloxone_completed_at=0, teams='[]' WHERE user_id IN ('pending-01', 'pending-50', 'pending-51', 'pending-52')",
     ),
     env.DB.prepare(
       "UPDATE volunteer_status SET application_rejection_reason=NULL WHERE user_id='pending-01'",

@@ -20,10 +20,10 @@ test("application list state preserves approval, search, sorting and pagination 
     applicationListState(new URL(url, "https://example.org").searchParams),
   ).toEqual(state);
   expect(applicationListUrl({ ...state, offset: 0 })).toBe(
-    "/applications?q=Alex+%26+Sam&approval=awaiting&sort=progress&direction=desc",
+    "/applications?q=Alex+%26+Sam&approval=awaiting&direction=desc",
   );
   expect(applicationListUrl({ ...state, sort: "name", direction: "asc" })).toBe(
-    "/applications?q=Alex+%26+Sam&approval=awaiting&offset=50",
+    "/applications?q=Alex+%26+Sam&approval=awaiting&sort=name&offset=50",
   );
   expect(volunteerListReturnUrl("/manage/applications")).toBe("/applications");
   expect(
@@ -63,12 +63,16 @@ test("list return destinations are restricted and untrusted filter inputs are no
     volunteerListReturnUrl(
       "/manage/applications?sort=progress&direction=desc&offset=50",
     ),
-  ).toBe("/applications?sort=progress&direction=desc&offset=50");
+  ).toBe("/applications?direction=desc&offset=50");
+  expect(applicationListState(new URLSearchParams()).sort).toBe("progress");
   expect(applicationListState(new URLSearchParams("sort=role")).sort).toBe(
-    "name",
+    "role",
+  );
+  expect(applicationListState(new URLSearchParams("sort=completed")).sort).toBe(
+    "completed",
   );
   expect(applicationListState(new URLSearchParams("sort=patrol")).sort).toBe(
-    "name",
+    "progress",
   );
   expect(volunteerListState(new URLSearchParams("sort=progress")).sort).toBe(
     "name",
