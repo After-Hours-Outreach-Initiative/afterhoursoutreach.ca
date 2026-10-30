@@ -13,7 +13,8 @@ export function initVolunteerBrowser() {
   const error = root?.querySelector<HTMLElement>(
     "[data-volunteer-search-error]",
   );
-  if (!root || !search || !form || !results || !filters || !error) return;
+  if (!root || !search || !form || !results || !error) return;
+  const people = filters ? "applications" : "volunteers";
 
   root.dataset.rowNavigation = "true";
   results.addEventListener("click", (event) => {
@@ -49,19 +50,25 @@ export function initVolunteerBrowser() {
     // Read both before replacing either, so an expired organizer session cannot
     // leave a new count attached to stale results (or the reverse).
     const nextResults = actionFragment(page, "[data-volunteer-results]");
-    const nextFilters = actionFragment(page, "[data-volunteer-filters]");
+    const nextFilters = filters
+      ? actionFragment(page, "[data-volunteer-filters]")
+      : undefined;
     const focused = document.activeElement;
     const focusedFilter =
-      focused instanceof HTMLButtonElement && filters.contains(focused)
+      focused instanceof HTMLButtonElement && filters?.contains(focused)
         ? focused.dataset.volunteerFilter
         : undefined;
     results.replaceChildren(...nextResults.childNodes);
-    filters.replaceChildren(...nextFilters.childNodes);
-    form.querySelector<HTMLInputElement>('[name="approval"]')!.value =
-      filters.querySelector<HTMLButtonElement>('[aria-pressed="true"]')!.value;
+    if (filters && nextFilters) {
+      filters.replaceChildren(...nextFilters.childNodes);
+      form.querySelector<HTMLInputElement>('[name="approval"]')!.value =
+        filters.querySelector<HTMLButtonElement>(
+          '[aria-pressed="true"]',
+        )!.value;
+    }
     if (focusedFilter)
       filters
-        .querySelector<HTMLButtonElement>(
+        ?.querySelector<HTMLButtonElement>(
           `[data-volunteer-filter="${focusedFilter}"]`,
         )
         ?.focus({ preventScroll: true });
@@ -90,7 +97,7 @@ export function initVolunteerBrowser() {
       });
       if (!response.ok || response.redirected)
         throw new Error(
-          "Could not search volunteers. Check your organizer session.",
+          `Could not search ${people}. Check your organizer session.`,
         );
       const page = new DOMParser().parseFromString(
         await response.text(),
@@ -106,7 +113,7 @@ export function initVolunteerBrowser() {
         error.textContent =
           reason instanceof Error
             ? reason.message
-            : "Volunteer search is unavailable.";
+            : `Could not search ${people}. Please try again.`;
         error.hidden = false;
       }
     } finally {
@@ -121,7 +128,7 @@ export function initVolunteerBrowser() {
     event.preventDefault();
     void loadResults();
   });
-  filters.addEventListener("click", (event) => {
+  filters?.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const button = event.target.closest<HTMLButtonElement>(
       "[data-volunteer-filter]",

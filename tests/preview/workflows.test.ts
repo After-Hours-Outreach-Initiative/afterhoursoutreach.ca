@@ -173,7 +173,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
         body: Buffer.from(await response.arrayBuffer()),
       });
     });
-    await page.goto(`${origin}/manage/volunteers?approval=awaiting`);
+    await page.goto(`${origin}/manage/applications?approval=awaiting`);
     await expect(
       page.locator('[aria-label="Preview environment"]'),
     ).toBeVisible();
@@ -200,7 +200,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
         exact: true,
       }),
     ).toBeEnabled();
-    await page.getByRole("link", { name: "Back to volunteers" }).click();
+    await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
       "0",
     );

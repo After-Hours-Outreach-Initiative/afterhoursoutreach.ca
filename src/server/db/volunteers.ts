@@ -52,6 +52,26 @@ export async function listVolunteers(
   actor: Actor,
   search = "",
   offset = 0,
+) {
+  return listPeople(db, actor, search, offset, false);
+}
+
+export async function listApplications(
+  db: Env["DB"],
+  actor: Actor,
+  search = "",
+  offset = 0,
+  approval: VolunteerApprovalFilter = "all",
+) {
+  return listPeople(db, actor, search, offset, true, approval);
+}
+
+async function listPeople(
+  db: Env["DB"],
+  actor: Actor,
+  search: string,
+  offset: number,
+  applications: boolean,
   approval: VolunteerApprovalFilter = "all",
 ) {
   requireOrganizer(actor);
@@ -61,7 +81,8 @@ export async function listVolunteers(
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
       WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
-        AND u.deleted_at IS NULL`;
+        AND u.deleted_at IS NULL
+        AND v.registration_approved = ${applications ? 0 : 1}`;
   const query = search.slice(0, 100);
   const readyForReviewSql = `v.registration_approved = 0 AND v.application_rejection_reason IS NULL AND ${applicationReadyForReviewSql}`;
   const [rows, counts] = (await db.batch([

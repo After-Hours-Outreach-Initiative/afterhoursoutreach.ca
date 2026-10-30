@@ -2690,6 +2690,7 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     "/volunteers-other",
     "/manage/events-other",
     "/manage/volunteers-other",
+    "/manage/applications-other",
     "/manage/unrelated",
   ])
     assert.equal(safeReturnTo(value), "/volunteer/account");
@@ -2709,6 +2710,10 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     ],
     ["/manage/events?occurrence=a%2Fb", "/manage/events?occurrence=a%2Fb"],
     ["/manage/volunteers?q=Alex", "/manage/volunteers?q=Alex"],
+    [
+      "/manage/applications?approval=awaiting&q=Alex",
+      "/manage/applications?approval=awaiting&q=Alex",
+    ],
   ])
     assert.equal(safeReturnTo(value), expected);
   const request = new Request(origin, {

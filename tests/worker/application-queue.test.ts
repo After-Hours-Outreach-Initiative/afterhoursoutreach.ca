@@ -6,7 +6,7 @@ import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { formatApplicationSubmittedTime } from "../../src/data/application";
 
-test("organizers review submitted applications with search-aware filter counts and persistent list context", async () => {
+test("organizers review applications separately from approved volunteers with persistent list context", async () => {
   const origin = "https://afterhoursoutreach.ca";
   const secret = "application-queue-test-secret-12345678901234567890";
   const server = createTestHarness({
@@ -102,27 +102,34 @@ test("organizers review submitted applications with search-aware filter counts a
         headers: { cookie: auth },
       });
     const listPath =
-      "/manage/volunteers?approval=awaiting&q=applicant&offset=50";
+      "/manage/applications?approval=awaiting&q=applicant&offset=50";
     const anonymous = await get(listPath, "");
     assert.equal(anonymous.status, 302);
     assert.equal(
       new URL(anonymous.headers.get("location")!, origin).searchParams.get(
         "returnTo",
       ),
-      "/manage/volunteers?q=applicant&approval=awaiting&offset=50",
+      "/manage/applications?q=applicant&approval=awaiting&offset=50",
     );
-    for (const path of [listPath, "/manage/volunteers/applicant-50"])
+    for (const path of [
+      listPath,
+      "/manage/volunteers",
+      "/manage/volunteers/applicant-50",
+    ])
       assert.equal((await get(path, volunteerCookie)).status, 403);
     for (const [oldPath, destination] of [
       [
         "/volunteer/volunteers?approval=awaiting&q=applicant&offset=50",
-        listPath,
+        "/manage/volunteers?approval=awaiting&q=applicant&offset=50",
       ],
       [
         "/volunteer/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
         "/manage/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
       ],
-      ["/volunteers?approval=awaiting&q=applicant&offset=50", listPath],
+      [
+        "/volunteers?approval=awaiting&q=applicant&offset=50",
+        "/manage/volunteers?approval=awaiting&q=applicant&offset=50",
+      ],
       ["/volunteers/applicant-50", "/manage/volunteers/applicant-50"],
     ]) {
       const legacy = await get(oldPath);
@@ -183,6 +190,10 @@ test("organizers review submitted applications with search-aware filter counts a
         auth === cookie,
       );
       assert.equal(
+        eventHtml.includes('href="/manage/applications"'),
+        auth === cookie,
+      );
+      assert.equal(
         eventHtml.includes('href="/manage/events"'),
         auth === cookie,
       );
@@ -201,6 +212,19 @@ test("organizers review submitted applications with search-aware filter counts a
       html,
       /PRIVATE QUEUE ANSWER|SECRET DRAFT NAME|draft-only|account-only/,
     );
+    for (const path of [
+      "/manage/volunteers",
+      "/manage/volunteers?approval=awaiting",
+    ]) {
+      const directory = await get(path);
+      assert.equal(directory.status, 200);
+      const directoryHtml = await directory.text();
+      assert.match(directoryHtml, /data-volunteer-profile-link>approved</);
+      assert.doesNotMatch(
+        directoryHtml,
+        /applicant-\d+|data-volunteer-filters|draft-only|account-only/,
+      );
+    }
     const auditCount = () =>
       DB.prepare(
         "SELECT count(*) AS n FROM audit_log WHERE action='profile_viewed'",
@@ -236,6 +260,19 @@ test("organizers review submitted applications with search-aware filter counts a
         body: Buffer.from(await result.arrayBuffer()),
       });
     });
+    await page.goto(`${origin}/manage/volunteers`);
+    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
+      2,
+    );
+    await page.locator("[data-volunteer-search]").fill("approved");
+    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
+      1,
+    );
+    await expect(
+      page
+        .locator("[data-volunteer-results]")
+        .getByRole("link", { name: "approved", exact: true }),
+    ).toBeVisible();
     await page.goto(`${origin}${listPath}`);
     const count = page.locator("[data-awaiting-approval-count]");
     const allCount = page.locator("[data-all-applicants-count]");
@@ -244,12 +281,16 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(allCount).toHaveText("53");
     await expect(results.locator("tbody tr")).toHaveCount(3);
     await expect(results.getByRole("columnheader")).toHaveText([
-      "Name and role",
-      "Application",
-      "Patrol access",
-      "Orientations completed",
-      "Status",
+      "Name",
+      "Application Progress",
     ]);
+    await expect(results.locator('[data-state="ready"]').first()).toHaveText(
+      "Ready for review",
+    );
+    await expect(results.locator('[data-state="ready"]').first()).toHaveCSS(
+      "color",
+      "rgb(74, 222, 128)",
+    );
     const filters = page.getByRole("group", { name: "Application approval" });
     const allApplicants = filters.getByRole("button", {
       name: /^All \(\d+\)$/,
@@ -259,7 +300,7 @@ test("organizers review submitted applications with search-aware filter counts a
     });
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(
-      page.getByRole("link", { name: "Previous volunteers" }),
+      page.getByRole("link", { name: "Previous applications" }),
     ).toHaveAttribute("href", /q=applicant&approval=awaiting/);
     const documents: string[] = [];
     page.on("request", (request) => {
@@ -269,11 +310,11 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await expect(allApplicants).toBeFocused();
     await expect(results.locator("tbody tr")).toHaveCount(50);
-    await expect(page).toHaveURL(`${origin}/manage/volunteers?q=applicant`);
+    await expect(page).toHaveURL(`${origin}/manage/applications?q=applicant`);
     await awaitingApproval.click();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(
-      `${origin}/manage/volunteers?q=applicant&approval=awaiting`,
+      `${origin}/manage/applications?q=applicant&approval=awaiting`,
     );
     await page.goBack();
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
@@ -394,7 +435,7 @@ test("organizers review submitted applications with search-aware filter counts a
     );
     assert.equal(await auditCount(), 1);
     // Merely reading the application is not review completion.
-    await page.getByRole("link", { name: "Back to volunteers" }).click();
+    await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("53");
     await expect(results.locator("tbody tr")).toHaveCount(3);
     // The table scrolls within the viewport on small screens. Modifier clicks on
@@ -404,7 +445,7 @@ test("organizers review submitted applications with search-aware filter counts a
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBe(320);
     const tableRegion = results.getByRole("region", {
-      name: "Volunteer table",
+      name: "Application table",
     });
     expect(
       await tableRegion.evaluate(
@@ -418,7 +459,7 @@ test("organizers review submitted applications with search-aware filter counts a
       .first()
       .click({ modifiers: ["Control"] });
     await expect(page).toHaveURL(
-      `${origin}/manage/volunteers?q=applicant&approval=awaiting&offset=50`,
+      `${origin}/manage/applications?q=applicant&approval=awaiting&offset=50`,
     );
     await page.setViewportSize({ width: 1280, height: 900 });
     await results.locator("tbody tr").first().locator("td").first().click();
@@ -436,14 +477,23 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(
       applicationProgress.getByText("Ready for review", { exact: true }),
     ).toHaveCount(0);
-    const inProgressList = await get("/manage/volunteers?q=applicant-50");
+    const inProgressList = await get("/manage/applications?q=applicant-50");
     const inProgressHtml = await inProgressList.text();
-    assert.match(inProgressHtml, /Application in progress/);
+    assert.match(inProgressHtml, /data-state="in-progress">In Progress</);
     assert.match(inProgressHtml, /data-awaiting-approval-count>0</);
     const reviewQueue = await get(
-      "/manage/volunteers?q=applicant-50&approval=awaiting",
+      "/manage/applications?q=applicant-50&approval=awaiting",
     );
     assert.doesNotMatch(await reviewQueue.text(), /data-volunteer-row/);
+    await page.goto(`${origin}/manage/applications?q=applicant-50`);
+    await expect(results.locator('[data-state="in-progress"]')).toHaveText(
+      "In Progress",
+    );
+    await expect(results.locator('[data-state="in-progress"]')).toHaveCSS(
+      "color",
+      "rgb(253, 224, 71)",
+    );
+    await page.goto(`${origin}${profileHref}`);
     await DB.prepare(
       "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='applicant-50'",
     ).run();
@@ -613,6 +663,11 @@ test("organizers review submitted applications with search-aware filter counts a
     assert.equal(recorded?.marked_by, "organizer");
     assert.equal(recorded?.marked_at, 1);
     assert.ok(Number(recorded?.approved_at) > 1);
+    const approvedDirectory = await get("/manage/volunteers?q=applicant-50");
+    assert.match(
+      await approvedDirectory.text(),
+      /data-volunteer-profile-link>applicant-50</,
+    );
     await expect(progression.locator("[data-orientation-event]")).toContainText(
       "Queue orientation",
     );
@@ -622,17 +677,17 @@ test("organizers review submitted applications with search-aware filter counts a
       ).first("n"),
       0,
     );
-    await page.getByRole("link", { name: "Back to volunteers" }).click();
+    await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("52");
-    await expect(allCount).toHaveText("53");
+    await expect(allCount).toHaveText("52");
     await expect(results.locator("tbody tr")).toHaveCount(2);
     // Normal full-page links retain exactly the same list context.
     await page.goto(`${origin}${profileHref}`);
     await expect(
-      page.getByRole("link", { name: "Back to volunteers" }),
+      page.getByRole("link", { name: "Back to applications" }),
     ).toHaveAttribute(
       "href",
-      "/manage/volunteers?q=applicant&approval=awaiting&offset=50",
+      "/manage/applications?q=applicant&approval=awaiting&offset=50",
     );
     await page
       .getByRole("button", { name: "Revoke application approval" })
@@ -643,7 +698,7 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(
       page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeEnabled();
-    await page.getByRole("link", { name: "Back to volunteers" }).click();
+    await page.getByRole("link", { name: "Back to applications" }).click();
     await page.waitForLoadState("load");
     await expect(count).toHaveText("53");
     await expect(results.locator("tbody tr")).toHaveCount(3);
@@ -657,15 +712,15 @@ test("organizers review submitted applications with search-aware filter counts a
     await search.fill("approved");
     await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("1");
+    await expect(allCount).toHaveText("0");
     await allApplicants.click();
-    await expect(results.locator("tbody tr")).toHaveCount(1);
+    await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("1");
+    await expect(allCount).toHaveText("0");
     await expect(
       results.getByRole("link", { name: "approved", exact: true }),
-    ).toBeVisible();
-    await expect(page).toHaveURL(`${origin}/manage/volunteers?q=approved`);
+    ).toHaveCount(0);
+    await expect(page).toHaveURL(`${origin}/manage/applications?q=approved`);
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(results.locator("tbody tr")).toHaveCount(0);
@@ -678,7 +733,7 @@ test("organizers review submitted applications with search-aware filter counts a
     await expect(allCount).toHaveText("0");
     await search.fill("applicant");
     await expect(results.locator("tbody tr")).toHaveCount(50);
-    await page.getByRole("link", { name: "Next volunteers" }).click();
+    await page.getByRole("link", { name: "Next applications" }).click();
     await expect(results.locator("tbody tr")).toHaveCount(3);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(page.url()).searchParams.get("q")).toBe("applicant");
@@ -727,10 +782,10 @@ test("organizers review submitted applications with search-aware filter counts a
       }),
     ).toBeVisible();
     await expect(
-      plain.getByRole("link", { name: "Back to volunteers" }),
+      plain.getByRole("link", { name: "Back to applications" }),
     ).toHaveAttribute(
       "href",
-      "/manage/volunteers?q=applicant-52&approval=awaiting",
+      "/manage/applications?q=applicant-52&approval=awaiting",
     );
     // Returning through bfcache must refresh approval changes without losing the
     // restored search or page, even when the last page becomes empty.
@@ -745,7 +800,7 @@ test("organizers review submitted applications with search-aware filter counts a
       ),
     );
     await expect(count).toHaveText("50");
-    await expect(allCount).toHaveText("53");
+    await expect(allCount).toHaveText("50");
     await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(
       results.getByText(
@@ -753,15 +808,15 @@ test("organizers review submitted applications with search-aware filter counts a
       ),
     ).toBeVisible();
     expect(page.url()).toBe(restoredListUrl);
-    await page.getByRole("link", { name: "Previous volunteers" }).click();
+    await page.getByRole("link", { name: "Previous applications" }).click();
     await expect(results.locator("tbody tr")).toHaveCount(50);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1",
     ).run();
-    await page.goto(`${origin}/manage/volunteers?approval=awaiting`);
+    await page.goto(`${origin}/manage/applications?approval=awaiting`);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("55");
+    await expect(allCount).toHaveText("0");
     await expect(
       results.getByText("No applications are ready for review."),
     ).toBeVisible();
@@ -873,7 +928,7 @@ test("organizers review submitted applications with search-aware filter counts a
       .getByRole("button", { name: "Approve application", exact: true })
       .focus();
     await page.goto(
-      `${origin}/manage/volunteers?approval=awaiting&q=applicant-50`,
+      `${origin}/manage/applications?approval=awaiting&q=applicant-50`,
     );
     await expect(count).toHaveText("0");
     await page.getByRole("button", { name: "All (1)", exact: true }).click();

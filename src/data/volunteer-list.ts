@@ -16,19 +16,39 @@ export function volunteerListState(params: URLSearchParams) {
 }
 
 export function volunteerListUrl(state: ReturnType<typeof volunteerListState>) {
-  const params = new URLSearchParams();
-  if (state.search) params.set("q", state.search);
-  if (state.approval === "awaiting") params.set("approval", state.approval);
-  if (state.offset) params.set("offset", String(state.offset));
-  const query = params.toString();
-  return `/manage/volunteers${query ? `?${query}` : ""}`;
+  return listUrl(state, false);
 }
 
-/** Only return to the organizer list, never a supplied external destination. */
+export function applicationListUrl(
+  state: ReturnType<typeof volunteerListState>,
+) {
+  return listUrl(state, true);
+}
+
+function listUrl(
+  state: ReturnType<typeof volunteerListState>,
+  applications: boolean,
+) {
+  const params = new URLSearchParams();
+  if (state.search) params.set("q", state.search);
+  if (applications && state.approval === "awaiting")
+    params.set("approval", state.approval);
+  if (state.offset) params.set("offset", String(state.offset));
+  const query = params.toString();
+  return `/manage/${applications ? "applications" : "volunteers"}${query ? `?${query}` : ""}`;
+}
+
+/** Only return to organizer lists, never a supplied external destination. */
 export function volunteerListReturnUrl(value: string | null) {
-  if (!value || !/^\/(?:(?:manage|volunteer)\/)?volunteers\?/.test(value))
+  if (
+    !value ||
+    !/^\/(?:manage\/applications|(?:(?:manage|volunteer)\/)?volunteers)(?:\?|$)/.test(
+      value,
+    )
+  )
     return "/manage/volunteers";
-  return volunteerListUrl(
-    volunteerListState(new URLSearchParams(value.split("?")[1])),
-  );
+  const url = value.startsWith("/manage/applications")
+    ? applicationListUrl
+    : volunteerListUrl;
+  return url(volunteerListState(new URLSearchParams(value.split("?")[1])));
 }

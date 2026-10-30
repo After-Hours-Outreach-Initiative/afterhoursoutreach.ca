@@ -731,7 +731,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     const awaiting = await DB.prepare(
       "SELECT count(*) n FROM profile p JOIN volunteer_status v ON v.user_id=p.user_id JOIN user u ON u.id=p.user_id WHERE v.registration_approved=0 AND v.application_rejection_reason IS NULL AND p.registered_at IS NOT NULL AND p.naloxone_completed_at IS NOT NULL AND u.deleted_at IS NULL",
     ).first<number>("n");
-    await organizerPage.goto(`${origin}/manage/volunteers?approval=awaiting`);
+    await organizerPage.goto(`${origin}/manage/applications?approval=awaiting`);
     await expect(
       organizerPage.locator("[data-awaiting-approval-count]"),
     ).toHaveText(String(awaiting));

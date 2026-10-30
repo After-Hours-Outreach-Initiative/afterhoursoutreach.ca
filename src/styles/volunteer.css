@@ -1490,6 +1490,28 @@ body:has(
     width: 10%;
   }
 }
+.application-table {
+  min-width: 26rem;
+  table-layout: auto;
+}
+.application-table thead th:nth-child(-n + 2) {
+  width: 50%;
+}
+.application-table-progress {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  color: #fde047;
+  background: #422006;
+}
+.application-table-progress[data-state="ready"] {
+  color: #4ade80;
+  background: #052e16;
+}
+.application-table-progress[data-state="rejected"] {
+  color: #fca5a5;
+  background: #450a0a;
+}
 [data-volunteer-profile] {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

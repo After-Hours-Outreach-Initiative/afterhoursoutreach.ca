@@ -32,6 +32,7 @@ export function siteNavigation(
                   href: "/manage/events",
                   children: [
                     { label: "Events", href: "/manage/events" },
+                    { label: "Applications", href: "/manage/applications" },
                     { label: "Volunteers", href: "/manage/volunteers" },
                   ],
                 },

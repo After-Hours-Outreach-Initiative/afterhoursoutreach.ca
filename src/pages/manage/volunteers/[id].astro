@@ -28,9 +28,6 @@ let applicationProgress: Awaited<ReturnType<typeof loadApplicationProgress>>;
 let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
-const returnUrl = volunteerListReturnUrl(
-  Astro.url.searchParams.get("returnTo"),
-);
 try {
   const { actor, headers, email, greetingName } = await accountContext(
     env,
@@ -71,6 +68,12 @@ try {
 }
 if (!profile || !person)
   return new Response("Volunteer not found", { status: 404 });
+const returnUrl = volunteerListReturnUrl(
+  Astro.url.searchParams.get("returnTo") ??
+    (person.applicationApproved
+      ? "/manage/volunteers"
+      : "/manage/applications"),
+);
 // const discord = await loadDiscordStatus(env, person.id);
 ---
 
@@ -85,7 +88,13 @@ if (!profile || !person)
 >
   <a class="volunteer-back-link" href={returnUrl}>
     <ArrowRightIcon class="size-[1.25em] shrink-0 rotate-180" />
-    <span>Back to volunteers</span>
+    <span
+      >{
+        returnUrl.startsWith("/manage/applications")
+          ? "Back to applications"
+          : "Back to volunteers"
+      }</span
+    >
   </a>
   <section class="volunteer-panel">
     <VolunteerProfileView

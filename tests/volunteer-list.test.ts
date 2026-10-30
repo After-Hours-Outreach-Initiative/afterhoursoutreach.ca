@@ -1,21 +1,28 @@
 import { expect, test } from "vitest";
 import {
+  applicationListUrl,
   volunteerListReturnUrl,
   volunteerListState,
   volunteerListUrl,
 } from "../src/data/volunteer-list";
 
-test("organizer list state preserves approval, search and pagination in profile return links", () => {
+test("application list state preserves approval, search and pagination in profile return links", () => {
   const state = volunteerListState(
     new URLSearchParams("approval=awaiting&q=Alex+%26+Sam&offset=50"),
   );
-  const url = volunteerListUrl(state);
+  const url = applicationListUrl(state);
   expect(volunteerListReturnUrl(url)).toBe(url);
   expect(
     volunteerListState(new URL(url, "https://example.org").searchParams),
   ).toEqual(state);
-  expect(volunteerListUrl({ ...state, offset: 0 })).toBe(
-    "/manage/volunteers?q=Alex+%26+Sam&approval=awaiting",
+  expect(applicationListUrl({ ...state, offset: 0 })).toBe(
+    "/manage/applications?q=Alex+%26+Sam&approval=awaiting",
+  );
+  expect(volunteerListUrl(state)).toBe(
+    "/manage/volunteers?q=Alex+%26+Sam&offset=50",
+  );
+  expect(volunteerListReturnUrl("/manage/applications")).toBe(
+    "/manage/applications",
   );
   expect(
     volunteerListReturnUrl(
@@ -30,6 +37,8 @@ test("list return destinations are restricted and untrusted filter inputs are no
     "https://evil.example/volunteers?q=x",
     "//evil.example",
     "/volunteers/another?q=x",
+    "/manage/applications/another?q=x",
+    "/manage/applications-other?q=x",
     "/volunteer/events",
   ])
     expect(volunteerListReturnUrl(value)).toBe("/manage/volunteers");

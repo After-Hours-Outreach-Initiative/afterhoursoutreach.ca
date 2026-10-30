@@ -61,7 +61,7 @@ export function safeReturnTo(value: string | undefined): string {
     const url = new URL(value, "https://local.invalid");
     if (
       url.origin !== "https://local.invalid" ||
-      !/^(?:\/(?:volunteer|volunteers)(?:\/|$)|\/manage\/(?:events\/?|volunteers(?:\/[^/]+)?\/?)$|\/(?:events|apply|register)\/?$)/.test(
+      !/^(?:\/(?:volunteer|volunteers)(?:\/|$)|\/manage\/(?:events\/?|applications\/?|volunteers(?:\/[^/]+)?\/?)$|\/(?:events|apply|register)\/?$)/.test(
         url.pathname,
       ) ||
       url.pathname.startsWith("/volunteer/sign-in")

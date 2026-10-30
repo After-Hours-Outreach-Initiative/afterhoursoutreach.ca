@@ -39,6 +39,7 @@ import {
 import { RequestError } from "../src/server/http";
 import {
   listVolunteers,
+  listApplications,
   setVolunteerStatus,
   rejectApplication,
   viewVolunteerProfile,
@@ -645,8 +646,8 @@ test("new medic marks require application approval and team selection without sa
     1,
   );
   assert.equal(
-    directory.find(({ id }) => id === "pending-medic")?.medicMark,
-    0,
+    directory.find(({ id }) => id === "pending-medic"),
+    undefined,
   );
   assert.equal(directory.find(({ id }) => id === "outreach")?.medicMark, 0);
 
@@ -786,13 +787,13 @@ test("review queue counts only review-ready applications matching search indepen
     "INSERT INTO volunteer_status (user_id, updated_at) VALUES ('account-only', 0)",
   ).run();
   const count = volunteerPageSize + 3;
-  const first = await listVolunteers(env.DB, actor, "", 0, "awaiting");
+  const first = await listApplications(env.DB, actor, "", 0, "awaiting");
   assert.equal(first.awaitingApprovalCount, count);
   assert.equal(first.rows.length, volunteerPageSize);
   assert.equal(first.hasMore, true);
   assert.equal(first.rows[0].active, 0); // Inactive is not an approval state.
   assert.equal(first.rows[1].patrolApproved, 1); // Neither is patrol approval.
-  const second = await listVolunteers(
+  const second = await listApplications(
     env.DB,
     actor,
     "",
@@ -812,17 +813,25 @@ test("review queue counts only review-ready applications matching search indepen
     ["approved", 0],
   ] as const)
     assert.equal(
-      (await listVolunteers(env.DB, actor, search, 0, "awaiting"))
+      (await listApplications(env.DB, actor, search, 0, "awaiting"))
         .awaitingApprovalCount,
       expected,
     );
   assert.deepEqual(
-    (await listVolunteers(env.DB, actor, "approved", 0, "awaiting")).rows,
+    (await listApplications(env.DB, actor, "approved", 0, "awaiting")).rows,
     [],
   );
   assert.equal(
     (await listVolunteers(env.DB, actor, "approved")).rows[0].id,
     "approved",
+  );
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor)).rows.map(({ id }) => id).sort(),
+    ["approved", actor.id],
+  );
+  assert.equal(
+    (await listApplications(env.DB, actor)).allApplicantsCount,
+    count,
   );
   assert.equal(
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
@@ -837,34 +846,38 @@ test("review queue counts only review-ready applications matching search indepen
   assert.equal(profile?.codeOfConductAcceptedAt, null);
   assert.equal(profile?.submission, null);
   assert.equal(
-    (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting")).rows
+    (await listApplications(env.DB, actor, "pending-02", 0, "awaiting")).rows
       .length,
     1,
   );
   assert.equal(
-    (await listVolunteers(env.DB, actor)).awaitingApprovalCount,
+    (await listApplications(env.DB, actor)).awaitingApprovalCount,
     count,
   );
   // A submitted form is still in progress until the earlier course step is complete.
   await env.DB.prepare(
     "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id='pending-02'",
   ).run();
-  const inProgress = await listVolunteers(env.DB, actor, "pending-02");
+  const inProgress = await listApplications(env.DB, actor, "pending-02");
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "pending-02")).rows,
+    [],
+  );
   assert.equal(inProgress.rows[0].applicationReadyForReview, 0);
   assert.equal(inProgress.allApplicantsCount, 1);
   assert.equal(inProgress.awaitingApprovalCount, 0);
   assert.deepEqual(
-    (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting")).rows,
+    (await listApplications(env.DB, actor, "pending-02", 0, "awaiting")).rows,
     [],
   );
   assert.equal(
-    (await listVolunteers(env.DB, actor)).awaitingApprovalCount,
+    (await listApplications(env.DB, actor)).awaitingApprovalCount,
     count - 1,
   );
   await env.DB.prepare(
     "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='pending-02'",
   ).run();
-  const ready = await listVolunteers(
+  const ready = await listApplications(
     env.DB,
     actor,
     "pending-02",
@@ -967,7 +980,7 @@ test("review queue counts only review-ready applications matching search indepen
     if (patrolApproved)
       assert.doesNotMatch(email!.body, /Naloxone|Volunteer page/);
   }
-  const after = await listVolunteers(
+  const after = await listApplications(
     env.DB,
     actor,
     "pending-02",
@@ -1008,9 +1021,13 @@ test("review queue counts only review-ready applications matching search indepen
     /check your events|register for an available spot/,
   );
   assert.equal(
-    (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting"))
+    (await listApplications(env.DB, actor, "pending-02", 0, "awaiting"))
       .awaitingApprovalCount,
     1,
+  );
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "pending-02")).rows,
+    [],
   );
   for (const denied of [
     { ...actor, role: "volunteer" as const },
@@ -1019,7 +1036,7 @@ test("review queue counts only review-ready applications matching search indepen
     { ...actor, twoFactorEnabled: true, twoFactorVerified: false },
   ])
     await assert.rejects(
-      listVolunteers(env.DB, denied, "", 0, "awaiting"),
+      listApplications(env.DB, denied, "", 0, "awaiting"),
       statusError(403),
     );
   // Organizer event access is a role exception, not application approval.
@@ -1028,7 +1045,7 @@ test("review queue counts only review-ready applications matching search indepen
   )
     .bind(actor.id)
     .run();
-  const organizerQueue = await listVolunteers(
+  const organizerQueue = await listApplications(
     env.DB,
     { ...actor, applicationApproved: false },
     "queue-organizer",
@@ -1039,7 +1056,7 @@ test("review queue counts only review-ready applications matching search indepen
   assert.equal(organizerQueue.rows[0].id, actor.id);
   const rejection = {
     userId: "pending-02",
-    version: (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
+    version: (await listApplications(env.DB, actor, "pending-02")).rows[0]
       .updatedAt,
     reason: "We cannot accommodate your availability.",
   };
@@ -1050,7 +1067,7 @@ test("review queue counts only review-ready applications matching search indepen
     rejection.reason,
   );
   assert.equal(
-    (await listVolunteers(env.DB, actor, rejection.userId, 0, "awaiting"))
+    (await listApplications(env.DB, actor, rejection.userId, 0, "awaiting"))
       .awaitingApprovalCount,
     0,
   );
