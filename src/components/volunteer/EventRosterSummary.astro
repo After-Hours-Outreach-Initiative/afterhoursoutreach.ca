@@ -56,11 +56,17 @@ const newMedicCount = roster.filter(
     outline-offset: 3px;
   }
   :global(details[open]) > .event-roster-toggle {
-    border-color: #818cf8;
+    border-color: var(--event-roster-open-border);
+    border-radius: 0.5rem 0.5rem 0 0;
     background: #16214a;
   }
   :global(details[open]) > .event-roster-toggle :global(.event-roster-chevron) {
     transform: rotate(180deg);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .event-roster-toggle > :global(.event-roster-chevron) {
+      transition: transform 180ms ease-out;
+    }
   }
   @container event-card (min-width: 32rem) {
     .event-roster-toggle {

@@ -113,12 +113,11 @@ test("empty volunteer rosters reserve no space through first/last signup updates
     };
     await setRegistration("join");
     for (const [index, card] of cards.entries()) {
-      await expect(roster(card).locator("summary")).toHaveText(
-        "Volunteers (1)",
-        {
-          timeout: 15_000,
-        },
-      );
+      await expect(
+        roster(card).locator("summary > span:first-child"),
+      ).toHaveText("Volunteers (1)", {
+        timeout: 15_000,
+      });
       await expect(
         roster(card).locator("summary .event-avatar-row .attendee-avatar"),
       ).toHaveCount(1);
@@ -131,9 +130,42 @@ test("empty volunteer rosters reserve no space through first/last signup updates
       expect(registered.height).toBeGreaterThan(initial[index].height);
       expect(registered.rosterHeight).toBeGreaterThan(0);
       expect(registered.actionTop).toBe(initial[index].actionTop);
+      await card.page().emulateMedia({
+        reducedMotion: index === 1 ? "reduce" : "no-preference",
+      });
       await roster(card).locator("summary").focus();
       await roster(card).locator("summary").press("Enter");
+      await expect(roster(card).locator("summary")).toHaveCSS(
+        "border-bottom-left-radius",
+        "0px",
+      );
       await expect(roster(card).locator("tbody tr")).toHaveCount(1);
+      const disclosure = await roster(card).evaluate((element) => {
+        const summary = element.querySelector("summary")!;
+        const panel = element.querySelector("table")!;
+        const triggerBounds = summary.getBoundingClientRect();
+        const panelBounds = panel.getBoundingClientRect();
+        return {
+          gap: panelBounds.top - triggerBounds.bottom,
+          sameWidth: panelBounds.width === triggerBounds.width,
+          joinedRadii: [
+            getComputedStyle(summary).borderBottomLeftRadius,
+            getComputedStyle(panel).borderTopLeftRadius,
+          ],
+          matchingBorder:
+            getComputedStyle(panel).borderLeftColor ===
+            getComputedStyle(summary).borderLeftColor,
+          transition: getComputedStyle(element, "::details-content")
+            .transitionDuration,
+        };
+      });
+      expect(disclosure).toEqual({
+        gap: 0,
+        sameWidth: true,
+        joinedRadii: ["0px", "0px"],
+        matchingBorder: true,
+        transition: index === 1 ? "0s" : "0.18s",
+      });
       const registrations = roster(card).locator(".event-roster-name time");
       await expect(registrations).toHaveCount(index === 0 ? 1 : 0);
       if (index === 0) {
@@ -184,9 +216,9 @@ test("empty volunteer rosters reserve no space through first/last signup updates
         },
         updated: async () => {
           if (joining) {
-            await expect(roster(publicCard).locator("summary")).toHaveText(
-              "Volunteers (1)",
-            );
+            await expect(
+              roster(publicCard).locator("summary > span:first-child"),
+            ).toHaveText("Volunteers (1)");
             await expect(
               roster(publicCard).locator("summary .attendee-avatar"),
             ).toHaveCount(1);
@@ -300,6 +332,10 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         await expect(
           roster.getByRole("table", { name: "Registered volunteers" }),
         ).toBeVisible();
+        await expect(summary.locator(".event-roster-chevron")).toHaveCSS(
+          "transform",
+          "matrix(-1, 0, 0, -1, 0, 0)",
+        );
         await expect(roster.locator("tbody tr")).toHaveCount(2);
         const layout = await card.evaluate((element) => {
           const rows = [...element.querySelectorAll("tbody tr")];

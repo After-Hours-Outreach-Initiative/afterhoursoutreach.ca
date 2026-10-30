@@ -1883,13 +1883,32 @@ body:has(
   width: fit-content;
   align-content: center;
 }
+.event-roster {
+  --event-roster-open-border: #818cf8;
+  margin-top: 0.5rem;
+  border: 0;
+  padding: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .event-roster::details-content {
+    opacity: 0;
+  }
+  .event-roster[open]::details-content {
+    opacity: 1;
+    /* Animate opening only; restored open rosters from live updates stay steady. */
+    transition: opacity 180ms ease-out;
+  }
+}
 .event-roster-table {
   width: 100%;
-  margin-top: 0.75rem;
+  margin: 0;
   table-layout: fixed;
-  border: var(--volunteer-border);
-  border-radius: 0.5rem;
+  border: 1px solid var(--event-roster-open-border);
+  border-top: 0;
+  border-radius: 0 0 0.5rem 0.5rem;
+  border-collapse: separate;
   border-spacing: 0;
+  overflow: hidden;
   text-align: left;
 }
 .event-roster-table :is(th, td) {

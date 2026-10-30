@@ -15,7 +15,7 @@ interface Props {
 const { event, roster, future, destinations } = Astro.props;
 ---
 
-<details class="volunteer-roster">
+<details class="volunteer-roster event-roster">
   <EventRosterSummary roster={roster} event={event} />
   <table class="event-roster-table">
     <caption class="sr-only">Registered volunteers</caption>
@@ -101,10 +101,3 @@ const { event, roster, future, destinations } = Astro.props;
     </tbody>
   </table>
 </details>
-
-<style>
-  .volunteer-roster {
-    border-top: 0;
-    padding-top: 0;
-  }
-</style>
