@@ -117,6 +117,11 @@ async function listPeople(
         ? "v.patrol_approved"
         : "name COLLATE NOCASE";
   const orderSql = `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}, name COLLATE NOCASE, u.id`;
+  // Application badges show submitted medic-team interest, not approval or
+  // patrol eligibility. Approved volunteers retain the shared roster mark.
+  const directoryMedicMarkSql = applications
+    ? "EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')"
+    : medicMarkSql("u.id");
   const [rows, counts] = (await db.batch([
     db
       .prepare(
@@ -124,7 +129,7 @@ async function listPeople(
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         ${applicationReadyForReviewSql} AS applicationReadyForReview,
         ${attendeeCategorySql("u.id")} AS category,
-        ${medicMarkSql("u.id")} AS medicMark,
+        ${directoryMedicMarkSql} AS medicMark,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       ${applicantsSql}
         AND (? = 'all' OR (${readyForReviewSql}))

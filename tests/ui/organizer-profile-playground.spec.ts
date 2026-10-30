@@ -46,6 +46,7 @@ test("organizer profile catalogue exposes every real profile state without accou
     "naloxone-pending": "Complete Naloxone 101",
     "ready-for-review": "Application review",
     rejected: "Application rejected",
+    "medic-applicant": "Application review",
     accepted: "New volunteer",
     "orientation-booked": "New volunteer",
     "orientation-completed": "New volunteer",
@@ -59,7 +60,7 @@ test("organizer profile catalogue exposes every real profile state without accou
     "profile-updated": "Outreach Volunteer",
     "legacy-patrol": "Medic",
   };
-  await expect(page.locator("[data-ui-profile-scenario]")).toHaveCount(15);
+  await expect(page.locator("[data-ui-profile-scenario]")).toHaveCount(16);
   for (const [id, step] of Object.entries(states)) {
     await page.locator(`[data-ui-profile-scenario="${id}"]`).click();
     await expect(
@@ -78,7 +79,7 @@ test("organizer profile catalogue exposes every real profile state without accou
   }
   await page.getByRole("searchbox", { name: "Find a state" }).fill("medic");
   await expect(page.locator("[data-ui-profile-scenario]:visible")).toHaveCount(
-    2,
+    3,
   );
   await page
     .getByRole("searchbox", { name: "Find a state" })

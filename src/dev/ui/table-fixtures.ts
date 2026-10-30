@@ -35,7 +35,7 @@ export function tableScenarios(kind: TableKind) {
       label: "Representative rows",
       description:
         kind === "applications"
-          ? "Submitted applications in progress, ready for review, and rejected. Unsubmitted drafts stay private."
+          ? "Medic and outreach applications in progress, ready for review, and rejected. Unsubmitted drafts stay private."
           : "Organizers, medics, outreach volunteers, and new volunteers, with both patrol access states and medic marks.",
     },
     {
@@ -129,6 +129,7 @@ const applicationProfiles = [
   "naloxone-pending",
   "ready-for-review",
   "rejected",
+  "medic-applicant",
 ];
 const volunteerProfiles = [
   "organizer",
@@ -193,13 +194,14 @@ export function createTableFixture(
       : volunteerProfiles[variant]!;
     profiles.set(
       id,
-      options.scenario === "none-ready" && profile === "ready-for-review"
+      options.scenario === "none-ready" &&
+        ["ready-for-review", "medic-applicant"].includes(profile)
         ? "naloxone-pending"
         : profile,
     );
     const ready =
       applications &&
-      profile === "ready-for-review" &&
+      ["ready-for-review", "medic-applicant"].includes(profile) &&
       options.scenario !== "none-ready";
     const name = (options.scenario === "long-names" ? longNames : names)[
       variant
@@ -217,7 +219,11 @@ export function createTableFixture(
           : [1, 6].includes(variant)
             ? "medic"
             : "outreach-volunteer",
-      medicMark: Number(!applications && [1, 4, 6].includes(variant)),
+      medicMark: Number(
+        applications
+          ? profile === "medic-applicant" && options.scenario !== "none-ready"
+          : [1, 4, 6].includes(variant),
+      ),
       active: Number(variant !== 7),
       applicationApproved: Number(!applications),
       applicationReadyForReview: Number(!applications || ready),

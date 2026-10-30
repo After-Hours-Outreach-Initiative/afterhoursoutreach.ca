@@ -582,6 +582,7 @@ test("new medic marks require application approval and team selection without sa
     ["outreach", true, true, ["outreach"]],
     ["eligible-medic", true, true, ["medic"]],
     ["pending-medic", false, false, ["medic"]],
+    ["pending-outreach", false, false, ["outreach"]],
   ] as const) {
     const actor: Actor = {
       ...(await draftActor(id)),
@@ -663,6 +664,17 @@ test("new medic marks require application approval and team selection without sa
     undefined,
   );
   assert.equal(directory.find(({ id }) => id === "outreach")?.medicMark, 0);
+  // Application presentation shows selected teams before approval, even while
+  // the avatar category is new-volunteer; it does not change roster eligibility.
+  assert.deepEqual(
+    (await listApplications(env.DB, organizer)).rows.map(
+      ({ id, category, medicMark }) => ({ id, category, medicMark }),
+    ),
+    [
+      { id: "pending-medic", category: "new-volunteer", medicMark: 1 },
+      { id: "pending-outreach", category: "new-volunteer", medicMark: 0 },
+    ],
+  );
 
   const selected = (await listEvents(env.DB, newMedic)).find(
     ({ id }) => id === "reserved",

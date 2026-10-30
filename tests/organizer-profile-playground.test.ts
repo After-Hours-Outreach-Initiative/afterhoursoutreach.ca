@@ -11,9 +11,9 @@ import {
 
 describe("organizer profile playground fixtures", () => {
   test("every listed state has a deterministic, internally consistent fictional profile", () => {
-    expect(organizerProfileScenarios).toHaveLength(15);
+    expect(organizerProfileScenarios).toHaveLength(16);
     expect(new Set(organizerProfileScenarios.map(({ id }) => id)).size).toBe(
-      15,
+      16,
     );
     for (const scenario of organizerProfileScenarios) {
       const options = readProfileOptions(

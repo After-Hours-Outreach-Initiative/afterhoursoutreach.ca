@@ -171,7 +171,7 @@ const columns = (
                       data-volunteer-sort={key}
                       aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
                     >
-                      {label}
+                      <span>{label}</span>
                       <ArrowRightIcon class="volunteer-table-sort-icon" />
                     </a>
                   </th>
@@ -185,30 +185,24 @@ const columns = (
             people.rows.map((person) => (
               <tr data-volunteer-row>
                 <th scope="row">
-                  {applications ? (
-                    <a
-                      href={profileHref(person.id)}
-                      data-volunteer-profile-link
-                    >
-                      {person.name}
-                    </a>
-                  ) : (
-                    <div class="volunteer-table-person">
-                      <AttendeeAvatar
-                        category={person.category}
-                        medicMark={Boolean(person.medicMark)}
-                        decorative
-                      />
-                      <div class="volunteer-table-name">
-                        <a
-                          href={profileHref(person.id)}
-                          data-volunteer-profile-link
-                        >
-                          {person.name}
-                        </a>
-                      </div>
+                  <div class="volunteer-table-person">
+                    <AttendeeAvatar
+                      category={person.category}
+                      medicMark={Boolean(person.medicMark)}
+                      decorative
+                    />
+                    <div class="volunteer-table-name">
+                      <a
+                        href={profileHref(person.id)}
+                        data-volunteer-profile-link
+                      >
+                        {person.name}
+                      </a>
+                      {applications && Boolean(person.medicMark) && (
+                        <VolunteerRoleBadge role="medic" />
+                      )}
                     </div>
-                  )}
+                  </div>
                 </th>
                 {applications ? (
                   <td>

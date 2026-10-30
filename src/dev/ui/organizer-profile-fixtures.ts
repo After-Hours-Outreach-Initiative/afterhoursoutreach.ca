@@ -44,6 +44,14 @@ export const organizerProfileScenarios: ProfileScenario[] = import.meta.env.DEV
           "A rejected application with its recorded, multiline reason.",
       },
       {
+        id: "medic-applicant",
+        group: "Application review",
+        label: "Medic applicant",
+        description:
+          "A review-ready application with medic team interest, not yet approved.",
+        medic: true,
+      },
+      {
         id: "accepted",
         group: "Orientation",
         label: "New volunteer",
