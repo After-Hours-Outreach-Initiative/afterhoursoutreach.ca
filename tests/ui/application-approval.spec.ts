@@ -4,6 +4,7 @@ import {
   approveLocalApplication,
   createLocalAccount,
   openLocalAccountSwitcher,
+  signInLocalAuthenticatorAccount,
 } from "../helpers/local-account";
 
 async function expectCompletedStep(step: Locator) {
@@ -32,6 +33,87 @@ async function expectCompletedStep(step: Locator) {
     "18px",
   );
 }
+
+test("application table opens a focused review with guarded decisions and list context", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  test.skip(!baseURL?.startsWith("http://localhost:"));
+  const applicantContext = await browser.newContext();
+  try {
+    const account = await createLocalAccount(
+      applicantContext.request,
+      baseURL!,
+    );
+    const applicationPath = `/applications/${account.id}`;
+    await signInLocalAuthenticatorAccount(page.request, baseURL!);
+    const listPath = `/applications?${new URLSearchParams({
+      q: account.name,
+      sort: "completed",
+      direction: "desc",
+    })}`;
+    await page.goto(listPath);
+    const row = page.locator("[data-volunteer-row]").filter({
+      has: page.locator(`a[href^="${applicationPath}?"]`),
+    });
+    await expect(row.locator("[data-volunteer-profile-link]")).toHaveAttribute(
+      "href",
+      `${applicationPath}?returnTo=${encodeURIComponent(listPath)}`,
+    );
+    await row.locator("td").last().click();
+    const review = page.locator("[data-application-review]");
+    await expect(review.getByRole("heading", { level: 1 })).toContainText(
+      account.name,
+    );
+    await expect(
+      review.getByRole("heading", { name: "Progress", exact: true }),
+    ).toBeVisible();
+    await expect(review.locator("[data-volunteer-progression]")).toHaveCount(0);
+    const approve = review.getByRole("button", {
+      name: "Approve application",
+      exact: true,
+    });
+    const reject = review.getByRole("button", {
+      name: "Reject application",
+      exact: true,
+    });
+    for (const button of [approve, reject]) {
+      await expect(button).toBeDisabled();
+      await expect(button).toHaveCSS("background-color", "rgb(39, 39, 42)");
+    }
+    const steps = review.locator("[data-application-mini-step]");
+    await expect(steps).toHaveCount(3);
+    await expect(steps.locator("time")).toHaveCount(1);
+    await expect(steps.locator("time")).toHaveText(/\d{1,2}:\d{2}/);
+    const completion = await applicantContext.request.post(
+      "/api/v1/account/naloxone",
+      {
+        headers: { origin: baseURL! },
+        data: { userId: account.id, completed: true },
+      },
+    );
+    expect(completion.status()).toBe(200);
+    await page.reload();
+    await expect(approve).toBeEnabled();
+    await expect(steps.locator("time")).toHaveCount(2);
+    await review.getByText("Reject application", { exact: true }).click();
+    await expect(
+      review.getByRole("textbox", { name: "Reason for rejection" }),
+    ).toBeEnabled();
+    for (const time of await steps.locator("time").all()) {
+      await expect(time).toHaveText(/\d{1,2}:\d{2}/);
+      await expect(time).toHaveAttribute("datetime", /T.*Z$/);
+    }
+    const back = page.getByRole("link", {
+      name: "Back to applications",
+      exact: true,
+    });
+    await expect(back).toHaveAttribute("href", listPath);
+  } finally {
+    await applicantContext.close();
+  }
+});
 
 test("pending applications poll every minute, then approval restores five-second event checks", async ({
   page,

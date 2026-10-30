@@ -1,0 +1,150 @@
+---
+import type {
+  viewVolunteerProfile,
+  VolunteerRow,
+} from "@/server/db/volunteers";
+import {
+  isApplicationReadyForReview,
+  type ApplicationProgress,
+} from "@/server/db/application-progress";
+import ApplicationProgressMini from "./ApplicationProgressMini.astro";
+import ApplicationSummary from "./ApplicationSummary.astro";
+import VolunteerAccessAction from "./VolunteerAccessAction.astro";
+
+interface Props {
+  profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
+  person: VolunteerRow;
+  progress: ApplicationProgress;
+}
+const { profile, person, progress } = Astro.props;
+const ready = isApplicationReadyForReview(progress);
+---
+
+<article class="application-review" data-application-review>
+  <h1 data-application-review-heading tabindex="-1">{person.name}</h1>
+  <section class="mt-8" aria-labelledby="application-review-progress-heading">
+    <h2 id="application-review-progress-heading">Progress</h2>
+    <ApplicationProgressMini {progress} showTime />
+    {
+      person.applicationRejectionReason && (
+        <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
+          Reason: {person.applicationRejectionReason}
+        </p>
+      )
+    }
+    {
+      !person.applicationApproved && (
+        <div
+          class="review-actions mt-6"
+          data-volunteer-controls={ready ? "" : undefined}
+        >
+          <VolunteerAccessAction {person} kind="application" />
+          {!person.applicationRejectionReason &&
+            (ready ? (
+              <details class="review-rejection">
+                <summary class="btn btn-outline cursor-pointer">
+                  Reject application
+                </summary>
+                <form
+                  class="volunteer-form mt-4"
+                  data-organizer-rejection
+                  action="/api/v1/organizer/action"
+                  method="post"
+                >
+                  <input type="hidden" name="userId" value={person.id} />
+                  <input
+                    type="hidden"
+                    name="version"
+                    value={person.updatedAt}
+                  />
+                  <label class="volunteer-field">
+                    Reason for rejection
+                    <textarea
+                      name="reason"
+                      required
+                      maxlength="2000"
+                      rows="4"
+                      data-volunteer-control
+                      disabled
+                    />
+                  </label>
+                  <p class="volunteer-help">
+                    This reason will be emailed to the applicant and shown in
+                    their application.
+                  </p>
+                  <p data-form-message role="status" hidden />
+                  <button
+                    class="btn btn-red"
+                    type="submit"
+                    data-loading-label="Sending…"
+                    data-volunteer-control
+                    disabled
+                  >
+                    Reject application and email reason
+                  </button>
+                </form>
+              </details>
+            ) : (
+              <button class="btn btn-outline" type="button" disabled>
+                Reject application
+              </button>
+            ))}
+        </div>
+      )
+    }
+  </section>
+  <section
+    class="mt-10"
+    aria-labelledby="application-review-answers-heading"
+    data-submitted-application
+  >
+    <h2 id="application-review-answers-heading">Submitted answers</h2>
+    {
+      !profile.submission && (
+        <p class="volunteer-help mt-4">
+          The original submitted application was not recorded. These details use
+          the current profile.
+        </p>
+      )
+    }
+    <ApplicationSummary
+      {...profile.submission ?? profile}
+      idPrefix="application-review"
+    />
+  </section>
+</article>
+
+<style>
+  .application-review h1 {
+    font-size: var(--text-3xl);
+    overflow-wrap: anywhere;
+  }
+  .application-review h2 {
+    font-size: var(--text-xl);
+  }
+  .review-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    gap: 1rem;
+  }
+  .review-rejection {
+    min-width: 0;
+  }
+  .review-rejection[open] {
+    flex-basis: 100%;
+  }
+  .review-rejection summary {
+    list-style: none;
+  }
+  .review-rejection summary::-webkit-details-marker {
+    display: none;
+  }
+  .review-actions :global(.btn:disabled) {
+    background: #27272a;
+    border-color: #3f3f46;
+    color: #a1a1aa;
+    cursor: not-allowed;
+    opacity: 1;
+  }
+</style>

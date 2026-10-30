@@ -33,7 +33,7 @@ const listUrl = urlForState(state);
 const profileHref =
   Astro.props.profileHref ??
   ((id: string) =>
-    `/volunteers/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(listUrl)}`);
+    `/${kind}/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(listUrl)}`);
 const { search, offset, approval, sort, direction } = state;
 const columns = (
   applications

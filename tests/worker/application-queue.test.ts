@@ -462,11 +462,24 @@ test("organizers review applications separately from approved volunteers with pe
     assert.equal(page.url(), `${origin}${listPath}`);
     assert.deepEqual(documents, []);
     const reviewLink = results.locator("[data-volunteer-profile-link]").first();
-    const profileHref = await reviewLink.getAttribute("href");
-    assert.ok(profileHref);
+    const applicationHref = await reviewLink.getAttribute("href");
+    assert.ok(applicationHref);
+    const profileHref = applicationHref.replace(
+      /^\/applications\//,
+      "/volunteers/",
+    );
     await reviewLink.focus();
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(`${origin}${profileHref}`);
+    await expect(page).toHaveURL(`${origin}${applicationHref}`);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      "applicant-50",
+    );
+    await expect(
+      page.getByRole("region", { name: "Submitted answers", exact: true }),
+    ).toContainText("PRIVATE QUEUE ANSWER");
+    await expect(page.locator("[data-volunteer-progression]")).toHaveCount(0);
+    // Progression, profile editing, and patrol controls belong to the volunteer profile.
+    await page.goto(`${origin}${profileHref}`);
     await expect(page.locator("[data-volunteer-profile-dialog]")).toHaveCount(
       0,
     );
@@ -571,7 +584,7 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(answer("Code of Conduct accepted")).toHaveText(
       formatApplicationSubmittedTime(submittedAt),
     );
-    assert.equal(await auditCount(), 2); // One directory profile and one application.
+    assert.equal(await auditCount(), 3); // Directory profile, application review, and volunteer profile.
     // Merely reading the application is not review completion.
     await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("53");
@@ -601,7 +614,8 @@ test("organizers review applications separately from approved volunteers with pe
     );
     await page.setViewportSize({ width: 1280, height: 900 });
     await results.locator("tbody tr").first().locator("td").first().click();
-    await expect(page).toHaveURL(`${origin}${profileHref}`);
+    await expect(page).toHaveURL(`${origin}${applicationHref}`);
+    await page.goto(`${origin}${profileHref}`);
     await DB.prepare(
       "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id='applicant-50'",
     ).run();
@@ -920,7 +934,7 @@ test("organizers review applications separately from approved volunteers with pe
     ).toHaveCount(0);
     await expect(
       plain.getByRole("heading", {
-        name: "Application",
+        name: "Submitted answers",
         exact: true,
       }),
     ).toBeVisible();

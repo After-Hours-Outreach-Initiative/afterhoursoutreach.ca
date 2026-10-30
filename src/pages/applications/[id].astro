@@ -1,0 +1,80 @@
+---
+import { env } from "cloudflare:workers";
+import { accountContext, requireOrganizer } from "@/server/db/access";
+import { findVolunteer, viewVolunteerProfile } from "@/server/db/volunteers";
+import { loadApplicationProgress } from "@/server/db/application-progress";
+import { forwardCookies } from "@/server/auth";
+import { RequestError } from "@/server/http";
+import { volunteerListReturnUrl } from "@/data/volunteer-list";
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import ApplicationReviewView from "@/components/volunteer/ApplicationReviewView.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+
+export const prerender = false;
+let profile;
+let person;
+let progress;
+let accountName = "";
+let accountGreeting = "";
+let accountEmail = "";
+try {
+  const { actor, headers, email, greetingName } = await accountContext(
+    env,
+    Astro.request,
+  );
+  forwardCookies(headers, Astro.response.headers);
+  if (!actor)
+    return Astro.redirect(
+      `/volunteer/sign-in?returnTo=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`,
+    );
+  requireOrganizer(actor);
+  accountName = actor.name;
+  accountGreeting = greetingName;
+  accountEmail = email;
+  const userId = Astro.params.id ?? "";
+  person = await findVolunteer(env.DB, actor, userId);
+  if (!person) return new Response("Application not found.", { status: 404 });
+  // Use the audited disclosure path for the immutable submission and legacy answers.
+  profile = await viewVolunteerProfile(env.DB, actor, userId);
+  progress = await loadApplicationProgress(env.DB, userId);
+} catch (error) {
+  return new Response(
+    error instanceof RequestError
+      ? error.message
+      : "Application review is temporarily unavailable.",
+    { status: error instanceof RequestError ? error.status : 503 },
+  );
+}
+if (!profile) return new Response("Application not found.", { status: 404 });
+const returnUrl = volunteerListReturnUrl(
+  Astro.url.searchParams.get("returnTo") ?? "/applications",
+);
+---
+
+<AccountLayout
+  title={person.name}
+  description="Organizer-only application review."
+  signedIn
+  organizer
+  name={accountName}
+  greetingName={accountGreeting}
+  email={accountEmail}
+>
+  <Fragment slot="heading"></Fragment>
+  <a class="volunteer-back-link" href={returnUrl}>
+    <ArrowRightIcon class="size-[1.25em] shrink-0 rotate-180" />
+    <span
+      >{
+        returnUrl.startsWith("/applications")
+          ? "Back to applications"
+          : "Back to volunteers"
+      }</span
+    >
+  </a>
+  <section class="volunteer-panel">
+    <ApplicationReviewView {profile} {person} {progress} />
+  </section>
+</AccountLayout>
+<script>
+  import "@/scripts/volunteer";
+</script>

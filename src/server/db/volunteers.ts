@@ -628,7 +628,8 @@ export async function rejectApplication(
         WHERE user_id=? AND updated_at=? AND registration_approved=0
           AND application_rejection_reason IS NULL
           AND EXISTS (SELECT 1 FROM profile p JOIN user u ON u.id=p.user_id
-            WHERE p.user_id=volunteer_status.user_id AND u.deleted_at IS NULL AND u.email_verified=1)
+            WHERE p.user_id=volunteer_status.user_id AND u.deleted_at IS NULL AND u.email_verified=1
+              AND ${applicationReadyForReviewSql})
           AND ${writePermission(true)}`,
         )
         .bind(reason, now, userId, version, ...permissionValues(actor)),

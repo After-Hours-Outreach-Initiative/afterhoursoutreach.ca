@@ -4,11 +4,13 @@ import {
   type ApplicationProgress,
 } from "@/server/db/application-progress";
 import CheckIcon from "@/components/icons/CheckIcon.astro";
+import { formatApplicationSubmittedTime } from "@/data/application";
 
 interface Props {
   progress: ApplicationProgress;
+  showTime?: boolean;
 }
-const { progress } = Astro.props;
+const { progress, showTime = false } = Astro.props;
 const steps = [
   {
     key: "form",
@@ -79,9 +81,16 @@ const dates = new Intl.DateTimeFormat("en-CA", {
                 {" "}
                 ·{" "}
                 <time datetime={new Date(step.completedAt).toISOString()}>
-                  {dates.format(step.completedAt)}
+                  {showTime
+                    ? formatApplicationSubmittedTime(
+                        new Date(step.completedAt).toISOString(),
+                      )
+                    : dates.format(step.completedAt)}
                 </time>
               </>
+            )}
+            {showTime && step.completed && step.completedAt === null && (
+              <> · Date and time not recorded</>
             )}
           </span>
         </span>

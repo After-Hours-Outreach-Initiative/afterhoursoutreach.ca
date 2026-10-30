@@ -1128,6 +1128,14 @@ test("review queue counts only review-ready applications matching search indepen
   assert.equal(inProgress.rows[0].applicationReadyForReview, 0);
   assert.equal(inProgress.allApplicantsCount, 1);
   assert.equal(inProgress.awaitingApprovalCount, 0);
+  await assert.rejects(
+    rejectApplication(env.DB, actor, {
+      userId: inProgress.rows[0].id,
+      version: inProgress.rows[0].updatedAt,
+      reason: "Cannot review an unfinished application.",
+    }),
+    statusError(409),
+  );
   assert.deepEqual(
     (await listApplications(env.DB, actor, "pending-02", 0, "awaiting")).rows,
     [],

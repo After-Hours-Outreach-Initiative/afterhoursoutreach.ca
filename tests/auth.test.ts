@@ -2720,6 +2720,10 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
       "/applications?approval=awaiting&q=Alex",
     ],
     ["/applications?q=Alex", "/applications?q=Alex"],
+    [
+      "/applications/alex?returnTo=%2Fapplications%3Fq%3DAlex",
+      "/applications/alex?returnTo=%2Fapplications%3Fq%3DAlex",
+    ],
   ])
     assert.equal(safeReturnTo(value), expected);
   const request = new Request(origin, {

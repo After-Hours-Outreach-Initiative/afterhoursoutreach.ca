@@ -481,9 +481,14 @@ async function refreshEvents(element: HTMLFormElement) {
 }
 
 async function refreshVolunteer(element: HTMLFormElement) {
-  const profile = element.closest<HTMLElement>("[data-volunteer-profile]")!;
+  const profile = element.closest<HTMLElement>(
+    "[data-volunteer-profile], [data-application-review]",
+  )!;
+  const rootSelector = profile.matches("[data-application-review]")
+    ? "[data-application-review]"
+    : "[data-volunteer-profile]";
   const page = await loadActionPage();
-  const replacement = actionFragment(page, "[data-volunteer-profile]");
+  const replacement = actionFragment(page, rootSelector);
   initVolunteerControls(replacement);
   const applicationOpen = profile.querySelector<HTMLDetailsElement>(
     "[data-submitted-application] details",
@@ -507,9 +512,12 @@ async function refreshVolunteer(element: HTMLFormElement) {
     profile.replaceWith(replacement);
     initVolunteerProfileContents(replacement, true);
     if (restoreFocus)
-      replacement
-        .querySelector<HTMLElement>(selector)
-        ?.focus({ preventScroll: true });
+      (
+        replacement.querySelector<HTMLElement>(selector) ??
+        replacement.querySelector<HTMLElement>(
+          "[data-application-review-heading]",
+        )
+      )?.focus({ preventScroll: true });
   }
 }
 
@@ -691,7 +699,9 @@ function form(
       return;
     event.preventDefault();
     const scope =
-      element.closest<HTMLElement>("[data-volunteer-profile]") ??
+      element.closest<HTMLElement>(
+        "[data-volunteer-profile], [data-application-review]",
+      ) ??
       element.closest<HTMLElement>("[data-volunteer-controls], dialog") ??
       element;
     if (scope.dataset.submitting) return;
