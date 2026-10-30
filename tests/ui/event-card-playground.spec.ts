@@ -226,12 +226,10 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     ),
   ).toHaveCount(1);
   await expect(
-    avatars.locator('[data-avatar-decoration="new-gradient-horizontal"]'),
+    avatars.locator('[data-avatar-decoration="new-dot"]'),
   ).toHaveCount(4);
   await expect(
-    avatars.locator(
-      '[data-avatar-decoration="new-dot"], [data-avatar-decoration="new-outline"]',
-    ),
+    avatars.locator('linearGradient, [data-avatar-decoration="new-outline"]'),
   ).toHaveCount(0);
   const medicSymbol = avatars
     .locator('[data-avatar-decoration="medic-cross"]')
@@ -241,22 +239,6 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     "M10.75 12.25h2.5v2.5h2.5v2.5h-2.5v2.5h-2.5v-2.5h-2.5v-2.5h2.5Z",
   );
   await expect(medicSymbol).toHaveCSS("fill", "rgb(255, 255, 255)");
-  const newVolunteerGradient = avatars
-    .locator('linearGradient[data-avatar-decoration="new-gradient-horizontal"]')
-    .first();
-  await expect(newVolunteerGradient).toHaveAttribute("x1", "5");
-  await expect(newVolunteerGradient).toHaveAttribute("x2", "19");
-  await expect(newVolunteerGradient).toHaveAttribute("y1", "12");
-  await expect(newVolunteerGradient).toHaveAttribute("y2", "12");
-  await expect(newVolunteerGradient.locator("stop")).toHaveCount(2);
-  await expect(newVolunteerGradient.locator("stop").first()).toHaveCSS(
-    "stop-color",
-    "rgb(65, 105, 225)",
-  );
-  await expect(newVolunteerGradient.locator("stop").last()).toHaveCSS(
-    "stop-color",
-    "rgb(34, 197, 94)",
-  );
   await expect(avatars.locator(".attendee-medic").first()).toHaveAttribute(
     "aria-label",
     "Approved medic: registered",
@@ -265,18 +247,20 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     avatars.locator(".attendee-new-volunteer").first(),
   ).toHaveAttribute("aria-label", "New medic: registered");
   for (const category of ["medic", "outreach-volunteer", "new-volunteer"]) {
-    await expect(avatars.locator(`.attendee-${category}`).first()).toHaveCSS(
-      "color",
-      "rgb(65, 105, 225)",
-    );
+    const avatar = avatars.locator(`.attendee-${category}`).first();
+    await expect(avatar).toHaveCSS("color", "rgb(65, 105, 225)");
+    for (const shape of ["circle", "path"]) {
+      await expect(avatar.locator(`svg > ${shape}`).first()).toHaveCSS(
+        "fill",
+        "rgb(65, 105, 225)",
+      );
+    }
   }
   await page.getByRole("checkbox", { name: "Expand all rosters" }).check();
   await expect(card.locator("details")).toHaveAttribute("open", "");
   await expect(card.getByRole("row")).toHaveCount(9);
   await expect(
-    card.locator(
-      '.event-roster-person [data-avatar-decoration="new-gradient-horizontal"]',
-    ),
+    card.locator('.event-roster-person [data-avatar-decoration="new-dot"]'),
   ).toHaveCount(4);
   await expect(card.locator(".event-roster-new-badge")).toHaveText([
     "New",

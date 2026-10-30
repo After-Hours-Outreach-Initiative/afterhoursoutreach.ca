@@ -7,7 +7,7 @@ const variants = [
     id: "dot",
     label: "Green dot",
     description:
-      "A small dot on the upper-right chest, with a primary blue fill.",
+      "The selected style: a small dot on the upper-right chest, with a primary blue fill. Used in the event cards below.",
   },
   {
     id: "outline",
@@ -25,7 +25,7 @@ const variants = [
     id: "gradient-horizontal",
     label: "Left-to-right gradient",
     description:
-      "The selected style: the original full-width fade from blue on the left to green on the right. Used in the event cards below.",
+      "The original full-width fade from blue on the left to green on the right.",
   },
 ] as const;
 const fullRoster: { category: AttendeeCategory; medicMark?: boolean }[] = [
@@ -48,8 +48,8 @@ const fullRoster: { category: AttendeeCategory; medicMark?: boolean }[] = [
   <h2 id="avatar-variations-heading">Avatar variations</h2>
   <p>
     Compare four ways to identify new volunteers at roster size and enlarged.
-    Medics keep their white plus, and the event cards below use the
-    left-to-right gradient.
+    Medics keep their white plus, and the event cards below use primary blue
+    with the green dot.
   </p>
   <div class="ui-avatar-variations">
     {

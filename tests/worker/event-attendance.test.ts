@@ -365,33 +365,16 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             };
           });
           expect(bounds.artwork).toEqual(bounds.viewBox);
-          const gradient = avatar.locator("linearGradient");
-          let fill = "currentColor";
-          if (category === "new-volunteer") {
-            const gradientId = await gradient.getAttribute("id");
-            fill = `url(#${gradientId})`;
-            await expect(gradient).toHaveAttribute("x1", "5");
-            await expect(gradient).toHaveAttribute("x2", "19");
-            await expect(gradient).toHaveAttribute("y1", "12");
-            await expect(gradient).toHaveAttribute("y2", "12");
-            await expect(gradient.locator("stop")).toHaveCount(2);
-            await expect(gradient.locator("stop").first()).toHaveCSS(
-              "stop-color",
-              color,
-            );
-            await expect(gradient.locator("stop").last()).toHaveCSS(
-              "stop-color",
-              "rgb(34, 197, 94)",
-            );
-          } else {
-            await expect(gradient).toHaveCount(0);
-          }
+          await expect(avatar.locator("linearGradient")).toHaveCount(0);
+          if (category === "new-volunteer")
+            await expect(
+              avatar.locator('[data-avatar-decoration="new-dot"]'),
+            ).toHaveCSS("fill", "rgb(34, 197, 94)");
           for (const tag of ["circle", "path"]) {
             const shape = avatar.locator(`:scope > ${tag}`).first();
-            await expect(shape).toHaveAttribute("fill", fill);
+            await expect(shape).toHaveAttribute("fill", "currentColor");
             await expect(shape).toHaveAttribute("stroke", "none");
-            if (category !== "new-volunteer")
-              await expect(shape).toHaveCSS("fill", color);
+            await expect(shape).toHaveCSS("fill", color);
             await expect(shape).toHaveCSS("stroke", "none");
           }
         }
