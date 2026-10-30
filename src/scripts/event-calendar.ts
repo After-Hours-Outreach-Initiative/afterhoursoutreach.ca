@@ -121,28 +121,17 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
         const date = document.createElement("span");
         date.className = "event-calendar-day";
         date.textContent = String(day.day);
-        if (!day.events.length) cell.appendChild(date);
-        const extraEvents = document.createElement("div");
-        extraEvents.className = "event-calendar-extra-events";
-        for (const [index, event] of day.events.entries()) {
+        const event = day.events[0];
+        if (event) {
           const link = document.createElement("a");
           link.href = `#event-${event.id}`;
           link.dataset.calendarEvent = event.id;
           link.setAttribute("aria-label", event.description);
           link.title = event.label;
-          if (index === 0) {
-            date.classList.add("event-calendar-circle");
-            link.appendChild(date);
-            cell.appendChild(link);
-          } else {
-            const dot = document.createElement("span");
-            dot.className = "event-calendar-dot";
-            dot.setAttribute("aria-hidden", "true");
-            link.appendChild(dot);
-            extraEvents.appendChild(link);
-          }
-        }
-        if (extraEvents.childElementCount) cell.appendChild(extraEvents);
+          date.classList.add("event-calendar-circle");
+          link.appendChild(date);
+          cell.appendChild(link);
+        } else cell.appendChild(date);
         row.appendChild(cell);
       }
       return row;

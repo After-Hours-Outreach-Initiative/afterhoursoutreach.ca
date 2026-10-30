@@ -25,7 +25,7 @@ const weekdays = [
   data-calendar-start={calendar.start}
 >
   <p id="calendar-help" class="sr-only">
-    Circled dates link to events. Dots link to more events that day.
+    Circled dates link to the first event that day.
   </p>
   <TableScrollFrame label="Event calendar">
     <table aria-describedby="calendar-help">
@@ -55,35 +55,16 @@ const weekdays = [
                   aria-current={day.today ? "date" : undefined}
                 >
                   {day.events.length ? (
-                    <>
-                      <a
-                        href={`#event-${day.events[0].id}`}
-                        data-calendar-event={day.events[0].id}
-                        aria-label={day.events[0].description}
-                        title={day.events[0].label}
-                      >
-                        <span class="event-calendar-day event-calendar-circle">
-                          {day.day}
-                        </span>
-                      </a>
-                      {day.events.length > 1 && (
-                        <div class="event-calendar-extra-events">
-                          {day.events.slice(1).map((event) => (
-                            <a
-                              href={`#event-${event.id}`}
-                              data-calendar-event={event.id}
-                              aria-label={event.description}
-                              title={event.label}
-                            >
-                              <span
-                                class="event-calendar-dot"
-                                aria-hidden="true"
-                              />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </>
+                    <a
+                      href={`#event-${day.events[0].id}`}
+                      data-calendar-event={day.events[0].id}
+                      aria-label={day.events[0].description}
+                      title={day.events[0].label}
+                    >
+                      <span class="event-calendar-day event-calendar-circle">
+                        {day.day}
+                      </span>
+                    </a>
                   ) : (
                     <span class="event-calendar-day">{day.day}</span>
                   )}

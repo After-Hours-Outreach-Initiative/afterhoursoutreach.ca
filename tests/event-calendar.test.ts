@@ -9,11 +9,13 @@ const event = (id: string, instant: string): CalendarEvent => ({
   label: `Patrol at ${id}`,
 });
 
-test("calendar uses Vancouver dates at UTC midnight and keeps every same-day event", () => {
+test("calendar uses Vancouver dates and orders same-day events chronologically with stable ties", () => {
   const events = [
     event("later", "2027-01-01T07:30:00Z"),
     event("next-day", "2027-01-01T08:30:00Z"),
     event("earlier", "2027-01-01T02:30:00Z"),
+    event("earlier-tie", "2027-01-01T02:30:00Z"),
+    event("a-earlier-tie", "2027-01-01T02:30:00Z"),
   ];
   const calendar = eventCalendar(
     events,
@@ -26,7 +28,7 @@ test("calendar uses Vancouver dates at UTC midnight and keeps every same-day eve
   assert.equal(today.date, "2026-12-31");
   assert.deepEqual(
     today.events.map((item) => item.id),
-    ["earlier", "later"],
+    ["earlier", "earlier-tie", "a-earlier-tie", "later"],
   );
   assert.equal(
     days.find((day) => day.date === "2027-01-01")!.events[0].id,
