@@ -1399,7 +1399,7 @@ body:has(
 }
 .volunteer-table {
   width: 100%;
-  /* Separate borders stay attached to sticky header cells while scrolling. */
+  /* Separate borders stay attached to the sticky header while scrolling. */
   border-collapse: separate;
   border-spacing: 0;
   text-align: left;
@@ -1411,10 +1411,21 @@ body:has(
   border-bottom: var(--volunteer-border);
   overflow-wrap: anywhere;
 }
-.volunteer-table thead th {
+.volunteer-table thead {
   position: sticky;
   top: var(--site-header-rendered-height, var(--site-header-height, 0px));
   z-index: 1;
+}
+.volunteer-table thead::before {
+  /* A separate backing layer avoids table backgrounds clipping to cell radii. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #000;
+  pointer-events: none;
+}
+.volunteer-table thead th {
   padding-block: 0.5rem;
   background: #171a20;
   box-shadow: 0 -1px #3f3f46;
