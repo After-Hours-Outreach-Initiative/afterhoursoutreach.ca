@@ -1,0 +1,23 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import { compactPersonDisplayName } from "../../data/person-name";
+
+interface Props extends HTMLAttributes<"a"> {
+  name: string;
+}
+const { name, href, class: className, ...rest } = Astro.props;
+const compact = compactPersonDisplayName(name);
+const truncated = compact !== name;
+const Tag = href ? "a" : "span";
+---
+
+<Tag
+  {...rest}
+  href={href}
+  class:list={["compact-person-name", className]}
+  tabindex={!href && truncated ? 0 : undefined}
+  data-compact-person-name={truncated ? name : undefined}
+>
+  <span aria-hidden={truncated ? "true" : undefined}>{compact}</span>
+  {truncated && <span class="sr-only">{name}</span>}
+</Tag>

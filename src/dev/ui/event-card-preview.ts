@@ -1,7 +1,9 @@
 import { eventCardChannel } from "./event-card-fixtures";
 import { confirmEventUnregistration } from "../../scripts/event-unregistration";
+import { initCompactPersonNames } from "../../scripts/compact-person-name";
 
 if (import.meta.env.DEV) {
+  initCompactPersonNames();
   const root = document.querySelector<HTMLElement>("[data-ui-event-preview]");
   const roster = root?.querySelector<HTMLDetailsElement>("details");
   if (roster)

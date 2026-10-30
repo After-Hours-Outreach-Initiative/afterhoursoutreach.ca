@@ -24,3 +24,21 @@ export function personDisplayName(
     ? `${parts[0]} ${Array.from(parts.at(-1)!)[0]}.`
     : parts[0];
 }
+
+const nameSegments = new Intl.Segmenter("en", { granularity: "grapheme" });
+
+/** Compact presentation of an already standardized name, not a stored value. */
+export function compactPersonDisplayName(name: string): string {
+  // Recognize only the final surname initial; multiword given names stay intact.
+  const suffix = name.match(/\s+(\S+\.)$/u);
+  const initial = suffix?.[1];
+  const hasInitial =
+    initial && Array.from(nameSegments.segment(initial)).length === 2;
+  const given = hasInitial ? name.slice(0, suffix!.index) : name;
+  const segments = Array.from(
+    nameSegments.segment(given),
+    ({ segment }) => segment,
+  );
+  if (segments.length <= 20) return name;
+  return `${segments.slice(0, 20).join("").trimEnd()}…${hasInitial ? suffix![0] : ""}`;
+}

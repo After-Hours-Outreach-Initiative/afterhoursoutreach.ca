@@ -13,6 +13,7 @@ import {
   initVolunteerProfileContents,
 } from "./volunteer-profile-contents";
 import { initSignupMenus } from "./signup-menu";
+import { initCompactPersonNames } from "./compact-person-name";
 import {
   initSignupMoveCalendars,
   syncSignupMoveCalendar,
@@ -80,6 +81,7 @@ for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
 initEventDates(document);
 initVolunteerProfileContents();
 initSignupMenus();
+initCompactPersonNames();
 initSignupMoveCalendars();
 
 function applyEventFilter(root: HTMLElement, type: string) {

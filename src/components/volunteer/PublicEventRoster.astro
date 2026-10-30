@@ -4,6 +4,7 @@ import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
 import NewVolunteerBadge from "./NewVolunteerBadge.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
+import CompactPersonName from "./CompactPersonName.astro";
 interface Props {
   event: EventRow;
   roster: PublicRosterRow[];
@@ -28,7 +29,7 @@ const { event, roster } = Astro.props;
                     medicMark={Boolean(person.medicMark)}
                   />
                   <span class="event-roster-name">
-                    <span>{person.name}</span>
+                    <CompactPersonName name={person.name} />
                     {person.category === "new-volunteer" && (
                       <>
                         {" "}

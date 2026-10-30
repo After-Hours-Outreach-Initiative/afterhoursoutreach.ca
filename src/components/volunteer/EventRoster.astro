@@ -5,6 +5,7 @@ import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
 import NewVolunteerBadge from "./NewVolunteerBadge.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
+import CompactPersonName from "./CompactPersonName.astro";
 
 interface Props {
   event: EventRow;
@@ -46,12 +47,11 @@ const registrationDateFormat = new Intl.DateTimeFormat("en-CA", {
                     medicMark={Boolean(person.medicMark)}
                   />
                   <div class="event-roster-name">
-                    <a
+                    <CompactPersonName
+                      name={person.name}
                       href={`/volunteers/${encodeURIComponent(person.userId)}`}
                       data-volunteer-profile-link
-                    >
-                      {person.name}
-                    </a>
+                    />
                     {person.category === "new-volunteer" && (
                       <>
                         {" "}

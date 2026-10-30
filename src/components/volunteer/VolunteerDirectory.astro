@@ -5,6 +5,7 @@ import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
 import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
+import CompactPersonName from "./CompactPersonName.astro";
 import {
   directoryListUrl,
   volunteerPageSize,
@@ -190,12 +191,11 @@ const columns = (
                       decorative
                     />
                     <div class="volunteer-table-name">
-                      <a
+                      <CompactPersonName
+                        name={person.name}
                         href={profileHref(person.id)}
                         data-volunteer-profile-link
-                      >
-                        {person.name}
-                      </a>
+                      />
                       {applications && Boolean(person.medicMark) && (
                         <VolunteerRoleBadge role="medic" />
                       )}
