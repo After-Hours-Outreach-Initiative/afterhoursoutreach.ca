@@ -1402,7 +1402,7 @@ body:has(
 }
 .volunteer-table {
   width: 100%;
-  min-width: 48rem;
+  min-width: 40rem;
   border-collapse: collapse;
   text-align: left;
   @apply text-base;
@@ -1455,12 +1455,6 @@ body:has(
 .volunteer-table-name {
   min-width: 0;
 }
-.volunteer-table-detail {
-  display: block;
-  margin-top: 0.375rem;
-  color: #a1a1aa;
-  @apply text-sm;
-}
 .volunteer-table-approved {
   color: #4ade80;
 }
@@ -1468,26 +1462,19 @@ body:has(
   .volunteer-table {
     /* Keep long names from squeezing the other columns into broken words.
        Only the labelled, keyboard-focusable table region scrolls sideways. */
-    min-width: 52rem;
     table-layout: fixed;
   }
   .volunteer-table :is(th, td) {
     padding: 0.75rem;
   }
   .volunteer-table thead th:nth-child(1) {
-    width: 27%;
+    width: 40%;
   }
   .volunteer-table thead th:nth-child(2) {
-    width: 22%;
+    width: 28%;
   }
   .volunteer-table thead th:nth-child(3) {
-    width: 23%;
-  }
-  .volunteer-table thead th:nth-child(4) {
-    width: 18%;
-  }
-  .volunteer-table thead th:nth-child(5) {
-    width: 10%;
+    width: 32%;
   }
 }
 .application-table {

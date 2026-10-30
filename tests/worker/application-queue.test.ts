@@ -261,6 +261,11 @@ test("organizers review applications separately from approved volunteers with pe
       });
     });
     await page.goto(`${origin}/manage/volunteers`);
+    await expect(page.getByRole("columnheader")).toHaveText([
+      "Name",
+      "Role",
+      "Patrol access",
+    ]);
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
       2,
     );
@@ -273,6 +278,10 @@ test("organizers review applications separately from approved volunteers with pe
         .locator("[data-volunteer-results]")
         .getByRole("link", { name: "approved", exact: true }),
     ).toBeVisible();
+    await expect(page.locator("[data-volunteer-results] tbody td")).toHaveText([
+      "New volunteer",
+      "Not approved for patrols",
+    ]);
     await page.goto(`${origin}${listPath}`);
     const count = page.locator("[data-awaiting-approval-count]");
     const allCount = page.locator("[data-all-applicants-count]");

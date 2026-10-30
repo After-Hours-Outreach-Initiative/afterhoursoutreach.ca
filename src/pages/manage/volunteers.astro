@@ -106,15 +106,13 @@ try {
             >
               <table class="volunteer-table">
                 <caption class="sr-only">
-                  Approved volunteers and access status
+                  Approved volunteers, roles, and patrol access
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col">Name and role</th>
-                    <th scope="col">Application</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Role</th>
                     <th scope="col">Patrol access</th>
-                    <th scope="col">Orientations completed</th>
-                    <th scope="col">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -134,25 +132,17 @@ try {
                             >
                               {person.name}
                             </a>
-                            <span class="volunteer-table-detail">
-                              {person.role === "organizer"
-                                ? "Organizer"
-                                : person.category === "new-volunteer"
-                                  ? "New volunteer"
-                                  : person.category === "medic"
-                                    ? "Medic"
-                                    : "Outreach Volunteer"}
-                            </span>
                           </div>
                         </div>
                       </th>
                       <td>
-                        Approved
-                        {person.role === "organizer" && (
-                          <span class="volunteer-table-detail">
-                            Event access through organizer role
-                          </span>
-                        )}
+                        {person.role === "organizer"
+                          ? "Organizer"
+                          : person.category === "new-volunteer"
+                            ? "New volunteer"
+                            : person.category === "medic"
+                              ? "Medic"
+                              : "Outreach Volunteer"}
                       </td>
                       <td
                         class:list={{
@@ -165,8 +155,6 @@ try {
                           ? "Approved for patrols"
                           : "Not approved for patrols"}
                       </td>
-                      <td>{person.orientations}</td>
-                      <td>{person.active ? "Active" : "Inactive"}</td>
                     </tr>
                   ))}
                 </tbody>
