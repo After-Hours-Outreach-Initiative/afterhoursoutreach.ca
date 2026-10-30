@@ -103,7 +103,7 @@ test("roster links open profile pages with readable progression cards", async ({
     await page.goto("/manage/events");
     await expect(page.locator(".attendee-new-volunteer").first()).toHaveCSS(
       "color",
-      "rgb(29, 78, 216)",
+      "rgb(65, 105, 225)",
     );
     const roster = page.locator(
       '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',

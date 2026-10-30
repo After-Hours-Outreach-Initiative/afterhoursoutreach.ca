@@ -1,0 +1,171 @@
+---
+import AttendeeAvatar from "../../components/volunteer/AttendeeAvatar.astro";
+import type { AttendeeCategory } from "../../data/event-roster";
+
+const variants = [
+  {
+    id: "dot",
+    label: "Green dot",
+    description:
+      "A small dot on the upper-right chest, with a primary blue fill.",
+  },
+  {
+    id: "outline",
+    label: "Green outline",
+    description:
+      "An outline around the head and body, with no dot. The fill stays primary blue.",
+  },
+  {
+    id: "gradient",
+    label: "Vertical gradient",
+    description:
+      "A smooth fade from blue at the top to green at the bottom, with no dot or outline.",
+  },
+  {
+    id: "gradient-horizontal",
+    label: "Left-to-right gradient",
+    description:
+      "The selected style: the original full-width fade from blue on the left to green on the right. Used in the event cards below.",
+  },
+] as const;
+const fullRoster: { category: AttendeeCategory; medicMark?: boolean }[] = [
+  { category: "medic" },
+  { category: "medic" },
+  { category: "outreach-volunteer" },
+  { category: "outreach-volunteer" },
+  { category: "new-volunteer", medicMark: true },
+  { category: "new-volunteer" },
+  { category: "new-volunteer" },
+  { category: "new-volunteer" },
+];
+---
+
+<section
+  class="ui-section"
+  aria-labelledby="avatar-variations-heading"
+  data-ui-avatar-variations
+>
+  <h2 id="avatar-variations-heading">Avatar variations</h2>
+  <p>
+    Compare four ways to identify new volunteers at roster size and enlarged.
+    Medics keep their white plus, and the event cards below use the
+    left-to-right gradient.
+  </p>
+  <div class="ui-avatar-variations">
+    {
+      variants.map((variant) => (
+        <section
+          class="ui-avatar-option"
+          aria-labelledby={`avatar-${variant.id}`}
+          data-ui-avatar-style={variant.id}
+        >
+          <h3 id={`avatar-${variant.id}`}>{variant.label}</h3>
+          <p>{variant.description}</p>
+          <div class="ui-avatar-sizes">
+            {[false, true].map((enlarged) => (
+              <div class="ui-avatar-role">
+                <div
+                  class:list={[
+                    "ui-avatar-sample",
+                    { "ui-avatar-enlarged": enlarged },
+                  ]}
+                >
+                  <AttendeeAvatar
+                    category="new-volunteer"
+                    newVolunteerStyle={variant.id}
+                    decorative
+                  />
+                </div>
+                <span>
+                  {enlarged ? "Enlarged · 56 px" : "Actual size · 24 px"}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div class="ui-avatar-roster">
+            <span>Full team, including one new medic · 24 px</span>
+            <div
+              class="ui-avatar-team"
+              role="group"
+              aria-label="Two approved medics, two outreach volunteers and four new volunteers, including one new medic"
+            >
+              {fullRoster.map(({ category, medicMark }) => (
+                <AttendeeAvatar
+                  category={category}
+                  newVolunteerStyle={variant.id}
+                  medicMark={medicMark}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .ui-avatar-variations {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .ui-avatar-option {
+    display: grid;
+    grid-template-rows: auto 1fr auto auto;
+    min-width: 0;
+    padding: 1.25rem;
+    border: 1px solid #3f3f46;
+    border-radius: 0.75rem;
+    background: #11141b;
+  }
+  .ui-avatar-option > p {
+    margin-top: 0.5rem;
+  }
+  .ui-avatar-sizes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-block: 1.5rem;
+  }
+  .ui-avatar-role {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+    font-size: 0.875rem;
+  }
+  .ui-avatar-enlarged {
+    --attendee-avatar-height: 3.5rem;
+  }
+  .ui-avatar-sample {
+    display: flex;
+    align-items: end;
+    height: 3.5rem;
+  }
+  .ui-avatar-roster {
+    display: grid;
+    gap: 0.75rem;
+    border-top: 1px solid #3f3f46;
+    padding-top: 1rem;
+    color: #b8bbc5;
+    font-size: 0.875rem;
+  }
+  .ui-avatar-team {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  @media (width < 70rem) {
+    .ui-avatar-variations {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (width < 45rem) {
+    .ui-avatar-variations {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

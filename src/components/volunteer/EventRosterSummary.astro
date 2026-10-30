@@ -1,19 +1,22 @@
 ---
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
-import type { EventRow } from "@/server/db/events";
+import type { EventRow, PublicRosterRow } from "@/server/db/events";
 import EventAttendance from "./EventAttendance.astro";
 
 interface Props {
-  count: number;
+  roster: Pick<PublicRosterRow, "category" | "medicMark">[];
   event: EventRow;
 }
-const { count, event } = Astro.props;
+const { roster, event } = Astro.props;
+const newMedicCount = roster.filter(
+  (person) => person.category === "new-volunteer" && person.medicMark,
+).length;
 ---
 
 <summary class="event-roster-toggle">
-  <span>Volunteers ({count})</span>
+  <span>Volunteers ({roster.length})</span>
   <ChevronDownIcon class="event-roster-chevron size-5 shrink-0" />
-  <EventAttendance event={event} />
+  <EventAttendance event={event} newMedicCount={newMedicCount} />
 </summary>
 
 <style>

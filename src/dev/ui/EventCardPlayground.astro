@@ -1,6 +1,7 @@
 ---
 import LocalLayout from "./LocalLayout.astro";
 import PlaygroundHeader from "./PlaygroundHeader.astro";
+import AvatarVariations from "./AvatarVariations.astro";
 import {
   eventCardPreviewPath,
   eventCardScenarios,
@@ -13,6 +14,7 @@ if (!import.meta.env.DEV) return new Response(null, { status: 404 });
 <LocalLayout title="Event card">
   <main class="ui-playground" data-ui-event-playground>
     <PlaygroundHeader active="event-card" />
+    <AvatarVariations />
     <section class="ui-section" aria-labelledby="event-card-heading">
       <h2 id="event-card-heading">Event card</h2>
       <p>

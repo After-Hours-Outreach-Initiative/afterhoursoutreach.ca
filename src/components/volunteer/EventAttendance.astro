@@ -3,8 +3,9 @@ import type { EventRow } from "@/server/db/events";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 interface Props {
   event: EventRow;
+  newMedicCount: number;
 }
-const { event } = Astro.props;
+const { event, newMedicCount } = Astro.props;
 const medics = event.medicConfirmed;
 const newVolunteers = event.newVolunteerConfirmed;
 const outreachVolunteers = Math.max(
@@ -28,8 +29,11 @@ const outreachVolunteers = Math.max(
           {Array.from({ length: outreachVolunteers }, () => (
             <AttendeeAvatar category="outreach-volunteer" />
           ))}
-          {Array.from({ length: newVolunteers }, () => (
-            <AttendeeAvatar category="new-volunteer" />
+          {Array.from({ length: newVolunteers }, (_, index) => (
+            <AttendeeAvatar
+              category="new-volunteer"
+              medicMark={index < newMedicCount}
+            />
           ))}
         </span>
       </span>

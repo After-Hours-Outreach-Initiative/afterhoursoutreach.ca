@@ -181,6 +181,8 @@
 }
 .ui-gallery-card iframe {
   display: block;
+  /* Height describes the preview viewport; keep the divider outside it. */
+  box-sizing: content-box;
   width: 100%;
   border: 0;
   border-top: 1px solid #3f3f46;

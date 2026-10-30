@@ -22,6 +22,7 @@ import {
   approvedMedicSql,
   attendeeCategorySql,
   includesOrientationSql,
+  medicMarkSql,
   newVolunteerSql,
   nowMsSql,
   profileDisplayNameSql,
@@ -145,11 +146,14 @@ export interface RosterRow {
   patrolApproved: number;
   statusVersion: number;
   category: AttendeeCategory;
+  // Display-only marker; category and approvedMedicSql still govern capacity.
+  medicMark: number;
 }
 export interface PublicRosterRow {
   eventId: string;
   name: string;
   category: AttendeeCategory;
+  medicMark: number;
 }
 export interface PublicRoster {
   people: PublicRosterRow[];
@@ -878,7 +882,8 @@ export async function listPublicRosters(
       `SELECT s.id AS membership, s.user_id AS attendeeIdentity, s.event_id AS eventId,
     p.first_name AS firstName, p.last_name AS lastName, p.preferred_name AS preferredName,
     ${profileDisplayNameSql} AS legacyName,
-    ${attendeeCategorySql("s.user_id")} AS category
+    ${attendeeCategorySql("s.user_id")} AS category,
+    ${medicMarkSql("s.user_id")} AS medicMark
     FROM signup s JOIN event e ON e.id = s.event_id
     JOIN profile p ON p.user_id = s.user_id JOIN user u ON u.id = s.user_id
      WHERE s.status = 'confirmed' AND e.id IN (SELECT value FROM json_each(?))
@@ -900,6 +905,7 @@ export async function listPublicRosters(
         attendeeIdentity: string;
         eventId: string;
         category: AttendeeCategory;
+        medicMark: number;
       }
     >();
   const people = rows.results.map((row) => ({
@@ -911,6 +917,7 @@ export async function listPublicRosters(
       row.preferredName,
     ),
     category: row.category,
+    medicMark: row.medicMark,
   }));
   const digest = await crypto.subtle.digest(
     "SHA-256",
@@ -947,6 +954,7 @@ export async function listRosters(
         p.first_name AS firstName, p.last_name AS lastName, p.preferred_name AS preferredName,
         ${profileDisplayNameSql} AS legacyName,
         ${attendeeCategorySql("s.user_id")} AS category,
+        ${medicMarkSql("s.user_id")} AS medicMark,
          v.patrol_approved AS patrolApproved, v.updated_at AS statusVersion,
          EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed

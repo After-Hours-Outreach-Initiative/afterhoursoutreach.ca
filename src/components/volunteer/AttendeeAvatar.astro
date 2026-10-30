@@ -3,9 +3,26 @@ import type { AttendeeCategory } from "@/data/event-roster";
 interface Props {
   category: AttendeeCategory;
   decorative?: boolean;
+  newVolunteerStyle?: "dot" | "outline" | "gradient" | "gradient-horizontal";
+  medicMark?: boolean;
 }
-const { category, decorative = false } = Astro.props;
-const label = `${category === "medic" ? "Approved medic" : category === "new-volunteer" ? "New volunteer" : "Outreach Volunteer"}: registered`;
+const {
+  category,
+  decorative = false,
+  newVolunteerStyle = "gradient-horizontal",
+  medicMark = false,
+} = Astro.props;
+const hasMedicMark =
+  category === "medic" || (category === "new-volunteer" && medicMark);
+const label = `${category === "medic" ? "Approved medic" : category === "new-volunteer" ? (hasMedicMark ? "New medic" : "New volunteer") : "Outreach Volunteer"}: registered`;
+const gradientId =
+  category === "new-volunteer" &&
+  (newVolunteerStyle === "gradient" ||
+    newVolunteerStyle === "gradient-horizontal")
+    ? `attendee-gradient-${crypto.randomUUID()}`
+    : undefined;
+const silhouetteFill = gradientId ? `url(#${gradientId})` : "currentColor";
+const horizontalGradient = newVolunteerStyle === "gradient-horizontal";
 ---
 
 <span
@@ -16,16 +33,61 @@ const label = `${category === "medic" ? "Approved medic" : category === "new-vol
   title={decorative ? undefined : label}
 >
   <svg viewBox="5 2.5 14 19.5" aria-hidden="true" focusable="false">
-    <circle cx="12" cy="6" r="3.5" fill="currentColor" stroke="none"></circle>
-    <path d="M5 22v-5a7 7 0 0 1 14 0v5Z" fill="currentColor" stroke="none"
+    {
+      gradientId && (
+        <defs>
+          <linearGradient
+            id={gradientId}
+            x1={horizontalGradient ? "5" : "12"}
+            y1={horizontalGradient ? "12" : "2.5"}
+            x2={horizontalGradient ? "19" : "12"}
+            y2={horizontalGradient ? "12" : "22"}
+            gradientUnits="userSpaceOnUse"
+            data-avatar-decoration={`new-${newVolunteerStyle}`}
+          >
+            <stop offset="0" stop-color="currentColor" />
+            <stop offset="1" stop-color="#22c55e" />
+          </linearGradient>
+        </defs>
+      )
+    }
+    <circle cx="12" cy="6" r="3.5" fill={silhouetteFill} stroke="none"></circle>
+    <path d="M5 22v-5a7 7 0 0 1 14 0v5Z" fill={silhouetteFill} stroke="none"
     ></path>
     {
-      category === "medic" && (
+      hasMedicMark && (
         <path
           d="M10.75 12.25h2.5v2.5h2.5v2.5h-2.5v2.5h-2.5v-2.5h-2.5v-2.5h2.5Z"
           fill="#fff"
           stroke="none"
+          data-avatar-decoration="medic-cross"
         />
+      )
+    }
+    {
+      category === "new-volunteer" && newVolunteerStyle === "dot" && (
+        <circle
+          cx="15.25"
+          cy="13.5"
+          r="1.75"
+          fill="#22c55e"
+          stroke="none"
+          data-avatar-decoration="new-dot"
+        />
+      )
+    }
+    {
+      category === "new-volunteer" && newVolunteerStyle === "outline" && (
+        <g
+          fill="none"
+          stroke="#22c55e"
+          stroke-width="1"
+          data-avatar-decoration="new-outline"
+        >
+          {/* Inset the strokes so the outline stays inside the original viewBox. */}
+          <circle cx="12" cy="6" r="3" />
+          <path d="M5.5 21.5V17a6.5 6.5 0 0 1 13 0v4.5Z" />
+        </g>
       )
     }
   </svg>
@@ -37,6 +99,7 @@ const label = `${category === "medic" ? "Approved medic" : category === "new-vol
     height: var(--attendee-avatar-height, 1.5rem);
     aspect-ratio: 14 / 19.5;
     flex: 0 0 auto;
+    color: var(--color-blue);
   }
   svg {
     width: 100%;

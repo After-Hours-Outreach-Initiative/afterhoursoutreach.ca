@@ -168,8 +168,12 @@ reserved places. Availability is capacity-only; the eligibility/booking-limit
 reason must still be checked. Both counts and viewer status participate in the
 existing view-version polling. `listPublicRosters` separately authorizes approved
 event access and rechecks volunteer visibility per event in SQL; its projection is
-only event ID, abbreviated name and mutually exclusive category. An opaque membership
-digest catches attendee swaps without exposing identifiers. Public names/categories
+only event ID, abbreviated name, mutually exclusive category and a display-only
+`medicMark` for application-approved volunteers who selected the medic team. New
+volunteers can show the plus while remaining in the new-volunteer capacity category;
+the marker never contributes to `medicConfirmed`, eligibility or reserved medic places.
+An opaque membership digest catches attendee swaps without exposing identifiers.
+Public names/categories, medic markers
 and that digest participate in `/events` polling; organizer-only full rosters never
 enter the volunteer view. Structured first/last names take precedence, with an
 abbreviated legacy fallback. No private profile answers or profile links are rendered.

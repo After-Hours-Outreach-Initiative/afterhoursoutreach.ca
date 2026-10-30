@@ -2,6 +2,7 @@
 import type { EventRow, PublicRosterRow } from "@/server/db/events";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
+import NewVolunteerBadge from "./NewVolunteerBadge.astro";
 interface Props {
   event: EventRow;
   roster: PublicRosterRow[];
@@ -10,7 +11,7 @@ const { event, roster } = Astro.props;
 ---
 
 <details class="public-event-roster">
-  <EventRosterSummary count={roster.length} event={event} />
+  <EventRosterSummary roster={roster} event={event} />
   <table class="event-roster-table">
     <caption class="sr-only">Registered volunteers</caption>
     <thead class="sr-only"><tr><th scope="col">Volunteer</th></tr></thead>
@@ -20,8 +21,19 @@ const { event, roster } = Astro.props;
           <tr>
             <th scope="row">
               <div class="event-roster-person">
-                <AttendeeAvatar category={person.category} />
-                <span>{person.name}</span>
+                <AttendeeAvatar
+                  category={person.category}
+                  medicMark={Boolean(person.medicMark)}
+                />
+                <span class="event-roster-name">
+                  {person.name}
+                  {person.category === "new-volunteer" && (
+                    <>
+                      {" "}
+                      <NewVolunteerBadge />
+                    </>
+                  )}
+                </span>
               </div>
             </th>
           </tr>

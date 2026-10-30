@@ -36,7 +36,7 @@ describe("event card playground fixtures", () => {
   });
 
   test("the default full card contains all three volunteer types and exactly eight people", () => {
-    const { event, actor, scenario } = createEventCardFixture(
+    const { event, actor, scenario, publicRoster } = createEventCardFixture(
       null,
       undefined,
       now,
@@ -49,6 +49,12 @@ describe("event card playground fixtures", () => {
       newVolunteerConfirmed: 4,
       availableSpots: 0,
     });
+    expect(publicRoster.filter(({ medicMark }) => medicMark)).toHaveLength(3);
+    expect(
+      publicRoster.filter(
+        ({ category, medicMark }) => category === "new-volunteer" && medicMark,
+      ),
+    ).toHaveLength(1);
     expect(
       eventSignupBlockReason(
         actor,

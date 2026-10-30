@@ -127,7 +127,14 @@ export function createEventCardFixture(
     count: number,
   ) => {
     publicRoster.push(
-      ...names.slice(0, count).map((name) => ({ eventId, name, category })),
+      ...names.slice(0, count).map((name, index) => ({
+        eventId,
+        name,
+        category,
+        medicMark: Number(
+          category === "medic" || (category === "new-volunteer" && index === 0),
+        ),
+      })),
     );
   };
   addPeople("medic", ["Alex C.", "Priya S."], scenario.medics);
@@ -186,6 +193,7 @@ export function createEventCardFixture(
       eventId,
       name: "Morgan P.",
       category: scenario.newViewer ? "new-volunteer" : "outreach-volunteer",
+      medicMark: 0,
     });
     event.signedUp = 1;
     event.confirmed++;

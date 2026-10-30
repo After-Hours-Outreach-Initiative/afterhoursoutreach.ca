@@ -1861,15 +1861,6 @@ body:has(
   width: fit-content;
   align-content: center;
 }
-.attendee-medic {
-  color: #b91c1c;
-}
-.attendee-outreach-volunteer {
-  color: #15803d;
-}
-.attendee-new-volunteer {
-  color: #1d4ed8;
-}
 .event-roster-table {
   width: 100%;
   margin-top: 0.75rem;

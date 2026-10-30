@@ -119,8 +119,8 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         empty,
       )
       .run();
-    // Three approved medics, three unapproved volunteers (including medic interest),
-    // then approved green attendees. Only the unapproved volunteers have attendance.
+    // Three patrol-approved medics, three volunteers awaiting patrol approval
+    // (one with approved medic-team interest), then returning outreach volunteers.
     for (let index = 0; index < 100; index++) {
       const id = `avatar-attendee-${index}`;
       await DB.batch([
@@ -334,14 +334,24 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         ).toHaveCount(3);
         await expect(
           card.locator(".event-avatar-row .attendee-new-volunteer").first(),
-        ).toHaveAttribute("aria-label", "New volunteer: registered");
+        ).toHaveAttribute("aria-label", "New medic: registered");
         await expect(
           card.locator(".event-avatar-row .attendee-new-volunteer").first(),
-        ).toHaveAttribute("title", "New volunteer: registered");
+        ).toHaveAttribute("title", "New medic: registered");
+        await expect(
+          card.locator(
+            '.event-avatar-row .attendee-new-volunteer [data-avatar-decoration="medic-cross"]',
+          ),
+        ).toHaveCount(1);
+        await expect(
+          card.locator(
+            '.event-avatar-row [data-avatar-decoration="medic-cross"]',
+          ),
+        ).toHaveCount(4);
         for (const [category, color] of [
-          ["medic", "rgb(185, 28, 28)"],
-          ["outreach-volunteer", "rgb(21, 128, 61)"],
-          ["new-volunteer", "rgb(29, 78, 216)"],
+          ["medic", "rgb(65, 105, 225)"],
+          ["outreach-volunteer", "rgb(65, 105, 225)"],
+          ["new-volunteer", "rgb(65, 105, 225)"],
         ]) {
           const avatar = card
             .locator(`.event-avatar-row .attendee-${category} svg`)
@@ -355,11 +365,33 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             };
           });
           expect(bounds.artwork).toEqual(bounds.viewBox);
+          const gradient = avatar.locator("linearGradient");
+          let fill = "currentColor";
+          if (category === "new-volunteer") {
+            const gradientId = await gradient.getAttribute("id");
+            fill = `url(#${gradientId})`;
+            await expect(gradient).toHaveAttribute("x1", "5");
+            await expect(gradient).toHaveAttribute("x2", "19");
+            await expect(gradient).toHaveAttribute("y1", "12");
+            await expect(gradient).toHaveAttribute("y2", "12");
+            await expect(gradient.locator("stop")).toHaveCount(2);
+            await expect(gradient.locator("stop").first()).toHaveCSS(
+              "stop-color",
+              color,
+            );
+            await expect(gradient.locator("stop").last()).toHaveCSS(
+              "stop-color",
+              "rgb(34, 197, 94)",
+            );
+          } else {
+            await expect(gradient).toHaveCount(0);
+          }
           for (const tag of ["circle", "path"]) {
-            const shape = avatar.locator(`${tag}[fill="currentColor"]`);
-            await expect(shape).toHaveAttribute("fill", "currentColor");
+            const shape = avatar.locator(`:scope > ${tag}`).first();
+            await expect(shape).toHaveAttribute("fill", fill);
             await expect(shape).toHaveAttribute("stroke", "none");
-            await expect(shape).toHaveCSS("fill", color);
+            if (category !== "new-volunteer")
+              await expect(shape).toHaveCSS("fill", color);
             await expect(shape).toHaveCSS("stroke", "none");
           }
         }
@@ -516,13 +548,13 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           );
           await expect(
             roster.locator("tbody tr").first().locator(".attendee-medic"),
-          ).toHaveCSS("color", "rgb(185, 28, 28)");
+          ).toHaveCSS("color", "rgb(65, 105, 225)");
           await expect(
             roster.locator(".attendee-outreach-volunteer").first(),
-          ).toHaveCSS("color", "rgb(21, 128, 61)");
+          ).toHaveCSS("color", "rgb(65, 105, 225)");
           await expect(
             roster.locator(".attendee-new-volunteer").first(),
-          ).toHaveCSS("color", "rgb(29, 78, 216)");
+          ).toHaveCSS("color", "rgb(65, 105, 225)");
           if (width === 1280) {
             await roster.locator("summary").focus();
             await DB.prepare(
@@ -554,6 +586,20 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             ),
           ).toHaveText(publicName);
         }
+        await expect(
+          expandedRoster.locator(
+            '.event-roster-person .attendee-new-volunteer [data-avatar-decoration="medic-cross"]',
+          ),
+        ).toHaveCount(1);
+        await expect(
+          expandedRoster.locator(".event-roster-new-badge"),
+        ).toHaveText(["New", "New", "New"]);
+        await expect(
+          expandedRoster
+            .locator("tbody tr")
+            .filter({ has: page.locator(".attendee-new-volunteer") })
+            .locator(".event-roster-name .event-roster-new-badge"),
+        ).toHaveCount(3);
         expect(
           await page.evaluate(
             () => document.documentElement.scrollWidth > innerWidth,
@@ -593,6 +639,18 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         }
       }
     }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${origin}/manage/volunteers?q=Member3`);
+    const newMedicDirectoryRow = page.locator("[data-volunteer-row]").filter({
+      has: page.locator('a[href^="/manage/volunteers/avatar-attendee-3?"]'),
+    });
+    await expect(newMedicDirectoryRow).toHaveCount(1);
+    await expect(newMedicDirectoryRow).toContainText("New volunteer");
+    await expect(
+      newMedicDirectoryRow.locator(
+        '.attendee-new-volunteer [data-avatar-decoration="medic-cross"]',
+      ),
+    ).toHaveCount(1);
   } finally {
     await browser.close();
     await server.close();

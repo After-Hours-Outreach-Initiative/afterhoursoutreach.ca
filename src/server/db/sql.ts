@@ -26,6 +26,14 @@ export const approvedMedicSql = (userId: string) => `EXISTS (
     AND EXISTS (SELECT 1 FROM json_each(mp.teams) WHERE value = 'medic')
 )`;
 
+// Presentation only: approved applicants who selected the medic team get a plus.
+// Unlike approvedMedicSql, this does not grant eligibility or satisfy reservations.
+export const medicMarkSql = (userId: string) => `EXISTS (
+  SELECT 1 FROM profile mp JOIN volunteer_status mv ON mv.user_id = mp.user_id
+  WHERE mp.user_id = ${userId} AND mv.registration_approved = 1
+    AND EXISTS (SELECT 1 FROM json_each(mp.teams) WHERE value = 'medic')
+)`;
+
 export const attendeeCategorySql = (userId: string) =>
   `CASE WHEN ${newVolunteerSql(userId)} THEN 'new-volunteer'
     WHEN ${approvedMedicSql(userId)} THEN 'medic' ELSE 'outreach-volunteer' END`;

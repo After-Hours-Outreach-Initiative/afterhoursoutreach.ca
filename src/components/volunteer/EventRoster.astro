@@ -3,6 +3,7 @@ import type { EventRow, RosterRow } from "@/server/db/events";
 import SignupEditor from "./SignupEditor.astro";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
+import NewVolunteerBadge from "./NewVolunteerBadge.astro";
 
 interface Props {
   event: EventRow;
@@ -14,7 +15,7 @@ const { event, roster, future, destinations } = Astro.props;
 ---
 
 <details class="volunteer-roster">
-  <EventRosterSummary count={roster.length} event={event} />
+  <EventRosterSummary roster={roster} event={event} />
   <table class="event-roster-table">
     <caption class="sr-only">Registered volunteers</caption>
     <thead class="sr-only">
@@ -29,7 +30,10 @@ const { event, roster, future, destinations } = Astro.props;
           <tr>
             <th scope="row">
               <div class="event-roster-person">
-                <AttendeeAvatar category={person.category} />
+                <AttendeeAvatar
+                  category={person.category}
+                  medicMark={Boolean(person.medicMark)}
+                />
                 <div class="event-roster-name">
                   <a
                     href={`/manage/volunteers/${encodeURIComponent(person.userId)}`}
@@ -37,6 +41,12 @@ const { event, roster, future, destinations } = Astro.props;
                   >
                     {person.name}
                   </a>
+                  {person.category === "new-volunteer" && (
+                    <>
+                      {" "}
+                      <NewVolunteerBadge />
+                    </>
+                  )}
                   {Boolean(person.completed) && (
                     <span class="event-roster-status">
                       Orientation completed

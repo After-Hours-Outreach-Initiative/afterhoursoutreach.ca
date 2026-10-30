@@ -24,6 +24,7 @@ import {
   applicationReadyForReviewSql,
   attendeeCategorySql,
   includesOrientationSql,
+  medicMarkSql,
   nowMsSql,
   profileDisplayNameSql,
   profileFullNameSql,
@@ -70,6 +71,7 @@ export async function listVolunteers(
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         ${applicationReadyForReviewSql} AS applicationReadyForReview,
         ${attendeeCategorySql("u.id")} AS category,
+        ${medicMarkSql("u.id")} AS medicMark,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       ${applicantsSql}
         AND (? = 'all' OR (${readyForReviewSql}))
@@ -85,7 +87,7 @@ export async function listVolunteers(
       )
       .bind(query),
   ])) as [
-    D1Result<VolunteerRow & { category: AttendeeCategory }>,
+    D1Result<VolunteerRow & { category: AttendeeCategory; medicMark: number }>,
     D1Result<{ allApplicantsCount: number; awaitingApprovalCount: number }>,
   ];
   return {

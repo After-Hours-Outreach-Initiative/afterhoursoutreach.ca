@@ -47,7 +47,12 @@ test("view versions detect capacity, signups, visibility and access changes with
   const original = await eventViewVersion([event], actor);
   const publicRoster = {
     people: [
-      { eventId: event.id, name: "Alice P.", category: "medic" as const },
+      {
+        eventId: event.id,
+        name: "Alice P.",
+        category: "new-volunteer" as const,
+        medicMark: 0,
+      },
     ],
     version: "membership-one",
   };
@@ -64,6 +69,10 @@ test("view versions detect capacity, signups, visibility and access changes with
     {
       ...publicRoster,
       people: [{ ...publicRoster.people[0], name: "Alex P." }],
+    },
+    {
+      ...publicRoster,
+      people: [{ ...publicRoster.people[0], medicMark: 1 }],
     },
     {
       ...publicRoster,
@@ -139,7 +148,8 @@ test("view versions detect capacity, signups, visibility and access changes with
       completed: 0,
       patrolApproved: 0,
       statusVersion: 0,
-      category: "outreach-volunteer" as const,
+      category: "new-volunteer" as const,
+      medicMark: 0,
     },
   ];
   const rosterVersion = await eventViewVersion([event], organizer, roster);
@@ -150,6 +160,7 @@ test("view versions detect capacity, signups, visibility and access changes with
     { patrolApproved: 1 },
     { statusVersion: 1 },
     { category: "medic" as const },
+    { medicMark: 1 },
   ]) {
     const updated = [{ ...roster[0], ...change }];
     expect(await eventViewVersion([event], organizer, updated)).not.toBe(

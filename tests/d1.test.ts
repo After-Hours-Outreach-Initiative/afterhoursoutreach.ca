@@ -328,7 +328,7 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     roster.people.every(
       (row) =>
         row.name === "Ally P." &&
-        Object.keys(row).sort().join() === "category,eventId,name",
+        Object.keys(row).sort().join() === "category,eventId,medicMark,name",
     ),
   );
   assert.doesNotMatch(
@@ -556,6 +556,175 @@ test("manual approvals recolour existing signups consistently without inventing 
   assert.notEqual(
     (await listPublicRosters(env.DB, organizer, [target.id])).version,
     publicRoster.version,
+  );
+});
+
+test("new medic marks require application approval and team selection without satisfying medic reservations", async () => {
+  const actors = new Map<string, Actor>();
+  for (const [id, approved, patrol, teams] of [
+    ["organizer", true, false, ["outreach"]],
+    ["new-medic", true, false, ["medic"]],
+    ["new-outreach", true, false, ["outreach"]],
+    ["outreach", true, true, ["outreach"]],
+    ["eligible-medic", true, true, ["medic"]],
+    ["pending-medic", false, false, ["medic"]],
+  ] as const) {
+    const actor: Actor = {
+      ...(await draftActor(id)),
+      role: id === "organizer" ? "organizer" : "volunteer",
+      applicationSubmitted: true,
+      applicationComplete: true,
+      naloxoneCompleted: true,
+      active: true,
+      applicationApproved: approved,
+      patrolApproved: patrol,
+    };
+    if (id === "organizer")
+      await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+        .bind(id)
+        .run();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,
+        emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,
+        motivation,teams,medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+        VALUES (?,?,'Volunteer','','555','2000-01-01','Contact','555','Friend','Friend','Help',?,'None','None',0,0,0)`,
+      ).bind(id, id, JSON.stringify(teams)),
+      env.DB.prepare(
+        `INSERT INTO volunteer_status
+        (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at)
+        VALUES (?,?,?,'organizer',0,0)`,
+      ).bind(id, Number(approved), Number(patrol)),
+    ]);
+    actors.set(id, actor);
+  }
+  const organizer = actors.get("organizer")!;
+  const newMedic = actors.get("new-medic")!;
+  const outreach = actors.get("outreach")!;
+  await env.DB.prepare(
+    `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+    VALUES ('reserved','orientation',?,'Meeting point',4,'organizer',0,0)`,
+  )
+    .bind(Date.now() + 86_400_000)
+    .run();
+  await changeSignup(env.DB, newMedic, "reserved", "join");
+  await changeSignup(env.DB, actors.get("new-outreach")!, "reserved", "join");
+
+  const registrations = await listRosters(env.DB, organizer, ["reserved"]);
+  assert.deepEqual(
+    registrations.map(({ userId, category, medicMark, patrolApproved }) => ({
+      userId,
+      category,
+      medicMark,
+      patrolApproved,
+    })),
+    [
+      {
+        userId: "new-medic",
+        category: "new-volunteer",
+        medicMark: 1,
+        patrolApproved: 0,
+      },
+      {
+        userId: "new-outreach",
+        category: "new-volunteer",
+        medicMark: 0,
+        patrolApproved: 0,
+      },
+    ],
+  );
+  const before = await listPublicRosters(env.DB, organizer, ["reserved"]);
+  assert.equal(
+    before.people.find(({ name }) => name === "new-medic V.")?.medicMark,
+    1,
+  );
+  const directory = (await listVolunteers(env.DB, organizer)).rows;
+  assert.equal(directory.find(({ id }) => id === "new-medic")?.medicMark, 1);
+  assert.equal(
+    directory.find(({ id }) => id === "eligible-medic")?.medicMark,
+    1,
+  );
+  assert.equal(
+    directory.find(({ id }) => id === "pending-medic")?.medicMark,
+    0,
+  );
+  assert.equal(directory.find(({ id }) => id === "outreach")?.medicMark, 0);
+
+  const selected = (await listEvents(env.DB, newMedic)).find(
+    ({ id }) => id === "reserved",
+  )!;
+  assert.deepEqual(
+    [
+      selected.confirmed,
+      selected.newVolunteerConfirmed,
+      selected.medicConfirmed,
+      selected.medicEligible,
+    ],
+    [2, 2, 0, 0],
+  );
+  assert.equal(
+    (await listEvents(env.DB, outreach)).find(({ id }) => id === "reserved")
+      ?.availableSpots,
+    0,
+  );
+  await assert.rejects(
+    changeSignup(env.DB, outreach, "reserved", "join"),
+    statusError(409),
+  );
+
+  // A display-only team edit must refresh polling without changing capacity.
+  await env.DB.prepare(
+    "UPDATE profile SET teams='[\"outreach\"]' WHERE user_id='new-medic'",
+  ).run();
+  const unmarked = await listPublicRosters(env.DB, organizer, ["reserved"]);
+  assert.notEqual(unmarked.version, before.version);
+  assert.equal(
+    unmarked.people.find(({ name }) => name === "new-medic V.")?.category,
+    "new-volunteer",
+  );
+  assert.equal(
+    unmarked.people.find(({ name }) => name === "new-medic V.")?.medicMark,
+    0,
+  );
+  await env.DB.prepare(
+    "UPDATE profile SET teams='[\"medic\"]' WHERE user_id='new-medic'",
+  ).run();
+  assert.equal(
+    (await listPublicRosters(env.DB, organizer, ["reserved"])).version,
+    before.version,
+  );
+
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET registration_approved=1 WHERE user_id='pending-medic'",
+  ).run();
+  assert.equal(
+    (await listVolunteers(env.DB, organizer)).rows.find(
+      ({ id }) => id === "pending-medic",
+    )?.medicMark,
+    1,
+  );
+  await changeSignup(env.DB, actors.get("eligible-medic")!, "reserved", "join");
+  const after = (await listEvents(env.DB, newMedic)).find(
+    ({ id }) => id === "reserved",
+  )!;
+  assert.deepEqual(
+    [
+      after.confirmed,
+      after.newVolunteerConfirmed,
+      after.medicConfirmed,
+      after.medicEligible,
+    ],
+    [3, 2, 1, 0],
+  );
+  assert.equal(
+    (await listPublicRosters(env.DB, organizer, ["reserved"])).people.filter(
+      ({ medicMark }) => medicMark,
+    ).length,
+    2,
+  );
+  await assert.rejects(
+    changeSignup(env.DB, outreach, "reserved", "join"),
+    statusError(409),
   );
 });
 
