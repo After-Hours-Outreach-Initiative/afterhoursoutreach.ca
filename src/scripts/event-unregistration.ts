@@ -19,12 +19,7 @@ export function confirmEventUnregistration(
   description.id = `${heading.id}-description`;
   dialog.setAttribute("aria-describedby", description.id);
   const card = form.closest<HTMLElement>("[data-live-event]");
-  const label = [
-    card?.querySelector("h3")?.textContent?.trim(),
-    card?.dataset.eventLabel,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const label = card?.querySelector("h3")?.textContent?.trim();
   description.textContent = `Your registration for ${label || "this event"} will be removed.`;
   content.appendChild(description);
   const footer = document.createElement("div");

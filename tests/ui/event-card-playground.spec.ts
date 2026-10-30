@@ -378,6 +378,9 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     name: "Unregister from this event?",
     exact: true,
   });
+  await expect(confirmation).toHaveAccessibleDescription(
+    `Your registration for ${await registered.locator("[data-live-event] h3").textContent()} will be removed.`,
+  );
   await expect(
     confirmation.getByRole("button", { name: "Cancel", exact: true }),
   ).toBeFocused();
