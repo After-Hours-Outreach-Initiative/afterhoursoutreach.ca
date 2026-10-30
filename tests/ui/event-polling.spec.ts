@@ -320,6 +320,9 @@ test("other viewers see signups and cancellations through polling without losing
         { exact: true },
       ),
     ).toHaveCount(1);
+    await expect(card(viewer).getByText("Full", { exact: true })).toHaveCount(
+      0,
+    );
     await expect(card(viewer)).not.toContainText(/You can(?:’t)? register/);
     await expect(organizerCard.locator("[data-event-availability]")).toHaveText(
       "2 of 4 spots taken",
