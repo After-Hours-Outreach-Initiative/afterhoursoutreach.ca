@@ -1475,6 +1475,7 @@ body:has(
 }
 .volunteer-table a.volunteer-table-sort {
   gap: 0.5rem;
+  color: #fff;
   text-decoration: none;
 }
 .volunteer-table [data-volunteer-sort="name"] {
