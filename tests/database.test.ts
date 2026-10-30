@@ -151,6 +151,19 @@ function capacityPeople(
   });
 }
 
+test("saved event limits cap new volunteers while preserving medic places", () => {
+  db.exec(
+    "UPDATE event SET spots=3,min_medic_spots=1,min_new_volunteer_spots=1,max_new_volunteers=1 WHERE id='orientation'",
+  );
+  signUp("alice-custom", "orientation", "alice");
+  assert.throws(
+    () => signUp("bob-custom", "orientation", "bob"),
+    /orientation_places_full/,
+  );
+  approve("bob");
+  signUp("bob-approved", "orientation", "bob");
+});
+
 test("medic and new volunteer reservations are exclusive, dynamic and freed by cancellation", () => {
   db.exec("UPDATE event SET spots=6 WHERE id='orientation'");
   const medics = capacityPeople("medic", 3, true);

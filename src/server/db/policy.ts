@@ -1,4 +1,9 @@
 import { contactEmail } from "../../data/site";
+import {
+  defaultEventLimits,
+  minimumEventSpots,
+  type EventLimits,
+} from "../../data/event-limits";
 
 // User-facing previews of the rules enforced by database writes and triggers.sql.
 export interface SignupVolunteer {
@@ -9,7 +14,7 @@ export interface SignupVolunteer {
   role?: "volunteer" | "organizer";
 }
 
-export interface SignupEvent {
+export interface SignupEvent extends Partial<EventLimits> {
   // Legacy callers can keep supplying type; new forms use includesOrientation.
   type?: "patrol" | "orientation";
   includesOrientation?: boolean | number;
@@ -26,19 +31,24 @@ export interface SignupEvent {
 export const orientationSignupLimitMessage =
   "You can book one upcoming orientation at a time until an organizer approves you for patrols. Unregister from your current orientation before choosing another.";
 
-export const orientationFullMessage =
-  "All four new volunteer places are booked.";
+export const orientationFullMessage = "All new volunteer places are booked.";
 export const orientationReservedMessage =
   "The remaining places are reserved for approved medics or new volunteers awaiting patrol approval.";
 
 export const orientationCapacityMessage =
-  "Patrols need at least 2 total volunteer spots, or 4 when including orientation, to preserve reserved places.";
+  "Volunteer spots must cover the reserved medic places and, with orientation, reserved new volunteer places. The new volunteer maximum cannot be below its reserved places.";
 
-export function validOrientationCapacity(event: {
-  includesOrientation: boolean | number;
-  spots: number;
-}) {
-  return event.spots >= (event.includesOrientation ? 4 : 2);
+export function validOrientationCapacity(
+  event: Partial<EventLimits> & {
+    includesOrientation: boolean | number;
+    spots: number;
+  },
+) {
+  return (
+    event.spots >= minimumEventSpots(event) &&
+    (event.minNewVolunteerSpots ?? defaultEventLimits.minNewVolunteerSpots) <=
+      (event.maxNewVolunteers ?? defaultEventLimits.maxNewVolunteers)
+  );
 }
 
 export function eventIncludesOrientation(
@@ -57,6 +67,7 @@ export function availableSignupSpots(
     | "newVolunteerConfirmed"
     | "medicConfirmed"
     | "medicEligible"
+    | keyof EventLimits
   >,
   confirmed: number,
   volunteer: Pick<SignupVolunteer, "patrolApproved">,
@@ -66,15 +77,19 @@ export function availableSignupSpots(
   const medic = !newVolunteer && Boolean(event.medicEligible);
   const medics = event.medicConfirmed ?? 0;
   const newVolunteers = event.newVolunteerConfirmed ?? 0;
+  const limits = { ...defaultEventLimits, ...event };
   // Try successive additions in the viewer's mutually exclusive category. Each
   // addition must leave room for BOTH categories' outstanding reservations.
   let available = 0;
   for (let added = 1; added <= event.spots - confirmed; added++) {
     const afterNewVolunteers = newVolunteers + (newVolunteer ? added : 0);
-    if (newVolunteer && afterNewVolunteers > 4) break;
-    const outstandingMedics = Math.max(0, 2 - medics - (medic ? added : 0));
+    if (newVolunteer && afterNewVolunteers > limits.maxNewVolunteers) break;
+    const outstandingMedics = Math.max(
+      0,
+      limits.minMedicSpots - medics - (medic ? added : 0),
+    );
     const outstandingNewVolunteers = orientation
-      ? Math.max(0, 2 - afterNewVolunteers)
+      ? Math.max(0, limits.minNewVolunteerSpots - afterNewVolunteers)
       : 0;
     if (
       confirmed + added + outstandingMedics + outstandingNewVolunteers >
@@ -120,7 +135,8 @@ export function eventSignupBlockReason(
   if (!availableSignupSpots(event, confirmed, volunteer))
     return includesOrientation &&
       !volunteer.patrolApproved &&
-      (event.newVolunteerConfirmed ?? 0) >= 4
+      (event.newVolunteerConfirmed ?? 0) >=
+        (event.maxNewVolunteers ?? defaultEventLimits.maxNewVolunteers)
       ? orientationFullMessage
       : orientationReservedMessage;
   if (includesOrientation && event.orientationSignupBlocked)

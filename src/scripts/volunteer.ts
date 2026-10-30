@@ -25,6 +25,7 @@ import {
   seriesSaveAction,
   syncSeriesControls,
   eventEmailPrompt,
+  eventFields,
 } from "./event-recurrence";
 import {
   actionEmailNeedsFeedback,
@@ -898,14 +899,8 @@ form(
         ? { id: str(v, "id"), version: Number(v.get("version")) }
         : {}),
       event: {
-        includesOrientation: v.has("includesOrientation"),
+        ...eventFields(v),
         startsAt: vancouverInstant(str(v, "startsAt")),
-        meetingPoint: str(v, "meetingPoint"),
-        meetingPointUrl: str(v, "meetingPointUrl"),
-        spots: Number(v.get("spots")),
-        // Keep the existing API/storage flags in sync from the single control.
-        open: str(v, "publicVisibility") === "true",
-        hidden: str(v, "publicVisibility") !== "true",
       },
     },
 );

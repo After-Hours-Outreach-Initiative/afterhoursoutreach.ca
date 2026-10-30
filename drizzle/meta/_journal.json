@@ -190,6 +190,13 @@
       "when": 1793337674105,
       "tag": "0026_manual_volunteer_progression",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1793349494396,
+      "tag": "0027_event_volunteer_limits",
+      "breakpoints": true
     }
   ]
 }

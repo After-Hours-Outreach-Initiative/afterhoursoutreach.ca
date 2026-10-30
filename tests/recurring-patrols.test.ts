@@ -93,6 +93,31 @@ const all = async (seriesId: string) =>
     (event) => event.seriesId === seriesId,
   );
 
+test("recurring patrols persist custom volunteer limits on generated occurrences", async () => {
+  const limits = {
+    minMedicSpots: 1,
+    minNewVolunteerSpots: 1,
+    maxNewVolunteers: 2,
+  };
+  const saved = await savePatrolSeries(db, organizer, {
+    ...input(),
+    includesOrientation: true,
+    ...limits,
+  });
+  const series = await findPatrolSeries(db, organizer, saved.id);
+  const occurrences = await all(saved.id);
+  assert.equal(occurrences.length, 3);
+  for (const settings of [series, ...occurrences])
+    assert.deepEqual(
+      [
+        settings.minMedicSpots,
+        settings.minNewVolunteerSpots,
+        settings.maxNewVolunteers,
+      ],
+      [1, 1, 2],
+    );
+});
+
 beforeAll(async () => {
   await harness.listen();
   db = (await harness.getWorker<Pick<Env, "DB">>().getEnv()).DB;
@@ -412,6 +437,9 @@ test("effective day shifts plan the true earliest starts across template boundar
       open: 1,
       hidden: 0,
       includesOrientation: 0,
+      minMedicSpots: 2,
+      minNewVolunteerSpots: 2,
+      maxNewVolunteers: 4,
     }));
     const candidates = Array.from({ length: 63 }, (_, index) => {
       const date = addCalendarDays(firstDate, index * 7);
@@ -1823,7 +1851,7 @@ test("orientation settings persist on series, future templates and individual ex
     (error: unknown) =>
       error instanceof RequestError &&
       error.status === 400 &&
-      /at least 2 total/.test(error.message),
+      /reserved medic places/.test(error.message),
   );
   await assert.rejects(
     updatePatrolSeriesFrom(
@@ -1837,7 +1865,7 @@ test("orientation settings persist on series, future templates and individual ex
     (error: unknown) =>
       error instanceof RequestError &&
       error.status === 400 &&
-      /at least 2 total/.test(error.message),
+      /reserved medic places/.test(error.message),
   );
   assert.ok(events.every((event) => event.includesOrientation === 1));
   await db

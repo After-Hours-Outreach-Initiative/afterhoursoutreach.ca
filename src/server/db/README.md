@@ -105,21 +105,27 @@ when both are present the explicit orientation setting wins.
 `0015_patrol_orientation_capacity.sql` adds only columns and replacement triggers;
 apply it before deploying code that reads the new setting.
 
-Total capacity includes everyone, with two **medic** places reserved on every
-patrol. A medic must have `medic` in `profile.teams`, both authoritative organizer
+Total capacity includes everyone. Organizer event settings control
+`minMedicSpots` (reserved **medic** places, default two),
+`minNewVolunteerSpots` (reserved **new volunteer** places with orientation, default
+two), and `maxNewVolunteers` (new volunteer cap with orientation, default four).
+These are reservations, not minimum attendance requirements. Limits are whole
+numbers from 0–100; zero removes that reservation or disallows new volunteers.
+The new volunteer maximum cannot be below its reserved places.
+A medic must have `medic` in `profile.teams`, both authoritative organizer
 approvals (`registration_approved` and `patrol_approved`). Orientation attendance
 is not a role requirement. No extra certification gate is imposed.
 
-Patrols with orientation also reserve two **new volunteer** places, with a maximum of
-four new volunteers and no minimum attendance. Anyone without manual patrol approval,
+Patrols with orientation also apply their saved new volunteer reservation and cap.
+Anyone without manual patrol approval,
 including someone with recorded orientation attendance or medic team interest,
 counts only as a new volunteer. Patrol-approved volunteers are outreach volunteers
 or approved medics regardless of attendance. Each person occupies one place.
 The same categories drive event counts, public/organizer rosters, volunteer-list
 avatars, profile progression, capacity reservations, and Discord Medic eligibility.
 
-After a candidate is added, `total + max(0, 2 - medics) + outstandingNewVolunteers`
-must not exceed capacity; `outstandingNewVolunteers = max(0, 2 - newVolunteers)` only when
+After a candidate is added, `total + max(0, minMedicSpots - medics) + outstandingNewVolunteers`
+must not exceed capacity; `outstandingNewVolunteers = max(0, minNewVolunteerSpots - newVolunteers)` only when
 orientation is included. Extra medics and additional new volunteers share the general
 pool, without consuming the other category's outstanding reservations. Cancellations
 free the appropriate category. SQLite insert/update triggers enforce this atomically,
@@ -132,9 +138,11 @@ back cancellation, audits and notifications).
 to manual patrol approval and removes attendance-driven Discord sync triggers.
 It preserves all existing profiles, approvals, attendance and signups.
 
-New or edited events, series and templates need capacity two, or four with
-orientation. Apply `0017_medic_orientee_reservations.sql` before deploying this code.
-It replaces triggers only: legacy undersized rows and bookings are not rewritten or
+New or edited events, series and templates need positive capacity covering all
+reserved places (two, or four with orientation, at the defaults).
+`0027_event_volunteer_limits.sql` adds defaulted limit columns to events, series
+and templates and replaces the enforcing triggers without rebuilding tables.
+Existing settings and bookings are not rewritten or
 deleted, remain readable/cancellable, and must be corrected before new bookings or
 relevant edits. Invalid recurring defaults do not generate new occurrences.
 
@@ -221,7 +229,9 @@ notify?)` provides actual **this-and-future** editing, including already-generat
   occurrences. The template contains `localTime`, `dayOffset` (−366…366 relative to
   each nominal date), meeting point/link, capacity, open and hidden. The effective
   template applies during generation too. Both series defaults and effective
-  templates include `includesOrientation`, which is copied to every new snapshot;
+  templates include `includesOrientation` and all three volunteer limits, copied
+  to every new snapshot. Older API clients omitting limits retain saved values on
+  edits; new records use the defaults. Bulk edits change only selected fields;
   individual overrides use the same setting through `saveEvent`. An earlier edit
   replaces later templates,
   but preserves earlier templates, individual `saveEvent` exceptions, cancellation

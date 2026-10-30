@@ -110,7 +110,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       },
     });
     expect(tooSmall.status).toBe(400);
-    expect(await tooSmall.text()).toContain("at least 2 total volunteer spots");
+    expect(await tooSmall.text()).toContain("reserved medic places");
     await ok(
       await action(
         { action: "save-series", series: seriesInput },

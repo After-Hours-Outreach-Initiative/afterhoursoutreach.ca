@@ -1,10 +1,22 @@
+import { defaultEventLimits, minimumEventSpots } from "../data/event-limits";
+
 const str = (values: FormData, key: string) => String(values.get(key) ?? "");
 
-function eventFields(values: FormData) {
+export function eventFields(values: FormData) {
   return {
     meetingPoint: str(values, "meetingPoint"),
     meetingPointUrl: str(values, "meetingPointUrl"),
     spots: Number(values.get("spots")),
+    minMedicSpots: Number(
+      values.get("minMedicSpots") ?? defaultEventLimits.minMedicSpots,
+    ),
+    minNewVolunteerSpots: Number(
+      values.get("minNewVolunteerSpots") ??
+        defaultEventLimits.minNewVolunteerSpots,
+    ),
+    maxNewVolunteers: Number(
+      values.get("maxNewVolunteers") ?? defaultEventLimits.maxNewVolunteers,
+    ),
     includesOrientation: values.has("includesOrientation"),
     open: str(values, "publicVisibility") === "true",
     hidden: str(values, "publicVisibility") !== "true",
@@ -126,16 +138,40 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     const capacityFeedback = form.querySelector<HTMLElement>(
       '[data-error$="-spots"] span',
     );
+    const minMedicSpots = form.querySelector<HTMLInputElement>(
+      '[name="minMedicSpots"]',
+    );
+    const minNewVolunteerSpots = form.querySelector<HTMLInputElement>(
+      '[name="minNewVolunteerSpots"]',
+    );
+    const maxNewVolunteers = form.querySelector<HTMLInputElement>(
+      '[name="maxNewVolunteers"]',
+    );
     if (orientation && spots && capacityFeedback) {
       const updateCapacity = () => {
-        spots.min = orientation.checked ? "4" : "2";
-        capacityFeedback.textContent = orientation.checked
-          ? "Enter a whole number from 4 to 100 for a patrol that includes orientation."
-          : "Enter a whole number from 2 to 100.";
+        const minimum = minimumEventSpots({
+          includesOrientation: orientation.checked,
+          minMedicSpots: Number(
+            minMedicSpots?.value ?? defaultEventLimits.minMedicSpots,
+          ),
+          minNewVolunteerSpots: Number(
+            minNewVolunteerSpots?.value ??
+              defaultEventLimits.minNewVolunteerSpots,
+          ),
+        });
+        spots.min = String(minimum);
+        capacityFeedback.textContent =
+          minimum > 100
+            ? "Reduce reserved places to a combined maximum of 100."
+            : `Enter a whole number from ${minimum} to 100, covering all reserved places.`;
+        if (maxNewVolunteers && minNewVolunteerSpots)
+          maxNewVolunteers.min = minNewVolunteerSpots.value || "0";
       };
       if (!form.dataset.capacityReady) {
         form.dataset.capacityReady = "true";
         orientation.addEventListener("change", updateCapacity);
+        for (const input of [minMedicSpots, minNewVolunteerSpots])
+          input?.addEventListener("input", updateCapacity);
         form.addEventListener("reset", () => queueMicrotask(updateCapacity));
       }
       updateCapacity();

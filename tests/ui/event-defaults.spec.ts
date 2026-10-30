@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 import { fillDateInput } from "../helpers/date-input";
 
-test("meeting defaults are submitted for new events without replacing drafts or saved values", async ({
+test("meeting and volunteer-limit defaults are submitted without replacing drafts or saved values", async ({
   page,
 }) => {
   await page.goto("/volunteer");
@@ -23,6 +23,9 @@ test("meeting defaults are submitted for new events without replacing drafts or 
   const defaults = {
     meetingPoint: "Lord Strathcona Elementary",
     meetingPointUrl: "https://maps.app.goo.gl/4ommJyZFCRJRGf9F9",
+    minMedicSpots: 2,
+    minNewVolunteerSpots: 2,
+    maxNewVolunteers: 4,
   };
   await expect(meeting).toHaveValue(defaults.meetingPoint);
   await expect(map).toHaveValue(defaults.meetingPointUrl);
@@ -56,13 +59,28 @@ test("meeting defaults are submitted for new events without replacing drafts or 
 
   await meeting.fill("Custom meeting point");
   await map.fill("");
+  await form.getByLabel("Minimum medic spots", { exact: true }).fill("3");
+  await form
+    .getByLabel("Minimum new volunteer spots", { exact: true })
+    .fill("1");
+  await form.getByLabel("Maximum new volunteers", { exact: true }).fill("2");
+  await form.getByLabel("Includes orientation", { exact: true }).check();
+  await expect(
+    form.getByLabel("Volunteer spots", { exact: true }),
+  ).toHaveAttribute("min", "4");
   await page.keyboard.press("Escape");
   await create.click();
   await expect(meeting).toHaveValue("Custom meeting point");
   await expect(map).toHaveValue("");
   expect(await submit()).toMatchObject({
     action: "save-series",
-    series: { meetingPoint: "Custom meeting point", meetingPointUrl: "" },
+    series: {
+      meetingPoint: "Custom meeting point",
+      meetingPointUrl: "",
+      minMedicSpots: 3,
+      minNewVolunteerSpots: 1,
+      maxNewVolunteers: 2,
+    },
   });
   await form.evaluate((element: HTMLFormElement) => element.reset());
   await expect(meeting).toHaveValue(defaults.meetingPoint);

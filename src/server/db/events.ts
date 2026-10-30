@@ -34,12 +34,19 @@ import {
 } from "./policy";
 import { databaseWriteError } from "./errors";
 import {
+  eventLimitFields,
+  eventLimitInputFields,
+  withEventLimits,
+} from "./event-limits";
+import type { EventLimits } from "../../data/event-limits";
+import {
   ensurePatrolOccurrences,
   recurringSignupWindowSql,
 } from "./patrol-series";
 
 export {
   patrolSeriesSchema,
+  patrolSeriesRequestSchema,
   savePatrolSeries,
   listPatrolSeries,
   findPatrolSeries,
@@ -47,6 +54,7 @@ export {
   materializePatrolOccurrence,
   patrolOccurrenceId,
   patrolTemplateSchema,
+  patrolTemplateRequestSchema,
   listPatrolTemplates,
   patrolTemplateFor,
   updatePatrolSeriesFrom,
@@ -69,9 +77,13 @@ const eventFieldsSchema = z.strictObject({
       .refine((value) => new URL(value).protocol === "https:"),
   ]),
   spots: z.number().int().min(1).max(100),
+  ...eventLimitFields,
   open: z.boolean(),
   hidden: z.boolean(),
 });
+export const eventRequestSchema = eventFieldsSchema.extend(
+  eventLimitInputFields,
+);
 export const eventSchema = eventFieldsSchema
   .refine(
     (value) =>
@@ -101,16 +113,20 @@ export const bulkEventSchema = z.strictObject({
       meetingPoint: true,
       meetingPointUrl: true,
       spots: true,
+      minMedicSpots: true,
+      minNewVolunteerSpots: true,
+      maxNewVolunteers: true,
       includesOrientation: true,
       open: true,
       hidden: true,
     })
     .partial()
+    .extend(eventLimitInputFields)
     .refine((changes) =>
       Object.values(changes).some((value) => value !== undefined),
     ),
 });
-export interface EventRow {
+export interface EventRow extends EventLimits {
   id: string;
   type: "patrol" | "orientation";
   includesOrientation: number;
@@ -173,7 +189,9 @@ const eventColumns = `
   e.series_id AS seriesId, e.occurrence_date AS occurrenceDate,
   ${recurringSignupWindowSql()} AS inSignupWindow,
   e.meeting_point AS meetingPoint, e.meeting_point_url AS meetingPointUrl,
-  e.spots, e.open, e.hidden,
+  e.spots, e.min_medic_spots AS minMedicSpots,
+  e.min_new_volunteer_spots AS minNewVolunteerSpots,
+  e.max_new_volunteers AS maxNewVolunteers, e.open, e.hidden,
   e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
 const confirmedSignupsSql = `(SELECT count(*) FROM signup
   WHERE event_id = e.id AND status = 'confirmed')`;
@@ -394,14 +412,17 @@ export async function saveEvent(
   notify = false,
 ) {
   requireOrganizer(actor);
-  const parsed = eventSchema.safeParse(input);
+  const old = id ? await findEvent(db, id) : null;
+  const parsed = eventSchema.safeParse(
+    withEventLimits(input, old ?? undefined),
+  );
   if (!parsed.success)
     throw new RequestError(
       400,
       parsed.error.issues.find(
         (issue) => issue.message === orientationCapacityMessage,
       )?.message ??
-        "Check the orientation setting, date, capacity (2–100, or 4–100 with orientation), meeting point, and HTTPS map link.",
+        "Check the orientation setting, date, capacity (1–100), volunteer limits (0–100), meeting point, and HTTPS map link.",
     );
   const data = parsed.data;
   const startsAt = new Date(data.startsAt).getTime();
@@ -417,9 +438,10 @@ export async function saveEvent(
           .prepare(
             `INSERT INTO event (
               id, type, includes_orientation, starts_at, meeting_point, meeting_point_url,
-              spots, open, hidden, created_by, created_at, updated_at
+              spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers,
+              open, hidden, created_by, created_at, updated_at
             )
-            SELECT ?, 'patrol', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            SELECT ?, 'patrol', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             WHERE ${writePermission(true)}`,
           )
           .bind(
@@ -429,6 +451,9 @@ export async function saveEvent(
             data.meetingPoint,
             data.meetingPointUrl || null,
             data.spots,
+            data.minMedicSpots,
+            data.minNewVolunteerSpots,
+            data.maxNewVolunteers,
             Number(data.open),
             Number(data.hidden),
             actor.id,
@@ -444,7 +469,7 @@ export async function saveEvent(
           "Organizer authorization changed. Sign in again.",
         );
     } else {
-      const old = await findEvent(db, id);
+      if (!old) throw new RequestError(404, "Event not found.");
       if (old.cancelledAt)
         throw new RequestError(409, "Cancelled events cannot be edited.");
       if (old.startsAt <= now)
@@ -471,6 +496,9 @@ export async function saveEvent(
                 meeting_point = ?,
                 meeting_point_url = ?,
                 spots = ?,
+                min_medic_spots = ?,
+                min_new_volunteer_spots = ?,
+                max_new_volunteers = ?,
                 open = ?,
                 hidden = ?,
                 updated_at = ?
@@ -486,6 +514,9 @@ export async function saveEvent(
             data.meetingPoint,
             data.meetingPointUrl || null,
             data.spots,
+            data.minMedicSpots,
+            data.minNewVolunteerSpots,
+            data.maxNewVolunteers,
             Number(data.open),
             Number(data.hidden),
             Math.max(now, old.updatedAt + 1),
@@ -570,6 +601,10 @@ export async function bulkSaveEvents(
       includesOrientation:
         changes.includesOrientation ?? Boolean(old.includesOrientation),
       spots: changes.spots ?? old.spots,
+      minMedicSpots: changes.minMedicSpots ?? old.minMedicSpots,
+      minNewVolunteerSpots:
+        changes.minNewVolunteerSpots ?? old.minNewVolunteerSpots,
+      maxNewVolunteers: changes.maxNewVolunteers ?? old.maxNewVolunteers,
     };
     if (!validOrientationCapacity(next))
       throw new RequestError(400, orientationCapacityMessage);
@@ -621,6 +656,9 @@ export async function bulkSaveEvents(
     meetingPoint: "meeting_point",
     meetingPointUrl: "meeting_point_url",
     spots: "spots",
+    minMedicSpots: "min_medic_spots",
+    minNewVolunteerSpots: "min_new_volunteer_spots",
+    maxNewVolunteers: "max_new_volunteers",
     includesOrientation: "includes_orientation",
     open: "open",
     hidden: "hidden",

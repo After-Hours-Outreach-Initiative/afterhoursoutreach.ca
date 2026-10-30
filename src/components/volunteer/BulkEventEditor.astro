@@ -1,6 +1,7 @@
 ---
 import DialogHeader from "@/components/DialogHeader.astro";
 import FieldError from "@/components/FieldError.astro";
+import { defaultEventLimits } from "@/data/event-limits";
 ---
 
 <div
@@ -111,7 +112,7 @@ import FieldError from "@/components/FieldError.astro";
             id="bulk-spots"
             name="spots"
             type="number"
-            min="2"
+            min="1"
             max="100"
             step="1"
             required
@@ -120,9 +121,44 @@ import FieldError from "@/components/FieldError.astro";
           />
           <FieldError
             field="bulk-spots"
-            message="Enter a whole number from 2 to 100 (at least 4 with orientation)."
+            message="Enter a whole number from 1 to 100, covering the event's reserved places."
           />
         </div>
+        {
+          [
+            ["minMedicSpots", "Minimum medic spots"],
+            ["minNewVolunteerSpots", "Minimum new volunteer spots"],
+            ["maxNewVolunteers", "Maximum new volunteers"],
+          ].map(([name, label]) => (
+            <div class="volunteer-field">
+              <label class="volunteer-check">
+                <input type="checkbox" data-bulk-enable={name} />
+                <span>Change {label.toLowerCase()}</span>
+              </label>
+              <label class="sr-only" for={`bulk-${name}`}>
+                {label}
+              </label>
+              <input
+                id={`bulk-${name}`}
+                name={name}
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                required
+                disabled
+                value={
+                  defaultEventLimits[name as keyof typeof defaultEventLimits]
+                }
+                aria-describedby={`error-bulk-${name}`}
+              />
+              <FieldError
+                field={`bulk-${name}`}
+                message="Enter a whole number from 0 to 100."
+              />
+            </div>
+          ))
+        }
         <label class="volunteer-field"
           >Includes orientation
           <select name="includesOrientation"
@@ -150,9 +186,10 @@ import FieldError from "@/components/FieldError.astro";
       </div>
       <p id="bulk-capacity-help" class="volunteer-help">
         Capacity and orientation must work for every selected event and its
-        registrations: at least 2 spots, or 4 with orientation. Existing
-        reserved-place and orientation policies still apply. If any event
-        conflicts, none are saved.
+        registrations. Capacity must cover reserved medic places and, with
+        orientation, reserved new volunteer places. The new volunteer maximum
+        cannot be below its reserved places. If any event conflicts, none are
+        saved.
       </p>
       <p data-bulk-stale role="alert" hidden>
         The selection changed while this dialog was open. Close it, review the

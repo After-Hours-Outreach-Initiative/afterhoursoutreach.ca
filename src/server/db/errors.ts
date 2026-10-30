@@ -17,7 +17,8 @@ export function databaseWriteError(error: unknown): never {
     throw new RequestError(409, "This event is full.");
   if (
     message.includes("orientation_minimum_capacity") ||
-    message.includes("event_minimum_capacity")
+    message.includes("event_minimum_capacity") ||
+    message.includes("event_invalid_limits")
   )
     throw new RequestError(400, orientationCapacityMessage);
   if (message.includes("orientation_places_full"))
@@ -30,7 +31,7 @@ export function databaseWriteError(error: unknown): never {
   if (message.includes("orientation_edit_conflict"))
     throw new RequestError(
       409,
-      "These changes conflict with existing registrations or completion history. Keep two medic places and, with orientation, two places reserved for new volunteers (maximum four new volunteers). Retain orientation where booked volunteers need it.",
+      "These changes conflict with existing registrations or completion history. Keep enough capacity for the event's reserved places and existing new volunteers. Retain orientation where booked volunteers need it.",
     );
   if (message.includes("orientation_signup_limit"))
     throw new RequestError(409, orientationSignupLimitMessage);

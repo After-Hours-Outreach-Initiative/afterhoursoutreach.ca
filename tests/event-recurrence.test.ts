@@ -53,6 +53,9 @@ const values = (extra: Record<string, string> = {}) => {
     meetingPoint: "Meeting point",
     meetingPointUrl: "",
     spots: "8",
+    minMedicSpots: "2",
+    minNewVolunteerSpots: "2",
+    maxNewVolunteers: "4",
     publicVisibility: "true",
     ...extra,
   }))
@@ -75,6 +78,9 @@ test("creation keeps Vancouver wall time and inclusive end date with optional or
       meetingPoint: "Meeting point",
       meetingPointUrl: "",
       spots: 8,
+      minMedicSpots: 2,
+      minNewVolunteerSpots: 2,
+      maxNewVolunteers: 4,
       includesOrientation: false,
       open: true,
       hidden: false,
@@ -97,6 +103,9 @@ test("this-and-future edits use nominal identities and series versions, not occu
     scope: "future",
     publicVisibility: "false",
     includesOrientation: "on",
+    minMedicSpots: "3",
+    minNewVolunteerSpots: "1",
+    maxNewVolunteers: "2",
   });
   expect(recurringSaveAction(data)).toMatchObject({
     action: "update-series-from",
@@ -109,6 +118,9 @@ test("this-and-future edits use nominal identities and series versions, not occu
       open: false,
       hidden: true,
       includesOrientation: true,
+      minMedicSpots: 3,
+      minNewVolunteerSpots: 1,
+      maxNewVolunteers: 2,
     },
   });
   expect(recurringCancelAction(data)).toEqual({
@@ -156,6 +168,9 @@ test("series settings send the create-event fields without a recurring checkbox"
       meetingPoint: "Meeting point",
       meetingPointUrl: "",
       spots: 8,
+      minMedicSpots: 2,
+      minNewVolunteerSpots: 2,
+      maxNewVolunteers: 4,
       open: false,
       hidden: true,
       includesOrientation: true,

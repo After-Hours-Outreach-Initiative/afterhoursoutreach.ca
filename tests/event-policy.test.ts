@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { contactEmail } from "../src/data/site";
+import { rosterCapacitySummary } from "../src/data/event-limits";
 import {
   canViewVolunteerProfile,
   availableSignupSpots,
@@ -25,6 +26,38 @@ const volunteer: SignupVolunteer = {
   active: true,
   patrolApproved: true,
 };
+
+test("saved limits govern reservations, newcomer caps and roster summaries", () => {
+  const custom = {
+    ...event,
+    includesOrientation: true,
+    minMedicSpots: 3,
+    minNewVolunteerSpots: 1,
+    maxNewVolunteers: 2,
+    medicConfirmed: 0,
+    newVolunteerConfirmed: 0,
+  };
+  const newcomer = { ...volunteer, patrolApproved: false };
+  assert.equal(availableSignupSpots(custom, 0, volunteer), 4);
+  assert.equal(availableSignupSpots(custom, 0, newcomer), 2);
+  assert.equal(
+    signupBlockReason(
+      newcomer,
+      { ...custom, newVolunteerConfirmed: 2 },
+      2,
+      now,
+    ),
+    orientationFullMessage,
+  );
+  assert.equal(
+    rosterCapacitySummary({
+      ...custom,
+      medicConfirmed: 1,
+      newVolunteerConfirmed: 2,
+    }),
+    "Medics: 1 registered, 2 places reserved. New volunteers: 2/2 registered, 0 places reserved.",
+  );
+});
 
 test("approval allows patrol signup without orientation completion", () => {
   assert.equal(signupBlockReason(volunteer, event, 0, now), null);
