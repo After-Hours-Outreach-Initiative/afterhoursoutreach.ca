@@ -194,7 +194,7 @@ test("pending applications poll every minute, then approval restores five-second
       .locator('[data-switch-user="local-fixture-user-robin"]')
       .click();
     await expect(
-      page.getByRole("link", { name: "Organizer", exact: true }),
+      page.getByRole("button", { name: "Create", exact: true }),
     ).toBeVisible();
     await page.goto(`/volunteers/${account.id}`);
     await page
@@ -370,7 +370,7 @@ test("an in-progress application preserves its course draft and focus until conf
       .locator('[data-switch-user="local-fixture-user-robin"]')
       .click();
     await expect(
-      page.getByRole("link", { name: "Organizer", exact: true }),
+      page.getByRole("button", { name: "Create", exact: true }),
     ).toBeVisible();
     const profile = await page.request.get(`/volunteers/${account.id}`);
     const profileHtml = await profile.text();

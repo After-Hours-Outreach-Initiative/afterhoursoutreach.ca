@@ -115,14 +115,14 @@ const blocked =
       </p>
       <p data-event-availability aria-live="polite" aria-atomic="true">
         {
-          !organizer && Boolean(event.signedUp) ? (
+          Boolean(event.signedUp) ? (
             <>
               <span class:list={{ "volunteer-spots": future }}>
                 {future ? "Registered" : "You registered"}
               </span>{" "}
               ·{" "}
             </>
-          ) : !organizer && future && event.confirmed >= event.spots ? (
+          ) : future && event.confirmed >= event.spots ? (
             <>
               <span class="volunteer-spots-full">Full</span> ·{" "}
             </>
@@ -135,16 +135,19 @@ const blocked =
         }
       </p>
       {
-        !organizer &&
-          future &&
+        future &&
           !event.signedUp &&
+          (!organizer || Boolean(event.inSignupWindow)) &&
+          !event.hidden &&
+          !event.cancelledAt &&
+          Boolean(event.open) &&
           blocked &&
           blocked !== "This event is full." && <p>{blocked}</p>
       }
     </div>
     <div class="volunteer-actions">
       {
-        organizer || !future ? null : event.signedUp ? (
+        !future ? null : event.signedUp ? (
           <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="cancel" />

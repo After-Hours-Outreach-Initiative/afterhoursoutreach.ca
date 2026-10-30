@@ -74,7 +74,6 @@ test("event dialogs offer only cancellation for future events and keep ended his
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -114,7 +113,7 @@ test("event dialogs offer only cancellation for future events and keep ended his
   });
   await page.goto("/events");
   const standaloneId = await page
-    .locator("[data-event-list] > [data-live-event]")
+    .locator("[data-event-list] > [data-live-event]:not([data-event-series])")
     .filter({ hasText: fields.meetingPoint })
     .getAttribute("data-live-event");
   const occurrenceId = `patrol:${series.id}:${firstDate}`;
@@ -131,6 +130,7 @@ test("event dialogs offer only cancellation for future events and keep ended his
     await expect(page.locator(`[data-live-event="${id}"]`)).toHaveCount(0);
   }
   const group = page.locator(`[data-series-card="${series.id}"]`);
+  await page.locator("[data-series-management] > summary").click();
   const seriesButton = group.getByRole("button", {
     name: "Edit series",
     exact: true,
@@ -160,7 +160,6 @@ test("event dialogs offer only cancellation for future events and keep ended his
     .click();
   await expect(settings).toBeHidden();
   await expect(seriesButton).toBeFocused();
-  await group.locator("[data-series-occurrences] > summary").click();
 
   const activeOccurrenceId = `patrol:${series.id}:${addCalendarDays(firstDate, 7)}`;
   for (const [id, editable, recurring] of [

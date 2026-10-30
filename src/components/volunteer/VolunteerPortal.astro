@@ -43,7 +43,7 @@ interface Props {
 }
 const { manage = false } = Astro.props;
 const { actor, email, greetingName } = Astro.props.account;
-// Callers authenticate first. Never let a view preference grant organizer access.
+// Callers authenticate first. Organizer controls always require authorization.
 if (!actor) throw new Error("VolunteerPortal requires a signed-in account.");
 if (manage) requireOrganizer(actor);
 const events = await listEvents(
@@ -60,7 +60,6 @@ const pastEvents = await listEvents(
 );
 const series = manage ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
-const organizer = actor.role === "organizer" && eventAccess;
 const showApplicationProgress =
   !manage && (!actor.twoFactorEnabled || actor.twoFactorVerified);
 const applicationProgress = showApplicationProgress
@@ -109,7 +108,11 @@ const destinations = events.filter(
 );
 // Legacy ?type=patrol now means all patrols, including those with orientation.
 const filter = eventFilter(Astro.url.searchParams.get("type"), manage);
-const managementItems = manage ? groupManagementEvents(events, series) : [];
+const seriesItems = manage
+  ? groupManagementEvents(events, series).filter(
+      (item) => item.kind === "series",
+    )
+  : [];
 const selectedOccurrence = Astro.url.searchParams.get("occurrence");
 const countEvents = (items: typeof events, type: string) =>
   items.filter((event) =>
@@ -119,33 +122,11 @@ const countEvents = (items: typeof events, type: string) =>
       Boolean(event.includesOrientation),
     ),
   ).length;
-const countManagementItems = (type: string) =>
-  managementItems.filter((item) =>
-    matchesEventFilter(
-      type,
-      item.kind === "series",
-      item.kind === "series"
-        ? Boolean(item.series.includesOrientation) ||
-            item.events.some((event) => Boolean(event.includesOrientation))
-        : Boolean(item.event.includesOrientation),
-    ),
-  ).length;
-// Count top-level items in both sections: upcoming series once, history per date.
+// Count dates consistently in the calendar, upcoming list and history.
 const filterCount = (type: string) =>
-  (manage ? countManagementItems(type) : countEvents(events, type)) +
-  countEvents(pastEvents, type);
-const hasVisibleEvents = manage
-  ? countManagementItems(filter) > 0
-  : countEvents(events, filter) > 0;
+  countEvents(events, type) + countEvents(pastEvents, type);
+const hasVisibleEvents = countEvents(events, filter) > 0;
 const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
-const viewUrl = (view: "organizer" | "volunteer") => {
-  const params = new URLSearchParams();
-  params.set("view", view);
-  const type = eventFilter(filter, view === "organizer");
-  if (type !== "all") params.set("type", type);
-  if (selectedOccurrence) params.set("occurrence", selectedOccurrence);
-  return `/events?${params}`;
-};
 ---
 
 <AccountLayout
@@ -268,39 +249,16 @@ const viewUrl = (view: "organizer" | "volunteer") => {
                 <h2 id="events-heading">Events</h2>
               )}
             </div>
-            <div class="flex flex-wrap items-center gap-3">
-              {organizer && (
-                <div
-                  class="flex flex-wrap items-center gap-2"
-                  role="group"
-                  aria-label="View as"
-                >
-                  <span class="text-base text-zinc-300">View as</span>
-                  {(["organizer", "volunteer"] as const).map((view) => (
-                    <a
-                      class="volunteer-filter"
-                      href={viewUrl(view)}
-                      data-event-view-link={view}
-                      aria-current={
-                        (view === "organizer") === manage ? "page" : undefined
-                      }
-                    >
-                      {view === "organizer" ? "Organizer" : "Volunteer"}
-                    </a>
-                  ))}
-                </div>
-              )}
-              {manage && (
-                <button
-                  class="btn btn-primary"
-                  data-show-dialog="event-editor-new"
-                  type="button"
-                >
-                  <PlusIcon class="btn-icon" />
-                  Create
-                </button>
-              )}
-            </div>
+            {manage && (
+              <button
+                class="btn btn-primary"
+                data-show-dialog="event-editor-new"
+                type="button"
+              >
+                <PlusIcon class="btn-icon" />
+                Create
+              </button>
+            )}
           </div>
           <form
             class="volunteer-filters"
@@ -308,13 +266,6 @@ const viewUrl = (view: "organizer" | "volunteer") => {
             role="group"
             aria-label="Filter events"
           >
-            {organizer && (
-              <input
-                type="hidden"
-                name="view"
-                value={manage ? "organizer" : "volunteer"}
-              />
-            )}
             {selectedOccurrence && (
               <input
                 type="hidden"
@@ -327,7 +278,7 @@ const viewUrl = (view: "organizer" | "volunteer") => {
               ...(manage
                 ? [
                     ["one-off", "One-off events"],
-                    ["recurring", "Recurring series"],
+                    ["recurring", "Recurring events"],
                   ]
                 : []),
               ["orientation", "Orientations"],
@@ -350,75 +301,58 @@ const viewUrl = (view: "organizer" | "volunteer") => {
               </button>
             ))}
           </form>
-          {manage && <BulkEventEditor />}
           {manage && (
-            <div class="volunteer-section-heading">
-              <h2>Upcoming events and series</h2>
-            </div>
+            <details class="volunteer-series-management" data-series-management>
+              <summary>Manage recurring series</summary>
+              <ul class="volunteer-event-list" data-series-list>
+                {seriesItems.map((item) => (
+                  <PatrolSeriesCard series={item.series} events={item.events} />
+                ))}
+              </ul>
+              <p
+                class="volunteer-help"
+                data-empty-series
+                hidden={seriesItems.length > 0}
+              >
+                No recurring series have been created.
+              </p>
+            </details>
           )}
-          <div class:list={{ "volunteer-event-schedule": !manage }}>
-            {!manage && (
-              <EventCalendar
-                events={events
-                  .filter((event) =>
-                    matchesEventFilter(
-                      filter,
-                      Boolean(event.seriesId),
-                      Boolean(event.includesOrientation),
-                    ),
-                  )
-                  .map((event) => ({
-                    id: event.id,
-                    startsAt: event.startsAt,
-                    label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
-                  }))}
-              />
-            )}
+          <div class="volunteer-event-schedule">
+            <EventCalendar
+              events={events
+                .filter((event) =>
+                  matchesEventFilter(
+                    filter,
+                    Boolean(event.seriesId),
+                    Boolean(event.includesOrientation),
+                  ),
+                )
+                .map((event) => ({
+                  id: event.id,
+                  startsAt: event.startsAt,
+                  label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
+                }))}
+            />
             <div class="volunteer-event-results">
+              {manage && <BulkEventEditor />}
               <ul class="volunteer-event-list" data-event-list>
-                {manage
-                  ? managementItems.map((item) =>
-                      item.kind === "series" ? (
-                        <PatrolSeriesCard
-                          series={item.series}
-                          events={item.events}
-                          actor={actor}
-                          rosters={rosters}
-                          destinations={destinations}
-                          filter={filter}
-                          selectedOccurrence={selectedOccurrence}
-                        />
-                      ) : (
-                        <EventCard
-                          event={item.event}
-                          actor={actor}
-                          organizer
-                          roster={rosters.filter(
-                            (person) => person.eventId === item.event.id,
-                          )}
-                          destinations={destinations}
-                          filter={filter}
-                        />
-                      ),
-                    )
-                  : events.map((event) => (
-                      <EventCard
-                        event={event}
-                        actor={actor}
-                        organizer={manage}
-                        publicRoster={publicRoster?.people.filter(
-                          (person) => person.eventId === event.id,
-                        )}
-                        roster={rosters.filter(
-                          (person) => person.eventId === event.id,
-                        )}
-                        destinations={destinations}
-                        filter={filter}
-                        series={series.find(
-                          (item) => item.id === event.seriesId,
-                        )}
-                      />
-                    ))}
+                {events.map((event) => (
+                  <EventCard
+                    event={event}
+                    actor={actor}
+                    organizer={manage}
+                    publicRoster={publicRoster?.people.filter(
+                      (person) => person.eventId === event.id,
+                    )}
+                    roster={rosters.filter(
+                      (person) => person.eventId === event.id,
+                    )}
+                    destinations={destinations}
+                    filter={filter}
+                    series={series.find((item) => item.id === event.seriesId)}
+                  />
+                ))}
               </ul>
               <p
                 class="volunteer-notice"
@@ -426,13 +360,9 @@ const viewUrl = (view: "organizer" | "volunteer") => {
                 role="status"
                 hidden={hasVisibleEvents}
               >
-                {manage
-                  ? managementItems.length
-                    ? "No upcoming events or series match this filter."
-                    : "No upcoming events or series are scheduled."
-                  : events.length
-                    ? "No upcoming events match this filter. Check back soon."
-                    : "No upcoming events are scheduled. Check back soon."}
+                {events.length
+                  ? "No upcoming events match this filter. Check back soon."
+                  : "No upcoming events are scheduled. Check back soon."}
               </p>
               <p
                 class="volunteer-help"
@@ -440,7 +370,7 @@ const viewUrl = (view: "organizer" | "volunteer") => {
                 hidden={events.length !== 100}
               >
                 {manage
-                  ? "Showing up to 100 loaded occurrences and one-off events. Open another recurring date under Occurrences."
+                  ? "Showing up to 100 events. Open another date under Manage recurring series."
                   : "Showing up to 100 events."}
               </p>
             </div>
@@ -480,7 +410,7 @@ const viewUrl = (view: "organizer" | "volunteer") => {
             hidden={pastEvents.length !== 100}
           >
             {manage
-              ? "Showing up to 100 past events. Open another recurring date under Occurrences."
+              ? "Showing up to 100 past events. Open another date under Manage recurring series."
               : "Showing the 100 most recent past events."}
           </p>
         </section>
@@ -501,6 +431,24 @@ const viewUrl = (view: "organizer" | "volunteer") => {
 <style>
   [data-event-view="manage"] [data-past-event-list] {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .volunteer-series-management {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid #3f3f46;
+    border-radius: 0.5rem;
+  }
+  .volunteer-series-management > summary {
+    min-height: 2rem;
+    color: #d4d4d8;
+    cursor: pointer;
+  }
+  .volunteer-series-management > summary:focus-visible {
+    outline: 3px solid #a5b4fc;
+    outline-offset: 0.25rem;
+  }
+  .volunteer-series-management > ul {
+    margin-top: 1rem;
   }
   .volunteer-event-schedule {
     container: event-schedule / inline-size;

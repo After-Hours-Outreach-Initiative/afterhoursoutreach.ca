@@ -216,9 +216,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       )
       .run();
     for (const cookie of [attendee.cookie, organizerCookie]) {
-      const html = await (
-        await send("/events?view=volunteer", undefined, cookie)
-      ).text();
+      const html = await (await send("/volunteer", undefined, cookie)).text();
       expect(html).toContain('data-live-event="live"');
       expect(html).toContain("data-live-signup");
       expect(html).toMatch(
@@ -265,14 +263,12 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     ).text();
     expect(managementHtml).toContain('data-live-event="hidden"');
     expect(managementHtml).toContain('data-live-event="past"');
-    expect(managementHtml).toContain('href="/events?view=volunteer"');
-    expect(managementHtml).toContain(
-      'data-event-view-link="organizer" aria-current="page"',
-    );
+    expect(managementHtml).not.toContain("data-event-view-link");
     expect(managementHtml).not.toContain('href="/manage/');
     expect(managementHtml).toContain("data-event-save");
     expect(managementHtml).toContain("volunteer-roster");
-    expect(managementHtml).not.toMatch(/data-live-signup|Sign in to register/);
+    expect(managementHtml).toContain("data-live-signup");
+    expect(managementHtml).not.toContain("Sign in to register");
     expect(managementHtml.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g)).toEqual([
       expect.stringMatching(/<h1\b[^>]*id="events-heading"[^>]*>Events<\/h1>/),
     ]);

@@ -93,11 +93,11 @@ function applyEventFilter(root: HTMLElement, type: string) {
     let visible = 0;
     const list = root.querySelector(listSelector);
     for (const card of list?.querySelectorAll<HTMLElement>(
-      ":scope > [data-live-event], :scope > [data-series-card]",
+      ":scope > [data-live-event]",
     ) ?? []) {
       card.hidden = !matchesEventFilter(
         selected,
-        Boolean(card.dataset.seriesCard || card.dataset.eventSeries),
+        Boolean(card.dataset.eventSeries),
         card.dataset.includesOrientation === "true",
       );
       if (!card.hidden) visible++;
@@ -112,20 +112,6 @@ function applyEventFilter(root: HTMLElement, type: string) {
       "aria-pressed",
       String(button.dataset.eventFilter === selected),
     );
-  for (const link of root.querySelectorAll<HTMLAnchorElement>(
-    "[data-event-view-link]",
-  )) {
-    const url = new URL(location.href);
-    url.pathname = "/events";
-    url.searchParams.set("view", link.dataset.eventViewLink!);
-    const type = eventFilter(
-      selected,
-      link.dataset.eventViewLink === "organizer",
-    );
-    if (type === "all") url.searchParams.delete("type");
-    else url.searchParams.set("type", type);
-    link.href = url.pathname + url.search + url.hash;
-  }
   syncEventCalendar(root);
   syncBulkEventSelection(root);
 }
@@ -288,7 +274,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     card.dataset.seriesCard
       ? `series:${card.dataset.seriesCard}`
       : `event:${card.dataset.liveEvent}`;
-  // A date can move between sections (or out of a series group) as it starts.
+  // A date can move between upcoming events and history as it starts.
   // Reuse its roster expansion state, and never duplicate an open editor.
   const existingEvents = new Map(
     [...root.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
@@ -317,10 +303,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       if (updated.dataset.seriesCard) {
         if (!card) {
           card = document.importNode(updated, true);
-          for (const occurrence of card.querySelectorAll<HTMLElement>(
-            "[data-live-event]",
-          ))
-            renderedCards.set(occurrence, occurrence.outerHTML);
           added ??= card;
         } else {
           card.dataset.includesOrientation =
@@ -337,10 +319,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           }
           deferredEventRefresh =
             syncSeriesControls(card, updated, element) || deferredEventRefresh;
-          syncList(
-            card.querySelector("[data-series-event-list]")!,
-            updated.querySelector("[data-series-event-list]")!,
-          );
         }
         if (card !== position) list.insertBefore(card, position);
         position = card.nextElementSibling;
@@ -405,6 +383,10 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     }
   };
   syncList(list, refreshed.querySelector("[data-event-list]")!);
+  const seriesList = root.querySelector<HTMLElement>("[data-series-list]");
+  const nextSeriesList =
+    refreshed.querySelector<HTMLElement>("[data-series-list]");
+  if (seriesList && nextSeriesList) syncList(seriesList, nextSeriesList);
   let pastList = root.querySelector<HTMLElement>("[data-past-event-list]");
   const nextPastList = refreshed.querySelector<HTMLElement>(
     "[data-past-event-list]",
@@ -421,7 +403,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   }
   if (pastList && nextPastList) syncList(pastList, nextPastList);
   // Adopt authoritative counts after polling/actions without replacing a
-  // focused filter button or counting nested occurrences as extra series.
+  // focused filter button. Recurring events count once per date, just like cards.
   for (const count of root.querySelectorAll<HTMLElement>(
     "[data-event-filter-count]",
   )) {
@@ -435,6 +417,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     "[data-event-limit]",
     "[data-empty-past-events]",
     "[data-past-event-limit]",
+    "[data-empty-series]",
   ]) {
     const target = root.querySelector(selector);
     if (target) target.replaceWith(actionFragment(page, selector));
@@ -452,7 +435,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           (card) => card.dataset.liveEvent === eventId,
         )
       : seriesId
-        ? [...list.querySelectorAll<HTMLElement>("[data-series-card]")].find(
+        ? [...root.querySelectorAll<HTMLElement>("[data-series-card]")].find(
             (card) => card.dataset.seriesCard === seriesId,
           )
         : added;
@@ -963,6 +946,8 @@ form(
     const id = `patrol:${value("seriesId")}:${value("occurrenceDate")}`;
     const url = new URL(location.href);
     url.searchParams.set("occurrence", id);
+    // An explicitly requested date must not stay hidden by an unrelated filter.
+    url.searchParams.delete("type");
     const page = await loadActionPage(url.href);
     history.replaceState(null, "", url);
     syncEvents(page, element);

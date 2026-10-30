@@ -18,7 +18,8 @@ if (!account.actor)
 if (!canViewEvents(account.actor))
   return Astro.redirect(`/volunteer${Astro.url.search}`);
 const view = Astro.url.searchParams.get("view");
-const manage = account.actor.role === "organizer" && view !== "volunteer";
+// Legacy view links no longer change the layout or the actor's capabilities.
+const manage = account.actor.role === "organizer";
 if (manage || view === "organizer") {
   try {
     requireOrganizer(account.actor);

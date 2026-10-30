@@ -239,9 +239,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
       await setCookie(manage ? organizer.cookie : viewer.cookie);
       for (const width of [1280, 1920, 800, 375, 320]) {
         await page.setViewportSize({ width, height: 900 });
-        await page.goto(
-          `${origin}${manage ? "/events" : "/events?view=volunteer"}`,
-        );
+        await page.goto(`${origin}/events`);
         const list = page.locator("[data-event-list]");
         await expect(
           page.getByRole("region", { name: "About these places" }),
@@ -254,9 +252,9 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(list).toHaveCSS("align-items", "start");
         expect(await list.evaluate(columns)).toBe(1);
         if (manage)
-          await expect(list.locator(":scope > [data-series-card]")).toHaveCount(
-            1,
-          );
+          await expect(
+            page.locator("[data-series-list] > [data-series-card]"),
+          ).toHaveCount(1);
         await list.evaluate((element) =>
           window.scrollTo({
             top: element.getBoundingClientRect().top + scrollY - 110,
@@ -266,16 +264,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await page.screenshot({
           path: `/tmp/opencode/event-attendance/${manage ? "manage" : "events"}-grid-${width}.png`,
         });
-        if (manage) {
-          await page
-            .locator(
-              `[data-series-card="${seriesId}"] > details[data-series-occurrences] > summary`,
-            )
-            .click();
-          expect(
-            await page.locator("[data-series-event-list]").evaluate(columns),
-          ).toBe(1);
-        }
         const card = page.locator(`[data-live-event="${booked}"]`);
         const rosterSelector = manage
           ? ".volunteer-roster"
@@ -464,7 +452,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         };
         await expectActionPosition();
         if (manage) {
-          await expect(emptyCard.locator("[data-live-signup]")).toHaveCount(0);
+          await expect(emptyCard.locator("[data-live-signup]")).toHaveCount(1);
           await expect(
             emptyCard.getByRole("button", { name: "Edit", exact: true }),
           ).toBeVisible();
@@ -624,17 +612,15 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         if (manage) {
           await page.locator('[data-event-filter="recurring"]').click();
           expect(await list.evaluate(columns)).toBe(1);
-          const series = list.locator(":scope > [data-series-card]");
+          const occurrence = list
+            .locator(`[data-event-series="${seriesId}"]`)
+            .first();
           expect(
             Math.abs(
-              (await series.boundingBox())!.width -
+              (await occurrence.boundingBox())!.width -
                 (await list.boundingBox())!.width,
             ),
           ).toBeLessThan(1);
-          // A lone series and its nested occurrences each fill their own row.
-          expect(
-            await series.locator("[data-series-event-list]").evaluate(columns),
-          ).toBe(1);
         }
       }
     }

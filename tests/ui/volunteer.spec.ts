@@ -167,11 +167,10 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
-  await expect(page.locator("[data-event-calendar]")).toHaveCount(0);
+  await expect(page.locator("[data-event-calendar]")).toBeVisible();
   const today = vancouverInput(Date.now()).slice(0, 10);
   const date = addCalendarDays(today, 2);
   const makeEvent = async (
@@ -205,7 +204,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   const patrol = await makeEvent(date, "18:00", false);
   const orientation = await makeEvent(date, "19:00", true);
   const distant = await makeEvent(addCalendarDays(today, 49), "20:00", true);
-  await page.goto(`/events?view=volunteer&occurrence=${orientation.id}`);
+  await page.goto(`/volunteer?occurrence=${orientation.id}`);
   const documents: string[] = [];
   page.on("request", (request) => {
     if (request.resourceType() === "document") documents.push(request.url());

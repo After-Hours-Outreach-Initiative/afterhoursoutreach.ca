@@ -200,7 +200,6 @@ test("other viewers see signups and cancellations through polling without losing
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -325,12 +324,12 @@ test("other viewers see signups and cancellations through polling without losing
     );
     await expect(card(viewer)).not.toContainText(/You can(?:’t)? register/);
     await expect(organizerCard.locator("[data-event-availability]")).toHaveText(
-      "2 of 4 spots taken",
+      "Registered · 2 of 4 spots taken",
       { timeout: 15_000 },
     );
     await expect(
       organizerCard.locator(".volunteer-spots, [data-live-signup]"),
-    ).toHaveCount(0);
+    ).toHaveCount(2);
     await expect(
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
@@ -408,7 +407,7 @@ test("other viewers see signups and cancellations through polling without losing
   }
 });
 
-test("filter counts track grouped series, polling, actions and past events", async ({
+test("filter counts track recurring dates, polling, actions and past events", async ({
   page,
   baseURL,
 }) => {
@@ -423,7 +422,6 @@ test("filter counts track grouped series, polling, actions and past events", asy
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   const filters = page.getByRole("group", { name: "Filter events" });
   await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
   const counts = filters.locator("[data-event-filter-count]");
@@ -452,12 +450,20 @@ test("filter counts track grouped series, polling, actions and past events", asy
   });
   expect(created.status(), await created.text()).toBe(200);
   const { id } = await created.json();
+  const occurrences = page.locator(
+    `[data-event-list] > [data-event-series="${id}"]`,
+  );
+  await expect
+    .poll(() => occurrences.count(), { timeout: 15_000 })
+    .toBeGreaterThan(1);
+  const added = await occurrences.count();
   await expect(counts).toHaveText(
-    [before[0] + 1, before[1], before[2] + 1, before[3] + 1].map(String),
+    [before[0] + added, before[1], before[2] + added, before[3] + added].map(
+      String,
+    ),
     { timeout: 15_000 },
   );
   const series = page.locator(`[data-series-card="${id}"]`);
-  expect(await series.locator("[data-live-event]").count()).toBeGreaterThan(1);
   await expect(selectedFilter).toBeFocused();
 
   await page.getByRole("button", { name: "Create", exact: true }).click();
@@ -470,7 +476,12 @@ test("filter counts track grouped series, polling, actions and past events", asy
     .click();
   await expect(editor).not.toBeVisible();
   await expect(counts).toHaveText(
-    [before[0] + 2, before[1] + 1, before[2] + 1, before[3] + 1].map(String),
+    [
+      before[0] + added + 1,
+      before[1] + 1,
+      before[2] + added,
+      before[3] + added,
+    ].map(String),
   );
   await expect(
     page.locator("[data-live-event]").filter({ hasText: meetingPoint }),
@@ -480,10 +491,9 @@ test("filter counts track grouped series, polling, actions and past events", asy
     "orientation",
   );
 
-  // An expanded occurrence/roster moves into management history at its start,
+  // An occurrence with an expanded roster moves into management history at its start,
   // without losing series tools, filter counts, or attendance actions.
-  await series.locator("[data-series-occurrences] > summary").click();
-  const occurrence = series.locator("[data-live-event]").first();
+  const occurrence = occurrences.first();
   const occurrenceId = (await occurrence.getAttribute("data-live-event"))!;
   const joined = await page.request.post("/api/v1/events/action", {
     headers: { origin: baseURL! },
@@ -517,7 +527,7 @@ test("filter counts track grouped series, polling, actions and past events", asy
   const pastOccurrence = past.locator(`[data-live-event="${occurrenceId}"]`);
   await expect(pastOccurrence).toBeVisible({ timeout: 25_000 });
   await expect(
-    series.locator(`[data-live-event="${occurrenceId}"]`),
+    page.locator(`[data-event-list] > [data-live-event="${occurrenceId}"]`),
   ).toHaveCount(0);
   await expect(page.locator(`[data-live-event="${occurrenceId}"]`)).toHaveCount(
     1,
@@ -532,7 +542,12 @@ test("filter counts track grouped series, polling, actions and past events", asy
     ),
   ).toHaveCount(0);
   await expect(counts).toHaveText(
-    [before[0] + 3, before[1] + 1, before[2] + 2, before[3] + 2].map(String),
+    [
+      before[0] + added + 2,
+      before[1] + 1,
+      before[2] + added + 1,
+      before[3] + added + 1,
+    ].map(String),
   );
   await pastOccurrence
     .getByRole("button", { name: "Approve for patrols", exact: true })
@@ -552,7 +567,7 @@ test("filter counts track grouped series, polling, actions and past events", asy
     .click();
   await expect(pastOccurrence).toBeHidden();
   await filters
-    .getByRole("button", { name: /^Recurring series \(\d+\)$/ })
+    .getByRole("button", { name: /^Recurring events \(\d+\)$/ })
     .click();
   await expect(pastOccurrence).toBeVisible();
   await page.goto(
@@ -560,19 +575,22 @@ test("filter counts track grouped series, polling, actions and past events", asy
   );
   await expect(pastOccurrence).toBeVisible();
   await expect(
-    series.locator(`[data-live-event="${occurrenceId}"]`),
+    page.locator(`[data-event-list] > [data-live-event="${occurrenceId}"]`),
   ).toHaveCount(0);
+  await page.locator("[data-series-management] > summary").click();
   await expect(
     series.getByRole("button", { name: "Edit series", exact: true }),
   ).toBeVisible();
 
-  await page.goto("/events?view=volunteer&type=orientation");
+  await page.goto("/events?type=orientation");
   const cards = page.locator("[data-live-event]");
   expect(
     await page.locator("[data-past-event-list] > li").count(),
   ).toBeGreaterThan(0);
   await expect(filters.getByRole("button")).toHaveText([
     `All (${await cards.count()})`,
+    `One-off events (${await page.locator("[data-live-event]:not([data-event-series])").count()})`,
+    `Recurring events (${await page.locator("[data-live-event][data-event-series]").count()})`,
     `Orientations (${await page.locator('[data-live-event][data-includes-orientation="true"]').count()})`,
   ]);
 });

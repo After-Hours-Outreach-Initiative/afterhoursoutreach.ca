@@ -708,10 +708,10 @@ test("organizer Volunteers heading matches the Events heading", async ({
   baseURL,
 }) => {
   await viewAs(page, baseURL!, true);
-  await page.goto("/events?view=volunteer");
+  await page.goto("/events");
   const events = page.getByRole("heading", {
     name: "Events",
-    level: 2,
+    level: 1,
     exact: true,
   });
   const size = await events.evaluate(

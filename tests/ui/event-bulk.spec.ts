@@ -12,7 +12,6 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -46,7 +45,7 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   await cards.first().locator("[data-bulk-event]").check();
   await expect(page.locator("[data-bulk-count]")).toHaveText("1 selected");
   await page
-    .getByRole("button", { name: /^Recurring series \(\d+\)$/ })
+    .getByRole("button", { name: /^Recurring events \(\d+\)$/ })
     .click();
   await expect(page.locator("[data-bulk-count]")).toContainText("0 selected");
   await expect(

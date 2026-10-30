@@ -174,10 +174,7 @@ test("organizers review applications separately from approved volunteers with pe
       const landingHtml = await landing.text();
       assert.match(landingHtml, /data-event-path="\/volunteer"/);
       assert.match(landingHtml, /data-event-access="true"/);
-      assert.equal(
-        landingHtml.includes('data-event-view-link="organizer"'),
-        auth === cookie,
-      );
+      assert.doesNotMatch(landingHtml, /data-event-view-link/);
       const events = await get("/events", auth);
       assert.equal(events.status, 200);
       assert.equal(events.headers.get("cache-control"), "no-store");
@@ -196,10 +193,7 @@ test("organizers review applications separately from approved volunteers with pe
       assert.doesNotMatch(eventHtml, /href="\/volunteer"/);
       assert.equal(eventHtml.includes('href="/volunteers"'), auth === cookie);
       assert.equal(eventHtml.includes('href="/applications"'), auth === cookie);
-      assert.equal(
-        eventHtml.includes('data-event-view-link="organizer"'),
-        auth === cookie,
-      );
+      assert.doesNotMatch(eventHtml, /data-event-view-link/);
       assert.doesNotMatch(eventHtml, /href="\/manage\//);
       assert.equal(
         eventHtml.includes('data-event-view="manage"'),
