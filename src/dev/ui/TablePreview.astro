@@ -1,0 +1,43 @@
+---
+import LocalLayout from "./LocalLayout.astro";
+import VolunteerDirectory from "../../components/volunteer/VolunteerDirectory.astro";
+import { volunteerListState } from "../../data/volunteer-list";
+import {
+  createTableFixture,
+  readTableOptions,
+  tableKind,
+  tablePreviewUrl,
+  tableQuery,
+} from "./table-fixtures";
+import "../../styles/volunteer.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+// Even without scripts, these GET forms and links stay inside fixture routes.
+Astro.response.headers.set("Content-Security-Policy", "form-action 'self'");
+const kind = tableKind(Astro.url.pathname);
+const options = readTableOptions(kind, Astro.url.searchParams);
+const state = volunteerListState(Astro.url.searchParams);
+const { people, profiles } = createTableFixture(kind, options, state);
+---
+
+<LocalLayout
+  title={kind === "applications"
+    ? "Applications table preview"
+    : "Volunteers table preview"}
+>
+  <main class="volunteer-portal" data-ui-table-preview>
+    <div class="volunteer-wrap">
+      <VolunteerDirectory
+        kind={kind}
+        people={people}
+        state={state}
+        urlForState={(next) => tablePreviewUrl(kind, options, next)}
+        profileHref={(id) =>
+          `/dev/ui/organizer-profile/preview?scenario=${encodeURIComponent(profiles.get(id) ?? "ready-for-review")}`}
+        formFields={Object.fromEntries(tableQuery(options))}
+      />
+    </div>
+  </main>
+</LocalLayout>
+
+<script src="./table-preview.ts"></script>

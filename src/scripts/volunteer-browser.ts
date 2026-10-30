@@ -1,6 +1,6 @@
 import { actionFragment } from "./action-page";
 
-export function initVolunteerBrowser() {
+export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   const root = document.querySelector<HTMLElement>("[data-volunteer-browser]");
   const search = root?.querySelector<HTMLInputElement>(
     "[data-volunteer-search]",
@@ -107,7 +107,7 @@ export function initVolunteerBrowser() {
     results.setAttribute("aria-busy", "true");
     error.hidden = true;
     try {
-      const response = await fetch(url, {
+      const response = await fetchPage(url, {
         credentials: "same-origin",
         cache: "no-store",
         signal: controller.signal,

@@ -1,10 +1,21 @@
 ---
 interface Props {
-  active: "discord" | "organizer-profile" | "event-card";
+  active:
+    | "discord"
+    | "organizer-profile"
+    | "event-card"
+    | "applications"
+    | "volunteers";
 }
 const { active } = Astro.props;
 const examples = [
   { id: "event-card", label: "Event card", href: "/dev/ui/event-card" },
+  {
+    id: "applications",
+    label: "Applications table",
+    href: "/dev/ui/applications",
+  },
+  { id: "volunteers", label: "Volunteers table", href: "/dev/ui/volunteers" },
   {
     id: "organizer-profile",
     label: "Organizer profile",

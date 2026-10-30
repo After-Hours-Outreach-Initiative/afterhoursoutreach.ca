@@ -17,6 +17,11 @@ playground. Account controls load only when the panel is opened.
 
 Choose a website part from the playground navigation:
 
+- **Applications table** (`/dev/ui/applications`): try application progress states,
+  approval filters, live search, empty results, long names, and pagination.
+- **Volunteers table** (`/dev/ui/volunteers`): inspect roles, avatars, patrol access,
+  and ascending/descending sorting on all three columns. Both table playgrounds
+  include viewport sizes and delayed, failed, or paused search/sort responses.
 - **Organizer profile**: inspect application review, rejection, orientation,
   volunteer/medic access, organizer roles, and historical records. Preview
   the profile page at different sizes, try long or sparse answers, and
@@ -25,7 +30,7 @@ Choose a website part from the playground navigation:
   delayed responses, and success/error flows. Developer controls simulate
   background updates without adding a refresh button to the actual component.
 
-Both use the website's real view components. Viewport settings and scenario URLs
+The previews use the website's real view components. Viewport settings and scenario URLs
 can be bookmarked or shared locally; reset restores the selected fictional state.
 The playground simulations need no sign-in and never change accounts, write to
 the database, or call Discord. The shared DEV panel still provides its usual

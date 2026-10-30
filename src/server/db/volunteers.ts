@@ -35,6 +35,8 @@ import type {
   VolunteerSortDirection,
 } from "../../data/volunteer-list";
 import type { AttendeeCategory } from "../../data/event-roster";
+import { volunteerPageSize } from "../../data/volunteer-list";
+export { volunteerPageSize } from "../../data/volunteer-list";
 
 export interface VolunteerRow {
   id: string;
@@ -49,7 +51,6 @@ export interface VolunteerRow {
   twoFactorEnabled: number;
   orientations: number;
 }
-export const volunteerPageSize = 50;
 
 export async function listVolunteers(
   db: Env["DB"],

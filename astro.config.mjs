@@ -76,6 +76,24 @@ export default defineConfig({
             ),
             prerender: false,
           });
+          for (const kind of ["applications", "volunteers"]) {
+            injectRoute({
+              pattern: `/dev/ui/${kind}`,
+              entrypoint: new URL(
+                "./src/dev/ui/TablePlayground.astro",
+                import.meta.url,
+              ),
+              prerender: false,
+            });
+            injectRoute({
+              pattern: `/dev/ui/${kind}/preview`,
+              entrypoint: new URL(
+                "./src/dev/ui/TablePreview.astro",
+                import.meta.url,
+              ),
+              prerender: false,
+            });
+          }
         },
       },
     },

@@ -1,0 +1,134 @@
+---
+import LocalLayout from "./LocalLayout.astro";
+import PlaygroundHeader from "./PlaygroundHeader.astro";
+import {
+  readTableOptions,
+  tableKind,
+  tablePreviewUrl,
+  tableScenarios,
+  tableWidths,
+} from "./table-fixtures";
+import "./playground.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+const kind = tableKind(Astro.url.pathname);
+const title =
+  kind === "applications" ? "Applications table" : "Volunteers table";
+const options = readTableOptions(kind, Astro.url.searchParams);
+const scenarios = tableScenarios(kind);
+const selected = scenarios.find(({ id }) => id === options.scenario)!;
+const frameUrl = tablePreviewUrl(kind, options);
+---
+
+<LocalLayout title={title}>
+  <main class="ui-playground" data-ui-table-playground>
+    <PlaygroundHeader active={kind} />
+    <section class="ui-section" aria-labelledby="table-playground-heading">
+      <div class="ui-section-heading">
+        <div>
+          <h2 id="table-playground-heading">{title}</h2>
+          <p>
+            The production table, search, {
+              kind === "applications" ? "approval filters" : "sortable columns"
+            }, and pagination with fictional rows. Profile links open
+            corresponding fictional organizer-profile states, not real accounts.
+          </p>
+        </div>
+        <button type="button" class="btn btn-quiet" data-ui-table-reset
+          >Reset preview</button
+        >
+      </div>
+      <form
+        class="ui-controls"
+        method="get"
+        action={`/dev/ui/${kind}`}
+        data-ui-table-controls
+      >
+        <label class="ui-field">
+          Scenario
+          <select name="scenario">
+            {
+              scenarios.map((scenario) => (
+                <option
+                  value={scenario.id}
+                  selected={scenario.id === options.scenario}
+                >
+                  {scenario.label}
+                </option>
+              ))
+            }
+          </select>
+        </label>
+        <label class="ui-field">
+          Preview width
+          <select name="width">
+            {
+              tableWidths.map((width) => (
+                <option value={width} selected={width === options.width}>
+                  {width === "fit" ? "Fit available space" : `${width} px`}
+                </option>
+              ))
+            }
+          </select>
+        </label>
+        <label class="ui-field">
+          Search / sort response
+          <select name="outcome">
+            <option value="success" selected={options.outcome === "success"}
+              >Successful update</option
+            >
+            <option value="failure" selected={options.outcome === "failure"}
+              >Failed update</option
+            >
+            <option value="pending" selected={options.outcome === "pending"}
+              >Loading (paused)</option
+            >
+          </select>
+        </label>
+        <label class="ui-field">
+          Response latency (ms)
+          <input
+            name="latency"
+            type="number"
+            min="0"
+            max="5000"
+            step="100"
+            value={options.latency}
+          />
+        </label>
+        <button type="submit" class="btn btn-outline">Apply settings</button>
+        <button type="button" class="btn btn-quiet" data-ui-table-copy
+          >Copy scenario link</button
+        >
+      </form>
+      <div class="ui-preview-toolbar">
+        <p data-ui-table-description>{selected.description}</p>
+        <a href={frameUrl} target="_blank" rel="noopener" data-ui-table-open
+          >Open isolated preview</a
+        >
+      </div>
+      <div
+        class="ui-preview-scroll"
+        tabindex="0"
+        aria-label="Table preview viewport; scroll horizontally for wider sizes"
+      >
+        <iframe
+          class="ui-live-preview"
+          data-ui-table-frame
+          src={frameUrl}
+          title={`Interactive ${title.toLowerCase()} preview`}
+          width={options.width === "fit" ? "100%" : options.width}
+          height="720"></iframe>
+      </div>
+      <p class="ui-simulation-status" role="status" data-ui-table-status>
+        Try searching for “Alex” or a name that does not exist{
+          kind === "applications"
+            ? ", then switch approval filters."
+            : ", then sort each column in both directions."
+        }
+      </p>
+    </section>
+  </main>
+</LocalLayout>
+
+<script src="./table-playground.ts"></script>

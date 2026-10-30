@@ -1,6 +1,7 @@
 export type VolunteerApprovalFilter = "all" | "awaiting";
 export type VolunteerSort = "name" | "role" | "patrol";
 export type VolunteerSortDirection = "asc" | "desc";
+export const volunteerPageSize = 50;
 
 export function volunteerListState(params: URLSearchParams) {
   const sort = params.get("sort");
