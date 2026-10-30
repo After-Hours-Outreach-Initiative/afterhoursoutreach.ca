@@ -28,6 +28,7 @@
     "organizer:bootstrap": "node scripts/bootstrap-organizer.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:seed:local": "tsx scripts/seed-local-events.ts",
+    "db:repair:local-names": "tsx scripts/repair-local-sample-names.ts",
     "db:migrate:preview": "node scripts/check-preview-migrations.mjs && wrangler d1 migrations apply PREVIEW_DB --config wrangler.preview-migrations.jsonc --remote",
     "db:migrate:production": "pnpm db:check && node scripts/migrate-production.mjs",
     "db:seed:preview": "tsx scripts/seed-preview-events.ts",

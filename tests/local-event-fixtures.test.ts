@@ -32,6 +32,8 @@ import {
   localAccountCleanup,
   localAccountCleanupCandidates,
 } from "../scripts/local-account-cleanup";
+import { localSampleNameRepair } from "../scripts/local-sample-name-repair";
+import { manualProfileFixture } from "../scripts/manual-profile-fixtures";
 
 function database() {
   const db = new DatabaseSync(":memory:");
@@ -43,6 +45,90 @@ function database() {
     db.exec(readFileSync(new URL(name, directory), "utf8"));
   return db;
 }
+
+test("local name repair upgrades only original synthetic names, preserves snapshots and is idempotent", () => {
+  const db = database();
+  try {
+    const now = Date.now();
+    const preset = manualAccountPresets.find(({ key }) => key === "organizer")!;
+    const original = manualProfileFixture(preset, now);
+    for (const [id, email, preferred] of [
+      [original.id, original.email, original.name],
+      ["local-fixture-user-robin", "robin.local@example.org", "Custom"],
+      ["real", "real@example.org", original.name],
+      [
+        "local-state-00000000-0000-4000-8000-000000000001",
+        "local-state-00000000-0000-4000-8000-000000000001@example.invalid",
+        original.name,
+      ],
+    ]) {
+      const fixture =
+        id === "local-fixture-user-robin"
+          ? sampleProfileFixtures("local", now)[0]
+          : original;
+      const person = {
+        ...fixture,
+        id,
+        email,
+        answers: { ...fixture.answers, preferredName: fixture.name },
+      };
+      db.prepare(
+        "INSERT INTO user (id,name,email,created_at,updated_at) VALUES (?,?,?,?,?)",
+      ).run(id, person.name, email, now, now);
+      db.exec(sampleProfileStatement(person, now));
+      if (preferred === "Custom")
+        db.prepare("UPDATE profile SET preferred_name=? WHERE user_id=?").run(
+          preferred,
+          id,
+        );
+    }
+    const rows = (table: string) =>
+      db
+        .prepare(`SELECT * FROM ${table} ORDER BY 1`)
+        .all()
+        .map((row) => ({ ...row }));
+    const before = rows("profile");
+    const users = rows("user");
+    const repair = localSampleNameRepair();
+    assert.equal(
+      repair.inventory.flatMap((sql) => db.prepare(sql).all()).length,
+      1,
+    );
+    db.exec(repair.statements.join(";\n"));
+    assert.deepEqual(
+      rows("profile"),
+      before.map((row) =>
+        row.user_id === original.id ? { ...row, preferred_name: "Robin" } : row,
+      ),
+    );
+    assert.deepEqual(
+      rows("user"),
+      users.map((row) =>
+        row.id === original.id ? { ...row, name: "Robin A." } : row,
+      ),
+    );
+    assert.equal(
+      repair.inventory.flatMap((sql) => db.prepare(sql).all()).length,
+      0,
+    );
+    db.exec(repair.statements.join(";\n"));
+    assert.deepEqual(
+      rows("profile"),
+      before.map((row) =>
+        row.user_id === original.id ? { ...row, preferred_name: "Robin" } : row,
+      ),
+    );
+    assert.throws(
+      () =>
+        db.exec(
+          `UPDATE profile SET submitted_application=NULL WHERE user_id='${original.id}'`,
+        ),
+      /submitted_application_immutable/,
+    );
+  } finally {
+    db.close();
+  }
+});
 
 test("the local seed refuses nonlocal targets and unknown arguments before any writes", () => {
   for (const args of [
