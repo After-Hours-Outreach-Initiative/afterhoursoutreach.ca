@@ -1963,6 +1963,10 @@ body:has(
   font-weight: normal;
   overflow-wrap: anywhere;
 }
+.event-roster-table > :is(thead, tbody) > tr > :first-child {
+  /* Match the summary's left inset without changing the actions gutter. */
+  padding-inline-start: 1rem;
+}
 .event-roster-table > tbody > tr:last-child > * {
   border-bottom: 0;
 }
