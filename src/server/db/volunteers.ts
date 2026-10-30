@@ -30,6 +30,8 @@ import {
   profileFullNameSql,
 } from "./sql";
 import type {
+  ApplicationSort,
+  DirectorySort,
   VolunteerApprovalFilter,
   VolunteerSort,
   VolunteerSortDirection,
@@ -69,8 +71,10 @@ export async function listApplications(
   search = "",
   offset = 0,
   approval: VolunteerApprovalFilter = "all",
+  sort: ApplicationSort = "name",
+  direction: VolunteerSortDirection = "asc",
 ) {
-  return listPeople(db, actor, search, offset, true, approval);
+  return listPeople(db, actor, search, offset, true, approval, sort, direction);
 }
 
 async function listPeople(
@@ -80,7 +84,7 @@ async function listPeople(
   offset: number,
   applications: boolean,
   approval: VolunteerApprovalFilter = "all",
-  sort: VolunteerSort = "name",
+  sort: DirectorySort = "name",
   direction: VolunteerSortDirection = "asc",
 ) {
   requireOrganizer(actor);
@@ -94,11 +98,17 @@ async function listPeople(
         AND v.registration_approved = ${applications ? 0 : 1}`;
   const query = search.slice(0, 100);
   const readyForReviewSql = `v.registration_approved = 0 AND v.application_rejection_reason IS NULL AND ${applicationReadyForReviewSql}`;
-  // Match the visible role, not just the account's volunteer/organizer flag.
+  // Match visible roles and progress labels (In Progress, Ready for review,
+  // Rejected in ascending order), not raw account flags or milestone counts.
   // Only backend-owned expressions and directions enter ORDER BY. Sort the
   // entire matching directory before pagination, with stable name/id ties.
-  const sortSql =
-    sort === "role"
+  const sortSql = applications
+    ? sort === "progress"
+      ? `CASE WHEN coalesce(v.application_rejection_reason, '') <> '' THEN 'Rejected'
+            WHEN ${applicationReadyForReviewSql} THEN 'Ready for review'
+            ELSE 'In Progress' END COLLATE NOCASE`
+      : "name COLLATE NOCASE"
+    : sort === "role"
       ? `CASE WHEN u.role = 'organizer' THEN 'Organizer'
           WHEN category = 'new-volunteer' THEN 'New volunteer'
           WHEN category = 'medic' THEN 'Medic'
@@ -106,9 +116,7 @@ async function listPeople(
       : sort === "patrol"
         ? "v.patrol_approved"
         : "name COLLATE NOCASE";
-  const orderSql = applications
-    ? "v.registration_approved, name, u.id"
-    : `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}, name COLLATE NOCASE, u.id`;
+  const orderSql = `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}, name COLLATE NOCASE, u.id`;
   const [rows, counts] = (await db.batch([
     db
       .prepare(

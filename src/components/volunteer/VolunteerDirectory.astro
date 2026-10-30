@@ -3,19 +3,18 @@ import AttendeeAvatar from "./AttendeeAvatar.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
 import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
 import {
-  applicationListUrl,
-  volunteerListUrl,
+  directoryListUrl,
   volunteerPageSize,
-  type volunteerListState,
-  type VolunteerSort,
+  type DirectoryListState,
+  type DirectorySort,
 } from "../../data/volunteer-list";
 import type { listVolunteers } from "../../server/db/volunteers";
 
 interface Props {
   kind: "applications" | "volunteers";
   people: Awaited<ReturnType<typeof listVolunteers>>;
-  state: ReturnType<typeof volunteerListState>;
-  urlForState?: (state: ReturnType<typeof volunteerListState>) => string;
+  state: DirectoryListState;
+  urlForState?: (state: DirectoryListState) => string;
   profileHref?: (id: string) => string;
   formFields?: Record<string, string>;
 }
@@ -24,18 +23,25 @@ const applications = kind === "applications";
 const title = applications ? "Applications" : "Volunteers";
 const urlForState =
   Astro.props.urlForState ??
-  (applications ? applicationListUrl : volunteerListUrl);
+  ((next: DirectoryListState) => directoryListUrl(kind, next));
 const listUrl = urlForState(state);
 const profileHref =
   Astro.props.profileHref ??
   ((id: string) =>
     `/volunteers/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(listUrl)}`);
 const { search, offset, approval, sort, direction } = state;
-const columns = [
-  { key: "name", label: "Name" },
-  { key: "role", label: "Role" },
-  { key: "patrol", label: "Patrol access" },
-] satisfies { key: VolunteerSort; label: string }[];
+const columns = (
+  applications
+    ? [
+        { key: "name", label: "Name" },
+        { key: "progress", label: "Application Progress" },
+      ]
+    : [
+        { key: "name", label: "Name" },
+        { key: "role", label: "Role" },
+        { key: "patrol", label: "Patrol access" },
+      ]
+) satisfies { key: DirectorySort; label: string }[];
 ---
 
 <section
@@ -59,6 +65,8 @@ const columns = [
           <input type="hidden" name={name} value={value} />
         ))}
         {search && <input type="hidden" name="q" value={search} />}
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="direction" value={direction} />
         <button
           class="volunteer-filter"
           type="submit"
@@ -97,16 +105,9 @@ const columns = [
         <input type="hidden" name={name} value={value} />
       ))
     }
-    {
-      applications ? (
-        <input type="hidden" name="approval" value={approval} />
-      ) : (
-        <>
-          <input type="hidden" name="sort" value={sort} />
-          <input type="hidden" name="direction" value={direction} />
-        </>
-      )
-    }
+    {applications && <input type="hidden" name="approval" value={approval} />}
+    <input type="hidden" name="sort" value={sort} />
+    <input type="hidden" name="direction" value={direction} />
     <label class="volunteer-search-field">
       <span class="sr-only">
         {applications ? "Find an applicant" : "Find a volunteer"}
@@ -143,45 +144,38 @@ const columns = [
         <thead>
           <tr>
             {
-              applications ? (
-                <>
-                  <th scope="col">Name</th>
-                  <th scope="col">Application Progress</th>
-                </>
-              ) : (
-                columns.map(({ key, label }) => {
-                  const active = sort === key;
-                  const nextDirection =
-                    active && direction === "asc" ? "desc" : "asc";
-                  return (
-                    <th
-                      scope="col"
-                      aria-sort={
-                        active
-                          ? direction === "asc"
-                            ? "ascending"
-                            : "descending"
-                          : undefined
-                      }
+              columns.map(({ key, label }) => {
+                const active = sort === key;
+                const nextDirection =
+                  active && direction === "asc" ? "desc" : "asc";
+                return (
+                  <th
+                    scope="col"
+                    aria-sort={
+                      active
+                        ? direction === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : undefined
+                    }
+                  >
+                    <a
+                      class="volunteer-table-sort"
+                      href={urlForState({
+                        ...state,
+                        sort: key,
+                        direction: nextDirection,
+                        offset: 0,
+                      })}
+                      data-volunteer-sort={key}
+                      aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
                     >
-                      <a
-                        class="volunteer-table-sort"
-                        href={urlForState({
-                          ...state,
-                          sort: key,
-                          direction: nextDirection,
-                          offset: 0,
-                        })}
-                        data-volunteer-sort={key}
-                        aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
-                      >
-                        {label}
-                        <ArrowRightIcon class="volunteer-table-sort-icon" />
-                      </a>
-                    </th>
-                  );
-                })
-              )
+                      {label}
+                      <ArrowRightIcon class="volunteer-table-sort-icon" />
+                    </a>
+                  </th>
+                );
+              })
             }
           </tr>
         </thead>

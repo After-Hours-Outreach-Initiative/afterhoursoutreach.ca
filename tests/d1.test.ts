@@ -903,6 +903,78 @@ test("review queue counts only review-ready applications matching search indepen
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
     0,
   );
+  // Sort the full mixed-progress result before slicing pages, using visible
+  // labels and case-insensitive name/id ties even in descending order.
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id='pending-52'",
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET application_rejection_reason='Review decision' WHERE user_id='pending-01'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET preferred_name='ALPHA' WHERE user_id='pending-02'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET preferred_name='alpha' WHERE user_id='pending-03'",
+    ),
+  ]);
+  const pending = ids.filter((id) => id.startsWith("pending-"));
+  const ties = ["pending-02", "pending-03"];
+  const otherNames = pending.filter((id) => !ties.includes(id));
+  const reviewNames = [
+    ...ties,
+    ...otherNames.filter((id) => !["pending-01", "pending-52"].includes(id)),
+  ];
+  for (const [sort, direction, expected] of [
+    ["name", "asc", [...ties, ...otherNames]],
+    ["name", "desc", [...otherNames.toReversed(), ...ties]],
+    ["progress", "asc", ["pending-52", ...reviewNames, "pending-01"]],
+    ["progress", "desc", ["pending-01", ...reviewNames, "pending-52"]],
+  ] as const) {
+    const pages = await Promise.all(
+      [0, volunteerPageSize].map((offset) =>
+        listApplications(env.DB, actor, "", offset, "all", sort, direction),
+      ),
+    );
+    assert.deepEqual(
+      pages.flatMap(({ rows }) => rows.map(({ id }) => id)),
+      expected,
+    );
+    assert.deepEqual(
+      pages.map(({ hasMore }) => hasMore),
+      [true, false],
+    );
+    for (const page of pages) {
+      assert.equal(page.allApplicantsCount, count);
+      assert.equal(page.awaitingApprovalCount, count - 2);
+    }
+  }
+  assert.deepEqual(
+    (
+      await listApplications(
+        env.DB,
+        actor,
+        "ALPHA",
+        0,
+        "awaiting",
+        "progress",
+        "desc",
+      )
+    ).rows.map(({ id }) => id),
+    ties,
+  );
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='pending-52'",
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET application_rejection_reason=NULL WHERE user_id='pending-01'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET preferred_name=user_id WHERE user_id IN ('pending-02', 'pending-03')",
+    ),
+  ]);
   const profile = await viewVolunteerProfile(env.DB, actor, "pending-02");
   assert.equal(profile?.email, "pending-02@example.org");
   assert.equal(profile?.answers.preferredName, "pending-02");

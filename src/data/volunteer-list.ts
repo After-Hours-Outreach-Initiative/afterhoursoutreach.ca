@@ -1,14 +1,44 @@
 export type VolunteerApprovalFilter = "all" | "awaiting";
 export type VolunteerSort = "name" | "role" | "patrol";
+export type ApplicationSort = "name" | "progress";
+export type DirectoryKind = "applications" | "volunteers";
+export type DirectorySort = VolunteerSort | ApplicationSort;
 export type VolunteerSortDirection = "asc" | "desc";
 export const volunteerPageSize = 50;
 
 export function volunteerListState(params: URLSearchParams) {
-  const sort = params.get("sort");
+  return { ...listState(params), sort: volunteerSort(params.get("sort")) };
+}
+
+export function applicationListState(params: URLSearchParams) {
+  return { ...listState(params), sort: applicationSort(params.get("sort")) };
+}
+
+export type DirectoryListState =
+  | ReturnType<typeof volunteerListState>
+  | ReturnType<typeof applicationListState>;
+
+export function directoryListState(
+  params: URLSearchParams,
+  kind: DirectoryKind,
+) {
+  return kind === "applications"
+    ? applicationListState(params)
+    : volunteerListState(params);
+}
+
+function volunteerSort(value: string | null): VolunteerSort {
+  return value === "role" || value === "patrol" ? value : "name";
+}
+
+function applicationSort(value: string | null): ApplicationSort {
+  return value === "progress" ? value : "name";
+}
+
+function listState(params: URLSearchParams) {
   return {
     search: (params.get("q") ?? "").slice(0, 100),
     approval: params.get("approval") === "awaiting" ? "awaiting" : "all",
-    sort: sort === "role" || sort === "patrol" ? sort : "name",
     direction: params.get("direction") === "desc" ? "desc" : "asc",
     offset: Math.min(
       10000,
@@ -17,34 +47,36 @@ export function volunteerListState(params: URLSearchParams) {
   } satisfies {
     search: string;
     approval: VolunteerApprovalFilter;
-    sort: VolunteerSort;
     direction: VolunteerSortDirection;
     offset: number;
   };
 }
 
 export function volunteerListUrl(state: ReturnType<typeof volunteerListState>) {
-  return listUrl(state, false);
+  return directoryListUrl("volunteers", state);
 }
 
 export function applicationListUrl(
-  state: ReturnType<typeof volunteerListState>,
+  state: ReturnType<typeof applicationListState>,
 ) {
-  return listUrl(state, true);
+  return directoryListUrl("applications", state);
 }
 
-function listUrl(
-  state: ReturnType<typeof volunteerListState>,
-  applications: boolean,
+/** Shared views normalize sort keys to the destination directory's columns. */
+export function directoryListUrl(
+  kind: DirectoryKind,
+  state: DirectoryListState,
 ) {
+  const applications = kind === "applications";
+  const sort = applications
+    ? applicationSort(state.sort)
+    : volunteerSort(state.sort);
   const params = new URLSearchParams();
   if (state.search) params.set("q", state.search);
   if (applications && state.approval === "awaiting")
     params.set("approval", state.approval);
-  if (!applications) {
-    if (state.sort !== "name") params.set("sort", state.sort);
-    if (state.direction !== "asc") params.set("direction", state.direction);
-  }
+  if (sort !== "name") params.set("sort", sort);
+  if (state.direction !== "asc") params.set("direction", state.direction);
   if (state.offset) params.set("offset", String(state.offset));
   const query = params.toString();
   return `/${applications ? "applications" : "volunteers"}${query ? `?${query}` : ""}`;
@@ -59,8 +91,8 @@ export function volunteerListReturnUrl(value: string | null) {
     )
   )
     return "/volunteers";
-  const url = /^\/(?:manage\/)?applications(?:\?|$)/.test(value)
-    ? applicationListUrl
-    : volunteerListUrl;
-  return url(volunteerListState(new URLSearchParams(value.split("?")[1])));
+  const params = new URLSearchParams(value.split("?")[1]);
+  return /^\/(?:manage\/)?applications(?:\?|$)/.test(value)
+    ? applicationListUrl(applicationListState(params))
+    : volunteerListUrl(volunteerListState(params));
 }

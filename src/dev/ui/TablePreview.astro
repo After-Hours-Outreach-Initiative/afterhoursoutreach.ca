@@ -1,7 +1,7 @@
 ---
 import LocalLayout from "./LocalLayout.astro";
 import VolunteerDirectory from "../../components/volunteer/VolunteerDirectory.astro";
-import { volunteerListState } from "../../data/volunteer-list";
+import { directoryListState } from "../../data/volunteer-list";
 import {
   createTableFixture,
   readTableOptions,
@@ -16,7 +16,7 @@ if (!import.meta.env.DEV) return new Response(null, { status: 404 });
 Astro.response.headers.set("Content-Security-Policy", "form-action 'self'");
 const kind = tableKind(Astro.url.pathname);
 const options = readTableOptions(kind, Astro.url.searchParams);
-const state = volunteerListState(Astro.url.searchParams);
+const state = directoryListState(Astro.url.searchParams, kind);
 const { people, profiles } = createTableFixture(kind, options, state);
 ---
 

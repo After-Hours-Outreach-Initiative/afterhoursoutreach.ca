@@ -348,6 +348,50 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(page.locator("[data-volunteer-search]")).toHaveValue(
       "approved",
     );
+    await page.goto(`${origin}/applications?q=applicant&offset=50`);
+    const progressSort = page.locator('[data-volunteer-sort="progress"]');
+    await progressSort.focus();
+    await page.keyboard.press("Enter");
+    await expect(progressSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await expect(progressSort).toBeFocused();
+    expect(new URL(page.url()).searchParams.has("offset")).toBe(false);
+    await progressSort.click();
+    await expect(progressSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    await expect(
+      page.getByRole("link", { name: "Next applications" }),
+    ).toHaveAttribute(
+      "href",
+      "/applications?q=applicant&sort=progress&direction=desc&offset=50",
+    );
+    await page.getByRole("button", { name: /^Ready for review/ }).click();
+    await expect(progressSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    await expect(
+      page.locator('[data-volunteer-search-form] [name="sort"]'),
+    ).toHaveValue("progress");
+    await nameSort.click();
+    await expect(nameSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await page.goBack();
+    await expect(progressSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    await page.goForward();
+    await expect(nameSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
     await page.goto(`${origin}${listPath}`);
     const count = page.locator("[data-awaiting-approval-count]");
     const allCount = page.locator("[data-all-applicants-count]");
@@ -832,13 +876,15 @@ test("organizers review applications separately from approved volunteers with pe
         body: Buffer.from(await result.arrayBuffer()),
       });
     });
-    await plain.goto(`${origin}${listPath}`);
+    await plain.goto(`${origin}${listPath}&sort=progress&direction=desc`);
     await plain.locator("[data-volunteer-search]").fill("applicant-52");
     await plain.getByRole("button", { name: "Search", exact: true }).click();
     await expect(
       plain.locator("[data-volunteer-results] tbody tr"),
     ).toHaveCount(1);
     expect(new URL(plain.url()).searchParams.get("approval")).toBe("awaiting");
+    expect(new URL(plain.url()).searchParams.get("sort")).toBe("progress");
+    expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
     await plain.getByRole("button", { name: "All (1)", exact: true }).click();
     expect(new URL(plain.url()).searchParams.get("q")).toBe("applicant-52");
@@ -846,6 +892,8 @@ test("organizers review applications separately from approved volunteers with pe
       plain.getByRole("button", { name: "All (1)", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
     await plain.getByRole("button", { name: "Ready for review (1)" }).click();
+    expect(new URL(plain.url()).searchParams.get("sort")).toBe("progress");
+    expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     await plain.locator("[data-volunteer-profile-link]").click();
     await expect(
       plain.getByRole("heading", { name: "Profile", exact: true }),
@@ -858,7 +906,10 @@ test("organizers review applications separately from approved volunteers with pe
     ).toBeVisible();
     await expect(
       plain.getByRole("link", { name: "Back to applications" }),
-    ).toHaveAttribute("href", "/applications?q=applicant-52&approval=awaiting");
+    ).toHaveAttribute(
+      "href",
+      "/applications?q=applicant-52&approval=awaiting&sort=progress&direction=desc",
+    );
     await plain.goto(`${origin}/volunteers?q=approved&offset=50`);
     await plain.locator('[data-volunteer-sort="patrol"]').click();
     await expect(

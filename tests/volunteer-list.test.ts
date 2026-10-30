@@ -1,35 +1,46 @@
 import { expect, test } from "vitest";
 import {
   applicationListUrl,
+  applicationListState,
+  directoryListUrl,
   volunteerListReturnUrl,
   volunteerListState,
   volunteerListUrl,
 } from "../src/data/volunteer-list";
 
-test("application list state preserves approval, search and pagination in profile return links", () => {
-  const state = volunteerListState(
-    new URLSearchParams("approval=awaiting&q=Alex+%26+Sam&offset=50"),
+test("application list state preserves approval, search, sorting and pagination in profile return links", () => {
+  const state = applicationListState(
+    new URLSearchParams(
+      "approval=awaiting&q=Alex+%26+Sam&sort=progress&direction=desc&offset=50",
+    ),
   );
   const url = applicationListUrl(state);
   expect(volunteerListReturnUrl(url)).toBe(url);
   expect(
-    volunteerListState(new URL(url, "https://example.org").searchParams),
+    applicationListState(new URL(url, "https://example.org").searchParams),
   ).toEqual(state);
   expect(applicationListUrl({ ...state, offset: 0 })).toBe(
-    "/applications?q=Alex+%26+Sam&approval=awaiting",
+    "/applications?q=Alex+%26+Sam&approval=awaiting&sort=progress&direction=desc",
   );
-  expect(volunteerListUrl(state)).toBe("/volunteers?q=Alex+%26+Sam&offset=50");
+  expect(applicationListUrl({ ...state, sort: "name", direction: "asc" })).toBe(
+    "/applications?q=Alex+%26+Sam&approval=awaiting&offset=50",
+  );
   expect(volunteerListReturnUrl("/manage/applications")).toBe("/applications");
   expect(
     volunteerListReturnUrl(
       "/volunteer/volunteers?q=Alex+%26+Sam&approval=awaiting",
     ),
-  ).toBe(volunteerListUrl({ ...state, offset: 0 }));
+  ).toBe("/volunteers?q=Alex+%26+Sam");
   const sorted = { ...state, sort: "patrol", direction: "desc" } as const;
   expect(volunteerListReturnUrl(volunteerListUrl(sorted))).toBe(
     "/volunteers?q=Alex+%26+Sam&sort=patrol&direction=desc&offset=50",
   );
-  expect(applicationListUrl(sorted)).toBe(url);
+  expect(directoryListUrl("applications", sorted)).toBe(
+    "/applications?q=Alex+%26+Sam&approval=awaiting&direction=desc&offset=50",
+  );
+  expect(directoryListUrl("volunteers", state)).toBe(
+    "/volunteers?q=Alex+%26+Sam&direction=desc&offset=50",
+  );
 });
 
 test("list return destinations are restricted and untrusted filter inputs are normalized", () => {
@@ -48,6 +59,20 @@ test("list return destinations are restricted and untrusted filter inputs are no
       "/volunteers?approval=viewed&offset=-50&extra=ignored&sort=unknown&direction=unknown",
     ),
   ).toBe("/volunteers");
+  expect(
+    volunteerListReturnUrl(
+      "/manage/applications?sort=progress&direction=desc&offset=50",
+    ),
+  ).toBe("/applications?sort=progress&direction=desc&offset=50");
+  expect(applicationListState(new URLSearchParams("sort=role")).sort).toBe(
+    "name",
+  );
+  expect(applicationListState(new URLSearchParams("sort=patrol")).sort).toBe(
+    "name",
+  );
+  expect(volunteerListState(new URLSearchParams("sort=progress")).sort).toBe(
+    "name",
+  );
   expect(
     volunteerListState(
       new URLSearchParams({ q: "x".repeat(200), offset: "999999" }),

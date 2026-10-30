@@ -28,10 +28,10 @@ const frameUrl = tablePreviewUrl(kind, options);
         <div>
           <h2 id="table-playground-heading">{title}</h2>
           <p>
-            The production table, search, {
-              kind === "applications" ? "approval filters" : "sortable columns"
-            }, and pagination with fictional rows. Profile links open
-            corresponding fictional organizer-profile states, not real accounts.
+            The production table, search, sortable columns, {
+              kind === "applications" ? "approval filters, and" : "and"
+            } pagination with fictional rows. Profile links open corresponding fictional
+            organizer-profile states, not real accounts.
           </p>
         </div>
         <button type="button" class="btn btn-quiet" data-ui-table-reset
@@ -123,7 +123,7 @@ const frameUrl = tablePreviewUrl(kind, options);
       <p class="ui-simulation-status" role="status" data-ui-table-status>
         Try searching for “Alex” or a name that does not exist{
           kind === "applications"
-            ? ", then switch approval filters."
+            ? ", then switch approval filters and sort each column in both directions."
             : ", then sort each column in both directions."
         }
       </p>

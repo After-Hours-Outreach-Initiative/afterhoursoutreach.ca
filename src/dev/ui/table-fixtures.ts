@@ -1,8 +1,10 @@
 import type { ComponentProps } from "astro/types";
 import type VolunteerDirectory from "../../components/volunteer/VolunteerDirectory.astro";
 import {
-  volunteerListState,
+  directoryListState,
+  directoryListUrl,
   volunteerPageSize,
+  type DirectoryListState,
 } from "../../data/volunteer-list";
 
 export type TableKind = "applications" | "volunteers";
@@ -45,7 +47,7 @@ export function tableScenarios(kind: TableKind) {
     {
       id: "paginated",
       label: "Multiple pages",
-      description: `63 fictional people, using the real ${volunteerPageSize}-row page size. Search and volunteer sorting happen before pagination.`,
+      description: `63 fictional people, using the real ${volunteerPageSize}-row page size. Search, filtering, and sorting happen before pagination.`,
     },
     {
       id: "empty",
@@ -93,16 +95,13 @@ export function tableQuery(options: TableOptions) {
 export function tablePreviewUrl(
   kind: TableKind,
   options: TableOptions,
-  state = volunteerListState(new URLSearchParams()),
+  state = directoryListState(new URLSearchParams(), kind),
 ) {
   const query = tableQuery(options);
-  if (state.search) query.set("q", state.search);
-  if (state.offset) query.set("offset", String(state.offset));
-  if (kind === "applications") query.set("approval", state.approval);
-  else {
-    query.set("sort", state.sort);
-    query.set("direction", state.direction);
-  }
+  const listQuery = new URLSearchParams(
+    directoryListUrl(kind, state).split("?")[1],
+  );
+  listQuery.forEach((value, name) => query.set(name, value));
   return `/dev/ui/${kind}/preview?${query}`;
 }
 
@@ -152,6 +151,14 @@ function roleLabel(person: Person) {
         : "Outreach Volunteer";
 }
 
+function progressLabel(person: Person) {
+  return person.applicationRejectionReason
+    ? "Rejected"
+    : person.applicationReadyForReview
+      ? "Ready for review"
+      : "In Progress";
+}
+
 // SQLite's NOCASE collation folds ASCII only; match its directory sort and ties.
 function compare(a: string | number, b: string | number) {
   const fold = (value: string | number) =>
@@ -166,7 +173,7 @@ function compare(a: string | number, b: string | number) {
 export function createTableFixture(
   kind: TableKind,
   options: TableOptions,
-  state: ReturnType<typeof volunteerListState>,
+  state: DirectoryListState,
 ) {
   if (!import.meta.env.DEV)
     throw new Error("UI fixtures are local-development only.");
@@ -236,16 +243,16 @@ export function createTableFixture(
   const filtered =
     applications && state.approval === "awaiting" ? awaiting : matching;
   filtered.sort((a, b) => {
-    if (applications)
-      return (
-        (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) || compare(a.id, b.id)
-      );
     const primary = (person: Person) =>
-      state.sort === "role"
-        ? roleLabel(person)
-        : state.sort === "patrol"
-          ? person.patrolApproved
-          : person.name;
+      applications
+        ? state.sort === "progress"
+          ? progressLabel(person)
+          : person.name
+        : state.sort === "role"
+          ? roleLabel(person)
+          : state.sort === "patrol"
+            ? person.patrolApproved
+            : person.name;
     return (
       compare(primary(a), primary(b)) * (state.direction === "desc" ? -1 : 1) ||
       compare(a.name, b.name) ||

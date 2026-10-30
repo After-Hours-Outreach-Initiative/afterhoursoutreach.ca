@@ -6,7 +6,10 @@ import { accountContext, requireOrganizer } from "@/server/db/access";
 import { listApplications } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
-import { applicationListUrl, volunteerListState } from "@/data/volunteer-list";
+import {
+  applicationListUrl,
+  applicationListState,
+} from "@/data/volunteer-list";
 import "@/styles/volunteer.css";
 export const prerender = false;
 let applications: Awaited<ReturnType<typeof listApplications>> = {
@@ -19,8 +22,8 @@ let lock = "";
 let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
-const state = volunteerListState(Astro.url.searchParams);
-const { search, offset, approval } = state;
+const state = applicationListState(Astro.url.searchParams);
+const { search, offset, approval, sort, direction } = state;
 const listUrl = applicationListUrl(state);
 try {
   const { actor, headers, email, greetingName } = await accountContext(
@@ -50,6 +53,8 @@ try {
       search,
       offset,
       approval,
+      sort,
+      direction,
     );
 } catch {
   return new Response("Application management is temporarily unavailable.", {
