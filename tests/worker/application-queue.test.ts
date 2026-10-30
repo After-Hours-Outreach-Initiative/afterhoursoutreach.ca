@@ -268,24 +268,27 @@ test("organizers review applications separately from approved volunteers with pe
       });
     });
     await page.goto(`${origin}/volunteers`);
-    await expect(page.getByRole("columnheader")).toHaveText([
-      "Name",
-      "Role",
-      "Patrol access",
-    ]);
+    await expect(page.getByRole("columnheader")).toHaveText(["Name", "Role"]);
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
       2,
     );
     const names = page.locator("[data-volunteer-profile-link]");
     const nameSort = page.locator('[data-volunteer-sort="name"]');
     const roleSort = page.locator('[data-volunteer-sort="role"]');
-    const patrolSort = page.locator('[data-volunteer-sort="patrol"]');
+    await expect(roleSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await expect(names).toHaveText(["approved", "organizer"]);
+    await nameSort.focus();
+    await page.keyboard.press("Enter");
     await expect(nameSort.locator("..")).toHaveAttribute(
       "aria-sort",
       "ascending",
     );
-    await nameSort.focus();
-    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(`${origin}/volunteers?sort=name`);
+    await expect(nameSort).toBeFocused();
+    await nameSort.click();
     await expect(nameSort.locator("..")).toHaveAttribute(
       "aria-sort",
       "descending",
@@ -298,22 +301,16 @@ test("organizers review applications separately from approved volunteers with pe
       "ascending",
     );
     await expect(names).toHaveText(["approved", "organizer"]);
-    await patrolSort.click();
-    await expect(patrolSort.locator("..")).toHaveAttribute(
-      "aria-sort",
-      "ascending",
-    );
-    await patrolSort.click();
-    await expect(patrolSort.locator("..")).toHaveAttribute(
+    await expect(page).toHaveURL(`${origin}/volunteers`);
+    await roleSort.click();
+    await expect(roleSort.locator("..")).toHaveAttribute(
       "aria-sort",
       "descending",
     );
     await expect(names).toHaveText(["organizer", "approved"]);
-    await expect(page).toHaveURL(
-      `${origin}/volunteers?sort=patrol&direction=desc`,
-    );
+    await expect(page).toHaveURL(`${origin}/volunteers?direction=desc`);
     await page.reload();
-    await expect(patrolSort.locator("..")).toHaveAttribute(
+    await expect(roleSort.locator("..")).toHaveAttribute(
       "aria-sort",
       "descending",
     );
@@ -328,11 +325,10 @@ test("organizers review applications separately from approved volunteers with pe
     ).toBeVisible();
     await expect(page.locator("[data-volunteer-results] tbody td")).toHaveText([
       "New",
-      "Not approved for patrols",
     ]);
-    await expect(page.locator('[name="sort"]')).toHaveValue("patrol");
+    await expect(page.locator('[name="sort"]')).toHaveValue("role");
     await expect(page.locator('[name="direction"]')).toHaveValue("desc");
-    const sortedReturn = "/volunteers?q=approved&sort=patrol&direction=desc";
+    const sortedReturn = "/volunteers?q=approved&direction=desc";
     await expect(names).toHaveAttribute(
       "href",
       `/volunteers/approved?returnTo=${encodeURIComponent(sortedReturn)}`,
@@ -346,7 +342,7 @@ test("organizers review applications separately from approved volunteers with pe
       "ascending",
     );
     await page.goBack();
-    await expect(patrolSort.locator("..")).toHaveAttribute(
+    await expect(roleSort.locator("..")).toHaveAttribute(
       "aria-sort",
       "descending",
     );
@@ -934,16 +930,16 @@ test("organizers review applications separately from approved volunteers with pe
       "href",
       "/applications?q=applicant-52&approval=awaiting&direction=desc",
     );
-    await plain.goto(`${origin}/volunteers?q=approved&offset=50`);
-    await plain.locator('[data-volunteer-sort="patrol"]').click();
+    await plain.goto(`${origin}/volunteers?q=approved&sort=name&offset=50`);
+    await plain.locator('[data-volunteer-sort="role"]').click();
     await expect(
       plain.locator("[data-volunteer-results] tbody tr"),
     ).toHaveCount(1);
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
-    await plain.locator('[data-volunteer-sort="patrol"]').click();
+    await plain.locator('[data-volunteer-sort="role"]').click();
     await plain.locator("[data-volunteer-search]").fill("organizer");
     await plain.getByRole("button", { name: "Search", exact: true }).click();
-    expect(new URL(plain.url()).searchParams.get("sort")).toBe("patrol");
+    expect(new URL(plain.url()).searchParams.get("sort")).toBe("role");
     expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     await expect(plain.locator("[data-volunteer-profile-link]")).toHaveText(
       "organizer",

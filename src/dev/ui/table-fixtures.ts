@@ -37,7 +37,7 @@ export function tableScenarios(kind: TableKind) {
       description:
         kind === "applications"
           ? "Medic and outreach applications in progress, ready for review, and rejected. Unsubmitted drafts stay private."
-          : "Organizers, medics, outreach volunteers, and new volunteers, with both patrol access states and medic marks.",
+          : "Organizers, medics, outreach volunteers, and new volunteers, with medic marks.",
     },
     {
       id: "long-names",
@@ -274,9 +274,7 @@ export function createTableFixture(
               : person.name
         : state.sort === "role"
           ? roleLabel(person)
-          : state.sort === "patrol"
-            ? person.patrolApproved
-            : person.name;
+          : person.name;
     return (
       compare(primary(a), primary(b)) * (state.direction === "desc" ? -1 : 1) ||
       compare(a.name, b.name) ||

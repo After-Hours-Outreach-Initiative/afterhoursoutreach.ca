@@ -31,16 +31,23 @@ test("application list state preserves approval, search, sorting and pagination 
       "/volunteer/volunteers?q=Alex+%26+Sam&approval=awaiting",
     ),
   ).toBe("/volunteers?q=Alex+%26+Sam");
-  const sorted = { ...state, sort: "patrol", direction: "desc" } as const;
+  const sorted = { ...state, sort: "name", direction: "desc" } as const;
   expect(volunteerListReturnUrl(volunteerListUrl(sorted))).toBe(
-    "/volunteers?q=Alex+%26+Sam&sort=patrol&direction=desc&offset=50",
+    "/volunteers?q=Alex+%26+Sam&sort=name&direction=desc&offset=50",
   );
   expect(directoryListUrl("applications", sorted)).toBe(
-    "/applications?q=Alex+%26+Sam&approval=awaiting&direction=desc&offset=50",
+    "/applications?q=Alex+%26+Sam&approval=awaiting&sort=name&direction=desc&offset=50",
   );
   expect(directoryListUrl("volunteers", state)).toBe(
     "/volunteers?q=Alex+%26+Sam&direction=desc&offset=50",
   );
+  const volunteers = volunteerListState(new URLSearchParams("sort=role"));
+  expect(volunteerListUrl(volunteers)).toBe("/volunteers");
+  expect(
+    volunteerListState(
+      new URL(volunteerListUrl(volunteers), "https://example.org").searchParams,
+    ),
+  ).toEqual(volunteers);
 });
 
 test("list return destinations are restricted and untrusted filter inputs are normalized", () => {
@@ -75,8 +82,14 @@ test("list return destinations are restricted and untrusted filter inputs are no
     "progress",
   );
   expect(volunteerListState(new URLSearchParams("sort=progress")).sort).toBe(
-    "name",
+    "role",
   );
+  expect(volunteerListState(new URLSearchParams("sort=patrol")).sort).toBe(
+    "role",
+  );
+  expect(
+    volunteerListReturnUrl("/volunteers?sort=patrol&direction=desc&offset=50"),
+  ).toBe("/volunteers?direction=desc&offset=50");
   expect(
     volunteerListState(
       new URLSearchParams({ q: "x".repeat(200), offset: "999999" }),
@@ -85,7 +98,7 @@ test("list return destinations are restricted and untrusted filter inputs are no
     search: "x".repeat(100),
     offset: 10000,
     approval: "all",
-    sort: "name",
+    sort: "role",
     direction: "asc",
   });
 });

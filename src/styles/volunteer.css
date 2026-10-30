@@ -1517,9 +1517,6 @@ body:has(
   /* Compact the whole name/badge group without changing its alignment. */
   margin-block: 0;
 }
-.volunteer-table-approved {
-  color: #4ade80;
-}
 @media (width < 64rem) {
   .volunteer-table :is(th, td) {
     padding: 0.75rem;

@@ -46,7 +46,6 @@ const columns = (
     : [
         { key: "name", label: "Name" },
         { key: "role", label: "Role" },
-        { key: "patrol", label: "Patrol access" },
       ]
 ) satisfies { key: DirectorySort; label: string }[];
 ---
@@ -141,7 +140,7 @@ const columns = (
           {
             applications
               ? "Applicants, roles, status, and completion dates"
-              : "Approved volunteers, roles, and patrol access"
+              : "Approved volunteers and roles"
           }
         </caption>
         <thead>
@@ -244,28 +243,15 @@ const columns = (
                     </td>
                   </>
                 ) : (
-                  <>
-                    <td>
-                      {person.role === "organizer" ? (
-                        <VolunteerRoleBadge role="organizer" />
-                      ) : person.category === "new-volunteer" ? (
-                        <NewVolunteerBadge />
-                      ) : person.category === "medic" ? (
-                        <VolunteerRoleBadge role="medic" />
-                      ) : null}
-                    </td>
-                    <td
-                      class:list={{
-                        "volunteer-table-approved": Boolean(
-                          person.patrolApproved,
-                        ),
-                      }}
-                    >
-                      {person.patrolApproved
-                        ? "Approved for patrols"
-                        : "Not approved for patrols"}
-                    </td>
-                  </>
+                  <td>
+                    {person.role === "organizer" ? (
+                      <VolunteerRoleBadge role="organizer" />
+                    ) : person.category === "new-volunteer" ? (
+                      <NewVolunteerBadge />
+                    ) : person.category === "medic" ? (
+                      <VolunteerRoleBadge role="medic" />
+                    ) : null}
+                  </td>
                 )}
               </tr>
             ))

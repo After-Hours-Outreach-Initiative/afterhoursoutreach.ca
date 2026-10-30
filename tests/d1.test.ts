@@ -811,7 +811,7 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
 
-test("volunteer directory sorts names, displayed roles and patrol flags before applying offsets", async () => {
+test("volunteer directory defaults to displayed roles and sorts before applying offsets", async () => {
   const actor: Actor = {
     ...(await draftActor("organizer")),
     role: "organizer",
@@ -846,8 +846,6 @@ test("volunteer directory sorts names, displayed roles and patrol flags before a
     ["name", "desc", ["new", "medic", "organizer", "outreach", "tie"]],
     ["role", "asc", ["outreach", "medic", "tie", "new", "organizer"]],
     ["role", "desc", ["organizer", "tie", "new", "medic", "outreach"]],
-    ["patrol", "asc", ["tie", "organizer", "new", "outreach", "medic"]],
-    ["patrol", "desc", ["outreach", "medic", "tie", "organizer", "new"]],
   ] as const) {
     const page = await listVolunteers(env.DB, actor, "", 1, sort, direction);
     assert.deepEqual(
@@ -857,9 +855,15 @@ test("volunteer directory sorts names, displayed roles and patrol flags before a
     assert.equal(page.allApplicantsCount, 5);
   }
   assert.deepEqual(
-    (await listVolunteers(env.DB, actor, "AL", 0, "role", "asc")).rows.map(
-      ({ id }) => id,
-    ),
+    (await listVolunteers(env.DB, actor)).rows.map(({ id }) => id),
+    ["outreach", "medic", "tie", "new", "organizer"],
+  );
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "", 1)).rows.map(({ id }) => id),
+    ["medic", "tie", "new", "organizer"],
+  );
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "AL")).rows.map(({ id }) => id),
     ["outreach", "tie"],
   );
 });

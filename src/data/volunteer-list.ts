@@ -1,5 +1,5 @@
 export type VolunteerApprovalFilter = "all" | "awaiting";
-export type VolunteerSort = "name" | "role" | "patrol";
+export type VolunteerSort = "name" | "role";
 export type ApplicationSort = "name" | "role" | "progress" | "completed";
 export type DirectoryKind = "applications" | "volunteers";
 export type DirectorySort = VolunteerSort | ApplicationSort;
@@ -28,7 +28,7 @@ export function directoryListState(
 }
 
 function volunteerSort(value: string | null): VolunteerSort {
-  return value === "role" || value === "patrol" ? value : "name";
+  return value === "name" ? value : "role";
 }
 
 function applicationSort(value: string | null): ApplicationSort {
@@ -77,7 +77,7 @@ export function directoryListUrl(
   if (state.search) params.set("q", state.search);
   if (applications && state.approval === "awaiting")
     params.set("approval", state.approval);
-  if (sort !== (applications ? "progress" : "name")) params.set("sort", sort);
+  if (sort !== (applications ? "progress" : "role")) params.set("sort", sort);
   if (state.direction !== "asc") params.set("direction", state.direction);
   if (state.offset) params.set("offset", String(state.offset));
   const query = params.toString();

@@ -60,7 +60,7 @@ export async function listVolunteers(
   actor: Actor,
   search = "",
   offset = 0,
-  sort: VolunteerSort = "name",
+  sort: VolunteerSort = "role",
   direction: VolunteerSortDirection = "asc",
 ) {
   return listPeople(db, actor, search, offset, false, "all", sort, direction);
@@ -127,9 +127,7 @@ async function listPeople(
           WHEN category = 'new-volunteer' THEN 'New'
           WHEN category = 'medic' THEN 'Medic'
           ELSE '' END COLLATE NOCASE`
-      : sort === "patrol"
-        ? "v.patrol_approved"
-        : "name COLLATE NOCASE";
+      : "name COLLATE NOCASE";
   const orderSql = `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}, name COLLATE NOCASE, u.id`;
   const [rows, counts] = (await db.batch([
     db
