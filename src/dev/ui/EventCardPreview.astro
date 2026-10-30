@@ -1,0 +1,37 @@
+---
+import LocalLayout from "./LocalLayout.astro";
+import EventCard from "../../components/volunteer/EventCard.astro";
+import { createEventCardFixture } from "./event-card-fixtures";
+import "../../styles/volunteer.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+// Native submissions must never reach account APIs, even with scripts disabled.
+Astro.response.headers.set("Content-Security-Policy", "form-action 'none'");
+const registered = Astro.url.searchParams.get("registered");
+const { scenario, ...fixture } = createEventCardFixture(
+  Astro.url.searchParams.get("scenario"),
+  registered === null ? undefined : registered === "1",
+);
+---
+
+<LocalLayout title={`${scenario.label} · Event card`}>
+  <main class="volunteer-portal ui-event-preview" data-ui-event-preview>
+    <ul class="volunteer-event-list" data-event-list>
+      <EventCard
+        {...fixture}
+        organizer={false}
+        roster={[]}
+        destinations={[]}
+        filter="all"
+      />
+    </ul>
+  </main>
+</LocalLayout>
+
+<script src="./event-card-preview.ts"></script>
+
+<style>
+  .ui-event-preview {
+    padding: 1rem;
+  }
+</style>
