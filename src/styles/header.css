@@ -94,20 +94,6 @@
   background: #0c0d10;
   box-shadow: 0 0.75rem 1.875rem #0008;
 }
-.header-manage-dropdown {
-  left: -0.75rem;
-  width: 12.5rem;
-}
-@media (min-width: 64rem) {
-  .header-manage-dropdown::before {
-    /* Bridge the gap so the pointer can reach the hover-open submenu. */
-    content: "";
-    position: absolute;
-    inset-inline: 0;
-    bottom: 100%;
-    height: calc(0.5rem + 1px);
-  }
-}
 .header-account-dropdown {
   right: 0;
   width: 16.25rem;
@@ -234,15 +220,6 @@
   flex-shrink: 0;
   margin-left: auto;
   color: #a1a1aa;
-}
-.header-mobile-children {
-  margin-left: 1.25rem;
-}
-.header-mobile-children .header-mobile-link {
-  @apply text-lg;
-  padding-left: 0.75rem;
-  line-height: 1.5;
-  border: 0;
 }
 .header-mobile-panel [data-header-discord] {
   @apply text-lg;

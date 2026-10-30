@@ -43,18 +43,15 @@ test("site navigation keeps Volunteer until event access is available", () => {
   ]);
   expect(siteNavigation(true, true, true).map((link) => link.href)).toEqual([
     "/events",
-    "/manage/events",
+    "/applications",
+    "/volunteers",
     "/donate",
     "/about",
   ]);
-  expect(siteNavigation(true, true)[1]).toMatchObject({
-    label: "Manage",
-    children: [
-      { label: "Events", href: "/manage/events" },
-      { label: "Applications", href: "/manage/applications" },
-      { label: "Volunteers", href: "/manage/volunteers" },
-    ],
-  });
+  expect(siteNavigation(true, true).slice(1, 3)).toEqual([
+    { label: "Applications", href: "/applications" },
+    { label: "Volunteers", href: "/volunteers" },
+  ]);
 });
 
 test("event access uses all three application milestones, not orientation attendance", () => {

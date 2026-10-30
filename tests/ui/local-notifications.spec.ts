@@ -54,7 +54,7 @@ test("local approval notifications work without crypto.randomUUID", async ({
       },
     });
   });
-  await page.route("**/manage/volunteers/test-patrol", (route) =>
+  await page.route("**/volunteers/test-patrol", (route) =>
     route.fulfill({
       contentType: "text/html",
       body: profile(),

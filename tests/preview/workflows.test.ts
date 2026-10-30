@@ -173,7 +173,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
         body: Buffer.from(await response.arrayBuffer()),
       });
     });
-    await page.goto(`${origin}/manage/applications?approval=awaiting`);
+    await page.goto(`${origin}/applications?approval=awaiting`);
     await expect(
       page.locator('[aria-label="Preview environment"]'),
     ).toBeVisible();
@@ -294,9 +294,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       await action({ action: "join", id: farId }, applicant.cookie),
       409,
     );
-    await page.goto(
-      `${origin}/manage/events?occurrence=${encodeURIComponent(farId)}`,
-    );
+    await page.goto(`${origin}/events?occurrence=${encodeURIComponent(farId)}`);
     const farCard = page.locator(`[data-live-event="${farId}"]`);
     await expect(farCard).toBeVisible();
     await expect(

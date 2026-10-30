@@ -101,36 +101,39 @@ test("organizers review applications separately from approved volunteers with pe
         redirect: "manual",
         headers: { cookie: auth },
       });
-    const listPath =
-      "/manage/applications?approval=awaiting&q=applicant&offset=50";
+    const listPath = "/applications?approval=awaiting&q=applicant&offset=50";
     const anonymous = await get(listPath, "");
     assert.equal(anonymous.status, 302);
     assert.equal(
       new URL(anonymous.headers.get("location")!, origin).searchParams.get(
         "returnTo",
       ),
-      "/manage/applications?q=applicant&approval=awaiting&offset=50",
+      "/applications?q=applicant&approval=awaiting&offset=50",
     );
-    for (const path of [
-      listPath,
-      "/manage/volunteers",
-      "/manage/volunteers/applicant-50",
-    ])
+    for (const path of [listPath, "/volunteers", "/volunteers/applicant-50"])
       assert.equal((await get(path, volunteerCookie)).status, 403);
     for (const [oldPath, destination] of [
       [
         "/volunteer/volunteers?approval=awaiting&q=applicant&offset=50",
-        "/manage/volunteers?approval=awaiting&q=applicant&offset=50",
+        "/volunteers?approval=awaiting&q=applicant&offset=50",
       ],
       [
         "/volunteer/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
-        "/manage/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
+        "/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
       ],
       [
-        "/volunteers?approval=awaiting&q=applicant&offset=50",
         "/manage/volunteers?approval=awaiting&q=applicant&offset=50",
+        "/volunteers?approval=awaiting&q=applicant&offset=50",
       ],
-      ["/volunteers/applicant-50", "/manage/volunteers/applicant-50"],
+      ["/manage/volunteers/applicant-50", "/volunteers/applicant-50"],
+      [
+        "/manage/applications?approval=awaiting&q=applicant&offset=50",
+        listPath,
+      ],
+      [
+        "/manage/events?type=orientation&occurrence=a%2Fb",
+        "/events?type=orientation&occurrence=a%2Fb&view=organizer",
+      ],
     ]) {
       const legacy = await get(oldPath);
       assert.equal(legacy.status, 301);
@@ -166,7 +169,7 @@ test("organizers review applications separately from approved volunteers with pe
       assert.match(landingHtml, /data-event-path="\/volunteer"/);
       assert.match(landingHtml, /data-event-access="true"/);
       assert.equal(
-        landingHtml.includes('href="/manage/events"'),
+        landingHtml.includes('data-event-view-link="organizer"'),
         auth === cookie,
       );
       const events = await get("/events", auth);
@@ -185,22 +188,18 @@ test("organizers review applications separately from approved volunteers with pe
       assert.match(eventHtml, /<title>Events \|/);
       assert.match(eventHtml, /href="\/events"/);
       assert.doesNotMatch(eventHtml, /href="\/volunteer"/);
+      assert.equal(eventHtml.includes('href="/volunteers"'), auth === cookie);
+      assert.equal(eventHtml.includes('href="/applications"'), auth === cookie);
       assert.equal(
-        eventHtml.includes('href="/manage/volunteers"'),
+        eventHtml.includes('data-event-view-link="organizer"'),
         auth === cookie,
       );
+      assert.doesNotMatch(eventHtml, /href="\/manage\//);
       assert.equal(
-        eventHtml.includes('href="/manage/applications"'),
+        eventHtml.includes('data-event-view="manage"'),
         auth === cookie,
       );
-      assert.equal(
-        eventHtml.includes('href="/manage/events"'),
-        auth === cookie,
-      );
-      assert.doesNotMatch(
-        eventHtml,
-        /data-event-save|data-live-series|data-manage-signup|volunteer-roster/,
-      );
+      assert.equal(eventHtml.includes("data-event-save"), auth === cookie);
       assert.doesNotMatch(eventHtml, /data-volunteer-profile-dialog/);
     }
     const response = await get(listPath);
@@ -212,10 +211,7 @@ test("organizers review applications separately from approved volunteers with pe
       html,
       /PRIVATE QUEUE ANSWER|SECRET DRAFT NAME|draft-only|account-only/,
     );
-    for (const path of [
-      "/manage/volunteers",
-      "/manage/volunteers?approval=awaiting",
-    ]) {
+    for (const path of ["/volunteers", "/volunteers?approval=awaiting"]) {
       const directory = await get(path);
       assert.equal(directory.status, 200);
       const directoryHtml = await directory.text();
@@ -260,7 +256,7 @@ test("organizers review applications separately from approved volunteers with pe
         body: Buffer.from(await result.arrayBuffer()),
       });
     });
-    await page.goto(`${origin}/manage/volunteers`);
+    await page.goto(`${origin}/volunteers`);
     await expect(page.getByRole("columnheader")).toHaveText([
       "Name",
       "Role",
@@ -319,11 +315,11 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await expect(allApplicants).toBeFocused();
     await expect(results.locator("tbody tr")).toHaveCount(50);
-    await expect(page).toHaveURL(`${origin}/manage/applications?q=applicant`);
+    await expect(page).toHaveURL(`${origin}/applications?q=applicant`);
     await awaitingApproval.click();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(
-      `${origin}/manage/applications?q=applicant&approval=awaiting`,
+      `${origin}/applications?q=applicant&approval=awaiting`,
     );
     await page.goBack();
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
@@ -468,7 +464,7 @@ test("organizers review applications separately from approved volunteers with pe
       .first()
       .click({ modifiers: ["Control"] });
     await expect(page).toHaveURL(
-      `${origin}/manage/applications?q=applicant&approval=awaiting&offset=50`,
+      `${origin}/applications?q=applicant&approval=awaiting&offset=50`,
     );
     await page.setViewportSize({ width: 1280, height: 900 });
     await results.locator("tbody tr").first().locator("td").first().click();
@@ -486,15 +482,15 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       applicationProgress.getByText("Ready for review", { exact: true }),
     ).toHaveCount(0);
-    const inProgressList = await get("/manage/applications?q=applicant-50");
+    const inProgressList = await get("/applications?q=applicant-50");
     const inProgressHtml = await inProgressList.text();
     assert.match(inProgressHtml, /data-state="in-progress">In Progress</);
     assert.match(inProgressHtml, /data-awaiting-approval-count>0</);
     const reviewQueue = await get(
-      "/manage/applications?q=applicant-50&approval=awaiting",
+      "/applications?q=applicant-50&approval=awaiting",
     );
     assert.doesNotMatch(await reviewQueue.text(), /data-volunteer-row/);
-    await page.goto(`${origin}/manage/applications?q=applicant-50`);
+    await page.goto(`${origin}/applications?q=applicant-50`);
     await expect(results.locator('[data-state="in-progress"]')).toHaveText(
       "In Progress",
     );
@@ -672,7 +668,7 @@ test("organizers review applications separately from approved volunteers with pe
     assert.equal(recorded?.marked_by, "organizer");
     assert.equal(recorded?.marked_at, 1);
     assert.ok(Number(recorded?.approved_at) > 1);
-    const approvedDirectory = await get("/manage/volunteers?q=applicant-50");
+    const approvedDirectory = await get("/volunteers?q=applicant-50");
     assert.match(
       await approvedDirectory.text(),
       /data-volunteer-profile-link>applicant-50</,
@@ -696,7 +692,7 @@ test("organizers review applications separately from approved volunteers with pe
       page.getByRole("link", { name: "Back to applications" }),
     ).toHaveAttribute(
       "href",
-      "/manage/applications?q=applicant&approval=awaiting&offset=50",
+      "/applications?q=applicant&approval=awaiting&offset=50",
     );
     await page
       .getByRole("button", { name: "Revoke application approval" })
@@ -729,7 +725,7 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       results.getByRole("link", { name: "approved", exact: true }),
     ).toHaveCount(0);
-    await expect(page).toHaveURL(`${origin}/manage/applications?q=approved`);
+    await expect(page).toHaveURL(`${origin}/applications?q=approved`);
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(results.locator("tbody tr")).toHaveCount(0);
@@ -792,10 +788,7 @@ test("organizers review applications separately from approved volunteers with pe
     ).toBeVisible();
     await expect(
       plain.getByRole("link", { name: "Back to applications" }),
-    ).toHaveAttribute(
-      "href",
-      "/manage/applications?q=applicant-52&approval=awaiting",
-    );
+    ).toHaveAttribute("href", "/applications?q=applicant-52&approval=awaiting");
     // Returning through bfcache must refresh approval changes without losing the
     // restored search or page, even when the last page becomes empty.
     await page.waitForLoadState("load");
@@ -823,7 +816,7 @@ test("organizers review applications separately from approved volunteers with pe
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1",
     ).run();
-    await page.goto(`${origin}/manage/applications?approval=awaiting`);
+    await page.goto(`${origin}/applications?approval=awaiting`);
     await expect(count).toHaveText("0");
     await expect(allCount).toHaveText("0");
     await expect(
@@ -879,7 +872,7 @@ test("organizers review applications separately from approved volunteers with pe
       await get("/api/v1/events/version", applicantCookie)
     ).text();
 
-    await page.goto(`${origin}/manage/volunteers/applicant-50`);
+    await page.goto(`${origin}/volunteers/applicant-50`);
     await page.getByText("Reject application", { exact: true }).click();
     await page
       .getByLabel("Reason for rejection")
@@ -936,9 +929,7 @@ test("organizers review applications separately from approved volunteers with pe
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .focus();
-    await page.goto(
-      `${origin}/manage/applications?approval=awaiting&q=applicant-50`,
-    );
+    await page.goto(`${origin}/applications?approval=awaiting&q=applicant-50`);
     await expect(count).toHaveText("0");
     await page.getByRole("button", { name: "All (1)", exact: true }).click();
     await expect(results).toContainText("Rejected");

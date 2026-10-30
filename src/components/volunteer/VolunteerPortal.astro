@@ -1,6 +1,10 @@
 ---
 import { env } from "cloudflare:workers";
-import { accountContext, canViewEvents } from "@/server/db/access";
+import {
+  accountContext,
+  canViewEvents,
+  requireOrganizer,
+} from "@/server/db/access";
 import {
   listEvents,
   listRosters,
@@ -30,7 +34,6 @@ import {
 } from "@/server/db/application-progress";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
-import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import { contactEmail, social } from "@/data/site";
 import "@/styles/volunteer.css";
 
@@ -40,8 +43,9 @@ interface Props {
 }
 const { manage = false } = Astro.props;
 const { actor, email, greetingName } = Astro.props.account;
-// Callers authenticate first; the manage route also requires organizer access.
+// Callers authenticate first. Never let a view preference grant organizer access.
 if (!actor) throw new Error("VolunteerPortal requires a signed-in account.");
+if (manage) requireOrganizer(actor);
 const events = await listEvents(
   env.DB,
   actor,
@@ -68,12 +72,11 @@ const submission =
   incompleteApplication && applicationProgress.submittedAt !== null
     ? await loadSubmittedApplication(env.DB, actor.id)
     : null;
-const title = manage
-  ? "Manage events"
-  : incompleteApplication && actor.role !== "organizer" && !actor.patrolApproved
+const title =
+  incompleteApplication && actor.role !== "organizer" && !actor.patrolApproved
     ? "Welcome"
     : "Events";
-const rosters = organizer
+const rosters = manage
   ? await listRosters(
       env.DB,
       actor,
@@ -81,7 +84,7 @@ const rosters = organizer
     )
   : [];
 const publicRoster =
-  !manage && eventAccess && !organizer
+  !manage && eventAccess
     ? await listPublicRosters(
         env.DB,
         actor,
@@ -135,6 +138,14 @@ const hasVisibleEvents = manage
   ? countManagementItems(filter) > 0
   : countEvents(events, filter) > 0;
 const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
+const viewUrl = (view: "organizer" | "volunteer") => {
+  const params = new URLSearchParams();
+  params.set("view", view);
+  const type = eventFilter(filter, view === "organizer");
+  if (type !== "all") params.set("type", type);
+  if (selectedOccurrence) params.set("occurrence", selectedOccurrence);
+  return `/events?${params}`;
+};
 ---
 
 <AccountLayout
@@ -164,24 +175,12 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
       )
     }
   </Fragment>
-  {
-    manage && (
-      <a class="volunteer-back-link" href="/events">
-        <ArrowRightIcon class="size-[1.25em] shrink-0 rotate-180" />
-        <span>View events</span>
-      </a>
-    )
-  }
   <div
     data-event-browser
     data-event-view={manage ? "manage" : "volunteer"}
     data-event-version={eventVersion}
     data-event-access={String(eventAccess)}
-    data-event-path={manage
-      ? "/manage/events"
-      : eventAccess
-        ? Astro.url.pathname
-        : "/volunteer"}
+    data-event-path={eventAccess ? Astro.url.pathname : "/volunteer"}
     data-application-awaiting-approval={String(
       Boolean(
         actor.applicationSubmitted &&
@@ -264,26 +263,44 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
           <div class="volunteer-section-heading">
             <div>
               {manage ? (
-                <h1 id="events-heading">Manage events</h1>
+                <h1 id="events-heading">Events</h1>
               ) : (
                 <h2 id="events-heading">Events</h2>
               )}
             </div>
-            {manage ? (
-              <button
-                class="btn btn-primary"
-                data-show-dialog="event-editor-new"
-                type="button"
-              >
-                <PlusIcon class="btn-icon" />
-                Create
-              </button>
-            ) : actor.role === "organizer" ? (
-              <a class="btn btn-primary" href="/manage/events">
-                Manage events
-                <ArrowRightIcon class="btn-icon" />
-              </a>
-            ) : null}
+            <div class="flex flex-wrap items-center gap-3">
+              {organizer && (
+                <div
+                  class="flex flex-wrap items-center gap-2"
+                  role="group"
+                  aria-label="View as"
+                >
+                  <span class="text-base text-zinc-300">View as</span>
+                  {(["organizer", "volunteer"] as const).map((view) => (
+                    <a
+                      class="volunteer-filter"
+                      href={viewUrl(view)}
+                      data-event-view-link={view}
+                      aria-current={
+                        (view === "organizer") === manage ? "page" : undefined
+                      }
+                    >
+                      {view === "organizer" ? "Organizer" : "Volunteer"}
+                    </a>
+                  ))}
+                </div>
+              )}
+              {manage && (
+                <button
+                  class="btn btn-primary"
+                  data-show-dialog="event-editor-new"
+                  type="button"
+                >
+                  <PlusIcon class="btn-icon" />
+                  Create
+                </button>
+              )}
+            </div>
           </div>
           <form
             class="volunteer-filters"
@@ -291,6 +308,20 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
             role="group"
             aria-label="Filter events"
           >
+            {organizer && (
+              <input
+                type="hidden"
+                name="view"
+                value={manage ? "organizer" : "volunteer"}
+              />
+            )}
+            {selectedOccurrence && (
+              <input
+                type="hidden"
+                name="occurrence"
+                value={selectedOccurrence}
+              />
+            )}
             {[
               ["all", "All"],
               ...(manage

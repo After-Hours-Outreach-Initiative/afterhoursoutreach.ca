@@ -2687,6 +2687,7 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     "/volunteer/sign-in",
     "/api/v1/auth/get-session",
     "/events-other",
+    "/applications-other",
     "/volunteers-other",
     "/manage/events-other",
     "/manage/volunteers-other",
@@ -2702,18 +2703,23 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     ["/volunteer?type=orientation", "/events?type=orientation"],
     [
       "/volunteers?approval=awaiting&q=Alex+Lee",
-      "/manage/volunteers?approval=awaiting&q=Alex+Lee",
+      "/volunteers?approval=awaiting&q=Alex+Lee",
     ],
     [
       "/volunteer/volunteers/alex?returnTo=%2Fvolunteers",
-      "/manage/volunteers/alex?returnTo=%2Fvolunteers",
+      "/volunteers/alex?returnTo=%2Fvolunteers",
     ],
-    ["/manage/events?occurrence=a%2Fb", "/manage/events?occurrence=a%2Fb"],
-    ["/manage/volunteers?q=Alex", "/manage/volunteers?q=Alex"],
+    [
+      "/manage/events?occurrence=a%2Fb",
+      "/events?occurrence=a%2Fb&view=organizer",
+    ],
+    ["/events?view=volunteer", "/events?view=volunteer"],
+    ["/manage/volunteers?q=Alex", "/volunteers?q=Alex"],
     [
       "/manage/applications?approval=awaiting&q=Alex",
-      "/manage/applications?approval=awaiting&q=Alex",
+      "/applications?approval=awaiting&q=Alex",
     ],
+    ["/applications?q=Alex", "/applications?q=Alex"],
   ])
     assert.equal(safeReturnTo(value), expected);
   const request = new Request(origin, {

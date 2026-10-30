@@ -167,7 +167,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -205,7 +205,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   const patrol = await makeEvent(date, "18:00", false);
   const orientation = await makeEvent(date, "19:00", true);
   const distant = await makeEvent(addCalendarDays(today, 49), "20:00", true);
-  await page.goto(`/events?occurrence=${orientation.id}`);
+  await page.goto(`/events?view=volunteer&occurrence=${orientation.id}`);
   const documents: string[] = [];
   page.on("request", (request) => {
     if (request.resourceType() === "document") documents.push(request.url());
@@ -365,9 +365,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   await expect(link(distant.id)).toBeVisible();
   const start = await calendar.getAttribute("data-calendar-start");
   const version = async () => {
-    const response = await page.request.get(
-      `/manage/events?occurrence=${distant.id}`,
-    );
+    const response = await page.request.get(`/events?occurrence=${distant.id}`);
     expect(response.ok()).toBe(true);
     const value = (await response.text()).match(
       new RegExp(
@@ -463,7 +461,7 @@ test("View as has a button for every seeded profile and supports keyboard switch
     page
       .getByRole("navigation", { name: "Mobile navigation" })
       .getByRole("button", { name: "Manage", exact: true }),
-  ).toHaveAttribute("aria-expanded", "true");
+  ).toHaveCount(0);
   await expect(
     page
       .getByRole("navigation", { name: "Mobile navigation" })

@@ -35,19 +35,19 @@ function listUrl(
     params.set("approval", state.approval);
   if (state.offset) params.set("offset", String(state.offset));
   const query = params.toString();
-  return `/manage/${applications ? "applications" : "volunteers"}${query ? `?${query}` : ""}`;
+  return `/${applications ? "applications" : "volunteers"}${query ? `?${query}` : ""}`;
 }
 
 /** Only return to organizer lists, never a supplied external destination. */
 export function volunteerListReturnUrl(value: string | null) {
   if (
     !value ||
-    !/^\/(?:manage\/applications|(?:(?:manage|volunteer)\/)?volunteers)(?:\?|$)/.test(
+    !/^\/(?:(?:manage\/)?applications|(?:(?:manage|volunteer)\/)?volunteers)(?:\?|$)/.test(
       value,
     )
   )
-    return "/manage/volunteers";
-  const url = value.startsWith("/manage/applications")
+    return "/volunteers";
+  const url = /^\/(?:manage\/)?applications(?:\?|$)/.test(value)
     ? applicationListUrl
     : volunteerListUrl;
   return url(volunteerListState(new URLSearchParams(value.split("?")[1])));

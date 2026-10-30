@@ -31,7 +31,7 @@ const { pathname } = Astro.url;
 const current = pathname.replace(/\/$/, "");
 const isCurrent = (href: string) =>
   current === href ||
-  (href === "/manage/volunteers" && current.startsWith(`${href}/`));
+  (href === "/volunteers" && current.startsWith(`${href}/`));
 const links = siteNavigation(signedIn, organizer, eventAccess);
 const accountPage = current === "/volunteer/account" || current === "/apply";
 ---
@@ -59,54 +59,20 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
       aria-label="Primary navigation"
     >
       {
-        links.map((link) =>
-          link.children ? (
-            <details
-              class="header-menu"
-              data-header-menu
-              data-header-hover-menu
-            >
-              <summary class="header-link" role="button" aria-expanded="false">
-                {link.label}
-                <svg
-                  class="header-chevron"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  aria-hidden="true"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </summary>
-              <ul class="header-dropdown header-manage-dropdown">
-                {link.children.map((child) => (
-                  <li>
-                    <a
-                      href={child.href}
-                      aria-current={isCurrent(child.href) ? "page" : undefined}
-                    >
-                      {child.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : (
-            <a
-              class="header-link"
-              href={link.href}
-              data-volunteer-nav={
-                link.href === "/volunteer" || link.href === "/events"
-                  ? ""
-                  : undefined
-              }
-              aria-current={isCurrent(link.href) ? "page" : undefined}
-            >
-              <span data-volunteer-nav-label>{link.label}</span>
-            </a>
-          ),
-        )
+        links.map((link) => (
+          <a
+            class="header-link"
+            href={link.href}
+            data-volunteer-nav={
+              link.href === "/volunteer" || link.href === "/events"
+                ? ""
+                : undefined
+            }
+            aria-current={isCurrent(link.href) ? "page" : undefined}
+          >
+            <span data-volunteer-nav-label>{link.label}</span>
+          </a>
+        ))
       }
     </nav>
 
@@ -190,57 +156,19 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
           {
             links.map((link) => (
               <li>
-                {link.children ? (
-                  <details class="header-menu" data-header-menu open>
-                    <summary
-                      class="header-mobile-link"
-                      role="button"
-                      aria-expanded="true"
-                    >
-                      {link.label}
-                      <svg
-                        class="header-chevron header-mobile-arrow"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        aria-hidden="true"
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </summary>
-                    <ul class="header-mobile-children">
-                      {link.children.map((child) => (
-                        <li>
-                          <a
-                            class="header-mobile-link"
-                            href={child.href}
-                            aria-current={
-                              isCurrent(child.href) ? "page" : undefined
-                            }
-                          >
-                            {child.label}
-                            <ArrowRightIcon class="header-mobile-arrow" />
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                ) : (
-                  <a
-                    class="header-mobile-link"
-                    href={link.href}
-                    data-volunteer-nav={
-                      link.href === "/volunteer" || link.href === "/events"
-                        ? ""
-                        : undefined
-                    }
-                    aria-current={isCurrent(link.href) ? "page" : undefined}
-                  >
-                    <span data-volunteer-nav-label>{link.label}</span>
-                    <ArrowRightIcon class="header-mobile-arrow" />
-                  </a>
-                )}
+                <a
+                  class="header-mobile-link"
+                  href={link.href}
+                  data-volunteer-nav={
+                    link.href === "/volunteer" || link.href === "/events"
+                      ? ""
+                      : undefined
+                  }
+                  aria-current={isCurrent(link.href) ? "page" : undefined}
+                >
+                  <span data-volunteer-nav-label>{link.label}</span>
+                  <ArrowRightIcon class="header-mobile-arrow" />
+                </a>
               </li>
             ))
           }

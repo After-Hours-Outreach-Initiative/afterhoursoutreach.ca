@@ -74,7 +74,7 @@ export function submissionNotificationStatements(
         recipient,
         applicationSubmittedTemplate.subject,
         // Not a capability URL; the existing route enforces organizer access.
-        `https://afterhoursoutreach.ca/manage/volunteers/${encodeURIComponent(userId)}`,
+        `https://afterhoursoutreach.ca/volunteers/${encodeURIComponent(userId)}`,
         mode === "preview" ? "suppressed" : "pending",
         userId,
         operationId,

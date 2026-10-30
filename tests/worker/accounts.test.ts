@@ -1298,7 +1298,7 @@ describe(
         );
         const fragment = new URLSearchParams({
           ...proof,
-          returnTo: "/manage/events",
+          returnTo: "/events",
         });
         await page.goto(`${origin}/volunteer/sign-in/complete#${fragment}`);
         await expect(page.getByLabel("Six-digit code")).toBeVisible();

@@ -113,7 +113,7 @@ test("profile pages opened directly or from rosters keep section navigation", as
     await page.setViewportSize({ width, height: 900 });
     for (const fromRoster of [false, true]) {
       if (fromRoster) {
-        await page.goto("/manage/events");
+        await page.goto("/events");
         const roster = page.locator(
           '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',
         );
@@ -124,7 +124,7 @@ test("profile pages opened directly or from rosters keep section navigation", as
         await link.click();
         await expect(page).toHaveURL(href);
       } else {
-        await page.goto("/manage/volunteers/local-fixture-user-robin");
+        await page.goto("/volunteers/local-fixture-user-robin");
       }
       const profile = page.locator("[data-volunteer-profile]");
       await expect(

@@ -105,6 +105,20 @@ function applyEventFilter(root: HTMLElement, type: string) {
       "aria-pressed",
       String(button.dataset.eventFilter === selected),
     );
+  for (const link of root.querySelectorAll<HTMLAnchorElement>(
+    "[data-event-view-link]",
+  )) {
+    const url = new URL(location.href);
+    url.pathname = "/events";
+    url.searchParams.set("view", link.dataset.eventViewLink!);
+    const type = eventFilter(
+      selected,
+      link.dataset.eventViewLink === "organizer",
+    );
+    if (type === "all") url.searchParams.delete("type");
+    else url.searchParams.set("type", type);
+    link.href = url.pathname + url.search + url.hash;
+  }
   syncEventCalendar(root);
   syncBulkEventSelection(root);
 }

@@ -178,7 +178,10 @@ export function developmentAccounts(bindings: AuthBindings) {
           else if (/^\/apply\/?(?:\?|$)/.test(next))
             next = "/volunteer/account";
           else if (
-            /^\/manage(?:\/|\?|$)/.test(next) &&
+            (/^\/(?:applications|volunteers)(?:\/|\?|$)/.test(next) ||
+              new URL(next, "https://local.invalid").searchParams.get(
+                "view",
+              ) === "organizer") &&
             !("role" in person && person.role === "organizer")
           )
             next = "/events";

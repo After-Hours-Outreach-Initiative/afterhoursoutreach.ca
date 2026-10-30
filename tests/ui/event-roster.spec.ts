@@ -23,7 +23,7 @@ test("empty volunteer rosters reserve no space through first/last signup updates
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -273,7 +273,7 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -324,10 +324,10 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
     await viewer.goto("/events");
 
     for (const [path, width] of [
+      ["/events?view=volunteer", 1280],
       ["/events", 1280],
-      ["/manage/events", 1280],
+      ["/events?view=volunteer", 320],
       ["/events", 320],
-      ["/manage/events", 320],
     ] as const) {
       await page.setViewportSize({ width, height: 900 });
       await viewer.setViewportSize({ width, height: 900 });
@@ -420,6 +420,10 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         }
       }
       const card = page.locator(`[data-live-event="${id}"]`);
+      if (path.includes("view=volunteer")) {
+        await expect(card.locator("[data-signup-menu-trigger]")).toHaveCount(0);
+        continue;
+      }
       const trigger = card.locator("[data-signup-menu-trigger]").first();
       await expect(card.locator("[data-signup-menu-trigger]")).toHaveCount(2);
       await expect(trigger).toHaveText("");

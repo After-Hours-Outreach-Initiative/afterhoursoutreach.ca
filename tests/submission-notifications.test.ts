@@ -276,7 +276,7 @@ test("form submission is silent; only the winning review transition records thre
     assert.equal(payload.subject, "Volunteer application ready for review");
     assert.equal(
       payload.text,
-      `Applicant: ${snapshot.answers.preferredName}\nSubmitted: ${snapshot.submittedAt}\nOrganizer review (authorized organizer sign-in required): https://afterhoursoutreach.ca/manage/volunteers/applicant`,
+      `Applicant: ${snapshot.answers.preferredName}\nSubmitted: ${snapshot.submittedAt}\nOrganizer review (authorized organizer sign-in required): https://afterhoursoutreach.ca/volunteers/applicant`,
     );
     assert.doesNotMatch(
       row.payload!,

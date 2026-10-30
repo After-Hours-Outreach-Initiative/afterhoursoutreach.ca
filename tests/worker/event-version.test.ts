@@ -81,7 +81,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       .run();
     const listingVersion = async (cookie: string, manage = false) => {
       const html = await (
-        await send(manage ? "/manage/events" : "/volunteer", undefined, cookie)
+        await send(manage ? "/events" : "/volunteer", undefined, cookie)
       ).text();
       const version = html.match(/data-event-version="([a-f0-9]{64})"/)?.[1];
       expect(version).toBeDefined();
@@ -154,9 +154,10 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       .map((value) => value.split(";")[0])
       .join("; ");
     for (const path of [
-      "/manage/events",
-      "/manage/volunteers",
-      `/manage/volunteers/${attendee.id}`,
+      "/events?view=organizer",
+      "/applications",
+      "/volunteers",
+      `/volunteers/${attendee.id}`,
     ]) {
       const anonymous = await send(path);
       expect(anonymous.status).toBe(302);
@@ -183,8 +184,8 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     ).toBe(403);
     for (const [path, cookie] of [
       ["/events", attendee.cookie],
+      ["/events?view=volunteer", organizerCookie],
       ["/events", organizerCookie],
-      ["/manage/events", organizerCookie],
     ]) {
       const html = await (await send(path, undefined, cookie)).text();
       expect(html).toContain("data-event-list");
@@ -215,7 +216,9 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       )
       .run();
     for (const cookie of [attendee.cookie, organizerCookie]) {
-      const html = await (await send("/events", undefined, cookie)).text();
+      const html = await (
+        await send("/events?view=volunteer", undefined, cookie)
+      ).text();
       expect(html).toContain('data-live-event="live"');
       expect(html).toContain("data-live-signup");
       expect(html).toMatch(
@@ -226,14 +229,9 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       expect(html).not.toMatch(
         /data-live-event="hidden"|data-event-save|data-live-series|Renamed attendee/,
       );
-      if (cookie === organizerCookie) {
-        expect(html).toContain("data-signup-menu-trigger");
-        expect(html).toContain("data-manage-signup");
-      } else {
-        expect(html).not.toMatch(
-          /data-signup-menu-trigger|data-manage-signup|volunteer-roster/,
-        );
-      }
+      expect(html).not.toMatch(
+        /data-signup-menu-trigger|data-manage-signup|volunteer-roster/,
+      );
       const history = html.match(
         /<section\b[^>]*aria-labelledby="past-events-heading"[\s\S]*?<\/section>/,
       )?.[0];
@@ -263,24 +261,24 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     );
     expect(pastSignup.status, await pastSignup.text()).toBe(409);
     const managementHtml = await (
-      await send("/manage/events", undefined, organizerCookie)
+      await send("/events", undefined, organizerCookie)
     ).text();
     expect(managementHtml).toContain('data-live-event="hidden"');
     expect(managementHtml).toContain('data-live-event="past"');
-    expect(managementHtml).toMatch(
-      /<a\b[^>]*href="\/events"[^>]*>\s*<svg\b[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg>\s*<span\b[^>]*>View events<\/span>\s*<\/a>/,
+    expect(managementHtml).toContain('href="/events?view=volunteer"');
+    expect(managementHtml).toContain(
+      'data-event-view-link="organizer" aria-current="page"',
     );
+    expect(managementHtml).not.toContain('href="/manage/');
     expect(managementHtml).toContain("data-event-save");
     expect(managementHtml).toContain("volunteer-roster");
     expect(managementHtml).not.toMatch(/data-live-signup|Sign in to register/);
     expect(managementHtml.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g)).toEqual([
-      expect.stringMatching(
-        /<h1\b[^>]*id="events-heading"[^>]*>Manage events<\/h1>/,
-      ),
+      expect.stringMatching(/<h1\b[^>]*id="events-heading"[^>]*>Events<\/h1>/),
     ]);
     expect(managementHtml).not.toMatch(/<h2\b[^>]*>\s*Events\s*<\/h2>/);
     const filteredHistory = await (
-      await send("/manage/events?type=recurring", undefined, organizerCookie)
+      await send("/events?type=recurring", undefined, organizerCookie)
     ).text();
     expect(filteredHistory).toContain('id="past-events-heading"');
     expect(filteredHistory).toContain("No past events match this filter.");

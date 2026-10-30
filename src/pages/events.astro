@@ -1,8 +1,13 @@
 ---
 import VolunteerPortal from "@/components/volunteer/VolunteerPortal.astro";
 import { env } from "cloudflare:workers";
-import { accountContext, canViewEvents } from "@/server/db/access";
+import {
+  accountContext,
+  canViewEvents,
+  requireOrganizer,
+} from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
+import { RequestError } from "@/server/http";
 export const prerender = false;
 const account = await accountContext(env, Astro.request);
 forwardCookies(account.headers, Astro.response.headers);
@@ -12,6 +17,17 @@ if (!account.actor)
   );
 if (!canViewEvents(account.actor))
   return Astro.redirect(`/volunteer${Astro.url.search}`);
+const view = Astro.url.searchParams.get("view");
+const manage = account.actor.role === "organizer" && view !== "volunteer";
+if (manage || view === "organizer") {
+  try {
+    requireOrganizer(account.actor);
+  } catch (error) {
+    if (error instanceof RequestError)
+      return new Response(error.message, { status: error.status });
+    throw error;
+  }
+}
 ---
 
-<VolunteerPortal {account} />
+<VolunteerPortal {account} {manage} />

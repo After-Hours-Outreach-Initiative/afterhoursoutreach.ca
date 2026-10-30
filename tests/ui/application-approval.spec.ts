@@ -194,9 +194,9 @@ test("pending applications poll every minute, then approval restores five-second
       .locator('[data-switch-user="local-fixture-user-robin"]')
       .click();
     await expect(
-      page.getByRole("link", { name: "Manage events", exact: true }),
+      page.getByRole("link", { name: "Organizer", exact: true }),
     ).toBeVisible();
-    await page.goto(`/manage/volunteers/${account.id}`);
+    await page.goto(`/volunteers/${account.id}`);
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
@@ -370,9 +370,9 @@ test("an in-progress application preserves its course draft and focus until conf
       .locator('[data-switch-user="local-fixture-user-robin"]')
       .click();
     await expect(
-      page.getByRole("link", { name: "Manage events", exact: true }),
+      page.getByRole("link", { name: "Organizer", exact: true }),
     ).toBeVisible();
-    const profile = await page.request.get(`/manage/volunteers/${account.id}`);
+    const profile = await page.request.get(`/volunteers/${account.id}`);
     const profileHtml = await profile.text();
     expect(profileHtml).toContain("Application in progress");
     const blockedApproval = await page.request.post(
@@ -441,7 +441,7 @@ test("an in-progress application preserves its course draft and focus until conf
     await expect(naloxone).toHaveAttribute("data-state", "complete");
     await expect(volunteer.locator("[data-event-list]")).toHaveCount(0);
     expect(
-      await (await page.request.get(`/manage/volunteers/${account.id}`)).text(),
+      await (await page.request.get(`/volunteers/${account.id}`)).text(),
     ).toContain("Ready for review");
     await approveLocalApplication(page.request, baseURL!, account.id);
     await volunteer.clock.runFor(60_000);

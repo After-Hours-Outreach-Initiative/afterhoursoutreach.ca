@@ -74,7 +74,7 @@ test("event dialogs offer only cancellation for future events and keep ended his
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -112,7 +112,7 @@ test("event dialogs offer only cancellation for future events and keep ended his
       startsAt: new Date(Date.now() + 86_400_000).toISOString(),
     },
   });
-  await page.goto("/manage/events");
+  await page.goto("/events");
   const standaloneId = await page
     .locator("[data-event-list] > [data-live-event]")
     .filter({ hasText: fields.meetingPoint })
@@ -255,7 +255,7 @@ test("event dialogs preserve their exit layout and roster profiles navigate to p
 
   for (const width of [1280, 320]) {
     await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
-    await page.goto("/manage/events");
+    await page.goto("/events");
     await page.getByRole("button", { name: "Create", exact: true }).click();
     await expectStableExit(page.locator("#event-editor-new"));
     await page
@@ -326,7 +326,7 @@ test("application dialogs keep their chrome visible while only their body scroll
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
   await expect(page.locator("[data-event-list]")).toBeVisible();
-  await page.goto("/manage/events");
+  await page.goto("/events");
   await page.route("**/api/v1/events/action", (route) =>
     route.fulfill({ status: 503, json: { message: "Please try again." } }),
   );

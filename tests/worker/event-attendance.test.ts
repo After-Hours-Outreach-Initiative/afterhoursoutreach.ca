@@ -239,7 +239,9 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
       await setCookie(manage ? organizer.cookie : viewer.cookie);
       for (const width of [1280, 1920, 800, 375, 320]) {
         await page.setViewportSize({ width, height: 900 });
-        await page.goto(`${origin}${manage ? "/manage/events" : "/events"}`);
+        await page.goto(
+          `${origin}${manage ? "/events" : "/events?view=volunteer"}`,
+        );
         const list = page.locator("[data-event-list]");
         await expect(
           page.getByRole("region", { name: "About these places" }),
@@ -577,14 +579,10 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(expandedRoster).not.toContainText("PrivateSurname");
         if (manage) {
           await expect(
-            expandedRoster.locator(
-              'a[href="/manage/volunteers/avatar-attendee-1"]',
-            ),
+            expandedRoster.locator('a[href="/volunteers/avatar-attendee-1"]'),
           ).toHaveText("MJ P.");
           await expect(
-            expandedRoster.locator(
-              'a[href="/manage/volunteers/avatar-attendee-0"]',
-            ),
+            expandedRoster.locator('a[href="/volunteers/avatar-attendee-0"]'),
           ).toHaveText(publicName);
         }
         await expect(
@@ -641,9 +639,9 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
       }
     }
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto(`${origin}/manage/volunteers?q=Member3`);
+    await page.goto(`${origin}/volunteers?q=Member3`);
     const newMedicDirectoryRow = page.locator("[data-volunteer-row]").filter({
-      has: page.locator('a[href^="/manage/volunteers/avatar-attendee-3?"]'),
+      has: page.locator('a[href^="/volunteers/avatar-attendee-3?"]'),
     });
     await expect(newMedicDirectoryRow).toHaveCount(1);
     await expect(newMedicDirectoryRow).toContainText("New volunteer");

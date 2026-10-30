@@ -100,7 +100,7 @@ test("roster links open profile pages with readable progression cards", async ({
 
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 1000 });
-    await page.goto("/manage/events");
+    await page.goto("/events");
     await expect(page.locator(".attendee-new-volunteer").first()).toHaveCSS(
       "color",
       "rgb(65, 105, 225)",
@@ -135,7 +135,7 @@ test("roster links open profile pages with readable progression cards", async ({
       path: testInfo.outputPath(`progression-roster-profile-${width}.png`),
     });
     await page.goBack();
-    await expect(page).toHaveURL(/\/manage\/events$/);
+    await expect(page).toHaveURL(/\/events$/);
   }
 
   const applicantContext = await browser.newContext();
@@ -146,7 +146,7 @@ test("roster links open profile pages with readable progression cards", async ({
     );
     for (const width of [320, 390, 1280]) {
       await page.setViewportSize({ width, height: 1000 });
-      await page.goto(`/manage/volunteers/${applicant.id}`);
+      await page.goto(`/volunteers/${applicant.id}`);
       const progression = page.locator("[data-volunteer-progression]");
       await expectReadableCards(progression);
       await expect(

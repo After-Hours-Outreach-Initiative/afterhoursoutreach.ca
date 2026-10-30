@@ -151,7 +151,7 @@ export const emailPreviews: EmailPreview[] = [
         applicationSubmittedEmail({
           applicant,
           submittedAt: "2026-10-23T18:30:00.000Z",
-          reviewUrl: `${origin}/manage/volunteers/sample-applicant`,
+          reviewUrl: `${origin}/volunteers/sample-applicant`,
         }),
         false,
         "organizer@example.invalid",

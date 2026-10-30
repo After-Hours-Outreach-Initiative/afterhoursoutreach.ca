@@ -12,7 +12,7 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -35,7 +35,7 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     });
     expect(response.status(), await response.text()).toBe(200);
   }
-  await page.goto("/manage/events?type=one-off");
+  await page.goto("/events?type=one-off");
   const cards = page.locator("[data-live-event]").filter({ hasText: label });
   const dates = await cards.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-event-start")),

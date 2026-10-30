@@ -2,6 +2,49 @@ import { expect, test } from "@playwright/test";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 import { fillDateInput } from "../helpers/date-input";
 
+test("organizers switch event views without losing filters or occurrence links", async ({
+  page,
+}) => {
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+  await page.goto("/events?occurrence=local-fixture-event-orientation");
+  const views = page.getByRole("group", { name: "View as", exact: true });
+  const organizer = views.getByRole("link", { name: "Organizer", exact: true });
+  const volunteer = views.getByRole("link", { name: "Volunteer", exact: true });
+  await expect(organizer).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.locator('[data-show-dialog="event-editor-new"]'),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /^Orientations \(/ }).click();
+  await expect(volunteer).toHaveAttribute("href", /view=volunteer/);
+  await volunteer.click();
+  expect(new URL(page.url()).searchParams.get("type")).toBe("orientation");
+  expect(new URL(page.url()).searchParams.get("occurrence")).toBe(
+    "local-fixture-event-orientation",
+  );
+  await expect(volunteer).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("[data-event-calendar]")).toBeVisible();
+  await expect(
+    page.locator("[data-event-save], [data-manage-signup]"),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: /^All \(/ }).click();
+  await organizer.click();
+  expect(new URL(page.url()).searchParams.has("type")).toBe(false);
+  await expect(organizer).toHaveAttribute("aria-current", "page");
+  await page.getByRole("button", { name: /^One-off events \(/ }).click();
+  await volunteer.click();
+  await expect(page.getByRole("button", { name: /^All \(/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator('a[href^="/manage"]')).toHaveCount(0);
+});
+
 test("meeting and volunteer-limit defaults are submitted without replacing drafts or saved values", async ({
   page,
 }) => {
@@ -10,7 +53,7 @@ test("meeting and volunteer-limit defaults are submitted without replacing draft
   await profiles
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   const create = page.locator('[data-show-dialog="event-editor-new"]');
   await create.click();
   const dialog = page.getByRole("dialog", {

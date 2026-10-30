@@ -200,7 +200,7 @@ test("other viewers see signups and cancellations through polling without losing
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -423,7 +423,7 @@ test("filter counts track grouped series, polling, actions and past events", asy
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
   const filters = page.getByRole("group", { name: "Filter events" });
   await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
   const counts = filters.locator("[data-event-filter-count]");
@@ -556,7 +556,7 @@ test("filter counts track grouped series, polling, actions and past events", asy
     .click();
   await expect(pastOccurrence).toBeVisible();
   await page.goto(
-    `/manage/events?type=recurring&occurrence=${encodeURIComponent(occurrenceId)}`,
+    `/events?type=recurring&occurrence=${encodeURIComponent(occurrenceId)}`,
   );
   await expect(pastOccurrence).toBeVisible();
   await expect(
@@ -566,7 +566,7 @@ test("filter counts track grouped series, polling, actions and past events", asy
     series.getByRole("button", { name: "Edit series", exact: true }),
   ).toBeVisible();
 
-  await page.goto("/events?type=orientation");
+  await page.goto("/events?view=volunteer&type=orientation");
   const cards = page.locator("[data-live-event]");
   expect(
     await page.locator("[data-past-event-list] > li").count(),

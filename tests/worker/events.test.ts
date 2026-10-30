@@ -261,10 +261,10 @@ describe(
         403,
       );
       await ok(
-        await send(`/manage/volunteers/${alice.id}`, undefined, alice.cookie),
+        await send(`/volunteers/${alice.id}`, undefined, alice.cookie),
         403,
       );
-      await ok(await send("/manage/volunteers"), 302);
+      await ok(await send("/volunteers"), 302);
     });
 
     const createEvent = async (type = "orientation", spots = 5) => {
@@ -577,11 +577,7 @@ describe(
           ),
         );
         const response = await ok(
-          await send(
-            `/manage/volunteers/${alice.id}`,
-            undefined,
-            organizer.cookie,
-          ),
+          await send(`/volunteers/${alice.id}`, undefined, organizer.cookie),
         );
         const profileHtml = await response.text();
         assert.match(profileHtml, /PRIVATE HEALTH ANSWER/);
@@ -598,7 +594,7 @@ describe(
         );
         assert.equal(response.headers.get("referrer-policy"), "no-referrer");
         const team = await ok(
-          await send("/manage/volunteers", undefined, organizer.cookie),
+          await send("/volunteers", undefined, organizer.cookie),
         );
         assert.doesNotMatch(await team.text(), /PRIVATE HEALTH ANSWER/);
       });
@@ -1067,7 +1063,7 @@ describe(
           0,
         );
         bob.cookie = await signIn(bob.email);
-        await ok(await send("/manage/volunteers", undefined, bob.cookie));
+        await ok(await send("/volunteers", undefined, bob.cookie));
         await ok(
           await send(
             "/api/v1/organizer/action",
@@ -1086,7 +1082,7 @@ describe(
           0,
         );
         bob.cookie = await signIn(bob.email);
-        await ok(await send("/manage/volunteers", undefined, bob.cookie), 403);
+        await ok(await send("/volunteers", undefined, bob.cookie), 403);
         const audit = await DB.prepare(
           "SELECT changed_fields FROM audit_log WHERE action='role_changed' AND subject_id=?",
         )
@@ -1162,7 +1158,7 @@ describe(
           };
           await page.route("**/_astro/*.js", holdScripts);
           try {
-            await page.goto(`${origin}/manage/volunteers/${alice.id}`, {
+            await page.goto(`${origin}/volunteers/${alice.id}`, {
               waitUntil: "commit",
             });
             await expect(page.getByLabel("Account role")).toBeDisabled();
@@ -1191,14 +1187,14 @@ describe(
             "Sample Organizer",
           );
           await account.waitFor();
-          await page.goto(`${origin}/manage/volunteers`);
+          await page.goto(`${origin}/volunteers`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
           const teamSearch = page.getByRole("searchbox", {
             name: "Find a volunteer",
           });
           await teamSearch.fill("Sample Alice");
-          await page.waitForURL(`${origin}/manage/volunteers?q=Sample+Alice`);
+          await page.waitForURL(`${origin}/volunteers?q=Sample+Alice`);
           await page
             .locator("[data-volunteer-results]")
             .getByRole("link", { name: "Sample Alice", exact: true })
@@ -1221,7 +1217,7 @@ describe(
           assert.match(await profileView.innerText(), /PRIVATE HEALTH ANSWER/);
           await expect(
             page.getByRole("link", { name: "Back to volunteers" }),
-          ).toHaveAttribute("href", "/manage/volunteers?q=Sample+Alice");
+          ).toHaveAttribute("href", "/volunteers?q=Sample+Alice");
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
             form: profileView.locator(
@@ -1284,7 +1280,7 @@ describe(
               .first(),
             { active: 0, approved: 1 },
           );
-          await page.goto(`${origin}/manage/volunteers/${alice.id}`);
+          await page.goto(`${origin}/volunteers/${alice.id}`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
           await inPlaceAction(page, {
@@ -1312,7 +1308,7 @@ describe(
               .first(),
             { active: 1, approved: 1 },
           );
-          await page.goto(`${origin}/manage/volunteers?q=Sample+Alice`);
+          await page.goto(`${origin}/volunteers?q=Sample+Alice`);
           await page
             .getByRole("link", {
               name: "Sample Alice",
@@ -1383,7 +1379,7 @@ describe(
           ).toBeEnabled();
           await page.unroute("**/api/v1/organizer/action");
           alice.cookie = await signIn(alice.email);
-          await page.goto(`${origin}/manage/events`);
+          await page.goto(`${origin}/events`);
           await page.locator('[data-show-dialog="event-editor-new"]').click();
           const dialog = page.getByRole("dialog", {
             name: "Create event",
@@ -1667,7 +1663,7 @@ describe(
             0,
           );
           routeCookie = organizer.cookie;
-          await page.goto(`${origin}/manage/events`);
+          await page.goto(`${origin}/events`);
           await card.locator(".volunteer-roster > summary").click();
           await card.locator("[data-signup-menu-trigger]").click();
           await card
@@ -1861,7 +1857,7 @@ describe(
           await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
             .bind(Date.now() - 1000, attendance.id)
             .run();
-          await page.goto(`${origin}/manage/events`);
+          await page.goto(`${origin}/events`);
           const attendanceCard = page.locator(
             `[data-live-event="${attendance.id}"]`,
           );

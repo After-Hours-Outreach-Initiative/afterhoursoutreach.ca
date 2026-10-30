@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
   await expect(page.locator("[data-event-list]")).toBeVisible();
-  await page.goto("/manage/events");
+  await page.goto("/events");
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -106,7 +106,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
     version++;
     await route.fulfill({ json: { message: "Volunteer access saved." } });
   });
-  await page.route("**/manage/volunteers/local-fixture-user-robin", (route) =>
+  await page.route("**/volunteers/local-fixture-user-robin", (route) =>
     route.request().isNavigationRequest()
       ? route.continue()
       : route.fulfill({
@@ -114,7 +114,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
           body: profile(),
         }),
   );
-  await page.goto("/manage/volunteers/local-fixture-user-robin");
+  await page.goto("/volunteers/local-fixture-user-robin");
   await expect(page.locator("[data-volunteer-control]").first()).toBeEnabled();
   await page.evaluate((html) => {
     const replacement = document.createElement("div");
@@ -195,9 +195,7 @@ test("organizer email choice defaults to no email and cancellation restores cont
     page.getByRole("dialog", { name: "Test email outcome", exact: true }),
   ).toHaveCount(0);
   await expect(profilePage).toBeVisible();
-  await expect(page).toHaveURL(
-    /\/manage\/volunteers\/local-fixture-user-robin$/,
-  );
+  await expect(page).toHaveURL(/\/volunteers\/local-fixture-user-robin$/);
   await expect(
     page.getByRole("dialog", { name: /volunteer profile/i }),
   ).toHaveCount(0);

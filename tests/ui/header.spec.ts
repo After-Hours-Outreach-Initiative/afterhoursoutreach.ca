@@ -1,12 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 import { profileWriteBody } from "../helpers/profile-write";
-import { createLocalAccount, sampleAnswers } from "../helpers/local-account";
+import {
+  createLocalAccount,
+  openLocalAccountSwitcher,
+  sampleAnswers,
+} from "../helpers/local-account";
 
 async function viewAs(page: Page, origin: string, organizer: boolean) {
   const response = await page.request.post("/api/v1/auth/dev/switch-user", {
     headers: { origin },
     data: {
-      userId: `local-fixture-user-${organizer ? "robin" : "casey"}`,
+      userId: `local-fixture-user-${organizer ? "robin" : "dana"}`,
       returnTo: "/events",
     },
   });
@@ -28,10 +32,7 @@ test.beforeAll(async ({ browser, baseURL }) => {
   try {
     const page = await context.newPage();
     await page.goto("/volunteer");
-    await expect(page.locator("[data-view-as]")).toHaveAttribute(
-      "aria-busy",
-      "false",
-    );
+    await openLocalAccountSwitcher(page);
   } finally {
     await context.close();
   }
@@ -76,7 +77,7 @@ for (const width of [1280, 375]) {
                     ? "[data-account-menu-name]"
                     : "[data-account-greeting]",
                 ),
-              ).toHaveText("Casey Lee");
+              ).toHaveText("Dana Whitfield");
               for (const discord of await header
                 .locator("[data-header-discord]")
                 .all())
@@ -86,7 +87,7 @@ for (const width of [1280, 375]) {
               await expect(
                 header.getByRole("link", { name: "Join Discord", exact: true }),
               ).toBeVisible();
-              expect(await response!.text()).not.toContain("Casey Lee");
+              expect(await response!.text()).not.toContain("Dana Whitfield");
             }
           }
         }
@@ -112,7 +113,7 @@ test("public headers need no browser-side session lookup", async ({
   for (const reload of [false, true]) {
     const response = reload ? await page.reload() : await page.goto("/about");
     expect(await response!.text()).toContain(
-      'aria-label="Account for Casey Lee"',
+      'aria-label="Account for Dana Whitfield"',
     );
     await expect(page.locator("[data-header-account]")).toBeVisible();
   }
@@ -256,7 +257,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       account.locator(
         mobile ? "[data-account-menu-name]" : "[data-account-greeting]",
       ),
-    ).toHaveText("Casey Lee");
+    ).toHaveText("Dana Whitfield");
     for (const discord of await header.locator("[data-header-discord]").all())
       await expect(discord).toBeHidden();
     await expect(
@@ -292,73 +293,23 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(
       navigation.getByRole("link", { name: "Events", exact: true }),
     ).toBeVisible();
-    const manage = navigation.getByRole("button", {
-      name: "Manage",
-      exact: true,
-    });
-    const manageMenu = manage.locator("..");
-    await manage.hover();
-    if (mobile) {
-      await expect(manage).toHaveAttribute("aria-expanded", "true");
-      await expect(
-        manageMenu.getByRole("link", { name: "Volunteers", exact: true }),
-      ).toBeVisible();
-      await manage.click();
-      await expect(manage).toHaveAttribute("aria-expanded", "false");
-      await manage.click();
-      await expect(manage).toHaveAttribute("aria-expanded", "true");
-      await manage.click();
-    } else {
-      await expect(manageMenu).toHaveAttribute("open", "");
-      await expect(manage).toHaveAttribute("aria-expanded", "true");
-      const triggerBox = (await manage.boundingBox())!;
-      const dropdownBox = (await manageMenu.locator("ul").boundingBox())!;
-      await page.mouse.move(
-        triggerBox.x + triggerBox.width / 2,
-        (triggerBox.y + triggerBox.height + dropdownBox.y) / 2,
-        { steps: 5 },
-      );
-      await expect(manageMenu).toHaveAttribute("open", "");
-      await manageMenu
-        .getByRole("link", { name: "Events", exact: true })
-        .hover();
-      await expect(manage).toHaveAttribute("aria-expanded", "true");
-      await page.mouse.move(0, 0);
-      await expect(manage).toHaveAttribute("aria-expanded", "false");
-      await manage.hover();
-      await manage.click();
-      await expect(manageMenu).not.toHaveAttribute("open");
-      await expect(manage).toHaveAttribute("aria-expanded", "false");
-      await manage.click();
-      await page.mouse.move(0, 0);
-      await expect(manage).toHaveAttribute("aria-expanded", "true");
-      await manage.press("Escape");
-    }
-    await manage.focus();
-    await manage.press("Enter");
-    await expect(manage).toHaveAttribute("aria-expanded", "true");
     await expect(
-      manageMenu.getByRole("link", { name: "Events", exact: true }),
-    ).toHaveAttribute("href", "/manage/events");
-    if (mobile) {
-      await expect(header.locator(".mobile-nav")).toHaveAttribute("open", "");
-      await expect(manage).toHaveCSS("border-bottom-width", "1px");
-      for (const child of await manageMenu.locator("a").all()) {
-        await expect(child).toHaveCSS("border-top-width", "0px");
-        await expect(child).toHaveCSS("border-bottom-width", "0px");
-      }
-    }
+      navigation.getByRole("button", { name: "Manage", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("link", { name: "Applications", exact: true }),
+    ).toHaveAttribute("href", "/applications");
     const volunteersLink = navigation.getByRole("link", {
       name: "Volunteers",
       exact: true,
     });
-    await expect(volunteersLink).toHaveAttribute("href", "/manage/volunteers");
+    await expect(volunteersLink).toHaveAttribute("href", "/volunteers");
     await expect(volunteersLink).toHaveCSS(
       "font-size",
-      mobile ? "18px" : "16px",
+      mobile ? "20px" : "16px",
     );
     await volunteersLink.click();
-    await expect(page).toHaveURL(/\/manage\/volunteers$/);
+    await expect(page).toHaveURL(/\/volunteers$/);
     await page.waitForLoadState("load");
     await expect(page.locator("[data-volunteer-browser]")).toBeVisible();
     await expect(
@@ -370,13 +321,6 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       await toggle.click();
       await expect(toggle).toHaveAttribute("aria-expanded", "true");
     }
-    await manage.focus();
-    if (mobile) {
-      await expect(manage).toHaveAttribute("aria-expanded", "true");
-      await manage.press("Enter");
-      await expect(manage).toHaveAttribute("aria-expanded", "false");
-    }
-    await manage.press("Enter");
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveAttribute("aria-current", "page");
@@ -384,9 +328,6 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     await expect(
       navigation.getByRole("link", { name: "Volunteers", exact: true }),
     ).toHaveCSS("color", mobile ? "rgb(212, 212, 216)" : "rgb(255, 255, 255)");
-    await page.keyboard.press("Escape");
-    await expect(manage).toBeFocused();
-    await expect(manage).toHaveAttribute("aria-expanded", "false");
     if (mobile) await expect(toggle).toHaveAttribute("aria-expanded", "true");
 
     await expect(
@@ -768,7 +709,7 @@ test("organizer Volunteers heading matches the Events heading", async ({
   baseURL,
 }) => {
   await viewAs(page, baseURL!, true);
-  await page.goto("/events");
+  await page.goto("/events?view=volunteer");
   const events = page.getByRole("heading", {
     name: "Events",
     level: 2,
@@ -777,7 +718,7 @@ test("organizer Volunteers heading matches the Events heading", async ({
   const size = await events.evaluate(
     (element) => getComputedStyle(element).fontSize,
   );
-  await page.goto("/manage/volunteers");
+  await page.goto("/volunteers");
   const volunteers = page.getByRole("heading", {
     name: "Volunteers",
     level: 2,

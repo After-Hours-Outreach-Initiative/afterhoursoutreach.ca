@@ -168,7 +168,7 @@ test("SQL-composed messages and pure formatting produce identical text", () => {
     const values = {
       applicant: "Sample O'Neil\r\n{{reviewUrl}}",
       submittedAt: "2026-10-23T18:30:00.000Z",
-      reviewUrl: `${origin}/manage/volunteers/sample`,
+      reviewUrl: `${origin}/volunteers/sample`,
     };
     const submissionSql = emailTextSql(applicationSubmittedTemplate.text, {
       applicant: "replace(replace(?,char(13),' '),char(10),' ')",
