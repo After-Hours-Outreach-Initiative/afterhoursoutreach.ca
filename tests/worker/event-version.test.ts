@@ -304,18 +304,21 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     const renamedRosterVersion = await readVersion(organizerCookie);
     expect(renamedRosterVersion).not.toBe(browsingVersion);
     expect(renamedRosterVersion).toBe(await listingVersion(organizerCookie));
-    expect(await readVersion(attendee.cookie)).toBe(volunteerBrowsingVersion);
+    const preferredPublicVersion = await readVersion(attendee.cookie);
+    expect(preferredPublicVersion).not.toBe(volunteerBrowsingVersion);
+    expect(preferredPublicVersion).toBe(await listingVersion(attendee.cookie));
     await DB.prepare("UPDATE profile SET first_name='Changed' WHERE user_id=?")
       .bind(attendee.id)
       .run();
     const renamedPublicVersion = await readVersion(attendee.cookie);
-    expect(renamedPublicVersion).not.toBe(volunteerBrowsingVersion);
+    expect(renamedPublicVersion).toBe(preferredPublicVersion);
     expect(renamedPublicVersion).toBe(await listingVersion(attendee.cookie));
     const publicHtml = await (
       await send("/events", undefined, attendee.cookie)
     ).text();
     expect(publicHtml).toContain("public-event-roster");
-    expect(publicHtml).toContain("Changed V.");
+    expect(publicHtml).toContain("Renamed attendee V.");
+    expect(publicHtml).not.toContain("Changed V.");
     expect(publicHtml).not.toMatch(
       /data-volunteer-profile-link|data-manage-signup/,
     );

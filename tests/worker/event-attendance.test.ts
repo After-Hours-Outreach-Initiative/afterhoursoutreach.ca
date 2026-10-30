@@ -55,13 +55,18 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
     await DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
       .bind(organizer.id)
       .run();
-    const personStatements = (id: string, first: string, medic: boolean) => [
+    const personStatements = (
+      id: string,
+      first: string,
+      medic: boolean,
+      preferred = "",
+    ) => [
       DB.prepare(
         `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,
         emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,
         motivation,teams,medical_certification,training_experience,medical_conditions,registered_at,updated_at)
-        VALUES (?,?,'PrivateSurname','PRIVATE FULL NAME','PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None','PRIVATE HEALTH',0,0)`,
-      ).bind(id, first, medic ? '["medic"]' : "[]"),
+        VALUES (?,?,'PrivateSurname',?,'PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None','PRIVATE HEALTH',0,0)`,
+      ).bind(id, first, preferred, medic ? '["medic"]' : "[]"),
       DB.prepare(
         "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,1,?,0,0)",
       ).bind(id, organizer.id),
@@ -126,6 +131,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           id,
           index === 0 ? "Medic" : `Member${index}`,
           index < 3 || index === 3,
+          index === 1 ? " MJ " : "",
         ),
       ]);
       if (index >= 3 && index < 6)
@@ -159,6 +165,8 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
       /PRIVATE|PrivateSurname|avatar-attendee|data-manage-signup|data-volunteer-profile-link/,
     );
     expect(html).toContain("Medic P.");
+    expect(html).toContain("MJ P.");
+    expect(html).not.toContain("Member1 P.");
     const version = async () =>
       (
         (await (
@@ -530,6 +538,21 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             await expect(roster).toHaveAttribute("open", "");
             await expect(roster.locator("summary")).toBeFocused();
           }
+        }
+        const expandedRoster = card.locator(rosterSelector);
+        await expect(expandedRoster).toContainText("MJ P.");
+        await expect(expandedRoster).not.toContainText("PrivateSurname");
+        if (manage) {
+          await expect(
+            expandedRoster.locator(
+              'a[href="/manage/volunteers/avatar-attendee-1"]',
+            ),
+          ).toHaveText("MJ P.");
+          await expect(
+            expandedRoster.locator(
+              'a[href="/manage/volunteers/avatar-attendee-0"]',
+            ),
+          ).toHaveText(publicName);
         }
         expect(
           await page.evaluate(

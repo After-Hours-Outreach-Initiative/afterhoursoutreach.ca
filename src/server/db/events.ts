@@ -156,6 +156,12 @@ export interface PublicRoster {
   // Opaque membership digest catches swaps even when abbreviated names match.
   version: string;
 }
+interface AttendeeNameRow {
+  firstName: string | null;
+  lastName: string | null;
+  preferredName: string | null;
+  legacyName: string;
+}
 const eventColumns = `
   e.id, CASE WHEN ${includesOrientationSql()} THEN 'orientation' ELSE 'patrol' END AS type,
   ${includesOrientationSql()} AS includesOrientation, e.starts_at AS startsAt,
@@ -870,7 +876,8 @@ export async function listPublicRosters(
   const rows = await db
     .prepare(
       `SELECT s.id AS membership, s.user_id AS attendeeIdentity, s.event_id AS eventId,
-    p.first_name AS firstName, p.last_name AS lastName, ${profileDisplayNameSql} AS legacyName,
+    p.first_name AS firstName, p.last_name AS lastName, p.preferred_name AS preferredName,
+    ${profileDisplayNameSql} AS legacyName,
     ${attendeeCategorySql("s.user_id")} AS category
     FROM signup s JOIN event e ON e.id = s.event_id
     JOIN profile p ON p.user_id = s.user_id JOIN user u ON u.id = s.user_id
@@ -887,18 +894,22 @@ export async function listPublicRosters(
     )
     // One JSON binding keeps a full 100-event page below D1's 100-parameter limit.
     .bind(JSON.stringify(ids), actor.id, actor.id)
-    .all<{
-      membership: string;
-      attendeeIdentity: string;
-      eventId: string;
-      firstName: string | null;
-      lastName: string | null;
-      legacyName: string;
-      category: AttendeeCategory;
-    }>();
+    .all<
+      AttendeeNameRow & {
+        membership: string;
+        attendeeIdentity: string;
+        eventId: string;
+        category: AttendeeCategory;
+      }
+    >();
   const people = rows.results.map((row) => ({
     eventId: row.eventId,
-    name: publicAttendeeName(row.firstName, row.lastName, row.legacyName),
+    name: publicAttendeeName(
+      row.firstName,
+      row.lastName,
+      row.legacyName,
+      row.preferredName,
+    ),
     category: row.category,
   }));
   const digest = await crypto.subtle.digest(
@@ -932,7 +943,9 @@ export async function listRosters(
   const ids = eventIds.slice(0, 200);
   const rows = await db
     .prepare(
-      `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, ${profileDisplayNameSql} AS name,
+      `SELECT s.id, s.event_id AS eventId, s.user_id AS userId,
+        p.first_name AS firstName, p.last_name AS lastName, p.preferred_name AS preferredName,
+        ${profileDisplayNameSql} AS legacyName,
         ${attendeeCategorySql("s.user_id")} AS category,
          v.patrol_approved AS patrolApproved, v.updated_at AS statusVersion,
          EXISTS(SELECT 1 FROM orientation_completion o
@@ -943,12 +956,17 @@ export async function listRosters(
        JOIN user u ON u.id = s.user_id
        JOIN volunteer_status v ON v.user_id = s.user_id
        WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'
-       ORDER BY name
+       ORDER BY legacyName
        LIMIT 20000`,
     )
     .bind(JSON.stringify(ids))
-    .all<RosterRow>();
-  return rows.results;
+    .all<Omit<RosterRow, "name"> & AttendeeNameRow>();
+  return rows.results.map(
+    ({ firstName, lastName, preferredName, legacyName, ...person }) => ({
+      ...person,
+      name: publicAttendeeName(firstName, lastName, legacyName, preferredName),
+    }),
+  );
 }
 
 export async function manageSignup(

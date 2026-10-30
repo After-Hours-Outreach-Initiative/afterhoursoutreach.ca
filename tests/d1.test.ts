@@ -277,7 +277,7 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
       env.DB.prepare(
         `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,emergency_contact_name,
         emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,medical_certification,training_experience,registered_at,updated_at)
-        VALUES (?, 'Alice', 'PrivateSurname', 'PRIVATE FULL NAME', 'PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None',0,0)`,
+        VALUES (?, 'Alice', 'PrivateSurname', ' Ally ', 'PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None',0,0)`,
       ).bind(id, id.startsWith("medic") ? '["medic"]' : "[]"),
       env.DB.prepare(
         "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,?,'organizer',0,0)",
@@ -327,7 +327,7 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
   assert.ok(
     roster.people.every(
       (row) =>
-        row.name === "Alice P." &&
+        row.name === "Ally P." &&
         Object.keys(row).sort().join() === "category,eventId,name",
     ),
   );
@@ -341,6 +341,29 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     ]),
     statusError(403),
   );
+  for (const [preferredName, expectedName] of [
+    [" AJ ", "AJ P."],
+    ["  ", "Alice P."],
+    ["", "Alice P."],
+    [" Ally ", "Ally P."],
+  ]) {
+    await env.DB.prepare("UPDATE profile SET preferred_name=?")
+      .bind(preferredName)
+      .run();
+    const publicRoster = await listPublicRosters(env.DB, people[0], ["target"]);
+    assert.ok(publicRoster.people.every(({ name }) => name === expectedName));
+    assert.equal(
+      publicRoster.version === roster.version,
+      expectedName === "Ally P.",
+    );
+    const organizerRoster = await listRosters(env.DB, organizer, ["target"]);
+    assert.equal(organizerRoster.length, 5);
+    assert.ok(organizerRoster.every(({ name }) => name === expectedName));
+    assert.doesNotMatch(
+      JSON.stringify(organizerRoster),
+      /PrivateSurname|firstName|lastName|preferredName|legacyName/,
+    );
+  }
   const general = people[generals[0].status === "rejected" ? 0 : 1];
   const bookedGeneral = people[generals[0].status === "fulfilled" ? 0 : 1];
   // Same signup, abbreviated name and category: reassignment must still change

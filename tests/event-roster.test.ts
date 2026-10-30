@@ -12,3 +12,29 @@ test("public rosters use first names and last initials, with an abbreviated lega
   expect(publicAttendeeName(null, null, " ")).toBe("Outreach Volunteer");
   expect(publicAttendeeName("Élodie", "李", "Ignored")).toBe("Élodie 李.");
 });
+
+test("rosters prefer a defined preferred name and keep the last name abbreviated", () => {
+  expect(
+    publicAttendeeName("Alice", "PrivateSurname", "Ignored", " Ally "),
+  ).toBe("Ally P.");
+  expect(publicAttendeeName("Mary", "Jones", "Ignored", "Mary Jane")).toBe(
+    "Mary Jane J.",
+  );
+  for (const preferredName of [null, "", "  "])
+    expect(
+      publicAttendeeName(
+        " Alice ",
+        " PrivateSurname ",
+        "Ignored",
+        preferredName,
+      ),
+    ).toBe("Alice P.");
+  expect(
+    publicAttendeeName(
+      null,
+      null,
+      "Legacy Middle PrivateSurname",
+      "Legacy Middle PrivateSurname",
+    ),
+  ).toBe("Legacy P.");
+});
