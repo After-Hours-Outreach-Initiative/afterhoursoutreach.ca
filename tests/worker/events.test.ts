@@ -1670,14 +1670,14 @@ describe(
             .getByRole("menuitem", { name: "Move volunteer", exact: true })
             .click();
           const signupDialog = page.getByRole("dialog", {
-            name: "Change a registration",
+            name: "Move volunteer",
             exact: true,
           });
           const sourceId = (await card.getAttribute("data-live-event"))!;
           const destinationId =
             (await destinationCard.getAttribute("data-live-event"))!;
           await signupDialog
-            .getByLabel("Destination")
+            .getByLabel("Destination", { exact: true })
             .selectOption(destinationId);
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
@@ -1686,7 +1686,7 @@ describe(
             trigger: () =>
               signupDialog
                 .getByRole("button", {
-                  name: "Save change",
+                  name: "Move volunteer",
                   exact: true,
                 })
                 .click(),
@@ -1749,14 +1749,16 @@ describe(
           await destinationCard
             .getByRole("menuitem", { name: "Move volunteer", exact: true })
             .click();
-          await signupDialog.getByLabel("Destination").selectOption(sourceId);
+          await signupDialog
+            .getByLabel("Destination", { exact: true })
+            .selectOption(sourceId);
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
             form: signupDialog.locator("[data-manage-signup]"),
             trigger: () =>
               signupDialog
                 .getByRole("button", {
-                  name: "Save change",
+                  name: "Move volunteer",
                   exact: true,
                 })
                 .click(),
@@ -1768,31 +1770,35 @@ describe(
                 destinationCard.locator(".volunteer-roster"),
               ).toHaveCount(0);
             },
-            loadingLabel: "Saving…",
+            loadingLabel: "Moving…",
           });
           await card.locator(".volunteer-roster > summary").click();
           await card.locator("[data-signup-menu-trigger]").click();
           await card
             .getByRole("menuitem", { name: "Remove volunteer", exact: true })
             .click();
-          await signupDialog
+          const removeSignupDialog = page.getByRole("dialog", {
+            name: "Remove volunteer",
+            exact: true,
+          });
+          await removeSignupDialog
             .getByLabel("Reason (optional)")
             .fill("Browser-tested cancellation");
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
-            form: signupDialog.locator("[data-manage-signup]"),
+            form: removeSignupDialog.locator("[data-manage-signup]"),
             trigger: () =>
-              signupDialog
+              removeSignupDialog
                 .getByRole("button", {
-                  name: "Save change",
+                  name: "Remove volunteer",
                   exact: true,
                 })
                 .click(),
             updated: () =>
               expect(card.locator(".volunteer-roster")).toHaveCount(0),
-            loadingLabel: "Saving…",
+            loadingLabel: "Removing…",
           });
-          assert.equal(await signupDialog.isVisible(), false);
+          assert.equal(await removeSignupDialog.isVisible(), false);
           routeCookie = bob.cookie;
           await page.goto(`${origin}/events`);
           await changeSpot("join", () =>

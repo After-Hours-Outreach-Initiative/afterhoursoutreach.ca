@@ -98,7 +98,11 @@ const registrationDateFormat = new Intl.DateTimeFormat("en-CA", {
             </th>
             {future && (
               <td class="event-roster-actions">
-                <SignupEditor signup={person} destinations={destinations} />
+                <SignupEditor
+                  signup={person}
+                  event={event}
+                  destinations={destinations}
+                />
               </td>
             )}
           </tr>

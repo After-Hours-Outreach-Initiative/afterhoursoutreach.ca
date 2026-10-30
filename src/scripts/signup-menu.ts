@@ -75,12 +75,6 @@ export function initSignupMenus() {
     if (!item || !menu) return;
     const dialog = document.getElementById(item.dataset.showDialog ?? "");
     if (!(dialog instanceof HTMLDialogElement)) return;
-    const destination = dialog.querySelector('[name="destination"]');
-    if (destination instanceof HTMLSelectElement)
-      destination.value =
-        item.dataset.signupChange === "move"
-          ? (destination.options[1]?.value ?? "")
-          : "";
     menu.hidePopover();
     // The existing dialog handler runs next. Native dialog close will then
     // restore focus to this visible invoker rather than a hidden menu item.

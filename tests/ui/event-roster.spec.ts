@@ -489,7 +489,7 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
       await expect(remove).toBeFocused();
       await remove.press("Enter");
       const dialog = page.getByRole("dialog", {
-        name: "Change a registration",
+        name: "Remove volunteer",
       });
       await expect(dialog).toBeVisible();
       await expect(dialog.locator(".dialog-body")).toHaveCSS(
@@ -497,18 +497,28 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         "left",
       );
       await expect(
-        dialog.locator('label:has(select[name="destination"])'),
+        dialog.locator('label[for^="signup-remove-reason-"]'),
       ).toHaveCSS("text-align", "left");
-      await expect(dialog.locator('label[for^="signup-reason-"]')).toHaveCSS(
-        "text-align",
-        "left",
-      );
-      await expect(dialog.getByLabel("Destination")).toHaveValue("");
+      await expect(
+        dialog.locator("select, [data-signup-move-calendar]"),
+      ).toHaveCount(0);
+      await expect(
+        dialog.getByRole("button", { name: "Remove volunteer", exact: true }),
+      ).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(trigger).toBeFocused();
       await trigger.click();
       await move.click();
-      await expect(dialog.getByLabel("Destination")).not.toHaveValue("");
+      const moveDialog = page.getByRole("dialog", {
+        name: "Move volunteer",
+        exact: true,
+      });
+      await expect(
+        moveDialog.getByLabel("Destination", { exact: true }),
+      ).toHaveValue("");
+      await expect(
+        moveDialog.locator("[data-signup-move-calendar]"),
+      ).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(trigger).toBeFocused();
       await trigger.click();
@@ -525,5 +535,166 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
     expect(denied.status()).toBe(403);
   } finally {
     await viewerContext.close();
+  }
+});
+
+test("move calendar and destination select stay synchronized across months and same-day events", async ({
+  page,
+  baseURL,
+}) => {
+  test.skip(
+    !baseURL?.startsWith("http://localhost:"),
+    "Local D1 development only",
+  );
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await page.getByRole("link", { name: "Organizer", exact: true }).click();
+  const year = new Date().getUTCFullYear() + 1;
+  const prefix = `Move calendar ${crypto.randomUUID()}`;
+  const events = [
+    ["source", `${year}-12-12T20:00:00Z`],
+    ["same-date", `${year}-12-12T21:00:00Z`],
+    ["first", `${year}-12-13T20:00:00Z`],
+    ["second", `${year}-12-13T21:00:00Z`],
+    ["next-month", `${year + 1}-01-10T20:00:00Z`],
+  ];
+  for (const [name, startsAt] of events) {
+    const response = await page.request.post("/api/v1/events/action", {
+      headers: { origin: baseURL! },
+      data: {
+        action: "save",
+        event: {
+          includesOrientation: false,
+          startsAt,
+          meetingPoint: `${prefix} ${name}`,
+          meetingPointUrl: "",
+          spots: 8,
+          open: true,
+          hidden: false,
+        },
+      },
+    });
+    expect(response.status(), await response.text()).toBe(200);
+  }
+  await page.reload();
+  const ids: string[] = [];
+  for (const [name] of events)
+    ids.push(
+      (await page
+        .locator("[data-live-event]")
+        .filter({ hasText: `${prefix} ${name}` })
+        .getAttribute("data-live-event"))!,
+    );
+  const joined = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: { action: "join", id: ids[0] },
+  });
+  expect(joined.status(), await joined.text()).toBe(200);
+  await page.reload();
+  const card = page.locator(`[data-live-event="${ids[0]}"]`);
+  await card.locator(".volunteer-roster > summary").click();
+  const trigger = card.locator("[data-signup-menu-trigger]");
+  await trigger.click();
+  await card
+    .getByRole("menuitem", { name: "Move volunteer", exact: true })
+    .click();
+  const move = page.getByRole("dialog", {
+    name: "Move volunteer",
+    exact: true,
+  });
+  const calendar = move.locator("[data-signup-move-calendar]");
+  const select = move.getByLabel("Destination", { exact: true });
+  const destination = (index: number) =>
+    calendar.locator(`[data-signup-destination="${ids[index]}"]`);
+  await expect(calendar.locator("[data-signup-month-label]")).toHaveText(
+    `December ${year}`,
+  );
+  await expect(calendar.locator("[data-signup-current]")).toBeDisabled();
+  await expect(calendar.locator("[data-signup-current]")).toHaveAccessibleName(
+    /Current event \(not selectable\)/,
+  );
+  await expect(
+    calendar.locator("[data-signup-current] .event-calendar-circle"),
+  ).toHaveCSS("background-color", "rgb(39, 39, 42)");
+  expect(
+    await select.evaluate(
+      (element) =>
+        element instanceof HTMLSelectElement && element.checkValidity(),
+    ),
+  ).toBe(false);
+  await expect(select.locator(`option[value="${ids[0]}"]`)).toHaveCount(0);
+  expect(
+    await move.evaluate(
+      (dialog) =>
+        dialog
+          .querySelector("[data-signup-move-calendar]")!
+          .compareDocumentPosition(dialog.querySelector("select")!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ),
+  ).toBeTruthy();
+  // The source marker is disabled, but other events on its date remain valid.
+  await destination(1).click();
+  await expect(select).toHaveValue(ids[1]);
+  await expect(destination(1)).toHaveAttribute("aria-pressed", "true");
+  await destination(2).focus();
+  await destination(2).press("Enter");
+  await expect(select).toHaveValue(ids[2]);
+  await expect(destination(2)).toBeFocused();
+  await destination(3).click();
+  await expect(select).toHaveValue(ids[3]);
+  await expect(destination(2)).toHaveAttribute("aria-pressed", "false");
+  await select.selectOption(ids[2]);
+  await expect(destination(2)).toHaveAttribute("aria-pressed", "true");
+  await select.selectOption(ids[4]);
+  await expect(calendar.locator("[data-signup-month-label]")).toHaveText(
+    `January ${year + 1}`,
+  );
+  await expect(destination(4)).toHaveAttribute("aria-pressed", "true");
+  await calendar.getByRole("button", { name: "Previous month" }).click();
+  await expect(select).toHaveValue(ids[4]);
+  await expect(calendar.locator("[data-signup-current]")).toBeDisabled();
+  await calendar.getByRole("button", { name: "Next month" }).click();
+  await expect(destination(4)).toHaveAttribute("aria-pressed", "true");
+  await select.selectOption(ids[3]);
+  await expect(calendar.locator("[data-signup-month-label]")).toHaveText(
+    `December ${year}`,
+  );
+  await expect(destination(3)).toHaveAttribute("aria-pressed", "true");
+  await move.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await card
+    .getByRole("menuitem", { name: "Remove volunteer", exact: true })
+    .click();
+  const remove = page.getByRole("dialog", {
+    name: "Remove volunteer",
+    exact: true,
+  });
+  await expect(remove.getByLabel("Reason (optional)")).toBeVisible();
+  await expect(
+    remove.locator("select, [name=destination], [data-signup-move-calendar]"),
+  ).toHaveCount(0);
+  await expect(
+    remove.getByRole("button", { name: "Remove volunteer", exact: true }),
+  ).toBeVisible();
+  await remove.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(trigger).toBeFocused();
+  for (const width of [1280, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await trigger.click();
+    await card
+      .getByRole("menuitem", { name: "Move volunteer", exact: true })
+      .click();
+    await expect(destination(3)).toHaveAttribute("aria-pressed", "true");
+    expect(
+      await move
+        .locator(".dialog-body")
+        .evaluate((body) => body.scrollWidth > body.clientWidth),
+    ).toBe(false);
+    await page.keyboard.press("Escape");
   }
 });

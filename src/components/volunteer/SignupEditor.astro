@@ -6,12 +6,14 @@ import DialogHeader from "@/components/DialogHeader.astro";
 import EllipsisIcon from "@/components/icons/EllipsisIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import TrashIcon from "@/components/icons/TrashIcon.astro";
+import SignupMoveCalendar from "./SignupMoveCalendar.astro";
 
 interface Props {
   signup: RosterRow;
+  event: EventRow;
   destinations: EventRow[];
 }
-const { signup, destinations } = Astro.props;
+const { signup, event, destinations } = Astro.props;
 ---
 
 <button
@@ -40,7 +42,7 @@ const { signup, destinations } = Astro.props;
     type="button"
     role="menuitem"
     tabindex="-1"
-    data-show-dialog={`signup-editor-${signup.id}`}
+    data-show-dialog={`signup-move-${signup.id}`}
     data-signup-change="move"
     disabled={destinations.length === 0}
   >
@@ -51,76 +53,103 @@ const { signup, destinations } = Astro.props;
     type="button"
     role="menuitem"
     tabindex="-1"
-    data-show-dialog={`signup-editor-${signup.id}`}
+    data-show-dialog={`signup-remove-${signup.id}`}
     data-signup-change="remove"
   >
     <TrashIcon class="size-5" />
     Remove volunteer
   </button>
 </div>
-<dialog
-  class="dialog-pop dialog-frame volunteer-dialog"
-  id={`signup-editor-${signup.id}`}
-  aria-labelledby={`signup-editor-heading-${signup.id}`}
->
-  <DialogHeader
-    id={`signup-editor-heading-${signup.id}`}
-    title="Change a registration"
-  />
-  <div class="dialog-body">
-    <p class="mb-6">{signup.name}</p>
-    <form
-      id={`signup-editor-form-${signup.id}`}
-      class="volunteer-form"
-      data-manage-signup
-      data-email-prompt="signup"
-      action="/api/v1/events/action"
-      method="post"
+{
+  (["move", "remove"] as const).map((action) => (
+    <dialog
+      class="dialog-pop dialog-frame volunteer-dialog"
+      id={`signup-${action}-${signup.id}`}
+      aria-labelledby={`signup-${action}-heading-${signup.id}`}
     >
-      <input type="hidden" name="id" value={signup.id} />
-      <label class="volunteer-field">
-        Destination
-        <select name="destination">
-          <option value="">Remove registration</option>
-          {
-            destinations.map((event) => (
-              <option value={event.id}>
-                {`Patrol${event.includesOrientation ? " (includes orientation)" : ""} · ${formatEventDate(event.startsAt)}`}
-              </option>
-            ))
-          }
-        </select>
-      </label>
-      <div class="volunteer-field">
-        <label for={`signup-reason-${signup.id}`}>Reason (optional)</label>
-        <textarea
-          id={`signup-reason-${signup.id}`}
-          name="reason"
-          aria-describedby={`error-signup-reason-${signup.id}`}
-          rows="3"
-          maxlength="1000"></textarea>
-        <FieldError
-          field={`signup-reason-${signup.id}`}
-          message="Keep the reason to 1000 characters or fewer."
-        />
+      <DialogHeader
+        id={`signup-${action}-heading-${signup.id}`}
+        title={action === "move" ? "Move volunteer" : "Remove volunteer"}
+      />
+      <div class="dialog-body">
+        <p class="mb-6">{signup.name}</p>
+        <form
+          id={`signup-${action}-form-${signup.id}`}
+          class="volunteer-form"
+          data-manage-signup
+          data-email-prompt="signup"
+          action="/api/v1/events/action"
+          method="post"
+        >
+          <input type="hidden" name="id" value={signup.id} />
+          {action === "move" && (
+            <>
+              <SignupMoveCalendar
+                id={`signup-calendar-${signup.id}`}
+                event={event}
+                destinations={destinations}
+              />
+              <div class="volunteer-field">
+                <label for={`signup-destination-${signup.id}`}>
+                  Destination
+                </label>
+                <select
+                  id={`signup-destination-${signup.id}`}
+                  name="destination"
+                  required
+                >
+                  <option value="">Choose a destination</option>
+                  {destinations.map((event) => (
+                    <option
+                      value={event.id}
+                      data-starts-at={event.startsAt}
+                      data-calendar-label={`Patrol${event.includesOrientation ? " (includes orientation)" : ""} at ${event.meetingPoint}`}
+                    >
+                      {`Patrol${event.includesOrientation ? " (includes orientation)" : ""} · ${formatEventDate(event.startsAt)}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+          <div class="volunteer-field">
+            <label for={`signup-${action}-reason-${signup.id}`}>
+              Reason (optional)
+            </label>
+            <textarea
+              id={`signup-${action}-reason-${signup.id}`}
+              name="reason"
+              aria-describedby={`error-signup-${action}-reason-${signup.id}`}
+              rows="3"
+              maxlength="1000"
+            />
+            <FieldError
+              field={`signup-${action}-reason-${signup.id}`}
+              message="Keep the reason to 1000 characters or fewer."
+            />
+          </div>
+          {!import.meta.env.DEV && (
+            <p class="volunteer-help">
+              Included in the email if you choose to send one. Do not include
+              medical or other sensitive information.
+            </p>
+          )}
+          <p data-form-message role="status" hidden />
+        </form>
       </div>
-      {
-        !import.meta.env.DEV && (
-          <p class="volunteer-help">
-            Included in the email if you choose to send one. Do not include
-            medical or other sensitive information.
-          </p>
-        )
-      }
-      <p data-form-message role="status" hidden></p>
-    </form>
-  </div>
-  <div class="dialog-footer">
-    <button
-      class="btn btn-outline"
-      type="submit"
-      form={`signup-editor-form-${signup.id}`}
-      data-loading-label="Saving…">Save change</button
-    >
-  </div>
-</dialog>
+      <div class="dialog-footer">
+        <button class="btn btn-outline" type="button" data-dismiss-dialog>
+          Cancel
+        </button>
+        <button
+          class:list={["btn", action === "move" ? "btn-outline" : "btn-red"]}
+          type="submit"
+          form={`signup-${action}-form-${signup.id}`}
+          data-loading-label={action === "move" ? "Moving…" : "Removing…"}
+        >
+          {action === "move" ? "Move volunteer" : "Remove volunteer"}
+        </button>
+      </div>
+    </dialog>
+  ))
+}

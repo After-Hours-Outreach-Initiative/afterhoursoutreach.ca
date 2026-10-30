@@ -414,7 +414,7 @@ test("application dialogs keep their chrome visible while only their body scroll
     await card.locator("[data-signup-menu-trigger]").first().click();
     await card.getByRole("menuitem", { name: "Remove volunteer" }).click();
     const registration = page.getByRole("dialog", {
-      name: "Change a registration",
+      name: "Remove volunteer",
     });
     await expectPinnedChrome(registration);
     await registration.locator(".dialog-close").click();

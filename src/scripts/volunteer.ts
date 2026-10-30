@@ -14,6 +14,10 @@ import {
 } from "./volunteer-profile-contents";
 import { initSignupMenus } from "./signup-menu";
 import {
+  initSignupMoveCalendars,
+  syncSignupMoveCalendar,
+} from "./signup-move-calendar";
+import {
   initBulkEvents,
   syncBulkEventSelection,
   clearBulkEventSelection,
@@ -76,6 +80,7 @@ for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
 initEventDates(document);
 initVolunteerProfileContents();
 initSignupMenus();
+initSignupMoveCalendars();
 
 function applyEventFilter(root: HTMLElement, type: string) {
   const selected = eventFilter(type, root.dataset.eventView === "manage");
@@ -1061,6 +1066,7 @@ document.addEventListener("click", (event) => {
     const dialog = document.getElementById(button.dataset.showDialog ?? "");
     if (dialog instanceof HTMLDialogElement) {
       initEventDates(dialog);
+      syncSignupMoveCalendar(dialog);
       dialog.showModal();
     }
   }

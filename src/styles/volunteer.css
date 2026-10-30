@@ -1913,20 +1913,21 @@ body:has(
   overflow: hidden;
   text-align: left;
 }
-.event-roster-table :is(th, td) {
+/* Dialog calendars nested in roster actions keep their own cell spacing. */
+.event-roster-table > :is(thead, tbody) > tr > :is(th, td) {
   padding: 0.625rem 0.75rem;
   vertical-align: middle;
   border-bottom: var(--volunteer-border);
   font-weight: normal;
   overflow-wrap: anywhere;
 }
-.event-roster-table tbody tr:last-child > * {
+.event-roster-table > tbody > tr:last-child > * {
   border-bottom: 0;
 }
-.event-roster-table tbody tr {
+.event-roster-table > tbody > tr {
   background: #0c0d10;
 }
-.event-roster-table tbody tr:nth-child(even) {
+.event-roster-table > tbody > tr:nth-child(even) {
   background: #171a20;
 }
 .event-roster-person {
