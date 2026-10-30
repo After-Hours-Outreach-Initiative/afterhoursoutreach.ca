@@ -59,8 +59,14 @@ test("organizers review applications separately from approved volunteers with pe
         ) VALUES (?, ?, '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', '[]', 'None', 'None', 'PRIVATE QUEUE ANSWER', 0, 0)`,
         ).bind(id, id),
         DB.prepare(
-          "INSERT INTO volunteer_status (user_id, registration_approved, updated_at) VALUES (?, ?, 0)",
-        ).bind(id, pendingIds.includes(id) ? 0 : 1),
+          "INSERT INTO volunteer_status (user_id, registration_approved, patrol_approved, approved_by, approved_at, updated_at) VALUES (?, ?, ?, ?, ?, 0)",
+        ).bind(
+          id,
+          pendingIds.includes(id) ? 0 : 1,
+          Number(id === "organizer"),
+          id === "organizer" ? id : null,
+          id === "organizer" ? 0 : null,
+        ),
       ]);
     }
     // Ready applicants have completed their steps before organizer review.
@@ -265,6 +271,47 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
       2,
     );
+    const names = page.locator("[data-volunteer-profile-link]");
+    const nameSort = page.locator('[data-volunteer-sort="name"]');
+    const roleSort = page.locator('[data-volunteer-sort="role"]');
+    const patrolSort = page.locator('[data-volunteer-sort="patrol"]');
+    await expect(nameSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await nameSort.focus();
+    await page.keyboard.press("Enter");
+    await expect(nameSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    await expect(nameSort).toBeFocused();
+    await expect(names).toHaveText(["organizer", "approved"]);
+    await roleSort.click();
+    await expect(roleSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await expect(names).toHaveText(["approved", "organizer"]);
+    await patrolSort.click();
+    await expect(patrolSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await patrolSort.click();
+    await expect(patrolSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    await expect(names).toHaveText(["organizer", "approved"]);
+    await expect(page).toHaveURL(
+      `${origin}/volunteers?sort=patrol&direction=desc`,
+    );
+    await page.reload();
+    await expect(patrolSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
     await page.locator("[data-volunteer-search]").fill("approved");
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
       1,
@@ -278,6 +325,29 @@ test("organizers review applications separately from approved volunteers with pe
       "New volunteer",
       "Not approved for patrols",
     ]);
+    await expect(page.locator('[name="sort"]')).toHaveValue("patrol");
+    await expect(page.locator('[name="direction"]')).toHaveValue("desc");
+    const sortedReturn = "/volunteers?q=approved&sort=patrol&direction=desc";
+    await expect(names).toHaveAttribute(
+      "href",
+      `/volunteers/approved?returnTo=${encodeURIComponent(sortedReturn)}`,
+    );
+    await page.locator("[data-volunteer-row] td").first().click();
+    await page.getByRole("link", { name: "Back to volunteers" }).click();
+    await expect(page).toHaveURL(`${origin}${sortedReturn}`);
+    await nameSort.click();
+    await expect(nameSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await page.goBack();
+    await expect(patrolSort.locator("..")).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    await expect(page.locator("[data-volunteer-search]")).toHaveValue(
+      "approved",
+    );
     await page.goto(`${origin}${listPath}`);
     const count = page.locator("[data-awaiting-approval-count]");
     const allCount = page.locator("[data-all-applicants-count]");
@@ -438,7 +508,7 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(answer("Code of Conduct accepted")).toHaveText(
       formatApplicationSubmittedTime(submittedAt),
     );
-    assert.equal(await auditCount(), 1);
+    assert.equal(await auditCount(), 2); // One directory profile and one application.
     // Merely reading the application is not review completion.
     await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("53");
@@ -789,6 +859,20 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       plain.getByRole("link", { name: "Back to applications" }),
     ).toHaveAttribute("href", "/applications?q=applicant-52&approval=awaiting");
+    await plain.goto(`${origin}/volunteers?q=approved&offset=50`);
+    await plain.locator('[data-volunteer-sort="patrol"]').click();
+    await expect(
+      plain.locator("[data-volunteer-results] tbody tr"),
+    ).toHaveCount(1);
+    expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
+    await plain.locator('[data-volunteer-sort="patrol"]').click();
+    await plain.locator("[data-volunteer-search]").fill("organizer");
+    await plain.getByRole("button", { name: "Search", exact: true }).click();
+    expect(new URL(plain.url()).searchParams.get("sort")).toBe("patrol");
+    expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
+    await expect(plain.locator("[data-volunteer-profile-link]")).toHaveText(
+      "organizer",
+    );
     // Returning through bfcache must refresh approval changes without losing the
     // restored search or page, even when the last page becomes empty.
     await page.waitForLoadState("load");

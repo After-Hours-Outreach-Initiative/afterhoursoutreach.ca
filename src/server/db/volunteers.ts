@@ -29,7 +29,11 @@ import {
   profileDisplayNameSql,
   profileFullNameSql,
 } from "./sql";
-import type { VolunteerApprovalFilter } from "../../data/volunteer-list";
+import type {
+  VolunteerApprovalFilter,
+  VolunteerSort,
+  VolunteerSortDirection,
+} from "../../data/volunteer-list";
 import type { AttendeeCategory } from "../../data/event-roster";
 
 export interface VolunteerRow {
@@ -52,8 +56,10 @@ export async function listVolunteers(
   actor: Actor,
   search = "",
   offset = 0,
+  sort: VolunteerSort = "name",
+  direction: VolunteerSortDirection = "asc",
 ) {
-  return listPeople(db, actor, search, offset, false);
+  return listPeople(db, actor, search, offset, false, "all", sort, direction);
 }
 
 export async function listApplications(
@@ -73,6 +79,8 @@ async function listPeople(
   offset: number,
   applications: boolean,
   approval: VolunteerApprovalFilter = "all",
+  sort: VolunteerSort = "name",
+  direction: VolunteerSortDirection = "asc",
 ) {
   requireOrganizer(actor);
   // A profile is created only on submission; private drafts never enter either
@@ -85,6 +93,21 @@ async function listPeople(
         AND v.registration_approved = ${applications ? 0 : 1}`;
   const query = search.slice(0, 100);
   const readyForReviewSql = `v.registration_approved = 0 AND v.application_rejection_reason IS NULL AND ${applicationReadyForReviewSql}`;
+  // Match the visible role, not just the account's volunteer/organizer flag.
+  // Only backend-owned expressions and directions enter ORDER BY. Sort the
+  // entire matching directory before pagination, with stable name/id ties.
+  const sortSql =
+    sort === "role"
+      ? `CASE WHEN u.role = 'organizer' THEN 'Organizer'
+          WHEN category = 'new-volunteer' THEN 'New volunteer'
+          WHEN category = 'medic' THEN 'Medic'
+          ELSE 'Outreach Volunteer' END COLLATE NOCASE`
+      : sort === "patrol"
+        ? "v.patrol_approved"
+        : "name COLLATE NOCASE";
+  const orderSql = applications
+    ? "v.registration_approved, name, u.id"
+    : `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}, name COLLATE NOCASE, u.id`;
   const [rows, counts] = (await db.batch([
     db
       .prepare(
@@ -96,7 +119,7 @@ async function listPeople(
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       ${applicantsSql}
         AND (? = 'all' OR (${readyForReviewSql}))
-      ORDER BY v.registration_approved, name, u.id
+      ORDER BY ${orderSql}
       LIMIT ? OFFSET ?`,
       )
       .bind(query, approval, volunteerPageSize + 1, offset),

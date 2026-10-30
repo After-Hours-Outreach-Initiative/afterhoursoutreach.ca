@@ -1,9 +1,14 @@
 export type VolunteerApprovalFilter = "all" | "awaiting";
+export type VolunteerSort = "name" | "role" | "patrol";
+export type VolunteerSortDirection = "asc" | "desc";
 
 export function volunteerListState(params: URLSearchParams) {
+  const sort = params.get("sort");
   return {
     search: (params.get("q") ?? "").slice(0, 100),
     approval: params.get("approval") === "awaiting" ? "awaiting" : "all",
+    sort: sort === "role" || sort === "patrol" ? sort : "name",
+    direction: params.get("direction") === "desc" ? "desc" : "asc",
     offset: Math.min(
       10000,
       Math.max(0, Number.parseInt(params.get("offset") ?? "0", 10) || 0),
@@ -11,6 +16,8 @@ export function volunteerListState(params: URLSearchParams) {
   } satisfies {
     search: string;
     approval: VolunteerApprovalFilter;
+    sort: VolunteerSort;
+    direction: VolunteerSortDirection;
     offset: number;
   };
 }
@@ -33,6 +40,10 @@ function listUrl(
   if (state.search) params.set("q", state.search);
   if (applications && state.approval === "awaiting")
     params.set("approval", state.approval);
+  if (!applications) {
+    if (state.sort !== "name") params.set("sort", state.sort);
+    if (state.direction !== "asc") params.set("direction", state.direction);
+  }
   if (state.offset) params.set("offset", String(state.offset));
   const query = params.toString();
   return `/${applications ? "applications" : "volunteers"}${query ? `?${query}` : ""}`;

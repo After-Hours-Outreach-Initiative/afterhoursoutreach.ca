@@ -25,6 +25,11 @@ test("application list state preserves approval, search and pagination in profil
       "/volunteer/volunteers?q=Alex+%26+Sam&approval=awaiting",
     ),
   ).toBe(volunteerListUrl({ ...state, offset: 0 }));
+  const sorted = { ...state, sort: "patrol", direction: "desc" } as const;
+  expect(volunteerListReturnUrl(volunteerListUrl(sorted))).toBe(
+    "/volunteers?q=Alex+%26+Sam&sort=patrol&direction=desc&offset=50",
+  );
+  expect(applicationListUrl(sorted)).toBe(url);
 });
 
 test("list return destinations are restricted and untrusted filter inputs are normalized", () => {
@@ -40,12 +45,18 @@ test("list return destinations are restricted and untrusted filter inputs are no
     expect(volunteerListReturnUrl(value)).toBe("/volunteers");
   expect(
     volunteerListReturnUrl(
-      "/volunteers?approval=viewed&offset=-50&extra=ignored",
+      "/volunteers?approval=viewed&offset=-50&extra=ignored&sort=unknown&direction=unknown",
     ),
   ).toBe("/volunteers");
   expect(
     volunteerListState(
       new URLSearchParams({ q: "x".repeat(200), offset: "999999" }),
     ),
-  ).toEqual({ search: "x".repeat(100), offset: 10000, approval: "all" });
+  ).toEqual({
+    search: "x".repeat(100),
+    offset: 10000,
+    approval: "all",
+    sort: "name",
+    direction: "asc",
+  });
 });

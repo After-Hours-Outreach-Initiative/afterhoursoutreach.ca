@@ -2,12 +2,17 @@
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AttendeeAvatar from "@/components/volunteer/AttendeeAvatar.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
 import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/db/access";
 import { listVolunteers, volunteerPageSize } from "@/server/db/volunteers";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
-import { volunteerListState, volunteerListUrl } from "@/data/volunteer-list";
+import {
+  volunteerListState,
+  volunteerListUrl,
+  type VolunteerSort,
+} from "@/data/volunteer-list";
 import "@/styles/volunteer.css";
 export const prerender = false;
 let team: Awaited<ReturnType<typeof listVolunteers>> = {
@@ -21,8 +26,13 @@ let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
 const state = volunteerListState(Astro.url.searchParams);
-const { search, offset } = state;
+const { search, offset, sort, direction } = state;
 const listUrl = volunteerListUrl(state);
+const columns = [
+  { key: "name", label: "Name" },
+  { key: "role", label: "Role" },
+  { key: "patrol", label: "Patrol access" },
+] satisfies { key: VolunteerSort; label: string }[];
 try {
   const { actor, headers, email, greetingName } = await accountContext(
     env,
@@ -44,7 +54,8 @@ try {
     if (error instanceof RequestError) lock = error.message;
     else throw error;
   }
-  if (!lock) team = await listVolunteers(env.DB, actor, search, offset);
+  if (!lock)
+    team = await listVolunteers(env.DB, actor, search, offset, sort, direction);
 } catch {
   return new Response("Volunteer management is temporarily unavailable.", {
     status: 503,
@@ -81,6 +92,8 @@ try {
             method="get"
             data-volunteer-search-form
           >
+            <input type="hidden" name="sort" value={sort} />
+            <input type="hidden" name="direction" value={direction} />
             <label class="volunteer-search-field">
               <span class="sr-only">Find a volunteer</span>
               <SearchIcon class="volunteer-search-icon" />
@@ -110,9 +123,38 @@ try {
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Role</th>
-                    <th scope="col">Patrol access</th>
+                    {columns.map(({ key, label }) => {
+                      const active = sort === key;
+                      const nextDirection =
+                        active && direction === "asc" ? "desc" : "asc";
+                      return (
+                        <th
+                          scope="col"
+                          aria-sort={
+                            active
+                              ? direction === "asc"
+                                ? "ascending"
+                                : "descending"
+                              : undefined
+                          }
+                        >
+                          <a
+                            class="volunteer-table-sort"
+                            href={volunteerListUrl({
+                              ...state,
+                              sort: key,
+                              direction: nextDirection,
+                              offset: 0,
+                            })}
+                            data-volunteer-sort={key}
+                            aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
+                          >
+                            {label}
+                            <ChevronDownIcon class="volunteer-table-sort-icon" />
+                          </a>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>

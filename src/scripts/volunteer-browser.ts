@@ -58,6 +58,10 @@ export function initVolunteerBrowser() {
       focused instanceof HTMLButtonElement && filters?.contains(focused)
         ? focused.dataset.volunteerFilter
         : undefined;
+    const focusedSort =
+      focused instanceof HTMLAnchorElement && results.contains(focused)
+        ? focused.dataset.volunteerSort
+        : undefined;
     results.replaceChildren(...nextResults.childNodes);
     if (filters && nextFilters) {
       filters.replaceChildren(...nextFilters.childNodes);
@@ -70,6 +74,19 @@ export function initVolunteerBrowser() {
       filters
         ?.querySelector<HTMLButtonElement>(
           `[data-volunteer-filter="${focusedFilter}"]`,
+        )
+        ?.focus({ preventScroll: true });
+    for (const name of ["sort", "direction"]) {
+      const input = form.querySelector<HTMLInputElement>(`[name="${name}"]`);
+      const nextInput = page.querySelector<HTMLInputElement>(
+        `[data-volunteer-search-form] [name="${name}"]`,
+      );
+      if (input && nextInput) input.value = nextInput.value;
+    }
+    if (focusedSort)
+      results
+        .querySelector<HTMLAnchorElement>(
+          `[data-volunteer-sort="${focusedSort}"]`,
         )
         ?.focus({ preventScroll: true });
   };
@@ -127,6 +144,31 @@ export function initVolunteerBrowser() {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void loadResults();
+  });
+  results.addEventListener("click", (event) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      !(event.target instanceof Element)
+    )
+      return;
+    const link = event.target.closest<HTMLAnchorElement>(
+      "[data-volunteer-sort]",
+    );
+    if (!link) return;
+    event.preventDefault();
+    const url = searchUrl();
+    const target = new URL(link.href);
+    for (const name of ["sort", "direction"]) {
+      const value = target.searchParams.get(name);
+      if (value) url.searchParams.set(name, value);
+      else url.searchParams.delete(name);
+    }
+    void loadResults(url, "push");
   });
   filters?.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;

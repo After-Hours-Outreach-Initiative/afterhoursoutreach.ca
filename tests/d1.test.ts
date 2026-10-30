@@ -751,6 +751,59 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
 
+test("volunteer directory sorts names, displayed roles and patrol flags before applying offsets", async () => {
+  const actor: Actor = {
+    ...(await draftActor("organizer")),
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+    applicationApproved: true,
+  };
+  for (const [id, name, role, patrol, teams] of [
+    ["organizer", "bravo", "organizer", 0, "[]"],
+    ["medic", "zebra", "volunteer", 1, '["medic"]'],
+    ["new", "Zulu", "volunteer", 0, "[]"],
+    ["outreach", "Alpha", "volunteer", 1, "[]"],
+    ["tie", "alpha", "volunteer", 0, "[]"],
+  ] as const) {
+    if (id !== actor.id) await draftActor(id);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE user SET role=? WHERE id=?").bind(role, id),
+      env.DB.prepare(
+        `INSERT INTO profile (
+          user_id, preferred_name, phone, birth_date, emergency_contact_name,
+          emergency_contact_phone, emergency_contact_relationship, heard_about_us,
+          motivation, teams, medical_certification, training_experience, registered_at, updated_at
+        ) VALUES (?, ?, '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', ?, 'None', 'None', 0, 0)`,
+      ).bind(id, name, teams),
+      env.DB.prepare(
+        "INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at) VALUES (?, 1, 1, ?, ?, ?, 0)",
+      ).bind(id, patrol, patrol ? actor.id : null, patrol ? 0 : null),
+    ]);
+  }
+  for (const [sort, direction, expected] of [
+    ["name", "asc", ["outreach", "tie", "organizer", "medic", "new"]],
+    ["name", "desc", ["new", "medic", "organizer", "outreach", "tie"]],
+    ["role", "asc", ["medic", "tie", "new", "organizer", "outreach"]],
+    ["role", "desc", ["outreach", "organizer", "tie", "new", "medic"]],
+    ["patrol", "asc", ["tie", "organizer", "new", "outreach", "medic"]],
+    ["patrol", "desc", ["outreach", "medic", "tie", "organizer", "new"]],
+  ] as const) {
+    const page = await listVolunteers(env.DB, actor, "", 1, sort, direction);
+    assert.deepEqual(
+      page.rows.map(({ id }) => id),
+      expected.slice(1),
+    );
+    assert.equal(page.allApplicantsCount, 5);
+  }
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "AL", 0, "role", "asc")).rows.map(
+      ({ id }) => id,
+    ),
+    ["tie", "outreach"],
+  );
+});
+
 test("review queue counts only review-ready applications matching search independently of pages and profile views", async () => {
   const actor: Actor = {
     ...(await draftActor("queue-organizer")),
