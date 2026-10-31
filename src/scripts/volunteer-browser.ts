@@ -1,5 +1,4 @@
 import { actionFragment } from "./action-page";
-import { initDirectoryTableHeader } from "./directory-table-header";
 import { initCompactPersonNames } from "./compact-person-name";
 
 export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
@@ -18,7 +17,6 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   if (!root || !search || !form || !results || !error) return;
   initCompactPersonNames();
   const people = filters ? "applications" : "volunteers";
-  const refreshTableHeader = initDirectoryTableHeader(results);
 
   root.dataset.rowNavigation = "true";
   results.addEventListener("click", (event) => {
@@ -71,7 +69,6 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
         ? focused.dataset.volunteerSort
         : undefined;
     results.replaceChildren(...nextResults.childNodes);
-    refreshTableHeader();
     const nextFrame = results.querySelector<HTMLElement>(
       ".volunteer-table-frame",
     );

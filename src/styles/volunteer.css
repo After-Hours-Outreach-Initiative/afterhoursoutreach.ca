@@ -1415,19 +1415,11 @@ body:has(
   white-space: nowrap;
 }
 .volunteer-table thead {
-  /* Without the helper, keep all rows reachable in the horizontal scroll frame. */
-  position: relative;
+  position: sticky;
   top: 0;
   z-index: 1;
-}
-.volunteer-table thead::before {
-  /* A separate backing layer avoids table backgrounds clipping to cell radii. */
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
+  /* Back the entire header, including the gaps outside rounded cell corners. */
   background: #000;
-  pointer-events: none;
 }
 .volunteer-table thead th {
   padding-block: 0.5rem;
@@ -1529,19 +1521,6 @@ body:has(
   .volunteer-table a.volunteer-table-sort {
     gap: 0.375rem;
   }
-}
-.volunteer-table-frame[data-horizontal-overflow="false"] {
-  /* Use native page-sticky positioning whenever the whole table fits. */
-  overflow: visible;
-}
-.volunteer-table-frame[data-horizontal-overflow="false"] thead {
-  position: sticky;
-  top: var(--site-header-rendered-height, var(--site-header-height, 0px));
-}
-.volunteer-table-frame[data-horizontal-overflow="true"] thead {
-  /* Horizontal overflow traps native sticky positioning. Move the original
-     header within the full-height frame instead; never clone its semantics. */
-  transform: translateY(var(--directory-table-header-shift, 0px));
 }
 .application-table-progress {
   display: inline-block;
