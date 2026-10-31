@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import {
   applicationTeamOptions,
+  formatApplicationSubmittedTime,
   latestApplicationBirthDate,
   normalizeCertifications,
   outreachRequiredError,
@@ -18,6 +19,22 @@ import {
 import { profileAnswerRows } from "../src/data/profile-answers";
 
 const birthDateSchema = profileSchema.shape.birthDate;
+
+test("application timestamps keep Vancouver time without timezone labels", () => {
+  for (const value of [
+    "2025-01-02T04:30:00.000Z",
+    "2025-07-03T03:30:00.000Z",
+  ]) {
+    const display = formatApplicationSubmittedTime(value);
+    expect(display).toBe(
+      new Date(value).toLocaleString("en-CA", {
+        timeZone: "America/Vancouver",
+      }),
+    );
+    expect(display).toMatch(/8:30:00/);
+    expect(display).not.toMatch(/PST|PDT|GMT|UTC/);
+  }
+});
 
 test("team choices offer Outreach and Medic while saved retired answers remain readable", () => {
   expect(applicationTeamOptions.map((option) => option.value)).toEqual([

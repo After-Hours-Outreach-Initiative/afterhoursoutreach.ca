@@ -45,7 +45,6 @@ export interface SubmittedApplication {
 export const formatApplicationSubmittedTime = (value: string) =>
   new Date(value).toLocaleString("en-CA", {
     timeZone: "America/Vancouver",
-    timeZoneName: "short",
   });
 
 export function applicationDisplayName(

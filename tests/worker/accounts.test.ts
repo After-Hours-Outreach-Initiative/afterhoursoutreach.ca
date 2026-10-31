@@ -818,7 +818,6 @@ describe(
         new Date(submission.submittedAt)
           .toLocaleString("en-CA", {
             timeZone: "America/Vancouver",
-            timeZoneName: "short",
           })
           .replace(/\s+/g, " "),
       );
