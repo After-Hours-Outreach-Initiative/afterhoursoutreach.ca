@@ -145,6 +145,49 @@ test("organizer profile catalogue exposes every real profile state without accou
   );
 });
 
+test("application summaries hide unselected medic details and empty optional answers", async ({
+  page,
+}) => {
+  for (const scenario of ["ready-for-review", "medic-applicant"]) {
+    for (const content of ["standard", "long"]) {
+      await page.goto(
+        `/dev/ui/organizer-profile?scenario=${scenario}&content=${content}`,
+      );
+      const preview = page.frameLocator("[data-ui-profile-frame]");
+      const application = preview.locator(
+        '[data-volunteer-profile-panel="application"]',
+      );
+      const submitted = application.locator(
+        '[data-application-mini-step="form"] details',
+      );
+      await submitted.locator("summary").click();
+      for (const label of [
+        "Highest medical certification or licence",
+        "Certification expiry date",
+      ])
+        await expect(submitted.getByText(label, { exact: true })).toHaveCount(
+          scenario === "medic-applicant" ? 1 : 0,
+        );
+      await expect(
+        submitted.getByText("Other training and experience", { exact: true }),
+      ).toHaveCount(0);
+      for (const label of [
+        "Other relevant training",
+        "Other relevant experience",
+      ])
+        await expect(submitted.getByText(label, { exact: true })).toHaveCount(
+          content === "long" ? 1 : 0,
+        );
+      await expect(
+        submitted.getByText("Relevant training", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        submitted.getByText("Relevant experience", { exact: true }),
+      ).toBeVisible();
+    }
+  }
+});
+
 test("organizer profiles omit empty middle names but retain provided names", async ({
   page,
 }) => {

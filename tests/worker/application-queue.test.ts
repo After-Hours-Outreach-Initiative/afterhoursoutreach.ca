@@ -574,6 +574,15 @@ test("organizers review applications separately from approved volunteers with pe
       ),
     ).toHaveCount(0);
     const summary = application.locator(".account-profile-summary");
+    for (const label of [
+      "Highest medical certification or licence",
+      "Additional certification answer",
+      "Certification expiry date",
+      "Other training and experience",
+      "Other relevant training",
+      "Other relevant experience",
+    ])
+      await expect(summary.getByText(label, { exact: true })).toHaveCount(0);
     await expect(application.getByRole("heading")).toHaveText([
       "Application",
       "Personal info",
@@ -773,6 +782,17 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       patrolApproval.locator("[data-orientation-status]"),
     ).toHaveText("Orientation completed");
+    await expect(
+      summary.getByText("Highest medical certification or licence", {
+        exact: true,
+      }),
+    ).toHaveCount(1);
+    await expect(
+      summary.getByText("Additional certification answer", { exact: true }),
+    ).toHaveCount(1);
+    await expect(
+      summary.getByText("Other training and experience", { exact: true }),
+    ).toHaveCount(1);
     await expect(
       patrolApproval.locator("[data-orientation-event]"),
     ).toContainText("Queue orientation");

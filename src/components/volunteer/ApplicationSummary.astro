@@ -35,6 +35,13 @@ const {
 } = Astro.props;
 // Display old immutable snapshots without rewriting the accepted submission.
 const answers = normalizeTrainingAnswers(savedAnswers);
+const medic = answers.teams.includes("medic");
+const optionalDetails = [
+  "experience",
+  "otherTraining",
+  "otherExperience",
+  ...trainingDetailOptions.map((option) => option.name),
+];
 const choices = (
   selected: string[],
   options: readonly { value: string; label: string }[],
@@ -80,8 +87,12 @@ const rows: {
     )
     .filter(
       (field) =>
-        !trainingDetailOptions.some((option) => option.name === field.name) ||
-        Boolean(answers[field.name]),
+        medic || !["certificationExpiry", "experience"].includes(field.name),
+    )
+    .filter(
+      (field) =>
+        !optionalDetails.includes(field.name) ||
+        Boolean(answers[field.name].trim()),
     )
     .map((field) => ({
       section: field.section,
@@ -94,12 +105,16 @@ const rows: {
     label: "Teams",
     value: choices(answers.teams, savedTeamOptions),
   },
-  {
-    section: "training-and-safety",
-    label: "Highest medical certification or licence",
-    value: choices(answers.certifications, certificationOptions),
-  },
-  ...(answers.certification
+  ...(medic
+    ? [
+        {
+          section: "training-and-safety",
+          label: "Highest medical certification or licence",
+          value: choices(answers.certifications, certificationOptions),
+        },
+      ]
+    : []),
+  ...(medic && answers.certification
     ? [
         {
           section: "training-and-safety",
