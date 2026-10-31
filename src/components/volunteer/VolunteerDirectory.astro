@@ -244,13 +244,17 @@ const columns = (
                   </>
                 ) : (
                   <td>
-                    {person.role === "organizer" ? (
-                      <VolunteerRoleBadge role="organizer" />
-                    ) : person.category === "new-volunteer" ? (
-                      <NewVolunteerBadge />
-                    ) : person.category === "medic" ? (
-                      <VolunteerRoleBadge role="medic" />
-                    ) : null}
+                    <div class="flex flex-wrap gap-2">
+                      {person.role === "organizer" && (
+                        <VolunteerRoleBadge role="organizer" />
+                      )}
+                      {person.category === "new-volunteer" && (
+                        <NewVolunteerBadge />
+                      )}
+                      {Boolean(person.medicMark) && (
+                        <VolunteerRoleBadge role="medic" />
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>
