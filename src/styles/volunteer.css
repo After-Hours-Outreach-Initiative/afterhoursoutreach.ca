@@ -1569,6 +1569,9 @@ body:has(
   min-width: 0;
   margin-bottom: 2rem;
 }
+[data-volunteer-profile-overview] h2 {
+  overflow-wrap: anywhere;
+}
 [data-volunteer-profile] > .volunteer-contents {
   grid-column: 1;
   grid-row: 2 / -1;
@@ -1701,25 +1704,28 @@ body:has(
   margin-top: 0.375rem;
   color: #a1a1aa;
 }
-.volunteer-progression-actions {
+.volunteer-progression-actions,
+.organizer-application-review-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 0.75rem;
   margin-top: 1rem;
 }
-.volunteer-progression-actions > .volunteer-form {
+.volunteer-progression-actions > .volunteer-form,
+.organizer-application-review-actions > .volunteer-form {
   min-width: 0;
   max-width: 100%;
   margin: 0;
   padding: 0;
   border: 0;
 }
-.volunteer-progression .btn {
+.volunteer-progression .btn,
+.organizer-application-review-details .btn {
   max-width: 100%;
   white-space: normal;
 }
-.volunteer-progression-rejection {
+.organizer-application-rejection {
   margin-top: 1rem;
   padding-top: 0.875rem;
   border-top: 1px solid #3f3f46;

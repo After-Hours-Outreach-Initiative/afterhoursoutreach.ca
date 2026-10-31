@@ -1204,7 +1204,7 @@ describe(
             .click();
           const profileView = page.locator("[data-volunteer-profile]");
           await profileView
-            .getByRole("heading", { name: "Sample Alice V.", exact: true })
+            .getByRole("heading", { name: "Sample Volunteer", exact: true })
             .waitFor();
           await expect(
             profileView.getByLabel("Active volunteer", { exact: true }),

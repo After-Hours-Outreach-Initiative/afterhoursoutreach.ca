@@ -18,7 +18,6 @@ const { person } = Astro.props;
   {
     Boolean(person.applicationApproved) && (
       <>
-        <VolunteerAccessAction {person} kind="application" />
         {Boolean(person.patrolApproved) && (
           <VolunteerAccessAction {person} kind="patrol" />
         )}

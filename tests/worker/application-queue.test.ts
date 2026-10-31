@@ -516,6 +516,9 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(page.locator("[data-volunteer-profile-dialog]")).toHaveCount(
       0,
     );
+    await expect(page.locator("[data-volunteer-profile-overview]")).toHaveText(
+      "Alex Jordan Marie de la Cruz",
+    );
     const profile = page.getByRole("region", {
       name: "Profile",
       exact: true,
@@ -530,7 +533,6 @@ test("organizers review applications separately from approved volunteers with pe
     ).toBeVisible();
     const progression = page.locator("[data-volunteer-progression]");
     await expect(progression.locator("h3")).toHaveText([
-      "Applicant",
       "New volunteer",
       "Outreach Volunteer",
     ]);
@@ -538,7 +540,7 @@ test("organizers review applications separately from approved volunteers with pe
     const currentCard = progression.locator(
       '[data-progression-stage][aria-current="step"]',
     );
-    const applicationProgress = progression.locator(
+    const applicationProgress = application.locator(
       "[data-application-progress-mini]",
     );
     await expect(
@@ -550,16 +552,12 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       applicationProgress.locator('[data-application-mini-step="naloxone"]'),
     ).toHaveAttribute("data-state", "complete");
-    await expect(currentCard).toHaveCSS("background-color", "rgb(20, 36, 59)");
+    await expect(currentCard).toHaveCount(0);
     await expect(
       progression
         .locator('[data-progression-stage][data-state="upcoming"]')
         .first(),
     ).toHaveCSS("background-color", "rgb(17, 19, 24)");
-    await expect(currentCard).toHaveAttribute(
-      "data-progression-stage",
-      "applicant",
-    );
     await expect(
       progression.locator('[data-progression-stage][data-state="upcoming"]'),
     ).toHaveCount(2);
@@ -574,18 +572,25 @@ test("organizers review applications separately from approved volunteers with pe
       ),
     ).toHaveCount(0);
     await expect(profile).toHaveCount(0);
+    const applicationForm = applicationProgress.locator(
+      '[data-application-mini-step="form"] details',
+    );
+    await expect(applicationForm).not.toHaveAttribute("open");
+    await applicationForm.locator("summary").click();
     await expect(
       application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
     ).toBeVisible();
     await expect(
-      page.locator("[data-volunteer-profile-overview] > p").first(),
-    ).toHaveText("Ready for review");
-    await expect(
       applicationProgress.getByText("Ready for review", { exact: true }),
     ).toBeVisible();
-    await expect(page.locator("[data-application-current-step]")).toHaveText(
-      "Application review",
-    );
+    await expect(
+      applicationProgress.locator('[data-application-mini-step="review"]'),
+    ).toHaveAttribute("data-state", "current");
+    await expect(
+      applicationProgress.locator(
+        '[data-application-mini-step="review"] [data-access-kind="application"]',
+      ),
+    ).toHaveCount(1);
     await expect(application).toBeVisible();
     await expect(
       page.locator(
@@ -654,9 +659,6 @@ test("organizers review applications separately from approved volunteers with pe
     ).run();
     await page.reload();
     await expect(
-      page.locator("[data-volunteer-profile-overview] > p").first(),
-    ).toHaveText("Application in progress");
-    await expect(
       applicationProgress.locator('[data-application-mini-step="naloxone"]'),
     ).toHaveAttribute("data-state", "current");
     await expect(
@@ -685,14 +687,8 @@ test("organizers review applications separately from approved volunteers with pe
     ).run();
     await page.reload();
     await expect(
-      page.locator("[data-volunteer-profile-overview] > p").first(),
-    ).toHaveText("Ready for review");
-    await expect(
       applicationProgress.getByText("Ready for review", { exact: true }),
     ).toBeVisible();
-    await expect(page.locator("[data-application-current-step]")).toHaveText(
-      "Application review",
-    );
     await expect(
       applicationProgress.locator('[data-application-mini-step="naloxone"]'),
     ).toHaveAttribute("data-state", "complete");
@@ -710,9 +706,7 @@ test("organizers review applications separately from approved volunteers with pe
     ).toBeEnabled();
     await expect(application).toBeVisible();
     await expect(profile).toBeVisible();
-    await expect(page.locator("[data-application-current-step]")).toHaveText(
-      "New volunteer",
-    );
+    await expect(currentCard.locator("h3")).toHaveText("New volunteer");
     await expect(currentCard).toHaveAttribute(
       "data-progression-stage",
       "new-volunteer",
@@ -730,11 +724,12 @@ test("organizers review applications separately from approved volunteers with pe
       }),
     ).toBeEnabled();
     await expect(profile.getByRole("heading").first()).toHaveText("Profile");
-    const submittedDetails = application.locator("details");
+    await expect(
+      applicationProgress.locator('[data-application-mini-step="review"]'),
+    ).toContainText("Approved by");
+    const submittedDetails = applicationForm;
     await expect(submittedDetails).not.toHaveAttribute("open");
-    await application
-      .getByText("View submitted application", { exact: true })
-      .click();
+    await submittedDetails.locator("summary").click();
     await expect(submittedDetails).toHaveAttribute("open");
     await expect(
       application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
@@ -828,17 +823,14 @@ test("organizers review applications separately from approved volunteers with pe
     );
     await expect(
       progression.locator('[data-progression-stage][data-state="complete"]'),
-    ).toHaveCount(2);
+    ).toHaveCount(1);
     await expect(
       progression.locator(
         '[data-progression-stage][data-state="complete"] .progression-marker svg',
       ),
-    ).toHaveCount(2);
+    ).toHaveCount(1);
     await expect(currentCard).toHaveCSS("background-color", "rgb(20, 36, 59)");
     await expect(currentCard.locator("h3")).toHaveText("Medic");
-    await expect(page.locator("[data-application-current-step]")).toHaveText(
-      "Medic",
-    );
     await expect(
       page.getByRole("button", { name: "Revoke patrol approval", exact: true }),
     ).toBeFocused();
@@ -1086,9 +1078,9 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(page.locator("[data-application-rejection]")).toHaveText(
       `Reason: ${rejection.reason}`,
     );
-    await expect(page.locator("[data-application-current-step]")).toHaveText(
-      "Application rejected",
-    );
+    await expect(
+      page.locator('[data-application-mini-step="review"]'),
+    ).toHaveAttribute("data-state", "rejected");
     const feedback = page.locator("[data-action-email-feedback]");
     await expect(feedback).toBeVisible();
     await expect(feedback).toContainText("Application rejected.");

@@ -6,33 +6,22 @@ import {
 
 async function expectReadableCards(progression: Locator) {
   const cards = progression.locator("[data-progression-stage]");
-  await expect(cards).toHaveCount(3);
+  await expect(cards).toHaveCount(2);
   await expect(
-    cards.nth(1).getByRole("heading", { name: "New volunteer", exact: true }),
+    cards.nth(0).getByRole("heading", { name: "New volunteer", exact: true }),
   ).toBeVisible();
   await expect(
     cards
-      .nth(2)
+      .nth(1)
       .getByRole("heading", { name: "Outreach Volunteer", exact: true }),
   ).toBeVisible();
   await expect(progression.getByText(/^(Current|Upcoming)$/)).toHaveCount(0);
-  const mini = cards.nth(0).locator("[data-application-progress-mini]");
-  await expect(mini.locator(".application-progress-mini-title")).toHaveText([
-    "Application form",
-    "Naloxone 101",
-    "Application review",
-  ]);
-  await expect(mini.locator("button, a, input")).toHaveCount(0);
-  for (const row of await mini.locator("li").all()) {
-    await expect(row).toHaveCSS("display", "grid");
-    expect(
-      await row.evaluate(
-        (element) => element.scrollWidth <= element.clientWidth,
-      ),
-    ).toBe(true);
-    const label = row.locator(".application-progress-mini-label");
-    expect((await label.boundingBox())!.width).toBeGreaterThan(100);
-  }
+  await expect(
+    progression.locator("[data-application-progress-mini]"),
+  ).toHaveCount(0);
+  await expect(cards.locator('[data-access-kind="application"]')).toHaveCount(
+    0,
+  );
   await expect(cards.locator(".progression-heading").first()).toHaveCSS(
     "display",
     "flex",
@@ -149,14 +138,18 @@ test("roster links open profile pages with readable progression cards", async ({
       await page.goto(`/volunteers/${applicant.id}`);
       const progression = page.locator("[data-volunteer-progression]");
       await expectReadableCards(progression);
+      const application = page.locator(
+        '[data-volunteer-profile-panel="application"]',
+      );
       await expect(
-        page.locator("[data-volunteer-profile-overview] > p").first(),
-      ).toHaveText("Application in progress");
+        application.locator(".application-progress-mini-title"),
+      ).toHaveText(["Application form", "Naloxone 101", "Application review"]);
+      await expect(progression.locator('[aria-current="step"]')).toHaveCount(0);
       await expect(
         progression.getByText("Ready for review", { exact: true }),
       ).toHaveCount(0);
       await expect(
-        progression.getByRole("button", {
+        application.getByRole("button", {
           name: "Approve application",
           exact: true,
         }),
@@ -167,14 +160,14 @@ test("roster links open profile pages with readable progression cards", async ({
       await progression.screenshot({
         path: testInfo.outputPath(`progression-applicant-${width}.png`),
       });
-      await progression
+      await application
         .getByText("Reject application", { exact: true })
         .click();
-      const reason = progression.getByRole("textbox", {
+      const reason = application.getByRole("textbox", {
         name: "Reason for rejection",
       });
       await expect(reason).toBeVisible();
-      const card = progression.locator('[data-progression-stage="applicant"]');
+      const card = application.locator('[data-application-mini-step="review"]');
       const cardBounds = (await card.boundingBox())!;
       const reasonBounds = (await reason.boundingBox())!;
       expect(reasonBounds.x + reasonBounds.width).toBeLessThanOrEqual(

@@ -5,20 +5,17 @@ import type {
   VolunteerOrientation,
 } from "@/server/db/volunteers";
 import {
-  formatApplicationSubmittedTime,
   profileFormSections,
   submittedApplicationSections,
 } from "@/data/application";
-import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro";
-import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
+import { personFullName } from "@/data/person-name";
+import OrganizerApplicationSteps from "@/components/volunteer/OrganizerApplicationSteps.astro";
 import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.astro";
+import VolunteerAccessAction from "@/components/volunteer/VolunteerAccessAction.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
 import VolunteerProgression from "@/components/volunteer/VolunteerProgression.astro";
 import PageContents from "@/components/volunteer/PageContents.astro";
-import {
-  isApplicationReadyForReview,
-  type ApplicationProgress,
-} from "@/server/db/application-progress";
+import type { ApplicationProgress } from "@/server/db/application-progress";
 interface Props {
   profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
   person: VolunteerRow;
@@ -61,75 +58,7 @@ const contents = [
 
 <div data-volunteer-profile>
   <div data-volunteer-profile-overview>
-    <h2>{person.name}</h2>
-    <p>
-      {
-        person.applicationApproved
-          ? profile.applicationApprovedBy
-            ? `Application approved by ${profile.applicationApprovedBy.name} (${profile.applicationApprovedBy.email}) on ${formatApplicationSubmittedTime(new Date(profile.applicationApprovedBy.approvedAt).toISOString())}`
-            : "Application approved. Approving organizer not recorded."
-          : person.applicationRejectionReason
-            ? "Application rejected"
-            : isApplicationReadyForReview(progress)
-              ? "Ready for review"
-              : "Application in progress"
-      }
-    </p>
-    {
-      person.applicationRejectionReason && (
-        <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
-          Reason: {person.applicationRejectionReason}
-        </p>
-      )
-    }
-    <div class="account-profile-summary mt-8" data-naloxone-review>
-      <dl>
-        <div>
-          <dt>Current step</dt>
-          <dd data-application-current-step>
-            {
-              person.applicationApproved
-                ? person.patrolApproved
-                  ? medic
-                    ? "Medic"
-                    : "Outreach Volunteer"
-                  : "New volunteer"
-                : person.applicationRejectionReason
-                  ? "Application rejected"
-                  : profile.naloxoneCompletedAt === null
-                    ? "Complete Naloxone 101"
-                    : "Application review"
-            }
-          </dd>
-        </div>
-        <div>
-          <dt>Naloxone 101</dt>
-          <dd>
-            {
-              profile.naloxoneCompletedAt === null
-                ? "Completion not confirmed"
-                : `Completion confirmed ${formatApplicationSubmittedTime(new Date(profile.naloxoneCompletedAt).toISOString())}`
-            }
-          </dd>
-        </div>
-        {
-          /* Discord connection is temporarily disabled.
-            <div>
-              <dt>Discord</dt>
-              <dd>
-                {
-                  !progress.discordRequired
-                    ? "Linking not required for this existing volunteer. "
-                    : "Required before application approval. "
-                }{discord.username ? `${discord.username}: ` : ""}{
-                  discord.connection
-                }. {discord.sync}.
-              </dd>
-            </div>
-            */
-        }
-      </dl>
-    </div>
+    <h2>{personFullName(profile.answers, person.name)}</h2>
   </div>
   <PageContents entries={contents} heading="Sections" idleHeading="Sections" />
   <div data-volunteer-profile-body>
@@ -138,7 +67,6 @@ const contents = [
       {orientation}
       {completedOrientation}
       {medic}
-      {progress}
     />
     {
       Boolean(person.applicationApproved) && (
@@ -179,34 +107,71 @@ const contents = [
     <section
       id="volunteer-application-panel"
       data-volunteer-profile-panel="application"
-      data-submitted-application={person.applicationApproved ? undefined : ""}
       aria-labelledby="volunteer-application-heading"
     >
       <h2 id="volunteer-application-heading" data-contents-section>
         Application
       </h2>
-      {
-        !profile.submission && (
-          <p class="volunteer-help mt-4">
-            The original submitted application was not recorded. These details
-            use the current profile.
-          </p>
-        )
-      }
-      {
-        person.applicationApproved ? (
-          <SubmittedApplication
-            submission={profile.submission ?? profile}
-            embedded
-            idPrefix="volunteer"
-          />
-        ) : (
-          <ApplicationSummary
-            {...(profile.submission ?? profile)}
-            idPrefix="volunteer"
-          />
-        )
-      }
+      <OrganizerApplicationSteps
+        {profile}
+        {progress}
+        idPrefix="volunteer"
+        showReview
+      >
+        <div slot="review" data-volunteer-controls>
+          <div class="organizer-application-review-actions">
+            <VolunteerAccessAction {person} kind="application" />
+          </div>
+          {
+            !person.applicationApproved &&
+              !person.applicationRejectionReason && (
+                <details class="organizer-application-rejection">
+                  <summary class="cursor-pointer text-red-300 underline underline-offset-4">
+                    Reject application
+                  </summary>
+                  <form
+                    class="volunteer-form mt-4"
+                    data-organizer-rejection
+                    action="/api/v1/organizer/action"
+                    method="post"
+                  >
+                    <input type="hidden" name="userId" value={person.id} />
+                    <input
+                      type="hidden"
+                      name="version"
+                      value={person.updatedAt}
+                    />
+                    <label class="volunteer-field">
+                      Reason for rejection
+                      <textarea
+                        name="reason"
+                        required
+                        maxlength="2000"
+                        rows="4"
+                        data-volunteer-control
+                        disabled
+                      />
+                    </label>
+                    <p class="volunteer-help">
+                      This reason will be emailed to the applicant and shown in
+                      their application.
+                    </p>
+                    <p data-form-message role="status" hidden />
+                    <button
+                      class="btn btn-red"
+                      type="submit"
+                      data-loading-label="Sending…"
+                      data-volunteer-control
+                      disabled
+                    >
+                      Reject application and email reason
+                    </button>
+                  </form>
+                </details>
+              )
+          }
+        </div>
+      </OrganizerApplicationSteps>
     </section>
     {
       Boolean(person.applicationApproved) && (

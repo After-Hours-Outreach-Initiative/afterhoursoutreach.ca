@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const unexpectedRequests = new WeakMap<Page, string[]>();
+const currentProfileStep =
+  '[data-progression-stage][aria-current="step"] h3, [data-application-mini-step][aria-current="step"] .application-progress-mini-title';
 // Keep the preview visible while exercising its notification dialogs.
 async function showPreview(page: Page) {
   await page
@@ -43,9 +45,9 @@ test("organizer profile catalogue exposes every real profile state without accou
     page.getByRole("combobox", { name: "Presentation", exact: true }),
   ).toHaveCount(0);
   const states: Record<string, string> = {
-    "naloxone-pending": "Complete Naloxone 101",
+    "naloxone-pending": "Naloxone 101",
     "ready-for-review": "Application review",
-    rejected: "Application rejected",
+    rejected: "Application review",
     "medic-applicant": "Application review",
     accepted: "New volunteer",
     "orientation-booked": "New volunteer",
@@ -66,9 +68,26 @@ test("organizer profile catalogue exposes every real profile state without accou
     await expect(
       preview.locator("[data-ui-organizer-preview]"),
     ).toHaveAttribute("data-ui-scenario", id);
-    await expect(preview.locator("[data-application-current-step]")).toHaveText(
-      step,
-    );
+    await expect(preview.locator(currentProfileStep)).toHaveText(step);
+    await expect(
+      preview.locator("[data-volunteer-profile-overview]"),
+    ).toHaveText("Alex Jordan Rivera");
+    await expect(
+      preview.locator('[data-progression-stage="applicant"]'),
+    ).toHaveCount(0);
+    await expect(
+      preview.locator(
+        '[data-volunteer-profile-panel="application"] .application-progress-mini-title',
+      ),
+    ).toHaveText(["Application form", "Naloxone 101", "Application review"]);
+    if (id === "accepted")
+      await expect(
+        preview.locator('[data-application-mini-step="review"]'),
+      ).toContainText("Approved by Morgan C. (morgan.organizer@example.org)");
+    if (id === "historic-approval")
+      await expect(
+        preview.locator('[data-application-mini-step="review"]'),
+      ).toContainText("Approving organizer not recorded.");
     await expect(page.locator("[data-ui-profile-state]")).toContainText(
       `"scenario": "${id}"`,
     );
@@ -93,9 +112,7 @@ test("organizer profile catalogue exposes every real profile state without accou
   await expect(
     page.getByRole("combobox", { name: "Viewport width" }),
   ).toHaveValue("375");
-  await expect(preview.locator("[data-application-current-step]")).toHaveText(
-    "Medic",
-  );
+  await expect(preview.locator(currentProfileStep)).toHaveText("Medic");
 });
 
 test("switching profile states preserves preview scrolling and reset starts at the top", async ({
@@ -223,7 +240,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
   await preview
     .getByRole("button", { name: "Cancel change", exact: true })
     .click();
-  await expect(preview.locator("[data-application-current-step]")).toHaveText(
+  await expect(preview.locator(currentProfileStep)).toHaveText(
     "Application review",
   );
   await expect(page.locator("[data-ui-profile-status]")).toContainText(
@@ -233,9 +250,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
   await preview
     .getByRole("button", { name: "Save without email", exact: true })
     .click();
-  await expect(preview.locator("[data-application-current-step]")).toHaveText(
-    "New volunteer",
-  );
+  await expect(preview.locator(currentProfileStep)).toHaveText("New volunteer");
   for (const [outcome, error] of [
     ["failure", "The change could not be saved."],
     ["conflict", "This volunteer's status changed."],
@@ -251,7 +266,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(preview.getByRole("alert")).toContainText(error);
-    await expect(preview.locator("[data-application-current-step]")).toHaveText(
+    await expect(preview.locator(currentProfileStep)).toHaveText(
       "New volunteer",
     );
   }
@@ -275,7 +290,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
     .getByRole("button", { name: "Reset preview", exact: true })
     .click();
   await expect(approval).toBeEnabled();
-  await expect(preview.locator("[data-application-current-step]")).toHaveText(
+  await expect(preview.locator(currentProfileStep)).toHaveText(
     "Application review",
   );
 });
@@ -309,9 +324,9 @@ test("rejections and email failures update only fictional state, and prerequisit
   await expect(preview.locator("[data-application-rejection]")).toContainText(
     "Fictional review reason.",
   );
-  await expect(preview.locator("[data-application-current-step]")).toHaveText(
-    "Application rejected",
-  );
+  await expect(
+    preview.locator('[data-application-mini-step="review"]'),
+  ).toHaveAttribute("data-state", "rejected");
 
   await page.locator('[data-ui-profile-scenario="naloxone-pending"]').click();
   await expect(preview.locator("[data-ui-organizer-preview]")).toHaveAttribute(
@@ -370,14 +385,12 @@ test("active status, account roles and patrol access can be changed through the 
     .getByRole("button", { name: "Revoke patrol approval", exact: true })
     .click();
   await save();
-  await expect(preview.locator("[data-application-current-step]")).toHaveText(
-    "New volunteer",
-  );
+  await expect(preview.locator(currentProfileStep)).toHaveText("New volunteer");
   await preview
     .getByRole("button", { name: "Approve for patrols", exact: true })
     .click();
   await save();
-  await expect(preview.locator("[data-application-current-step]")).toHaveText(
+  await expect(preview.locator(currentProfileStep)).toHaveText(
     "Outreach Volunteer",
   );
 });
@@ -432,7 +445,7 @@ test("profile previews stay on the page at every viewport, including old dialog 
       .getByRole("combobox", { name: "Profile content" })
       .selectOption("minimal");
     await expect(
-      preview.getByRole("heading", { name: "Alex R.", exact: true }),
+      preview.getByRole("heading", { name: "Alex Rivera", exact: true }),
     ).toBeVisible();
   }
 });

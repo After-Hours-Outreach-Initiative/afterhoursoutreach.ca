@@ -299,7 +299,7 @@ test("event dialogs preserve their exit layout and roster profiles navigate to p
     });
     await expect(applicationPanel).toBeVisible();
     await applicationPanel
-      .getByText("View submitted application", { exact: true })
+      .locator('[data-application-mini-step="form"] summary')
       .click();
     await expect(applicationPanel.getByRole("heading")).toHaveText([
       "Application",
