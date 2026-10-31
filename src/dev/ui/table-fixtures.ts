@@ -277,6 +277,12 @@ export function createTableFixture(
           : person.name;
     return (
       compare(primary(a), primary(b)) * (state.direction === "desc" ? -1 : 1) ||
+      (applications && state.sort === "progress"
+        ? compare(
+            b.applicationCompletedAt ?? -Infinity,
+            a.applicationCompletedAt ?? -Infinity,
+          )
+        : 0) ||
       compare(a.name, b.name) ||
       compare(a.id, b.id)
     );

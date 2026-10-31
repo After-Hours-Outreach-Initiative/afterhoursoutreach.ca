@@ -967,8 +967,8 @@ test("review queue counts only review-ready applications matching search indepen
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
     0,
   );
-  // Sort the full result before slicing pages, retaining case-insensitive
-  // name/id ties even when the status groups are reversed.
+  // Sort the full result before slicing pages, keeping newest completions first
+  // within status groups and case-insensitive name/id ties in either direction.
   await env.DB.batch([
     env.DB.prepare(
       "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id='pending-52'",
@@ -1005,6 +1005,7 @@ test("review queue counts only review-ready applications matching search indepen
   const earlyCompletions = reviewNames.filter(
     (id) => !["pending-50", "pending-51"].includes(id),
   );
+  const reviewByCompletion = ["pending-51", "pending-50", ...earlyCompletions];
   const defaultPages = await Promise.all(
     [0, volunteerPageSize].map((offset) =>
       listApplications(env.DB, actor, "", offset),
@@ -1013,7 +1014,7 @@ test("review queue counts only review-ready applications matching search indepen
   const defaultRows = defaultPages.flatMap(({ rows }) => rows);
   assert.deepEqual(
     defaultRows.map(({ id }) => id),
-    [...reviewNames, "pending-52", "pending-01"],
+    [...reviewByCompletion, "pending-52", "pending-01"],
   );
   for (const [id, completedAt] of [
     ["pending-00", 0],
@@ -1029,8 +1030,8 @@ test("review queue counts only review-ready applications matching search indepen
   for (const [sort, direction, expected] of [
     ["name", "asc", [...ties, ...otherNames]],
     ["name", "desc", [...otherNames.toReversed(), ...ties]],
-    ["progress", "asc", [...reviewNames, "pending-52", "pending-01"]],
-    ["progress", "desc", ["pending-01", "pending-52", ...reviewNames]],
+    ["progress", "asc", [...reviewByCompletion, "pending-52", "pending-01"]],
+    ["progress", "desc", ["pending-01", "pending-52", ...reviewByCompletion]],
     ["role", "asc", [...reviewNames, "pending-01", "pending-52"]],
     ["role", "desc", ["pending-01", "pending-52", ...reviewNames]],
     [

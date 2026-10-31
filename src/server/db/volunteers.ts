@@ -109,7 +109,8 @@ async function listPeople(
   const applicationCompletedAtSql =
     "max(p.registered_at, p.naloxone_completed_at)";
   // Ascending status order is ready, in progress, rejected; descending reverses
-  // those groups. Match visible role badges, not raw account flags.
+  // those groups, always keeping newest completions first within each group.
+  // Match visible role badges, not raw account flags.
   // Only backend-owned expressions and directions enter ORDER BY. Sort the
   // entire matching directory before pagination, with stable name/id ties.
   const sortSql = applications
@@ -128,7 +129,14 @@ async function listPeople(
           WHEN category = 'medic' THEN 'Medic'
           ELSE '' END COLLATE NOCASE`
       : "name COLLATE NOCASE";
-  const orderSql = `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}, name COLLATE NOCASE, u.id`;
+  const orderSql = [
+    `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}`,
+    ...(applications && sort === "progress"
+      ? ["applicationCompletedAt DESC"]
+      : []),
+    "name COLLATE NOCASE",
+    "u.id",
+  ].join(", ");
   const [rows, counts] = (await db.batch([
     db
       .prepare(
