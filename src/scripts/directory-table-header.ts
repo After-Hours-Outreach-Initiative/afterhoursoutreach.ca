@@ -21,7 +21,7 @@ export function initDirectoryTableHeader(results: HTMLElement) {
     if (!frame?.isConnected || !table || !head) return;
     if (needsMeasurement) {
       // All geometry reads precede style writes, and only happen on layout
-      // changes. A fallback scroll frame only reads scrollY, never DOM geometry.
+      // changes. A scroll frame only reads scrollY, never DOM geometry.
       const bounds = table.getBoundingClientRect();
       const top = siteHeader?.getBoundingClientRect().height ?? 0;
       const headHeight = head.getBoundingClientRect().height;
@@ -37,7 +37,7 @@ export function initDirectoryTableHeader(results: HTMLElement) {
       lastShift = -1;
 
       window.removeEventListener("scroll", schedule);
-      if (mode === "fallback" && travel > 0)
+      if (travel > 0)
         window.addEventListener("scroll", schedule, { passive: true });
       frame.tabIndex = overflowing ? 0 : -1;
       frame.style.setProperty("--directory-table-header-top", `${top}px`);
@@ -55,8 +55,12 @@ export function initDirectoryTableHeader(results: HTMLElement) {
       if (mode !== "fallback") head.style.removeProperty("transform");
       frame.dataset.tableHeader = mode;
     }
+    const shift = Math.max(0, Math.min(window.scrollY - start, travel));
+    const stuck = String(shift > 0);
+    // Only the corner state changes at the sticky edge; native/timeline modes
+    // still leave all header positioning to the browser.
+    if (frame.dataset.headerStuck !== stuck) frame.dataset.headerStuck = stuck;
     if (mode === "fallback") {
-      const shift = Math.max(0, Math.min(window.scrollY - start, travel));
       if (shift !== lastShift) {
         head.style.transform = `translate3d(0, ${shift}px, 0)`;
         lastShift = shift;

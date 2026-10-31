@@ -1444,6 +1444,15 @@ body:has(
 .volunteer-table thead th:last-child {
   border-top-right-radius: 0.4375rem;
 }
+.volunteer-table-frame[data-header-stuck="true"],
+.volunteer-table-frame[data-header-stuck="true"] thead th {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.volunteer-table-frame[data-header-stuck="true"] thead th {
+  /* Keep the top edge below the page navigation, not behind its opaque layer. */
+  box-shadow: inset 0 1px #3f3f46;
+}
 .volunteer-table th {
   font-weight: normal;
 }

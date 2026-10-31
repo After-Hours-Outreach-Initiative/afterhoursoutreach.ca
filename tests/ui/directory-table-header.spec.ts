@@ -20,6 +20,16 @@ for (const fallback of [false, true]) {
       "scrollbar-color",
       "rgb(113, 113, 122) rgb(23, 26, 32)",
     );
+    const expectCorners = async (radius: string) => {
+      await expect(head.locator("th").first()).toHaveCSS(
+        "border-top-left-radius",
+        radius,
+      );
+      await expect(head.locator("th").last()).toHaveCSS(
+        "border-top-right-radius",
+        radius,
+      );
+    };
     const expectPinned = async () => {
       await expect
         .poll(async () =>
@@ -30,8 +40,14 @@ for (const fallback of [false, true]) {
           ),
         )
         .toBeLessThan(1);
+      await expectCorners("0px");
+      await expect(head.locator("th").first()).toHaveCSS(
+        "box-shadow",
+        "rgb(63, 63, 70) 0px 1px 0px 0px inset",
+      );
     };
     await expect(frame).toHaveAttribute("data-table-header", "native");
+    await expectCorners("7px");
     await frame.evaluate((element) =>
       window.scrollTo(0, element.getBoundingClientRect().top + scrollY + 200),
     );
@@ -45,14 +61,6 @@ for (const fallback of [false, true]) {
     await page.evaluate(() => window.scrollBy(0, 300));
     await expectPinned();
     await expect(head).toHaveCSS("background-color", "rgb(0, 0, 0)");
-    await expect(head.locator("th").first()).toHaveCSS(
-      "border-top-left-radius",
-      "7px",
-    );
-    await expect(head.locator("th").last()).toHaveCSS(
-      "border-top-right-radius",
-      "7px",
-    );
     await frame.evaluate((element) => (element.scrollLeft = 120));
     expect(
       await head.evaluate((element) =>
@@ -74,5 +82,7 @@ for (const fallback of [false, true]) {
     await expect(frame).toHaveAttribute("data-table-header", "native");
     await expect(head).toHaveCSS("transform", "none");
     await expectPinned();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expectCorners("7px");
   });
 }
