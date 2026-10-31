@@ -15,6 +15,11 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+    scrollbar-color: #71717a #171a20;
+  }
+
   /* One type scale for the whole site. Every heading level and every
      paragraph gets its size here, so pages carry layout classes only.
      h1 and h2 step up at md; the rest are one size at every width. */
@@ -62,7 +67,6 @@
   }
 
   dialog {
-    scrollbar-color: #52525b transparent;
     scrollbar-width: thin;
   }
 

@@ -8,12 +8,18 @@ for (const fallback of [false, true]) {
       await page.addInitScript(() => {
         CSS.supports = () => false;
       });
+    await page.emulateMedia({ colorScheme: "light" });
     await page.setViewportSize({ width: 1440, height: 800 });
     await page.goto(
       "/dev/ui/applications/preview?scenario=paginated&latency=0",
     );
     const frame = page.locator(".volunteer-table-frame");
     const head = frame.locator("thead");
+    await expect(frame).toHaveCSS("color-scheme", "dark");
+    await expect(frame).toHaveCSS(
+      "scrollbar-color",
+      "rgb(113, 113, 122) rgb(23, 26, 32)",
+    );
     const expectPinned = async () => {
       await expect
         .poll(async () =>

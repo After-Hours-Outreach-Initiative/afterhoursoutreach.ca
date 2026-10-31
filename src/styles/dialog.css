@@ -58,7 +58,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scrollbar-color: #52525b transparent;
   scrollbar-width: thin;
   overflow-wrap: anywhere;
 }
