@@ -1,4 +1,5 @@
 import { actionFragment } from "./action-page";
+import { initDirectoryTableHeader } from "./directory-table-header";
 import { initCompactPersonNames } from "./compact-person-name";
 
 export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
@@ -16,6 +17,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   );
   if (!root || !search || !form || !results || !error) return;
   initCompactPersonNames();
+  const refreshTableHeader = initDirectoryTableHeader(results);
   const people = filters ? "applications" : "volunteers";
 
   root.dataset.rowNavigation = "true";
@@ -102,6 +104,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
           `[data-volunteer-sort="${focusedSort}"]`,
         )
         ?.focus({ preventScroll: true });
+    refreshTableHeader();
   };
   const searchUrl = (resetOffset = true) => {
     const url = new URL(location.href);

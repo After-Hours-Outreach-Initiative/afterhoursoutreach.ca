@@ -1393,7 +1393,8 @@ body:has(
 }
 .volunteer-table-frame {
   border: var(--volunteer-border);
-  border-radius: 0.5rem;
+  /* Square header edges cannot expose rows underneath while pinned. */
+  border-radius: 0 0 0.5rem 0.5rem;
 }
 .volunteer-table {
   --volunteer-table-avatar-width: calc(
@@ -1415,22 +1416,15 @@ body:has(
   white-space: nowrap;
 }
 .volunteer-table thead {
-  position: sticky;
+  position: relative;
   top: 0;
   z-index: 1;
-  /* Back the entire header, including the gaps outside rounded cell corners. */
-  background: #000;
+  background: #171a20;
 }
 .volunteer-table thead th {
   padding-block: 0.5rem;
   background: #171a20;
   box-shadow: 0 -1px #3f3f46;
-}
-.volunteer-table thead th:first-child {
-  border-top-left-radius: 0.4375rem;
-}
-.volunteer-table thead th:last-child {
-  border-top-right-radius: 0.4375rem;
 }
 .volunteer-table th {
   font-weight: normal;
@@ -1520,6 +1514,35 @@ body:has(
   }
   .volunteer-table a.volunteer-table-sort {
     gap: 0.375rem;
+  }
+}
+.volunteer-table-frame[data-table-header="native"] {
+  overflow: visible;
+}
+.volunteer-table-frame[data-table-header="native"] thead {
+  position: sticky;
+  top: var(--directory-table-header-top, 0px);
+}
+.volunteer-table-frame:is(
+    [data-table-header="timeline"],
+    [data-table-header="fallback"]
+  )
+  thead {
+  will-change: transform;
+}
+.volunteer-table-frame[data-table-header="timeline"] thead {
+  /* JS supplies bounds only on layout changes; scrolling stays in the browser. */
+  animation: directory-table-header-stick auto linear both;
+  animation-timeline: scroll(root block);
+  animation-range: var(--directory-table-header-start)
+    var(--directory-table-header-end);
+}
+@keyframes directory-table-header-stick {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--directory-table-header-travel));
   }
 }
 .application-table-progress {
