@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const unexpectedRequests = new WeakMap<Page, string[]>();
 const currentProfileState =
-  '[data-patrol-status], [data-application-mini-step][aria-current="step"] .application-progress-mini-title';
+  '[data-patrol-status], [data-patrol-approval] .btn-red, [data-application-mini-step][aria-current="step"] .application-progress-mini-title';
 
 async function expectOrganizerField(field: Locator, label: string) {
   const term = field.locator("dt");
@@ -67,14 +67,14 @@ test("organizer profile catalogue exposes every real profile state without accou
     "orientation-booked": "Awaiting patrol approval",
     "orientation-completed": "Awaiting patrol approval",
     "medic-new-volunteer": "Awaiting patrol approval",
-    "outreach-volunteer": "Patrol access approved",
-    medic: "Patrol access approved",
-    inactive: "Patrol access approved",
-    organizer: "Patrol access approved",
+    "outreach-volunteer": "Revoke patrol approval",
+    medic: "Revoke patrol approval",
+    inactive: "Revoke patrol approval",
+    organizer: "Revoke patrol approval",
     "historic-approval": "Awaiting patrol approval",
-    "legacy-application": "Patrol access approved",
-    "profile-updated": "Patrol access approved",
-    "legacy-patrol": "Patrol access approved",
+    "legacy-application": "Revoke patrol approval",
+    "profile-updated": "Revoke patrol approval",
+    "legacy-patrol": "Revoke patrol approval",
   };
   await expect(page.locator("[data-ui-profile-scenario]")).toHaveCount(16);
   for (const [id, step] of Object.entries(states)) {
@@ -93,7 +93,7 @@ test("organizer profile catalogue exposes every real profile state without accou
     await expect(patrolApproval).toBeVisible();
     await expect(patrolApproval.getByRole("list")).toHaveCount(0);
     await expect(patrolApproval.getByRole("button")).toHaveCount(
-      ["Awaiting patrol approval", "Patrol access approved"].includes(step)
+      ["Awaiting patrol approval", "Revoke patrol approval"].includes(step)
         ? 1
         : 0,
     );
@@ -102,6 +102,20 @@ test("organizer profile catalogue exposes every real profile state without accou
         '.volunteer-profile-controls [data-access-kind="patrol"]',
       ),
     ).toHaveCount(0);
+    if (step === "Revoke patrol approval") {
+      await expect(patrolApproval.locator("[data-patrol-status]")).toHaveCount(
+        0,
+      );
+      await expect(
+        patrolApproval.getByText("Orientation not completed", { exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        patrolApproval.getByText("Patrol access approved", { exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        patrolApproval.locator("[data-orientation-status]"),
+      ).toHaveCount(id === "legacy-patrol" ? 0 : 1);
+    }
     await expect(
       preview.locator(
         '[data-volunteer-profile-panel="application"] .application-progress-mini-title',
@@ -141,7 +155,7 @@ test("organizer profile catalogue exposes every real profile state without accou
     page.getByRole("combobox", { name: "Viewport width" }),
   ).toHaveValue("375");
   await expect(preview.locator(currentProfileState)).toHaveText(
-    "Patrol access approved",
+    "Revoke patrol approval",
   );
 });
 
@@ -535,7 +549,7 @@ test("active status, account roles and patrol access can be changed through the 
     .click();
   await save();
   await expect(preview.locator(currentProfileState)).toHaveText(
-    "Patrol access approved",
+    "Revoke patrol approval",
   );
   await expectOrganizerField(
     patrolChange.locator("dl > div").first(),
@@ -568,6 +582,24 @@ test("profile previews stay on the page at every viewport, including old dialog 
     await expect(
       preview.getByRole("dialog", { name: "Volunteer profile", exact: true }),
     ).toHaveCount(0);
+    const approvalFields = preview.locator(
+      "[data-patrol-access-change] dl > div",
+    );
+    await expect
+      .poll(() =>
+        approvalFields.evaluateAll((fields) => {
+          const [organizer, date] = fields.map((field) =>
+            field.getBoundingClientRect(),
+          );
+          return Boolean(
+            organizer?.height &&
+            date?.height &&
+            date.top >= organizer.bottom &&
+            date.left === organizer.left,
+          );
+        }),
+      )
+      .toBe(true);
     expect(
       await preview
         .locator("html")

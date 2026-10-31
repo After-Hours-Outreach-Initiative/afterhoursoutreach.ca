@@ -26,13 +26,15 @@ const orientationEvent = completedOrientation ?? orientation;
   aria-labelledby="patrol-approval-heading"
 >
   <h2 id="patrol-approval-heading" data-contents-section>Patrol Approval</h2>
-  <p data-orientation-status>
-    {
-      completedOrientation
-        ? "Orientation completed"
-        : "Orientation not completed"
-    }
-  </p>
+  {
+    (completedOrientation || !person.patrolApproved) && (
+      <p data-orientation-status>
+        {completedOrientation
+          ? "Orientation completed"
+          : "Orientation not completed"}
+      </p>
+    )
+  }
   {
     orientationEvent && (
       <p data-orientation-event>
@@ -45,12 +47,8 @@ const orientationEvent = completedOrientation ?? orientation;
     )
   }
   {
-    Boolean(person.applicationApproved) && (
-      <p data-patrol-status>
-        {person.patrolApproved
-          ? "Patrol access approved"
-          : "Awaiting patrol approval"}
-      </p>
+    Boolean(person.applicationApproved) && !person.patrolApproved && (
+      <p data-patrol-status>Awaiting patrol approval</p>
     )
   }
   {

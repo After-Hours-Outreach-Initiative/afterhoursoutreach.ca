@@ -727,15 +727,13 @@ test("organizers review applications separately from approved volunteers with pe
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
-    await expect(patrolApproval.locator("[data-patrol-status]")).toHaveText(
-      "Patrol access approved",
-    );
+    await expect(patrolApproval.locator("[data-patrol-status]")).toHaveCount(0);
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
     ).toContainText("Approved by");
     await expect(
       patrolApproval.locator("[data-orientation-status]"),
-    ).toHaveText("Orientation not completed");
+    ).toHaveCount(0);
     assert.equal(
       await DB.prepare(
         "SELECT count(*) AS n FROM orientation_completion WHERE user_id='applicant-50'",
@@ -819,9 +817,7 @@ test("organizers review applications separately from approved volunteers with pe
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
-    await expect(patrolApproval.locator("[data-patrol-status]")).toHaveText(
-      "Patrol access approved",
-    );
+    await expect(patrolApproval.locator("[data-patrol-status]")).toHaveCount(0);
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
     ).toContainText("Approved by");

@@ -6,9 +6,12 @@ import {
 
 async function expectReadableCard(card: Locator) {
   await expect(card).toHaveCount(1);
-  await expect(
-    card.getByRole("heading", { name: "Patrol Approval", exact: true }),
-  ).toBeVisible();
+  const heading = card.getByRole("heading", {
+    name: "Patrol Approval",
+    exact: true,
+  });
+  await expect(heading).toBeVisible();
+  await expect(heading).toHaveCSS("font-size", "18px");
   await expect(card.getByRole("list")).toHaveCount(0);
   await expect(card.locator("[data-application-progress-mini]")).toHaveCount(0);
   await expect(card.locator('[data-access-kind="application"]')).toHaveCount(0);

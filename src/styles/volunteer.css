@@ -1666,12 +1666,18 @@ body:has(
   border-radius: 0.625rem;
   background: #111318;
 }
+.patrol-approval > h2 {
+  @apply text-lg;
+}
 .patrol-approval > p {
   margin-top: 0.5rem;
   color: #a1a1aa;
   font-size: 1rem;
   line-height: 1.5;
   overflow-wrap: break-word;
+}
+.patrol-approval .account-profile-summary dl {
+  grid-template-columns: minmax(0, 1fr);
 }
 .patrol-approval-actions,
 .organizer-application-review-actions {
