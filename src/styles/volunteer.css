@@ -1590,7 +1590,9 @@ body:has(
 [data-volunteer-profile] {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto var(--contents-bar-height, 4.875rem) auto;
+  grid-template-rows:
+    auto calc(var(--contents-bar-height, 3.375rem) + 1.5rem)
+    auto;
 }
 [data-volunteer-profile-overview] {
   grid-column: 1;
@@ -1625,6 +1627,18 @@ body:has(
 }
 [data-volunteer-profile] .volunteer-contents-sidebar h2 {
   @apply text-base;
+}
+@media (width < 64rem) {
+  [data-volunteer-profile] > .volunteer-contents {
+    margin-block: 0.5rem 1rem;
+    background: transparent;
+  }
+  [data-volunteer-profile] > .volunteer-contents::before {
+    content: none;
+  }
+  [data-volunteer-profile] .volunteer-contents-bar {
+    padding-block: 0;
+  }
 }
 [data-volunteer-profile-body] {
   grid-column: 1;

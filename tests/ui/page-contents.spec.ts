@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   createLocalAccount,
   openLocalAccountSwitcher,
+  signInLocalAuthenticatorAccount,
 } from "../helpers/local-account";
 
 for (const width of [390, 1280]) {
@@ -94,6 +95,64 @@ for (const width of [390, 1280]) {
     });
   }
 }
+
+test("organizer profiles keep only the compact contents bar sticky", async ({
+  page,
+  baseURL,
+}) => {
+  test.skip(!baseURL?.startsWith("http://localhost:"));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await signInLocalAuthenticatorAccount(page.request, baseURL!);
+
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/volunteers/local-fixture-user-robin");
+    const contents = page.locator(
+      "[data-volunteer-profile] > [data-page-contents]",
+    );
+    const bar = contents.locator("[data-contents-bar]");
+    const summary = contents.locator("[data-contents-menu] > summary");
+    await expect(contents).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(bar).toHaveCSS("padding", "0px");
+    expect(
+      await contents.evaluate(
+        (nav) => getComputedStyle(nav, "::before").content,
+      ),
+    ).toBe("none");
+    const initial = (await contents.boundingBox())!;
+    expect(initial.height).toBe((await summary.boundingBox())!.height);
+    const body = (await page
+      .locator("[data-volunteer-profile-body]")
+      .boundingBox())!;
+    expect(body.y - initial.y - initial.height).toBe(16);
+
+    await page.evaluate(
+      (top) => scrollTo({ top, behavior: "instant" }),
+      body.y + 150,
+    );
+    await expect(contents).toHaveAttribute("data-contents-stuck", "");
+    await expect
+      .poll(async () => {
+        const header = (await page.locator(".site-header").boundingBox())!;
+        const bounds = (await contents.boundingBox())!;
+        return Math.abs(bounds.y - header.y - header.height);
+      })
+      .toBeLessThan(1);
+    const stuck = (await contents.boundingBox())!;
+    expect(stuck.height).toBe((await summary.boundingBox())!.height);
+    expect(
+      await contents.evaluate((nav) => {
+        const bounds = nav.getBoundingClientRect();
+        return nav.contains(
+          document.elementFromPoint(
+            bounds.left + bounds.width / 2,
+            bounds.bottom + 8,
+          ),
+        );
+      }),
+    ).toBe(false);
+  }
+});
 
 test("profile pages opened directly or from rosters keep section navigation", async ({
   page,
