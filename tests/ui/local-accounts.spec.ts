@@ -913,6 +913,7 @@ test.skip("Connect Discord locally simulates consent, cancellation, failure and 
   );
   await expect(discord.locator("[data-discord-description]")).toBeHidden();
   await expect(discord).toHaveAttribute("data-state", "current");
+  const review = page.locator('[data-application-progress-step="review"]');
   await expect(
     review.getByText("Ready for review", { exact: true }),
   ).toHaveCount(0);
@@ -931,7 +932,6 @@ test.skip("Connect Discord locally simulates consent, cancellation, failure and 
   expect(screened.ok(), await screened.text()).toBe(true);
   await page.reload();
   await expect(discord).toHaveAttribute("data-state", "complete");
-  const review = page.locator('[data-application-progress-step="review"]');
   await expect(review).toHaveAttribute("data-state", "current");
   await expect(
     review.getByText("Ready for review", { exact: true }),
