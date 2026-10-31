@@ -1393,8 +1393,7 @@ body:has(
 }
 .volunteer-table-frame {
   border: var(--volunteer-border);
-  /* Square header edges cannot expose rows underneath while pinned. */
-  border-radius: 0 0 0.5rem 0.5rem;
+  border-radius: 0.5rem;
 }
 .volunteer-table {
   --volunteer-table-avatar-width: calc(
@@ -1419,12 +1418,31 @@ body:has(
   position: relative;
   top: 0;
   z-index: 1;
-  background: #171a20;
+  background: #000;
+}
+.volunteer-table thead::before {
+  /* Table backgrounds clip to cell radii; this layer masks the rows instead. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #000;
+  pointer-events: none;
+}
+.volunteer-table thead tr {
+  position: relative;
+  z-index: 1;
 }
 .volunteer-table thead th {
   padding-block: 0.5rem;
   background: #171a20;
   box-shadow: 0 -1px #3f3f46;
+}
+.volunteer-table thead th:first-child {
+  border-top-left-radius: 0.4375rem;
+}
+.volunteer-table thead th:last-child {
+  border-top-right-radius: 0.4375rem;
 }
 .volunteer-table th {
   font-weight: normal;

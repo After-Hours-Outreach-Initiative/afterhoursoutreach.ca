@@ -38,10 +38,14 @@ for (const fallback of [false, true]) {
     );
     await page.evaluate(() => window.scrollBy(0, 300));
     await expectPinned();
-    await expect(head).toHaveCSS("background-color", "rgb(23, 26, 32)");
+    await expect(head).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await expect(head.locator("th").first()).toHaveCSS(
       "border-top-left-radius",
-      "0px",
+      "7px",
+    );
+    await expect(head.locator("th").last()).toHaveCSS(
+      "border-top-right-radius",
+      "7px",
     );
     await frame.evaluate((element) => (element.scrollLeft = 120));
     expect(
