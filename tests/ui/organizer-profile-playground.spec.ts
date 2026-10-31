@@ -145,6 +145,29 @@ test("organizer profile catalogue exposes every real profile state without accou
   );
 });
 
+test("organizer profiles omit empty middle names but retain provided names", async ({
+  page,
+}) => {
+  for (const scenario of ["ready-for-review", "profile-updated"]) {
+    for (const content of ["minimal", "standard"]) {
+      await page.goto(
+        `/dev/ui/organizer-profile?scenario=${scenario}&content=${content}`,
+      );
+      const preview = page.frameLocator("[data-ui-profile-frame]");
+      await expect(preview.locator("[data-volunteer-profile]")).toBeVisible();
+      const middleNames = preview
+        .locator("dt")
+        .filter({ hasText: /^Middle name\(s\)$/ });
+      const expected =
+        content === "minimal" ? 0 : scenario === "profile-updated" ? 2 : 1;
+      await expect(middleNames).toHaveCount(expected);
+      await expect(middleNames.locator("+ dd")).toHaveText(
+        Array(expected).fill("Jordan"),
+      );
+    }
+  }
+});
+
 test("switching profile states preserves preview scrolling and reset starts at the top", async ({
   page,
 }) => {
@@ -330,13 +353,43 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
 test("rejections and email failures update only fictional state, and prerequisites remain real", async ({
   page,
 }) => {
-  await page.goto("/dev/ui/organizer-profile?latency=0&outcome=email-failure");
+  await page.goto(
+    "/dev/ui/organizer-profile?latency=0&outcome=email-failure&viewport=375",
+  );
   const preview = page.frameLocator("[data-ui-profile-frame]");
   await showPreview(page);
-  await preview.getByText("Reject application", { exact: true }).click();
+  const rejectAction = preview.getByText("Reject application", {
+    exact: true,
+  });
+  await expect(rejectAction).toHaveClass(/\bbtn btn-red\b/);
+  for (const button of [
+    preview.getByRole("button", { name: "Approve application", exact: true }),
+    rejectAction,
+  ]) {
+    await expect
+      .poll(() =>
+        button.evaluate((button) =>
+          Math.abs(
+            button.getBoundingClientRect().width -
+              button
+                .closest(".application-decision-actions")!
+                .getBoundingClientRect().width,
+          ),
+        ),
+      )
+      .toBeLessThan(1);
+  }
+  await rejectAction.click();
+  await page.mouse.move(0, 0);
   await preview
     .getByRole("textbox", { name: "Reason for rejection" })
     .fill("Fictional review reason.\nA second line for layout checks.");
+  await expect(rejectAction).toHaveCSS(
+    "background-color",
+    await preview
+      .getByRole("button", { name: "Reject application and email reason" })
+      .evaluate((button) => getComputedStyle(button).backgroundColor),
+  );
   await preview
     .getByRole("button", {
       name: "Reject application and email reason",

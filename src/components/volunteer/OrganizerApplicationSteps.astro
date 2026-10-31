@@ -27,7 +27,11 @@ const { profile, progress, idPrefix, showReview = false } = Astro.props;
         </p>
       )
     }
-    <ApplicationSummary {...profile.submission ?? profile} {idPrefix} />
+    <ApplicationSummary
+      {...profile.submission ?? profile}
+      {idPrefix}
+      hideEmptyMiddleNames
+    />
   </section>
   <div slot="review" class="organizer-application-review-details">
     {

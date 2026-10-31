@@ -97,6 +97,7 @@ const contents = [
               <AccountProfileAnswers
                 section={section}
                 values={profile.answers}
+                hideEmptyMiddleNames
               />
             </section>
           ))}
@@ -117,7 +118,11 @@ const contents = [
         idPrefix="volunteer"
         showReview
       >
-        <div slot="review" data-volunteer-controls>
+        <div
+          slot="review"
+          class="application-decision-actions"
+          data-volunteer-controls
+        >
           <div class="organizer-application-review-actions">
             <VolunteerAccessAction {person} kind="application" />
           </div>
@@ -125,7 +130,7 @@ const contents = [
             !person.applicationApproved &&
               !person.applicationRejectionReason && (
                 <details class="organizer-application-rejection">
-                  <summary class="cursor-pointer text-red-300 underline underline-offset-4">
+                  <summary class="btn btn-red cursor-pointer">
                     Reject application
                   </summary>
                   <form

@@ -9,14 +9,21 @@ import AnswerValue from "./AnswerValue.astro";
 interface Props {
   section: ReturnType<typeof profileFormSections>[number];
   values?: ApplicationAnswers | null;
+  hideEmptyMiddleNames?: boolean;
 }
-const { section, values } = Astro.props;
+const { section, values, hideEmptyMiddleNames = false } = Astro.props;
+const rows = profileAnswerRows(section, values).filter(
+  (row) =>
+    !hideEmptyMiddleNames ||
+    row.name !== "middleNames" ||
+    Boolean(values?.middleNames?.trim()),
+);
 ---
 
 <div class="account-profile-summary" data-profile-answers={section.key}>
   <dl>
     {
-      profileAnswerRows(section, values).map((row) => (
+      rows.map((row) => (
         <div
           data-profile-answer={row.name}
           class:list={{ "volunteer-wide": row.wide }}

@@ -22,6 +22,7 @@ interface Props {
   codeOfConductVersion: string | null;
   codeOfConductAcceptedAt: string | null;
   idPrefix?: string;
+  hideEmptyMiddleNames?: boolean;
 }
 const {
   answers: savedAnswers,
@@ -30,6 +31,7 @@ const {
   codeOfConductVersion,
   codeOfConductAcceptedAt,
   idPrefix = "submitted",
+  hideEmptyMiddleNames = false,
 } = Astro.props;
 // Display old immutable snapshots without rewriting the accepted submission.
 const answers = normalizeTrainingAnswers(savedAnswers);
@@ -70,6 +72,12 @@ const rows: {
   },
   ...applicationFields
     .filter((field) => field.name !== "heardAboutUs" || answers.heardAboutUs)
+    .filter(
+      (field) =>
+        !hideEmptyMiddleNames ||
+        field.name !== "middleNames" ||
+        Boolean(answers.middleNames.trim()),
+    )
     .filter(
       (field) =>
         !trainingDetailOptions.some((option) => option.name === field.name) ||

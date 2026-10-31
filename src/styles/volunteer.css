@@ -2191,6 +2191,11 @@ body:has(
   cursor: wait;
 }
 @media (width < 40rem) {
+  .application-decision-actions > *,
+  .application-decision-actions .volunteer-form,
+  .application-decision-actions .btn {
+    width: 100%;
+  }
   [data-application-draft-actions] .btn {
     padding: 0.5rem 0.75rem;
   }

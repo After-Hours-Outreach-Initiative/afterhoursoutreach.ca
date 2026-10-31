@@ -40,6 +40,7 @@ test("application table opens a focused review with guarded decisions and list c
   baseURL,
 }) => {
   test.skip(!baseURL?.startsWith("http://localhost:"));
+  await page.setViewportSize({ width: 375, height: 812 });
   const applicantContext = await browser.newContext();
   try {
     const account = await createLocalAccount(
@@ -81,6 +82,18 @@ test("application table opens a focused review with guarded decisions and list c
     for (const button of [approve, reject]) {
       await expect(button).toBeDisabled();
       await expect(button).toHaveCSS("background-color", "rgb(39, 39, 42)");
+      await expect
+        .poll(() =>
+          button.evaluate((button) =>
+            Math.abs(
+              button.getBoundingClientRect().width -
+                button
+                  .closest(".application-decision-actions")!
+                  .getBoundingClientRect().width,
+            ),
+          ),
+        )
+        .toBeLessThan(1);
     }
     const steps = review.locator("[data-application-mini-step]");
     await expect(steps).toHaveCount(2);
@@ -100,10 +113,35 @@ test("application table opens a focused review with guarded decisions and list c
     await page.reload();
     await expect(approve).toBeEnabled();
     await expect(steps.locator("time")).toHaveCount(2);
-    await review.getByText("Reject application", { exact: true }).click();
+    const rejectAction = review.getByText("Reject application", {
+      exact: true,
+    });
+    await expect(rejectAction).toHaveClass(/\bbtn btn-red\b/);
+    for (const button of [approve, rejectAction]) {
+      await expect
+        .poll(() =>
+          button.evaluate((button) =>
+            Math.abs(
+              button.getBoundingClientRect().width -
+                button
+                  .closest(".application-decision-actions")!
+                  .getBoundingClientRect().width,
+            ),
+          ),
+        )
+        .toBeLessThan(1);
+    }
+    await rejectAction.click();
+    await page.mouse.move(0, 0);
     await expect(
       review.getByRole("textbox", { name: "Reason for rejection" }),
     ).toBeEnabled();
+    await expect(rejectAction).toHaveCSS(
+      "background-color",
+      await review
+        .getByRole("button", { name: "Reject application and email reason" })
+        .evaluate((button) => getComputedStyle(button).backgroundColor),
+    );
     for (const time of await steps.locator("time").all()) {
       await expect(time).toHaveText(/\d{1,2}:\d{2}/);
       await expect(time).toHaveAttribute("datetime", /T.*Z$/);

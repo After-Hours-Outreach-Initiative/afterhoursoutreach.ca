@@ -41,14 +41,14 @@ const ready = isApplicationReadyForReview(progress);
     {
       !person.applicationApproved && (
         <div
-          class="review-actions mt-6"
+          class="review-actions application-decision-actions mt-6"
           data-volunteer-controls={ready ? "" : undefined}
         >
           <VolunteerAccessAction {person} kind="application" />
           {!person.applicationRejectionReason &&
             (ready ? (
               <details class="review-rejection">
-                <summary class="btn btn-outline cursor-pointer">
+                <summary class="btn btn-red cursor-pointer">
                   Reject application
                 </summary>
                 <form
@@ -91,7 +91,7 @@ const ready = isApplicationReadyForReview(progress);
                 </form>
               </details>
             ) : (
-              <button class="btn btn-outline" type="button" disabled>
+              <button class="btn btn-red" type="button" disabled>
                 Reject application
               </button>
             ))}
