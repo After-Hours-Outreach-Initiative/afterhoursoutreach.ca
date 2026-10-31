@@ -6,6 +6,7 @@ import { loadApplicationProgress } from "@/server/db/application-progress";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
 import { volunteerListReturnUrl } from "@/data/volunteer-list";
+import { personFullName } from "@/data/person-name";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import ApplicationReviewView from "@/components/volunteer/ApplicationReviewView.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
@@ -52,7 +53,7 @@ const returnUrl = volunteerListReturnUrl(
 ---
 
 <AccountLayout
-  title={person.name}
+  title={personFullName((profile.submission ?? profile).answers, person.name)}
   description="Organizer-only application review."
   signedIn
   organizer
@@ -71,9 +72,7 @@ const returnUrl = volunteerListReturnUrl(
       }</span
     >
   </a>
-  <section class="volunteer-panel">
-    <ApplicationReviewView {profile} {person} {progress} />
-  </section>
+  <ApplicationReviewView {profile} {person} {progress} />
 </AccountLayout>
 <script>
   import "@/scripts/volunteer";

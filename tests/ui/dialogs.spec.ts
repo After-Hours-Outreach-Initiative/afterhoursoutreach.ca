@@ -303,12 +303,12 @@ test("event dialogs preserve their exit layout and roster profiles navigate to p
       .click();
     await expect(applicationPanel.getByRole("heading")).toHaveText([
       "Application",
-      "Submission details",
       "Personal info",
       "Emergency contact",
       "Team interests",
       "Training and safety",
       "Personal statement",
+      "Submission details",
     ]);
     await expect(controls).toBeVisible();
   }

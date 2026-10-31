@@ -47,6 +47,17 @@ export const formatApplicationSubmittedTime = (value: string) =>
     timeZone: "America/Vancouver",
   });
 
+/** Keep the directory's completion column compact without changing detailed timestamps. */
+export const formatApplicationCompletedTime = (value: string) =>
+  new Date(value).toLocaleString("en-CA", {
+    timeZone: "America/Vancouver",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
 export function applicationDisplayName(
   answers: Pick<
     ApplicationAnswers,
@@ -459,12 +470,12 @@ export const profileReadOnlyFields: readonly (keyof ApplicationAnswers)[] = [
 
 /** Shared by the immutable application summary and organizer contents links. */
 export const submittedApplicationSections = [
-  { key: "submission", heading: "Submission details" },
   { key: "personal-info", heading: "Personal info" },
   { key: "emergency-contact", heading: "Emergency contact" },
   { key: "team-interests", heading: "Team interests" },
   { key: "training-and-safety", heading: "Training and safety" },
   { key: "about-volunteering", heading: "Personal statement" },
+  { key: "submission", heading: "Submission details" },
 ] as const;
 
 /** Keep form sections and their contents links in the same order. */

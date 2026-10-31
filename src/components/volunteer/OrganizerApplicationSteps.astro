@@ -1,0 +1,55 @@
+---
+import type { viewVolunteerProfile } from "@/server/db/volunteers";
+import type { ApplicationProgress } from "@/server/db/application-progress";
+import { formatApplicationSubmittedTime } from "@/data/application";
+import ApplicationProgressMini from "./ApplicationProgressMini.astro";
+import ApplicationSummary from "./ApplicationSummary.astro";
+
+interface Props {
+  profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
+  progress: ApplicationProgress;
+  idPrefix: string;
+  showReview?: boolean;
+}
+const { profile, progress, idPrefix, showReview = false } = Astro.props;
+---
+
+<ApplicationProgressMini {progress} {showReview} showTime>
+  <section
+    slot="application"
+    class="organizer-application-answers"
+    aria-label="Submitted answers"
+  >
+    {
+      !profile.submission && (
+        <p class="volunteer-help mt-4">
+          The original submitted application was not recorded. These details use
+          the current profile.
+        </p>
+      )
+    }
+    <ApplicationSummary {...profile.submission ?? profile} {idPrefix} />
+  </section>
+  <div slot="review" class="organizer-application-review-details">
+    {
+      progress.applicationApproved && (
+        <p class="volunteer-help mt-4">
+          {profile.applicationApprovedBy
+            ? `Approved by ${profile.applicationApprovedBy.name} (${profile.applicationApprovedBy.email}) on ${formatApplicationSubmittedTime(new Date(profile.applicationApprovedBy.approvedAt).toISOString())}`
+            : "Approving organizer not recorded."}
+        </p>
+      )
+    }
+    {
+      progress.applicationRejectionReason && (
+        <p
+          class="volunteer-help mt-4 whitespace-pre-wrap"
+          data-application-rejection
+        >
+          Reason: {progress.applicationRejectionReason}
+        </p>
+      )
+    }
+    <slot name="review" />
+  </div>
+</ApplicationProgressMini>

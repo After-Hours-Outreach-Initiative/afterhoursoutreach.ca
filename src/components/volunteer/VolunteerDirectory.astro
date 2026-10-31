@@ -6,7 +6,7 @@ import SearchIcon from "../icons/SearchIcon.astro";
 import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
 import CompactPersonName from "./CompactPersonName.astro";
-import { formatApplicationSubmittedTime } from "../../data/application";
+import { formatApplicationCompletedTime } from "../../data/application";
 import {
   directoryListUrl,
   volunteerPageSize,
@@ -233,7 +233,7 @@ const columns = (
                             person.applicationCompletedAt,
                           ).toISOString()}
                         >
-                          {formatApplicationSubmittedTime(
+                          {formatApplicationCompletedTime(
                             new Date(
                               person.applicationCompletedAt,
                             ).toISOString(),

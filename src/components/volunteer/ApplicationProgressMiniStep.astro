@@ -1,0 +1,83 @@
+---
+import CheckIcon from "@/components/icons/CheckIcon.astro";
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+import { formatApplicationSubmittedTime } from "@/data/application";
+
+interface Props {
+  step: {
+    key: string;
+    title: string;
+    completed: boolean;
+    completedAt: number | null;
+    status: string;
+  };
+  index: number;
+  state: "complete" | "current" | "upcoming" | "rejected";
+  current: boolean;
+  showTime: boolean;
+  expandable?: boolean;
+}
+const {
+  step,
+  index,
+  state,
+  current,
+  showTime,
+  expandable = false,
+} = Astro.props;
+const Container = expandable ? "details" : "div";
+const Heading = expandable ? "summary" : "div";
+const dates = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Vancouver",
+  dateStyle: "medium",
+});
+---
+
+<li
+  data-application-mini-step={step.key}
+  data-state={state}
+  aria-current={current ? "step" : undefined}
+  data-submitted-application={expandable && step.key === "form"
+    ? ""
+    : undefined}
+>
+  <Container>
+    <Heading class="application-progress-mini-heading">
+      <span class="application-progress-mini-marker" aria-hidden="true">
+        {step.completed ? <CheckIcon class="size-4" /> : index + 1}
+      </span>
+      <span class="application-progress-mini-label">
+        <span class="application-progress-mini-title">{step.title}</span>
+        <span class="application-progress-mini-status">
+          {step.status}
+          {
+            step.completed && step.completedAt !== null && (
+              <>
+                {" "}
+                ·{" "}
+                <time datetime={new Date(step.completedAt).toISOString()}>
+                  {showTime
+                    ? formatApplicationSubmittedTime(
+                        new Date(step.completedAt).toISOString(),
+                      )
+                    : dates.format(step.completedAt)}
+                </time>
+              </>
+            )
+          }
+          {
+            showTime && step.completed && step.completedAt === null && (
+              <> · Date and time not recorded</>
+            )
+          }
+        </span>
+      </span>
+      {
+        expandable && (
+          <ChevronDownIcon class="application-progress-mini-toggle size-5" />
+        )
+      }
+    </Heading>
+    <slot />
+  </Container>
+</li>

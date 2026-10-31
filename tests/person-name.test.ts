@@ -3,7 +3,29 @@ import { test } from "vitest";
 import {
   compactPersonDisplayName,
   personDisplayName,
+  personFullName,
 } from "../src/data/person-name";
+
+test("organizer detail names include every recorded name without using nicknames or initials", () => {
+  assert.equal(
+    personFullName({
+      firstName: " Alex ",
+      middleNames: " Jordan Marie ",
+      lastName: " de la Cruz ",
+      preferredName: "Lex",
+    }),
+    "Alex Jordan Marie de la Cruz",
+  );
+  assert.equal(
+    personFullName({ firstName: "Alex", lastName: "Lee" }),
+    "Alex Lee",
+  );
+  assert.equal(personFullName(null, "Legacy name"), "Legacy name");
+  assert.equal(
+    personFullName({ firstName: " ", middleNames: "" }, "Legacy name"),
+    "Legacy name",
+  );
+});
 
 test("compact names shorten only the given portion, preserving the full source name", () => {
   const name = personDisplayName({

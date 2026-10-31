@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   applicationTeamOptions,
   formatApplicationSubmittedTime,
+  formatApplicationCompletedTime,
   latestApplicationBirthDate,
   normalizeCertifications,
   outreachRequiredError,
@@ -33,6 +34,18 @@ test("application timestamps keep Vancouver time without timezone labels", () =>
     );
     expect(display).toMatch(/8:30:00/);
     expect(display).not.toMatch(/PST|PDT|GMT|UTC/);
+  }
+});
+
+test("completion table timestamps omit seconds as well as timezone labels", () => {
+  for (const value of [
+    "2025-01-02T04:30:45.000Z",
+    "2025-07-03T03:30:45.000Z",
+  ]) {
+    const display = formatApplicationCompletedTime(value);
+    expect(display).toMatch(/8:30/);
+    expect(display).not.toMatch(/8:30:|PST|PDT|GMT|UTC/);
+    expect(formatApplicationSubmittedTime(value)).toMatch(/8:30:45/);
   }
 });
 

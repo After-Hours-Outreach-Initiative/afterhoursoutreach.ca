@@ -1,7 +1,21 @@
 export interface PersonName {
   firstName?: string | null;
+  middleNames?: string | null;
   lastName?: string | null;
   preferredName?: string | null;
+}
+
+/** Organizer detail headings use the full recorded name, not a nickname or initials. */
+export function personFullName(
+  answers?: PersonName | null,
+  fallback = "",
+): string {
+  return (
+    [answers?.firstName, answers?.middleNames, answers?.lastName]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(" ") || fallback
+  );
 }
 
 /** Display only; never change the underlying profile or submitted answers. */

@@ -4,7 +4,10 @@ import { test } from "vitest";
 import { chromium, expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
-import { formatApplicationSubmittedTime } from "../../src/data/application";
+import {
+  formatApplicationCompletedTime,
+  formatApplicationSubmittedTime,
+} from "../../src/data/application";
 
 test("organizers review applications separately from approved volunteers with persistent list context", async () => {
   const origin = "https://afterhoursoutreach.ca";
@@ -74,8 +77,15 @@ test("organizers review applications separately from approved volunteers with pe
     await DB.prepare("UPDATE profile SET naloxone_completed_at=0").run();
     const submittedAt = "2026-09-15T18:30:00.000Z";
     const completedAt = "2026-09-16T19:45:00.000Z";
+    // Status sorting puts newest completions first. Keep the detailed subject
+    // on the second page rather than moving it ahead of the first 50 fixtures.
     await DB.prepare(
-      "UPDATE profile SET registered_at=?, naloxone_completed_at=?, code_of_conduct_version='2026-09-01', code_of_conduct_accepted_at=? WHERE user_id='applicant-50'",
+      "UPDATE profile SET naloxone_completed_at=? WHERE user_id >= 'applicant-00' AND user_id < 'applicant-50'",
+    )
+      .bind(Date.parse(completedAt) + 1)
+      .run();
+    await DB.prepare(
+      "UPDATE profile SET first_name='Alex', middle_names='Jordan Marie', last_name='de la Cruz', registered_at=?, naloxone_completed_at=?, code_of_conduct_version='2026-09-01', code_of_conduct_accepted_at=? WHERE user_id='applicant-50'",
     )
       .bind(
         Date.parse(submittedAt),
@@ -414,8 +424,14 @@ test("organizers review applications separately from approved volunteers with pe
     const completedTime = results.locator("tbody tr").first().locator("time");
     await expect(completedTime).toHaveAttribute("datetime", completedAt);
     await expect(completedTime).toHaveText(
-      formatApplicationSubmittedTime(completedAt),
+      formatApplicationCompletedTime(completedAt),
     );
+    for (const cell of await results
+      .locator("tbody tr")
+      .first()
+      .locator("th, td")
+      .all())
+      await expect(cell).toHaveCSS("vertical-align", "middle");
     await expect(results.locator("tbody th [data-volunteer-role]")).toHaveCount(
       0,
     );
@@ -472,11 +488,28 @@ test("organizers review applications separately from approved volunteers with pe
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(`${origin}${applicationHref}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      "applicant-50",
+      "Alex Jordan Marie de la Cruz",
     );
+    await expect(page.locator(".volunteer-panel")).toHaveCount(0);
+    const formStep = page.locator(
+      '[data-application-mini-step="form"] details',
+    );
+    await expect(formStep).not.toHaveAttribute("open");
+    await expect(
+      page.locator('[data-application-mini-step="review"]'),
+    ).toHaveCount(0);
+    await formStep.locator("summary").click();
     await expect(
       page.getByRole("region", { name: "Submitted answers", exact: true }),
     ).toContainText("PRIVATE QUEUE ANSWER");
+    await expect(formStep.locator("h3")).toHaveText([
+      "Personal info",
+      "Emergency contact",
+      "Team interests",
+      "Training and safety",
+      "Personal statement",
+      "Submission details",
+    ]);
     await expect(page.locator("[data-volunteer-progression]")).toHaveCount(0);
     // Progression, profile editing, and patrol controls belong to the volunteer profile.
     await page.goto(`${origin}${profileHref}`);
@@ -562,12 +595,12 @@ test("organizers review applications separately from approved volunteers with pe
     const summary = application.locator(".account-profile-summary");
     await expect(application.getByRole("heading")).toHaveText([
       "Application",
-      "Submission details",
       "Personal info",
       "Emergency contact",
       "Team interests",
       "Training and safety",
       "Personal statement",
+      "Submission details",
     ]);
     const answer = (label: string) =>
       summary
@@ -819,7 +852,7 @@ test("organizers review applications separately from approved volunteers with pe
     const approvedDirectory = await get("/volunteers?q=applicant-50");
     assert.match(
       await approvedDirectory.text(),
-      /data-volunteer-profile-link[^>]*><span>applicant-50</,
+      /data-volunteer-profile-link[^>]*><span>applicant-50 d\.</,
     );
     await expect(progression.locator("[data-orientation-event]")).toContainText(
       "Queue orientation",
@@ -932,11 +965,9 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       plain.getByRole("heading", { name: "Profile", exact: true }),
     ).toHaveCount(0);
+    await plain.locator('[data-application-mini-step="form"] summary').click();
     await expect(
-      plain.getByRole("heading", {
-        name: "Submitted answers",
-        exact: true,
-      }),
+      plain.getByRole("region", { name: "Submitted answers", exact: true }),
     ).toBeVisible();
     await expect(
       plain.getByRole("link", { name: "Back to applications" }),

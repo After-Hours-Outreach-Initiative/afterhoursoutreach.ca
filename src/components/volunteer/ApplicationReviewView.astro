@@ -7,8 +7,8 @@ import {
   isApplicationReadyForReview,
   type ApplicationProgress,
 } from "@/server/db/application-progress";
-import ApplicationProgressMini from "./ApplicationProgressMini.astro";
-import ApplicationSummary from "./ApplicationSummary.astro";
+import { personFullName } from "@/data/person-name";
+import OrganizerApplicationSteps from "./OrganizerApplicationSteps.astro";
 import VolunteerAccessAction from "./VolunteerAccessAction.astro";
 
 interface Props {
@@ -21,10 +21,16 @@ const ready = isApplicationReadyForReview(progress);
 ---
 
 <article class="application-review" data-application-review>
-  <h1 data-application-review-heading tabindex="-1">{person.name}</h1>
+  <h1 data-application-review-heading tabindex="-1">
+    {personFullName((profile.submission ?? profile).answers, person.name)}
+  </h1>
   <section class="mt-8" aria-labelledby="application-review-progress-heading">
     <h2 id="application-review-progress-heading">Progress</h2>
-    <ApplicationProgressMini {progress} showTime />
+    <OrganizerApplicationSteps
+      {profile}
+      {progress}
+      idPrefix="application-review"
+    />
     {
       person.applicationRejectionReason && (
         <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
@@ -93,31 +99,15 @@ const ready = isApplicationReadyForReview(progress);
       )
     }
   </section>
-  <section
-    class="mt-10"
-    aria-labelledby="application-review-answers-heading"
-    data-submitted-application
-  >
-    <h2 id="application-review-answers-heading">Submitted answers</h2>
-    {
-      !profile.submission && (
-        <p class="volunteer-help mt-4">
-          The original submitted application was not recorded. These details use
-          the current profile.
-        </p>
-      )
-    }
-    <ApplicationSummary
-      {...profile.submission ?? profile}
-      idPrefix="application-review"
-    />
-  </section>
 </article>
 
 <style>
   .application-review h1 {
     font-size: var(--text-3xl);
     overflow-wrap: anywhere;
+  }
+  .application-review {
+    margin-top: 2rem;
   }
   .application-review h2 {
     font-size: var(--text-xl);

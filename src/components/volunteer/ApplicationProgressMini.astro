@@ -3,14 +3,14 @@ import {
   isApplicationReadyForReview,
   type ApplicationProgress,
 } from "@/server/db/application-progress";
-import CheckIcon from "@/components/icons/CheckIcon.astro";
-import { formatApplicationSubmittedTime } from "@/data/application";
+import ApplicationProgressMiniStep from "./ApplicationProgressMiniStep.astro";
 
 interface Props {
   progress: ApplicationProgress;
   showTime?: boolean;
+  showReview?: boolean;
 }
-const { progress, showTime = false } = Astro.props;
+const { progress, showTime = false, showReview = true } = Astro.props;
 const steps = [
   {
     key: "form",
@@ -40,12 +40,8 @@ const steps = [
           ? "Ready for review"
           : "Not reviewed",
   },
-];
+].filter((step) => showReview || step.key !== "review");
 const current = steps.findIndex((step) => !step.completed);
-const dates = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Vancouver",
-  dateStyle: "medium",
-});
 ---
 
 <ol
@@ -56,9 +52,13 @@ const dates = new Intl.DateTimeFormat("en-CA", {
 >
   {
     steps.map((step, index) => (
-      <li
-        data-application-mini-step={step.key}
-        data-state={
+      <ApplicationProgressMiniStep
+        {step}
+        {index}
+        {showTime}
+        expandable={step.key === "form" && Astro.slots.has("application")}
+        current={index === current}
+        state={
           step.key === "review" && progress.applicationRejectionReason
             ? "rejected"
             : step.completed
@@ -67,34 +67,10 @@ const dates = new Intl.DateTimeFormat("en-CA", {
                 ? "current"
                 : "upcoming"
         }
-        aria-current={index === current ? "step" : undefined}
       >
-        <span class="application-progress-mini-marker" aria-hidden="true">
-          {step.completed ? <CheckIcon class="size-4" /> : index + 1}
-        </span>
-        <span class="application-progress-mini-label">
-          <span class="application-progress-mini-title">{step.title}</span>
-          <span class="application-progress-mini-status">
-            {step.status}
-            {step.completed && step.completedAt !== null && (
-              <>
-                {" "}
-                ·{" "}
-                <time datetime={new Date(step.completedAt).toISOString()}>
-                  {showTime
-                    ? formatApplicationSubmittedTime(
-                        new Date(step.completedAt).toISOString(),
-                      )
-                    : dates.format(step.completedAt)}
-                </time>
-              </>
-            )}
-            {showTime && step.completed && step.completedAt === null && (
-              <> · Date and time not recorded</>
-            )}
-          </span>
-        </span>
-      </li>
+        {step.key === "form" && <slot name="application" />}
+        {step.key === "review" && <slot name="review" />}
+      </ApplicationProgressMiniStep>
     ))
   }
 </ol>
