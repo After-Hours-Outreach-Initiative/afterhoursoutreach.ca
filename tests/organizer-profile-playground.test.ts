@@ -109,6 +109,7 @@ describe("organizer profile playground fixtures", () => {
       ...profileSimulationState(original),
       approved: true,
       patrol: true,
+      patrolChangedAt: Date.UTC(2026, 9, 31, 18, 30),
       role: "organizer" as const,
     };
     const parsed = readProfileState(profileStateQuery(options, state));
@@ -119,6 +120,15 @@ describe("organizer profile playground fixtures", () => {
       patrolApproved: 1,
       role: "organizer",
     });
+    expect(updated.profile.patrolAccessChangedBy).toMatchObject({
+      name: "Morgan C.",
+      changedAt: state.patrolChangedAt,
+    });
+    const revoked = createProfileFixture(options, { ...state, patrol: false });
+    expect(revoked.person.patrolApproved).toBe(0);
+    expect(revoked.profile.patrolAccessChangedBy).toEqual(
+      updated.profile.patrolAccessChangedBy,
+    );
     expect(createProfileFixture(options)).toEqual(original);
     expect(readProfileState(new URLSearchParams())).toBeUndefined();
   });

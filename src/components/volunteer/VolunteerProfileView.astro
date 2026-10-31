@@ -13,7 +13,7 @@ import OrganizerApplicationSteps from "@/components/volunteer/OrganizerApplicati
 import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.astro";
 import VolunteerAccessAction from "@/components/volunteer/VolunteerAccessAction.astro";
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
-import VolunteerProgression from "@/components/volunteer/VolunteerProgression.astro";
+import PatrolApproval from "@/components/volunteer/PatrolApproval.astro";
 import PageContents from "@/components/volunteer/PageContents.astro";
 import type { ApplicationProgress } from "@/server/db/application-progress";
 interface Props {
@@ -26,9 +26,8 @@ interface Props {
 const { profile, person, orientation, completedOrientation, progress } =
   Astro.props;
 const profileSections = profileFormSections();
-const medic = profile.answers.teams.includes("medic");
 const contents = [
-  { id: "volunteer-progression-heading", heading: "Volunteer progression" },
+  { id: "patrol-approval-heading", heading: "Patrol Approval" },
   ...(person.applicationApproved
     ? [
         { id: "volunteer-profile-panel", heading: "Profile" },
@@ -62,11 +61,11 @@ const contents = [
   </div>
   <PageContents entries={contents} heading="Sections" idleHeading="Sections" />
   <div data-volunteer-profile-body>
-    <VolunteerProgression
+    <PatrolApproval
       {person}
       {orientation}
       {completedOrientation}
-      {medic}
+      accessChangedBy={profile.patrolAccessChangedBy}
     />
     {
       Boolean(person.applicationApproved) && (

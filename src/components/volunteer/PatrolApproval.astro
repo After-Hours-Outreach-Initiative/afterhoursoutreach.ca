@@ -1,0 +1,90 @@
+---
+import type {
+  VolunteerOrientation,
+  VolunteerPatrolAccessChange,
+  VolunteerRow,
+} from "@/server/db/volunteers";
+import VolunteerAccessAction from "./VolunteerAccessAction.astro";
+import { formatEventDate } from "@/data/event-time";
+import { formatApplicationSubmittedTime } from "@/data/application";
+
+interface Props {
+  person: VolunteerRow;
+  orientation: VolunteerOrientation | null;
+  completedOrientation: VolunteerOrientation | null;
+  accessChangedBy: VolunteerPatrolAccessChange | null;
+}
+const { person, orientation, completedOrientation, accessChangedBy } =
+  Astro.props;
+const orientationEvent = completedOrientation ?? orientation;
+---
+
+<section
+  class="patrol-approval"
+  data-patrol-approval
+  data-volunteer-controls
+  aria-labelledby="patrol-approval-heading"
+>
+  <h2 id="patrol-approval-heading" data-contents-section>Patrol Approval</h2>
+  <p data-orientation-status>
+    {
+      completedOrientation
+        ? "Orientation completed"
+        : "Orientation not completed"
+    }
+  </p>
+  {
+    orientationEvent && (
+      <p data-orientation-event>
+        {!completedOrientation && "Registered orientation: "}
+        <time datetime={new Date(orientationEvent.startsAt).toISOString()}>
+          {formatEventDate(orientationEvent.startsAt)}
+        </time>{" "}
+        · {orientationEvent.meetingPoint}
+      </p>
+    )
+  }
+  {
+    Boolean(person.applicationApproved) && (
+      <p data-patrol-status>
+        {person.patrolApproved
+          ? "Patrol access approved"
+          : "Awaiting patrol approval"}
+      </p>
+    )
+  }
+  {
+    accessChangedBy && (
+      <div class="account-profile-summary mt-4" data-patrol-access-change>
+        <dl>
+          <div>
+            <dt>{person.patrolApproved ? "Approved by" : "Revoked by"}</dt>
+            <dd>
+              {accessChangedBy.name} ({accessChangedBy.email})
+            </dd>
+          </div>
+          <div>
+            <dt>{person.patrolApproved ? "Approved on" : "Revoked on"}</dt>
+            <dd>
+              <time
+                datetime={new Date(accessChangedBy.changedAt).toISOString()}
+              >
+                {formatApplicationSubmittedTime(
+                  new Date(accessChangedBy.changedAt).toISOString(),
+                )}
+              </time>
+            </dd>
+          </div>
+        </dl>
+      </div>
+    )
+  }
+  {!person.active && <p>Volunteer account inactive</p>}
+  {
+    Boolean(person.applicationApproved) && (
+      <div class="patrol-approval-actions">
+        <VolunteerAccessAction {person} kind="patrol" />
+      </div>
+    )
+  }
+</section>

@@ -69,7 +69,7 @@ test("application table opens a focused review with guarded decisions and list c
     await expect(
       review.getByRole("heading", { name: "Progress", exact: true }),
     ).toBeVisible();
-    await expect(review.locator("[data-volunteer-progression]")).toHaveCount(0);
+    await expect(review.locator("[data-patrol-approval]")).toHaveCount(0);
     const approve = review.getByRole("button", {
       name: "Approve application",
       exact: true,
@@ -83,7 +83,10 @@ test("application table opens a focused review with guarded decisions and list c
       await expect(button).toHaveCSS("background-color", "rgb(39, 39, 42)");
     }
     const steps = review.locator("[data-application-mini-step]");
-    await expect(steps).toHaveCount(3);
+    await expect(steps).toHaveCount(2);
+    await expect(
+      review.locator('[data-application-mini-step="review"]'),
+    ).toHaveCount(0);
     await expect(steps.locator("time")).toHaveCount(1);
     await expect(steps.locator("time")).toHaveText(/\d{1,2}:\d{2}/);
     const completion = await applicantContext.request.post(
@@ -456,7 +459,9 @@ test("an in-progress application preserves its course draft and focus until conf
     ).toBeVisible();
     const profile = await page.request.get(`/volunteers/${account.id}`);
     const profileHtml = await profile.text();
-    expect(profileHtml).toContain("Application in progress");
+    expect(profileHtml).toContain(
+      'data-application-mini-step="naloxone" data-state="current"',
+    );
     const blockedApproval = await page.request.post(
       "/api/v1/organizer/action",
       {

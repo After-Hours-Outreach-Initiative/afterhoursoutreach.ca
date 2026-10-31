@@ -1,6 +1,5 @@
 ---
 import type { VolunteerRow } from "@/server/db/volunteers";
-import VolunteerAccessAction from "./VolunteerAccessAction.astro";
 interface Props {
   person: VolunteerRow;
 }
@@ -18,9 +17,6 @@ const { person } = Astro.props;
   {
     Boolean(person.applicationApproved) && (
       <>
-        {Boolean(person.patrolApproved) && (
-          <VolunteerAccessAction {person} kind="patrol" />
-        )}
         <form
           class="volunteer-form"
           data-organizer-status

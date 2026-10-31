@@ -1892,6 +1892,118 @@ async function patrolApprovalFixture() {
   return { organizer, volunteer, input: { userId: volunteer.id, version: 0 } };
 }
 
+test("patrol access attribution follows approvals and revocations, not unrelated organizer changes", async () => {
+  const { organizer, volunteer, input } = await patrolApprovalFixture();
+  const reviewer: Actor = {
+    ...(await draftActor("patrol-reviewer")),
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+  };
+  await saveProfile(env.DB, reviewer.id, {
+    ...completeAnswers(),
+    firstName: "Taylor",
+    lastName: "Reviewer",
+    preferredName: "Taylor",
+    codeOfConductAccepted: true,
+  });
+  await env.DB.prepare(
+    "UPDATE user SET role='organizer', name='Taylor Reviewer' WHERE id=?",
+  )
+    .bind(reviewer.id)
+    .run();
+  const readChange = async () =>
+    (await viewVolunteerProfile(env.DB, organizer, volunteer.id))!
+      .patrolAccessChangedBy;
+  const version = async () =>
+    (await env.DB.prepare(
+      "SELECT updated_at FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first<number>("updated_at"))!;
+  assert.equal(await readChange(), null);
+  await approveForPatrols(env.DB, organizer, input);
+  const approval = await readChange();
+  assert.deepEqual(approval, {
+    id: organizer.id,
+    name: applicationDisplayName(completeAnswers()),
+    email: "patrol-organizer@example.org",
+    changedAt: await version(),
+  });
+  await setVolunteerStatus(env.DB, reviewer, {
+    userId: volunteer.id,
+    version: await version(),
+    active: false,
+    applicationApproved: true,
+    patrolApproved: true,
+  });
+  await env.DB.prepare(
+    `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+      VALUES ('unrelated-application-approval', ?, ?, 'approval_changed', '["applicationApproved"]', ?)`,
+  )
+    .bind(reviewer.id, volunteer.id, await version())
+    .run();
+  assert.deepEqual(await readChange(), approval);
+  await setVolunteerStatus(env.DB, reviewer, {
+    userId: volunteer.id,
+    version: await version(),
+    active: false,
+    applicationApproved: true,
+    patrolApproved: false,
+  });
+  const revocation = await readChange();
+  assert.deepEqual(revocation, {
+    id: reviewer.id,
+    name: "Taylor R.",
+    email: "patrol-reviewer@example.org",
+    changedAt: await version(),
+  });
+  assert.ok(revocation!.changedAt > approval!.changedAt);
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT approved_by FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first("approved_by"),
+    null,
+  );
+  await approveForPatrols(env.DB, organizer, {
+    userId: volunteer.id,
+    version: await version(),
+  });
+  assert.deepEqual(await readChange(), {
+    ...approval,
+    changedAt: await version(),
+  });
+  assert.equal(
+    "patrolAccessChangedBy" in (await loadProfile(env.DB, volunteer.id))!,
+    false,
+  );
+  await assert.rejects(
+    viewVolunteerProfile(env.DB, volunteer, volunteer.id),
+    statusError(403),
+  );
+});
+
+test("legacy patrol approval attribution retains its recorded organizer and epoch timestamp without an audit", async () => {
+  const { organizer, volunteer } = await patrolApprovalFixture();
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=1, approved_by=?, approved_at=0 WHERE user_id=?",
+  )
+    .bind(organizer.id, volunteer.id)
+    .run();
+  assert.deepEqual(
+    (await viewVolunteerProfile(env.DB, organizer, volunteer.id))
+      ?.patrolAccessChangedBy,
+    {
+      id: organizer.id,
+      name: applicationDisplayName(completeAnswers()),
+      email: "patrol-organizer@example.org",
+      changedAt: 0,
+    },
+  );
+});
+
 test("one patrol approval records orientation, approval, attribution and optional email atomically", async () => {
   const { organizer, volunteer, input } = await patrolApprovalFixture();
   const attendanceInput = { ...input, eventId: "patrol-orientation" };

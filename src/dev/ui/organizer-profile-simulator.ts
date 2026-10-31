@@ -343,6 +343,7 @@ function initializeProfileSimulator() {
         throw new Error(
           "The applicant must complete Naloxone 101 before approval.",
         );
+      if (next.patrol !== current.patrol) next.patrolChangedAt = Date.now();
       if (!(await refreshProfile(next, selector, actionGeneration))) return;
       phase =
         outcome === "email-failure" && notify ? "saved-email-failed" : "saved";

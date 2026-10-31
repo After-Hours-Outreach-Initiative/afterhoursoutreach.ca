@@ -1,7 +1,6 @@
 ---
 import type { viewVolunteerProfile } from "@/server/db/volunteers";
 import type { ApplicationProgress } from "@/server/db/application-progress";
-import { formatApplicationSubmittedTime } from "@/data/application";
 import ApplicationProgressMini from "./ApplicationProgressMini.astro";
 import ApplicationSummary from "./ApplicationSummary.astro";
 
@@ -33,11 +32,18 @@ const { profile, progress, idPrefix, showReview = false } = Astro.props;
   <div slot="review" class="organizer-application-review-details">
     {
       progress.applicationApproved && (
-        <p class="volunteer-help mt-4">
-          {profile.applicationApprovedBy
-            ? `Approved by ${profile.applicationApprovedBy.name} (${profile.applicationApprovedBy.email}) on ${formatApplicationSubmittedTime(new Date(profile.applicationApprovedBy.approvedAt).toISOString())}`
-            : "Approving organizer not recorded."}
-        </p>
+        <div class="account-profile-summary mt-4" data-application-approved-by>
+          <dl>
+            <div class="volunteer-wide">
+              <dt>Approved by</dt>
+              <dd>
+                {profile.applicationApprovedBy
+                  ? `${profile.applicationApprovedBy.name} (${profile.applicationApprovedBy.email})`
+                  : "Approving organizer not recorded."}
+              </dd>
+            </div>
+          </dl>
+        </div>
       )
     }
     {

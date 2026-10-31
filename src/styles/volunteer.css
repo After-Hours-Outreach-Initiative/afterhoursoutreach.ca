@@ -1658,82 +1658,22 @@ body:has(
   padding-top: 0;
   border-top: 0;
 }
-.volunteer-progression {
+.patrol-approval {
   min-width: 0;
   margin-bottom: 2.5rem;
-}
-.volunteer-progression-list {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.75rem;
-  margin-top: 1.25rem;
-  padding: 0;
-  list-style: none;
-}
-.volunteer-progression-step {
-  display: block;
-  min-width: 0;
   padding: 1rem;
   border: 1px solid #27272a;
   border-radius: 0.625rem;
   background: #111318;
 }
-.volunteer-progression-step[data-state="current"] {
-  border-color: #60a5fa;
-  background: #14243b;
-}
-.volunteer-progression-step[data-state="complete"] {
-  border-color: #2b4032;
-  background: #101a14;
-}
-.volunteer-progression .progression-content {
-  min-width: 0;
-  width: 100%;
-}
-.volunteer-progression .progression-heading {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-width: 0;
-}
-.volunteer-progression .progression-marker {
-  display: grid;
-  place-items: center;
-  flex: 0 0 2rem;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid #71717a;
-  border-radius: 50%;
+.patrol-approval > p {
+  margin-top: 0.5rem;
   color: #a1a1aa;
-  font-size: 1rem;
-  line-height: 1;
-}
-.volunteer-progression-step[data-state="current"] .progression-marker {
-  border-color: #60a5fa;
-  background: #172554;
-  color: #bfdbfe;
-}
-.volunteer-progression-step[data-state="complete"] .progression-marker {
-  border-color: #4ade80;
-  color: #4ade80;
-}
-.volunteer-progression h3 {
-  min-width: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  line-height: 1.5;
-}
-.volunteer-progression p {
-  margin-top: 0.75rem;
   font-size: 1rem;
   line-height: 1.5;
   overflow-wrap: break-word;
 }
-.volunteer-progression .progression-status {
-  margin-top: 0.375rem;
-  color: #a1a1aa;
-}
-.volunteer-progression-actions,
+.patrol-approval-actions,
 .organizer-application-review-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1741,7 +1681,7 @@ body:has(
   gap: 0.75rem;
   margin-top: 1rem;
 }
-.volunteer-progression-actions > .volunteer-form,
+.patrol-approval-actions > .volunteer-form,
 .organizer-application-review-actions > .volunteer-form {
   min-width: 0;
   max-width: 100%;
@@ -1749,7 +1689,7 @@ body:has(
   padding: 0;
   border: 0;
 }
-.volunteer-progression .btn,
+.patrol-approval .btn,
 .organizer-application-review-details .btn {
   max-width: 100%;
   white-space: normal;

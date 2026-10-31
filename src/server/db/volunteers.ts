@@ -201,6 +201,13 @@ export interface VolunteerOrientation {
   meetingPoint: string;
 }
 
+export interface VolunteerPatrolAccessChange {
+  id: string;
+  name: string;
+  email: string;
+  changedAt: number;
+}
+
 /** Prefer the next booked orientation, otherwise the latest started orientation. */
 export function findVolunteerOrientation(
   db: Env["DB"],
@@ -314,6 +321,31 @@ export async function viewVolunteerProfile(
         ORDER BY a.created_at DESC, a.rowid DESC LIMIT 1`,
       )
       .bind(userId, accessId),
+    // Revocation clears approved_by/approved_at, so use the latest patrol-specific
+    // audit. Retain attribution for older approvals recorded only on the status.
+    db
+      .prepare(
+        `SELECT organizer.id, ${personDisplayNameSql({
+          firstName: "organizer_profile.first_name",
+          lastName: "organizer_profile.last_name",
+          preferredName: "organizer_profile.preferred_name",
+          legacyName: "organizer.name",
+        })} AS name, organizer.email, change.changedAt
+        FROM (
+          SELECT actor_id, created_at AS changedAt, rowid AS sequence FROM audit_log
+          WHERE subject_id=? AND action='approval_changed'
+            AND EXISTS (SELECT 1 FROM json_each(changed_fields) WHERE value='patrolApproved')
+          UNION ALL
+          SELECT approved_by, approved_at, 0 FROM volunteer_status
+          WHERE user_id=? AND patrol_approved=1
+            AND approved_by IS NOT NULL AND approved_at IS NOT NULL
+        ) change
+        JOIN user organizer ON organizer.id=change.actor_id
+        LEFT JOIN profile organizer_profile ON organizer_profile.user_id=organizer.id
+        WHERE EXISTS (SELECT 1 FROM audit_log WHERE id=?)
+        ORDER BY change.changedAt DESC, change.sequence DESC LIMIT 1`,
+      )
+      .bind(userId, userId, accessId),
   ]);
   if (!results[0].meta.changes)
     throw new RequestError(
@@ -354,6 +386,8 @@ export async function viewVolunteerProfile(
   } = row;
   const applicationApprovedBy = results[2].results[0] as
     { id: string; name: string; email: string; approvedAt: number } | undefined;
+  const patrolAccessChangedBy = results[3].results[0] as
+    VolunteerPatrolAccessChange | undefined;
   const sources = row.heardAboutUsSources
     ? (JSON.parse(row.heardAboutUsSources) as string[])
     : [];
@@ -383,6 +417,7 @@ export async function viewVolunteerProfile(
     } satisfies ApplicationAnswers,
     email,
     applicationApprovedBy: applicationApprovedBy ?? null,
+    patrolAccessChangedBy: patrolAccessChangedBy ?? null,
     submittedAt: new Date(submittedAt).toISOString(),
     naloxoneCompletedAt,
     codeOfConductVersion,

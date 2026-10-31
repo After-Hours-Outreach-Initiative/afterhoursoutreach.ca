@@ -510,8 +510,8 @@ test("organizers review applications separately from approved volunteers with pe
       "Personal statement",
       "Submission details",
     ]);
-    await expect(page.locator("[data-volunteer-progression]")).toHaveCount(0);
-    // Progression, profile editing, and patrol controls belong to the volunteer profile.
+    await expect(page.locator("[data-patrol-approval]")).toHaveCount(0);
+    // Profile editing and patrol controls belong to the volunteer profile.
     await page.goto(`${origin}${profileHref}`);
     await expect(page.locator("[data-volunteer-profile-dialog]")).toHaveCount(
       0,
@@ -528,18 +528,12 @@ test("organizers review applications separately from approved volunteers with pe
       exact: true,
     });
     await expect(page.getByRole("tab")).toHaveCount(0);
-    await expect(
-      page.getByRole("region", { name: "Volunteer progression", exact: true }),
-    ).toBeVisible();
-    const progression = page.locator("[data-volunteer-progression]");
-    await expect(progression.locator("h3")).toHaveText([
-      "New volunteer",
-      "Outreach Volunteer",
-    ]);
-    await expect(progression.getByText(/^(Current|Upcoming)$/)).toHaveCount(0);
-    const currentCard = progression.locator(
-      '[data-progression-stage][aria-current="step"]',
-    );
+    const patrolApproval = page.getByRole("region", {
+      name: "Patrol Approval",
+      exact: true,
+    });
+    await expect(patrolApproval).toBeVisible();
+    await expect(patrolApproval.getByRole("list")).toHaveCount(0);
     const applicationProgress = application.locator(
       "[data-application-progress-mini]",
     );
@@ -552,25 +546,7 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       applicationProgress.locator('[data-application-mini-step="naloxone"]'),
     ).toHaveAttribute("data-state", "complete");
-    await expect(currentCard).toHaveCount(0);
-    await expect(
-      progression
-        .locator('[data-progression-stage][data-state="upcoming"]')
-        .first(),
-    ).toHaveCSS("background-color", "rgb(17, 19, 24)");
-    await expect(
-      progression.locator('[data-progression-stage][data-state="upcoming"]'),
-    ).toHaveCount(2);
-    await expect(
-      progression.locator(
-        '[data-progression-stage][data-state="upcoming"] .progression-description',
-      ),
-    ).toHaveCount(2);
-    await expect(
-      progression.locator(
-        '[data-progression-stage][data-state="upcoming"] :is(button, a)',
-      ),
-    ).toHaveCount(0);
+    await expect(patrolApproval.getByRole("button")).toHaveCount(0);
     await expect(profile).toHaveCount(0);
     const applicationForm = applicationProgress.locator(
       '[data-application-mini-step="form"] details',
@@ -706,19 +682,17 @@ test("organizers review applications separately from approved volunteers with pe
     ).toBeEnabled();
     await expect(application).toBeVisible();
     await expect(profile).toBeVisible();
-    await expect(currentCard.locator("h3")).toHaveText("New volunteer");
-    await expect(currentCard).toHaveAttribute(
-      "data-progression-stage",
-      "new-volunteer",
+    await expect(patrolApproval.locator("[data-patrol-status]")).toHaveText(
+      "Awaiting patrol approval",
     );
-    await expect(progression.locator("[data-orientation-status]")).toHaveText(
-      "Orientation not completed",
-    );
+    await expect(
+      patrolApproval.locator("[data-orientation-status]"),
+    ).toHaveText("Orientation not completed");
     await expect(
       applicationProgress.locator('[data-state="complete"]'),
     ).toHaveCount(3);
     await expect(
-      progression.getByRole("button", {
+      patrolApproval.getByRole("button", {
         name: "Approve for patrols",
         exact: true,
       }),
@@ -736,7 +710,7 @@ test("organizers review applications separately from approved volunteers with pe
     ).toBeVisible();
     // An organizer can approve patrols before any orientation is booked, without
     // recording attendance that has not happened.
-    const approvePatrols = progression.getByRole("button", {
+    const approvePatrols = patrolApproval.getByRole("button", {
       name: "Approve for patrols",
       exact: true,
     });
@@ -744,23 +718,31 @@ test("organizers review applications separately from approved volunteers with pe
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
-    await expect(currentCard.locator("h3")).toHaveText("Outreach Volunteer");
-    await expect(progression.locator("[data-orientation-status]")).toHaveText(
-      "Orientation not completed",
+    await expect(patrolApproval.locator("[data-patrol-status]")).toHaveText(
+      "Patrol access approved",
     );
+    await expect(
+      patrolApproval.locator("[data-patrol-access-change]"),
+    ).toContainText("Approved by");
+    await expect(
+      patrolApproval.locator("[data-orientation-status]"),
+    ).toHaveText("Orientation not completed");
     assert.equal(
       await DB.prepare(
         "SELECT count(*) AS n FROM orientation_completion WHERE user_id='applicant-50'",
       ).first("n"),
       0,
     );
-    await page
+    await patrolApproval
       .getByRole("button", { name: "Revoke patrol approval", exact: true })
       .click();
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(approvePatrols).toBeEnabled();
+    await expect(
+      patrolApproval.locator("[data-patrol-access-change]"),
+    ).toContainText("Revoked by");
     await DB.batch([
       DB.prepare(
         `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,created_by,created_at,updated_at)
@@ -771,9 +753,9 @@ test("organizers review applications separately from approved volunteers with pe
       ),
     ]);
     await page.reload();
-    await expect(progression).toContainText("Queue orientation");
+    await expect(patrolApproval).toContainText("Queue orientation");
     await expect(
-      progression.getByRole("button", {
+      patrolApproval.getByRole("button", {
         name: "Approve for patrols",
         exact: true,
       }),
@@ -788,14 +770,14 @@ test("organizers review applications separately from approved volunteers with pe
       "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES ('queue-completion','applicant-50','queue-orientation','organizer',1)",
     ).run();
     await page.reload();
-    await expect(progression.locator("[data-orientation-status]")).toHaveText(
-      "Orientation completed",
-    );
-    await expect(progression.locator("[data-orientation-event]")).toContainText(
-      "Queue orientation",
-    );
+    await expect(
+      patrolApproval.locator("[data-orientation-status]"),
+    ).toHaveText("Orientation completed");
+    await expect(
+      patrolApproval.locator("[data-orientation-event]"),
+    ).toContainText("Queue orientation");
     await expect(approvePatrols).toBeEnabled();
-    await expect(progression.getByRole("button")).toHaveCount(1);
+    await expect(patrolApproval.getByRole("button")).toHaveCount(1);
     for (const width of [320, 1280]) {
       await page.setViewportSize({ width, height: 900 });
       expect(
@@ -817,20 +799,18 @@ test("organizers review applications separately from approved volunteers with pe
     await page
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
-    await expect(currentCard).toHaveAttribute(
-      "data-progression-stage",
-      "approved",
+    await expect(patrolApproval.locator("[data-patrol-status]")).toHaveText(
+      "Patrol access approved",
     );
     await expect(
-      progression.locator('[data-progression-stage][data-state="complete"]'),
-    ).toHaveCount(1);
+      patrolApproval.locator("[data-patrol-access-change]"),
+    ).toContainText("Approved by");
     await expect(
-      progression.locator(
-        '[data-progression-stage][data-state="complete"] .progression-marker svg',
-      ),
-    ).toHaveCount(1);
-    await expect(currentCard).toHaveCSS("background-color", "rgb(20, 36, 59)");
-    await expect(currentCard.locator("h3")).toHaveText("Medic");
+      patrolApproval.locator("[data-patrol-access-change] time"),
+    ).toHaveAttribute("datetime", /T.*Z$/);
+    await expect(
+      page.locator('.volunteer-profile-controls [data-access-kind="patrol"]'),
+    ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Revoke patrol approval", exact: true }),
     ).toBeFocused();
@@ -846,9 +826,9 @@ test("organizers review applications separately from approved volunteers with pe
       await approvedDirectory.text(),
       /data-volunteer-profile-link[^>]*><span>applicant-50 d\.</,
     );
-    await expect(progression.locator("[data-orientation-event]")).toContainText(
-      "Queue orientation",
-    );
+    await expect(
+      patrolApproval.locator("[data-orientation-event]"),
+    ).toContainText("Queue orientation");
     assert.equal(
       await DB.prepare(
         "SELECT count(*) AS n FROM event_notification WHERE user_id='applicant-50'",

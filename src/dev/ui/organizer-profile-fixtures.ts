@@ -202,6 +202,7 @@ export interface ProfilePreviewOptions {
 export interface ProfileSimulationState {
   approved: boolean;
   patrol: boolean;
+  patrolChangedAt: number | null;
   active: boolean;
   role: "volunteer" | "organizer";
   rejection: string | null;
@@ -260,9 +261,16 @@ export function readProfileState(
   params: URLSearchParams,
 ): ProfileSimulationState | undefined {
   if (!params.has("simulated")) return;
+  const patrolChangedAt = Number(params.get("patrolChangedAt") ?? NaN);
   return {
     approved: params.get("approved") === "1",
     patrol: params.get("patrol") === "1",
+    patrolChangedAt:
+      Number.isSafeInteger(patrolChangedAt) &&
+      patrolChangedAt >= 0 &&
+      patrolChangedAt <= 8.64e15
+        ? patrolChangedAt
+        : null,
     active: params.get("active") === "1",
     role: params.get("role") === "organizer" ? "organizer" : "volunteer",
     rejection: (params.get("rejection") ?? "").slice(0, 2000) || null,
@@ -277,6 +285,8 @@ export function profileStateQuery(
   query.set("simulated", "1");
   for (const key of ["approved", "patrol", "active"] as const)
     query.set(key, state[key] ? "1" : "0");
+  if (state.patrolChangedAt !== null)
+    query.set("patrolChangedAt", String(state.patrolChangedAt));
   query.set("role", state.role);
   query.set("rejection", state.rejection ?? "");
   return query;
@@ -288,6 +298,7 @@ export function profileSimulationState(
   return {
     approved: Boolean(fixture.person.applicationApproved),
     patrol: Boolean(fixture.person.patrolApproved),
+    patrolChangedAt: fixture.profile.patrolAccessChangedBy?.changedAt ?? null,
     active: Boolean(fixture.person.active),
     role: fixture.person.role,
     rejection: fixture.person.applicationRejectionReason,
@@ -405,6 +416,11 @@ export function createProfileFixture(
     startsAt: Date.UTC(2026, 1, 7, 21),
     meetingPoint: "Fictional Community Centre · Main entrance",
   };
+  const patrolChangedAt =
+    state?.patrolChangedAt ??
+    (patrol && options.scenario !== "legacy-patrol"
+      ? orientation.startsAt + 86_400_000
+      : null);
   return {
     person: {
       id: "ui-fictional-volunteer",
@@ -437,6 +453,15 @@ export function createProfileFixture(
               name: "Morgan C.",
               email: "morgan.organizer@example.org",
               approvedAt,
+            }
+          : null,
+      patrolAccessChangedBy:
+        patrolChangedAt !== null
+          ? {
+              id: "ui-fictional-organizer",
+              name: "Morgan C.",
+              email: "morgan.organizer@example.org",
+              changedAt: patrolChangedAt,
             }
           : null,
       submission:
