@@ -1,0 +1,113 @@
+---
+import type { EventRow } from "@/server/db/events";
+import { manualAttendeeCategory } from "@/data/event-roster";
+import DialogHeader from "@/components/DialogHeader.astro";
+import FieldError from "@/components/FieldError.astro";
+import RosterPerson from "./RosterPerson.astro";
+
+interface Props {
+  event: EventRow;
+}
+const { event } = Astro.props;
+const id = `add-attendee-${event.id}`;
+const roles = [
+  { medic: false, newVolunteer: false },
+  { medic: true, newVolunteer: false },
+  { medic: false, newVolunteer: true },
+  { medic: true, newVolunteer: true },
+];
+---
+
+<dialog
+  id={id}
+  class="dialog-pop dialog-frame volunteer-dialog"
+  aria-labelledby={`${id}-heading`}
+>
+  <DialogHeader id={`${id}-heading`} title="Add volunteer" />
+  <div class="dialog-body">
+    <form
+      id={`${id}-form`}
+      class="volunteer-form"
+      data-add-attendee
+      action="/api/v1/events/action"
+      method="post"
+    >
+      <input type="hidden" name="id" value={event.id} />
+      <div class="volunteer-field">
+        <label for={`${id}-name`}>
+          Name <span class="volunteer-required" aria-hidden="true">*</span>
+        </label>
+        <input
+          id={`${id}-name`}
+          name="name"
+          type="text"
+          required
+          maxlength="200"
+          pattern=".*\S.*"
+          aria-describedby={`error-${id}-name`}
+          autocomplete="off"
+          autofocus
+        />
+        <FieldError field={`${id}-name`} message="Enter a name." />
+      </div>
+      <div class="attendee-roles">
+        <label class="volunteer-check"
+          ><input type="checkbox" name="medic" /><span>Medic</span></label
+        >
+        <label class="volunteer-check"
+          ><input type="checkbox" name="newVolunteer" /><span>New</span></label
+        >
+      </div>
+      <div
+        class="attendee-preview"
+        data-attendee-preview
+        role="group"
+        aria-label="Volunteer preview"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {
+          roles.map(({ medic, newVolunteer }) => (
+            <div
+              data-attendee-preview-medic={String(medic)}
+              data-attendee-preview-new={String(newVolunteer)}
+              hidden={medic || newVolunteer}
+            >
+              <RosterPerson
+                name="Name"
+                category={manualAttendeeCategory(medic, newVolunteer)}
+                medicMark={medic}
+                gradientId={`${id}-gradient-${medic}`}
+              />
+            </div>
+          ))
+        }
+      </div>
+      <p data-form-message role="status" hidden></p>
+    </form>
+  </div>
+  <div class="dialog-footer">
+    <button class="btn btn-outline" type="button" data-dismiss-dialog
+      >Cancel</button
+    >
+    <button
+      class="btn btn-green"
+      type="submit"
+      form={`${id}-form`}
+      data-loading-label="Adding…">Add</button
+    >
+  </div>
+</dialog>
+
+<style>
+  .attendee-roles {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .attendee-preview {
+    padding: 1rem;
+    border: 1px solid #3f3f46;
+    border-radius: 0.5rem;
+  }
+</style>

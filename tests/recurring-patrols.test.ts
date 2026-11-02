@@ -14,6 +14,7 @@ import {
   deletePatrolSeries,
   listPatrolSeries,
   changeSignup,
+  addManualSignup,
   ensurePatrolOccurrences,
   findEvent,
   findPatrolSeries,
@@ -632,6 +633,55 @@ test("fourth occurrence is rejected by direct join, SQL reactivation/reassignmen
       .run(),
     /recurring_signup_window/,
   );
+});
+
+test("manual attendees obey recurring windows and keep their history when the series stops", async () => {
+  const data = { ...input(), includesOrientation: true, spots: 8 };
+  const saved = await savePatrolSeries(db, organizer, data);
+  const first = (await all(saved.id))[0];
+  const fourth = await materializePatrolOccurrence(
+    db,
+    organizer,
+    saved.id,
+    addCalendarDays(data.firstDate, 42),
+  );
+  const attendee = { name: "Manual Medic", medic: true, newVolunteer: true };
+  await assert.rejects(
+    addManualSignup(db, organizer, fourth.id, attendee),
+    status(409),
+  );
+  await addManualSignup(db, organizer, first.id, attendee);
+  const signup = (await listRosters(db, organizer, [first.id]))[0];
+  await assert.rejects(
+    manageSignup(db, organizer, signup.id, fourth.id, ""),
+    status(409),
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE id=?")
+      .bind(signup.id)
+      .first("status"),
+    "confirmed",
+  );
+  const series = await findPatrolSeries(db, organizer, saved.id);
+  await stopPatrolSeries(
+    db,
+    organizer,
+    saved.id,
+    first.occurrenceDate!,
+    series.updatedAt,
+    "",
+    true,
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE id=?")
+      .bind(signup.id)
+      .first("status"),
+    "cancelled",
+  );
+  assert.equal(await count("signup"), 1);
+  assert.equal(await count("event_notification"), 0);
 });
 
 test("closed/full/hidden occurrences consume slots; hidden recurring occurrences are invisible even with a booking", async () => {

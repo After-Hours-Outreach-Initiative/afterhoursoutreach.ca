@@ -10,6 +10,9 @@ import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
 import {
   changeSignup,
+  addManualSignup,
+  cancelEvent,
+  findEvent,
   listEvents,
   listPublicRosters,
   listRosters,
@@ -221,6 +224,245 @@ async function draftActor(id = "draft-volunteer"): Promise<Actor> {
     patrolApproved: false,
   };
 }
+
+async function manualRosterActor(
+  id: string,
+  role: Actor["role"],
+): Promise<Actor> {
+  const actor = {
+    ...(await draftActor(id)),
+    role,
+    applicationSubmitted: true,
+    applicationComplete: true,
+    naloxoneCompleted: true,
+    applicationApproved: true,
+    active: true,
+    patrolApproved: true,
+  };
+  await env.DB.prepare("UPDATE user SET role=? WHERE id=?")
+    .bind(role, id)
+    .run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO profile (user_id,preferred_name,phone,birth_date,emergency_contact_name,
+      emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,
+      medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+      VALUES (?,?,'555','2000-01-01','Contact','555','Friend','Friend','Help','[]','None','None',0,0,0)`,
+    ).bind(id, id),
+    env.DB.prepare(
+      `INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at)
+      VALUES (?,1,1,'manual-organizer',0,0)`,
+    ).bind(id),
+  ]);
+  return actor;
+}
+
+test("organizers add, move and remove name-only attendees with shared rosters, limits, audits and no mail", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("manual-viewer", "volunteer");
+  for (const [id, orientation] of [
+    ["manual-source", 1],
+    ["manual-destination", 1],
+    ["manual-patrol", 0],
+  ] as const)
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,
+      min_medic_spots,min_new_volunteer_spots,max_new_volunteers,created_by,created_at,updated_at)
+      VALUES (?,'patrol',?,?,'Point',4,1,1,2,?,0,0)`,
+    )
+      .bind(id, orientation, Date.now() + 86_400_000, organizer.id)
+      .run();
+  const input = { name: "General Person", medic: false, newVolunteer: false };
+  await assert.rejects(
+    addManualSignup(env.DB, volunteer, "manual-source", input),
+    statusError(403),
+  );
+  for (const name of ["", "   ", "x".repeat(201)])
+    await assert.rejects(
+      addManualSignup(env.DB, organizer, "manual-source", { ...input, name }),
+      statusError(400),
+    );
+  for (const [name, medic, newVolunteer] of [
+    [" General Person ", false, false],
+    ["Medic Person", true, false],
+    ["New Person", false, true],
+    ["NewMedic Person", true, true],
+  ] as const)
+    await addManualSignup(env.DB, organizer, "manual-source", {
+      name,
+      medic,
+      newVolunteer,
+    });
+  const counts = (
+    await listEvents(env.DB, volunteer, undefined, "volunteer")
+  ).find(({ id }) => id === "manual-source")!;
+  assert.deepEqual(
+    [counts.confirmed, counts.medicConfirmed, counts.newVolunteerConfirmed],
+    [4, 1, 2],
+  );
+  const roster = await listRosters(env.DB, organizer, ["manual-source"]);
+  assert.equal(roster.length, 4);
+  assert.ok(roster.every(({ userId }) => userId === null));
+  assert.deepEqual(
+    roster.map(({ name, category, medicMark }) => [name, category, medicMark]),
+    [
+      ["General P.", "outreach-volunteer", 0],
+      ["Medic P.", "medic", 1],
+      ["New P.", "new-volunteer", 0],
+      ["NewMedic P.", "new-volunteer", 1],
+    ],
+  );
+  const publicRoster = await listPublicRosters(env.DB, volunteer, [
+    "manual-source",
+  ]);
+  assert.deepEqual(
+    publicRoster.people,
+    roster.map(({ eventId, name, category, medicMark }) => ({
+      eventId,
+      name,
+      category,
+      medicMark,
+    })),
+  );
+  assert.doesNotMatch(
+    JSON.stringify(publicRoster),
+    /userId|Person|manual_name|manual_medic|manual_new/,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM user").first("n"),
+    2,
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM event_audit WHERE action='signup_manually_added' AND actor_id=?",
+    )
+      .bind(organizer.id)
+      .first("n"),
+    4,
+  );
+  await assert.rejects(
+    addManualSignup(env.DB, organizer, "manual-source", input),
+    statusError(409),
+  );
+  await assert.rejects(
+    changeSignup(env.DB, volunteer, "manual-source", "join"),
+    statusError(409),
+  );
+  const newMedic = roster.find(({ name }) => name === "NewMedic P.")!;
+  const auditCount = await env.DB.prepare(
+    "SELECT count(*) n FROM event_audit",
+  ).first("n");
+  await assert.rejects(
+    manageSignup(env.DB, organizer, newMedic.id, "manual-patrol", "", true),
+    statusError(403),
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT status FROM signup WHERE id=?")
+      .bind(newMedic.id)
+      .first("status"),
+    "confirmed",
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_audit").first("n"),
+    auditCount,
+  );
+  await manageSignup(
+    env.DB,
+    organizer,
+    newMedic.id,
+    "manual-destination",
+    "",
+    true,
+  );
+  const moved = (
+    await listRosters(env.DB, organizer, ["manual-destination"])
+  )[0];
+  assert.deepEqual(
+    [moved.userId, moved.name, moved.category, moved.medicMark],
+    [null, "NewMedic P.", "new-volunteer", 1],
+  );
+  assert.notEqual(
+    (await listPublicRosters(env.DB, volunteer, ["manual-source"])).version,
+    publicRoster.version,
+  );
+  await manageSignup(env.DB, organizer, moved.id, undefined, "", true);
+  assert.equal(
+    (await listRosters(env.DB, organizer, ["manual-destination"])).length,
+    0,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_notification").first(
+      "n",
+    ),
+    0,
+  );
+  const source = await findEvent(env.DB, "manual-source");
+  await cancelEvent(env.DB, organizer, source.id, source.updatedAt, "", true);
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM signup WHERE event_id=? AND status='confirmed'",
+    )
+      .bind(source.id)
+      .first("n"),
+    0,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM signup WHERE event_id=?")
+      .bind(source.id)
+      .first("n"),
+    4,
+  );
+  await env.DB.prepare("DELETE FROM session WHERE id=?")
+    .bind(organizer.sessionId)
+    .run();
+  await assert.rejects(
+    addManualSignup(env.DB, organizer, "manual-destination", input),
+    statusError(403),
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM signup WHERE event_id='manual-destination'",
+    ).first("n"),
+    1,
+  );
+});
+
+test("concurrent manual and account signups cannot take each other's reserved capacity", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("manual-viewer", "volunteer");
+  await env.DB.prepare(
+    `INSERT INTO event (id,type,starts_at,meeting_point,spots,min_medic_spots,created_by,created_at,updated_at)
+    VALUES ('manual-race','patrol',?,'Point',2,1,?,0,0)`,
+  )
+    .bind(Date.now() + 86_400_000, organizer.id)
+    .run();
+  const attempts = await Promise.allSettled([
+    addManualSignup(env.DB, organizer, "manual-race", {
+      name: "General Person",
+      medic: false,
+      newVolunteer: false,
+    }),
+    changeSignup(env.DB, volunteer, "manual-race", "join"),
+  ]);
+  assert.equal(
+    attempts.filter(({ status }) => status === "fulfilled").length,
+    1,
+  );
+  const failure = attempts.find(({ status }) => status === "rejected");
+  assert.ok(failure?.status === "rejected" && statusError(409)(failure.reason));
+  await addManualSignup(env.DB, organizer, "manual-race", {
+    name: "Medic Person",
+    medic: true,
+    newVolunteer: false,
+  });
+  const event = (await listEvents(env.DB, volunteer)).find(
+    ({ id }) => id === "manual-race",
+  )!;
+  assert.deepEqual(
+    [event.confirmed, event.medicConfirmed, event.newVolunteerConfirmed],
+    [2, 1, 0],
+  );
+});
 
 test("development application shortcuts preserve snapshots and advance without emails or patrol approval", async () => {
   const actor = await draftActor();

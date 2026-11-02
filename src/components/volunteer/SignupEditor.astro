@@ -77,7 +77,7 @@ const { signup, event, destinations } = Astro.props;
           id={`signup-${action}-form-${signup.id}`}
           class="volunteer-form"
           data-manage-signup
-          data-email-prompt="signup"
+          data-email-prompt={signup.userId ? "signup" : undefined}
           action="/api/v1/events/action"
           method="post"
         >
@@ -112,23 +112,25 @@ const { signup, event, destinations } = Astro.props;
               </div>
             </>
           )}
-          <div class="volunteer-field">
-            <label for={`signup-${action}-reason-${signup.id}`}>
-              Reason (optional)
-            </label>
-            <textarea
-              id={`signup-${action}-reason-${signup.id}`}
-              name="reason"
-              aria-describedby={`error-signup-${action}-reason-${signup.id}`}
-              rows="3"
-              maxlength="1000"
-            />
-            <FieldError
-              field={`signup-${action}-reason-${signup.id}`}
-              message="Keep the reason to 1000 characters or fewer."
-            />
-          </div>
-          {!import.meta.env.DEV && (
+          {signup.userId && (
+            <div class="volunteer-field">
+              <label for={`signup-${action}-reason-${signup.id}`}>
+                Reason (optional)
+              </label>
+              <textarea
+                id={`signup-${action}-reason-${signup.id}`}
+                name="reason"
+                aria-describedby={`error-signup-${action}-reason-${signup.id}`}
+                rows="3"
+                maxlength="1000"
+              />
+              <FieldError
+                field={`signup-${action}-reason-${signup.id}`}
+                message="Keep the reason to 1000 characters or fewer."
+              />
+            </div>
+          )}
+          {signup.userId && !import.meta.env.DEV && (
             <p class="volunteer-help">
               Included in the email if you choose to send one. Do not include
               medical or other sensitive information.

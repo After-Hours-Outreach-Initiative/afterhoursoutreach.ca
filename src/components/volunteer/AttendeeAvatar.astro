@@ -5,12 +5,14 @@ interface Props {
   decorative?: boolean;
   newVolunteerStyle?: "dot" | "outline" | "gradient" | "gradient-horizontal";
   medicMark?: boolean;
+  gradientId?: string;
 }
 const {
   category,
   decorative = false,
   newVolunteerStyle = "gradient-horizontal",
   medicMark = false,
+  gradientId: providedGradientId,
 } = Astro.props;
 const hasMedicMark =
   category === "medic" || (category === "new-volunteer" && medicMark);
@@ -19,7 +21,7 @@ const gradientId =
   category === "new-volunteer" &&
   (newVolunteerStyle === "gradient" ||
     newVolunteerStyle === "gradient-horizontal")
-    ? `attendee-gradient-${crypto.randomUUID()}`
+    ? (providedGradientId ?? `attendee-gradient-${crypto.randomUUID()}`)
     : undefined;
 const silhouetteFill = gradientId ? `url(#${gradientId})` : "currentColor";
 const horizontalGradient = newVolunteerStyle === "gradient-horizontal";

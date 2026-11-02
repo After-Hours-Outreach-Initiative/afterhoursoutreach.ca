@@ -1,4 +1,24 @@
 import "../styles/compact-person-name.css";
+import { compactPersonDisplayName } from "../data/person-name";
+
+export function setCompactPersonName(element: HTMLElement, name: string) {
+  const compact = compactPersonDisplayName(name);
+  const visible = document.createElement("span");
+  visible.textContent = compact;
+  element.replaceChildren(visible);
+  if (compact !== name) {
+    element.dataset.compactPersonName = name;
+    element.tabIndex = 0;
+    visible.setAttribute("aria-hidden", "true");
+    const accessible = document.createElement("span");
+    accessible.className = "sr-only";
+    accessible.textContent = name;
+    element.appendChild(accessible);
+  } else {
+    delete element.dataset.compactPersonName;
+    element.removeAttribute("tabindex");
+  }
+}
 
 let initialized = false;
 

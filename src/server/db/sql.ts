@@ -38,6 +38,17 @@ export const attendeeCategorySql = (userId: string) =>
   `CASE WHEN ${newVolunteerSql(userId)} THEN 'new-volunteer'
     WHEN ${approvedMedicSql(userId)} THEN 'medic' ELSE 'outreach-volunteer' END`;
 
+// Manual attendees have event-local roles, not accounts or account approvals.
+export const signupNewVolunteerSql = (alias = "s") =>
+  `(CASE WHEN ${alias}.user_id IS NULL THEN ${alias}.manual_new ELSE ${newVolunteerSql(`${alias}.user_id`)} END)`;
+export const signupMedicSql = (alias = "s") =>
+  `(CASE WHEN ${alias}.user_id IS NULL THEN ${alias}.manual_medic = 1 AND ${alias}.manual_new = 0 ELSE ${approvedMedicSql(`${alias}.user_id`)} END)`;
+export const signupMedicMarkSql = (alias = "s") =>
+  `(CASE WHEN ${alias}.user_id IS NULL THEN ${alias}.manual_medic ELSE ${medicMarkSql(`${alias}.user_id`)} END)`;
+export const signupCategorySql = (alias = "s") =>
+  `CASE WHEN ${signupNewVolunteerSql(alias)} THEN 'new-volunteer'
+    WHEN ${signupMedicSql(alias)} THEN 'medic' ELSE 'outreach-volunteer' END`;
+
 // Keep full names available for directory searches, not standard display.
 export const profileFullNameSql = `trim(coalesce(p.first_name, '') || ' ' ||
   CASE WHEN coalesce(p.middle_names, '') <> '' THEN p.middle_names || ' ' ELSE '' END ||

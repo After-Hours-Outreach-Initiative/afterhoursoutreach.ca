@@ -1,5 +1,15 @@
 import { expect, test } from "vitest";
-import { publicAttendeeName } from "../src/data/event-roster";
+import {
+  manualAttendeeCategory,
+  publicAttendeeName,
+} from "../src/data/event-roster";
+
+test("manual attendee checkboxes keep new medics in the new-volunteer category", () => {
+  expect(manualAttendeeCategory(false, false)).toBe("outreach-volunteer");
+  expect(manualAttendeeCategory(true, false)).toBe("medic");
+  expect(manualAttendeeCategory(false, true)).toBe("new-volunteer");
+  expect(manualAttendeeCategory(true, true)).toBe("new-volunteer");
+});
 
 test("public rosters use first names and last initials, with an abbreviated legacy fallback", () => {
   expect(

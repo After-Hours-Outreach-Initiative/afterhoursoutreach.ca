@@ -2,6 +2,17 @@ import { personDisplayName } from "./person-name";
 
 export type AttendeeCategory = "medic" | "outreach-volunteer" | "new-volunteer";
 
+export function manualAttendeeCategory(
+  medic: boolean,
+  newVolunteer: boolean,
+): AttendeeCategory {
+  return newVolunteer
+    ? "new-volunteer"
+    : medic
+      ? "medic"
+      : "outreach-volunteer";
+}
+
 /** Shared display policy for public and organizer rosters. */
 export function publicAttendeeName(
   firstName: string | null,

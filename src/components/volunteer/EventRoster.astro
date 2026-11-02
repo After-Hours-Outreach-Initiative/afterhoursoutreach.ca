@@ -1,11 +1,9 @@
 ---
 import type { EventRow, RosterRow } from "@/server/db/events";
 import SignupEditor from "./SignupEditor.astro";
-import AttendeeAvatar from "./AttendeeAvatar.astro";
+import RosterPerson from "./RosterPerson.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
-import NewVolunteerBadge from "./NewVolunteerBadge.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
-import CompactPersonName from "./CompactPersonName.astro";
 
 interface Props {
   event: EventRow;
@@ -41,36 +39,28 @@ const registrationDateFormat = new Intl.DateTimeFormat("en-CA", {
           roster.map((person) => (
             <tr>
               <th scope="row">
-                <div class="event-roster-person">
-                  <AttendeeAvatar
-                    category={person.category}
-                    medicMark={Boolean(person.medicMark)}
-                  />
-                  <div class="event-roster-name">
-                    <CompactPersonName
-                      name={person.name}
-                      href={`/volunteers/${encodeURIComponent(person.userId)}`}
-                      data-volunteer-profile-link
-                    />
-                    {person.category === "new-volunteer" && (
-                      <>
-                        {" "}
-                        <NewVolunteerBadge />
-                      </>
-                    )}
-                  </div>
-                </div>
+                <RosterPerson
+                  name={person.name}
+                  category={person.category}
+                  medicMark={Boolean(person.medicMark)}
+                  href={
+                    person.userId
+                      ? `/volunteers/${encodeURIComponent(person.userId)}`
+                      : undefined
+                  }
+                />
                 <time
                   class="event-roster-status"
                   datetime={new Date(person.registeredAt).toISOString()}
                 >
-                  Registered{" "}
+                  {person.userId ? "Registered" : "Manually added"}{" "}
                   {registrationDateFormat.format(person.registeredAt)}
                 </time>
                 {Boolean(person.completed) && (
                   <span class="event-roster-status">Orientation completed</span>
                 )}
-                {Boolean(event.includesOrientation) &&
+                {person.userId &&
+                  Boolean(event.includesOrientation) &&
                   !future &&
                   !event.cancelledAt &&
                   (!person.completed || !person.patrolApproved) && (

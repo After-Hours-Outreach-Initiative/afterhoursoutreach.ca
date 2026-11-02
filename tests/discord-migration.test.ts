@@ -49,6 +49,9 @@ test("Discord migration preserves existing volunteers and drafts without inventi
                 max_new_volunteers: 4,
               }
             : {}),
+          ...(table === "signup"
+            ? { manual_name: null, manual_medic: 0, manual_new: 0 }
+            : {}),
         })),
     );
     for (const file of files.slice(discord))

@@ -445,9 +445,10 @@ export const signup = sqliteTable(
     event_id: text()
       .notNull()
       .references(() => event.id),
-    user_id: text()
-      .notNull()
-      .references(() => user.id),
+    user_id: text().references(() => user.id),
+    manual_name: text(),
+    manual_medic: integer({ mode: "boolean" }).notNull().default(false),
+    manual_new: integer({ mode: "boolean" }).notNull().default(false),
     status: text({ enum: ["confirmed", "cancelled"] })
       .notNull()
       .default("confirmed"),
@@ -456,6 +457,14 @@ export const signup = sqliteTable(
   },
   (table) => [
     check("signup_status", sql`${table.status} IN ('confirmed', 'cancelled')`),
+    check(
+      "signup_attendee",
+      sql`(${table.user_id} IS NOT NULL AND ${table.manual_name} IS NULL AND ${table.manual_medic} = 0 AND ${table.manual_new} = 0) OR (${table.user_id} IS NULL AND ${table.manual_name} IS NOT NULL AND length(trim(${table.manual_name})) BETWEEN 1 AND 200)`,
+    ),
+    check(
+      "signup_manual_roles",
+      sql`${table.manual_medic} IN (0, 1) AND ${table.manual_new} IN (0, 1)`,
+    ),
     uniqueIndex("signup_one_confirmed_spot")
       .on(table.event_id, table.user_id)
       .where(sql`${table.status} = 'confirmed'`),

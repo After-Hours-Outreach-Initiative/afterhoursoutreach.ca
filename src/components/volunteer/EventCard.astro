@@ -12,6 +12,7 @@ import { matchesEventFilter } from "@/data/event-browser";
 import EventEditor from "./EventEditor.astro";
 import EventRoster from "./EventRoster.astro";
 import PublicEventRoster from "./PublicEventRoster.astro";
+import AddAttendee from "./AddAttendee.astro";
 
 interface Props {
   event: EventRow;
@@ -35,6 +36,14 @@ const {
   publicRoster = [],
 } = Astro.props;
 const future = event.startsAt > Date.now();
+const canAddAttendee =
+  organizer &&
+  future &&
+  !event.cancelledAt &&
+  !event.hidden &&
+  Boolean(event.open) &&
+  Boolean(event.inSignupWindow) &&
+  event.confirmed < event.spots;
 const blocked =
   future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
     ? "Registration is available only for the next three patrol occurrences in this series."
@@ -189,6 +198,19 @@ const blocked =
           </button>
         )
       }
+      {
+        canAddAttendee && roster.length === 0 && (
+          <button
+            class="btn btn-outline"
+            type="button"
+            data-show-dialog={`add-attendee-${event.id}`}
+            aria-haspopup="dialog"
+            aria-controls={`add-attendee-${event.id}`}
+          >
+            Add volunteer
+          </button>
+        )
+      }
     </div>
   </div>
   {
@@ -206,11 +228,28 @@ const blocked =
       />
     )
   }
+  {
+    canAddAttendee && roster.length > 0 && (
+      <div class="volunteer-roster-add">
+        <button
+          class="btn btn-outline"
+          type="button"
+          data-show-dialog={`add-attendee-${event.id}`}
+          aria-haspopup="dialog"
+          aria-controls={`add-attendee-${event.id}`}
+        >
+          Add volunteer
+        </button>
+      </div>
+    )
+  }
   {organizer && future && <EventEditor event={event} series={series} />}
+  {canAddAttendee && <AddAttendee event={event} />}
 </li>
 
 <style>
   .volunteer-event-card {
+    --event-card-gap: 1rem;
     container: event-card / inline-size;
     padding: 1rem;
     scroll-margin-top: calc(
@@ -241,7 +280,7 @@ const blocked =
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    gap: 0.75rem;
+    gap: var(--event-card-gap);
   }
   .volunteer-event-info {
     min-width: 0;
@@ -264,12 +303,27 @@ const blocked =
   .volunteer-actions:empty {
     display: none;
   }
+  .volunteer-actions {
+    gap: var(--event-card-gap);
+  }
   .volunteer-actions > :is(form, .btn),
   .volunteer-actions > form > .btn {
     width: 100%;
   }
   .volunteer-actions > form > .btn {
     white-space: nowrap;
+  }
+  .volunteer-event-card > :global(.event-roster) {
+    margin-top: var(--event-card-gap);
+  }
+  .volunteer-roster-add {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    padding-top: var(--event-card-gap);
+  }
+  .volunteer-roster-add > .btn {
+    width: 100%;
   }
   @container event-card (min-width: 32rem) {
     .volunteer-event-layout:has(> .volunteer-actions:not(:empty)) {
@@ -279,6 +333,13 @@ const blocked =
     .volunteer-actions {
       grid-column: 2;
       grid-row: 1;
+    }
+  }
+  @media (min-width: 64rem) {
+    @container event-card (min-width: 32rem) {
+      .volunteer-roster-add > .btn {
+        width: 12rem;
+      }
     }
   }
 </style>

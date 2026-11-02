@@ -190,6 +190,20 @@ and that digest participate in `/events` polling; organizer-only full rosters ne
 enter the volunteer view. Structured first/last names take precedence, with an
 abbreviated legacy fallback. No private profile answers or profile links are rendered.
 
+## Manual event attendees
+
+Organizers can add an attendee using a name and independent Medic/New flags.
+These are `signup` rows with a null `user_id` and event-local `manual_name`,
+`manual_medic`, and `manual_new` fields, never placeholder accounts or profiles.
+Manual attendees share total capacity, reservations, new-volunteer caps, recurring
+signup windows, cancellation history, and atomic move/removal workflows with account
+registrations. New medics count only as new volunteers for capacity while retaining
+the medic avatar mark. New attendees require an event with orientation.
+Both rosters abbreviate manual names using the existing display policy. Manual
+entries have no profile/approval actions and never receive notifications. Writes
+recheck the organizer's live session and create event audits. Migration
+`0028_manual_event_attendees.sql` preserves all existing registrations.
+
 ## First-orientation booking limit
 
 Application-approved volunteers without current `patrol_approved` status may hold

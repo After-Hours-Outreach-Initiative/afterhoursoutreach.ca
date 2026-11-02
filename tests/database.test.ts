@@ -58,6 +58,131 @@ function signUp(id: string, eventId: string, userId: string) {
   ).run(id, eventId, userId);
 }
 
+function manualSignup(
+  id: string,
+  eventId: string,
+  medic = false,
+  newVolunteer = false,
+) {
+  db.prepare(
+    `INSERT INTO signup (id, event_id, manual_name, manual_medic, manual_new, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 0, 0)`,
+  ).run(id, eventId, id, Number(medic), Number(newVolunteer));
+}
+
+test("manual and account registrations share atomic capacity and role reservations", () => {
+  db.exec("UPDATE event SET spots=6 WHERE id='orientation'");
+  manualSignup("general", "orientation");
+  manualSignup("new-medic", "orientation", true, true);
+  signUp("alice", "orientation", "alice");
+  approve("bob");
+  signUp("bob", "orientation", "bob");
+  assert.throws(
+    () => manualSignup("extra-general", "orientation"),
+    /signup_places_reserved/,
+  );
+  manualSignup("medic-1", "orientation", true);
+  manualSignup("medic-2", "orientation", true);
+  assert.throws(() => manualSignup("full", "orientation", true), /event_full/);
+  db.exec("UPDATE signup SET status='cancelled' WHERE id='medic-1'");
+  assert.throws(
+    () => manualSignup("reserved", "orientation"),
+    /signup_places_reserved/,
+  );
+  assert.throws(
+    () => db.exec("UPDATE signup SET manual_medic=0 WHERE id='medic-2'"),
+    /signup_places_reserved/,
+  );
+  db.exec("UPDATE signup SET status='confirmed' WHERE id='medic-1'");
+  assert.throws(
+    () => db.exec("UPDATE event SET spots=5 WHERE id='orientation'"),
+    /capacity_below_signups|orientation_edit_conflict/,
+  );
+  assert.equal(db.prepare("SELECT count(*) n FROM user").get()?.n, 3);
+});
+
+test("manual new volunteers obey orientation requirements and caps on insert, updates and event edits", () => {
+  db.exec(
+    "UPDATE event SET spots=6,max_new_volunteers=2 WHERE id='orientation'",
+  );
+  manualSignup("new", "orientation", false, true);
+  manualSignup("new-medic", "orientation", true, true);
+  assert.throws(
+    () => manualSignup("third", "orientation", false, true),
+    /orientation_places_full/,
+  );
+  assert.throws(
+    () => signUp("alice", "orientation", "alice"),
+    /orientation_places_full/,
+  );
+  assert.throws(
+    () => manualSignup("no-orientation", "patrol", false, true),
+    /signup_not_eligible/,
+  );
+  assert.throws(
+    () => db.exec("UPDATE signup SET event_id='patrol' WHERE id='new-medic'"),
+    /signup_not_eligible/,
+  );
+  assert.throws(
+    () =>
+      db.exec("UPDATE event SET includes_orientation=0 WHERE id='orientation'"),
+    /orientation_edit_conflict/,
+  );
+  manualSignup("general", "orientation");
+  assert.throws(
+    () => db.exec("UPDATE signup SET manual_new=1 WHERE id='general'"),
+    /orientation_places_full/,
+  );
+  db.exec("UPDATE signup SET status='cancelled' WHERE id='new'");
+  signUp("alice", "orientation", "alice");
+  assert.throws(
+    () => db.exec("UPDATE signup SET status='confirmed' WHERE id='new'"),
+    /orientation_places_full/,
+  );
+});
+
+test("manual registrations reject malformed identities and unavailable events", () => {
+  db.exec("UPDATE event SET spots=10 WHERE id='orientation'");
+  for (const name of [null, "", "   ", "x".repeat(201)])
+    assert.throws(
+      () =>
+        db
+          .prepare(
+            "INSERT INTO signup (id,event_id,manual_name,created_at,updated_at) VALUES ('invalid','orientation',?,0,0)",
+          )
+          .run(name),
+      /signup_attendee/,
+    );
+  assert.throws(
+    () =>
+      db.exec(
+        "INSERT INTO signup (id,event_id,user_id,manual_name,created_at,updated_at) VALUES ('mixed','orientation','alice','Manual',0,0)",
+      ),
+    /signup_attendee/,
+  );
+  assert.throws(
+    () =>
+      db.exec(
+        "INSERT INTO signup (id,event_id,manual_name,manual_medic,created_at,updated_at) VALUES ('flags','orientation','Manual',2,0,0)",
+      ),
+    /signup_manual_roles/,
+  );
+  for (const change of [
+    "open=0",
+    "hidden=1",
+    "cancelled_at=1",
+    "starts_at=0",
+  ]) {
+    db.exec("SAVEPOINT unavailable");
+    db.exec(`UPDATE event SET ${change} WHERE id='orientation'`);
+    assert.throws(
+      () => manualSignup("blocked", "orientation", true),
+      /signup_not_eligible/,
+    );
+    db.exec("ROLLBACK TO unavailable; RELEASE unavailable");
+  }
+});
+
 function anotherOrientation() {
   db.exec(`INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
     SELECT 'other-orientation', type, starts_at, meeting_point, spots, created_by, created_at, updated_at

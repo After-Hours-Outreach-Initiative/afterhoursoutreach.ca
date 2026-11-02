@@ -13,6 +13,8 @@ import {
   deleteEvent,
   deletePatrolSeries,
   changeSignup,
+  addManualSignup,
+  manualSignupSchema,
   manageSignup,
   eventRequestSchema,
   patrolSeriesRequestSchema,
@@ -81,6 +83,7 @@ const inputSchema = z.discriminatedUnion("action", [
     notify: z.boolean().default(false),
   }),
   z.strictObject({ action: z.enum(["join", "cancel"]), id }),
+  manualSignupSchema.extend({ action: z.literal("add-attendee"), id }),
   z.strictObject({
     action: z.literal("manage-signup"),
     id,
@@ -226,6 +229,13 @@ export const POST: APIRoute = async ({ request }) => {
           input.reason,
           input.notify,
         );
+        break;
+      case "add-attendee":
+        result = await addManualSignup(env.DB, actor, input.id, {
+          name: input.name,
+          medic: input.medic,
+          newVolunteer: input.newVolunteer,
+        });
         break;
       case "retry-notifications":
         requireOrganizer(actor);

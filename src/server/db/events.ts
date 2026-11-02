@@ -17,12 +17,14 @@ import {
 import { RequestError } from "../http";
 import {
   approvedMedicSql,
-  attendeeCategorySql,
   includesOrientationSql,
-  medicMarkSql,
-  newVolunteerSql,
   nowMsSql,
+  personDisplayNameSql,
   profileDisplayNameSql,
+  signupCategorySql,
+  signupMedicMarkSql,
+  signupMedicSql,
+  signupNewVolunteerSql,
 } from "./sql";
 import {
   availableSignupSpots,
@@ -153,7 +155,7 @@ export interface EventRow extends EventLimits {
 export interface RosterRow {
   id: string;
   eventId: string;
-  userId: string;
+  userId: string | null;
   name: string;
   registeredAt: number;
   completed: number;
@@ -186,6 +188,14 @@ const eventColumns = `
   e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
 const confirmedSignupsSql = `(SELECT count(*) FROM signup
   WHERE event_id = e.id AND status = 'confirmed')`;
+const rosterNameSql = `CASE WHEN s.user_id IS NULL THEN ${personDisplayNameSql({ legacyName: "s.manual_name" })}
+  ELSE coalesce(nullif(${profileDisplayNameSql}, ''), 'Outreach Volunteer') END`;
+
+export const manualSignupSchema = z.strictObject({
+  name: z.string().trim().min(1).max(200),
+  medic: z.boolean(),
+  newVolunteer: z.boolean(),
+});
 
 export { eventDescription } from "../../data/email-templates";
 
@@ -246,10 +256,10 @@ export async function listEvents(
   const select = `SELECT ${eventColumns},
     ${confirmedSignupsSql} AS confirmed,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
-      AND ${newVolunteerSql("s.user_id")}) AS newVolunteerConfirmed,
+      AND ${signupNewVolunteerSql()}) AS newVolunteerConfirmed,
     EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = ?) AS orientationCompleted,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
-      AND ${approvedMedicSql("s.user_id")}) AS medicConfirmed,
+      AND ${signupMedicSql()}) AS medicConfirmed,
     ${approvedMedicSql("?")} AS medicEligible,
     ${organizer ? `(${futureSignups})` : "0"} AS futureConfirmed,
     ${
@@ -769,7 +779,7 @@ export async function cancelEvent(
           AND NOT EXISTS(SELECT 1 FROM signup WHERE event_id = e.id)
           AND NOT EXISTS(SELECT 1 FROM orientation_completion WHERE event_id = e.id)
           AND NOT EXISTS(SELECT 1 FROM event_audit WHERE event_id = e.id
-            AND action IN ('signup_joined', 'signup_cancelled', 'signup_moved', 'signup_removed'))`,
+            AND action IN ('signup_joined', 'signup_cancelled', 'signup_moved', 'signup_removed', 'signup_manually_added'))`,
       )
       .bind(removedAudit, actor.id, now, id, operation),
     // The immutable recurring row/nominal key must remain. Keep only its required
@@ -897,6 +907,61 @@ export async function changeSignup(
   }
 }
 
+export async function addManualSignup(
+  db: Env["DB"],
+  actor: Actor,
+  eventId: string,
+  input: unknown,
+) {
+  requireOrganizer(actor);
+  const parsed = manualSignupSchema.safeParse(input);
+  if (!parsed.success)
+    throw new RequestError(
+      400,
+      "Enter a name of 1–200 characters and valid roles.",
+    );
+  await ensurePatrolOccurrences(db);
+  const event = await findEvent(db, eventId);
+  if (event.startsAt <= Date.now())
+    throw new RequestError(409, "Registration closes when the event starts.");
+  if (parsed.data.newVolunteer && !event.includesOrientation)
+    throw new RequestError(
+      409,
+      "New volunteers need an event with orientation.",
+    );
+  const operation = crypto.randomUUID();
+  const now = Date.now();
+  try {
+    const results = await db.batch([
+      db
+        .prepare(
+          `INSERT INTO signup (id, event_id, manual_name, manual_medic, manual_new, created_at, updated_at)
+        SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          eventId,
+          parsed.data.name,
+          Number(parsed.data.medic),
+          Number(parsed.data.newVolunteer),
+          now,
+          now,
+          ...permissionValues(actor),
+        ),
+      eventAudit(db, operation, eventId, actor.id, "signup_manually_added", [
+        "name",
+        "medic",
+        "newVolunteer",
+      ]),
+    ]);
+    if (!results[0].meta.changes)
+      throw new RequestError(403, "Your sign-in changed. Sign in again.");
+    return { operation, message: "Volunteer added." };
+  } catch (error) {
+    return databaseWriteError(error);
+  }
+}
+
 /** Safe roster for approved event viewers. Recheck visibility in SQL rather than
  * trusting event IDs supplied by a caller. Never return IDs or private profiles. */
 export async function listPublicRosters(
@@ -910,11 +975,11 @@ export async function listPublicRosters(
   const rows = await db
     .prepare(
       `SELECT s.id AS membership, s.user_id AS attendeeIdentity, s.event_id AS eventId,
-    coalesce(nullif(${profileDisplayNameSql}, ''), 'Outreach Volunteer') AS name,
-    ${attendeeCategorySql("s.user_id")} AS category,
-    ${medicMarkSql("s.user_id")} AS medicMark
+    ${rosterNameSql} AS name,
+    ${signupCategorySql()} AS category,
+    ${signupMedicMarkSql()} AS medicMark
     FROM signup s JOIN event e ON e.id = s.event_id
-    JOIN profile p ON p.user_id = s.user_id JOIN user u ON u.id = s.user_id
+    LEFT JOIN profile p ON p.user_id = s.user_id LEFT JOIN user u ON u.id = s.user_id
      WHERE s.status = 'confirmed' AND e.id IN (SELECT value FROM json_each(?))
       AND e.starts_at > ${nowMsSql} AND e.cancelled_at IS NULL
       AND ${volunteerEventVisibilitySql(actor)}
@@ -931,7 +996,7 @@ export async function listPublicRosters(
     .all<
       PublicRosterRow & {
         membership: string;
-        attendeeIdentity: string;
+        attendeeIdentity: string | null;
       }
     >();
   const people = rows.results.map((row) => ({
@@ -972,17 +1037,17 @@ export async function listRosters(
   const rows = await db
     .prepare(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, s.created_at AS registeredAt,
-        coalesce(nullif(${profileDisplayNameSql}, ''), 'Outreach Volunteer') AS name,
-        ${attendeeCategorySql("s.user_id")} AS category,
-        ${medicMarkSql("s.user_id")} AS medicMark,
-         v.patrol_approved AS patrolApproved, v.updated_at AS statusVersion,
+        ${rosterNameSql} AS name,
+        ${signupCategorySql()} AS category,
+        ${signupMedicMarkSql()} AS medicMark,
+         coalesce(v.patrol_approved, 0) AS patrolApproved, coalesce(v.updated_at, 0) AS statusVersion,
          EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
       FROM signup s
       JOIN event e ON e.id = s.event_id
-      JOIN profile p ON p.user_id = s.user_id
-       JOIN user u ON u.id = s.user_id
-       JOIN volunteer_status v ON v.user_id = s.user_id
+      LEFT JOIN profile p ON p.user_id = s.user_id
+       LEFT JOIN user u ON u.id = s.user_id
+       LEFT JOIN volunteer_status v ON v.user_id = s.user_id
        WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'
        ORDER BY s.event_id, s.created_at, s.id
        LIMIT 20000`,
@@ -1004,12 +1069,19 @@ export async function manageSignup(
   if (destination) await ensurePatrolOccurrences(db);
   const row = await db
     .prepare(
-      `SELECT event_id AS eventId, user_id AS userId
+      `SELECT event_id AS eventId, user_id AS userId, manual_name AS manualName,
+        manual_medic AS manualMedic, manual_new AS manualNew
       FROM signup
       WHERE id = ? AND status = 'confirmed'`,
     )
     .bind(signupId)
-    .first<{ eventId: string; userId: string }>();
+    .first<{
+      eventId: string;
+      userId: string | null;
+      manualName: string | null;
+      manualMedic: number;
+      manualNew: number;
+    }>();
   if (!row) throw new RequestError(404, "Registration not found.");
   const old = await findEvent(db, row.eventId);
   if (old.startsAt <= Date.now())
@@ -1051,11 +1123,21 @@ export async function manageSignup(
       statements.push(
         db
           .prepare(
-            `INSERT INTO signup (id, event_id, user_id, status, created_at, updated_at)
-            SELECT ?, ?, ?, 'confirmed', ?, ?
+            `INSERT INTO signup (id, event_id, user_id, manual_name, manual_medic, manual_new, status, created_at, updated_at)
+            SELECT ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?
             WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
           )
-          .bind(crypto.randomUUID(), next.id, row.userId, now, now, operation),
+          .bind(
+            crypto.randomUUID(),
+            next.id,
+            row.userId,
+            row.manualName,
+            row.manualMedic,
+            row.manualNew,
+            now,
+            now,
+            operation,
+          ),
       );
     statements.push(
       db

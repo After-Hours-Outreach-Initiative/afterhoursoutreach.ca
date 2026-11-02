@@ -14,6 +14,7 @@ import {
 } from "./volunteer-profile-contents";
 import { initSignupMenus } from "./signup-menu";
 import { initCompactPersonNames } from "./compact-person-name";
+import { initAttendeePreviews, syncAttendeePreview } from "./add-attendee";
 import {
   initSignupMoveCalendars,
   syncSignupMoveCalendar,
@@ -82,6 +83,7 @@ initEventDates(document);
 initVolunteerProfileContents();
 initSignupMenus();
 initCompactPersonNames();
+initAttendeePreviews();
 initSignupMoveCalendars();
 
 function applyEventFilter(root: HTMLElement, type: string) {
@@ -453,15 +455,17 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
                 ? card?.dataset.seriesCard
                   ? "[data-series-occurrences] > summary"
                   : "[data-show-dialog]"
-                : !element && focusedSeriesSummary
-                  ? focusedSeriesSummary
-                  : !element && focusedEventSummary
-                    ? focusedEventSummary
-                    : !element &&
-                        focused instanceof HTMLElement &&
-                        focused.dataset.showDialog
-                      ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
-                      : ".volunteer-roster summary";
+                : element?.matches("[data-add-attendee]")
+                  ? `[data-show-dialog="add-attendee-${CSS.escape(eventId ?? "")}"]`
+                  : !element && focusedSeriesSummary
+                    ? focusedSeriesSummary
+                    : !element && focusedEventSummary
+                      ? focusedEventSummary
+                      : !element &&
+                          focused instanceof HTMLElement &&
+                          focused.dataset.showDialog
+                        ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+                        : ".volunteer-roster summary";
     (card && !card.hidden
       ? !element && focused === focusedCard
         ? card
@@ -743,11 +747,13 @@ function form(
               ? "Event cancelled"
               : element.matches("[data-manage-signup]")
                 ? "Registration changed"
-                : element.matches("[data-organizer-role]")
-                  ? "Account role saved"
-                  : element.matches("[data-organizer-rejection]")
-                    ? "Application rejected"
-                    : "Volunteer access saved";
+                : element.matches("[data-add-attendee]")
+                  ? "Volunteer added"
+                  : element.matches("[data-organizer-role]")
+                    ? "Account role saved"
+                    : element.matches("[data-organizer-rejection]")
+                      ? "Application rejected"
+                      : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -910,6 +916,13 @@ form("[data-live-signup]", "/api/v1/events/action", (v) => ({
   action: str(v, "action"),
   id: str(v, "id"),
 }));
+form("[data-add-attendee]", "/api/v1/events/action", (v) => ({
+  action: "add-attendee",
+  id: str(v, "id"),
+  name: str(v, "name"),
+  medic: v.has("medic"),
+  newVolunteer: v.has("newVolunteer"),
+}));
 form(
   "[data-event-save]",
   "/api/v1/events/action",
@@ -1064,6 +1077,10 @@ document.addEventListener("click", (event) => {
     if (dialog instanceof HTMLDialogElement) {
       initEventDates(dialog);
       syncSignupMoveCalendar(dialog);
+      const attendeeForm = dialog.querySelector<HTMLFormElement>(
+        "[data-add-attendee]",
+      );
+      if (attendeeForm) syncAttendeePreview(attendeeForm);
       dialog.showModal();
     }
   }
