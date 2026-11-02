@@ -924,7 +924,7 @@ export async function listPublicRosters(
       AND (e.series_id IS NULL OR e.hidden = 0)
       AND ((e.series_id IS NOT NULL AND e.hidden = 0) OR (e.open = 1 AND e.hidden = 0)
         OR EXISTS (SELECT 1 FROM signup own WHERE own.event_id = e.id AND own.user_id = ? AND own.status = 'confirmed'))
-    ORDER BY s.event_id, s.id LIMIT 10000`,
+    ORDER BY s.event_id, s.created_at, s.id LIMIT 10000`,
     )
     // One JSON binding keeps a full 100-event page below D1's 100-parameter limit.
     .bind(JSON.stringify(ids), actor.id, actor.id)
@@ -984,7 +984,7 @@ export async function listRosters(
        JOIN user u ON u.id = s.user_id
        JOIN volunteer_status v ON v.user_id = s.user_id
        WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'
-       ORDER BY name COLLATE NOCASE, s.id
+       ORDER BY s.event_id, s.created_at, s.id
        LIMIT 20000`,
     )
     .bind(JSON.stringify(ids))

@@ -8,9 +8,6 @@ interface Props {
   event: EventRow;
 }
 const { roster, event } = Astro.props;
-const newMedicCount = roster.filter(
-  (person) => person.category === "new-volunteer" && person.medicMark,
-).length;
 ---
 
 <summary class="event-roster-toggle">
@@ -18,7 +15,7 @@ const newMedicCount = roster.filter(
     >Volunteers ({roster.length})</span
   >
   <ChevronDownIcon class="event-roster-chevron size-5 shrink-0" />
-  <EventAttendance event={event} newMedicCount={newMedicCount} />
+  <EventAttendance event={event} roster={roster} />
 </summary>
 
 <style>

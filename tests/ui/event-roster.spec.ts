@@ -138,7 +138,9 @@ test("empty volunteer rosters reserve no space through first/last signup updates
         "border-bottom-left-radius",
         "0px",
       );
-      await expect(roster(card).locator("tbody tr")).toHaveCount(1);
+      await expect(
+        roster(card).locator(".event-roster-table > tbody > tr"),
+      ).toHaveCount(1);
       const disclosure = await roster(card).evaluate((element) => {
         const summary = element.querySelector("summary")!;
         const frame = element.querySelector(".table-scroll-frame")!;
@@ -389,9 +391,27 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           "transform",
           "matrix(-1, 0, 0, -1, 0, 0)",
         );
-        await expect(roster.locator("tbody tr")).toHaveCount(2);
+        await expect(
+          roster.locator(".event-roster-table > tbody > tr"),
+        ).toHaveCount(2);
+        await expect(roster.locator(".compact-person-name")).toHaveText([
+          "Robin V.",
+          "Dana W.",
+        ]);
+        expect(
+          await summary
+            .locator(".attendee-avatar")
+            .evaluateAll((avatars) =>
+              avatars.map((avatar) => avatar.getAttribute("aria-label")),
+            ),
+        ).toEqual([
+          "Outreach Volunteer: registered",
+          "Approved medic: registered",
+        ]);
         const layout = await card.evaluate((element) => {
-          const rows = [...element.querySelectorAll("tbody tr")];
+          const rows = [
+            ...element.querySelectorAll(".event-roster-table > tbody > tr"),
+          ];
           const avatar = (selector: string) =>
             element.querySelector(selector)!.getBoundingClientRect().height;
           const summary = element.querySelector("details > summary")!;

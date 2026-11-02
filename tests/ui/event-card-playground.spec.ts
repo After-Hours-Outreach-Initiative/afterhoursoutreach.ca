@@ -337,6 +337,23 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   await expect(
     mixed.getByRole("rowheader", { name: "Morgan P." }),
   ).toBeVisible();
+  await expect(
+    mixed.locator(
+      ".event-roster-table tbody tr:last-child .compact-person-name",
+    ),
+  ).toHaveText("Morgan P.");
+  expect(
+    await mixed.locator(".volunteer-event-card").evaluate((element) => {
+      const labels = (selector: string) =>
+        [...element.querySelectorAll(selector)].map((avatar) =>
+          avatar.getAttribute("aria-label"),
+        );
+      return (
+        labels(".event-avatar-row .attendee-avatar").join() ===
+        labels(".event-roster-person .attendee-avatar").join()
+      );
+    }),
+  ).toBe(true);
   await mixed.getByRole("button", { name: "Unregister", exact: true }).click();
   await mixed
     .getByRole("dialog", { name: "Unregister from this event?", exact: true })

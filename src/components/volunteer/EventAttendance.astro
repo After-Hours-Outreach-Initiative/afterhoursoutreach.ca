@@ -1,11 +1,11 @@
 ---
-import type { EventRow } from "@/server/db/events";
+import type { EventRow, PublicRosterRow } from "@/server/db/events";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 interface Props {
   event: EventRow;
-  newMedicCount: number;
+  roster: Pick<PublicRosterRow, "category" | "medicMark">[];
 }
-const { event, newMedicCount } = Astro.props;
+const { event, roster } = Astro.props;
 const medics = event.medicConfirmed;
 const newVolunteers = event.newVolunteerConfirmed;
 const outreachVolunteers = Math.max(
@@ -16,23 +16,17 @@ const outreachVolunteers = Math.max(
 
 <span class="event-attendance">
   {
-    medics + outreachVolunteers + newVolunteers > 0 && (
+    roster.length > 0 && (
       <span class="event-attendance-row">
         <span
           class="event-avatar-row"
           role="group"
           aria-label={`${medics} approved medics, ${outreachVolunteers} outreach volunteer${outreachVolunteers === 1 ? "" : "s"} and ${newVolunteers} new volunteer${newVolunteers === 1 ? "" : "s"} registered`}
         >
-          {Array.from({ length: medics }, () => (
-            <AttendeeAvatar category="medic" />
-          ))}
-          {Array.from({ length: outreachVolunteers }, () => (
-            <AttendeeAvatar category="outreach-volunteer" />
-          ))}
-          {Array.from({ length: newVolunteers }, (_, index) => (
+          {roster.map((person) => (
             <AttendeeAvatar
-              category="new-volunteer"
-              medicMark={index < newMedicCount}
+              category={person.category}
+              medicMark={Boolean(person.medicMark)}
             />
           ))}
         </span>

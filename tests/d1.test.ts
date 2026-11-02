@@ -487,6 +487,107 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
   await changeSignup(env.DB, newVolunteer, "target", "join");
 });
 
+test("public and organizer rosters share earliest-registration-first order with stable ties", async () => {
+  const organizer: Actor = {
+    ...(await draftActor("organizer")),
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+    applicationApproved: true,
+  };
+  await env.DB.prepare(
+    "UPDATE user SET role='organizer' WHERE id='organizer'",
+  ).run();
+  const registrations = [
+    { id: "z-signup", userId: "Zoe", registeredAt: 1000 },
+    { id: "b-signup", userId: "Yara", registeredAt: 2000 },
+    { id: "c-signup", userId: "Bella", registeredAt: 2000 },
+    { id: "a-signup", userId: "Alice", registeredAt: 3000 },
+  ];
+  const volunteers: Actor[] = [];
+  for (const { userId } of registrations) {
+    volunteers.push({
+      ...(await draftActor(userId)),
+      applicationSubmitted: true,
+      applicationComplete: true,
+      naloxoneCompleted: true,
+      active: true,
+      applicationApproved: true,
+      patrolApproved: true,
+    });
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,
+        emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,
+        motivation,teams,medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+        VALUES (?,?,'Volunteer','','555','2000-01-01','Contact','555','Friend','Friend','Help','[]','None','None',0,0,0)`,
+      ).bind(userId, userId),
+      env.DB.prepare(
+        `INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at)
+        VALUES (?,1,1,'organizer',0,0)`,
+      ).bind(userId),
+    ]);
+  }
+  for (const eventId of ["target", "other"])
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES (?,'patrol',?,'Meeting point',8,'organizer',0,0)`,
+    )
+      .bind(eventId, Date.now() + 86_400_000)
+      .run();
+  for (const { id, userId, registeredAt } of [...registrations].reverse())
+    await env.DB.prepare(
+      `INSERT INTO signup (id,event_id,user_id,created_at,updated_at)
+      VALUES (?,'target',?,?,?)`,
+    )
+      .bind(id, userId, registeredAt, 10_000 - registeredAt)
+      .run();
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('other-signup','other','Alice',0,0)",
+    ),
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,status,created_at,updated_at) VALUES ('cancelled','target','Zoe','cancelled',0,0)",
+    ),
+  ]);
+  const viewer = volunteers[0];
+  const eventIds = ["target", "other"];
+  const organizerRoster = await listRosters(env.DB, organizer, eventIds);
+  const publicRoster = await listPublicRosters(env.DB, viewer, eventIds);
+  const target = organizerRoster.filter(({ eventId }) => eventId === "target");
+  assert.deepEqual(
+    target.map(({ userId, registeredAt }) => ({ userId, registeredAt })),
+    registrations.map(({ userId, registeredAt }) => ({ userId, registeredAt })),
+  );
+  assert.deepEqual(
+    publicRoster.people,
+    organizerRoster.map(({ eventId, name, category, medicMark }) => ({
+      eventId,
+      name,
+      category,
+      medicMark,
+    })),
+  );
+  // Rejoining creates a fresh registration, placing the volunteer at the end.
+  await changeSignup(env.DB, viewer, "target", "cancel");
+  await changeSignup(env.DB, viewer, "target", "join");
+  const after = await listRosters(env.DB, organizer, ["target"]);
+  assert.deepEqual(
+    after.map(({ userId }) => userId),
+    ["Yara", "Bella", "Alice", "Zoe"],
+  );
+  assert.deepEqual(
+    (await listPublicRosters(env.DB, viewer, ["target"])).people.map(
+      ({ name }) => name,
+    ),
+    after.map(({ name }) => name),
+  );
+  assert.notEqual(
+    (await listPublicRosters(env.DB, viewer, eventIds)).version,
+    publicRoster.version,
+  );
+});
+
 test("manual approvals recolour existing signups consistently without inventing attendance", async () => {
   const actors: Actor[] = [];
   for (const id of ["organizer", "blue", "attended", "green", "red"]) {
