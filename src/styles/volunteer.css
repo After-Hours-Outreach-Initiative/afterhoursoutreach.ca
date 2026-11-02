@@ -1418,20 +1418,9 @@ body:has(
   position: relative;
   top: 0;
   z-index: 1;
+  /* Paint directly on the header: WebKit can size an absolute thead mask to
+     the table or viewport, hiding rows while leaving them clickable. */
   background: #000;
-}
-.volunteer-table thead::before {
-  /* Table backgrounds clip to cell radii; this layer masks the rows instead. */
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: #000;
-  pointer-events: none;
-}
-.volunteer-table thead tr {
-  position: relative;
-  z-index: 1;
 }
 .volunteer-table thead th {
   padding-block: 0.5rem;

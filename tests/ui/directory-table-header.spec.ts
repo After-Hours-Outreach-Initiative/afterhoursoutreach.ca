@@ -1,4 +1,89 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
+import sharp from "sharp";
+
+async function expectRowsPainted(frame: Locator) {
+  // DOM visibility and hit testing both pass when a pointer-transparent header
+  // layer paints over the rows. Check actual pixels without font-specific images.
+  await frame.page().evaluate(() => document.fonts.ready);
+  await expect
+    .poll(
+      async () => {
+        const clip = await frame.evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          const headBottom = element
+            .querySelector("thead")!
+            .getBoundingClientRect().bottom;
+          const row = [...element.querySelectorAll("[data-volunteer-row]")]
+            .map((row) => row.getBoundingClientRect())
+            .find(
+              (row) =>
+                row.top >= Math.max(0, headBottom) && row.bottom < innerHeight,
+            );
+          if (!row) return null;
+          const x = Math.ceil(Math.max(0, bounds.left) + 1);
+          const y = Math.ceil(row.top + 1);
+          return {
+            x,
+            y,
+            width: Math.floor(Math.min(innerWidth, bounds.right) - 1) - x,
+            height: Math.floor(row.bottom - 1) - y,
+          };
+        });
+        if (!clip) return 0;
+        const { data, info } = await sharp(
+          await frame.page().screenshot({ clip, scale: "css" }),
+        )
+          .removeAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        let foreground = 0;
+        for (let index = 0; index < data.length; index += info.channels)
+          if (
+            data[index] > 100 &&
+            data[index + 1] > 100 &&
+            data[index + 2] > 100
+          )
+            foreground++;
+        return foreground;
+      },
+      {
+        message:
+          "Directory row text should be painted, not covered by the header",
+      },
+    )
+    .toBeGreaterThan(20);
+}
+
+for (const kind of ["applications", "volunteers"]) {
+  for (const fallback of [false, true]) {
+    test(`${kind} rows stay painted below sticky headers${fallback ? " without scroll timelines" : ""}`, async ({
+      page,
+    }) => {
+      if (fallback)
+        await page.addInitScript(() => {
+          CSS.supports = () => false;
+        });
+      await page.setViewportSize({ width: 390, height: 800 });
+      await page.goto(`/dev/ui/${kind}/preview?scenario=paginated&latency=0`);
+      const frame = page.locator(".volunteer-table-frame");
+      await expect(frame.locator("[data-volunteer-row]")).toHaveCount(50);
+      await expectRowsPainted(frame);
+      await frame.evaluate((element) =>
+        window.scrollTo(0, element.getBoundingClientRect().top + scrollY + 200),
+      );
+      await expectRowsPainted(frame);
+      await frame.evaluate((element) => (element.scrollLeft = 80));
+      await expectRowsPainted(frame);
+      await frame.locator('[data-volunteer-sort="name"]').click();
+      await expect(frame.locator("[aria-sort]")).toContainText("Name");
+      await frame.evaluate((element) => (element.scrollLeft = 0));
+      await expectRowsPainted(frame);
+      await page.setViewportSize({ width: 1440, height: 800 });
+      await expect(frame).toHaveAttribute("data-table-header", "native");
+      await expectRowsPainted(frame);
+    });
+  }
+}
 
 for (const fallback of [false, true]) {
   test(`directory headers remain aligned through scrolling, sorting, and resizing${fallback ? " without scroll timelines" : ""}`, async ({
