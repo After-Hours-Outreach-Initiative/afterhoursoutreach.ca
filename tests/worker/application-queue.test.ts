@@ -183,7 +183,7 @@ test("organizers review applications separately from approved volunteers with pe
         auth,
       );
       assert.equal(signIn.status, 302);
-      assert.equal(signIn.headers.get("location"), "/volunteer");
+      assert.equal(signIn.headers.get("location"), "/events");
       const landing = await get(
         "/volunteer?type=orientation&occurrence=a%2Fb",
         auth,
@@ -249,16 +249,6 @@ test("organizers review applications separately from approved volunteers with pe
     assert.equal(await auditCount(), 0);
 
     const context = await browser.newContext();
-    await context.addCookies(
-      cookie.split("; ").map((value) => {
-        const index = value.indexOf("=");
-        return {
-          name: value.slice(0, index),
-          value: value.slice(index + 1),
-          url: origin,
-        };
-      }),
-    );
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -277,6 +267,32 @@ test("organizers review applications separately from approved volunteers with pe
         body: Buffer.from(await result.arrayBuffer()),
       });
     });
+    for (const [id, destination] of [
+      ["organizer", "/events"],
+      ["approved", "/events"],
+      ["applicant-00", "/volunteer"],
+    ]) {
+      await context.clearCookies();
+      const proof = await createSignInOTP(DB, secret, `${id}@example.org`);
+      await page.goto(
+        `${origin}/volunteer/sign-in/complete#${new URLSearchParams(proof)}`,
+      );
+      await page.getByLabel("Six-digit code").fill(proof.otp);
+      await page.getByRole("button", { name: "Sign in with code" }).click();
+      await expect(page).toHaveURL(`${origin}${destination}`);
+      await expect(page.locator("[data-event-browser]")).toBeVisible();
+    }
+    await context.clearCookies();
+    await context.addCookies(
+      cookie.split("; ").map((value) => {
+        const index = value.indexOf("=");
+        return {
+          name: value.slice(0, index),
+          value: value.slice(index + 1),
+          url: origin,
+        };
+      }),
+    );
     await page.goto(`${origin}/volunteers`);
     await expect(page.getByRole("columnheader")).toHaveText(["Name", "Role"]);
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(

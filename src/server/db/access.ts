@@ -15,6 +15,7 @@ import {
   isApplicationComplete,
   loadApplicationProgress,
 } from "./application-progress";
+export { canViewEvents } from "./policy";
 
 export async function accountContext(
   bindings: AuthBindings,
@@ -128,19 +129,6 @@ export function requireVolunteer(actor: Actor | null): asserts actor is Actor {
     );
   if (actor.twoFactorEnabled && !actor.twoFactorVerified)
     throw new RequestError(403, "Sign in with your authenticator to continue.");
-}
-export function canViewEvents(actor: Actor | null): boolean {
-  // Preserve existing patrol-approved volunteers and organizers, including legacy
-  // accounts without a self-reported course date. New volunteers need all milestones.
-  return Boolean(
-    actor?.applicationSubmitted &&
-    actor.active &&
-    (actor.applicationApproved || actor.role === "organizer") &&
-    (actor.applicationComplete ||
-      actor.patrolApproved ||
-      actor.role === "organizer") &&
-    (!actor.twoFactorEnabled || actor.twoFactorVerified),
-  );
 }
 export function requireOrganizer(actor: Actor | null): asserts actor is Actor {
   requireVolunteer(actor);

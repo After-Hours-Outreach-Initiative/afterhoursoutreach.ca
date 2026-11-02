@@ -165,7 +165,11 @@ function finish(result: object) {
   if ("twoFactorRedirect" in result && result.twoFactorRedirect === true)
     return;
   rememberSuccessfulSignIn(result);
-  location.assign(signInDestination);
+  location.assign(
+    "next" in result && result.next === "/events"
+      ? result.next
+      : signInDestination,
+  );
 }
 
 const pendingFactor = new URLSearchParams(location.search).has("second-factor");

@@ -8,7 +8,7 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import { signInDestination } from "@/data/account-navigation";
+import { signInDestinationForUser } from "@/server/auth/destination";
 export const prerender = false;
 if (env.BETTER_AUTH_SECRET) {
   try {
@@ -21,7 +21,13 @@ if (env.BETTER_AUTH_SECRET) {
       current?.user.emailVerified &&
       (!current.user.twoFactorEnabled || current.session.twoFactorVerified)
     )
-      return Astro.redirect(signInDestination);
+      return Astro.redirect(
+        await signInDestinationForUser(
+          env.DB,
+          current.user.id,
+          current.session.twoFactorVerified,
+        ),
+      );
   } catch {
     return new Response("Sign-in is temporarily unavailable.", { status: 503 });
   }

@@ -25,6 +25,7 @@ import {
   revokeOtherAccountSessions,
 } from "../db/sessions";
 import { sendSignInEmail, type SignInEmail } from "./services";
+import { signInDestinationForUser } from "./destination";
 
 // A build-time gate keeps the development plugin out of deployed Workers.
 // Direct .DEV access lets Vite replace the flag; the property check also keeps
@@ -249,10 +250,16 @@ export function createAuth(
             const token =
               ctx.context.newSession?.session.token ?? result.data.token;
             await markSessionSecondFactorVerified(bindings.DB, token);
-            // Clear return cookies from older sign-in flows, but never use them
-            // to choose a different landing page after verifying the factor.
+            // Clear legacy return cookies; current access determines the landing page.
             expireCookie(ctx, ctx.context.createAuthCookie("sign_in_return"));
-            return ctx.json({ ...result.data, next: signInDestination });
+            return ctx.json({
+              ...result.data,
+              next: await signInDestinationForUser(
+                bindings.DB,
+                result.data.user.id,
+                true,
+              ),
+            });
           }),
         },
       ],
@@ -568,8 +575,14 @@ export function createAuth(
         if (ctx.headers?.has("x-email-link-activation"))
           expireCookie(ctx, ctx.context.createAuthCookie("email_link"));
         // The two-factor plugin still replaces this response with a challenge
-        // for enrolled accounts. Every completed sign-in shares one destination.
-        return ctx.json({ ...result.data, next: signInDestination });
+        // for enrolled accounts. Resolve their destination after verification.
+        return ctx.json({
+          ...result.data,
+          next: await signInDestinationForUser(
+            bindings.DB,
+            result.data.user.id,
+          ),
+        });
       }),
     },
     plugins: [

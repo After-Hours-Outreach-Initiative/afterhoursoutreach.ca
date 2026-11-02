@@ -14,6 +14,28 @@ export interface SignupVolunteer {
   role?: "volunteer" | "organizer";
 }
 
+export function canViewEvents(
+  actor:
+    | (SignupVolunteer & {
+        applicationComplete: boolean;
+        twoFactorEnabled: boolean | null | undefined;
+        twoFactorVerified: boolean;
+      })
+    | null,
+): boolean {
+  // Preserve existing patrol-approved volunteers and organizers, including legacy
+  // accounts without a self-reported course date. New volunteers need all milestones.
+  return Boolean(
+    actor?.applicationSubmitted &&
+    actor.active &&
+    (actor.applicationApproved || actor.role === "organizer") &&
+    (actor.applicationComplete ||
+      actor.patrolApproved ||
+      actor.role === "organizer") &&
+    (!actor.twoFactorEnabled || actor.twoFactorVerified),
+  );
+}
+
 export interface SignupEvent extends Partial<EventLimits> {
   // Legacy callers can keep supplying type; new forms use includesOrientation.
   type?: "patrol" | "orientation";
