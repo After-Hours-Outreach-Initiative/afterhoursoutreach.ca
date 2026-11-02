@@ -8,7 +8,10 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
 export default defineConfig({
-  adapter: cloudflare({ imageService: "compile", remoteBindings: false }),
+  adapter: cloudflare({
+    imageService: { build: "compile", runtime: "cloudflare-binding" },
+    remoteBindings: false,
+  }),
   fonts: [
     {
       provider: fontProviders.google(),
