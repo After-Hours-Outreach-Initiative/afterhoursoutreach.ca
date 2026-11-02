@@ -1,7 +1,53 @@
 import { expect, test } from "vitest";
 import { createTestHarness } from "wrangler";
+import sharp from "sharp";
 import { formatEventDate } from "../../src/data/event-time";
 import { createSignInOTP } from "../helpers/email-otp";
+
+test("homepage photo is already cropped to its displayed aspect ratio in production", async () => {
+  const origin = "https://afterhoursoutreach.ca";
+  const server = createTestHarness({
+    workers: [
+      {
+        configPath: "dist/server/wrangler.json",
+        vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
+        secrets: {
+          BETTER_AUTH_SECRET: "homepage-image-test-secret-12345678901234567890",
+          RESEND_API_KEY: "",
+        },
+      },
+    ],
+  });
+  try {
+    await server.listen();
+    const worker = server.getWorker<Env>();
+    await worker.applyD1Migrations("DB");
+    const response = await worker.fetch(origin);
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    const section = html.match(
+      /<section\b[^>]*id="upcoming-events"[\s\S]*?<\/section>/,
+    )?.[0];
+    const image = section?.match(/<img\b[^>]*>/)?.[0];
+    expect(image).toBeDefined();
+    expect(image).not.toMatch(/object-bottom|position=|fit=/);
+    const src = image!.match(/\bsrc="([^"]+)"/)?.[1];
+    expect(src).toBeDefined();
+    const photo = await worker.fetch(
+      new URL(src!.replaceAll("&amp;", "&"), origin),
+    );
+    expect(photo.status).toBe(200);
+    expect(photo.headers.get("content-type")).toBe("image/webp");
+    const { width, height, format } = await sharp(
+      Buffer.from(await photo.arrayBuffer()),
+    ).metadata();
+    expect(format).toBe("webp");
+    expect(width! / height!).toBe(4 / 3);
+    expect(image).toContain('width="960" height="720"');
+  } finally {
+    await server.close();
+  }
+});
 
 test("homepage exposes only the next two published dates and total confirmed counts to every visitor", async () => {
   const origin = "https://afterhoursoutreach.ca";
