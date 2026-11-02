@@ -131,138 +131,142 @@ const columns = (
     <button class="btn btn-outline" type="submit">Search</button>
   </form>
   <div data-volunteer-results>
-    <TableScrollFrame
-      class="volunteer-table-frame"
-      label={applications ? "Application table" : "Volunteer table"}
-    >
-      <table class="volunteer-table">
-        <caption class="sr-only">
-          {
-            applications
-              ? "Applicants, roles, status, and completion dates"
-              : "Approved volunteers and roles"
-          }
-        </caption>
-        <thead>
-          <tr>
+    <div class="volunteer-table-shell">
+      <TableScrollFrame
+        class="volunteer-table-frame"
+        label={applications ? "Application table" : "Volunteer table"}
+      >
+        <table class="volunteer-table" id={`${kind}-table`}>
+          <caption class="sr-only">
             {
-              columns.map(({ key, label }) => {
-                const active = sort === key;
-                const nextDirection =
-                  active && direction === "asc" ? "desc" : "asc";
-                return (
-                  <th
-                    scope="col"
-                    aria-sort={
-                      active
-                        ? direction === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : undefined
-                    }
-                  >
-                    <a
-                      class="volunteer-table-sort"
-                      href={urlForState({
-                        ...state,
-                        sort: key,
-                        direction: nextDirection,
-                        offset: 0,
-                      })}
-                      data-volunteer-sort={key}
-                      aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
-                    >
-                      <span>{label}</span>
-                      <ArrowRightIcon class="volunteer-table-sort-icon" />
-                    </a>
-                  </th>
-                );
-              })
+              applications
+                ? "Applicants, roles, status, and completion dates"
+                : "Approved volunteers and roles"
             }
-          </tr>
-        </thead>
-        <tbody>
-          {
-            people.rows.map((person) => (
-              <tr data-volunteer-row>
-                <th scope="row">
-                  <div class="volunteer-table-person">
-                    <AttendeeAvatar
-                      category={person.category}
-                      medicMark={Boolean(person.medicMark)}
-                      decorative
-                    />
-                    <div class="volunteer-table-name">
-                      <CompactPersonName
-                        name={person.name}
-                        href={profileHref(person.id)}
-                        data-volunteer-profile-link
-                      />
-                    </div>
-                  </div>
-                </th>
-                {applications ? (
-                  <>
-                    <td>
-                      {Boolean(person.medicMark) && (
-                        <VolunteerRoleBadge role="medic" />
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        class="application-table-progress"
-                        data-state={
-                          person.applicationRejectionReason
-                            ? "rejected"
-                            : person.applicationReadyForReview
-                              ? "ready"
-                              : "in-progress"
-                        }
+          </caption>
+          <thead>
+            <tr>
+              {
+                columns.map(({ key, label }) => {
+                  const active = sort === key;
+                  const nextDirection =
+                    active && direction === "asc" ? "desc" : "asc";
+                  return (
+                    <th
+                      scope="col"
+                      data-directory-column={key}
+                      aria-sort={
+                        active
+                          ? direction === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : undefined
+                      }
+                    >
+                      <a
+                        class="volunteer-table-sort"
+                        href={urlForState({
+                          ...state,
+                          sort: key,
+                          direction: nextDirection,
+                          offset: 0,
+                        })}
+                        data-volunteer-sort={key}
+                        aria-controls={`${kind}-table`}
+                        aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
                       >
-                        {person.applicationRejectionReason
-                          ? "Rejected"
-                          : person.applicationReadyForReview
-                            ? "Ready for review"
-                            : "In Progress"}
-                      </span>
-                    </td>
-                    <td>
-                      {person.applicationCompletedAt !== null ? (
-                        <time
-                          datetime={new Date(
-                            person.applicationCompletedAt,
-                          ).toISOString()}
-                        >
-                          {formatApplicationCompletedTime(
-                            new Date(
-                              person.applicationCompletedAt,
-                            ).toISOString(),
-                          )}
-                        </time>
-                      ) : null}
-                    </td>
-                  </>
-                ) : (
-                  <td>
-                    <div class="flex flex-wrap gap-2">
-                      {person.role === "organizer" && (
-                        <VolunteerRoleBadge role="organizer" />
-                      )}
-                      {person.category === "new-volunteer" && (
-                        <NewVolunteerBadge />
-                      )}
-                      {Boolean(person.medicMark) && (
-                        <VolunteerRoleBadge role="medic" />
-                      )}
+                        <span>{label}</span>
+                        <ArrowRightIcon class="volunteer-table-sort-icon" />
+                      </a>
+                    </th>
+                  );
+                })
+              }
+            </tr>
+          </thead>
+          <tbody>
+            {
+              people.rows.map((person) => (
+                <tr data-volunteer-row>
+                  <th scope="row">
+                    <div class="volunteer-table-person">
+                      <AttendeeAvatar
+                        category={person.category}
+                        medicMark={Boolean(person.medicMark)}
+                        decorative
+                      />
+                      <div class="volunteer-table-name">
+                        <CompactPersonName
+                          name={person.name}
+                          href={profileHref(person.id)}
+                          data-volunteer-profile-link
+                        />
+                      </div>
                     </div>
-                  </td>
-                )}
-              </tr>
-            ))
-          }
-        </tbody>
-      </table>
-    </TableScrollFrame>
+                  </th>
+                  {applications ? (
+                    <>
+                      <td>
+                        {Boolean(person.medicMark) && (
+                          <VolunteerRoleBadge role="medic" />
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          class="application-table-progress"
+                          data-state={
+                            person.applicationRejectionReason
+                              ? "rejected"
+                              : person.applicationReadyForReview
+                                ? "ready"
+                                : "in-progress"
+                          }
+                        >
+                          {person.applicationRejectionReason
+                            ? "Rejected"
+                            : person.applicationReadyForReview
+                              ? "Ready for review"
+                              : "In Progress"}
+                        </span>
+                      </td>
+                      <td>
+                        {person.applicationCompletedAt !== null ? (
+                          <time
+                            datetime={new Date(
+                              person.applicationCompletedAt,
+                            ).toISOString()}
+                          >
+                            {formatApplicationCompletedTime(
+                              new Date(
+                                person.applicationCompletedAt,
+                              ).toISOString(),
+                            )}
+                          </time>
+                        ) : null}
+                      </td>
+                    </>
+                  ) : (
+                    <td>
+                      <div class="flex flex-wrap gap-2">
+                        {person.role === "organizer" && (
+                          <VolunteerRoleBadge role="organizer" />
+                        )}
+                        {person.category === "new-volunteer" && (
+                          <NewVolunteerBadge />
+                        )}
+                        {Boolean(person.medicMark) && (
+                          <VolunteerRoleBadge role="medic" />
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </TableScrollFrame>
+    </div>
     {
       !people.rows.length && (
         <p class="volunteer-notice">

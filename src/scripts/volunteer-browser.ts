@@ -98,13 +98,15 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
       );
       if (input && nextInput) input.value = nextInput.value;
     }
+    // Split the new header before restoring focus, so moving its original links
+    // out of the body scroller cannot drop the keyboard user's focus.
+    refreshTableHeader();
     if (focusedSort)
       results
         .querySelector<HTMLAnchorElement>(
           `[data-volunteer-sort="${focusedSort}"]`,
         )
         ?.focus({ preventScroll: true });
-    refreshTableHeader();
   };
   const searchUrl = (resetOffset = true) => {
     const url = new URL(location.href);

@@ -1,71 +1,61 @@
-// Keep the original semantic header and horizontal scroll frame. Prefer native
-// sticky positioning; overflowing tables can use a compositor-driven timeline.
+// The page owns vertical scrolling. Keep the native sticky header outside the
+// body's horizontal scroller, and synchronize only horizontal position/widths.
 export function initDirectoryTableHeader(results: HTMLElement) {
   const siteHeader = document.querySelector<HTMLElement>(".site-header");
-  const scrollDriven =
-    CSS.supports("animation-timeline: scroll(root block)") &&
-    CSS.supports("animation-range: 0px 1px");
+  let shell: HTMLElement | null = null;
   let frame: HTMLElement | null = null;
   let table: HTMLTableElement | null = null;
-  let head: HTMLTableSectionElement | null = null;
+  let header: HTMLElement | null = null;
+  let headerTable: HTMLTableElement | null = null;
   let scheduled: number | undefined;
   let needsMeasurement = true;
   let active = true;
-  let mode: "native" | "timeline" | "fallback" = "native";
   let start = 0;
-  let travel = 0;
-  let lastShift = -1;
+  let scrollLeft = 0;
+
+  const syncFromBody = () => {
+    if (!frame || !header || Math.abs(frame.scrollLeft - scrollLeft) < 0.5)
+      return;
+    scrollLeft = frame.scrollLeft;
+    header.scrollLeft = scrollLeft;
+  };
+  const syncFromHeader = () => {
+    if (!frame || !header || Math.abs(header.scrollLeft - scrollLeft) < 0.5)
+      return;
+    scrollLeft = header.scrollLeft;
+    frame.scrollLeft = scrollLeft;
+  };
 
   const update = () => {
     scheduled = undefined;
-    if (!frame?.isConnected || !table || !head) return;
+    if (!shell?.isConnected || !frame || !table || !header || !headerTable)
+      return;
     if (needsMeasurement) {
-      // All geometry reads precede style writes, and only happen on layout
-      // changes. A scroll frame only reads scrollY, never DOM geometry.
+      // The body's non-interactive semantic header also retains the intrinsic
+      // column sizes. Only the separate visual table gets fixed column widths.
       const bounds = table.getBoundingClientRect();
+      const widths = [...table.tHead!.rows[0].cells].map(
+        (cell) => cell.getBoundingClientRect().width,
+      );
+      const height = headerTable.tHead!.getBoundingClientRect().height;
       const top = siteHeader?.getBoundingClientRect().height ?? 0;
-      const headHeight = head.getBoundingClientRect().height;
-      const overflowing = table.scrollWidth > frame.clientWidth;
-      start = bounds.top + window.scrollY - top;
-      travel = Math.max(0, bounds.height - headHeight);
-      mode = !overflowing
-        ? "native"
-        : scrollDriven && travel > 0
-          ? "timeline"
-          : "fallback";
+      start = shell.getBoundingClientRect().top + window.scrollY - top;
+      const overflowing = bounds.width > frame.clientWidth;
       needsMeasurement = false;
-      lastShift = -1;
 
-      window.removeEventListener("scroll", schedule);
-      if (travel > 0)
-        window.addEventListener("scroll", schedule, { passive: true });
+      headerTable.style.width = `${bounds.width}px`;
+      [...headerTable.querySelectorAll("col")].forEach((col, index) => {
+        col.style.width = `${widths[index]}px`;
+      });
+      shell.style.setProperty("--directory-table-header-height", `${height}px`);
+      shell.style.setProperty("--directory-table-header-top", `${top}px`);
       frame.tabIndex = overflowing ? 0 : -1;
-      frame.style.setProperty("--directory-table-header-top", `${top}px`);
-      if (mode === "timeline") {
-        head.style.setProperty("--directory-table-header-start", `${start}px`);
-        head.style.setProperty(
-          "--directory-table-header-end",
-          `${start + travel}px`,
-        );
-        head.style.setProperty(
-          "--directory-table-header-travel",
-          `${travel}px`,
-        );
-      }
-      if (mode !== "fallback") head.style.removeProperty("transform");
-      frame.dataset.tableHeader = mode;
+      scrollLeft = frame.scrollLeft;
+      header.scrollLeft = scrollLeft;
     }
-    const shift = Math.max(0, Math.min(window.scrollY - start, travel));
-    const stuck = String(shift > 0);
-    // Only the corner state changes at the sticky edge; native/timeline modes
-    // still leave all header positioning to the browser.
-    if (frame.dataset.headerStuck !== stuck) frame.dataset.headerStuck = stuck;
-    if (mode === "fallback") {
-      if (shift !== lastShift) {
-        head.style.transform = `translate3d(0, ${shift}px, 0)`;
-        lastShift = shift;
-      }
-    }
+    // Cosmetic corner changes only; native sticky owns all vertical positioning.
+    const stuck = String(window.scrollY > start);
+    if (shell.dataset.headerStuck !== stuck) shell.dataset.headerStuck = stuck;
   };
   function schedule() {
     if (active) scheduled ??= requestAnimationFrame(update);
@@ -74,24 +64,66 @@ export function initDirectoryTableHeader(results: HTMLElement) {
     needsMeasurement = true;
     schedule();
   };
-  // Observe actual layout changes, not height-only viewport resize events from
-  // mobile browser toolbars animating during a scroll.
   const observer = new ResizeObserver(measure);
-  const refresh = () => {
+  const disconnect = () => {
     observer.disconnect();
     window.removeEventListener("scroll", schedule);
+    frame?.removeEventListener("scroll", syncFromBody);
+    header?.removeEventListener("scroll", syncFromHeader);
     if (scheduled !== undefined) cancelAnimationFrame(scheduled);
     scheduled = undefined;
-    frame = results.querySelector<HTMLElement>(".volunteer-table-frame");
+  };
+
+  const refresh = () => {
+    disconnect();
+    shell = results.querySelector<HTMLElement>(".volunteer-table-shell");
+    frame = shell?.querySelector<HTMLElement>(".volunteer-table-frame") ?? null;
     table = frame?.querySelector<HTMLTableElement>("table") ?? null;
-    head = table?.tHead ?? null;
-    if (!frame || !table || !head) return;
+    if (!shell || !frame || !table?.tHead) return;
+    header = shell.querySelector<HTMLElement>(".volunteer-table-header");
+    if (!header) {
+      const head = table.tHead;
+      const height = head.getBoundingClientRect().height;
+      const semanticHead = head.cloneNode(true) as HTMLTableSectionElement;
+      // Keep real column headers in the data table, but only one set of sort
+      // controls. The original links move into the visible presentation table.
+      semanticHead.querySelectorAll("a").forEach((link) => {
+        const label = document.createElement("span");
+        label.className = link.className;
+        label.replaceChildren(...link.childNodes);
+        link.replaceWith(label);
+      });
+      table.replaceChild(semanticHead, head);
+      header = document.createElement("div");
+      header.className = "volunteer-table-header";
+      header.setAttribute("role", "group");
+      header.setAttribute(
+        "aria-label",
+        `${frame.getAttribute("aria-label")} sorting`,
+      );
+      headerTable = document.createElement("table");
+      headerTable.className = "volunteer-table";
+      headerTable.setAttribute("role", "presentation");
+      const columns = document.createElement("colgroup");
+      for (const _ of head.rows[0].cells)
+        columns.appendChild(document.createElement("col"));
+      headerTable.appendChild(columns);
+      headerTable.appendChild(head);
+      header.appendChild(headerTable);
+      shell.insertBefore(header, frame);
+      shell.style.setProperty("--directory-table-header-height", `${height}px`);
+      shell.dataset.tableHeader = "split";
+    }
+    headerTable = header.querySelector<HTMLTableElement>("table");
     observer.observe(frame);
     observer.observe(table);
-    observer.observe(head);
-    // Include filters/search errors above the table when caching its page offset.
+    observer.observe(header);
+    observer.observe(table.tHead);
     observer.observe(results.closest("[data-volunteer-browser]") ?? results);
     if (siteHeader) observer.observe(siteHeader);
+    frame.addEventListener("scroll", syncFromBody, { passive: true });
+    header.addEventListener("scroll", syncFromHeader, { passive: true });
+    window.addEventListener("scroll", schedule, { passive: true });
     measure();
   };
   const resume = () => {
@@ -100,10 +132,7 @@ export function initDirectoryTableHeader(results: HTMLElement) {
   };
   window.addEventListener("pagehide", () => {
     active = false;
-    observer.disconnect();
-    if (scheduled !== undefined) cancelAnimationFrame(scheduled);
-    scheduled = undefined;
-    window.removeEventListener("scroll", schedule);
+    disconnect();
   });
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) resume();
