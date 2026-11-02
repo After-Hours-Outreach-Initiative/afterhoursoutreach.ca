@@ -368,6 +368,36 @@ test("sorting and semantic headers still work without JavaScript", async ({
   }
 });
 
+for (const javaScriptEnabled of [true, false]) {
+  test.describe(`volunteer column sizing with JavaScript ${javaScriptEnabled ? "enabled" : "disabled"}`, () => {
+    test.use({ javaScriptEnabled });
+
+    test("short names keep Name and Role visible at phone widths", async ({
+      page,
+    }) => {
+      await page.goto("/dev/ui/volunteers/preview?scenario=mixed&latency=0");
+      const shell = page.locator(".volunteer-table-shell");
+      const frame = shell.locator(".volunteer-table-frame");
+      await expect(frame.locator("[data-volunteer-row]")).toHaveCount(8);
+      await page.evaluate(() => document.fonts.ready);
+
+      for (const width of [320, 375, 390, 430]) {
+        await page.setViewportSize({ width, height: 844 });
+        // Checking the painted avatar's width alone misses WebKit reserving
+        // the SVG's 300px intrinsic width while sizing the name column.
+        await expect
+          .poll(() =>
+            frame.evaluate(
+              (element) => element.scrollWidth - element.clientWidth,
+            ),
+          )
+          .toBeLessThanOrEqual(1);
+        if (javaScriptEnabled) await expectColumnsAligned(shell);
+      }
+    });
+  });
+}
+
 test("column widths update for long names, empty searches, and restored results", async ({
   page,
 }) => {

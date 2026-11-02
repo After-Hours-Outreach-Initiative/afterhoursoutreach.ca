@@ -96,8 +96,9 @@ const horizontalGradient = newVolunteerStyle === "gradient-horizontal";
 <style>
   .attendee-avatar {
     display: inline-flex;
+    /* Keep the SVG's intrinsic width out of WebKit's table column sizing. */
+    width: calc(var(--attendee-avatar-height, 1.5rem) * 14 / 19.5);
     height: var(--attendee-avatar-height, 1.5rem);
-    aspect-ratio: 14 / 19.5;
     flex: 0 0 auto;
     color: var(--color-blue);
   }
