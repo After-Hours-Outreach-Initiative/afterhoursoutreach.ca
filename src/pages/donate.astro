@@ -81,7 +81,7 @@ const equipmentNeeds = [
     <div
       class="mx-auto grid w-full max-w-site items-center gap-14 px-6 pt-24 max-sm:px-4 max-sm:pt-18 lg:grid-cols-[minmax(0,1fr)_26.25rem] lg:gap-20"
     >
-      <div>
+      <div class="min-w-0">
         <h1>
           <span class="text-blue">Donate</span>
         </h1>
@@ -116,26 +116,92 @@ const equipmentNeeds = [
             Donate on GoFundMe
           </a>
         </div>
-        <p class="mt-6 max-w-xl text-zinc-300">
-          You can also donate by e-Transfer to <code
-            data-etransfer-email
-            class="rounded bg-panel-soft px-1.5 py-0.5 text-base break-all text-white"
-            >finance@afterhoursoutreach.ca</code
+        <div class="mt-6 text-zinc-300">
+          <p>You can also donate by e-Transfer to:</p>
+          <div
+            class="mt-3 flex w-full max-w-full flex-col gap-2 rounded-lg bg-panel-soft p-2 sm:w-fit"
           >
-          <button
-            type="button"
-            class="btn btn-quiet ml-2 align-middle"
-            data-copy-etransfer-email
-            aria-label="Copy e-Transfer email address"
-          >
-            Copy
-          </button>
-          <span
-            class="mt-2 block text-sm"
-            data-etransfer-copy-status
-            role="status"
-            aria-live="polite"></span>
-        </p>
+            <pre
+              class="w-full min-w-0 overflow-x-auto px-2 py-1 text-base whitespace-pre text-white [scrollbar-width:thin]"
+              tabindex="0"
+              role="region"
+              aria-label="e-Transfer email address"><code data-etransfer-email>finance@afterhoursoutreach.ca</code></pre>
+            <button
+              type="button"
+              class="btn btn-primary min-h-8 w-full text-sm"
+              data-copy-etransfer-email
+              aria-label="Copy e-Transfer email address"
+              aria-live="polite"
+            >
+              <span class="grid">
+                <span
+                  class="etransfer-copy-state"
+                  data-etransfer-copy-state="copy"
+                  aria-hidden="false"
+                >
+                  {/* lucide: copy */}
+                  <svg
+                    class="lucide btn-icon"
+                    data-etransfer-copy-icon="copy"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <rect x="8" y="8" width="14" height="14" rx="2"></rect>
+                    <path
+                      d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"
+                    ></path>
+                  </svg>
+                  <span data-etransfer-copy-label>Copy</span>
+                </span>
+                <span
+                  class="etransfer-copy-state"
+                  data-etransfer-copy-state="copied"
+                  aria-hidden="true"
+                >
+                  {/* lucide: check */}
+                  <svg
+                    class="lucide btn-icon text-green-300"
+                    data-etransfer-copy-icon="copied"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="m20 6-11 11-5-5"></path>
+                  </svg>
+                  <span data-etransfer-copy-label>Copied</span>
+                </span>
+                <span
+                  class="etransfer-copy-state"
+                  data-etransfer-copy-state="error"
+                  aria-hidden="true"
+                >
+                  {/* lucide: circle-alert */}
+                  <svg
+                    class="lucide btn-icon text-red-300"
+                    data-etransfer-copy-icon="error"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 8v4"></path>
+                    <path d="M12 16h.01"></path>
+                  </svg>
+                  <span class="text-red-300" data-etransfer-copy-label
+                    >Error</span
+                  >
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="relative flex items-center justify-center max-lg:order-first">
@@ -244,6 +310,32 @@ const equipmentNeeds = [
   </section>
 </Layout>
 
+<style>
+  .etransfer-copy-state {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.625rem;
+    visibility: hidden;
+    opacity: 0;
+    transition:
+      opacity 160ms ease,
+      visibility 160ms;
+  }
+
+  .etransfer-copy-state[aria-hidden="false"] {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .etransfer-copy-state {
+      transition: none;
+    }
+  }
+</style>
+
 <script>
   const email = document
     .querySelector<HTMLElement>("[data-etransfer-email]")
@@ -251,19 +343,43 @@ const equipmentNeeds = [
   const copyButton = document.querySelector<HTMLButtonElement>(
     "[data-copy-etransfer-email]",
   );
-  const copyStatus = document.querySelector<HTMLElement>(
-    "[data-etransfer-copy-status]",
-  );
 
-  if (email && copyButton && copyStatus) {
+  if (email && copyButton) {
+    const copyPanels = copyButton.querySelectorAll<HTMLElement>(
+      "[data-etransfer-copy-state]",
+    );
+    const copyDescriptions = {
+      copy: "Copy e-Transfer email address",
+      copied: "e-Transfer email address copied",
+      error: "Could not copy e-Transfer email address. Try again.",
+    };
+    let resetTimer: number | undefined;
+    let copyAttempt = 0;
+
+    const setCopyState = (state: keyof typeof copyDescriptions) => {
+      window.clearTimeout(resetTimer);
+      resetTimer = undefined;
+      copyButton.setAttribute("aria-label", copyDescriptions[state]);
+      for (const panel of copyPanels) {
+        panel.setAttribute(
+          "aria-hidden",
+          String(panel.dataset.etransferCopyState !== state),
+        );
+      }
+      if (state !== "copy") {
+        resetTimer = window.setTimeout(() => setCopyState("copy"), 3000);
+      }
+    };
+
     copyButton.addEventListener("click", async () => {
-      copyStatus.textContent = "";
+      const attempt = ++copyAttempt;
+      window.clearTimeout(resetTimer);
+      resetTimer = undefined;
       try {
         await navigator.clipboard.writeText(email);
-        copyStatus.textContent = "e-Transfer email address copied.";
+        if (attempt === copyAttempt) setCopyState("copied");
       } catch {
-        copyStatus.textContent =
-          "Could not copy. Select and copy the email address above.";
+        if (attempt === copyAttempt) setCopyState("error");
       }
     });
   }
