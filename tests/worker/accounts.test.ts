@@ -693,13 +693,10 @@ describe(
         html,
         /submitted-application-heading|data-submitted-application|data-application-tracker|data-naloxone-confirm|account-naloxone-heading/,
       );
-      assert.doesNotMatch(
-        html,
-        /Please tell us what motivates you volunteer with us\?/,
-      );
+      assert.doesNotMatch(html, /What motivates you to volunteer with us\?/);
       assert.doesNotMatch(
         html.match(/<form\b[^>]*data-account-profile[\s\S]*?<\/form>/)![0],
-        /How did you find out about us\?|Please tell us what motivates you volunteer with us\?|code-of-conduct-heading/,
+        /How did you find out about us\?|What motivates you to volunteer with us\?|code-of-conduct-heading/,
       );
       assert.doesNotMatch(
         html,
@@ -821,10 +818,7 @@ describe(
           })
           .replace(/\s+/g, " "),
       );
-      assert.match(
-        html,
-        /Please tell us what motivates you volunteer with us\?/,
-      );
+      assert.match(html, /What motivates you to volunteer with us\?/);
     });
 
     test("submitted applications stay private and legacy profile edits do not invent an original snapshot", async () => {
@@ -937,7 +931,10 @@ describe(
         }
         const signedInHTML = await signedIn.text();
         const header = signedInHTML.match(/<header\b[\s\S]*?<\/header>/)![0];
-        assert.match(header, /aria-label="Account for Worker Test Volunteer"/);
+        assert.match(
+          header,
+          /aria-label="Account for Worker Test Volunteer V\."/,
+        );
         assert.match(header, /data-account-menu(?:=""|[\s>])/);
         assert.match(header, /data-header-discord[^>]*hidden/);
         assert.doesNotMatch(signedInHTML, /Sample private answer/);
@@ -1514,7 +1511,7 @@ describe(
           (
             await menu.locator("[data-account-menu-name]").textContent()
           )?.trim(),
-          changedName,
+          `${changedName} V.`,
         );
         assert.equal(
           await page
