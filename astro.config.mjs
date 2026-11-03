@@ -32,6 +32,14 @@ export default defineConfig({
           // Register no routes or playground imports in either hosted build.
           if (command !== "dev") return;
           injectRoute({
+            pattern: "/dev/ui/buttons",
+            entrypoint: new URL(
+              "./src/dev/ui/ButtonsPlayground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
             pattern: "/dev/ui",
             entrypoint: new URL(
               "./src/dev/ui/Playground.astro",

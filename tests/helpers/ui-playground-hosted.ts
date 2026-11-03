@@ -18,6 +18,7 @@ export async function assertHostedUiPlaygroundAbsent(configPath: string) {
     const worker = server.getWorker();
     for (const path of [
       "/dev/ui",
+      "/dev/ui/buttons",
       "/dev/ui/discord?scenario=connected",
       "/dev/ui/event-card",
       "/dev/ui/event-card/preview?scenario=full",
