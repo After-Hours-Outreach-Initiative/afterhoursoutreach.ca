@@ -11,6 +11,7 @@ import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
 import PatrolApproval from "@/components/volunteer/PatrolApproval.astro";
 import PageContents from "@/components/volunteer/PageContents.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import type { ApplicationProgress } from "@/server/db/application-progress";
 interface Props {
   profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
@@ -104,15 +105,12 @@ const contents = [
         Application
       </h2>
       <ApplicationProgressMini {progress} showTime />
-      <p class="volunteer-help mt-6">
-        View submitted answers and manage application approval on the
-        application page.
-      </p>
       <a
-        class="btn btn-outline mt-4"
+        class="btn btn-outline mt-6"
         href={`/applications/${encodeURIComponent(person.id)}`}
       >
         View application
+        <ArrowRightIcon class="btn-icon" />
       </a>
     </section>
     {
