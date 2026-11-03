@@ -398,6 +398,22 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           "Robin V.",
           "Dana W.",
         ]);
+        if (current === page) {
+          const timestamp = roster.locator("time.event-roster-status").first();
+          await expect(timestamp).not.toContainText(/\b\d{4}\b/);
+          await expect(timestamp).toHaveAttribute(
+            "datetime",
+            /^\d{4}-\d{2}-\d{2}T/,
+          );
+          await expect(timestamp).toHaveAttribute("title", /\b\d{4}\b/);
+          const lines = await timestamp.evaluate((element) => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return range.getClientRects().length;
+          });
+          if (width === 320) expect(lines).toBeGreaterThan(1);
+          else expect(lines).toBe(1);
+        }
         expect(
           await summary
             .locator(".attendee-avatar")
@@ -418,6 +434,8 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           const title = summary.querySelector(":scope > span")!;
           const avatars = summary.querySelector(".event-avatar-row")!;
           const chevron = summary.querySelector(".event-roster-chevron")!;
+          const frame = element.querySelector(".table-scroll-frame")!;
+          const table = frame.querySelector("table")!;
           const summaryBounds = summary.getBoundingClientRect();
           const chevronBounds = chevron.getBoundingClientRect();
           return {
@@ -440,6 +458,8 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
               (summaryBounds.top + summaryBounds.height / 2),
             rosterBorderTop: getComputedStyle(summary.parentElement!)
               .borderTopWidth,
+            rosterOverflow: frame.scrollWidth > frame.clientWidth,
+            tableWidth: table.getBoundingClientRect().width,
             chevron: getComputedStyle(chevron).transform,
             overflow: document.documentElement.scrollWidth > innerWidth,
           };
@@ -452,6 +472,8 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         expect(layout.avatarsLeftOfChevron).toBe(true);
         expect(Math.abs(layout.chevronCenterOffset)).toBeLessThan(1);
         expect(layout.rosterBorderTop).toBe("0px");
+        expect(layout.rosterOverflow).toBe(false);
+        expect(layout.tableWidth).toBeCloseTo(layout.summaryWidth, 1);
         expect(layout.chevron).toBe("matrix(-1, 0, 0, -1, 0, 0)");
         expect(layout.overflow).toBe(false);
         await summary.focus();

@@ -12,14 +12,22 @@ interface Props {
   destinations: EventRow[];
 }
 const { event, roster, future, destinations } = Astro.props;
-const registrationDateFormat = new Intl.DateTimeFormat("en-CA", {
+const registrationDateOptions: Intl.DateTimeFormatOptions = {
   timeZone: "America/Vancouver",
   month: "short",
   day: "numeric",
-  year: "numeric",
   hour: "numeric",
   minute: "2-digit",
   hour12: true,
+};
+const registrationDateFormat = new Intl.DateTimeFormat(
+  "en-CA",
+  registrationDateOptions,
+);
+const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
+  ...registrationDateOptions,
+  year: "numeric",
+  timeZoneName: "short",
 });
 ---
 
@@ -52,6 +60,7 @@ const registrationDateFormat = new Intl.DateTimeFormat("en-CA", {
                 <time
                   class="event-roster-status"
                   datetime={new Date(person.registeredAt).toISOString()}
+                  title={fullRegistrationDateFormat.format(person.registeredAt)}
                 >
                   {person.userId ? "Registered" : "Manually added"}{" "}
                   {registrationDateFormat.format(person.registeredAt)}

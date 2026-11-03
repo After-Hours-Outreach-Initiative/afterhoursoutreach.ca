@@ -1950,10 +1950,10 @@ body:has(
   }
 }
 .event-roster-table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
   margin: 0;
-  table-layout: auto;
+  /* Let roster text wrap within the card, reserving only the actions gutter. */
+  table-layout: fixed;
   border: 1px solid var(--event-roster-open-border);
   border-top: 0;
   border-radius: 0 0 0.5rem 0.5rem;
@@ -1986,20 +1986,22 @@ body:has(
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  white-space: nowrap;
 }
 .event-roster-name {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 0.5rem;
   min-width: 0;
 }
 .event-roster-name > :first-child {
   min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .event-roster-status {
   display: block;
-  white-space: nowrap;
+  white-space: normal;
   @apply text-sm/[inherit];
   color: #a1a1aa;
 }
@@ -2007,7 +2009,8 @@ body:has(
   margin-top: 0.75rem;
 }
 .event-roster-orientation .btn {
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
 }
 .event-roster-table .event-roster-actions {
   width: 4rem;
