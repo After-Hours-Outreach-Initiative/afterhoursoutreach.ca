@@ -92,6 +92,10 @@
 }
 
 @layer components {
+  .volunteer-spots-full {
+    color: #f87171;
+  }
+
   /* One button size for the whole site. Variants change colour and border
      only, so a bordered button lines up with a filled one at the same
      height. Pair .btn with exactly one variant. */

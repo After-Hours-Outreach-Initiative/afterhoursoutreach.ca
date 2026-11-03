@@ -97,6 +97,11 @@ const [account, upcomingEvents] = await Promise.all([
                     </time>
                   </h3>
                   <p class="mt-1 text-base leading-normal text-zinc-400">
+                    {event.confirmed >= event.spots && (
+                      <>
+                        <span class="volunteer-spots-full">Full</span> ·{" "}
+                      </>
+                    )}
                     {Math.max(0, event.spots - event.confirmed)} of{" "}
                     {event.spots} spots remaining
                   </p>

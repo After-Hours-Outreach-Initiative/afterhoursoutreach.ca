@@ -1927,9 +1927,6 @@ body:has(
 .volunteer-event-card .volunteer-spots-low {
   color: #fbbf24;
 }
-.volunteer-event-card .volunteer-spots-full {
-  color: #f87171;
-}
 .volunteer-event-top {
   display: flex;
   flex-wrap: wrap;
