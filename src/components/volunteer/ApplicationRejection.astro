@@ -29,6 +29,7 @@ const id = `application-rejection-${person.id}`;
       method="post"
       aria-labelledby={`${id}-heading`}
       aria-hidden="true"
+      tabindex="-1"
       inert
     >
       <h3 id={`${id}-heading`} class="text-lg">Reject application</h3>
@@ -131,9 +132,8 @@ const id = `application-rejection-${person.id}`;
       form.inert = !expanded;
       form.setAttribute("aria-hidden", String(!expanded));
       trigger.inert = expanded;
-      (expanded ? form.querySelector("textarea")! : trigger).focus({
-        preventScroll: true,
-      });
+      // Focus the form itself, not the textarea or the hidden trigger.
+      (expanded ? form : trigger).focus({ preventScroll: true });
 
       const after = surface.getBoundingClientRect();
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;

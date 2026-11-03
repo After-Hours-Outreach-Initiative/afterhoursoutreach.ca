@@ -1124,7 +1124,9 @@ test("organizers review pending and approved applications with persistent list c
     ).text();
 
     await page.goto(`${origin}/volunteers/applicant-50`);
-    await page.getByText("Reject application", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "Reject application", exact: true })
+      .click();
     await page
       .getByLabel("Reason for rejection")
       .fill(`  ${rejection.reason}  `);

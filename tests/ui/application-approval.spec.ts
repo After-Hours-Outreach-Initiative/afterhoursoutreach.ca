@@ -156,7 +156,8 @@ test("application table opens a focused review with guarded decisions and list c
       name: "Reason for rejection",
     });
     await expect(reason).toBeEnabled();
-    await expect(reason).toBeFocused();
+    await expect(rejectionForm).toBeFocused();
+    await expect(reason).not.toBeFocused();
     await expect(rejectAction).toHaveAttribute("aria-expanded", "true");
     await expect(rejectAction).toBeHidden();
     await expect(rejection.locator(".rejection-surface")).toHaveCSS(
@@ -191,7 +192,7 @@ test("application table opens a focused review with guarded decisions and list c
     await expect(rejectAction).toBeFocused();
     await expect(reason).toBeHidden();
     await rejectAction.press("Enter");
-    await expect(reason).toBeFocused();
+    await expect(rejectionForm).toBeFocused();
     await expect(reason).toHaveValue("A draft reason");
     await reason.press("Escape");
     await expect(rejectAction).toBeFocused();
