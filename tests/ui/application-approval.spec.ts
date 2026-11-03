@@ -716,11 +716,28 @@ test("an in-progress application preserves its course draft and focus until conf
     const completedInfo = volunteer.locator(
       'section[aria-labelledby="submitted-application-heading"]',
     );
+    const completedSteps = completedInfo.locator(
+      "[data-application-mini-step]",
+    );
+    await expect(completedSteps).toHaveCount(3);
+    for (const step of await completedSteps.all()) {
+      await expect(step).toHaveAttribute("data-state", "complete");
+      await expect(
+        step.locator(".application-progress-mini-marker svg"),
+      ).toHaveAttribute("aria-hidden", "true");
+      const time = step.locator(".application-progress-mini-heading time");
+      await expect(time).toHaveText(/\d{1,2}:\d{2}/);
+      await expect(time).toHaveAttribute("datetime", /T.*Z$/);
+    }
+    const application = completedInfo.locator(
+      '[data-application-mini-step="form"] details',
+    );
+    await expect(application).not.toHaveAttribute("open");
+    await application.locator("summary").click();
     await expect(
-      completedInfo.locator("[data-submitted-application]"),
+      application.getByText(account.email, { exact: true }),
     ).toBeVisible();
-    await expect(completedInfo).toContainText("Naloxone 101 completion");
-    await expect(completedInfo).toContainText("Application approved");
+    await expect(application.locator("details")).toHaveCount(0);
   } finally {
     await volunteerContext.close();
   }
