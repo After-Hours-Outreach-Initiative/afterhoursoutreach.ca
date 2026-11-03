@@ -227,7 +227,7 @@ class AddAttendee extends HTMLElement {
       );
       message.textContent = this.candidates.length
         ? `${this.candidates.length} matching volunteers.`
-        : "No matching eligible volunteers. You can add a name manually.";
+        : "No matching eligible volunteers. You can add a volunteer manually.";
       if (this.candidates.length) this.selectOption();
     } catch (error) {
       if (!controller.signal.aborted)

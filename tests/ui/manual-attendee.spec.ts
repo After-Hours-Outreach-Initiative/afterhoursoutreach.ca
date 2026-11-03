@@ -55,7 +55,9 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   const form = card.locator("[data-add-attendee]");
   const search = form.getByRole("combobox", { name: "Search volunteers" });
   const staged = form.getByRole("list", { name: "Volunteers to add" });
-  const addManual = form.getByRole("button", { name: "Add name manually" });
+  const addManual = form.getByRole("button", {
+    name: "Add volunteer manually",
+  });
   await page.setViewportSize({ width: 375, height: 600 });
   await expect(form).toHaveAttribute("inert", "");
   await trigger.evaluate((element) =>
