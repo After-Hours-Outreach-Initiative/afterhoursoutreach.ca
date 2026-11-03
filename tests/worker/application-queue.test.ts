@@ -476,7 +476,7 @@ test("organizers review pending and approved applications with persistent list c
       "color",
       "rgb(74, 222, 128)",
     );
-    const filters = page.getByRole("group", { name: "Application approval" });
+    const filters = page.getByRole("group", { name: "Application status" });
     const allApplicants = filters.getByRole("button", {
       name: /^All \(\d+\)$/,
     });

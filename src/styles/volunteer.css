@@ -1581,20 +1581,29 @@ body:has(
     gap: 0.375rem;
   }
 }
+.application-status-text {
+  @apply text-base;
+  font-weight: 400;
+  color: #d4d4d8;
+}
+.application-status-text[data-state="ready"],
+.application-status-text[data-state="approved"] {
+  color: #4ade80;
+}
+.application-status-text[data-state="rejected"] {
+  color: #fca5a5;
+}
 .application-table-progress {
   display: inline-block;
   padding: 0.25rem 0.625rem;
   border-radius: 0.375rem;
-  color: #d4d4d8;
   background: #27272a;
 }
 .application-table-progress[data-state="ready"],
 .application-table-progress[data-state="approved"] {
-  color: #4ade80;
   background: #052e16;
 }
 .application-table-progress[data-state="rejected"] {
-  color: #fca5a5;
   background: #450a0a;
 }
 [data-volunteer-profile] {

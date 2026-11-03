@@ -22,6 +22,7 @@ import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
 import {
   applicationReadyForReviewSql,
+  applicationStatusSql,
   attendeeCategorySql,
   includesOrientationSql,
   medicMarkSql,
@@ -32,8 +33,8 @@ import {
 } from "./sql";
 import type {
   ApplicationSort,
+  ApplicationApprovalFilter,
   DirectorySort,
-  VolunteerApprovalFilter,
   VolunteerSort,
   VolunteerSortDirection,
 } from "../../data/volunteer-list";
@@ -71,7 +72,7 @@ export async function listApplications(
   actor: Actor,
   search = "",
   offset = 0,
-  approval: VolunteerApprovalFilter = "all",
+  approval: ApplicationApprovalFilter = "all",
   sort: ApplicationSort = "progress",
   direction: VolunteerSortDirection = "asc",
 ) {
@@ -84,13 +85,13 @@ async function listPeople(
   search: string,
   offset: number,
   applications: boolean,
-  approval: VolunteerApprovalFilter = "all",
+  approval: ApplicationApprovalFilter = "all",
   sort: DirectorySort = "name",
   direction: VolunteerSortDirection = "asc",
 ) {
   requireOrganizer(actor);
   // A profile is created only on submission; private drafts never enter either
-  // query. Both filter counts respect search, but not approval or pagination.
+  // query. All filter counts respect search, but not approval or pagination.
   const applicantsSql = `FROM user u
       JOIN profile p ON p.user_id = u.id
       JOIN volunteer_status v ON v.user_id = u.id
@@ -98,7 +99,6 @@ async function listPeople(
         AND u.deleted_at IS NULL
         ${applications ? "" : "AND v.registration_approved = 1"}`;
   const query = search.slice(0, 100);
-  const readyForReviewSql = `v.registration_approved = 0 AND v.application_rejection_reason IS NULL AND ${applicationReadyForReviewSql}`;
   // Application badges show submitted medic-team interest, not approval or
   // patrol eligibility. Approved volunteers retain the shared roster mark.
   const directoryMedicMarkSql = applications
@@ -115,10 +115,8 @@ async function listPeople(
   // entire matching directory before pagination, with stable name/id ties.
   const sortSql = applications
     ? sort === "progress"
-      ? `CASE WHEN v.registration_approved = 1 THEN 3
-             WHEN coalesce(v.application_rejection_reason, '') <> '' THEN 2
-            WHEN ${applicationReadyForReviewSql} THEN 0
-            ELSE 1 END`
+      ? `CASE ${applicationStatusSql} WHEN 'awaiting' THEN 0
+          WHEN 'in-progress' THEN 1 WHEN 'rejected' THEN 2 ELSE 3 END`
       : sort === "role"
         ? `CASE WHEN ${directoryMedicMarkSql} THEN 'Medic' ELSE '' END COLLATE NOCASE`
         : sort === "completed"
@@ -149,15 +147,18 @@ async function listPeople(
         ${directoryMedicMarkSql} AS medicMark,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
       ${applicantsSql}
-        AND (? = 'all' OR (${readyForReviewSql}))
+        AND (? = 'all' OR (${applicationStatusSql}) = ?)
       ORDER BY ${orderSql}
       LIMIT ? OFFSET ?`,
       )
-      .bind(query, approval, volunteerPageSize + 1, offset),
+      .bind(query, approval, approval, volunteerPageSize + 1, offset),
     db
       .prepare(
         `SELECT count(*) AS allApplicantsCount,
-          count(CASE WHEN ${readyForReviewSql} THEN 1 END) AS awaitingApprovalCount
+          count(CASE WHEN (${applicationStatusSql}) = 'awaiting' THEN 1 END) AS awaitingApprovalCount,
+          count(CASE WHEN (${applicationStatusSql}) = 'in-progress' THEN 1 END) AS inProgressCount,
+          count(CASE WHEN (${applicationStatusSql}) = 'rejected' THEN 1 END) AS rejectedCount,
+          count(CASE WHEN (${applicationStatusSql}) = 'approved' THEN 1 END) AS approvedCount
         ${applicantsSql}`,
       )
       .bind(query),
@@ -169,7 +170,13 @@ async function listPeople(
         applicationCompletedAt: number | null;
       }
     >,
-    D1Result<{ allApplicantsCount: number; awaitingApprovalCount: number }>,
+    D1Result<{
+      allApplicantsCount: number;
+      awaitingApprovalCount: number;
+      inProgressCount: number;
+      rejectedCount: number;
+      approvedCount: number;
+    }>,
   ];
   return {
     rows: rows.results.slice(0, volunteerPageSize),
@@ -178,6 +185,9 @@ async function listPeople(
     awaitingApprovalCount: Number(
       counts.results[0]?.awaitingApprovalCount ?? 0,
     ),
+    inProgressCount: Number(counts.results[0]?.inProgressCount ?? 0),
+    rejectedCount: Number(counts.results[0]?.rejectedCount ?? 0),
+    approvedCount: Number(counts.results[0]?.approvedCount ?? 0),
   };
 }
 

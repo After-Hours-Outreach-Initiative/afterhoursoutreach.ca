@@ -1,4 +1,37 @@
 export type VolunteerApprovalFilter = "all" | "awaiting";
+// Preserve the existing review-queue URL while sharing the table's exact labels.
+export const applicationStatuses = {
+  awaiting: { label: "Ready for review", state: "ready" },
+  "in-progress": { label: "In Progress", state: "in-progress" },
+  rejected: { label: "Rejected", state: "rejected" },
+  approved: { label: "Approved", state: "approved" },
+} as const;
+export type ApplicationStatus = keyof typeof applicationStatuses;
+export type ApplicationApprovalFilter = "all" | ApplicationStatus;
+
+/** Match the status column's precedence, including legacy approvals. */
+export function applicationStatus(person: {
+  applicationApproved: number | boolean;
+  applicationRejectionReason: string | null;
+  applicationReadyForReview: number | boolean;
+}): ApplicationStatus {
+  return person.applicationApproved
+    ? "approved"
+    : person.applicationRejectionReason
+      ? "rejected"
+      : person.applicationReadyForReview
+        ? "awaiting"
+        : "in-progress";
+}
+
+function applicationApprovalFilter(
+  value: string | null,
+): ApplicationApprovalFilter {
+  return value && Object.hasOwn(applicationStatuses, value)
+    ? (value as ApplicationStatus)
+    : "all";
+}
+
 export type VolunteerSort = "name" | "role";
 export type ApplicationSort = "name" | "role" | "progress" | "completed";
 export type DirectoryKind = "applications" | "volunteers";
@@ -11,7 +44,11 @@ export function volunteerListState(params: URLSearchParams) {
 }
 
 export function applicationListState(params: URLSearchParams) {
-  return { ...listState(params), sort: applicationSort(params.get("sort")) };
+  return {
+    ...listState(params),
+    approval: applicationApprovalFilter(params.get("approval")),
+    sort: applicationSort(params.get("sort")),
+  };
 }
 
 export type DirectoryListState =
@@ -54,7 +91,7 @@ function listState(params: URLSearchParams) {
   };
 }
 
-export function volunteerListUrl(state: ReturnType<typeof volunteerListState>) {
+export function volunteerListUrl(state: DirectoryListState) {
   return directoryListUrl("volunteers", state);
 }
 
@@ -75,7 +112,7 @@ export function directoryListUrl(
     : volunteerSort(state.sort);
   const params = new URLSearchParams();
   if (state.search) params.set("q", state.search);
-  if (applications && state.approval === "awaiting")
+  if (applications && state.approval !== "all")
     params.set("approval", state.approval);
   if (sort !== (applications ? "progress" : "role")) params.set("sort", sort);
   if (state.direction !== "asc") params.set("direction", state.direction);

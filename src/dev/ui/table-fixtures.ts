@@ -4,6 +4,7 @@ import { personDisplayName } from "../../data/person-name";
 import {
   directoryListState,
   directoryListUrl,
+  applicationStatus,
   volunteerPageSize,
   type DirectoryListState,
 } from "../../data/volunteer-list";
@@ -154,11 +155,9 @@ function roleLabel(person: Person) {
 }
 
 function progressOrder(person: Person) {
-  return person.applicationRejectionReason
-    ? 2
-    : person.applicationReadyForReview
-      ? 0
-      : 1;
+  return { awaiting: 0, "in-progress": 1, rejected: 2, approved: 3 }[
+    applicationStatus(person)
+  ];
 }
 
 // SQLite's NOCASE collation folds ASCII only; match its directory sort and ties.
@@ -254,12 +253,14 @@ export function createTableFixture(
   const matching = rows.filter((person) =>
     compareSearch(`${person.name} ${searchNames.get(person.id)}`, state.search),
   );
-  const awaiting = matching.filter(
-    (person) =>
-      person.applicationReadyForReview && !person.applicationRejectionReason,
-  );
+  const countStatus = (status: string) =>
+    matching.filter((person) => applicationStatus(person) === status).length;
   const filtered =
-    applications && state.approval === "awaiting" ? awaiting : matching;
+    applications && state.approval !== "all"
+      ? matching.filter(
+          (person) => applicationStatus(person) === state.approval,
+        )
+      : matching;
   filtered.sort((a, b) => {
     const primary = (person: Person) =>
       applications
@@ -291,7 +292,10 @@ export function createTableFixture(
     rows: filtered.slice(state.offset, state.offset + volunteerPageSize),
     hasMore: filtered.length > state.offset + volunteerPageSize,
     allApplicantsCount: matching.length,
-    awaitingApprovalCount: awaiting.length,
+    awaitingApprovalCount: countStatus("awaiting"),
+    inProgressCount: countStatus("in-progress"),
+    rejectedCount: countStatus("rejected"),
+    approvedCount: countStatus("approved"),
   };
   return { people, profiles };
 }

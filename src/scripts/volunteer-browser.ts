@@ -171,8 +171,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     if (!button) return;
     event.preventDefault();
     const url = searchUrl();
-    if (button.dataset.volunteerFilter === "awaiting")
-      url.searchParams.set("approval", "awaiting");
+    if (button.value !== "all") url.searchParams.set("approval", button.value);
     else url.searchParams.delete("approval");
     void loadResults(url, "push");
   });

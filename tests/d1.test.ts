@@ -5,6 +5,7 @@ import { localEventFixtures } from "../scripts/local-event-fixtures";
 import { localAccountFixtures } from "../scripts/local-account-fixtures";
 import { personDisplayName } from "../src/data/person-name";
 import { applicationDisplayName } from "../src/data/application";
+import { applicationStatus } from "../src/data/volunteer-list";
 import { personDisplayNameSql } from "../src/server/db/sql";
 import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
@@ -1377,6 +1378,51 @@ test("review queue counts only review-ready applications matching search indepen
     ),
   );
   const defaultRows = defaultPages.flatMap(({ rows }) => rows);
+  // Every visible status has a mutually exclusive filter. Counts include all
+  // search matches, independently of the selected status and page offset.
+  const expectedCounts = {
+    awaitingApprovalCount: count - 2,
+    inProgressCount: 1,
+    rejectedCount: 1,
+    approvedCount: 2,
+  };
+  for (const status of [
+    "awaiting",
+    "in-progress",
+    "rejected",
+    "approved",
+  ] as const) {
+    const expected = defaultRows.filter(
+      (row) => applicationStatus(row) === status,
+    );
+    for (const offset of [0, volunteerPageSize]) {
+      const page = await listApplications(env.DB, actor, "", offset, status);
+      assert.deepEqual(
+        page.rows,
+        expected.slice(offset, offset + volunteerPageSize),
+      );
+      assert.equal(page.hasMore, expected.length > offset + volunteerPageSize);
+      for (const [key, value] of Object.entries(expectedCounts))
+        assert.equal(page[key as keyof typeof expectedCounts], value);
+    }
+    const searched = await listApplications(
+      env.DB,
+      actor,
+      "pending-",
+      0,
+      status,
+    );
+    assert.equal(searched.allApplicantsCount, count - 2); // ALPHA names do not match.
+    assert.equal(searched.approvedCount, 0);
+    assert.deepEqual(
+      searched.rows,
+      expected.filter((row) => row.name.startsWith("pending-")),
+    );
+    await assert.rejects(
+      listApplications(env.DB, { ...actor, role: "volunteer" }, "", 0, status),
+      statusError(403),
+    );
+  }
   assert.deepEqual(
     defaultRows.map(({ id }) => id),
     [...reviewByCompletion, "pending-52", "pending-01", "approved", actor.id],

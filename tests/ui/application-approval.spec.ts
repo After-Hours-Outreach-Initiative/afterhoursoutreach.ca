@@ -63,6 +63,55 @@ test("application table opens a focused review with guarded decisions and list c
       "href",
       `${applicationPath}?returnTo=${encodeURIComponent(listPath)}`,
     );
+    const filters = page.getByRole("group", { name: "Application status" });
+    await expect(filters.getByRole("button")).toHaveText([
+      "All (1)",
+      "Ready for review (0)",
+      "In Progress (1)",
+      "Rejected (0)",
+      "Approved (0)",
+    ]);
+    for (const value of ["awaiting", "rejected", "approved"]) {
+      const filter = filters.locator(`[data-volunteer-filter="${value}"]`);
+      await filter.click();
+      await expect(filter).toHaveAttribute("aria-pressed", "true");
+      await expect(row).toHaveCount(0);
+      expect(new URL(page.url()).searchParams.get("approval")).toBe(value);
+      expect(new URL(page.url()).searchParams.get("sort")).toBe("completed");
+      expect(new URL(page.url()).searchParams.get("direction")).toBe("desc");
+    }
+    const inProgress = filters.getByRole("button", {
+      name: "In Progress (1)",
+      exact: true,
+    });
+    await inProgress.focus();
+    await page.keyboard.press("Enter");
+    await expect(inProgress).toHaveAttribute("aria-pressed", "true");
+    await expect(inProgress).toBeFocused();
+    await expect(inProgress).toHaveCSS("outline-style", "solid");
+    for (const property of [
+      "color",
+      "font-size",
+      "font-weight",
+      "font-family",
+    ]) {
+      const tableStyle = await row
+        .locator(".application-status-text")
+        .evaluate(
+          (element, property) =>
+            getComputedStyle(element).getPropertyValue(property),
+          property,
+        );
+      await expect(inProgress.locator(".application-status-text")).toHaveCSS(
+        property,
+        tableStyle,
+      );
+    }
+    expect(new URL(page.url()).searchParams.get("approval")).toBe(
+      "in-progress",
+    );
+    await filters.getByRole("button", { name: "All (1)", exact: true }).click();
+    await expect(page).toHaveURL(new URL(listPath, baseURL!).href);
     await row.click({ position: { x: 2, y: 2 } });
     const review = page.locator("[data-application-review]");
     await expect(review.getByRole("heading", { level: 1 })).toContainText(

@@ -9,6 +9,13 @@ export const nowMsSql =
 export const applicationReadyForReviewSql =
   "(p.registered_at IS NOT NULL AND p.naloxone_completed_at IS NOT NULL)";
 
+// Match applicationStatus: decisions take precedence over applicant milestones.
+export const applicationStatusSql = `CASE
+  WHEN v.registration_approved = 1 THEN 'approved'
+  WHEN coalesce(v.application_rejection_reason, '') <> '' THEN 'rejected'
+  WHEN ${applicationReadyForReviewSql} THEN 'awaiting'
+  ELSE 'in-progress' END`;
+
 // Backend-owned aliases only. Null preserves deployed orientation events while
 // allowing an explicit override on both standalone and recurring patrols.
 export const includesOrientationSql = (alias = "e") =>

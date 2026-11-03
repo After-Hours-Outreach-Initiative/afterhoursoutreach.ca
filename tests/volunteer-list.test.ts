@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   applicationListUrl,
   applicationListState,
+  applicationStatuses,
   directoryListUrl,
   volunteerListReturnUrl,
   volunteerListState,
@@ -41,6 +42,21 @@ test("application list state preserves approval, search, sorting and pagination 
   expect(directoryListUrl("volunteers", state)).toBe(
     "/volunteers?q=Alex+%26+Sam&direction=desc&offset=50",
   );
+  for (const approval of Object.keys(applicationStatuses)) {
+    const filtered = applicationListState(
+      new URLSearchParams({
+        approval,
+        q: "Alex & Sam",
+        offset: "50",
+        sort: "completed",
+        direction: "desc",
+      }),
+    );
+    expect(filtered.approval).toBe(approval);
+    expect(volunteerListReturnUrl(applicationListUrl(filtered))).toBe(
+      `/applications?q=Alex+%26+Sam&approval=${approval}&sort=completed&direction=desc&offset=50`,
+    );
+  }
   const volunteers = volunteerListState(new URLSearchParams("sort=role"));
   expect(volunteerListUrl(volunteers)).toBe("/volunteers");
   expect(
@@ -72,6 +88,10 @@ test("list return destinations are restricted and untrusted filter inputs are no
     ),
   ).toBe("/applications?direction=desc&offset=50");
   expect(applicationListState(new URLSearchParams()).sort).toBe("progress");
+  for (const approval of ["unknown", "__proto__", "constructor"])
+    expect(
+      applicationListState(new URLSearchParams({ approval })).approval,
+    ).toBe("all");
   expect(applicationListState(new URLSearchParams("sort=role")).sort).toBe(
     "role",
   );

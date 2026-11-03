@@ -17,6 +17,9 @@ let applications: Awaited<ReturnType<typeof listApplications>> = {
   hasMore: false,
   allApplicantsCount: 0,
   awaitingApprovalCount: 0,
+  inProgressCount: 0,
+  rejectedCount: 0,
+  approvedCount: 0,
 };
 let lock = "";
 let accountName = "";
