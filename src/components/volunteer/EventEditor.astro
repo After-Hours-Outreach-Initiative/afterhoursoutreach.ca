@@ -90,6 +90,9 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
     }
   </div>
   <div class="dialog-footer">
+    <button class="btn btn-quiet" type="button" data-dismiss-dialog>
+      Cancel
+    </button>
     {
       editable && (
         <button
@@ -99,7 +102,7 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
           data-loading-label={event ? "Saving…" : "Creating…"}
           disabled
         >
-          {event ? "Save event" : "Create event"}
+          {event ? "Save" : "Create"}
         </button>
       )
     }

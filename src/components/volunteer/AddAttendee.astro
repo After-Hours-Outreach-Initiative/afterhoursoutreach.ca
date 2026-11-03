@@ -112,11 +112,11 @@ const roles = [
       </div>
       <p data-form-message role="status" hidden></p>
       <div class="attendee-actions">
-        <button class="btn btn-green" type="submit" data-loading-label="Adding…"
-          >Add</button
-        >
         <button class="btn btn-quiet" type="button" data-attendee-cancel
           >Cancel</button
+        >
+        <button class="btn btn-green" type="submit" data-loading-label="Adding…"
+          >Add</button
         >
       </div>
     </form>
@@ -291,6 +291,7 @@ const roles = [
   .attendee-actions {
     display: flex;
     flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 0.75rem;
   }
   .attendee-surface:has(.attendee-trigger:focus-visible) {

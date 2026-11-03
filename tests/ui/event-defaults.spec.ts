@@ -95,15 +95,13 @@ test("meeting and volunteer-limit defaults are submitted without replacing draft
   );
   const submit = async () => {
     const request = page.waitForRequest("**/api/v1/events/action");
-    await dialog
-      .getByRole("button", { name: "Create event", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Create", exact: true }).click();
     const body = (await request).postDataJSON();
     await expect(form.locator("[data-form-message]")).toHaveText(
       "Request inspected without saving.",
     );
     await expect(
-      dialog.getByRole("button", { name: "Create event", exact: true }),
+      dialog.getByRole("button", { name: "Create", exact: true }),
     ).toBeEnabled();
     return body;
   };

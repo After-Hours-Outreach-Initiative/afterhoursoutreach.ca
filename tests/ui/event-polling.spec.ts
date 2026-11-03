@@ -471,9 +471,7 @@ test("filter counts track recurring dates, polling, actions and past events", as
   await fillDateInput(editor, "startsAt", `${firstDate}T21:30`);
   const meetingPoint = `One-off count ${crypto.randomUUID()}`;
   await editor.getByLabel("Meeting point", { exact: true }).fill(meetingPoint);
-  await editor
-    .getByRole("button", { name: "Create event", exact: true })
-    .click();
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).not.toBeVisible();
   await expect(counts).toHaveText(
     [

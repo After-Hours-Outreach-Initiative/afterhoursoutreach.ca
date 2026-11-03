@@ -21,11 +21,3 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-@media (max-width: 37.5rem) {
-  .local-email-actions {
-    flex-direction: column;
-  }
-  .local-email-actions .btn {
-    width: 100%;
-  }
-}

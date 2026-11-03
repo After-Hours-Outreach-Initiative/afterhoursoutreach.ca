@@ -25,8 +25,8 @@ export function confirmEventUnregistration(
   const footer = document.createElement("div");
   footer.className = "dialog-footer";
   for (const [value, label, variant] of [
-    ["unregister", "Unregister", "btn-red"],
     ["", "Cancel", "btn-quiet"],
+    ["unregister", "Unregister", "btn-red"],
   ]) {
     const button = document.createElement("button");
     button.type = "button";

@@ -53,15 +53,6 @@ const id = `application-rejection-${person.id}`;
       <p data-form-message role="status" hidden></p>
       <div class="rejection-actions">
         <button
-          class="btn btn-red"
-          type="submit"
-          data-loading-label="Sending…"
-          data-volunteer-control
-          disabled
-        >
-          Reject and send email
-        </button>
-        <button
           class="btn btn-quiet"
           type="button"
           data-rejection-cancel
@@ -69,6 +60,15 @@ const id = `application-rejection-${person.id}`;
           disabled
         >
           Cancel
+        </button>
+        <button
+          class="btn btn-red"
+          type="submit"
+          data-loading-label="Sending…"
+          data-volunteer-control
+          disabled
+        >
+          Reject and send email
         </button>
       </div>
     </form>
@@ -243,6 +243,7 @@ const id = `application-rejection-${person.id}`;
   .rejection-actions {
     display: flex;
     flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 0.75rem;
   }
   .rejection-surface:has(.rejection-trigger:focus-visible) {

@@ -1428,7 +1428,7 @@ describe(
             form: dialog.locator("[data-event-save]"),
             trigger: () =>
               dialog
-                .getByRole("button", { name: "Create event", exact: true })
+                .getByRole("button", { name: "Create", exact: true })
                 .click(),
             updated: () => createdCard.waitFor(),
             loadingLabel: "Creating…",
@@ -1496,7 +1496,7 @@ describe(
               form: editor.locator("[data-event-save]"),
               trigger: () =>
                 editor
-                  .getByRole("button", { name: "Save event", exact: true })
+                  .getByRole("button", { name: "Save", exact: true })
                   .click(),
               updated: () =>
                 expect(
@@ -1543,7 +1543,7 @@ describe(
             form: dialog.locator("[data-event-save]"),
             trigger: () =>
               dialog
-                .getByRole("button", { name: "Create event", exact: true })
+                .getByRole("button", { name: "Create", exact: true })
                 .click(),
             updated: () => destinationCard.waitFor(),
             loadingLabel: "Creating…",

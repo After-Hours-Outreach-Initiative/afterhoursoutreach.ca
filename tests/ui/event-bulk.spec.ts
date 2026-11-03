@@ -68,6 +68,14 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     name: "Bulk edit events",
     exact: true,
   });
+  await expect(dialog.locator(".dialog-footer button")).toHaveText([
+    "Cancel",
+    "Save selected events",
+  ]);
+  await expect(dialog.locator(".dialog-footer")).toHaveCSS(
+    "justify-content",
+    "flex-end",
+  );
   await expect(dialog).toContainText("not entire recurring series");
   await expect(dialog.locator('[name="startsAt"]')).toHaveCount(0);
   await expect(

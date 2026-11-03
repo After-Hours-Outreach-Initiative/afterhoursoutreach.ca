@@ -98,15 +98,15 @@ const id = `${dialogId}-cancel`;
       </div>
       <p data-form-message role="status" hidden></p>
       <div class="cancellation-actions">
+        <button class="btn btn-quiet" type="button" data-event-cancel-close>
+          Keep event
+        </button>
         <button
           class="btn btn-red"
           type="submit"
           data-loading-label="Cancelling…"
         >
           Confirm cancellation
-        </button>
-        <button class="btn btn-quiet" type="button" data-event-cancel-close>
-          Keep event
         </button>
       </div>
     </form>
@@ -283,6 +283,7 @@ const id = `${dialogId}-cancel`;
   .cancellation-actions {
     display: flex;
     flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 0.75rem;
   }
   .cancellation-surface:has(.cancellation-trigger:focus-visible) {

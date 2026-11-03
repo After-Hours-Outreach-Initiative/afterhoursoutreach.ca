@@ -13,6 +13,19 @@ async function expectPinnedChrome(dialog: Locator) {
   });
   const header = dialog.locator(".dialog-header");
   const footer = dialog.locator(".dialog-footer");
+  if (await footer.isVisible()) {
+    await expect(footer).toHaveCSS("justify-content", "flex-end");
+    expect(
+      await footer.evaluate((element) => {
+        const last = element.querySelector<HTMLElement>(".btn:last-child")!;
+        return Math.abs(
+          element.getBoundingClientRect().right -
+            parseFloat(getComputedStyle(element).paddingRight) -
+            last.getBoundingClientRect().right,
+        );
+      }),
+    ).toBeLessThan(1);
+  }
   const before = {
     header: await header.boundingBox(),
     footer: (await footer.count()) ? await footer.boundingBox() : null,
@@ -161,6 +174,10 @@ test("event dialogs offer only cancellation for future events and keep ended his
     exact: true,
   });
   await expect(settings.locator("details")).toHaveCount(0);
+  await expect(settings.locator(".dialog-footer button")).toHaveText([
+    "Delete series",
+    "Save series defaults",
+  ]);
   await expectPinnedChrome(settings);
   await settings
     .getByLabel("Meeting point", { exact: true })
@@ -284,6 +301,15 @@ test("event dialogs offer only cancellation for future events and keep ended his
   await settings
     .getByRole("button", { name: "Delete series", exact: true })
     .click();
+  const deletion = page.getByRole("dialog", {
+    name: "Delete series?",
+    exact: true,
+  });
+  await expect(deletion.locator(".dialog-footer button")).toHaveText([
+    "Keep",
+    "Delete",
+  ]);
+  await expectPinnedChrome(deletion);
   await page
     .getByRole("dialog", { name: "Delete series?", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
@@ -322,6 +348,17 @@ test("event cancellation morphs in place and preserves its draft after notificat
       name: "Edit event",
       exact: true,
     });
+    const footer = dialog.locator(".dialog-footer");
+    await expect(footer.getByRole("button")).toHaveText(["Cancel", "Save"]);
+    await expect(footer.getByRole("button", { name: "Cancel" })).toHaveClass(
+      "btn btn-quiet",
+    );
+    await expect(
+      footer.getByRole("button", { name: "Cancel" }),
+    ).toHaveAttribute("type", "button");
+    await footer.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    await card.getByRole("button", { name: "Edit", exact: true }).click();
     const form = dialog.locator("[data-event-cancel]");
     const morph = dialog.locator("event-cancellation");
     await dialog
@@ -343,6 +380,14 @@ test("event cancellation morphs in place and preserves its draft after notificat
       name: "Confirm cancellation",
       exact: true,
     });
+    await expect(form.locator(".cancellation-actions button")).toHaveText([
+      "Keep event",
+      "Confirm cancellation",
+    ]);
+    await expect(form.locator(".cancellation-actions")).toHaveCSS(
+      "justify-content",
+      "flex-end",
+    );
     await confirm.click();
     const notification = page.getByRole("dialog", {
       name: "Send an email?",
@@ -370,7 +415,7 @@ test("event cancellation morphs in place and preserves its draft after notificat
           form.getByRole("button", { name: "Keep event" }),
         ).toBeDisabled();
         await expect(
-          dialog.getByRole("button", { name: "Save event", exact: true }),
+          dialog.getByRole("button", { name: "Save", exact: true }),
         ).toBeDisabled();
         await expect(morph).toHaveAttribute("data-expanded", "");
       },
@@ -404,7 +449,23 @@ test("event dialogs preserve their exit layout and roster profiles navigate to p
     await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
     await page.goto("/events");
     await page.getByRole("button", { name: "Create", exact: true }).click();
-    await expectStableExit(page.locator("#event-editor-new"));
+    const create = page.locator("#event-editor-new");
+    const footer = create.locator(".dialog-footer");
+    await expect(footer.getByRole("button")).toHaveText(["Cancel", "Create"]);
+    const cancel = footer.getByRole("button", { name: "Cancel", exact: true });
+    await expect(cancel).toHaveClass("btn btn-quiet");
+    await expect(cancel).toHaveAttribute("type", "button");
+    await expect(
+      footer.getByRole("button", { name: "Create" }),
+    ).toHaveAttribute("form", "event-editor-new-save");
+    await expect(
+      footer.getByRole("button", { name: "Create" }),
+    ).toHaveAttribute("type", "submit");
+    await expectPinnedChrome(create);
+    await cancel.click();
+    await expect(create).toBeHidden();
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await expectStableExit(create);
     await page
       .locator('[data-live-event="local-fixture-event-orientation"]')
       .getByRole("button", { name: "Edit", exact: true })
@@ -502,7 +563,7 @@ test("application dialogs keep their chrome visible while only their body scroll
       ).toBeGreaterThan(0);
     expect(
       await create
-        .getByRole("button", { name: "Create event" })
+        .getByRole("button", { name: "Create", exact: true })
         .evaluate((element: HTMLButtonElement) =>
           element.form?.hasAttribute("data-event-save"),
         ),
@@ -516,7 +577,7 @@ test("application dialogs keep their chrome visible while only their body scroll
         endpoint: "/api/v1/events/action",
         form: create.locator("[data-event-save]"),
         trigger: () =>
-          create.getByRole("button", { name: "Create event" }).click(),
+          create.getByRole("button", { name: "Create", exact: true }).click(),
         updated: () =>
           expect(create.locator("[data-form-message]")).toHaveText(
             "Please try again.",
@@ -534,7 +595,7 @@ test("application dialogs keep their chrome visible while only their body scroll
         },
       });
       await expect(
-        create.getByRole("button", { name: "Create event" }),
+        create.getByRole("button", { name: "Create", exact: true }),
       ).toBeEnabled();
       await expect(create.locator("[data-form-message]")).toBeInViewport();
       for (const name of [

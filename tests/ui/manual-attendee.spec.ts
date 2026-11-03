@@ -74,6 +74,13 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
     "rgb(0, 0, 0)",
   );
   await expect(form).toBeVisible();
+  await expect(form.locator(".attendee-actions button")).toHaveText([
+    "Cancel",
+    "Add",
+  ]);
+  await expect(form.locator("[data-attendee-cancel]")).toHaveClass(
+    "btn btn-quiet",
+  );
   await expect(form).toHaveAccessibleName("Add volunteer");
   await expect(
     form.getByRole("heading", {
@@ -182,6 +189,10 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
     .fill("Avery Example");
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 900 });
+    await expect(form.locator(".attendee-actions")).toHaveCSS(
+      "justify-content",
+      "flex-end",
+    );
     expect(
       await form.evaluate((element) => ({
         form: element.scrollWidth > element.clientWidth,
@@ -372,6 +383,13 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       name: "Remove volunteer",
       exact: true,
     });
+    await expect(remove.locator(".dialog-footer button")).toHaveText([
+      "Cancel",
+      "Remove volunteer",
+    ]);
+    await expect(remove.locator("[data-dismiss-dialog]").last()).toHaveClass(
+      "btn btn-quiet",
+    );
     await expect(
       remove.locator("[data-email-prompt], textarea, .volunteer-help"),
     ).toHaveCount(0);

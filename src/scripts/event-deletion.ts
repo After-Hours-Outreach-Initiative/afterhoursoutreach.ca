@@ -23,8 +23,8 @@ export function confirmSeriesDeletion(): Promise<boolean> {
   const footer = document.createElement("div");
   footer.className = "dialog-footer";
   for (const [value, label, variant] of [
-    ["delete", "Delete", "btn-red"],
     ["", "Keep", "btn-quiet"],
+    ["delete", "Delete", "btn-red"],
   ]) {
     const button = document.createElement("button");
     button.type = "button";

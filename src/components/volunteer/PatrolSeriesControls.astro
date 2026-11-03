@@ -53,17 +53,17 @@ const dialogId = `series-editor-${series.id}`;
   </div>
   <div class="dialog-footer">
     <button
+      class="btn btn-red"
+      type="submit"
+      form={`${dialogId}-delete`}
+      data-loading-label="Deleting…">Delete series</button
+    >
+    <button
       class="btn btn-primary"
       type="submit"
       form={`${dialogId}-save`}
       data-loading-label="Saving…"
       disabled>Save series defaults</button
-    >
-    <button
-      class="btn btn-red"
-      type="submit"
-      form={`${dialogId}-delete`}
-      data-loading-label="Deleting…">Delete series</button
     >
   </div>
 </dialog>

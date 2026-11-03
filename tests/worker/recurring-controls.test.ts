@@ -484,9 +484,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .locator("label.volunteer-state-option")
       .filter({ hasText: /^Visible$/ })
       .click();
-    await creator
-      .getByRole("button", { name: "Create event", exact: true })
-      .click();
+    await creator.getByRole("button", { name: "Create", exact: true }).click();
     await expect(creator).not.toBeVisible();
     const uiSeries = await DB.prepare(
       "SELECT id FROM patrol_series WHERE meeting_point='UI recurring patrol'",
@@ -588,9 +586,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await editor
       .getByLabel("Meeting point", { exact: true })
       .fill("UI future meeting point");
-    await editor
-      .getByRole("button", { name: "Save event", exact: true })
-      .click();
+    await editor.getByRole("button", { name: "Save", exact: true }).click();
     await expect(uiCard.locator("dialog")).not.toBeVisible();
     // Empty occurrences do not offer roster email or a cancellation reason.
     await expect(
@@ -612,7 +608,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .check();
     await uiCard
       .locator("dialog")
-      .getByRole("button", { name: "Save event", exact: true })
+      .getByRole("button", { name: "Save", exact: true })
       .click();
     await expect(uiCard.locator("dialog")).not.toBeVisible();
     expect(

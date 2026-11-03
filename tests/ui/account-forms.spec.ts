@@ -3291,7 +3291,7 @@ test("event editor shows native number and URL errors without submitting invalid
     "2025-11-02T01:30",
   ]) {
     await fillDateInput(form, "startsAt", value);
-    await dialog.getByRole("button", { name: "Create event" }).click();
+    await dialog.getByRole("button", { name: "Create", exact: true }).click();
     await expect(value ? time : date).toBeFocused();
     await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
     await expectDateErrorRail(false);
@@ -3311,14 +3311,14 @@ test("event editor shows native number and URL errors without submitting invalid
     "2030-01-01T20:00",
   );
   await date.fill("");
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(date).toBeFocused();
   await expectDateErrorRail(false);
   await expect(date).toHaveAttribute("aria-invalid", "true");
   await expect(time).not.toHaveAttribute("aria-invalid");
   await date.fill("2030-01-01");
   await time.fill("");
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(time).toBeFocused();
   await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
   await expectDateErrorRail(false);
@@ -3392,7 +3392,7 @@ test("event editor shows native number and URL errors without submitting invalid
   const map = form.getByLabel("Map link (optional)");
   await spots.fill("0");
   await map.fill("not-a-url");
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(form.locator("[data-error$='-spots']")).toBeVisible();
   await expect(form.locator("[data-error$='-meetingPointUrl']")).toBeVisible();
   await expect(spots).toBeFocused();
@@ -3409,7 +3409,7 @@ test("event editor shows native number and URL errors without submitting invalid
     ["", "2"],
   ]) {
     await spots.fill(invalid);
-    await dialog.getByRole("button", { name: "Create event" }).click();
+    await dialog.getByRole("button", { name: "Create", exact: true }).click();
     await expect(form.locator("[data-error$='-spots']")).toBeVisible();
     expect(requests).toEqual([]);
     await increase.click();
@@ -3437,7 +3437,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await orientation.check();
   await expect(spots).toHaveAttribute("min", "4");
   await expect(spots).toHaveValue("1");
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(form.locator('[data-error$="-spots"]')).toBeVisible();
   await expect(form.locator('[data-error$="-spots"]')).toContainText(
     "from 4 to 100",
@@ -3461,7 +3461,7 @@ test("event editor shows native number and URL errors without submitting invalid
       json: { message: "Submission reached the server." },
     }),
   );
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(form.locator("[data-form-message]")).toHaveText(
     "Submission reached the server.",
   );

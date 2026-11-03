@@ -48,6 +48,15 @@ for (const [kind, description] of [
       exact: true,
     });
     await expect(choice.locator(".volunteer-help")).toHaveText(description);
+    await expect(choice.locator(".dialog-footer button")).toHaveText([
+      "Cancel change",
+      "Save and send email",
+      "Save without email",
+    ]);
+    await expect(choice.locator(".dialog-footer")).toHaveCSS(
+      "justify-content",
+      "flex-end",
+    );
     await choice
       .getByRole("button", { name: "Cancel change", exact: true })
       .click();

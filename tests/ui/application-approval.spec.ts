@@ -165,9 +165,13 @@ test("application table opens a focused review with guarded decisions and list c
       "rgb(0, 0, 0)",
     );
     await expect(rejection.locator(".rejection-actions button")).toHaveText([
-      "Reject and send email",
       "Cancel",
+      "Reject and send email",
     ]);
+    await expect(rejection.locator(".rejection-actions")).toHaveCSS(
+      "justify-content",
+      "flex-end",
+    );
     for (const width of [1280, 375]) {
       await page.setViewportSize({ width, height: 812 });
       const rejectionBounds = (await rejection.boundingBox())!;
