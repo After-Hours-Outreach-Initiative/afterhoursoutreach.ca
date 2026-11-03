@@ -6,13 +6,17 @@ import {
   orientationCapacityMessage,
 } from "./policy";
 
+/** D1 can report a trigger invariant on the error or its cause. */
+export function databaseErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
+    : "";
+}
+
 /** Translate database invariants into responses without exposing SQL or values. */
 export function databaseWriteError(error: unknown): never {
   if (error instanceof RequestError) throw error;
-  const message =
-    error instanceof Error
-      ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
-      : "";
+  const message = databaseErrorMessage(error);
   if (message.includes("event_full"))
     throw new RequestError(409, "This event is full.");
   if (

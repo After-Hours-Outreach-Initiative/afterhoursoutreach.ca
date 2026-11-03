@@ -21,7 +21,11 @@ import {
   listRosters,
   manageSignup,
 } from "../src/server/db/events";
-import { orientationSignupLimitMessage } from "../src/server/db/policy";
+import {
+  orientationFullMessage,
+  orientationReservedMessage,
+  orientationSignupLimitMessage,
+} from "../src/server/db/policy";
 import {
   loadApplicationDraft,
   saveApplicationDraft,
@@ -561,16 +565,39 @@ test("organizer staged additions search eligible accounts and commit mixed lists
     ]),
     statusError(409),
   );
-  // The last insertion exceeds capacity; neither earlier rows nor audits survive.
+  // Category restrictions are not total-capacity errors when the batch fits.
+  for (const [isNewVolunteer, message] of [
+    [false, orientationReservedMessage],
+    [true, orientationFullMessage],
+  ] as const)
+    await assert.rejects(
+      addEventVolunteers(
+        env.DB,
+        organizer,
+        "staged-event",
+        ["First", "Second", "Third"].map((name) => ({
+          name,
+          medic: false,
+          newVolunteer: isNewVolunteer,
+        })),
+      ),
+      { status: 409, message },
+    );
+  // Total capacity is insufficient even if a reserved-place guard fires first;
+  // neither earlier rows nor audits survive.
   await assert.rejects(
     addEventVolunteers(env.DB, organizer, "staged-event", [
       manual,
-      { userId: newVolunteer.id },
       { userId: volunteer.id },
       { ...manual, name: "Fourth" },
       { ...manual, name: "Fifth" },
+      { userId: newVolunteer.id },
+      { ...manual, name: "  " },
     ]),
-    statusError(409),
+    {
+      status: 409,
+      message: "Can't add 5 volunteers. Only 4 spots remaining.",
+    },
   );
   assert.equal(
     await env.DB.prepare("SELECT count(*) n FROM signup").first("n"),
@@ -608,7 +635,37 @@ test("organizer staged additions search eligible accounts and commit mixed lists
       manual,
       { userId: volunteer.id },
     ]),
-    statusError(409),
+    {
+      status: 409,
+      message:
+        "A selected volunteer is already registered or is no longer eligible for this event. Remove them or search again. No volunteers were added.",
+    },
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      manual,
+      { ...manual, name: "Last" },
+      { ...manual, name: "  " },
+    ]),
+    {
+      status: 409,
+      message: "Can't add 2 volunteers. Only 1 spot remaining.",
+    },
+  );
+  const attempts = await Promise.allSettled([
+    addEventVolunteers(env.DB, organizer, "staged-event", [manual]),
+    addEventVolunteers(env.DB, organizer, "staged-event", [manual]),
+  ]);
+  assert.equal(
+    attempts.filter(({ status }) => status === "fulfilled").length,
+    1,
+  );
+  const failure = attempts.find(({ status }) => status === "rejected");
+  assert.ok(failure?.status === "rejected");
+  assert.equal(failure.reason.status, 409);
+  assert.equal(
+    failure.reason.message,
+    "Can't add 1 volunteer. Only 0 spots remaining.",
   );
   await env.DB.prepare("DELETE FROM session WHERE id=?")
     .bind(organizer.sessionId)
@@ -623,7 +680,7 @@ test("organizer staged additions search eligible accounts and commit mixed lists
   );
   assert.equal(
     (await listRosters(env.DB, organizer, ["staged-event"])).length,
-    3,
+    4,
   );
 });
 

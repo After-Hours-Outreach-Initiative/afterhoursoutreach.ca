@@ -35,7 +35,7 @@ import {
   orientationCapacityMessage,
   validOrientationCapacity,
 } from "./policy";
-import { databaseWriteError } from "./errors";
+import { databaseErrorMessage, databaseWriteError } from "./errors";
 import {
   eventLimitFields,
   eventLimitInputFields,
@@ -359,6 +359,46 @@ export async function addEventVolunteers(
           : `${rows.length} volunteers added.`,
     };
   } catch (error) {
+    const invariant = databaseErrorMessage(error);
+    if (
+      !(error instanceof RequestError) &&
+      [
+        "event_full",
+        "signup_places_reserved",
+        "orientation_places_reserved",
+        "orientation_places_full",
+      ].some((value) => invariant.includes(value))
+    ) {
+      // Read after rollback: earlier staged rows must not reduce the remaining
+      // count. Recheck organizer/session access before disclosing fresh capacity.
+      const capacity = await db
+        .prepare(
+          `SELECT (SELECT max(0, e.spots - ${confirmedSignupsSql}) FROM event e
+          WHERE e.id = ?
+            AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
+            AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')
+          ) AS remainingSpots WHERE ${writePermission(true)}`,
+        )
+        .bind(eventId, ...permissionValues(actor))
+        .first<{ remainingSpots: number | null }>();
+      if (!capacity)
+        throw new RequestError(403, "Your sign-in changed. Sign in again.");
+      if (capacity.remainingSpots === null)
+        throw new RequestError(404, "Event not found.");
+      if (
+        rows.length > capacity.remainingSpots ||
+        invariant.includes("event_full")
+      ) {
+        const volunteers = `${rows.length} volunteer${rows.length === 1 ? "" : "s"}`;
+        const spots = `${capacity.remainingSpots} spot${capacity.remainingSpots === 1 ? "" : "s"}`;
+        throw new RequestError(
+          409,
+          rows.length > capacity.remainingSpots
+            ? `Can't add ${volunteers}. Only ${spots} remaining.`
+            : `Couldn't add ${volunteers} because the event filled up. ${spots} remaining now. Try again.`,
+        );
+      }
+    }
     return databaseWriteError(error);
   }
 }
