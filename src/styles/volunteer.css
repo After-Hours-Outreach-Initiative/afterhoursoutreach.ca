@@ -28,6 +28,7 @@ body:has(
   [data-application],
   [data-account-contents-flow],
   [data-volunteer-profile],
+  article[data-application-review],
   [data-event-calendar],
   [data-volunteer-browser]
 ) {

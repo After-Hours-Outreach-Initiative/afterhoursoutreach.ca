@@ -96,6 +96,54 @@ for (const width of [390, 1280]) {
   }
 }
 
+test("application reviews link to submitted sections on mobile and desktop", async ({
+  page,
+  baseURL,
+}) => {
+  test.skip(!baseURL?.startsWith("http://localhost:"));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await signInLocalAuthenticatorAccount(page.request, baseURL!);
+  const path = "/applications/local-fixture-user-robin";
+
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${path}#application-review-emergency-contact`);
+    const review = page.locator("article[data-application-review]");
+    const contents = review.getByRole("navigation", { name: "Sections" });
+    const menu = contents.locator("[data-contents-menu]");
+    const answers = review.locator("[data-submitted-application] details");
+    await expect(answers).toHaveAttribute("open");
+    await expect(
+      review.locator("#application-review-emergency-contact"),
+    ).toBeInViewport({ ratio: 1 });
+    const jump = async (id: string) => {
+      if (width < 1024) await menu.locator("summary").click();
+      await contents.locator(`a[href="#${id}"]:visible`).click();
+      await expect(page).toHaveURL(`${baseURL}${path}#${id}`);
+      const heading = review.locator(`#${id}`);
+      await expect(heading).toBeInViewport({ ratio: 1 });
+      const header = (await page.locator(".site-header").boundingBox())!;
+      const bar = (await menu.boundingBox())?.height ?? 0;
+      expect((await heading.boundingBox())!.y).toBeGreaterThanOrEqual(
+        header.y + header.height + bar,
+      );
+      if (width < 1024) await expect(menu).not.toHaveAttribute("open");
+    };
+    await jump("application-review-progress-heading");
+    await answers.locator("summary").click();
+    await expect(answers).not.toHaveAttribute("open");
+    await jump("application-review-about-volunteering");
+    await expect(answers).toHaveAttribute("open");
+    await page.reload();
+    await expect(
+      review.locator("#application-review-about-volunteering"),
+    ).toBeInViewport({ ratio: 1 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
+  }
+});
+
 test("organizer profiles keep only the compact contents bar sticky", async ({
   page,
   baseURL,
