@@ -94,6 +94,11 @@ test("application table opens a focused review with guarded decisions and list c
       "font-size",
       "font-weight",
       "font-family",
+      "background-color",
+      "border-radius",
+      "padding",
+      "display",
+      "line-height",
     ]) {
       const tableStyle = await row
         .locator(".application-status-text")
