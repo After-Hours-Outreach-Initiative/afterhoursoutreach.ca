@@ -63,6 +63,11 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
   expect(Number.parseFloat(String(morph[1].width))).toBeGreaterThan(
     Number.parseFloat(String(morph[0].width)),
   );
+  expect(morph[0].backgroundColor).toBe(morph[1].backgroundColor);
+  await expect(card.locator(".attendee-surface")).toHaveCSS(
+    "background-color",
+    "rgb(0, 0, 0)",
+  );
   await expect(form).toBeVisible();
   await expect(name).not.toBeFocused();
   await expect(name).not.toHaveAttribute("autofocus");

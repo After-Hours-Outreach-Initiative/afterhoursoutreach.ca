@@ -153,7 +153,6 @@ const roles = [
       )!;
       // Sample an interrupted morph before cancelling it, so reversing never jumps.
       const before = surface.getBoundingClientRect();
-      const background = getComputedStyle(surface).backgroundColor;
       this.animation?.cancel();
       this.animation = undefined;
       form.style.removeProperty("width");
@@ -169,18 +168,19 @@ const roles = [
       const after = surface.getBoundingClientRect();
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         // Keep fields at their expanded width while the same border reveals them.
+        // Keep the section black until the morph finishes in either direction.
         form.style.width = `${Math.max(before.width, after.width) - 4}px`;
         const animation = surface.animate(
           [
             {
               width: `${before.width}px`,
               height: `${before.height}px`,
-              backgroundColor: background,
+              backgroundColor: "#000",
             },
             {
               width: `${after.width}px`,
               height: `${after.height}px`,
-              backgroundColor: getComputedStyle(surface).backgroundColor,
+              backgroundColor: "#000",
             },
           ],
           { duration: 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
@@ -217,7 +217,7 @@ const roles = [
     overflow: clip;
     border: 2px solid var(--color-blue);
     border-radius: 0.5rem;
-    background: transparent;
+    background: #000;
   }
   .attendee-trigger.btn {
     width: 100%;

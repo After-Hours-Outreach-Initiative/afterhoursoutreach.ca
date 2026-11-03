@@ -139,6 +139,7 @@ test("application table opens a focused review with guarded decisions and list c
     expect(Number.parseFloat(String(morph[1].height))).toBeGreaterThan(
       Number.parseFloat(String(morph[0].height)),
     );
+    expect(morph[0].backgroundColor).toBe(morph[1].backgroundColor);
     const rejection = review.locator("application-rejection");
     const reason = review.getByRole("textbox", {
       name: "Reason for rejection",
@@ -149,7 +150,7 @@ test("application table opens a focused review with guarded decisions and list c
     await expect(rejectAction).toBeHidden();
     await expect(rejection.locator(".rejection-surface")).toHaveCSS(
       "background-color",
-      "rgba(0, 0, 0, 0)",
+      "rgb(0, 0, 0)",
     );
     await expect(rejection.locator(".rejection-actions button")).toHaveText([
       "Reject and send email",

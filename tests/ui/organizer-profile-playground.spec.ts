@@ -438,7 +438,7 @@ test("rejections and email failures update only fictional state, and prerequisit
   await rejectAction.click();
   await expect(preview.locator(".rejection-surface")).toHaveCSS(
     "background-color",
-    "rgba(0, 0, 0, 0)",
+    "rgb(0, 0, 0)",
   );
   expect(
     await preview

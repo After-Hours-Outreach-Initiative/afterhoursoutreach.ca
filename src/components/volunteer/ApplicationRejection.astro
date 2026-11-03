@@ -122,7 +122,6 @@ const id = `application-rejection-${person.id}`;
       const form = this.querySelector<HTMLFormElement>("form")!;
       // Sample an interrupted morph before cancelling it, so reversing never jumps.
       const before = surface.getBoundingClientRect();
-      const background = getComputedStyle(surface).backgroundColor;
       this.animation?.cancel();
       this.animation = undefined;
       form.style.removeProperty("width");
@@ -139,18 +138,19 @@ const id = `application-rejection-${person.id}`;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       // Keep the fields at their expanded width while the same border reveals or
       // conceals them. Only the enclosing surface changes size, not the text.
+      // Keep the section black until the morph finishes in either direction.
       form.style.width = `${Math.max(before.width, after.width) - 4}px`;
       const animation = surface.animate(
         [
           {
             width: `${before.width}px`,
             height: `${before.height}px`,
-            backgroundColor: background,
+            backgroundColor: "#000",
           },
           {
             width: `${after.width}px`,
             height: `${after.height}px`,
-            backgroundColor: getComputedStyle(surface).backgroundColor,
+            backgroundColor: "#000",
           },
         ],
         { duration: 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
@@ -221,7 +221,7 @@ const id = `application-rejection-${person.id}`;
   }
   [data-expanded] .rejection-surface {
     width: 100%;
-    background: transparent;
+    background: #000;
   }
   [data-expanded] .rejection-trigger {
     position: absolute;
