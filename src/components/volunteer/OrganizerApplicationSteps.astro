@@ -13,7 +13,7 @@ interface Props {
 const { profile, progress, idPrefix, showReview = false } = Astro.props;
 ---
 
-<ApplicationProgressMini {progress} {showReview} showTime>
+<ApplicationProgressMini {progress} {showReview} {idPrefix} showTime>
   <section
     slot="application"
     class="organizer-application-answers"

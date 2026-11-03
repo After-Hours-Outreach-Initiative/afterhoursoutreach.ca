@@ -22,16 +22,24 @@ interface Props {
 const { profile, person, progress } = Astro.props;
 const ready = isApplicationReadyForReview(progress);
 const contents = [
+  { id: "application-review-overview", heading: "Overview" },
   { id: "application-review-progress-heading", heading: "Progress" },
+  { id: "application-review-form-heading", heading: "Application form" },
   ...submittedApplicationSections.map((section) => ({
     id: `application-review-${section.key}`,
     heading: section.heading,
+    nested: true,
   })),
+  { id: "application-review-naloxone-heading", heading: "Naloxone 101" },
 ];
 ---
 
 <article class="application-review" data-application-review>
-  <h1 data-application-review-heading tabindex="-1">
+  <h1
+    id="application-review-overview"
+    data-application-review-heading
+    tabindex="-1"
+  >
     {personFullName((profile.submission ?? profile).answers, person.name)}
   </h1>
   <PageContents entries={contents} heading="Sections" idleHeading="Sections" />

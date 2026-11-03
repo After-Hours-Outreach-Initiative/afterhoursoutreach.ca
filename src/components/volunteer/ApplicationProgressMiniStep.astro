@@ -15,6 +15,7 @@ interface Props {
   state: "complete" | "current" | "upcoming" | "rejected";
   current: boolean;
   showTime: boolean;
+  headingId?: string;
   expandable?: boolean;
 }
 const {
@@ -23,6 +24,7 @@ const {
   state,
   current,
   showTime,
+  headingId,
   expandable = false,
 } = Astro.props;
 const Container = expandable ? "details" : "div";
@@ -42,7 +44,7 @@ const dates = new Intl.DateTimeFormat("en-CA", {
     : undefined}
 >
   <Container>
-    <Heading class="application-progress-mini-heading">
+    <Heading id={headingId} class="application-progress-mini-heading">
       <span class="application-progress-mini-marker" aria-hidden="true">
         {step.completed ? <CheckIcon class="size-4" /> : index + 1}
       </span>

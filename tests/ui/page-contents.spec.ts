@@ -96,7 +96,7 @@ for (const width of [390, 1280]) {
   }
 }
 
-test("application reviews link to submitted sections on mobile and desktop", async ({
+test("application reviews link to the overview, form sections and naloxone on mobile and desktop", async ({
   page,
   baseURL,
 }) => {
@@ -112,6 +112,32 @@ test("application reviews link to submitted sections on mobile and desktop", asy
     const contents = review.getByRole("navigation", { name: "Sections" });
     const menu = contents.locator("[data-contents-menu]");
     const answers = review.locator("[data-submitted-application] details");
+    for (const list of await contents.locator("ol").all()) {
+      await expect(list.locator("a")).toHaveText([
+        "Overview",
+        "Progress",
+        "Application form",
+        "Personal info",
+        "Emergency contact",
+        "Team interests",
+        "Training and safety",
+        "Personal statement",
+        "Submission details",
+        "Naloxone 101",
+      ]);
+      await expect(list.locator(".volunteer-contents-nested a")).toHaveText([
+        "Personal info",
+        "Emergency contact",
+        "Team interests",
+        "Training and safety",
+        "Personal statement",
+        "Submission details",
+      ]);
+      await expect(list.locator("a").first()).toHaveAttribute(
+        "href",
+        "#application-review-overview",
+      );
+    }
     await expect(answers).toHaveAttribute("open");
     await expect(
       review.locator("#application-review-emergency-contact"),
@@ -132,12 +158,31 @@ test("application reviews link to submitted sections on mobile and desktop", asy
     await jump("application-review-progress-heading");
     await answers.locator("summary").click();
     await expect(answers).not.toHaveAttribute("open");
+    await jump("application-review-naloxone-heading");
+    await expect(answers).not.toHaveAttribute("open");
+    await jump("application-review-form-heading");
+    await expect(answers).toHaveAttribute("open");
+    await page.reload();
+    await expect(answers).toHaveAttribute("open");
+    await expect(
+      review.locator("#application-review-form-heading"),
+    ).toBeInViewport({ ratio: 1 });
+    await answers.locator("summary").click();
     await jump("application-review-about-volunteering");
     await expect(answers).toHaveAttribute("open");
     await page.reload();
     await expect(
       review.locator("#application-review-about-volunteering"),
     ).toBeInViewport({ ratio: 1 });
+    await jump("application-review-overview");
+    await expect(contents.locator('a[aria-current="location"]')).toHaveText([
+      "Overview",
+      "Overview",
+    ]);
+    await page.reload();
+    await expect(review.locator("#application-review-overview")).toBeInViewport(
+      { ratio: 1 },
+    );
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width);

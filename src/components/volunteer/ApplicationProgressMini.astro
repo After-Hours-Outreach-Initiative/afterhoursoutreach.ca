@@ -9,8 +9,9 @@ interface Props {
   progress: ApplicationProgress;
   showTime?: boolean;
   showReview?: boolean;
+  idPrefix?: string;
 }
-const { progress, showTime = false, showReview = true } = Astro.props;
+const { progress, showTime = false, showReview = true, idPrefix } = Astro.props;
 const steps = [
   {
     key: "form",
@@ -56,6 +57,7 @@ const current = steps.findIndex((step) => !step.completed);
         {step}
         {index}
         {showTime}
+        headingId={idPrefix ? `${idPrefix}-${step.key}-heading` : undefined}
         expandable={step.key === "form" && Astro.slots.has("application")}
         current={index === current}
         state={
