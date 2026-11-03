@@ -1,7 +1,6 @@
 ---
 import type { EventRow } from "@/server/db/events";
 import { manualAttendeeCategory } from "@/data/event-roster";
-import DialogHeader from "@/components/DialogHeader.astro";
 import FieldError from "@/components/FieldError.astro";
 import RosterPerson from "./RosterPerson.astro";
 
@@ -18,19 +17,27 @@ const roles = [
 ];
 ---
 
-<dialog
-  id={id}
-  class="dialog-pop dialog-frame volunteer-dialog"
-  aria-labelledby={`${id}-heading`}
->
-  <DialogHeader id={`${id}-heading`} title="Add volunteer" />
-  <div class="dialog-body">
+<add-attendee>
+  <div class="attendee-surface">
+    <button
+      class="btn btn-outline attendee-trigger"
+      type="button"
+      aria-expanded="false"
+      aria-controls={`${id}-form`}
+      data-attendee-open
+    >
+      Add volunteer
+    </button>
     <form
       id={`${id}-form`}
-      class="volunteer-form"
+      class="volunteer-form attendee-form"
       data-add-attendee
       action="/api/v1/events/action"
       method="post"
+      aria-label="Add volunteer"
+      aria-hidden="true"
+      tabindex="-1"
+      inert
     >
       <input type="hidden" name="id" value={event.id} />
       <div class="volunteer-field">
@@ -46,7 +53,6 @@ const roles = [
           pattern=".*\S.*"
           aria-describedby={`error-${id}-name`}
           autocomplete="off"
-          autofocus
         />
         <FieldError field={`${id}-name`} message="Enter a name." />
       </div>
@@ -84,22 +90,192 @@ const roles = [
         }
       </div>
       <p data-form-message role="status" hidden></p>
+      <div class="attendee-actions">
+        <button class="btn btn-green" type="submit" data-loading-label="Adding…"
+          >Add</button
+        >
+        <button class="btn btn-quiet" type="button" data-attendee-cancel
+          >Cancel</button
+        >
+      </div>
     </form>
   </div>
-  <div class="dialog-footer">
-    <button class="btn btn-outline" type="button" data-dismiss-dialog
-      >Cancel</button
-    >
-    <button
-      class="btn btn-green"
-      type="submit"
-      form={`${id}-form`}
-      data-loading-label="Adding…">Add</button
-    >
-  </div>
-</dialog>
+</add-attendee>
+
+<script>
+  import { syncAttendeePreview } from "@/scripts/add-attendee";
+
+  class AddAttendee extends HTMLElement {
+    private controller?: AbortController;
+    private animation?: Animation;
+
+    connectedCallback() {
+      this.controller?.abort();
+      this.controller = new AbortController();
+      const { signal } = this.controller;
+      this.addEventListener(
+        "click",
+        (event) => {
+          if (!(event.target instanceof Element)) return;
+          const button = event.target.closest<HTMLButtonElement>(
+            "[data-attendee-open], [data-attendee-cancel]",
+          );
+          if (button && !button.disabled)
+            this.expand(button.hasAttribute("data-attendee-open"));
+        },
+        { signal },
+      );
+      this.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape" && this.hasAttribute("data-expanded")) {
+            event.preventDefault();
+            this.expand(false);
+          }
+        },
+        { signal },
+      );
+    }
+
+    disconnectedCallback() {
+      this.controller?.abort();
+      this.animation?.cancel();
+      this.animation = undefined;
+      this.querySelector("form")?.style.removeProperty("width");
+    }
+
+    private expand(expanded: boolean) {
+      const form = this.querySelector<HTMLFormElement>("form")!;
+      if (form.dataset.submitting) return;
+      const surface = this.querySelector<HTMLElement>(".attendee-surface")!;
+      const trigger = this.querySelector<HTMLButtonElement>(
+        "[data-attendee-open]",
+      )!;
+      // Sample an interrupted morph before cancelling it, so reversing never jumps.
+      const before = surface.getBoundingClientRect();
+      const background = getComputedStyle(surface).backgroundColor;
+      this.animation?.cancel();
+      this.animation = undefined;
+      form.style.removeProperty("width");
+      this.toggleAttribute("data-expanded", expanded);
+      trigger.setAttribute("aria-expanded", String(expanded));
+      form.inert = !expanded;
+      form.setAttribute("aria-hidden", String(!expanded));
+      trigger.inert = expanded;
+      if (expanded) syncAttendeePreview(form);
+      // Focus the form itself, not the name input or the hidden trigger.
+      (expanded ? form : trigger).focus({ preventScroll: true });
+
+      const after = surface.getBoundingClientRect();
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        // Keep fields at their expanded width while the same border reveals them.
+        form.style.width = `${Math.max(before.width, after.width) - 4}px`;
+        const animation = surface.animate(
+          [
+            {
+              width: `${before.width}px`,
+              height: `${before.height}px`,
+              backgroundColor: background,
+            },
+            {
+              width: `${after.width}px`,
+              height: `${after.height}px`,
+              backgroundColor: getComputedStyle(surface).backgroundColor,
+            },
+          ],
+          { duration: 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+        );
+        this.animation = animation;
+        void animation.finished.then(
+          () => {
+            if (this.animation !== animation) return;
+            this.animation = undefined;
+            form.style.removeProperty("width");
+          },
+          () => {},
+        );
+      }
+      if (!expanded)
+        this.dispatchEvent(new Event("add-attendee-close", { bubbles: true }));
+    }
+  }
+
+  if (!customElements.get("add-attendee"))
+    customElements.define("add-attendee", AddAttendee);
+</script>
 
 <style>
+  add-attendee {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .attendee-surface {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    overflow: clip;
+    border: 2px solid var(--color-blue);
+    border-radius: 0.5rem;
+    background: transparent;
+  }
+  .attendee-trigger.btn {
+    width: 100%;
+    min-height: 2.5rem;
+    padding-inline: calc(1.25rem - 2px);
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+  }
+  add-attendee:not([data-expanded])
+    .attendee-surface:has(.attendee-trigger:hover:not(:disabled)) {
+    background: var(--color-blue);
+  }
+  .attendee-trigger,
+  .attendee-form {
+    transition:
+      opacity 160ms ease,
+      visibility 0s linear 160ms;
+  }
+  .attendee-form {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 1rem;
+    visibility: hidden;
+    opacity: 0;
+    outline: none;
+  }
+  [data-expanded] .attendee-surface {
+    width: 100%;
+  }
+  [data-expanded] .attendee-trigger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    opacity: 0;
+  }
+  [data-expanded] .attendee-form {
+    position: relative;
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  add-attendee:not([data-expanded]) .attendee-trigger {
+    transition-delay: 0s;
+  }
+  .attendee-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .attendee-surface:has(.attendee-trigger:focus-visible) {
+    outline: 2px solid white;
+    outline-offset: 3px;
+  }
   .attendee-roles {
     display: flex;
     gap: 1.5rem;
@@ -109,5 +285,18 @@ const roles = [
     padding: 1rem;
     border: 1px solid #3f3f46;
     border-radius: 0.5rem;
+  }
+  @media (min-width: 64rem) {
+    @container event-card (min-width: 32rem) {
+      add-attendee:not([data-expanded]) .attendee-surface {
+        width: fit-content;
+      }
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .attendee-trigger,
+    .attendee-form {
+      transition: none;
+    }
   }
 </style>

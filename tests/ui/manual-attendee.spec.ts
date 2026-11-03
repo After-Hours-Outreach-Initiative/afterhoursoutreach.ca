@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 
-test("name-only attendees have independent checkboxes, a live roster preview and no explanatory UI", async ({
+test("inline add-volunteer forms preserve validation, previews and responsive roster updates", async ({
   page,
   browser,
   baseURL,
@@ -46,30 +46,50 @@ test("name-only attendees have independent checkboxes, a live roster preview and
     .locator("[data-live-event]")
     .filter({ hasText: meetingPoint });
   const id = await card.getAttribute("data-live-event");
-  await expect(
-    card
-      .locator(".volunteer-actions")
-      .getByRole("button", { name: "Add volunteer", exact: true }),
-  ).toBeVisible();
-  await card
-    .getByRole("button", { name: "Add volunteer", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Add volunteer",
-    exact: true,
+  const trigger = card.locator("[data-attendee-open]");
+  const form = card.locator("[data-add-attendee]");
+  const name = form.getByRole("textbox", { name: "Name", exact: true });
+  await expect(trigger).toBeVisible();
+  await expect(form).toHaveAttribute("inert", "");
+  const morph = await trigger.evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    return (
+      button.parentElement!.getAnimations()[0].effect as KeyframeEffect
+    ).getKeyframes();
   });
-  const preview = dialog.locator("[data-attendee-preview]");
+  expect(Number.parseFloat(String(morph[1].height))).toBeGreaterThan(
+    Number.parseFloat(String(morph[0].height)),
+  );
+  expect(Number.parseFloat(String(morph[1].width))).toBeGreaterThan(
+    Number.parseFloat(String(morph[0].width)),
+  );
+  await expect(form).toBeVisible();
+  await expect(name).not.toBeFocused();
+  await expect(name).not.toHaveAttribute("autofocus");
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("dialog", { name: "Add volunteer" })).toHaveCount(
+    0,
+  );
+  const preview = form.locator("[data-attendee-preview]");
   const visibleEntry = preview.locator("[data-attendee-preview-medic]:visible");
-  await expect(
-    dialog.getByRole("textbox", { name: "Name", exact: true }),
-  ).toBeFocused();
-  await expect(dialog.getByRole("checkbox")).toHaveCount(2);
-  await expect(dialog.locator("small, .volunteer-help")).toHaveCount(0);
-  await expect(dialog.locator("p:visible")).toHaveCount(0);
-  await expect(dialog.locator(".volunteer-required")).toHaveText("*");
+  await expect(form.getByRole("checkbox")).toHaveCount(2);
+  await expect(form.locator("small, .volunteer-help")).toHaveCount(0);
+  await expect(form.locator("p:visible")).toHaveCount(0);
+  await expect(form.locator(".volunteer-required")).toHaveText("*");
   await expect(visibleEntry.locator(".compact-person-name")).toHaveText("Name");
-  const nameError = dialog.locator("[data-error]");
+  const nameError = form.locator("[data-error]");
   await expect(nameError).toBeHidden();
+  await name.fill("A draft name");
+  await form.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(trigger).toBeFocused();
+  await expect(form).toHaveAttribute("inert", "");
+  await trigger.press("Enter");
+  await expect(form).toBeFocused();
+  await expect(name).toHaveValue("A draft name");
+  await form.press("Escape");
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(trigger).toBeFocused();
+  await trigger.click();
   let actionRequests = 0;
   page.on("request", (request) => {
     if (
@@ -79,16 +99,16 @@ test("name-only attendees have independent checkboxes, a live roster preview and
       actionRequests++;
   });
   for (const name of ["", "   "]) {
-    await dialog.getByRole("textbox", { name: "Name", exact: true }).fill(name);
-    await dialog.getByRole("button", { name: "Add", exact: true }).click();
+    await form.getByRole("textbox", { name: "Name", exact: true }).fill(name);
+    await form.getByRole("button", { name: "Add", exact: true }).click();
     await expect(nameError).toBeVisible();
     await expect(nameError).toHaveText("Enter a name.");
     await expect(
-      dialog.getByRole("textbox", { name: "Name", exact: true }),
+      form.getByRole("textbox", { name: "Name", exact: true }),
     ).toBeFocused();
     expect(actionRequests).toBe(0);
   }
-  await dialog
+  await form
     .getByRole("textbox", { name: "Name", exact: true })
     .fill("Avery Example");
   await expect(nameError).toBeHidden();
@@ -101,10 +121,10 @@ test("name-only attendees have independent checkboxes, a live roster preview and
     [false, true, "new-volunteer"],
     [true, true, "new-volunteer"],
   ] as const) {
-    await dialog
+    await form
       .getByRole("checkbox", { name: "Medic", exact: true })
       .setChecked(medic);
-    await dialog
+    await form
       .getByRole("checkbox", { name: "New", exact: true })
       .setChecked(isNew);
     await expect(visibleEntry).toHaveCount(1);
@@ -118,38 +138,57 @@ test("name-only attendees have independent checkboxes, a live roster preview and
       Number(isNew),
     );
   }
-  await dialog
+  await form
     .getByRole("textbox", { name: "Name", exact: true })
     .fill("Averyaveryaveryaveryavery Example");
   await expect(
     visibleEntry.locator(".compact-person-name > span").first(),
   ).toContainText("… E.");
-  await dialog
+  await form
     .getByRole("textbox", { name: "Name", exact: true })
     .fill("Avery Example");
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 900 });
     expect(
-      await dialog.evaluate((element) => ({
-        dialog: element.scrollWidth > element.clientWidth,
+      await form.evaluate((element) => ({
+        form: element.scrollWidth > element.clientWidth,
         page: document.documentElement.scrollWidth > innerWidth,
       })),
-    ).toEqual({ dialog: false, page: false });
+    ).toEqual({ form: false, page: false });
   }
+  const fail = (route: Route) =>
+    route.fulfill({
+      status: 409,
+      json: { message: "Try adding the volunteer again." },
+    });
+  await page.route("**/api/v1/events/action", fail);
+  await form.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(form.getByRole("alert")).toHaveText(
+    "Try adding the volunteer again.",
+  );
+  await expect(name).toBeEnabled();
+  await expect(name).toHaveValue("Avery Example");
+  await page.unroute("**/api/v1/events/action", fail);
   await inPlaceAction(page, {
     endpoint: "/api/v1/events/action",
-    form: dialog.locator("form"),
+    form,
     loadingLabel: "Adding…",
     trigger: () =>
-      dialog.getByRole("button", { name: "Add", exact: true }).click(),
+      form.getByRole("button", { name: "Add", exact: true }).click(),
     pending: async () => {
-      await expect(dialog.getByRole("textbox")).toBeDisabled();
+      await expect(form.getByRole("textbox")).toBeDisabled();
       await expect(
-        dialog.getByRole("checkbox", { name: "Medic", exact: true }),
+        form.getByRole("checkbox", { name: "Medic", exact: true }),
       ).toBeDisabled();
+      await expect(
+        form.getByRole("button", { name: "Cancel", exact: true }),
+      ).toBeDisabled();
+      await form.press("Escape");
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
     },
     updated: async () => {
-      await expect(dialog).not.toBeVisible();
+      await expect(form).not.toBeVisible();
+      await expect(trigger).toBeFocused();
       await expect(card.locator("[data-event-availability]")).toContainText(
         "1 of 8 spots taken",
       );
@@ -184,7 +223,7 @@ test("name-only attendees have independent checkboxes, a live roster preview and
             .closest("[data-live-event]")!
             .querySelector(".volunteer-roster")!;
           const eventLayout = roster.previousElementSibling!;
-          const bounds = button.getBoundingClientRect();
+          const bounds = button.parentElement!.getBoundingClientRect();
           const rosterBounds = roster.getBoundingClientRect();
           return {
             gap: bounds.top - rosterBounds.bottom,
@@ -209,14 +248,26 @@ test("name-only attendees have independent checkboxes, a live roster preview and
         ).toBeCloseTo(layout.rem, 1);
         expect(layout.gapAboveRoster).toBeCloseTo(layout.rem, 1);
         expect(layout.buttonGap).toBeCloseTo(layout.rem, 1);
+        expect(layout.left).toBeCloseTo(0, 1);
         if (width < 64 * layout.rem || layout.rosterWidth < 32 * layout.rem) {
           expect(layout.buttonWidth).toBeCloseTo(layout.rosterWidth, 1);
-          expect(layout.left).toBeCloseTo(0, 1);
           expect(layout.right).toBeCloseTo(0, 1);
         }
       }
     }
   }
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await addVolunteer.click();
+  await expect(form).toBeVisible();
+  await expect(name).not.toBeFocused();
+  expect(
+    await card
+      .locator(".attendee-surface")
+      .evaluate((surface) => surface.getAnimations().length),
+  ).toBe(0);
+  await form.press("Escape");
+  await expect(addVolunteer).toBeFocused();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   const row = roster.locator("tbody > tr").filter({ hasText: "Avery E." });
   await expect(row).toHaveCount(1);
   await expect(row.locator("time.event-roster-status")).toHaveText(
@@ -299,9 +350,7 @@ test("name-only attendees have independent checkboxes, a live roster preview and
       updated: async () => {
         await expect(card.locator(".volunteer-roster")).toHaveCount(0);
         await expect(
-          card
-            .locator(".volunteer-actions")
-            .getByRole("button", { name: "Add volunteer", exact: true }),
+          card.getByRole("button", { name: "Add volunteer", exact: true }),
         ).toBeVisible();
         await expect(card.locator("[data-event-availability]")).toContainText(
           "0 of 8 spots taken",

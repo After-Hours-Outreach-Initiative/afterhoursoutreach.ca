@@ -14,7 +14,7 @@ import {
 } from "./volunteer-profile-contents";
 import { initSignupMenus } from "./signup-menu";
 import { initCompactPersonNames } from "./compact-person-name";
-import { initAttendeePreviews, syncAttendeePreview } from "./add-attendee";
+import { initAttendeePreviews } from "./add-attendee";
 import {
   initSignupMoveCalendars,
   syncSignupMoveCalendar,
@@ -268,7 +268,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       card.querySelector("dialog[open], [data-signup-menu]:popover-open") ||
       [
         ...card.querySelectorAll<HTMLFormElement>(
-          'form[data-submitting="true"]',
+          'form[data-submitting="true"], add-attendee[data-expanded] form',
         ),
       ].some((form) => form !== element),
     );
@@ -455,8 +455,9 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
                 ? card?.dataset.seriesCard
                   ? "[data-series-occurrences] > summary"
                   : "[data-show-dialog]"
-                : element?.matches("[data-add-attendee]")
-                  ? `[data-show-dialog="add-attendee-${CSS.escape(eventId ?? "")}"]`
+                : element?.matches("[data-add-attendee]") ||
+                    (!element && focused?.matches("[data-attendee-open]"))
+                  ? "[data-attendee-open]"
                   : !element && focusedSeriesSummary
                     ? focusedSeriesSummary
                     : !element && focusedEventSummary
@@ -581,7 +582,7 @@ if (eventBrowser) {
         const needsDeferredRefresh =
           deferredEventRefresh &&
           !eventBrowser.querySelector(
-            'dialog[open], [data-signup-menu]:popover-open, [data-live-series][open], form[data-submitting="true"]',
+            'dialog[open], add-attendee[data-expanded], [data-signup-menu]:popover-open, [data-live-series][open], form[data-submitting="true"]',
           );
         if (
           !forceRefresh &&
@@ -688,6 +689,9 @@ if (eventBrowser) {
     },
     true,
   );
+  document.addEventListener("add-attendee-close", () => {
+    if (deferredEventRefresh) refreshDeferredEvents();
+  });
   startPolling();
 }
 
@@ -1077,10 +1081,6 @@ document.addEventListener("click", (event) => {
     if (dialog instanceof HTMLDialogElement) {
       initEventDates(dialog);
       syncSignupMoveCalendar(dialog);
-      const attendeeForm = dialog.querySelector<HTMLFormElement>(
-        "[data-add-attendee]",
-      );
-      if (attendeeForm) syncAttendeePreview(attendeeForm);
       dialog.showModal();
     }
   }

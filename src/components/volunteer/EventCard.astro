@@ -198,19 +198,6 @@ const blocked =
           </button>
         )
       }
-      {
-        canAddAttendee && roster.length === 0 && (
-          <button
-            class="btn btn-outline"
-            type="button"
-            data-show-dialog={`add-attendee-${event.id}`}
-            aria-haspopup="dialog"
-            aria-controls={`add-attendee-${event.id}`}
-          >
-            Add volunteer
-          </button>
-        )
-      }
     </div>
   </div>
   {
@@ -229,22 +216,13 @@ const blocked =
     )
   }
   {
-    canAddAttendee && roster.length > 0 && (
+    canAddAttendee && (
       <div class="volunteer-roster-add">
-        <button
-          class="btn btn-outline"
-          type="button"
-          data-show-dialog={`add-attendee-${event.id}`}
-          aria-haspopup="dialog"
-          aria-controls={`add-attendee-${event.id}`}
-        >
-          Add volunteer
-        </button>
+        <AddAttendee event={event} />
       </div>
     )
   }
   {organizer && future && <EventEditor event={event} series={series} />}
-  {canAddAttendee && <AddAttendee event={event} />}
 </li>
 
 <style>
@@ -317,13 +295,8 @@ const blocked =
     margin-top: var(--event-card-gap);
   }
   .volunteer-roster-add {
-    display: flex;
-    justify-content: flex-end;
     width: 100%;
     padding-top: var(--event-card-gap);
-  }
-  .volunteer-roster-add > .btn {
-    width: 100%;
   }
   @container event-card (min-width: 32rem) {
     .volunteer-event-layout:has(> .volunteer-actions:not(:empty)) {
@@ -333,13 +306,6 @@ const blocked =
     .volunteer-actions {
       grid-column: 2;
       grid-row: 1;
-    }
-  }
-  @media (min-width: 64rem) {
-    @container event-card (min-width: 32rem) {
-      .volunteer-roster-add > .btn {
-        width: 12rem;
-      }
     }
   }
 </style>
