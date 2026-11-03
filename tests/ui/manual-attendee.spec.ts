@@ -59,18 +59,51 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
   );
   await expect(form).toHaveAttribute("inert", "");
   const morph = await trigger.evaluate((button) => {
+    const label = document.createRange();
+    label.selectNodeContents(button);
+    const initial = label.getBoundingClientRect();
     (button as HTMLButtonElement).click();
-    return (
-      button.parentElement!.getAnimations()[0].effect as KeyframeEffect
+    const surface = button.parentElement!;
+    const keyframes = (
+      surface.getAnimations()[0].effect as KeyframeEffect
     ).getKeyframes();
+    let movement = 0;
+    // Reverse mid-opening, then reopen mid-closing without letting the label slide.
+    for (const phase of ["opening", "closing", "reopening"]) {
+      if (phase === "closing")
+        button
+          .closest("add-attendee")!
+          .dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+          );
+      if (phase === "reopening") (button as HTMLButtonElement).click();
+      const animation = surface.getAnimations()[0];
+      animation.pause();
+      for (const time of [0, 80, 160]) {
+        animation.currentTime = time;
+        const bounds = label.getBoundingClientRect();
+        movement = Math.max(
+          movement,
+          Math.abs(bounds.x - initial.x),
+          Math.abs(bounds.y - initial.y),
+          Math.abs(bounds.width - initial.width),
+          Math.abs(bounds.height - initial.height),
+        );
+      }
+    }
+    surface.getAnimations()[0].finish();
+    return { keyframes, movement };
   });
-  expect(Number.parseFloat(String(morph[1].height))).toBeGreaterThan(
-    Number.parseFloat(String(morph[0].height)),
+  expect(morph.movement).toBeLessThan(0.1);
+  expect(Number.parseFloat(String(morph.keyframes[1].height))).toBeGreaterThan(
+    Number.parseFloat(String(morph.keyframes[0].height)),
   );
-  expect(Number.parseFloat(String(morph[1].width))).toBeGreaterThan(
-    Number.parseFloat(String(morph[0].width)),
+  expect(Number.parseFloat(String(morph.keyframes[1].width))).toBeGreaterThan(
+    Number.parseFloat(String(morph.keyframes[0].width)),
   );
-  expect(morph[0].backgroundColor).toBe(morph[1].backgroundColor);
+  expect(morph.keyframes[0].backgroundColor).toBe(
+    morph.keyframes[1].backgroundColor,
+  );
   await expect(card.locator(".attendee-surface")).toHaveCSS(
     "background-color",
     "rgb(0, 0, 0)",

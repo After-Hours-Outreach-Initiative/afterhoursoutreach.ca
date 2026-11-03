@@ -114,9 +114,11 @@ const id = `${dialogId}-cancel`;
 </event-cancellation>
 
 <script>
+  import { InlineMorph } from "@/scripts/inline-morph";
+
   class EventCancellation extends HTMLElement {
     private controller?: AbortController;
-    private animation?: Animation;
+    private morph = new InlineMorph();
 
     connectedCallback() {
       this.controller?.abort();
@@ -148,9 +150,7 @@ const id = `${dialogId}-cancel`;
 
     disconnectedCallback() {
       this.controller?.abort();
-      this.animation?.cancel();
-      this.animation = undefined;
-      this.querySelector("form")?.style.removeProperty("width");
+      this.morph.cancel();
     }
 
     private expand(expanded: boolean) {
@@ -160,47 +160,15 @@ const id = `${dialogId}-cancel`;
       const trigger = this.querySelector<HTMLButtonElement>(
         "[data-event-cancel-open]",
       )!;
-      // Sample interrupted morphs before cancelling, so reversing never jumps.
-      const before = surface.getBoundingClientRect();
-      this.animation?.cancel();
-      this.animation = undefined;
-      form.style.removeProperty("width");
-      this.toggleAttribute("data-expanded", expanded);
-      trigger.setAttribute("aria-expanded", String(expanded));
-      form.inert = !expanded;
-      form.setAttribute("aria-hidden", String(!expanded));
-      trigger.inert = expanded;
-      // Focus the section without opening the keyboard or choosing an action.
-      (expanded ? form : trigger).focus({ preventScroll: true });
-
-      const after = surface.getBoundingClientRect();
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      // Reveal the fields at their expanded width inside the same red border.
-      form.style.width = `${Math.max(before.width, after.width) - 4}px`;
-      const animation = surface.animate(
-        [
-          {
-            width: `${before.width}px`,
-            height: `${before.height}px`,
-            backgroundColor: "#000",
-          },
-          {
-            width: `${after.width}px`,
-            height: `${after.height}px`,
-            backgroundColor: "#000",
-          },
-        ],
-        { duration: 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
-      );
-      this.animation = animation;
-      void animation.finished.then(
-        () => {
-          if (this.animation !== animation) return;
-          this.animation = undefined;
-          form.style.removeProperty("width");
-        },
-        () => {},
-      );
+      this.morph.run(surface, trigger, form, expanded, () => {
+        this.toggleAttribute("data-expanded", expanded);
+        trigger.setAttribute("aria-expanded", String(expanded));
+        form.inert = !expanded;
+        form.setAttribute("aria-hidden", String(!expanded));
+        trigger.inert = expanded;
+        // Focus the section without opening the keyboard or choosing an action.
+        (expanded ? form : trigger).focus({ preventScroll: true });
+      });
     }
   }
 

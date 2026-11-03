@@ -127,10 +127,11 @@ const roles = [
 
 <script>
   import { syncAttendeePreview } from "@/scripts/add-attendee";
+  import { InlineMorph } from "@/scripts/inline-morph";
 
   class AddAttendee extends HTMLElement {
     private controller?: AbortController;
-    private animation?: Animation;
+    private morph = new InlineMorph();
 
     connectedCallback() {
       this.controller?.abort();
@@ -162,9 +163,7 @@ const roles = [
 
     disconnectedCallback() {
       this.controller?.abort();
-      this.animation?.cancel();
-      this.animation = undefined;
-      this.querySelector("form")?.style.removeProperty("width");
+      this.morph.cancel();
     }
 
     private expand(expanded: boolean) {
@@ -174,50 +173,16 @@ const roles = [
       const trigger = this.querySelector<HTMLButtonElement>(
         "[data-attendee-open]",
       )!;
-      // Sample an interrupted morph before cancelling it, so reversing never jumps.
-      const before = surface.getBoundingClientRect();
-      this.animation?.cancel();
-      this.animation = undefined;
-      form.style.removeProperty("width");
-      this.toggleAttribute("data-expanded", expanded);
-      trigger.setAttribute("aria-expanded", String(expanded));
-      form.inert = !expanded;
-      form.setAttribute("aria-hidden", String(!expanded));
-      trigger.inert = expanded;
-      if (expanded) syncAttendeePreview(form);
-      // Focus the form itself, not the name input or the hidden trigger.
-      (expanded ? form : trigger).focus({ preventScroll: true });
-
-      const after = surface.getBoundingClientRect();
-      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        // Keep fields at their expanded width while the same border reveals them.
-        // Keep the section black until the morph finishes in either direction.
-        form.style.width = `${Math.max(before.width, after.width) - 4}px`;
-        const animation = surface.animate(
-          [
-            {
-              width: `${before.width}px`,
-              height: `${before.height}px`,
-              backgroundColor: "#000",
-            },
-            {
-              width: `${after.width}px`,
-              height: `${after.height}px`,
-              backgroundColor: "#000",
-            },
-          ],
-          { duration: 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
-        );
-        this.animation = animation;
-        void animation.finished.then(
-          () => {
-            if (this.animation !== animation) return;
-            this.animation = undefined;
-            form.style.removeProperty("width");
-          },
-          () => {},
-        );
-      }
+      this.morph.run(surface, trigger, form, expanded, () => {
+        this.toggleAttribute("data-expanded", expanded);
+        trigger.setAttribute("aria-expanded", String(expanded));
+        form.inert = !expanded;
+        form.setAttribute("aria-hidden", String(!expanded));
+        trigger.inert = expanded;
+        if (expanded) syncAttendeePreview(form);
+        // Focus the form itself, not the name input or the hidden trigger.
+        (expanded ? form : trigger).focus({ preventScroll: true });
+      });
       if (!expanded)
         this.dispatchEvent(new Event("add-attendee-close", { bubbles: true }));
     }
