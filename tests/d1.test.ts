@@ -682,6 +682,133 @@ test("organizer staged additions search eligible accounts and commit mixed lists
   );
 });
 
+test.each(["search", "add"] as const)(
+  "organizer %s allows a booked new volunteer into another orientation's last available spot",
+  async (action) => {
+    const organizer = await manualRosterActor("manual-organizer", "organizer");
+    const volunteer = {
+      ...(await manualRosterActor("booked-new-volunteer", "volunteer")),
+      patrolApproved: false,
+    };
+    await env.DB.prepare(
+      "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .run();
+    for (const [id, orientation] of [
+      ["first-orientation", 1],
+      ["second-orientation", 1],
+      ["regular-patrol", 0],
+    ] as const)
+      await env.DB.prepare(
+        `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,
+        min_medic_spots,min_new_volunteer_spots,max_new_volunteers,created_by,created_at,updated_at)
+        VALUES (?,'patrol',?,?,'Point',10,2,2,4,?,0,0)`,
+      )
+        .bind(id, orientation, Date.now() + 86_400_000, organizer.id)
+        .run();
+    await changeSignup(env.DB, volunteer, "first-orientation", "join");
+    // Mirror the reported event: 9/10 filled, including two new volunteers and
+    // four medics. The last place is available to another new volunteer.
+    await addEventVolunteers(env.DB, organizer, "second-orientation", [
+      ...Array.from({ length: 4 }, (_, index) => ({
+        name: `Medic ${index}`,
+        medic: true,
+        newVolunteer: false,
+      })),
+      ...Array.from({ length: 2 }, (_, index) => ({
+        name: `New ${index}`,
+        medic: false,
+        newVolunteer: true,
+      })),
+      ...Array.from({ length: 3 }, (_, index) => ({
+        name: `General ${index}`,
+        medic: false,
+        newVolunteer: false,
+      })),
+    ]);
+    const target = (await listEvents(env.DB, organizer)).find(
+      ({ id }) => id === "second-orientation",
+    )!;
+    assert.deepEqual(
+      [target.confirmed, target.newVolunteerConfirmed, target.medicConfirmed],
+      [9, 2, 4],
+    );
+
+    if (action === "search") {
+      const candidates = await searchSignupCandidates(
+        env.DB,
+        organizer,
+        target.id,
+        volunteer.id,
+      );
+      assert.deepEqual(
+        candidates.map(({ id }) => id),
+        [volunteer.id],
+      );
+      assert.equal(candidates[0].category, "new-volunteer");
+      assert.deepEqual(
+        await searchSignupCandidates(
+          env.DB,
+          organizer,
+          target.id,
+          volunteer.id,
+          [volunteer.id],
+        ),
+        [],
+      );
+    } else {
+      await addEventVolunteers(env.DB, organizer, target.id, [
+        { userId: volunteer.id },
+      ]);
+      const registrations = await env.DB.prepare(
+        "SELECT event_id FROM signup WHERE user_id=? AND status='confirmed' ORDER BY event_id",
+      )
+        .bind(volunteer.id)
+        .all<{ event_id: string }>();
+      assert.deepEqual(
+        registrations.results.map(({ event_id }) => event_id),
+        ["first-orientation", "second-orientation"],
+      );
+      assert.equal(
+        (await listRosters(env.DB, organizer, [target.id])).length,
+        10,
+      );
+      assert.deepEqual(
+        await searchSignupCandidates(
+          env.DB,
+          organizer,
+          target.id,
+          volunteer.id,
+        ),
+        [],
+      );
+      await assert.rejects(
+        addEventVolunteers(env.DB, organizer, target.id, [
+          { userId: volunteer.id },
+        ]),
+        statusError(409),
+      );
+    }
+    // Removing the cross-event limit does not grant patrol access.
+    assert.deepEqual(
+      await searchSignupCandidates(
+        env.DB,
+        organizer,
+        "regular-patrol",
+        volunteer.id,
+      ),
+      [],
+    );
+    await assert.rejects(
+      addEventVolunteers(env.DB, organizer, "regular-patrol", [
+        { userId: volunteer.id },
+      ]),
+      statusError(409),
+    );
+  },
+);
+
 test("development application shortcuts preserve snapshots and advance without emails or patrol approval", async () => {
   const actor = await draftActor();
   await assert.rejects(

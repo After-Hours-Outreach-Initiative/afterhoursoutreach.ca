@@ -228,17 +228,13 @@ export interface SignupCandidate {
 
 // Shared by organizer search and the atomic batch guard. Account roles always
 // come from the account, not from event-local manual role inputs.
+// Existing bookings exclude only the same event, never another orientation.
 const signupCandidateSql = `u.deleted_at IS NULL AND u.email_verified = 1
   AND v.active = 1 AND (v.registration_approved = 1 OR u.role = 'organizer')
   AND (u.role = 'organizer' OR v.patrol_approved = 1 OR ${applicationReadyForReviewSql})
   AND (${includesOrientationSql()} OR v.patrol_approved = 1)
   AND NOT EXISTS(SELECT 1 FROM signup booked
-    WHERE booked.event_id = e.id AND booked.user_id = u.id AND booked.status = 'confirmed')
-  AND NOT (${includesOrientationSql()} AND v.patrol_approved = 0 AND EXISTS(
-    SELECT 1 FROM signup booked JOIN event other ON other.id = booked.event_id
-    WHERE booked.user_id = u.id AND booked.status = 'confirmed'
-      AND ${includesOrientationSql("other")} AND other.cancelled_at IS NULL
-      AND other.starts_at > ${nowMsSql}))`;
+    WHERE booked.event_id = e.id AND booked.user_id = u.id AND booked.status = 'confirmed')`;
 
 /** Organizer-only autocomplete: names and roster presentation, never profiles. */
 export async function searchSignupCandidates(
