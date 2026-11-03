@@ -31,7 +31,6 @@ test("view versions detect capacity, signups, visibility and access changes with
     futureConfirmed: 0,
     futureEditableConfirmed: 0,
     signedUp: 0,
-    orientationSignupBlocked: 0,
   };
   const actor: Actor = {
     id: "volunteer",
@@ -103,7 +102,6 @@ test("view versions detect capacity, signups, visibility and access changes with
     { futureConfirmed: 1 },
     { futureEditableConfirmed: 1 },
     { signedUp: 1 },
-    { orientationSignupBlocked: 1 },
     { spots: 2 },
     { minMedicSpots: 3 },
     { minNewVolunteerSpots: 1 },

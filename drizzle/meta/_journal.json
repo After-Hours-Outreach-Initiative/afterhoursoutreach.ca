@@ -211,6 +211,13 @@
       "when": 1793684408390,
       "tag": "0029_signup_added_by",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1793696477908,
+      "tag": "0030_remove_orientation_booking_limit",
+      "breakpoints": true
     }
   ]
 }

@@ -204,24 +204,19 @@ entries have no profile/approval actions and never receive notifications. Writes
 recheck the organizer's live session and create event audits. Migration
 `0028_manual_event_attendees.sql` preserves all existing registrations.
 
-## First-orientation booking limit
+## Orientation bookings
 
-Application-approved volunteers without current `patrol_approved` status may hold
-one confirmed upcoming orientation booking at a time. Account age and recorded
-attendance do not determine who is new. Only explicit manual patrol approval lifts
-this cap; orientation completion alone neither advances progression nor lifts it.
-The organizer's combined roster approval action explicitly records both milestones.
-Organizer role alone does not lift the cap (or grant patrol approval).
+Application-approved new volunteers may hold multiple upcoming orientation
+bookings. Rebooking, reactivation, and organizer moves follow the same rule.
+Each event still enforces its capacity, reserved places, new-volunteer maximum,
+and one confirmed registration per account. Recurring signup windows also apply.
 
-Confirmed bookings for future, non-cancelled orientations count even when an
-event is closed or hidden. Cancelled signups, cancelled events, and events that
-have started do not count, so cancellation/rebooking and rebooking after a missed
-orientation are allowed. The insert/update triggers check the limit inside the
-write, including reactivation and organizer moves, not in a race-prone preflight.
-The migration does not change existing bookings. Accounts already above the cap
-keep those spots but cannot add another until none count or the cap is lifted.
-No over-cap cleanup runs on event edits or status changes; existing access-revocation
-and event-cancellation workflows are unchanged.
+Account age and recorded attendance do not determine who is new. Only explicit
+manual patrol approval changes that status or grants access to patrols without
+orientation. The organizer's combined roster approval action explicitly records
+both attendance and patrol approval; orientation completion alone grants neither
+patrol access nor a different capacity category. Existing bookings and cancellation
+history are preserved.
 
 ## Recurring patrol controls
 

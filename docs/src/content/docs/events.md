@@ -18,8 +18,8 @@ Progression and avatar colours follow manual approval everywhere: volunteers awa
 patrol approval are blue, patrol-approved outreach volunteers are green, and
 patrol-approved medic-team volunteers are red. Recorded orientation attendance never
 changes a category, medic eligibility, or reserved-place counts. Volunteers awaiting
-patrol approval may hold one upcoming orientation booking; only patrol approval lifts
-that limit, even if attendance has already been recorded.
+patrol approval may book multiple upcoming orientations, subject to each event's
+capacity, reserved places, and recurring signup window.
 
 Orientations use the same cards, edit view, and volunteer list as patrols.
 

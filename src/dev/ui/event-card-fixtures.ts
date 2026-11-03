@@ -177,7 +177,6 @@ export function createEventCardFixture(
     futureConfirmed: publicRoster.length,
     futureEditableConfirmed: publicRoster.length,
     signedUp: 0,
-    orientationSignupBlocked: 0,
   };
   const requested = registeredOverride ?? Boolean(scenario.registered);
   const blocked = eventSignupBlockReason(
@@ -186,7 +185,6 @@ export function createEventCardFixture(
       ...event,
       startsAt: new Date(event.startsAt),
       open: true,
-      orientationSignupBlocked: false,
     },
     event.confirmed,
     new Date(now),

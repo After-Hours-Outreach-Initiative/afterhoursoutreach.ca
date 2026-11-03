@@ -62,7 +62,6 @@ describe("event card playground fixtures", () => {
           ...event,
           startsAt: new Date(event.startsAt),
           open: true,
-          orientationSignupBlocked: false,
         },
         event.confirmed,
         new Date(now),

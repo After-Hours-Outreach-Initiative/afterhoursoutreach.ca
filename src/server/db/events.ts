@@ -154,7 +154,6 @@ export interface EventRow extends EventLimits {
   futureConfirmed: number;
   futureEditableConfirmed: number;
   signedUp: number;
-  orientationSignupBlocked: number;
 }
 export interface RosterRow {
   id: string;
@@ -476,17 +475,7 @@ export async function listEvents(
         : "0"
     } AS futureEditableConfirmed,
     EXISTS(SELECT 1 FROM signup
-      WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp,
-    (${includesOrientationSql()} AND EXISTS(
-      SELECT 1 FROM volunteer_status v
-      WHERE v.user_id = ? AND v.patrol_approved = 0
-        AND EXISTS(
-          SELECT 1 FROM signup s JOIN event booked ON booked.id = s.event_id
-          WHERE s.user_id = v.user_id AND s.status = 'confirmed'
-            AND ${includesOrientationSql("booked")} AND booked.cancelled_at IS NULL
-            AND booked.starts_at > ${nowMsSql}
-        )
-    )) AS orientationSignupBlocked
+      WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp
     FROM event e`;
   const notDeleted = `NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
     AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')`;
@@ -511,7 +500,6 @@ export async function listEvents(
           actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
-          actor?.id ?? "",
           selectedOccurrence ?? "",
         )
     : db
@@ -533,7 +521,6 @@ export async function listEvents(
         LIMIT 100`,
         )
         .bind(
-          actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",

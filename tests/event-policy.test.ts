@@ -6,7 +6,6 @@ import {
   availableSignupSpots,
   orientationFullMessage,
   orientationReservedMessage,
-  orientationSignupLimitMessage,
   signupBlockReason,
   type SignupEvent,
   type SignupVolunteer,
@@ -70,18 +69,6 @@ test("application-approved volunteers need no patrol approval for orientations",
       now,
     ),
     null,
-  );
-});
-
-test("an existing first-orientation booking shows the cancellation/rebooking reason", () => {
-  assert.equal(
-    signupBlockReason(
-      { ...volunteer, patrolApproved: false },
-      { ...event, type: "orientation", orientationSignupBlocked: true },
-      0,
-      now,
-    ),
-    orientationSignupLimitMessage,
   );
 });
 

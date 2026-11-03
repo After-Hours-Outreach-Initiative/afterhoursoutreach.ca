@@ -55,17 +55,6 @@ BEGIN
   ) counts
   WHERE e.id = NEW.event_id AND counts.total + max(0, e.min_medic_spots - counts.medics)
     + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, e.min_new_volunteer_spots - counts.new_volunteers) ELSE 0 END > e.spots;
-  -- Closed/hidden bookings still reserve a spot; past/cancelled events do not.
-  SELECT RAISE(ABORT, 'orientation_signup_limit')
-  WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
-    AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
-    AND EXISTS (
-      SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
-      WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
-        AND s.event_id != NEW.event_id
-        AND coalesce(e.includes_orientation, e.type = 'orientation') AND e.cancelled_at IS NULL
-        AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
-    );
 END;
 --> statement-breakpoint
 
@@ -180,16 +169,6 @@ BEGIN
   ) counts
   WHERE e.id = NEW.event_id AND counts.total + max(0, e.min_medic_spots - counts.medics)
     + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, e.min_new_volunteer_spots - counts.new_volunteers) ELSE 0 END > e.spots;
-  SELECT RAISE(ABORT, 'orientation_signup_limit')
-  WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
-    AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
-    AND EXISTS (
-      SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
-      WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
-        AND s.id != OLD.id AND s.event_id != NEW.event_id
-        AND coalesce(e.includes_orientation, e.type = 'orientation') AND e.cancelled_at IS NULL
-        AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
-    );
 END;
 --> statement-breakpoint
 CREATE TRIGGER event_capacity_update

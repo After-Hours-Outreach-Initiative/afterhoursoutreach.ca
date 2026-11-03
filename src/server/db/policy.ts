@@ -47,11 +47,7 @@ export interface SignupEvent extends Partial<EventLimits> {
   medicConfirmed?: number;
   // Server-derived: team selection and both manual organizer approvals.
   medicEligible?: boolean | number;
-  orientationSignupBlocked?: boolean;
 }
-
-export const orientationSignupLimitMessage =
-  "You can book one upcoming orientation at a time until an organizer approves you for patrols. Unregister from your current orientation before choosing another.";
 
 export const orientationFullMessage = "All new volunteer places are booked.";
 export const orientationReservedMessage =
@@ -161,8 +157,6 @@ export function eventSignupBlockReason(
         (event.maxNewVolunteers ?? defaultEventLimits.maxNewVolunteers)
       ? orientationFullMessage
       : orientationReservedMessage;
-  if (includesOrientation && event.orientationSignupBlocked)
-    return orientationSignupLimitMessage;
   return null;
 }
 

@@ -2,7 +2,6 @@ import { RequestError } from "../http";
 import {
   orientationFullMessage,
   orientationReservedMessage,
-  orientationSignupLimitMessage,
   orientationCapacityMessage,
 } from "./policy";
 
@@ -37,8 +36,6 @@ export function databaseWriteError(error: unknown): never {
       409,
       "These changes conflict with existing registrations or completion history. Keep enough capacity for the event's reserved places and existing new volunteers. Retain orientation where booked volunteers need it.",
     );
-  if (message.includes("orientation_signup_limit"))
-    throw new RequestError(409, orientationSignupLimitMessage);
   if (message.includes("recurring_signup_window"))
     throw new RequestError(
       409,

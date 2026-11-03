@@ -24,7 +24,6 @@ import {
 import {
   orientationFullMessage,
   orientationReservedMessage,
-  orientationSignupLimitMessage,
 } from "../src/server/db/policy";
 import {
   loadApplicationDraft,
@@ -1109,15 +1108,11 @@ test("manual approvals recolour existing signups consistently without inventing 
     before,
   );
   const attendedEvents = await listEvents(env.DB, volunteers[1]);
-  assert.equal(
-    attendedEvents.find(({ id }) => id === "other-orientation")
-      ?.orientationSignupBlocked,
-    1,
+  assert.ok(
+    attendedEvents.find(({ id }) => id === "other-orientation")!
+      .availableSpots > 0,
   );
-  await assert.rejects(
-    changeSignup(env.DB, volunteers[1], "other-orientation", "join"),
-    statusError(409),
-  );
+  await changeSignup(env.DB, volunteers[1], "other-orientation", "join");
 
   for (const userId of ["green", "red"])
     await approveForPatrols(env.DB, organizer, { userId, version: 0 });
@@ -3085,7 +3080,7 @@ test("first completed orientation uses the earliest attended event, not when att
   );
 });
 
-test("concurrent first-orientation signups reserve one booking; cancellation and past/cancelled events allow rebooking", async () => {
+test("new volunteers can concurrently book multiple orientations and rebook while another booking is closed or hidden", async () => {
   const actor = {
     ...(await draftActor("orientation-volunteer")),
     applicationSubmitted: true,
@@ -3114,43 +3109,32 @@ test("concurrent first-orientation signups reserve one booking; cancellation and
       ).bind(id, Date.now() + 86_400_000, actor.id),
     ),
   ]);
-  const attempts = await Promise.allSettled(
+  const attempts = await Promise.all(
     eventIds.map((id) => changeSignup(env.DB, actor, id, "join")),
   );
+  assert.equal(attempts.length, 2);
+  const events = await listEvents(env.DB, actor);
+  assert.equal(events.filter((item) => item.signedUp).length, 2);
+  const [booked, other] = events;
+  assert.equal(await loadFirstCompletedOrientation(env.DB, actor.id), null);
+  await changeSignup(env.DB, actor, booked.id, "cancel");
   assert.equal(
-    attempts.filter((result) => result.status === "fulfilled").length,
+    (await listEvents(env.DB, actor)).filter((item) => item.signedUp).length,
     1,
   );
-  const failure = attempts.find((result) => result.status === "rejected");
-  assert.ok(
-    failure?.status === "rejected" && failure.reason instanceof RequestError,
-  );
-  assert.equal(failure.reason.status, 409);
-  assert.equal(failure.reason.message, orientationSignupLimitMessage);
-  const events = await listEvents(env.DB, actor);
-  const booked = events.find((item) => item.signedUp)!;
-  const other = events.find((item) => !item.signedUp)!;
-  assert.equal(await loadFirstCompletedOrientation(env.DB, actor.id), null);
-  assert.equal(other.orientationSignupBlocked, 1);
-  await changeSignup(env.DB, actor, booked.id, "cancel");
-  assert.ok(
-    (await listEvents(env.DB, actor)).every(
-      (item) => !item.orientationSignupBlocked,
-    ),
-  );
-  await changeSignup(env.DB, actor, other.id, "join");
-
-  // Hiding/closing does not release the reservation, but event cancellation does.
+  // Another existing booking never blocks registration, even when it is hidden.
   await env.DB.prepare("UPDATE event SET open=0, hidden=1 WHERE id=?")
     .bind(other.id)
     .run();
-  await assert.rejects(
-    changeSignup(env.DB, actor, booked.id, "join"),
-    statusError(409),
+  await changeSignup(env.DB, actor, booked.id, "join");
+  assert.equal(
+    (await listEvents(env.DB, actor)).filter((item) => item.signedUp).length,
+    2,
   );
   await env.DB.prepare("UPDATE event SET cancelled_at=1 WHERE id=?")
     .bind(other.id)
     .run();
+  await changeSignup(env.DB, actor, booked.id, "cancel");
   await changeSignup(env.DB, actor, booked.id, "join");
   await env.DB.prepare("UPDATE event SET starts_at=0 WHERE id=?")
     .bind(booked.id)
