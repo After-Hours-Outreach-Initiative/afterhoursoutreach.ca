@@ -90,6 +90,18 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
   );
   const preview = form.locator("[data-attendee-preview]");
   const visibleEntry = preview.locator("[data-attendee-preview-medic]:visible");
+  const previewMenu = preview.getByRole("button", {
+    name: "Registration actions (preview only)",
+  });
+  await expect(
+    form.getByRole("group", { name: "Preview", exact: true }),
+  ).toBeVisible();
+  await expect(form.getByText("Preview", { exact: true })).toBeVisible();
+  await expect(preview).toHaveCSS("background-color", "rgb(23, 26, 32)");
+  await expect(previewMenu).toBeDisabled();
+  await expect(previewMenu.locator("svg circle")).toHaveCount(3);
+  await expect(previewMenu).not.toHaveAttribute("popovertarget");
+  await expect(previewMenu).not.toHaveAttribute("data-signup-menu-trigger");
   await expect(form.getByRole("checkbox")).toHaveCount(2);
   await expect(form.locator("small, .volunteer-help")).toHaveCount(0);
   await expect(form.locator("p:visible")).toHaveCount(0);
@@ -146,6 +158,9 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       .getByRole("checkbox", { name: "New", exact: true })
       .setChecked(isNew);
     await expect(visibleEntry).toHaveCount(1);
+    await expect(preview).toHaveCSS("background-color", "rgb(23, 26, 32)");
+    await expect(previewMenu).toBeDisabled();
+    await expect(previewMenu.locator("svg circle")).toHaveCount(3);
     await expect(visibleEntry.locator(".attendee-avatar")).toHaveClass(
       `attendee-avatar attendee-${category}`,
     );
@@ -186,6 +201,7 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
   );
   await expect(name).toBeEnabled();
   await expect(name).toHaveValue("Avery Example");
+  await expect(previewMenu).toBeDisabled();
   await page.unroute("**/api/v1/events/action", fail);
   await inPlaceAction(page, {
     endpoint: "/api/v1/events/action",
