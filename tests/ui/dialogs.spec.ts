@@ -298,18 +298,16 @@ test("event dialogs preserve their exit layout and roster profiles navigate to p
       exact: true,
     });
     await expect(applicationPanel).toBeVisible();
-    await applicationPanel
-      .locator('[data-application-mini-step="form"] summary')
-      .click();
+    await expect(applicationPanel.locator("details")).toHaveCount(0);
     await expect(applicationPanel.getByRole("heading")).toHaveText([
       "Application",
-      "Personal info",
-      "Emergency contact",
-      "Team interests",
-      "Training and safety",
-      "Personal statement",
-      "Submission details",
     ]);
+    await expect(
+      applicationPanel.getByRole("link", {
+        name: "View application",
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(controls).toBeVisible();
   }
 });

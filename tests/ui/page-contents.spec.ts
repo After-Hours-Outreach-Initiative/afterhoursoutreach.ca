@@ -233,6 +233,10 @@ test("profile pages opened directly or from rosters keep section navigation", as
       } else {
         await page.goto("/volunteers/local-fixture-user-robin");
       }
+      const applicationPath = new URL(page.url()).pathname.replace(
+        "/volunteers/",
+        "/applications/",
+      );
       const profile = page.locator("[data-volunteer-profile]");
       await expect(
         page.getByRole("dialog", { name: "Volunteer profile", exact: true }),
@@ -263,18 +267,20 @@ test("profile pages opened directly or from rosters keep section navigation", as
       };
       await jump("volunteer-profile-panel");
       await jump("volunteer-application-panel");
-      await jump("volunteer-emergency-contact");
       await expect(
         profile.locator('[data-volunteer-profile-panel="application"] details'),
-      ).toHaveAttribute("open");
+      ).toHaveCount(0);
+      await expect(
+        contents.locator('a[href="#volunteer-emergency-contact"]'),
+      ).toHaveCount(0);
       await expect(
         profile.locator('[data-volunteer-profile-panel="profile"]'),
       ).toBeVisible();
       await jump("volunteer-current-emergency-contact");
       await page.goBack();
       await expect(
-        profile.locator("#volunteer-emergency-contact"),
-      ).toBeInViewport({ ratio: 1 });
+        profile.locator("#volunteer-application-panel"),
+      ).toBeInViewport();
       expect(
         await profile.evaluate((element) => {
           const panel = element.querySelector<HTMLElement>(
@@ -298,10 +304,46 @@ test("profile pages opened directly or from rosters keep section navigation", as
       await page.reload();
       await expect(
         profile.locator('[data-volunteer-profile-panel="application"] details'),
-      ).toHaveAttribute("open");
+      ).toHaveCount(0);
       await expect(
-        profile.locator("#volunteer-emergency-contact"),
-      ).toBeInViewport({ ratio: 1 });
+        profile.locator("#volunteer-application-panel"),
+      ).toBeInViewport();
+      await expect(
+        profile.locator(
+          '[data-access-kind="application"], application-rejection',
+        ),
+      ).toHaveCount(0);
+      const application = profile.locator(
+        '[data-volunteer-profile-panel="application"]',
+      );
+      await expect(
+        application.locator(".application-progress-mini-title"),
+      ).toHaveText(["Application form", "Naloxone 101", "Application review"]);
+      await expect(application.locator("time")).toHaveCount(1);
+      await expect(
+        application.locator('[data-application-mini-step="review"]'),
+      ).toContainText("Date and time not recorded");
+      for (const time of await application.locator("time").all()) {
+        await expect(time).toHaveAttribute("datetime", /T.*Z$/);
+        await expect(time).toHaveText(/\d{1,2}:\d{2}/);
+      }
+      await application
+        .getByRole("link", { name: "View application", exact: true })
+        .click();
+      await expect(page).toHaveURL(`${baseURL}${applicationPath}`);
+      const review = page.locator("[data-application-review]");
+      await review
+        .locator('[data-application-mini-step="form"] summary')
+        .click();
+      await expect(
+        review.locator("#application-review-emergency-contact"),
+      ).toBeVisible();
+      await expect(
+        review.getByRole("button", {
+          name: "Revoke application approval",
+          exact: true,
+        }),
+      ).toBeEnabled();
     }
   }
 });

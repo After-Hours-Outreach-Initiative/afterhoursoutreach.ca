@@ -121,15 +121,23 @@ test("organizer profile catalogue exposes every real profile state without accou
         '[data-volunteer-profile-panel="application"] .application-progress-mini-title',
       ),
     ).toHaveText(["Application form", "Naloxone 101", "Application review"]);
-    if (id === "accepted") {
-      const attribution = preview.locator("[data-application-approved-by]");
-      await expectOrganizerField(attribution, "Approved by");
-      await expect(attribution.locator("time")).toHaveCount(0);
+    const application = preview.locator(
+      '[data-volunteer-profile-panel="application"]',
+    );
+    await expect(
+      application.locator("details, form, [data-application-approved-by]"),
+    ).toHaveCount(0);
+    await expect(
+      application.getByRole("link", { name: "View application", exact: true }),
+    ).toHaveAttribute("href", "/applications/ui-fictional-volunteer");
+    for (const time of await application.locator("time").all()) {
+      await expect(time).toHaveAttribute("datetime", /T.*Z$/);
+      await expect(time).toHaveText(/\d{1,2}:\d{2}/);
     }
     if (id === "historic-approval")
       await expect(
-        preview.locator('[data-application-mini-step="review"]'),
-      ).toContainText("Approving organizer not recorded.");
+        application.locator('[data-application-mini-step="review"]'),
+      ).toContainText("Date and time not recorded");
     await expect(page.locator("[data-ui-profile-state]")).toContainText(
       `"scenario": "${id}"`,
     );
@@ -159,44 +167,40 @@ test("organizer profile catalogue exposes every real profile state without accou
   );
 });
 
-test("application summaries hide unselected medic details and empty optional answers", async ({
+test("current profiles hide unselected medic details and empty optional answers", async ({
   page,
 }) => {
-  for (const scenario of ["ready-for-review", "medic-applicant"]) {
+  for (const scenario of ["outreach-volunteer", "medic"]) {
     for (const content of ["standard", "long"]) {
       await page.goto(
         `/dev/ui/organizer-profile?scenario=${scenario}&content=${content}`,
       );
       const preview = page.frameLocator("[data-ui-profile-frame]");
-      const application = preview.locator(
-        '[data-volunteer-profile-panel="application"]',
+      const labels = preview.locator(
+        '[data-volunteer-profile-panel="profile"] dt:visible',
       );
-      const submitted = application.locator(
-        '[data-application-mini-step="form"] details',
-      );
-      await submitted.locator("summary").click();
       for (const label of [
         "Highest medical certification or licence",
         "Certification expiry date",
       ])
-        await expect(submitted.getByText(label, { exact: true })).toHaveCount(
-          scenario === "medic-applicant" ? 1 : 0,
-        );
+        await expect(
+          labels.filter({ hasText: new RegExp(`^${label}$`) }),
+        ).toHaveCount(scenario === "medic" ? 1 : 0);
       await expect(
-        submitted.getByText("Other training and experience", { exact: true }),
+        labels.filter({ hasText: /^Other training and experience$/ }),
       ).toHaveCount(0);
       for (const label of [
         "Other relevant training",
         "Other relevant experience",
       ])
-        await expect(submitted.getByText(label, { exact: true })).toHaveCount(
-          content === "long" ? 1 : 0,
-        );
+        await expect(
+          labels.filter({ hasText: new RegExp(`^${label}$`) }),
+        ).toHaveCount(content === "long" ? 1 : 0);
       await expect(
-        submitted.getByText("Relevant training", { exact: true }),
+        labels.filter({ hasText: /^Relevant training$/ }),
       ).toBeVisible();
       await expect(
-        submitted.getByText("Relevant experience", { exact: true }),
+        labels.filter({ hasText: /^Relevant experience$/ }),
       ).toBeVisible();
     }
   }
@@ -216,7 +220,7 @@ test("organizer profiles omit empty middle names but retain provided names", asy
         .locator("dt")
         .filter({ hasText: /^Middle name\(s\)$/ });
       const expected =
-        content === "minimal" ? 0 : scenario === "profile-updated" ? 2 : 1;
+        content === "minimal" || scenario === "ready-for-review" ? 0 : 1;
       await expect(middleNames).toHaveCount(expected);
       await expect(middleNames.locator("+ dd")).toHaveText(
         Array(expected).fill("Jordan"),
@@ -338,10 +342,10 @@ test("failed state changes retain the existing preview and can be retried", asyn
 test("real organizer controls simulate confirmation, cancellation, success, errors and pending saves", async ({
   page,
 }) => {
-  await page.goto("/dev/ui/organizer-profile?latency=0");
+  await page.goto("/dev/ui/organizer-profile?scenario=accepted&latency=0");
   const preview = page.frameLocator("[data-ui-profile-frame]");
   const approval = preview.getByRole("button", {
-    name: "Approve application",
+    name: "Approve for patrols",
     exact: true,
   });
   await expect(approval).toBeEnabled();
@@ -351,7 +355,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
     .getByRole("button", { name: "Cancel change", exact: true })
     .click();
   await expect(preview.locator(currentProfileState)).toHaveText(
-    "Application review",
+    "Awaiting patrol approval",
   );
   await expect(page.locator("[data-ui-profile-status]")).toContainText(
     "cancelled",
@@ -361,7 +365,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
     .getByRole("button", { name: "Save without email", exact: true })
     .click();
   await expect(preview.locator(currentProfileState)).toHaveText(
-    "Awaiting patrol approval",
+    "Revoke patrol approval",
   );
   for (const [outcome, error] of [
     ["failure", "The change could not be saved."],
@@ -372,14 +376,14 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
       .selectOption(outcome);
     await showPreview(page);
     await preview
-      .getByRole("button", { name: "Approve for patrols", exact: true })
+      .getByRole("button", { name: "Revoke patrol approval", exact: true })
       .click();
     await preview
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(preview.getByRole("alert")).toContainText(error);
     await expect(preview.locator(currentProfileState)).toHaveText(
-      "Awaiting patrol approval",
+      "Revoke patrol approval",
     );
   }
   await page
@@ -387,7 +391,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
     .selectOption("pending");
   await showPreview(page);
   await preview
-    .getByRole("button", { name: "Approve for patrols", exact: true })
+    .getByRole("button", { name: "Revoke patrol approval", exact: true })
     .click();
   await preview
     .getByRole("button", { name: "Save without email", exact: true })
@@ -403,94 +407,46 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
     .click();
   await expect(approval).toBeEnabled();
   await expect(preview.locator(currentProfileState)).toHaveText(
-    "Application review",
+    "Awaiting patrol approval",
   );
 });
 
-test("rejections and email failures update only fictional state, and prerequisites remain real", async ({
+test("patrol approval email failures update only fictional state", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(
-    "/dev/ui/organizer-profile?latency=0&outcome=email-failure&viewport=375",
+    "/dev/ui/organizer-profile?scenario=accepted&latency=0&outcome=email-failure&viewport=375",
   );
   const preview = page.frameLocator("[data-ui-profile-frame]");
   await showPreview(page);
-  const rejectAction = preview.locator("[data-rejection-open]");
-  await expect(rejectAction).toHaveClass(/\bbtn btn-red\b/);
-  for (const button of [
-    preview.getByRole("button", { name: "Approve application", exact: true }),
-    preview.locator(".rejection-surface"),
-  ]) {
-    await expect
-      .poll(() =>
-        button.evaluate((button) =>
-          Math.abs(
-            button.getBoundingClientRect().width -
-              button
-                .closest(".application-decision-actions")!
-                .getBoundingClientRect().width,
-          ),
-        ),
-      )
-      .toBeLessThan(1);
-  }
-  await rejectAction.click();
-  await expect(preview.locator(".rejection-surface")).toHaveCSS(
-    "background-color",
-    "rgb(0, 0, 0)",
-  );
-  expect(
-    await preview
-      .locator("application-rejection")
-      .evaluate((element) => element.getAnimations({ subtree: true }).length),
-  ).toBe(0);
-  await preview.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(rejectAction).toBeFocused();
-  await rejectAction.press("Space");
   await preview
-    .getByRole("textbox", { name: "Reason for rejection" })
-    .fill("Fictional review reason.\nA second line for layout checks.");
+    .getByRole("button", { name: "Approve for patrols", exact: true })
+    .click();
   await preview
     .getByRole("button", {
-      name: "Reject and send email",
+      name: "Save and send email",
       exact: true,
     })
     .click();
   await expect(
-    preview.getByRole("dialog", { name: "Application rejected", exact: true }),
+    preview.getByRole("dialog", {
+      name: "Volunteer access saved",
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
-    preview.getByRole("dialog", { name: "Application rejected", exact: true }),
+    preview.getByRole("dialog", {
+      name: "Volunteer access saved",
+      exact: true,
+    }),
   ).toContainText("change is saved");
   await preview
-    .getByRole("dialog", { name: "Application rejected", exact: true })
+    .getByRole("dialog", { name: "Volunteer access saved", exact: true })
     .getByRole("button", { name: "Close" })
     .click();
-  await expect(preview.locator("[data-application-rejection]")).toContainText(
-    "Fictional review reason.",
-  );
-  await expect(
-    preview.locator('[data-application-mini-step="review"]'),
-  ).toHaveAttribute("data-state", "rejected");
-
-  await page.locator('[data-ui-profile-scenario="naloxone-pending"]').click();
-  await expect(preview.locator("[data-ui-organizer-preview]")).toHaveAttribute(
-    "data-ui-scenario",
-    "naloxone-pending",
-  );
-  await page
-    .getByRole("combobox", { name: "Action result" })
-    .selectOption("success");
-  await showPreview(page);
-  await preview
-    .getByRole("button", { name: "Approve application", exact: true })
-    .click();
-  await preview
-    .getByRole("button", { name: "Save without email", exact: true })
-    .click();
-  await expect(preview.getByRole("alert")).toHaveText(
-    "The applicant must complete Naloxone 101 before approval.",
+  await expect(preview.locator(currentProfileState)).toHaveText(
+    "Revoke patrol approval",
   );
 });
 

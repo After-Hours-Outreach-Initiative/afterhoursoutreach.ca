@@ -106,41 +106,19 @@ test("roster links open profile pages with one readable patrol approval card", a
       await expect(
         patrolApproval.getByText("Ready for review", { exact: true }),
       ).toHaveCount(0);
+      await expect(application.locator("form, details, button")).toHaveCount(0);
       await expect(
-        application.getByRole("button", {
-          name: "Approve application",
+        application.getByRole("link", {
+          name: "View application",
           exact: true,
         }),
-      ).toBeEnabled();
+      ).toHaveAttribute("href", `/applications/${applicant.id}`);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBe(width);
       await patrolApproval.screenshot({
         path: testInfo.outputPath(`patrol-approval-applicant-${width}.png`),
       });
-      await application
-        .getByRole("button", { name: "Reject application", exact: true })
-        .click();
-      const reason = application.getByRole("textbox", {
-        name: "Reason for rejection",
-      });
-      await expect(reason).toBeVisible();
-      const rejection = application.locator("application-rejection");
-      const rejectionBounds = (await rejection.boundingBox())!;
-      if (width === 1280) expect(rejectionBounds.width).toBeGreaterThan(576);
-      const surfaceBounds = (await rejection
-        .locator(".rejection-surface")
-        .boundingBox())!;
-      expect(surfaceBounds.width).toBeCloseTo(
-        Math.min(rejectionBounds.width, 576),
-      );
-      expect(surfaceBounds.x).toBeCloseTo(rejectionBounds.x);
-      const card = application.locator('[data-application-mini-step="review"]');
-      const cardBounds = (await card.boundingBox())!;
-      const reasonBounds = (await reason.boundingBox())!;
-      expect(reasonBounds.x + reasonBounds.width).toBeLessThanOrEqual(
-        cardBounds.x + cardBounds.width,
-      );
     }
   } finally {
     await applicantContext.close();

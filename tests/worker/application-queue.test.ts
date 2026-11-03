@@ -541,6 +541,33 @@ test("organizers review pending and approved applications with persistent list c
       "Personal statement",
       "Submission details",
     ]);
+    const submittedSummary = formStep.locator(".account-profile-summary");
+    for (const label of [
+      "Highest medical certification or licence",
+      "Additional certification answer",
+      "Certification expiry date",
+      "Other training and experience",
+      "Other relevant training",
+      "Other relevant experience",
+    ])
+      await expect(
+        submittedSummary.getByText(label, { exact: true }),
+      ).toHaveCount(0);
+    const answer = (label: string) =>
+      submittedSummary
+        .locator("dl > div")
+        .filter({ has: page.getByText(label, { exact: true }) })
+        .locator("dd");
+    await expect(answer("Email")).toHaveText("applicant-50@example.org");
+    await expect(answer("Submitted")).toHaveText(
+      formatApplicationSubmittedTime(submittedAt),
+    );
+    await expect(answer("Code of Conduct version accepted")).toHaveText(
+      "2026-09-01",
+    );
+    await expect(answer("Code of Conduct accepted")).toHaveText(
+      formatApplicationSubmittedTime(submittedAt),
+    );
     await expect(page.locator("[data-patrol-approval]")).toHaveCount(0);
     // Profile editing and patrol controls belong to the volunteer profile.
     await page.goto(`${origin}${profileHref}`);
@@ -582,11 +609,10 @@ test("organizers review pending and approved applications with persistent list c
     const applicationForm = applicationProgress.locator(
       '[data-application-mini-step="form"] details',
     );
-    await expect(applicationForm).not.toHaveAttribute("open");
-    await applicationForm.locator("summary").click();
+    await expect(applicationForm).toHaveCount(0);
     await expect(
       application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       applicationProgress.getByText("Ready for review", { exact: true }),
     ).toBeVisible();
@@ -597,47 +623,18 @@ test("organizers review pending and approved applications with persistent list c
       applicationProgress.locator(
         '[data-application-mini-step="review"] [data-access-kind="application"]',
       ),
-    ).toHaveCount(1);
+    ).toHaveCount(0);
+    await expect(
+      application.getByRole("link", { name: "View application", exact: true }),
+    ).toHaveAttribute("href", "/applications/applicant-50");
+    await expect(applicationProgress.locator("time")).toHaveCount(2);
     await expect(application).toBeVisible();
     await expect(
       page.locator(
         '[data-access-kind="patrol"], [data-organizer-role], [data-access-kind="active"]',
       ),
     ).toHaveCount(0);
-    const summary = application.locator(".account-profile-summary");
-    for (const label of [
-      "Highest medical certification or licence",
-      "Additional certification answer",
-      "Certification expiry date",
-      "Other training and experience",
-      "Other relevant training",
-      "Other relevant experience",
-    ])
-      await expect(summary.getByText(label, { exact: true })).toHaveCount(0);
-    await expect(application.getByRole("heading")).toHaveText([
-      "Application",
-      "Personal info",
-      "Emergency contact",
-      "Team interests",
-      "Training and safety",
-      "Personal statement",
-      "Submission details",
-    ]);
-    const answer = (label: string) =>
-      summary
-        .locator("dl > div")
-        .filter({ has: page.getByText(label, { exact: true }) })
-        .locator("dd");
-    await expect(answer("Email")).toHaveText("applicant-50@example.org");
-    await expect(answer("Submitted")).toHaveText(
-      formatApplicationSubmittedTime(submittedAt),
-    );
-    await expect(answer("Code of Conduct version accepted")).toHaveText(
-      "2026-09-01",
-    );
-    await expect(answer("Code of Conduct accepted")).toHaveText(
-      formatApplicationSubmittedTime(submittedAt),
-    );
+    await expect(application.getByRole("heading")).toHaveText(["Application"]);
     assert.equal(await auditCount(), 3); // Directory profile, application review, and volunteer profile.
     // Merely reading the application is not review completion.
     await page.getByRole("link", { name: "Back to applications" }).click();
@@ -762,14 +759,11 @@ test("organizers review pending and approved applications with persistent list c
     await expect(profile.getByRole("heading").first()).toHaveText("Profile");
     await expect(
       applicationProgress.locator('[data-application-mini-step="review"]'),
-    ).toContainText("Approved by");
-    const submittedDetails = applicationForm;
-    await expect(submittedDetails).not.toHaveAttribute("open");
-    await submittedDetails.locator("summary").click();
-    await expect(submittedDetails).toHaveAttribute("open");
+    ).toContainText("Approved");
+    await expect(applicationForm).toHaveCount(0);
     await expect(
       application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     // An organizer can approve patrols before any orientation is booked, without
     // recording attendance that has not happened.
     const approvePatrols = patrolApproval.getByRole("button", {
@@ -833,6 +827,7 @@ test("organizers review pending and approved applications with persistent list c
     await expect(
       patrolApproval.locator("[data-orientation-status]"),
     ).toHaveText("Orientation completed");
+    const summary = profile.locator(".account-profile-summary");
     await expect(
       summary.getByText("Highest medical certification or licence", {
         exact: true,
@@ -1123,7 +1118,7 @@ test("organizers review pending and approved applications with persistent list c
       await get("/api/v1/events/version", applicantCookie)
     ).text();
 
-    await page.goto(`${origin}/volunteers/applicant-50`);
+    await page.goto(`${origin}/applications/applicant-50`);
     await page
       .getByRole("button", { name: "Reject application", exact: true })
       .click();
@@ -1141,7 +1136,7 @@ test("organizers review pending and approved applications with persistent list c
     );
     await expect(
       page.locator('[data-application-mini-step="review"]'),
-    ).toHaveAttribute("data-state", "rejected");
+    ).toHaveCount(0);
     const feedback = page.locator("[data-action-email-feedback]");
     await expect(feedback).toBeVisible();
     await expect(feedback).toContainText("Application rejected.");
