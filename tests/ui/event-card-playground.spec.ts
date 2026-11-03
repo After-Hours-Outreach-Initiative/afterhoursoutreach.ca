@@ -332,7 +332,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   const mixed = page.frameLocator('[data-ui-event-frame="mixed"]');
   await mixed.getByRole("button", { name: "Register", exact: true }).click();
   await expect(mixed.locator("[data-event-availability]")).toHaveText(
-    "Registered",
+    "Registered · 1 of 8 spots remaining",
   );
   await expect(
     mixed.locator(".event-roster-list > li").filter({ hasText: "Morgan P." }),
@@ -368,7 +368,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   const oneLeft = page.frameLocator('[data-ui-event-frame="one-left"]');
   await oneLeft.getByRole("button", { name: "Register", exact: true }).click();
   await expect(oneLeft.locator("[data-event-availability]")).toHaveText(
-    "Registered",
+    "Registered · 8 spots taken",
   );
   await expect(oneLeft.getByText("Registered", { exact: true })).toHaveCSS(
     "color",
@@ -407,7 +407,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     .click();
   await expect(confirmation).toHaveCount(0);
   await expect(registered.locator("[data-event-availability]")).toHaveText(
-    "Registered",
+    "Registered · 2 of 8 spots remaining",
   );
   await expect(
     registered.getByRole("button", { name: "Unregister", exact: true }),

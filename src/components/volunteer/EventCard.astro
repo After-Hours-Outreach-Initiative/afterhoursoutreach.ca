@@ -137,7 +137,17 @@ const blocked =
               {event.confirmed === 1 ? "registration" : "registrations"}
             </>
           ) : event.signedUp ? (
-            <span class="volunteer-spots">Registered</span>
+            <>
+              <span class="volunteer-spots">Registered</span> ·{" "}
+              {event.confirmed >= event.spots ? (
+                <>
+                  {event.confirmed} {event.confirmed === 1 ? "spot" : "spots"}{" "}
+                  taken
+                </>
+              ) : (
+                `${event.spots - event.confirmed} of ${event.spots} spots remaining`
+              )}
+            </>
           ) : event.confirmed >= event.spots ? (
             <>
               <span class="volunteer-spots-full">Full</span> · {event.confirmed}{" "}
