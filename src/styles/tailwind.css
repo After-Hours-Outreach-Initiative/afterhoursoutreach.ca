@@ -92,6 +92,10 @@
 }
 
 @layer components {
+  .volunteer-spots-open {
+    color: #4ade80;
+  }
+
   .volunteer-spots-full {
     color: #f87171;
   }

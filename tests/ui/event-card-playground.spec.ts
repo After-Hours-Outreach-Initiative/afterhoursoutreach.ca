@@ -209,9 +209,9 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   const card = full.locator(".volunteer-event-card");
   await expect(card.locator("summary")).toHaveText("Volunteers (8)");
   await expect(card.locator("[data-event-availability]")).toHaveText(
-    "Full · 0 of 8 spots remaining",
+    "Full · 8 spots taken",
   );
-  await expect(card.getByText("Full", { exact: true })).toHaveCSS(
+  await expect(card.locator(".volunteer-spots-full")).toHaveCSS(
     "color",
     "rgb(248, 113, 113)",
   );
@@ -332,7 +332,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   const mixed = page.frameLocator('[data-ui-event-frame="mixed"]');
   await mixed.getByRole("button", { name: "Register", exact: true }).click();
   await expect(mixed.locator("[data-event-availability]")).toContainText(
-    "Registered · 1 of 8 spots remaining",
+    "Registered · Open · 1 of 8 spots remaining",
   );
   await expect(
     mixed.getByRole("listitem").filter({ hasText: "Morgan P." }),
@@ -358,19 +358,26 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     .getByRole("button", { name: "Unregister", exact: true })
     .click();
   await expect(mixed.locator("[data-event-availability]")).toHaveText(
-    "2 of 8 spots remaining",
+    "Open · 2 of 8 spots remaining",
+  );
+  await expect(mixed.locator(".volunteer-spots-open")).toHaveCSS(
+    "color",
+    "rgb(74, 222, 128)",
   );
 
   const oneLeft = page.frameLocator('[data-ui-event-frame="one-left"]');
   await oneLeft.getByRole("button", { name: "Register", exact: true }).click();
   await expect(oneLeft.locator("[data-event-availability]")).toHaveText(
-    "Registered · 0 of 8 spots remaining",
+    "Registered · Full · 8 spots taken",
   );
   await expect(oneLeft.getByText("Registered", { exact: true })).toHaveCSS(
     "color",
     "rgb(74, 222, 128)",
   );
-  await expect(oneLeft.getByText("Full", { exact: true })).toHaveCount(0);
+  await expect(oneLeft.locator(".volunteer-spots-full")).toHaveCSS(
+    "color",
+    "rgb(248, 113, 113)",
+  );
   await expect(oneLeft.locator(".volunteer-event-card")).not.toContainText(
     "This event is full.",
   );
@@ -382,7 +389,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     .getByRole("button", { name: "Unregister", exact: true })
     .click();
   await expect(oneLeft.locator("[data-event-availability]")).toHaveText(
-    "1 of 8 spots remaining",
+    "Open · 1 of 8 spots remaining",
   );
 
   const registered = page.frameLocator('[data-ui-event-frame="registered"]');
@@ -404,7 +411,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     .click();
   await expect(confirmation).toHaveCount(0);
   await expect(registered.locator("[data-event-availability]")).toHaveText(
-    "Registered · 2 of 8 spots remaining",
+    "Registered · Open · 2 of 8 spots remaining",
   );
   await expect(
     registered.getByRole("button", { name: "Unregister", exact: true }),
@@ -419,7 +426,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     registered.getByRole("button", { name: "Register", exact: true }),
   ).toBeVisible();
   await expect(registered.locator("[data-event-availability]")).toHaveText(
-    "3 of 8 spots remaining",
+    "Open · 3 of 8 spots remaining",
   );
   await page.getByRole("button", { name: "Reset previews" }).click();
   await expect(width).toHaveValue("fit");

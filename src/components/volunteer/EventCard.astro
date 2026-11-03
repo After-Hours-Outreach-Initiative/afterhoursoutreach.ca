@@ -36,6 +36,12 @@ const {
   publicRoster = [],
 } = Astro.props;
 const future = event.startsAt > Date.now();
+const registrationOpen =
+  future &&
+  Boolean(event.open) &&
+  !event.hidden &&
+  !event.cancelledAt &&
+  Boolean(event.inSignupWindow);
 const canAddAttendee =
   organizer &&
   future &&
@@ -131,16 +137,24 @@ const blocked =
               </span>{" "}
               ·{" "}
             </>
-          ) : future && event.confirmed >= event.spots ? (
-            <>
-              <span class="volunteer-spots-full">Full</span> ·{" "}
-            </>
           ) : null
         }
         {
-          future
-            ? `${Math.max(0, event.spots - event.confirmed)} of ${event.spots} spots remaining`
-            : `${event.confirmed} ${event.confirmed === 1 ? "registration" : "registrations"}`
+          !future ? (
+            `${event.confirmed} ${event.confirmed === 1 ? "registration" : "registrations"}`
+          ) : event.confirmed >= event.spots ? (
+            <span class="volunteer-spots-full">
+              Full · {event.confirmed}{" "}
+              {event.confirmed === 1 ? "spot" : "spots"} taken
+            </span>
+          ) : registrationOpen ? (
+            <span class="volunteer-spots-open">
+              Open · {event.spots - event.confirmed} of {event.spots} spots
+              remaining
+            </span>
+          ) : (
+            `${Math.max(0, event.spots - event.confirmed)} of ${event.spots} spots remaining`
+          )
         }
       </p>
       {

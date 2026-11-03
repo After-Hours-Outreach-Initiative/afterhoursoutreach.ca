@@ -139,22 +139,25 @@ test("homepage exposes only the next two published dates and remaining spot coun
         .trim(),
     );
     expect(entries).toEqual([
-      `${formatEventDate(first)} 7 of 8 spots remaining`,
-      `${formatEventDate(second)} 6 of 6 spots remaining`,
+      `${formatEventDate(first)} Open · 7 of 8 spots remaining`,
+      `${formatEventDate(second)} Open · 6 of 6 spots remaining`,
     ]);
     expect(publicSection).toContain(new Date(first).toISOString());
     expect(publicSection).toContain(new Date(second).toISOString());
     expect(publicSection).not.toContain("Full");
+    expect(publicSection.match(/volunteer-spots-open/g)).toHaveLength(2);
 
     await DB.prepare(
       "UPDATE event SET spots = 1, min_medic_spots = 0 WHERE id = 'first'",
     ).run();
     const fullSection = await readHomepage();
     expect(fullSection).toMatch(
-      /<span class="volunteer-spots-full">Full<\/span> ·\s*0 of\s*1 spots remaining/,
+      /<span class="volunteer-spots-full">Full · 1 spot taken<\/span>/,
     );
     expect(fullSection.match(/volunteer-spots-full/g)).toHaveLength(1);
-    expect(fullSection).toMatch(/6 of\s*6 spots remaining/);
+    expect(fullSection).toMatch(
+      /<span class="volunteer-spots-open">Open · 6 of 6 spots remaining<\/span>/,
+    );
 
     // Exercise defensive rendering of legacy over-capacity data in this isolated DB.
     await DB.prepare("DROP TRIGGER signup_confirm_insert").run();
@@ -162,7 +165,10 @@ test("homepage exposes only the next two published dates and remaining spot coun
       `INSERT INTO signup (id,event_id,manual_name,status,created_at,updated_at)
       VALUES ('extra','first','PRIVATE ATTENDEE','confirmed',0,0)`,
     ).run();
-    expect(await readHomepage()).toBe(fullSection);
+    const overCapacitySection = await readHomepage();
+    expect(overCapacitySection).toMatch(
+      /<span class="volunteer-spots-full">Full · 2 spots taken<\/span>/,
+    );
 
     const signedIn = await worker.fetch(
       `${origin}/api/v1/auth/sign-in/email-otp`,
@@ -180,7 +186,7 @@ test("homepage exposes only the next two published dates and remaining spot coun
       .filter((value) => !value.includes("Max-Age=0"))
       .map((value) => value.split(";")[0])
       .join("; ");
-    expect(await readHomepage(cookie)).toBe(fullSection);
+    expect(await readHomepage(cookie)).toBe(overCapacitySection);
     // The summary must not relax the protected event/roster API.
     expect((await worker.fetch(`${origin}/api/v1/events`)).status).toBe(401);
   } finally {

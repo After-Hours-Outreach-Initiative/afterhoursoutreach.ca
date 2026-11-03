@@ -270,7 +270,7 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       await expect(form).not.toBeVisible();
       await expect(trigger).toBeFocused();
       await expect(card.locator("[data-event-availability]")).toContainText(
-        "7 of 8 spots remaining",
+        "Open · 7 of 8 spots remaining",
       );
     },
   });
@@ -382,7 +382,7 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       publicCard.locator(".event-roster-list .compact-person-name"),
     ).toHaveText("Avery E.");
     await expect(publicCard.locator("[data-event-availability]")).toHaveText(
-      "7 of 8 spots remaining",
+      "Open · 7 of 8 spots remaining",
     );
     await expect(publicCard.locator("time.event-roster-status")).toHaveCount(0);
     await expect(publicCard.getByText(/Manually added/)).toHaveCount(0);
@@ -446,7 +446,7 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
           card.getByRole("button", { name: "Add volunteer", exact: true }),
         ).toBeVisible();
         await expect(card.locator("[data-event-availability]")).toContainText(
-          "8 of 8 spots remaining",
+          "Open · 8 of 8 spots remaining",
         );
       },
     });
@@ -454,7 +454,7 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       timeout: 15_000,
     });
     await expect(publicCard.locator("[data-event-availability]")).toHaveText(
-      "8 of 8 spots remaining",
+      "Open · 8 of 8 spots remaining",
     );
   } finally {
     await viewerContext.close();
