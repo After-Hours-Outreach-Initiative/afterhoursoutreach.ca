@@ -11,8 +11,8 @@ const event = (id: string, instant: string): CalendarEvent => ({
 
 test("calendar uses Vancouver dates and orders same-day events chronologically with stable ties", () => {
   const events = [
-    event("later", "2027-01-01T07:30:00Z"),
-    event("next-day", "2027-01-01T08:30:00Z"),
+    event("later", "2027-01-01T06:30:00Z"),
+    event("next-day", "2027-01-01T07:30:00Z"),
     event("earlier", "2027-01-01T02:30:00Z"),
     event("earlier-tie", "2027-01-01T02:30:00Z"),
     event("a-earlier-tie", "2027-01-01T02:30:00Z"),
@@ -20,7 +20,7 @@ test("calendar uses Vancouver dates and orders same-day events chronologically w
   const calendar = eventCalendar(
     events,
     undefined,
-    Date.parse("2027-01-01T07:00:00Z"),
+    Date.parse("2027-01-01T06:00:00Z"),
   );
   const days = calendar.weeks.flat();
   assert.equal(calendar.start, "2026-12-27");

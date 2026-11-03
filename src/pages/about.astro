@@ -299,7 +299,7 @@ const documents = [
       toggle.addEventListener("click", () => {
         if (!panel) return;
 
-        const open = panel.hidden;
+        const open = Boolean(panel.hidden);
         panel.hidden = !open;
         toggle.setAttribute("aria-expanded", String(open));
         const label = toggle.querySelector(".document-toggle-label");

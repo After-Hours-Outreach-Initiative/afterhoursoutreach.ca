@@ -30,7 +30,7 @@ test("event calendar inputs always use Vancouver time", () => {
   );
   assert.equal(
     vancouverInstant("2030-01-02T20:30"),
-    "2030-01-03T04:30:00.000Z",
+    "2030-01-03T03:30:00.000Z",
   );
   assert.equal(
     vancouverInput(Date.parse("2030-07-03T03:30:00Z")),
@@ -45,8 +45,19 @@ test("event calendar inputs always use Vancouver time", () => {
     /skipped or ambiguous/,
   );
   assert.throws(
-    () => vancouverInstant("2026-11-01T01:30"),
+    () => vancouverInstant("2025-11-02T01:30"),
     /skipped or ambiguous/,
+  );
+});
+
+test("Vancouver remains on UTC−7 after the final 2026 spring change", () => {
+  assert.equal(
+    vancouverInstant("2026-11-01T01:30"),
+    "2026-11-01T08:30:00.000Z",
+  );
+  assert.equal(
+    vancouverInput(Date.parse("2026-11-01T09:30:00Z")),
+    "2026-11-01T02:30",
   );
 });
 

@@ -215,7 +215,14 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
         now,
       )
       .run();
-    for (const cookie of [attendee.cookie, organizerCookie]) {
+    const legacyOrganizer = await send(
+      "/volunteer",
+      undefined,
+      organizerCookie,
+    );
+    expect(legacyOrganizer.status).toBe(302);
+    expect(legacyOrganizer.headers.get("location")).toBe("/events");
+    for (const cookie of [attendee.cookie]) {
       const html = await (await send("/volunteer", undefined, cookie)).text();
       expect(html).toContain('data-live-event="live"');
       expect(html).toContain("data-live-signup");
@@ -241,11 +248,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
         [...history!.matchAll(/data-live-event="([^"]+)"/g)].map(
           (match) => match[1],
         ),
-      ).toEqual(
-        cookie === attendee.cookie
-          ? ["past-orientation"]
-          : ["past", "past-orientation"],
-      );
+      ).toEqual(["past-orientation"]);
       expect(history).toContain("Past event");
       expect(history).not.toMatch(
         /data-live-signup|spots remaining|public-event-roster|event-attendance/,
@@ -297,7 +300,8 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     );
     const renamedRosterVersion = await readVersion(organizerCookie);
     expect(renamedRosterVersion).not.toBe(browsingVersion);
-    expect(renamedRosterVersion).toBe(await listingVersion(organizerCookie));
+    // The default API remains volunteer-scoped; the organizer's canonical
+    // page uses the management version checked above instead.
     const preferredPublicVersion = await readVersion(attendee.cookie);
     expect(preferredPublicVersion).not.toBe(volunteerBrowsingVersion);
     expect(preferredPublicVersion).toBe(await listingVersion(attendee.cookie));

@@ -1184,7 +1184,7 @@ describe(
             (
               await nav.locator("[data-account-menu-name]").textContent()
             )?.trim(),
-            "Sample Organizer",
+            "Sample Organizer V.",
           );
           await account.waitFor();
           await page.goto(`${origin}/volunteers`);
@@ -1270,8 +1270,13 @@ describe(
           await expect(
             page
               .locator("[data-volunteer-results]")
-              .getByText("Approved for patrols", { exact: true }),
+              .getByRole("link", { name: "Sample Alice V.", exact: true }),
           ).toBeVisible();
+          await expect(
+            page.locator(
+              '[data-volunteer-results] [data-volunteer-role="new-volunteer"]',
+            ),
+          ).toHaveCount(0);
           assert.deepEqual(
             await DB.prepare(
               "SELECT active, patrol_approved AS approved FROM volunteer_status WHERE user_id=?",
@@ -1855,7 +1860,7 @@ describe(
             (
               await nav.locator("[data-account-menu-name]").textContent()
             )?.trim(),
-            "Sample Bob",
+            "Sample Bob V.",
           );
           routeCookie = organizer.cookie;
           const attendance = await createEvent("orientation", 5);

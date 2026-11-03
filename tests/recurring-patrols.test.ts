@@ -215,8 +215,8 @@ test("fortnightly October 20/November 3/November 17 preserve local wall time; De
     initial.occurrences.map((event) => new Date(event.startsAt).toISOString()),
     [
       "2026-10-21T03:30:00.000Z",
-      "2026-11-04T04:30:00.000Z",
-      "2026-11-18T04:30:00.000Z",
+      "2026-11-04T03:30:00.000Z",
+      "2026-11-18T03:30:00.000Z",
     ],
   );
   const existing = initial.occurrences.map((event) => ({
@@ -402,8 +402,8 @@ test("spring/fall recurrence DST policy is deterministic, including gaps and fol
     "2026-03-08T10:30:00.000Z",
   );
   assert.equal(
-    new Date(vancouverOccurrenceInstant("2026-11-01", "01:30")).toISOString(),
-    "2026-11-01T08:30:00.000Z",
+    new Date(vancouverOccurrenceInstant("2025-11-02", "01:30")).toISOString(),
+    "2025-11-02T08:30:00.000Z",
   );
   assert.equal(
     vancouverInput(vancouverOccurrenceInstant("2026-03-15", "02:30")),
@@ -1579,7 +1579,7 @@ test("validation and authorization reject invalid recurrence input or stale orga
   for (const extra of [
     { firstDate: "2026-02-30" },
     { firstDate: "2026-03-08", localTime: "02:30" },
-    { firstDate: "2026-11-01", localTime: "01:30" },
+    { firstDate: "2025-11-02", localTime: "01:30" },
     { intervalWeeks: 0 },
     { intervalWeeks: 53 },
     { localTime: "25:00" },

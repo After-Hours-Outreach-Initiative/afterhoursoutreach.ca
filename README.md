@@ -5,6 +5,10 @@ Cloudflare Workers.
 
 ## Setup
 
+Use Node.js 24.22.2 (see `.node-version`) and pnpm 11.9.0. Current timezone data
+keeps Vancouver event times consistent with the Workers runtime after B.C.'s
+2026 move to permanent UTC−7.
+
 ```sh
 pnpm install
 ```

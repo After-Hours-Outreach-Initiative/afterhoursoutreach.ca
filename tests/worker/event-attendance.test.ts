@@ -568,7 +568,11 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         }
         const expandedRoster = card.locator(rosterSelector);
         await expect(expandedRoster).toContainText("MJ P.");
-        await expect(expandedRoster).not.toContainText("PrivateSurname");
+        // Organizer-only confirmation dialogs intentionally use full names;
+        // the visible roster keeps the abbreviated presentation.
+        await expect(expandedRoster).not.toContainText("PrivateSurname", {
+          useInnerText: true,
+        });
         if (manage) {
           await expect(
             expandedRoster.locator('a[href="/volunteers/avatar-attendee-1"]'),

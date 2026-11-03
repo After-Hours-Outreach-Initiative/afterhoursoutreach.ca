@@ -30,6 +30,7 @@ pnpm-debug.log*
 worker-configuration.d.ts
 playwright-report/
 test-results/
+.vitest/
 
 # macOS-specific files
 .DS_Store
