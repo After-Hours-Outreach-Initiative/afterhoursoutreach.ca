@@ -115,7 +115,6 @@ test("application reviews link to the overview, form sections and naloxone on mo
     for (const list of await contents.locator("ol").all()) {
       await expect(list.locator("a")).toHaveText([
         "Overview",
-        "Progress",
         "Application form",
         "Personal info",
         "Emergency contact",
@@ -155,7 +154,6 @@ test("application reviews link to the overview, form sections and naloxone on mo
       );
       if (width < 1024) await expect(menu).not.toHaveAttribute("open");
     };
-    await jump("application-review-progress-heading");
     await answers.locator("summary").click();
     await expect(answers).not.toHaveAttribute("open");
     await jump("application-review-naloxone-heading");

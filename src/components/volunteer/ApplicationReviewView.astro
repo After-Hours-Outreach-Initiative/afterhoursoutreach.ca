@@ -23,7 +23,6 @@ const { profile, person, progress } = Astro.props;
 const ready = isApplicationReadyForReview(progress);
 const contents = [
   { id: "application-review-overview", heading: "Overview" },
-  { id: "application-review-progress-heading", heading: "Progress" },
   { id: "application-review-form-heading", heading: "Application form" },
   ...submittedApplicationSections.map((section) => ({
     id: `application-review-${section.key}`,
@@ -47,7 +46,7 @@ const contents = [
     class="application-review-body"
     aria-labelledby="application-review-progress-heading"
   >
-    <h2 id="application-review-progress-heading">Progress</h2>
+    <h2 id="application-review-progress-heading">Application Steps</h2>
     <OrganizerApplicationSteps
       {profile}
       {progress}

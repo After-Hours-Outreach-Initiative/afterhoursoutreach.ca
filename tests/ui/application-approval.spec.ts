@@ -69,7 +69,7 @@ test("application table opens a focused review with guarded decisions and list c
       account.name,
     );
     await expect(
-      review.getByRole("heading", { name: "Progress", exact: true }),
+      review.getByRole("heading", { name: "Application Steps", exact: true }),
     ).toBeVisible();
     await expect(review.locator("[data-patrol-approval]")).toHaveCount(0);
     const approve = review.getByRole("button", {
