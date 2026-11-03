@@ -2035,8 +2035,11 @@ body:has(
   max-width: 100%;
   white-space: normal;
 }
-.event-roster-table .event-roster-actions {
+.event-roster-actions-column {
+  /* Fixed table layout reads column widths, not widths on later body cells. */
   width: 4rem;
+}
+.event-roster-table .event-roster-actions {
   padding: 0.375rem 0.625rem;
   text-align: right;
 }

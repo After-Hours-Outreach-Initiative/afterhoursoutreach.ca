@@ -399,6 +399,29 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           "Dana W.",
         ]);
         if (current === page) {
+          const columns = await roster
+            .locator(".event-roster-actions")
+            .first()
+            .evaluate((cell) => {
+              const styles = getComputedStyle(cell);
+              return {
+                actions: cell.getBoundingClientRect().width,
+                requiredActions:
+                  cell
+                    .querySelector("[data-signup-menu-trigger]")!
+                    .getBoundingClientRect().width +
+                  parseFloat(styles.paddingLeft) +
+                  parseFloat(styles.paddingRight),
+                volunteer:
+                  cell.previousElementSibling!.getBoundingClientRect().width,
+                row: cell.parentElement!.getBoundingClientRect().width,
+              };
+            });
+          expect(columns.actions).toBeCloseTo(columns.requiredActions, 1);
+          expect(columns.volunteer).toBeCloseTo(
+            columns.row - columns.requiredActions,
+            1,
+          );
           const timestamp = roster.locator("time.event-roster-status").first();
           await expect(timestamp).not.toContainText(/\b\d{4}\b/);
           await expect(timestamp).toHaveAttribute(

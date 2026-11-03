@@ -36,6 +36,10 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
   <TableScrollFrame label="Registered volunteers">
     <table class="event-roster-table">
       <caption class="sr-only">Registered volunteers</caption>
+      <colgroup>
+        <col />
+        {future && <col class="event-roster-actions-column" />}
+      </colgroup>
       <thead class="sr-only">
         <tr>
           <th scope="col">Volunteer</th>
