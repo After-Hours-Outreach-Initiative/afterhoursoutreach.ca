@@ -10,8 +10,13 @@ for (const javaScriptEnabled of [true, false]) {
       await page.goto("/dev/ui/applications/preview?scenario=mixed&latency=0");
       const filters = page.getByRole("group", { name: "Application status" });
       const buttons = filters.getByRole("button");
+      const approved = filters.getByRole("button", {
+        name: "Approved 0",
+        exact: true,
+      });
       await expect(buttons).toHaveCount(5);
       await expect(buttons.locator(".volunteer-filter-count")).toHaveCount(5);
+      await expect(approved).toHaveCSS("background-color", "rgb(23, 37, 84)");
       await page.evaluate(() => document.fonts.ready);
 
       for (const width of [320, 375, 1440]) {
@@ -24,7 +29,9 @@ for (const javaScriptEnabled of [true, false]) {
           }),
         );
         const centers = bounds.map(({ top, height }) => top + height / 2);
-        expect(bounds.every(({ height }) => height >= 40)).toBe(true);
+        expect(bounds.every(({ height }) => height >= 32 && height < 40)).toBe(
+          true,
+        );
         expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
         await expect(buttons.first()).toHaveCSS("white-space", "nowrap");
         expect(
@@ -63,9 +70,8 @@ for (const javaScriptEnabled of [true, false]) {
       }
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(/approval=approved/);
-      await expect(
-        filters.getByRole("button", { name: "Approved 0", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
+      await expect(approved).toHaveAttribute("aria-pressed", "true");
+      await expect(approved).toHaveCSS("background-color", "rgb(23, 37, 84)");
     });
   });
 }

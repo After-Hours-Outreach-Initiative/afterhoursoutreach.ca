@@ -127,17 +127,11 @@ const columns = (
             name="approval"
             value={value}
             data-volunteer-filter={value}
+            data-state={status.state}
             aria-controls={`${kind}-table`}
             aria-pressed={approval === value ? "true" : "false"}
           >
-            <span>
-              <span
-                class="application-table-progress application-status-text"
-                data-state={status.state}
-              >
-                {status.label}
-              </span>
-            </span>{" "}
+            <span>{status.label}</span>{" "}
             {value === "awaiting" ? (
               <span
                 class="volunteer-filter-count"
