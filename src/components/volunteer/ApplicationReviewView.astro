@@ -10,6 +10,7 @@ import {
 import { personFullName } from "@/data/person-name";
 import OrganizerApplicationSteps from "./OrganizerApplicationSteps.astro";
 import VolunteerAccessAction from "./VolunteerAccessAction.astro";
+import ApplicationRejection from "./ApplicationRejection.astro";
 
 interface Props {
   profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
@@ -47,49 +48,7 @@ const ready = isApplicationReadyForReview(progress);
           <VolunteerAccessAction {person} kind="application" />
           {!person.applicationRejectionReason &&
             (ready ? (
-              <details class="review-rejection">
-                <summary class="btn btn-red cursor-pointer">
-                  Reject application
-                </summary>
-                <form
-                  class="volunteer-form mt-4"
-                  data-organizer-rejection
-                  action="/api/v1/organizer/action"
-                  method="post"
-                >
-                  <input type="hidden" name="userId" value={person.id} />
-                  <input
-                    type="hidden"
-                    name="version"
-                    value={person.updatedAt}
-                  />
-                  <label class="volunteer-field">
-                    Reason for rejection
-                    <textarea
-                      name="reason"
-                      required
-                      maxlength="2000"
-                      rows="4"
-                      data-volunteer-control
-                      disabled
-                    />
-                  </label>
-                  <p class="volunteer-help">
-                    This reason will be emailed to the applicant and shown in
-                    their application.
-                  </p>
-                  <p data-form-message role="status" hidden />
-                  <button
-                    class="btn btn-red"
-                    type="submit"
-                    data-loading-label="Sending…"
-                    data-volunteer-control
-                    disabled
-                  >
-                    Reject application and email reason
-                  </button>
-                </form>
-              </details>
+              <ApplicationRejection {person} />
             ) : (
               <button class="btn btn-red" type="button" disabled>
                 Reject application
@@ -114,21 +73,9 @@ const ready = isApplicationReadyForReview(progress);
   }
   .review-actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     align-items: start;
     gap: 1rem;
-  }
-  .review-rejection {
-    min-width: 0;
-  }
-  .review-rejection[open] {
-    flex-basis: 100%;
-  }
-  .review-rejection summary {
-    list-style: none;
-  }
-  .review-rejection summary::-webkit-details-marker {
-    display: none;
   }
   .review-actions :global(.btn:disabled) {
     background: #27272a;

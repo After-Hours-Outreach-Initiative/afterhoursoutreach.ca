@@ -40,6 +40,7 @@ test("application table opens a focused review with guarded decisions and list c
   baseURL,
 }) => {
   test.skip(!baseURL?.startsWith("http://localhost:"));
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: 375, height: 812 });
   const applicantContext = await browser.newContext();
   try {
@@ -113,11 +114,9 @@ test("application table opens a focused review with guarded decisions and list c
     await page.reload();
     await expect(approve).toBeEnabled();
     await expect(steps.locator("time")).toHaveCount(2);
-    const rejectAction = review.getByText("Reject application", {
-      exact: true,
-    });
+    const rejectAction = review.locator("[data-rejection-open]");
     await expect(rejectAction).toHaveClass(/\bbtn btn-red\b/);
-    for (const button of [approve, rejectAction]) {
+    for (const button of [approve, review.locator(".rejection-surface")]) {
       await expect
         .poll(() =>
           button.evaluate((button) =>
@@ -131,17 +130,41 @@ test("application table opens a focused review with guarded decisions and list c
         )
         .toBeLessThan(1);
     }
-    await rejectAction.click();
-    await page.mouse.move(0, 0);
-    await expect(
-      review.getByRole("textbox", { name: "Reason for rejection" }),
-    ).toBeEnabled();
-    await expect(rejectAction).toHaveCSS(
-      "background-color",
-      await review
-        .getByRole("button", { name: "Reject application and email reason" })
-        .evaluate((button) => getComputedStyle(button).backgroundColor),
+    const morph = await rejectAction.evaluate((trigger) => {
+      (trigger as HTMLButtonElement).click();
+      return (
+        trigger.parentElement!.getAnimations()[0].effect as KeyframeEffect
+      ).getKeyframes();
+    });
+    expect(Number.parseFloat(String(morph[1].height))).toBeGreaterThan(
+      Number.parseFloat(String(morph[0].height)),
     );
+    const rejection = review.locator("application-rejection");
+    const reason = review.getByRole("textbox", {
+      name: "Reason for rejection",
+    });
+    await expect(reason).toBeEnabled();
+    await expect(reason).toBeFocused();
+    await expect(rejectAction).toHaveAttribute("aria-expanded", "true");
+    await expect(rejectAction).toBeHidden();
+    await expect(rejection.locator(".rejection-surface")).toHaveCSS(
+      "background-color",
+      "rgba(0, 0, 0, 0)",
+    );
+    await expect(rejection.locator(".rejection-actions button")).toHaveText([
+      "Reject and send email",
+      "Cancel",
+    ]);
+    await reason.fill("A draft reason");
+    await review.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(rejectAction).toHaveAttribute("aria-expanded", "false");
+    await expect(rejectAction).toBeFocused();
+    await expect(reason).toBeHidden();
+    await rejectAction.press("Enter");
+    await expect(reason).toBeFocused();
+    await expect(reason).toHaveValue("A draft reason");
+    await reason.press("Escape");
+    await expect(rejectAction).toBeFocused();
     for (const time of await steps.locator("time").all()) {
       await expect(time).toHaveText(/\d{1,2}:\d{2}/);
       await expect(time).toHaveAttribute("datetime", /T.*Z$/);

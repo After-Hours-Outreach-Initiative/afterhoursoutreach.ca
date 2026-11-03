@@ -1083,7 +1083,7 @@ test("organizers review applications separately from approved volunteers with pe
       .fill(`  ${rejection.reason}  `);
     await page
       .getByRole("button", {
-        name: "Reject application and email reason",
+        name: "Reject and send email",
         exact: true,
       })
       .click();

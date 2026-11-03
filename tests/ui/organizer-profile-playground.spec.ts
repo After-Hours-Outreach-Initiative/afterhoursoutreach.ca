@@ -410,18 +410,17 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
 test("rejections and email failures update only fictional state, and prerequisites remain real", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(
     "/dev/ui/organizer-profile?latency=0&outcome=email-failure&viewport=375",
   );
   const preview = page.frameLocator("[data-ui-profile-frame]");
   await showPreview(page);
-  const rejectAction = preview.getByText("Reject application", {
-    exact: true,
-  });
+  const rejectAction = preview.locator("[data-rejection-open]");
   await expect(rejectAction).toHaveClass(/\bbtn btn-red\b/);
   for (const button of [
     preview.getByRole("button", { name: "Approve application", exact: true }),
-    rejectAction,
+    preview.locator(".rejection-surface"),
   ]) {
     await expect
       .poll(() =>
@@ -437,19 +436,24 @@ test("rejections and email failures update only fictional state, and prerequisit
       .toBeLessThan(1);
   }
   await rejectAction.click();
-  await page.mouse.move(0, 0);
+  await expect(preview.locator(".rejection-surface")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  expect(
+    await preview
+      .locator("application-rejection")
+      .evaluate((element) => element.getAnimations({ subtree: true }).length),
+  ).toBe(0);
+  await preview.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(rejectAction).toBeFocused();
+  await rejectAction.press("Space");
   await preview
     .getByRole("textbox", { name: "Reason for rejection" })
     .fill("Fictional review reason.\nA second line for layout checks.");
-  await expect(rejectAction).toHaveCSS(
-    "background-color",
-    await preview
-      .getByRole("button", { name: "Reject application and email reason" })
-      .evaluate((button) => getComputedStyle(button).backgroundColor),
-  );
   await preview
     .getByRole("button", {
-      name: "Reject application and email reason",
+      name: "Reject and send email",
       exact: true,
     })
     .click();

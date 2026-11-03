@@ -1,0 +1,262 @@
+---
+import type { VolunteerRow } from "@/server/db/volunteers";
+
+interface Props {
+  person: VolunteerRow;
+}
+const { person } = Astro.props;
+const id = `application-rejection-${person.id}`;
+---
+
+<application-rejection>
+  <div class="rejection-surface">
+    <button
+      class="btn btn-red rejection-trigger"
+      type="button"
+      aria-expanded="false"
+      aria-controls={id}
+      data-rejection-open
+      data-volunteer-control
+      disabled
+    >
+      Reject application
+    </button>
+    <form
+      id={id}
+      class="volunteer-form rejection-form"
+      data-organizer-rejection
+      action="/api/v1/organizer/action"
+      method="post"
+      aria-label="Reject application"
+      aria-hidden="true"
+      inert
+    >
+      <input type="hidden" name="userId" value={person.id} />
+      <input type="hidden" name="version" value={person.updatedAt} />
+      <label class="volunteer-field">
+        Reason for rejection
+        <textarea
+          name="reason"
+          required
+          maxlength="2000"
+          rows="4"
+          aria-describedby={`${id}-help`}
+          data-volunteer-control
+          disabled></textarea>
+      </label>
+      <p id={`${id}-help`} class="volunteer-help">
+        This reason will be emailed to the applicant and shown in their
+        application.
+      </p>
+      <p data-form-message role="status" hidden></p>
+      <div class="rejection-actions">
+        <button
+          class="btn btn-red"
+          type="submit"
+          data-loading-label="Sending…"
+          data-volunteer-control
+          disabled
+        >
+          Reject and send email
+        </button>
+        <button
+          class="btn btn-quiet"
+          type="button"
+          data-rejection-cancel
+          data-volunteer-control
+          disabled
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</application-rejection>
+
+<script>
+  class ApplicationRejection extends HTMLElement {
+    private controller?: AbortController;
+    private animation?: Animation;
+
+    connectedCallback() {
+      this.controller?.abort();
+      this.controller = new AbortController();
+      const { signal } = this.controller;
+      this.addEventListener(
+        "click",
+        (event) => {
+          if (!(event.target instanceof Element)) return;
+          const button = event.target.closest<HTMLButtonElement>(
+            "[data-rejection-open], [data-rejection-cancel]",
+          );
+          if (button && !button.disabled)
+            this.expand(button.hasAttribute("data-rejection-open"));
+        },
+        { signal },
+      );
+      this.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape" && this.hasAttribute("data-expanded")) {
+            event.preventDefault();
+            this.expand(false);
+          }
+        },
+        { signal },
+      );
+    }
+
+    disconnectedCallback() {
+      this.controller?.abort();
+      this.animation?.cancel();
+      this.animation = undefined;
+      this.querySelector("form")?.style.removeProperty("width");
+    }
+
+    private expand(expanded: boolean) {
+      if (this.closest("[data-submitting]")) return;
+      const surface = this.querySelector<HTMLElement>(".rejection-surface")!;
+      const trigger = this.querySelector<HTMLButtonElement>(
+        "[data-rejection-open]",
+      )!;
+      const form = this.querySelector<HTMLFormElement>("form")!;
+      // Sample an interrupted morph before cancelling it, so reversing never jumps.
+      const before = surface.getBoundingClientRect();
+      const background = getComputedStyle(surface).backgroundColor;
+      this.animation?.cancel();
+      this.animation = undefined;
+      form.style.removeProperty("width");
+      this.toggleAttribute("data-expanded", expanded);
+      trigger.setAttribute("aria-expanded", String(expanded));
+      form.inert = !expanded;
+      form.setAttribute("aria-hidden", String(!expanded));
+      trigger.inert = expanded;
+      (expanded ? form.querySelector("textarea")! : trigger).focus({
+        preventScroll: true,
+      });
+
+      const after = surface.getBoundingClientRect();
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      // Keep the fields at their expanded width while the same border reveals or
+      // conceals them. Only the enclosing surface changes size, not the text.
+      form.style.width = `${Math.max(before.width, after.width) - 4}px`;
+      const animation = surface.animate(
+        [
+          {
+            width: `${before.width}px`,
+            height: `${before.height}px`,
+            backgroundColor: background,
+          },
+          {
+            width: `${after.width}px`,
+            height: `${after.height}px`,
+            backgroundColor: getComputedStyle(surface).backgroundColor,
+          },
+        ],
+        { duration: 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      );
+      this.animation = animation;
+      void animation.finished.then(
+        () => {
+          if (this.animation !== animation) return;
+          this.animation = undefined;
+          form.style.removeProperty("width");
+        },
+        () => {},
+      );
+    }
+  }
+
+  if (!customElements.get("application-rejection"))
+    customElements.define("application-rejection", ApplicationRejection);
+</script>
+
+<style>
+  application-rejection {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .rejection-surface {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    overflow: clip;
+    border: 2px solid var(--color-red-700);
+    border-radius: 0.5rem;
+    background: var(--color-red-700);
+  }
+  .rejection-trigger.btn {
+    min-height: 2.5rem;
+    padding-inline: calc(1.25rem - 2px);
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+  }
+  application-rejection:not([data-expanded])
+    .rejection-surface:has(.rejection-trigger:hover:not(:disabled)) {
+    border-color: var(--color-red-800);
+    background: var(--color-red-800);
+  }
+  application-rejection:not([data-expanded])
+    .rejection-surface:has(.rejection-trigger:disabled) {
+    border-color: #3f3f46;
+    background: #27272a;
+  }
+  .rejection-trigger,
+  .rejection-form {
+    transition:
+      opacity 160ms ease,
+      visibility 0s linear 160ms;
+  }
+  .rejection-form {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 1rem;
+    visibility: hidden;
+    opacity: 0;
+  }
+  [data-expanded] .rejection-surface {
+    width: 100%;
+    background: transparent;
+  }
+  [data-expanded] .rejection-trigger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    opacity: 0;
+  }
+  [data-expanded] .rejection-form {
+    position: relative;
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  application-rejection:not([data-expanded]) .rejection-trigger {
+    transition-delay: 0s;
+  }
+  .rejection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .rejection-surface:has(.rejection-trigger:focus-visible) {
+    outline: 2px solid white;
+    outline-offset: 3px;
+  }
+  @media (width < 40rem) {
+    .rejection-surface {
+      width: 100%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rejection-trigger,
+    .rejection-form {
+      transition: none;
+    }
+  }
+</style>
