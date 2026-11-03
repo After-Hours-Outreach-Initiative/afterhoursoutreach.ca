@@ -406,18 +406,6 @@ class AddAttendee extends HTMLElement {
       this.form.setAttribute("aria-hidden", String(!expanded));
       trigger.inert = expanded;
       (expanded ? this.form : trigger).focus({ preventScroll: true });
-      if (expanded) {
-        // Measure and scroll the expanded layout before the morph resizes it.
-        const style = getComputedStyle(surface);
-        const height =
-          surface.getBoundingClientRect().height +
-          parseFloat(style.scrollMarginTop) +
-          parseFloat(style.scrollMarginBottom);
-        surface.scrollIntoView({
-          block: height > window.innerHeight ? "start" : "nearest",
-          behavior: "instant",
-        });
-      }
     });
     if (!expanded)
       this.dispatchEvent(new Event("add-attendee-close", { bubbles: true }));

@@ -56,31 +56,24 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   const search = form.getByRole("combobox", { name: "Search volunteers" });
   const staged = form.getByRole("list", { name: "Volunteers to add" });
   const addManual = form.getByRole("button", { name: "Add name manually" });
-  const surface = card.locator(".attendee-surface");
   await page.setViewportSize({ width: 375, height: 600 });
   await expect(form).toHaveAttribute("inert", "");
-  await trigger.evaluate((element) => element.scrollIntoView({ block: "end" }));
-  // Sample in the click's task, without waiting for animation or smooth scrolling.
+  await trigger.evaluate((element) =>
+    element.scrollIntoView({ block: "end", behavior: "instant" }),
+  );
+  // Expansion must preserve the scroll position immediately and after animation.
   expect(
     await trigger.evaluate(async (element) => {
+      const before = scrollY;
       (element as HTMLButtonElement).click();
       const surface = element.closest(".attendee-surface")!;
-      const inView = () => {
-        const bounds = surface.querySelector("form")!.getBoundingClientRect();
-        const style = getComputedStyle(surface);
-        return (
-          bounds.top >= parseFloat(style.scrollMarginTop) - 1 &&
-          bounds.bottom <=
-            innerHeight - parseFloat(style.scrollMarginBottom) + 1
-        );
-      };
-      const immediate = inView();
+      const immediate = scrollY - before;
       await Promise.all(
         surface.getAnimations().map((animation) => animation.finished),
       );
-      return { immediate, finished: inView() };
+      return { immediate, finished: scrollY - before };
     }),
-  ).toEqual({ immediate: true, finished: true });
+  ).toEqual({ immediate: 0, finished: 0 });
   await expect(form).toHaveAccessibleName("Add volunteers");
   await expect(form).toBeFocused();
   await expect(search).not.toBeFocused();
@@ -198,20 +191,11 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   await expect(trigger).toBeFocused();
   await page.setViewportSize({ width: 320, height: 480 });
   await page.emulateMedia({ reducedMotion: "reduce" });
+  const scrollBeforeExpansion = await page.evaluate(() => scrollY);
   await trigger.press("Enter");
   await expect(form).toBeFocused();
   await expect(search).not.toBeFocused();
-  await expect
-    .poll(() =>
-      surface.evaluate((element) => {
-        const bounds = element.getBoundingClientRect();
-        const top = parseFloat(getComputedStyle(element).scrollMarginTop);
-        return (
-          bounds.height > innerHeight - top && Math.abs(bounds.top - top) < 1
-        );
-      }),
-    )
-    .toBe(true);
+  expect(await page.evaluate(() => scrollY)).toBe(scrollBeforeExpansion);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(name).toHaveValue("Avery Example");
   await expect(medic).toBeChecked();
@@ -252,7 +236,7 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
       await expect(form).not.toBeVisible();
       await expect(trigger).toBeFocused();
       await expect(card.locator("[data-event-availability]")).toHaveText(
-        "Registered",
+        "Registered · 6 of 8 spots remaining",
       );
     },
   });
@@ -363,7 +347,7 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
       updated: async () => {
         await expect(row).toHaveCount(0);
         await expect(card.locator("[data-event-availability]")).toHaveText(
-          "Registered",
+          "Registered · 7 of 8 spots remaining",
         );
       },
     });
