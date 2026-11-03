@@ -408,6 +408,34 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       },
     });
     expect(denied.status()).toBe(403);
+
+    // Counts must return to their original value without discarding an editor's
+    // draft, even when the server card matches the last complete snapshot again.
+    await card.getByRole("button", { name: "Edit", exact: true }).click();
+    const editor = card.getByRole("dialog", {
+      name: "Edit event",
+      exact: true,
+    });
+    const meeting = editor.getByLabel("Meeting point", { exact: true });
+    await meeting.fill("Unsaved round-trip draft");
+    for (const [action, availability] of [
+      ["join", "Registered · Open · 6 of 8 spots remaining"],
+      ["cancel", "Open · 7 of 8 spots remaining"],
+    ]) {
+      const response = await page.request.post("/api/v1/events/action", {
+        headers: { origin: baseURL! },
+        data: { action, id },
+      });
+      expect(response.status(), await response.text()).toBe(200);
+      await expect(card.locator("[data-event-availability]")).toHaveText(
+        availability,
+        { timeout: 15_000 },
+      );
+      await expect(editor).toBeVisible();
+      await expect(meeting).toHaveValue("Unsaved round-trip draft");
+      await expect(meeting).toBeFocused();
+    }
+    await editor.getByRole("button", { name: "Cancel", exact: true }).click();
     await row
       .getByRole("button", {
         name: "Registration actions for Avery E.",

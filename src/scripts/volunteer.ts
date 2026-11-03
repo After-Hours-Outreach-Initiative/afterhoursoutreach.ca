@@ -326,18 +326,21 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       }
       // Don't discard an unrelated editor's draft or another action in flight.
       const protectedCard = card && protectedEvent(card);
-      if (
-        card &&
-        protectedCard &&
-        renderedCards.get(card) !== updated.outerHTML
-      ) {
-        deferredEventRefresh = true;
+      if (card && protectedCard) {
+        if (renderedCards.get(card) !== updated.outerHTML)
+          deferredEventRefresh = true;
         // A live count must not overwrite an open editor or an in-flight signup.
+        // Compare the live region itself: after a partial update, a return to
+        // the cached full-card snapshot must still restore its original count.
         const availability = card.querySelector("[data-event-availability]");
         const nextAvailability = updated.querySelector(
           "[data-event-availability]",
         );
-        if (availability && nextAvailability)
+        if (
+          availability &&
+          nextAvailability &&
+          availability.outerHTML !== nextAvailability.outerHTML
+        )
           availability.replaceWith(document.importNode(nextAvailability, true));
         // Signup counts can change while an editor is open. Refresh only email
         // eligibility; leave the organizer's fields, reason and scope draft intact.
