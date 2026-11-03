@@ -677,14 +677,17 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await uiFirstCard
       .getByRole("button", { name: "Edit", exact: true })
       .click();
+    await uiFirstCard
+      .getByRole("button", { name: "Cancel event", exact: true })
+      .click();
     const cancelForm = uiFirstCard.locator("[data-event-cancel]");
     await cancelForm.locator('[name="scope"]').selectOption("future");
     await expect(
-      cancelForm.locator("[data-event-cancel-heading]"),
-    ).toBeHidden();
+      cancelForm.getByRole("heading", { name: "Cancel event?", exact: true }),
+    ).toBeVisible();
     await expect(cancelForm.locator("[data-event-cancel-reason]")).toBeHidden();
     await uiFirstCard
-      .getByRole("button", { name: "Cancel event", exact: true })
+      .getByRole("button", { name: "Confirm cancellation", exact: true })
       .click();
     await expect(uiFirstCard.locator(".volunteer-hidden")).toHaveText(
       "Cancelled",

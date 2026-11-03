@@ -119,6 +119,25 @@ test("event dialogs offer only cancellation for future events and keep ended his
   const occurrenceId = `patrol:${series.id}:${firstDate}`;
   for (const id of [standaloneId, occurrenceId]) {
     const form = page.locator(`[data-live-event="${id}"] [data-event-cancel]`);
+    if (id === standaloneId) {
+      const card = page.locator(`[data-live-event="${id}"]`);
+      await card.getByRole("button", { name: "Edit", exact: true }).click();
+      const dialog = card.getByRole("dialog", {
+        name: "Edit event",
+        exact: true,
+      });
+      await dialog
+        .getByRole("button", { name: "Cancel event", exact: true })
+        .click();
+      await expect(card).toBeVisible();
+      await expect(form).toBeFocused();
+      await expect(form.locator("[data-event-cancel-reason]")).toBeHidden();
+      await form
+        .getByRole("button", { name: "Confirm cancellation", exact: true })
+        .click();
+      await expect(card).toHaveCount(0);
+      continue;
+    }
     await action({
       action: "cancel-event",
       id,
@@ -209,14 +228,49 @@ test("event dialogs offer only cancellation for future events and keep ended his
       ).toHaveValue("occurrence");
     }
     await expect(dialog.getByRole("button", { name: /Delete/ })).toHaveCount(0);
+    const cancel = dialog.locator("[data-event-cancel-open]");
+    const cancelForm = dialog.locator("[data-event-cancel]");
+    await expect(cancel).toHaveCount(1);
     await expect(
-      dialog.getByRole("button", { name: "Cancel event", exact: true }),
-    ).toHaveCount(editable ? 1 : 0);
-    if (editable) {
-      await expect(dialog.locator("[data-event-cancel-policy]")).toContainText(
-        "If anyone has ever registered",
+      dialog.locator(".dialog-footer [data-event-cancel-open]"),
+    ).toHaveCount(0);
+    await expect(
+      dialog.locator(".dialog-body [data-event-cancel-open]"),
+    ).toHaveCount(1);
+    await expect(dialog.getByText(/If anyone has ever registered/)).toHaveCount(
+      0,
+    );
+    await expect(cancelForm).toHaveAttribute("inert", "");
+    await expect(cancelForm).toHaveAttribute("aria-hidden", "true");
+    await cancel.focus();
+    await cancel.press("Enter");
+    await expect(cancel).toHaveAttribute("aria-expanded", "true");
+    await expect(cancelForm).toHaveAttribute("aria-hidden", "false");
+    await expect(cancelForm).toBeFocused();
+    await expect(
+      cancelForm.getByRole("heading", { name: "Cancel event?", exact: true }),
+    ).toBeVisible();
+    if (recurring) {
+      await expect(cancelForm.locator("[data-event-cancel-policy]")).toHaveText(
+        "The rest of the series will continue.",
       );
+      await cancelForm.locator('[name="scope"]').selectOption("future");
+      await expect(
+        cancelForm.locator("[data-event-cancel-policy]"),
+      ).toBeHidden();
+      await expect(
+        cancelForm.locator("[data-event-cancel-reason]"),
+      ).toBeHidden();
     }
+    await cancelForm.getByRole("button", { name: "Keep event" }).click();
+    await expect(cancel).toBeFocused();
+    await expect(cancel).toHaveAttribute("aria-expanded", "false");
+    await cancel.press("Space");
+    await expect(cancelForm).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeVisible();
+    await expect(cancel).toBeFocused();
+    await expect(cancelForm).toHaveAttribute("inert", "");
     await page.keyboard.press("Escape");
     await expect(edit).toBeFocused();
   }
@@ -238,6 +292,100 @@ test("event dialogs offer only cancellation for future events and keep ended his
     .getByRole("button", { name: "Save without email", exact: true })
     .click();
   await expect(group).toHaveCount(0);
+});
+
+test("event cancellation morphs in place and preserves its draft after notification dismissal and failure", async ({
+  page,
+}) => {
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+  await page.route("**/api/v1/events/action", (route) =>
+    route.fulfill({ status: 503, json: { message: "Please try again." } }),
+  );
+
+  for (const width of [1280, 320]) {
+    await page.emulateMedia({
+      reducedMotion: width === 320 ? "reduce" : "no-preference",
+    });
+    await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
+    await page.goto("/events");
+    const card = page.locator(
+      '[data-live-event="local-fixture-event-orientation"]',
+    );
+    await card.getByRole("button", { name: "Edit", exact: true }).click();
+    const dialog = card.getByRole("dialog", {
+      name: "Edit event",
+      exact: true,
+    });
+    const form = dialog.locator("[data-event-cancel]");
+    const morph = dialog.locator("event-cancellation");
+    await dialog
+      .getByRole("button", { name: "Cancel event", exact: true })
+      .click();
+    await form.getByLabel("Reason (optional)").fill("Unsafe conditions");
+    await morph.locator(".cancellation-surface").evaluate(async (surface) => {
+      await Promise.allSettled(
+        surface.getAnimations().map((animation) => animation.finished),
+      );
+    });
+    await expectPinnedChrome(dialog);
+    expect(
+      await dialog.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      ),
+    ).toBe(false);
+    const confirm = form.getByRole("button", {
+      name: "Confirm cancellation",
+      exact: true,
+    });
+    await confirm.click();
+    const notification = page.getByRole("dialog", {
+      name: "Send an email?",
+      exact: true,
+    });
+    await expect(notification).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(notification).toBeHidden();
+    await expect(confirm).toBeEnabled();
+    await expect(form.getByLabel("Reason (optional)")).toHaveValue(
+      "Unsafe conditions",
+    );
+
+    await inPlaceAction(page, {
+      endpoint: "/api/v1/events/action",
+      form,
+      trigger: () => confirm.click(),
+      updated: () =>
+        expect(form.locator("[data-form-message]")).toHaveText(
+          "Please try again.",
+        ),
+      loadingLabel: "Cancelling…",
+      pending: async () => {
+        await expect(
+          form.getByRole("button", { name: "Keep event" }),
+        ).toBeDisabled();
+        await expect(
+          dialog.getByRole("button", { name: "Save event", exact: true }),
+        ).toBeDisabled();
+        await expect(morph).toHaveAttribute("data-expanded", "");
+      },
+    });
+    await expect(confirm).toBeEnabled();
+    await expect(form.getByLabel("Reason (optional)")).toHaveValue(
+      "Unsafe conditions",
+    );
+    await form.getByRole("button", { name: "Keep event" }).click();
+    await expect(
+      dialog.getByRole("button", { name: "Cancel event", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+  }
 });
 
 test("event dialogs preserve their exit layout and roster profiles navigate to pages", async ({

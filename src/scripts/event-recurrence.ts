@@ -103,9 +103,6 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
       "[data-event-cancel-reason]",
     );
     const input = reason?.querySelector<HTMLTextAreaElement>("textarea");
-    const heading = form.querySelector<HTMLElement>(
-      "[data-event-cancel-heading]",
-    );
     const policy = form.querySelector<HTMLElement>(
       "[data-event-cancel-policy]",
     );
@@ -117,7 +114,6 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
         form.dataset.emailPrompt,
         form.dataset.futureEmailPrompt,
       );
-      if (heading) heading.hidden = reason.hidden;
       input.disabled = reason.hidden;
     };
     if (!form.dataset.cancelReasonReady) {

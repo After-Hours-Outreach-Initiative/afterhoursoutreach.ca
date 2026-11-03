@@ -1,0 +1,303 @@
+---
+import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
+import FieldError from "@/components/FieldError.astro";
+
+interface Props {
+  event: EventRow;
+  series?: PatrolSeriesRow;
+}
+const { event, series } = Astro.props;
+const dialogId = `event-editor-${event.id}`;
+const id = `${dialogId}-cancel`;
+---
+
+<event-cancellation>
+  <div class="cancellation-surface">
+    <button
+      class="btn btn-red cancellation-trigger"
+      type="button"
+      aria-expanded="false"
+      aria-controls={id}
+      data-event-cancel-open
+    >
+      Cancel event
+    </button>
+    <form
+      id={id}
+      class="volunteer-form cancellation-form"
+      data-event-cancel
+      data-email-prompt={event.confirmed > 0 ? "event-cancel" : undefined}
+      data-future-email-prompt={event.futureConfirmed > 0
+        ? "series-cancel"
+        : undefined}
+      action="/api/v1/events/action"
+      method="post"
+      aria-labelledby={`${id}-heading`}
+      aria-hidden="true"
+      tabindex="-1"
+      inert
+    >
+      <h3 id={`${id}-heading`} class="text-lg">Cancel event?</h3>
+      <input type="hidden" name="id" value={event.id} />
+      <input type="hidden" name="version" value={event.updatedAt} />
+      {
+        event.seriesId && (
+          <p class="volunteer-help" data-event-cancel-policy>
+            The rest of the series will continue.
+          </p>
+        )
+      }
+      {
+        series && (
+          <>
+            <input type="hidden" name="seriesId" value={series.id} />
+            <input
+              type="hidden"
+              name="seriesVersion"
+              value={series.updatedAt}
+            />
+            <input
+              type="hidden"
+              name="occurrenceDate"
+              value={event.occurrenceDate!}
+            />
+            <label class="volunteer-field">
+              Cancel
+              <select name="scope">
+                <option value="occurrence">Only this occurrence</option>
+                <option value="future">
+                  This and future occurrences (stop recurrence)
+                </option>
+              </select>
+            </label>
+            <p class="volunteer-help">
+              Cancelling future occurrences also cancels their bookings,
+              including individual exceptions. Past attendance and cancellation
+              history are kept.
+            </p>
+          </>
+        )
+      }
+      <div
+        class="volunteer-field"
+        data-event-cancel-reason
+        hidden={event.confirmed === 0}
+      >
+        <label for={`${dialogId}-reason`}>Reason (optional)</label>
+        <textarea
+          id={`${dialogId}-reason`}
+          name="reason"
+          aria-describedby={`error-${dialogId}-reason`}
+          maxlength="1000"
+          rows="3"
+          disabled={event.confirmed === 0}></textarea>
+        <FieldError
+          field={`${dialogId}-reason`}
+          message="Keep the reason to 1000 characters or fewer."
+        />
+      </div>
+      <p data-form-message role="status" hidden></p>
+      <div class="cancellation-actions">
+        <button
+          class="btn btn-red"
+          type="submit"
+          data-loading-label="Cancelling…"
+        >
+          Confirm cancellation
+        </button>
+        <button class="btn btn-quiet" type="button" data-event-cancel-close>
+          Keep event
+        </button>
+      </div>
+    </form>
+  </div>
+</event-cancellation>
+
+<script>
+  class EventCancellation extends HTMLElement {
+    private controller?: AbortController;
+    private animation?: Animation;
+
+    connectedCallback() {
+      this.controller?.abort();
+      this.controller = new AbortController();
+      const { signal } = this.controller;
+      this.addEventListener(
+        "click",
+        (event) => {
+          if (!(event.target instanceof Element)) return;
+          const button = event.target.closest<HTMLButtonElement>(
+            "[data-event-cancel-open], [data-event-cancel-close]",
+          );
+          if (button && !button.disabled)
+            this.expand(button.hasAttribute("data-event-cancel-open"));
+        },
+        { signal },
+      );
+      this.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape" && this.hasAttribute("data-expanded")) {
+            event.preventDefault();
+            this.expand(false);
+          }
+        },
+        { signal },
+      );
+    }
+
+    disconnectedCallback() {
+      this.controller?.abort();
+      this.animation?.cancel();
+      this.animation = undefined;
+      this.querySelector("form")?.style.removeProperty("width");
+    }
+
+    private expand(expanded: boolean) {
+      const form = this.querySelector<HTMLFormElement>("form")!;
+      if (this.closest("[data-submitting]") || form.dataset.submitting) return;
+      const surface = this.querySelector<HTMLElement>(".cancellation-surface")!;
+      const trigger = this.querySelector<HTMLButtonElement>(
+        "[data-event-cancel-open]",
+      )!;
+      // Sample interrupted morphs before cancelling, so reversing never jumps.
+      const before = surface.getBoundingClientRect();
+      this.animation?.cancel();
+      this.animation = undefined;
+      form.style.removeProperty("width");
+      this.toggleAttribute("data-expanded", expanded);
+      trigger.setAttribute("aria-expanded", String(expanded));
+      form.inert = !expanded;
+      form.setAttribute("aria-hidden", String(!expanded));
+      trigger.inert = expanded;
+      // Focus the section without opening the keyboard or choosing an action.
+      (expanded ? form : trigger).focus({ preventScroll: true });
+
+      const after = surface.getBoundingClientRect();
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      // Reveal the fields at their expanded width inside the same red border.
+      form.style.width = `${Math.max(before.width, after.width) - 4}px`;
+      const animation = surface.animate(
+        [
+          {
+            width: `${before.width}px`,
+            height: `${before.height}px`,
+            backgroundColor: "#000",
+          },
+          {
+            width: `${after.width}px`,
+            height: `${after.height}px`,
+            backgroundColor: "#000",
+          },
+        ],
+        { duration: 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      );
+      this.animation = animation;
+      void animation.finished.then(
+        () => {
+          if (this.animation !== animation) return;
+          this.animation = undefined;
+          form.style.removeProperty("width");
+        },
+        () => {},
+      );
+    }
+  }
+
+  if (!customElements.get("event-cancellation"))
+    customElements.define("event-cancellation", EventCancellation);
+</script>
+
+<style>
+  event-cancellation {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #3f3f46;
+  }
+  .cancellation-surface {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    overflow: clip;
+    border: 2px solid var(--color-red-700);
+    border-radius: 0.5rem;
+    background: var(--color-red-700);
+  }
+  .cancellation-trigger.btn {
+    min-height: 2.5rem;
+    padding-inline: calc(1.25rem - 2px);
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+  }
+  event-cancellation:not([data-expanded])
+    .cancellation-surface:has(.cancellation-trigger:hover:not(:disabled)) {
+    border-color: var(--color-red-800);
+    background: var(--color-red-800);
+  }
+  event-cancellation:not([data-expanded])
+    .cancellation-surface:has(.cancellation-trigger:disabled) {
+    border-color: #3f3f46;
+    background: #27272a;
+  }
+  .cancellation-trigger,
+  .cancellation-form {
+    transition:
+      opacity 160ms ease,
+      visibility 0s linear 160ms;
+  }
+  .cancellation-form {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 1rem;
+    visibility: hidden;
+    opacity: 0;
+    outline: none;
+  }
+  [data-expanded] .cancellation-surface {
+    width: 100%;
+    background: #000;
+  }
+  [data-expanded] .cancellation-trigger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    opacity: 0;
+  }
+  [data-expanded] .cancellation-form {
+    position: relative;
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  event-cancellation:not([data-expanded]) .cancellation-trigger {
+    transition-delay: 0s;
+  }
+  .cancellation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .cancellation-surface:has(.cancellation-trigger:focus-visible) {
+    outline: 2px solid white;
+    outline-offset: 3px;
+  }
+  @media (width < 40rem) {
+    .cancellation-surface {
+      width: 100%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cancellation-trigger,
+    .cancellation-form {
+      transition: none;
+    }
+  }
+</style>

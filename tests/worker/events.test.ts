@@ -1893,13 +1893,16 @@ describe(
             name: "Edit event",
             exact: true,
           });
+          await cancelEditor
+            .getByRole("button", { name: "Cancel event", exact: true })
+            .click();
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
             form: cancelEditor.locator("[data-event-cancel]"),
             trigger: () =>
               cancelEditor
                 .getByRole("button", {
-                  name: "Cancel event",
+                  name: "Confirm cancellation",
                   exact: true,
                 })
                 .click(),
