@@ -54,6 +54,13 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   });
   const form = card.locator("[data-add-attendee]");
   const search = form.getByRole("combobox", { name: "Search volunteers" });
+  const searchMessage = form.locator("[data-search-message]");
+  const searchErrorIcon = form.locator(
+    ".attendee-message:has(> [data-search-message]) > svg",
+  );
+  const formErrorIcon = form.locator(
+    ".attendee-message:has(> [data-form-message]) > svg",
+  );
   const staged = form.getByRole("list", { name: "Volunteers to add" });
   const addManual = form.getByRole("button", {
     name: "Add volunteer manually",
@@ -86,14 +93,35 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   );
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(form.getByText("Preview", { exact: true })).toHaveCount(0);
+  await expect(formErrorIcon).toBeHidden();
+  await expect(searchErrorIcon).toBeHidden();
   await form.getByRole("button", { name: "Add", exact: true }).click();
   await expect(form.getByRole("alert")).toHaveText(
     "Choose a volunteer or enter a name.",
   );
+  await expect(formErrorIcon).toBeVisible();
+  await expect(formErrorIcon).toHaveAttribute("aria-hidden", "true");
+
+  const failSearch = (route: Route) =>
+    route.fulfill({
+      status: 503,
+      json: { message: "Volunteers could not be found. Try again." },
+    });
+  await page.route("**/api/v1/events/volunteers?*", failSearch);
+  await search.fill("Robin");
+  await expect(searchMessage).toHaveText(
+    "Volunteers could not be found. Try again.",
+  );
+  await expect(searchMessage).toHaveAttribute("role", "alert");
+  await expect(searchErrorIcon).toBeVisible();
+  await expect(searchErrorIcon).toHaveAttribute("aria-hidden", "true");
+  await page.unroute("**/api/v1/events/volunteers?*", failSearch);
 
   await search.fill("a");
   const options = form.getByRole("option");
   await expect.poll(() => options.count()).toBeGreaterThan(1);
+  await expect(searchMessage).toHaveAttribute("role", "status");
+  await expect(searchErrorIcon).toBeHidden();
   const first = await search.getAttribute("aria-activedescendant");
   await search.press("ArrowDown");
   const second = await search.getAttribute("aria-activedescendant");
@@ -126,6 +154,7 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   await expect(form.locator("[data-search-message]")).toContainText(
     "No matching eligible volunteers",
   );
+  await expect(searchErrorIcon).toBeHidden();
   await expect(options).toHaveCount(0);
   await search.fill("");
   await expect(addManual.locator("svg.btn-icon")).toHaveAttribute(
@@ -216,6 +245,7 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   await page.route("**/api/v1/events/action", fail);
   await form.getByRole("button", { name: "Add", exact: true }).click();
   await expect(form.getByRole("alert")).toHaveText("This event is full.");
+  await expect(formErrorIcon).toBeVisible();
   await expect(name).toBeEnabled();
   await expect(name).toHaveValue("Avery Example");
   await expect(staged.locator("[data-staged-row]")).toHaveCount(3);
@@ -227,6 +257,8 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
     trigger: () =>
       form.getByRole("button", { name: "Add", exact: true }).click(),
     pending: async () => {
+      await expect(formErrorIcon).toBeHidden();
+      await expect(searchErrorIcon).toBeHidden();
       await expect(name).toBeDisabled();
       await expect(medic).toBeDisabled();
       await expect(newVolunteer).toBeDisabled();

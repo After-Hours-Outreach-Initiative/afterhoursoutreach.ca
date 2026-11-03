@@ -183,6 +183,7 @@ class AddAttendee extends HTMLElement {
       query.append("exclude", row.dataset.userId!);
     const message = this.querySelector<HTMLElement>("[data-search-message]")!;
     this.search.setAttribute("aria-busy", "true");
+    message.setAttribute("role", "status");
     message.textContent = "Searching…";
     message.hidden = false;
     try {
@@ -230,13 +231,15 @@ class AddAttendee extends HTMLElement {
         : "No matching eligible volunteers. You can add a volunteer manually.";
       if (this.candidates.length) this.selectOption();
     } catch (error) {
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted) {
+        message.setAttribute("role", "alert");
         message.textContent =
           error instanceof Error &&
           !(error instanceof TypeError) &&
           !(error instanceof SyntaxError)
             ? error.message
             : "Volunteers could not be found. Try again.";
+      }
     } finally {
       if (!controller.signal.aborted) this.search.removeAttribute("aria-busy");
     }

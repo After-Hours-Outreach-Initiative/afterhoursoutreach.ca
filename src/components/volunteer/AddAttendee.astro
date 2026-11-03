@@ -4,6 +4,7 @@ import { manualAttendeeCategory } from "@/data/event-roster";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
 import TrashIcon from "@/components/icons/TrashIcon.astro";
+import WarningIcon from "@/components/icons/WarningIcon.astro";
 import RosterPerson from "./RosterPerson.astro";
 import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
 
@@ -79,7 +80,13 @@ const roles = [
           hidden
         >
         </ul>
-        <p class="volunteer-help" role="status" data-search-message hidden></p>
+        <div class="attendee-message">
+          <WarningIcon
+            class="attendee-error-icon mt-0.5 size-5 shrink-0 text-red-400"
+          />
+          <p class="volunteer-help" role="status" data-search-message hidden>
+          </p>
+        </div>
       </div>
       <ul
         class="event-roster-list attendee-staged"
@@ -153,7 +160,12 @@ const roles = [
           </div>
         </li>
       </template>
-      <p data-form-message role="status" hidden></p>
+      <div class="attendee-message">
+        <WarningIcon
+          class="attendee-error-icon mt-0.5 size-5 shrink-0 text-red-400"
+        />
+        <p data-form-message role="status" hidden></p>
+      </div>
       <div class="attendee-actions">
         <button class="btn btn-quiet" type="button" data-attendee-cancel
           >Cancel</button
@@ -238,6 +250,23 @@ const roles = [
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 0.75rem;
+  }
+  .attendee-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  .attendee-message:has(> [hidden]) {
+    display: none;
+  }
+  .attendee-message:not(:has(> [role="alert"])) :global(.attendee-error-icon) {
+    display: none;
+  }
+  .attendee-message > p {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
   }
   .attendee-form .attendee-search input {
     padding-left: 2.75rem;
