@@ -62,10 +62,12 @@ const roles = [
       </div>
       <div class="attendee-roles">
         <label class="volunteer-check"
-          ><input type="checkbox" name="medic" /><span>Medic</span></label
+          ><input type="checkbox" name="newVolunteer" /><span
+            >New volunteer</span
+          ></label
         >
         <label class="volunteer-check"
-          ><input type="checkbox" name="newVolunteer" /><span>New</span></label
+          ><input type="checkbox" name="medic" /><span>Medic</span></label
         >
       </div>
       <div
@@ -300,8 +302,8 @@ const roles = [
   }
   .attendee-roles {
     display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 0.75rem;
   }
   .attendee-preview {
     display: grid;

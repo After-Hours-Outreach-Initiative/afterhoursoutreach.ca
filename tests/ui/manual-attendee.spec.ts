@@ -164,7 +164,7 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       .getByRole("checkbox", { name: "Medic", exact: true })
       .setChecked(medic);
     await form
-      .getByRole("checkbox", { name: "New", exact: true })
+      .getByRole("checkbox", { name: "New volunteer", exact: true })
       .setChecked(isNew);
     await expect(visibleEntry).toHaveCount(1);
     await expect(preview).toHaveCSS("background-color", "rgb(23, 26, 32)");
