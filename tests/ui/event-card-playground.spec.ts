@@ -335,7 +335,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     "Registered · Open · 1 of 8 spots remaining",
   );
   await expect(
-    mixed.getByRole("listitem").filter({ hasText: "Morgan P." }),
+    mixed.locator(".event-roster-list > li").filter({ hasText: "Morgan P." }),
   ).toBeVisible();
   await expect(
     mixed.locator(".event-roster-list > li:last-child .compact-person-name"),

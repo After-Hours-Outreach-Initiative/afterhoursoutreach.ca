@@ -34,4 +34,11 @@ const { scenario, ...fixture } = createEventCardFixture(
   .ui-event-preview {
     padding: 1rem;
   }
+  /* Wide cards can be horizontally clipped by the gallery. Keep modal actions
+     inside the visible slice, rather than centering them in the full iframe. */
+  .ui-event-preview :global(.dialog-frame) {
+    left: var(--preview-dialog-left, 0px);
+    right: var(--preview-dialog-right, 0px);
+    width: min(45rem, calc(var(--preview-dialog-width, 100vw) - 2rem));
+  }
 </style>

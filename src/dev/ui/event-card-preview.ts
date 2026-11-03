@@ -3,6 +3,38 @@ import { confirmEventUnregistration } from "../../scripts/event-unregistration";
 
 if (import.meta.env.DEV) {
   const root = document.querySelector<HTMLElement>("[data-ui-event-preview]");
+  const frame = window.frameElement;
+  const viewport = frame?.parentElement;
+  const syncDialogViewport = () => {
+    if (!root || !frame || !viewport) return;
+    const bounds = frame.getBoundingClientRect();
+    const clip = viewport.getBoundingClientRect();
+    const left = Math.max(0, clip.left + viewport.clientLeft - bounds.left);
+    const right = Math.max(
+      0,
+      bounds.right - clip.left - viewport.clientLeft - viewport.clientWidth,
+    );
+    root.style.setProperty("--preview-dialog-left", `${left}px`);
+    root.style.setProperty("--preview-dialog-right", `${right}px`);
+    root.style.setProperty(
+      "--preview-dialog-width",
+      `${bounds.width - left - right}px`,
+    );
+  };
+  if (viewport) {
+    const observer = new ResizeObserver(syncDialogViewport);
+    observer.observe(viewport);
+    viewport.addEventListener("scroll", syncDialogViewport, { passive: true });
+    window.addEventListener("resize", syncDialogViewport);
+    window.addEventListener(
+      "pagehide",
+      () => {
+        observer.disconnect();
+        viewport.removeEventListener("scroll", syncDialogViewport);
+      },
+      { once: true },
+    );
+  }
   const roster = root?.querySelector<HTMLDetailsElement>("details");
   if (roster)
     roster.open = new URLSearchParams(location.search).get("roster") === "open";
@@ -28,10 +60,11 @@ if (import.meta.env.DEV) {
       if (action === "cancel") {
         // A wide preview may be scrolled to its right-hand action. Reveal the
         // confirmation controls inside the iframe before opening the modal.
-        window.frameElement?.scrollIntoView({
+        frame?.scrollIntoView({
           block: "center",
           inline: "start",
         });
+        syncDialogViewport();
         if (!(await confirmEventUnregistration(form))) return;
       }
       const url = new URL(location.href);
