@@ -58,7 +58,17 @@ const orientationEvent = completedOrientation ?? orientation;
           <div>
             <dt>{person.patrolApproved ? "Approved by" : "Revoked by"}</dt>
             <dd>
-              {accessChangedBy.name} ({accessChangedBy.email})
+              {accessChangedBy.profileId ? (
+                <a
+                  class="underline underline-offset-4"
+                  href={`/volunteers/${encodeURIComponent(accessChangedBy.profileId)}`}
+                  data-volunteer-profile-link
+                >
+                  {accessChangedBy.name || "Organizer"}
+                </a>
+              ) : (
+                accessChangedBy.name || "Organizer"
+              )}
             </dd>
           </div>
           <div>

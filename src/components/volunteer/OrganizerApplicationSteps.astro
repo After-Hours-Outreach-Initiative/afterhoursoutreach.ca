@@ -41,9 +41,21 @@ const { profile, progress, idPrefix, showReview = false } = Astro.props;
             <div class="volunteer-wide">
               <dt>Approved by</dt>
               <dd>
-                {profile.applicationApprovedBy
-                  ? `${profile.applicationApprovedBy.name} (${profile.applicationApprovedBy.email})`
-                  : "Approving organizer not recorded."}
+                {profile.applicationApprovedBy ? (
+                  profile.applicationApprovedBy.profileId ? (
+                    <a
+                      class="underline underline-offset-4"
+                      href={`/volunteers/${encodeURIComponent(profile.applicationApprovedBy.profileId)}`}
+                      data-volunteer-profile-link
+                    >
+                      {profile.applicationApprovedBy.name || "Organizer"}
+                    </a>
+                  ) : (
+                    profile.applicationApprovedBy.name || "Organizer"
+                  )
+                ) : (
+                  "Approving organizer not recorded."
+                )}
               </dd>
             </div>
           </dl>

@@ -307,18 +307,16 @@ test("organizers review pending and approved applications with persistent list c
       }),
     );
     await page.goto(`${origin}/volunteers`);
-    await expect(page.getByRole("columnheader")).toHaveText(["Name", "Role"]);
+    await expect(page.getByRole("columnheader")).toHaveText(["Name"]);
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
       2,
     );
     const names = page.locator("[data-volunteer-profile-link]");
     const nameSort = page.locator('[data-volunteer-sort="name"]');
-    const roleSort = page.locator('[data-volunteer-sort="role"]');
-    await expect(roleSort.locator("..")).toHaveAttribute(
-      "aria-sort",
-      "ascending",
-    );
     await expect(names).toHaveText(["approved", "organizer"]);
+    await expect(
+      page.locator('.volunteer-table-name > [data-volunteer-role="organizer"]'),
+    ).toHaveText("Organizer");
     await nameSort.focus();
     await page.keyboard.press("Enter");
     await expect(nameSort.locator("..")).toHaveAttribute(
@@ -334,22 +332,11 @@ test("organizers review pending and approved applications with persistent list c
     );
     await expect(nameSort).toBeFocused();
     await expect(names).toHaveText(["organizer", "approved"]);
-    await roleSort.click();
-    await expect(roleSort.locator("..")).toHaveAttribute(
-      "aria-sort",
-      "ascending",
+    await expect(page).toHaveURL(
+      `${origin}/volunteers?sort=name&direction=desc`,
     );
-    await expect(names).toHaveText(["approved", "organizer"]);
-    await expect(page).toHaveURL(`${origin}/volunteers`);
-    await roleSort.click();
-    await expect(roleSort.locator("..")).toHaveAttribute(
-      "aria-sort",
-      "descending",
-    );
-    await expect(names).toHaveText(["organizer", "approved"]);
-    await expect(page).toHaveURL(`${origin}/volunteers?direction=desc`);
     await page.reload();
-    await expect(roleSort.locator("..")).toHaveAttribute(
+    await expect(nameSort.locator("..")).toHaveAttribute(
       "aria-sort",
       "descending",
     );
@@ -362,12 +349,14 @@ test("organizers review pending and approved applications with persistent list c
         .locator("[data-volunteer-results]")
         .getByRole("link", { name: "approved", exact: true }),
     ).toBeVisible();
-    await expect(page.locator("[data-volunteer-results] tbody td")).toHaveText([
-      "New",
-    ]);
-    await expect(page.locator('[name="sort"]')).toHaveValue("role");
+    await expect(
+      page.locator(
+        '[data-volunteer-results] tbody th .volunteer-table-name > [data-volunteer-role="new-volunteer"]',
+      ),
+    ).toHaveText("New");
+    await expect(page.locator('[name="sort"]')).toHaveValue("name");
     await expect(page.locator('[name="direction"]')).toHaveValue("desc");
-    const sortedReturn = "/volunteers?q=approved&direction=desc";
+    const sortedReturn = "/volunteers?q=approved&sort=name&direction=desc";
     await expect(names).toHaveAttribute(
       "href",
       `/volunteers/approved?returnTo=${encodeURIComponent(sortedReturn)}`,
@@ -383,7 +372,7 @@ test("organizers review pending and approved applications with persistent list c
       "ascending",
     );
     await page.goBack();
-    await expect(roleSort.locator("..")).toHaveAttribute(
+    await expect(nameSort.locator("..")).toHaveAttribute(
       "aria-sort",
       "descending",
     );
@@ -448,7 +437,6 @@ test("organizers review pending and approved applications with persistent list c
     await expect(results.locator("tbody tr")).toHaveCount(3);
     await expect(results.getByRole("columnheader")).toHaveText([
       "Name",
-      "Role",
       "Status",
       "Completed",
     ]);
@@ -463,11 +451,13 @@ test("organizers review pending and approved applications with persistent list c
       .locator("th, td")
       .all())
       await expect(cell).toHaveCSS("vertical-align", "middle");
-    await expect(results.locator("tbody th [data-volunteer-role]")).toHaveCount(
+    await expect(results.locator("tbody td [data-volunteer-role]")).toHaveCount(
       0,
     );
     await expect(
-      results.locator('tbody td [data-volunteer-role="medic"]'),
+      results.locator(
+        'tbody th .volunteer-table-name > [data-volunteer-role="medic"]',
+      ),
     ).toHaveText("Medic");
     await expect(results.locator('[data-state="ready"]').first()).toHaveText(
       "Ready for review",
@@ -724,7 +714,10 @@ test("organizers review pending and approved applications with persistent list c
     await expect(approvedReview).toHaveAttribute("data-state", "complete");
     await expect(
       approvedReview.locator("[data-application-approved-by] dd"),
-    ).toHaveText("organizer (organizer@example.org)");
+    ).toHaveText("organizer");
+    await expect(
+      approvedReview.locator("[data-volunteer-profile-link]"),
+    ).toHaveAttribute("href", "/volunteers/organizer");
     await expect(approvedReview.locator("time")).toHaveAttribute(
       "datetime",
       /T.*Z$/,
@@ -736,8 +729,8 @@ test("organizers review pending and approved applications with persistent list c
     // The dedicated application route renders the same approved review on reload.
     await page.reload();
     await expect(
-      approvedReview.locator("[data-application-approved-by]"),
-    ).toContainText("organizer@example.org");
+      approvedReview.locator("[data-application-approved-by] dd"),
+    ).toHaveText("organizer");
     await page.goto(`${origin}${profileHref}`);
     await expect(application).toBeVisible();
     await expect(profile).toBeVisible();
@@ -778,6 +771,12 @@ test("organizers review pending and approved applications with persistent list c
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
     ).toContainText("Approved by");
+    await expect(
+      patrolApproval.locator("[data-patrol-access-change] dd").first(),
+    ).toHaveText("organizer");
+    await expect(
+      patrolApproval.locator("[data-volunteer-profile-link]"),
+    ).toHaveAttribute("href", "/volunteers/organizer");
     await expect(
       patrolApproval.locator("[data-orientation-status]"),
     ).toHaveCount(0);
@@ -1022,15 +1021,14 @@ test("organizers review pending and approved applications with persistent list c
       "/applications?q=applicant-52&approval=awaiting&direction=desc",
     );
     await plain.goto(`${origin}/volunteers?q=approved&sort=name&offset=50`);
-    await plain.locator('[data-volunteer-sort="role"]').click();
+    await plain.locator('[data-volunteer-sort="name"]').click();
     await expect(
       plain.locator("[data-volunteer-results] tbody tr"),
     ).toHaveCount(1);
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
-    await plain.locator('[data-volunteer-sort="role"]').click();
     await plain.locator("[data-volunteer-search]").fill("organizer");
     await plain.getByRole("button", { name: "Search", exact: true }).click();
-    expect(new URL(plain.url()).searchParams.get("sort")).toBe("role");
+    expect(new URL(plain.url()).searchParams.get("sort")).toBe("name");
     expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     await expect(plain.locator("[data-volunteer-profile-link]")).toHaveText(
       "organizer",

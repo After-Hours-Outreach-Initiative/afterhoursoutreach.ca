@@ -450,8 +450,8 @@ export function createProfileFixture(
         approved && approvedAt !== null
           ? {
               id: "ui-fictional-organizer",
+              profileId: "ui-fictional-organizer",
               name: "Morgan C.",
-              email: "morgan.organizer@example.org",
               approvedAt,
             }
           : null,
@@ -459,8 +459,8 @@ export function createProfileFixture(
         patrolChangedAt !== null
           ? {
               id: "ui-fictional-organizer",
+              profileId: "ui-fictional-organizer",
               name: "Morgan C.",
-              email: "morgan.organizer@example.org",
               changedAt: patrolChangedAt,
             }
           : null,

@@ -2392,8 +2392,8 @@ test("application progress and organizer attribution use application audits, not
       ?.applicationApprovedBy,
     {
       id: approver.id,
+      profileId: approver.id,
       name: "Alex M.",
-      email: "application-approver@example.org",
       approvedAt: 2000,
     },
   ); // A later, different patrol approver must not replace the application approver.
@@ -2421,6 +2421,31 @@ test("application progress and organizer attribution use application audits, not
     isApplicationComplete({ ...dated, naloxoneCompletedAt: null }),
     false,
   );
+  await env.DB.prepare("DELETE FROM profile WHERE user_id=?")
+    .bind(approver.id)
+    .run();
+  assert.deepEqual(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy,
+    {
+      id: approver.id,
+      profileId: null,
+      name: "Application O.",
+      approvedAt: 2000,
+    },
+  ); // Missing profiles retain name-only attribution without a broken link.
+  await saveProfile(env.DB, approver.id, {
+    ...completeAnswers(),
+    codeOfConductAccepted: true,
+  });
+  await env.DB.prepare("UPDATE user SET deleted_at=? WHERE id=?")
+    .bind(Date.now(), approver.id)
+    .run();
+  assert.equal(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy?.profileId,
+    null,
+  ); // Retained decision records do not link to a deleted account's profile.
   await env.DB.prepare(
     "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
   )
@@ -2521,8 +2546,8 @@ test("patrol access attribution follows approvals and revocations, not unrelated
   const approval = await readChange();
   assert.deepEqual(approval, {
     id: organizer.id,
+    profileId: organizer.id,
     name: applicationDisplayName(completeAnswers()),
-    email: "patrol-organizer@example.org",
     changedAt: await version(),
   });
   await setVolunteerStatus(env.DB, reviewer, {
@@ -2549,8 +2574,8 @@ test("patrol access attribution follows approvals and revocations, not unrelated
   const revocation = await readChange();
   assert.deepEqual(revocation, {
     id: reviewer.id,
+    profileId: reviewer.id,
     name: "Taylor R.",
-    email: "patrol-reviewer@example.org",
     changedAt: await version(),
   });
   assert.ok(revocation!.changedAt > approval!.changedAt);
@@ -2592,8 +2617,8 @@ test("legacy patrol approval attribution retains its recorded organizer and epoc
       ?.patrolAccessChangedBy,
     {
       id: organizer.id,
+      profileId: organizer.id,
       name: applicationDisplayName(completeAnswers()),
-      email: "patrol-organizer@example.org",
       changedAt: 0,
     },
   );

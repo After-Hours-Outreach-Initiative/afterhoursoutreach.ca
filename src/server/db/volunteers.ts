@@ -214,8 +214,9 @@ export interface VolunteerOrientation {
 
 export interface VolunteerPatrolAccessChange {
   id: string;
+  /** Historical attribution can outlive the organizer's viewable profile. */
+  profileId: string | null;
   name: string;
-  email: string;
   changedAt: number;
 }
 
@@ -313,6 +314,7 @@ export async function viewVolunteerProfile(
     // approved_by belongs to patrol approval. The latest application-status
     // audit identifies the current approver only while the application is approved.
     // Historical approvals without such an audit deliberately stay unattributed.
+    // Link only to profiles the organizer-only detail route can still resolve.
     db
       .prepare(
         `SELECT approver.id, ${personDisplayNameSql({
@@ -320,7 +322,11 @@ export async function viewVolunteerProfile(
           lastName: "approver_profile.last_name",
           preferredName: "approver_profile.preferred_name",
           legacyName: "approver.name",
-        })} AS name, approver.email, a.created_at AS approvedAt
+        })} AS name,
+           CASE WHEN approver.deleted_at IS NULL AND EXISTS (
+             SELECT 1 FROM volunteer_status WHERE user_id=approver.id
+           ) THEN approver_profile.user_id END AS profileId,
+           a.created_at AS approvedAt
         FROM audit_log a JOIN user approver ON approver.id=a.actor_id
         LEFT JOIN profile approver_profile ON approver_profile.user_id=approver.id
         JOIN volunteer_status v ON v.user_id=a.subject_id
@@ -341,7 +347,11 @@ export async function viewVolunteerProfile(
           lastName: "organizer_profile.last_name",
           preferredName: "organizer_profile.preferred_name",
           legacyName: "organizer.name",
-        })} AS name, organizer.email, change.changedAt
+        })} AS name,
+           CASE WHEN organizer.deleted_at IS NULL AND EXISTS (
+             SELECT 1 FROM volunteer_status WHERE user_id=organizer.id
+           ) THEN organizer_profile.user_id END AS profileId,
+           change.changedAt
         FROM (
           SELECT actor_id, created_at AS changedAt, rowid AS sequence FROM audit_log
           WHERE subject_id=? AND action='approval_changed'
@@ -396,7 +406,8 @@ export async function viewVolunteerProfile(
     ...answers
   } = row;
   const applicationApprovedBy = results[2].results[0] as
-    { id: string; name: string; email: string; approvedAt: number } | undefined;
+    | { id: string; profileId: string | null; name: string; approvedAt: number }
+    | undefined;
   const patrolAccessChangedBy = results[3].results[0] as
     VolunteerPatrolAccessChange | undefined;
   const sources = row.heardAboutUsSources

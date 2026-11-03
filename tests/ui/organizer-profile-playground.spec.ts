@@ -9,7 +9,11 @@ async function expectOrganizerField(field: Locator, label: string) {
   const value = field.locator("dd");
   await expect(term).toHaveText(label);
   await expect(term).toHaveCSS("color", "rgb(161, 161, 170)");
-  await expect(value).toHaveText("Morgan C. (morgan.organizer@example.org)");
+  await expect(value).toHaveText("Morgan C.");
+  await expect(value.locator("[data-volunteer-profile-link]")).toHaveAttribute(
+    "href",
+    "/volunteers/ui-fictional-organizer",
+  );
   await expect(value).toHaveCSS("color", "rgb(244, 244, 245)");
   const labelBounds = (await term.boundingBox())!;
   const valueBounds = (await value.boundingBox())!;

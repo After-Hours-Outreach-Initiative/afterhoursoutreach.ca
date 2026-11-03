@@ -447,6 +447,14 @@ test("pending applications poll every minute, then approval restores five-second
         exact: true,
       }),
     ).toBeEnabled();
+    const approval = page.locator("[data-application-approved-by]");
+    await expect(approval.locator("dd")).toHaveText("Robin V.");
+    await expect(
+      approval.locator("[data-volunteer-profile-link]"),
+    ).toHaveAttribute("href", "/volunteers/local-fixture-user-robin");
+    expect(
+      (await page.request.get("/volunteers/local-fixture-user-robin")).status(),
+    ).toBe(200);
     await volunteer.clock.runFor(59_999);
     expect(checks).toBe(1);
     await expect(portal).toHaveAttribute(
