@@ -1,6 +1,7 @@
 import type { AccountNavigation } from "../data/account-navigation";
 import { forwardCookies, type AuthBindings } from "./auth";
 import { accountContext, canViewEvents } from "./db/access";
+import { countReadyApplications } from "./db/volunteers";
 
 /** Resolve the header before rendering; personalized HTML must never be cached. */
 export async function loadAccountNavigation(
@@ -16,6 +17,7 @@ export async function loadAccountNavigation(
     email: "",
     organizer: false,
     eventAccess: false,
+    readyApplicationCount: 0,
   };
   if (!bindings.BETTER_AUTH_SECRET) return signedOut;
   try {
@@ -24,6 +26,7 @@ export async function loadAccountNavigation(
       request,
     );
     forwardCookies(headers, responseHeaders);
+    const eventAccess = canViewEvents(actor);
     return actor
       ? {
           signedIn: true,
@@ -31,7 +34,11 @@ export async function loadAccountNavigation(
           greetingName,
           email,
           organizer: actor.role === "organizer",
-          eventAccess: canViewEvents(actor),
+          eventAccess,
+          readyApplicationCount:
+            actor.role === "organizer" && eventAccess
+              ? await countReadyApplications(bindings.DB, actor)
+              : 0,
         }
       : signedOut;
   } catch {

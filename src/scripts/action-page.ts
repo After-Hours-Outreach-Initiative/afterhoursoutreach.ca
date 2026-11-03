@@ -47,10 +47,22 @@ export async function loadActionPage(
       location.assign(signIn.href);
       throw new Error("Sign-in required");
     }
+    syncHeaderApplications(page);
     return page;
   } catch {
     throw new Error(savedRefreshError);
   }
+}
+
+/** Adopt the server count after decisions without replacing menu listeners. */
+export function syncHeaderApplications(page: Document) {
+  const selector = "[data-header-applications] [data-volunteer-nav-label]";
+  const next = page.querySelector(selector);
+  if (!next) return;
+  for (const label of document.querySelectorAll(selector))
+    label.replaceChildren(
+      ...[...next.childNodes].map((node) => document.importNode(node, true)),
+    );
 }
 
 export function actionFragment(page: Document, selector: string) {

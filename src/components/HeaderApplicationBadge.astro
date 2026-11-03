@@ -1,0 +1,31 @@
+---
+interface Props {
+  count: number;
+}
+const { count } = Astro.props;
+---
+
+{count > 0 && (
+  <span class="header-application-badge text-sm" data-header-application-count>
+    {count}
+    <span class="sr-only"> ready for review</span>
+  </span>
+)}
+
+<style>
+  .header-application-badge {
+    display: inline-block;
+    flex-shrink: 0;
+    min-width: 1.5rem;
+    border: 1px solid #166534;
+    border-radius: 9999px;
+    padding: 0.0625rem 0.375rem;
+    background: #10291b;
+    color: #86efac;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+</style>

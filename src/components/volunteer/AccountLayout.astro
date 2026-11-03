@@ -10,6 +10,7 @@ interface Props {
   signedIn?: boolean;
   organizer?: boolean;
   eventAccess?: boolean;
+  readyApplicationCount?: number;
   name?: string;
   greetingName?: string;
   email?: string;
@@ -21,6 +22,7 @@ const {
   signedIn = false,
   organizer = false,
   eventAccess,
+  readyApplicationCount = 0,
   name,
   greetingName,
   email,
@@ -30,7 +32,15 @@ const {
 const account =
   signedIn && eventAccess === undefined
     ? await loadAccountNavigation(env, Astro.request, Astro.response.headers)
-    : { signedIn, organizer, eventAccess, name, greetingName, email };
+    : {
+        signedIn,
+        organizer,
+        eventAccess,
+        readyApplicationCount,
+        name,
+        greetingName,
+        email,
+      };
 ---
 
 <Layout

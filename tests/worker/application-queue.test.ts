@@ -172,6 +172,21 @@ test("organizers review pending and approved applications with persistent list c
     const introduction = await get("/volunteer?type=orientation", "");
     assert.equal(introduction.status, 200);
     assert.match(await introduction.text(), /data-return-to="\/volunteer"/);
+    for (const auth of ["", volunteerCookie])
+      assert.doesNotMatch(
+        await (await get("/about", auth)).text(),
+        /data-header-application-count/,
+      );
+    await DB.prepare(
+      "UPDATE user SET two_factor_enabled=1 WHERE id='organizer'",
+    ).run();
+    assert.doesNotMatch(
+      await (await get("/about")).text(),
+      /data-header-application-count/,
+    );
+    await DB.prepare(
+      "UPDATE user SET two_factor_enabled=0 WHERE id='organizer'",
+    ).run();
     const signedOutEvents = await get(eventPath, "");
     assert.equal(signedOutEvents.status, 302);
     assert.equal(
@@ -223,6 +238,10 @@ test("organizers review pending and approved applications with persistent list c
       assert.doesNotMatch(eventHtml, /href="\/volunteer"/);
       assert.equal(eventHtml.includes('href="/volunteers"'), auth === cookie);
       assert.equal(eventHtml.includes('href="/applications"'), auth === cookie);
+      assert.equal(
+        [...eventHtml.matchAll(/data-header-application-count/g)].length,
+        auth === cookie ? 2 : 0,
+      );
       assert.doesNotMatch(eventHtml, /data-event-view-link/);
       assert.doesNotMatch(eventHtml, /href="\/manage\//);
       assert.equal(
@@ -306,6 +325,27 @@ test("organizers review pending and approved applications with persistent list c
       }),
     );
     await page.goto(`${origin}/volunteers`);
+    const headerCount = page.locator("[data-header-application-count]");
+    await expect(headerCount).toHaveText([
+      "53 ready for review",
+      "53 ready for review",
+    ]);
+    for (const width of [1280, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      if (width < 1024)
+        await page.getByRole("button", { name: "Open navigation" }).click();
+      const navigation = page.getByRole("navigation", {
+        name: width < 1024 ? "Mobile navigation" : "Primary navigation",
+        exact: true,
+      });
+      await expect(
+        navigation.getByRole("link", {
+          name: "Applications 53 ready for review",
+          exact: true,
+        }),
+      ).toBeVisible();
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
     await expect(page.getByRole("columnheader")).toHaveText(["Name"]);
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
       2,
@@ -661,6 +701,7 @@ test("organizers review pending and approved applications with persistent list c
     const inProgressHtml = await inProgressList.text();
     assert.match(inProgressHtml, /data-state="in-progress">In Progress</);
     assert.match(inProgressHtml, /data-awaiting-approval-count[^>]*>0</);
+    assert.match(inProgressHtml, /data-header-application-count[^>]*>52</);
     const reviewQueue = await get(
       "/applications?q=applicant-50&approval=awaiting",
     );
@@ -712,6 +753,10 @@ test("organizers review pending and approved applications with persistent list c
       '[data-application-review] [data-application-mini-step="review"]',
     );
     await expect(approvedReview).toHaveAttribute("data-state", "complete");
+    await expect(headerCount).toHaveText([
+      "52 ready for review",
+      "52 ready for review",
+    ]);
     await expect(
       approvedReview.locator("[data-application-approved-by] dd"),
     ).toHaveText("organizer");
@@ -1044,6 +1089,10 @@ test("organizers review pending and approved applications with persistent list c
       ),
     );
     await expect(count).toHaveText("50");
+    await expect(headerCount).toHaveText([
+      "50 ready for review",
+      "50 ready for review",
+    ]);
     await expect(allCount).toHaveText("53");
     await expect(results.locator("tbody tr")).toHaveCount(50);
     expect(page.url()).toBe(restoredListUrl);
@@ -1054,6 +1103,7 @@ test("organizers review pending and approved applications with persistent list c
     await page.goto(`${origin}/applications?approval=awaiting`);
     await expect(count).toHaveText("0");
     await expect(allCount).toHaveText("55");
+    await expect(headerCount).toHaveCount(0);
     await expect(
       results.getByText("No applications are ready for review."),
     ).toBeVisible();
@@ -1123,6 +1173,7 @@ test("organizers review pending and approved applications with persistent list c
     await expect(page.locator("[data-application-rejection]")).toHaveText(
       `Reason: ${rejection.reason}`,
     );
+    await expect(headerCount).toHaveCount(0);
     await expect(
       page.locator('[data-application-mini-step="review"]'),
     ).toHaveCount(0);
@@ -1168,6 +1219,7 @@ test("organizers review pending and approved applications with persistent list c
       .focus();
     await page.goto(`${origin}/applications?approval=awaiting&q=applicant-50`);
     await expect(count).toHaveText("0");
+    await expect(headerCount).toHaveCount(0);
     await page.getByRole("button", { name: "All (1)", exact: true }).click();
     await expect(results).toContainText("Rejected");
     assert.notEqual(
@@ -1178,7 +1230,12 @@ test("organizers review pending and approved applications with persistent list c
       const decision = await get(path, applicantCookie);
       assert.equal(decision.status, 200);
       const decisionHtml = await decision.text();
-      assert.match(decisionHtml, /Application rejected/);
+      assert.match(
+        decisionHtml,
+        path === "/volunteer/account"
+          ? /data-application-mini-step="review" data-state="rejected"/
+          : /Application rejected/,
+      );
       assert.ok(decisionHtml.includes("&lt;Please contact us&gt;"));
       assert.equal(
         await page.evaluate(

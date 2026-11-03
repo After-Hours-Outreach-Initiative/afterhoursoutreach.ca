@@ -1,4 +1,4 @@
-import { actionFragment } from "./action-page";
+import { actionFragment, syncHeaderApplications } from "./action-page";
 import { initDirectoryTableHeader } from "./directory-table-header";
 import {
   directoryEmptyMessage,
@@ -190,6 +190,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
       if (nextRoot.dataset.directoryKind !== kind)
         throw new Error(`Could not refresh ${kind}. Please reload the page.`);
       if (controller.signal.aborted) return;
+      syncHeaderApplications(page);
       const focused = document.activeElement;
       const focusedId =
         focused instanceof Element

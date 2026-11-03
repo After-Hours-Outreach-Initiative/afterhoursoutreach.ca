@@ -297,7 +297,7 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       navigation.getByRole("button", { name: "Manage", exact: true }),
     ).toHaveCount(0);
     await expect(
-      navigation.getByRole("link", { name: "Applications", exact: true }),
+      navigation.getByRole("link", { name: /^Applications\b/ }),
     ).toHaveAttribute("href", "/applications");
     const volunteersLink = navigation.getByRole("link", {
       name: "Volunteers",

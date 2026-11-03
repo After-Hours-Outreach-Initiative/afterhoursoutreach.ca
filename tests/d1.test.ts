@@ -52,6 +52,7 @@ import { RequestError } from "../src/server/http";
 import {
   listVolunteers,
   listApplications,
+  countReadyApplications,
   setVolunteerStatus,
   rejectApplication,
   viewVolunteerProfile,
@@ -1604,6 +1605,7 @@ test("review queue loads every submitted entry and counts search matches indepen
   const count = 53;
   const first = await listApplications(env.DB, actor, "", "awaiting");
   assert.equal(first.awaitingApprovalCount, count);
+  assert.equal(await countReadyApplications(env.DB, actor), count);
   assert.equal(first.rows.length, count);
   assert.equal(first.allRows.length, count + 2);
   assert.equal(first.rows[0].active, 0); // Inactive is not an approval state.
@@ -1692,6 +1694,7 @@ test("review queue loads every submitted entry and counts search matches indepen
     actor.id,
   ];
   const defaultRows = (await listApplications(env.DB, actor)).rows;
+  assert.equal(await countReadyApplications(env.DB, actor), count - 2);
   // Every visible status has a mutually exclusive filter. Counts include all
   // search matches, independently of the selected status.
   const expectedCounts = {
@@ -2028,11 +2031,16 @@ test("review queue loads every submitted entry and counts search matches indepen
     { ...actor, active: false },
     { ...actor, applicationSubmitted: false },
     { ...actor, twoFactorEnabled: true, twoFactorVerified: false },
-  ])
+  ]) {
     await assert.rejects(
       listApplications(env.DB, denied, "", "awaiting"),
       statusError(403),
     );
+    await assert.rejects(
+      countReadyApplications(env.DB, denied),
+      statusError(403),
+    );
+  }
   // Organizer event access is a role exception, not application approval.
   await env.DB.prepare(
     "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
@@ -2081,6 +2089,11 @@ test("review queue loads every submitted entry and counts search matches indepen
   );
   assert.ok(rejectionPayload[0].text.includes(rejection.reason));
   assert.deepEqual(rejectionPayload[0].to, ["pending-02@example.org"]);
+  const beforeDeletion = await countReadyApplications(env.DB, actor);
+  await env.DB.prepare(
+    "UPDATE user SET deleted_at=0 WHERE id='pending-00'",
+  ).run();
+  assert.equal(await countReadyApplications(env.DB, actor), beforeDeletion - 1);
   await env.DB.prepare("DELETE FROM session WHERE id=?")
     .bind(actor.sessionId)
     .run();

@@ -83,6 +83,21 @@ export async function listApplications(
   return listPeople(db, actor, true, { search, approval, sort, direction });
 }
 
+/** Count the full review queue without loading directory rows or private answers. */
+export async function countReadyApplications(db: Env["DB"], actor: Actor) {
+  requireOrganizer(actor);
+  return (
+    (await db
+      .prepare(
+        `SELECT count(*) AS count
+         FROM user u JOIN profile p ON p.user_id = u.id
+         JOIN volunteer_status v ON v.user_id = u.id
+         WHERE u.deleted_at IS NULL AND (${applicationStatusSql}) = 'awaiting'`,
+      )
+      .first<number>("count")) ?? 0
+  );
+}
+
 async function listPeople(
   db: Env["DB"],
   actor: Actor,

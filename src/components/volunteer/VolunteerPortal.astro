@@ -12,6 +12,7 @@ import {
   listPatrolSeries,
 } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
+import { countReadyApplications } from "@/server/db/volunteers";
 import AccountLayout from "./AccountLayout.astro";
 import EventCard from "./EventCard.astro";
 import EventCalendar from "./EventCalendar.astro";
@@ -60,6 +61,10 @@ const pastEvents = await listEvents(
 );
 const series = manage ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
+const readyApplicationCount =
+  actor.role === "organizer" && eventAccess
+    ? await countReadyApplications(env.DB, actor)
+    : 0;
 const showApplicationProgress =
   !manage && (!actor.twoFactorEnabled || actor.twoFactorVerified);
 const applicationProgress = showApplicationProgress
@@ -135,6 +140,7 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
   signedIn
   organizer={actor.role === "organizer"}
   eventAccess={eventAccess}
+  {readyApplicationCount}
   name={actor.name}
   greetingName={greetingName}
   email={email}

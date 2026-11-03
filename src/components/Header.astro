@@ -7,6 +7,7 @@ import ArrowUpRightIcon from "@/components/icons/ArrowUpRightIcon.astro";
 import MenuIcon from "@/components/icons/MenuIcon.svg";
 import CloseIcon from "@/components/icons/CloseIcon.svg";
 import HeaderAccountCard from "@/components/HeaderAccountCard.astro";
+import HeaderApplicationBadge from "@/components/HeaderApplicationBadge.astro";
 import { siteNavigation, social } from "@/data/site";
 import { accountGreeting } from "@/data/account-navigation";
 import "@/styles/header.css";
@@ -15,6 +16,7 @@ interface Props {
   signedIn: boolean;
   organizer?: boolean;
   eventAccess?: boolean;
+  readyApplicationCount?: number;
   name?: string;
   greetingName?: string;
   email?: string;
@@ -23,6 +25,7 @@ const {
   signedIn,
   organizer = false,
   eventAccess = false,
+  readyApplicationCount = 0,
   name,
   greetingName = accountGreeting(undefined, name),
   email,
@@ -33,6 +36,7 @@ const isCurrent = (href: string) =>
   current === href ||
   (href === "/volunteers" && current.startsWith(`${href}/`));
 const links = siteNavigation(signedIn, organizer, eventAccess);
+const applicationCount = signedIn && organizer ? readyApplicationCount : 0;
 const accountPage = current === "/volunteer/account" || current === "/apply";
 ---
 
@@ -63,6 +67,9 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
           <a
             class="header-link"
             href={link.href}
+            data-header-applications={
+              link.href === "/applications" ? "" : undefined
+            }
             data-volunteer-nav={
               link.href === "/volunteer" || link.href === "/events"
                 ? ""
@@ -70,7 +77,12 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
             }
             aria-current={isCurrent(link.href) ? "page" : undefined}
           >
-            <span data-volunteer-nav-label>{link.label}</span>
+            <span class="header-link-label" data-volunteer-nav-label>
+              {link.label}
+              {link.href === "/applications" && (
+                <HeaderApplicationBadge count={applicationCount} />
+              )}
+            </span>
           </a>
         ))
       }
@@ -159,6 +171,9 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
                 <a
                   class="header-mobile-link"
                   href={link.href}
+                  data-header-applications={
+                    link.href === "/applications" ? "" : undefined
+                  }
                   data-volunteer-nav={
                     link.href === "/volunteer" || link.href === "/events"
                       ? ""
@@ -166,7 +181,12 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
                   }
                   aria-current={isCurrent(link.href) ? "page" : undefined}
                 >
-                  <span data-volunteer-nav-label>{link.label}</span>
+                  <span class="header-link-label" data-volunteer-nav-label>
+                    {link.label}
+                    {link.href === "/applications" && (
+                      <HeaderApplicationBadge count={applicationCount} />
+                    )}
+                  </span>
                   <ArrowRightIcon class="header-mobile-arrow" />
                 </a>
               </li>

@@ -9,6 +9,7 @@ export interface AccountNavigation {
   email: string;
   organizer: boolean;
   eventAccess: boolean;
+  readyApplicationCount: number;
 }
 
 export function accountGreeting(answers?: PersonName | null, name?: string) {
