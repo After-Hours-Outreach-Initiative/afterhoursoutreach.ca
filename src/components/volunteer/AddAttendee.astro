@@ -2,6 +2,7 @@
 import type { EventRow } from "@/server/db/events";
 import { manualAttendeeCategory } from "@/data/event-roster";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
+import SearchIcon from "@/components/icons/SearchIcon.astro";
 import TrashIcon from "@/components/icons/TrashIcon.astro";
 import RosterPerson from "./RosterPerson.astro";
 import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
@@ -45,19 +46,26 @@ const roles = [
       <h4 id={`${id}-heading`} class="text-lg">Add volunteers</h4>
       <input type="hidden" name="id" value={event.id} />
       <div class="volunteer-field">
-        <label for={`${id}-search`}>Search volunteers</label>
-        <input
-          id={`${id}-search`}
-          type="text"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded="false"
-          aria-controls={`${id}-suggestions`}
-          aria-describedby={`${id}-search-help`}
-          maxlength="100"
-          autocomplete="off"
-          data-attendee-search
-        />
+        <label
+          class="volunteer-search-field attendee-search"
+          for={`${id}-search`}
+        >
+          <span class="sr-only">Search volunteers</span>
+          <SearchIcon class="volunteer-search-icon" />
+          <input
+            id={`${id}-search`}
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls={`${id}-suggestions`}
+            aria-describedby={`${id}-search-help`}
+            maxlength="100"
+            autocomplete="off"
+            placeholder="Search by name"
+            data-attendee-search
+          />
+        </label>
         <span id={`${id}-search-help`} class="sr-only"
           >Use arrow keys or Tab to choose a result, Enter to add it to the
           list, and Escape to close suggestions.</span
@@ -121,13 +129,18 @@ const roles = [
                 placeholder="Name"
                 data-manual-name
               />
-              <label class="sr-only" data-manual-role-label>Role</label>
-              <select data-manual-role>
-                <option value="outreach-volunteer">Outreach volunteer</option>
-                <option value="medic">Medic</option>
-                <option value="new-volunteer">New volunteer</option>
-                <option value="new-medic">New medic</option>
-              </select>
+              <div class="attendee-manual-roles" role="group" aria-label="Role">
+                <label>
+                  <VolunteerRoleBadge role="medic">
+                    <input type="checkbox" name="medic" />
+                  </VolunteerRoleBadge>
+                </label>
+                <label>
+                  <VolunteerRoleBadge role="new-volunteer">
+                    <input type="checkbox" name="newVolunteer" />
+                  </VolunteerRoleBadge>
+                </label>
+              </div>
             </div>
           </div>
           <div class="event-roster-actions">
@@ -171,6 +184,10 @@ const roles = [
     border: 2px solid var(--color-blue);
     border-radius: 0.5rem;
     background: #000;
+    scroll-margin-top: calc(
+      var(--site-header-rendered-height, var(--site-header-height, 6rem)) + 1rem
+    );
+    scroll-margin-bottom: 1rem;
   }
   .attendee-trigger.btn {
     width: 100%;
@@ -226,6 +243,9 @@ const roles = [
     justify-content: flex-end;
     gap: 0.75rem;
   }
+  .attendee-form .attendee-search input {
+    padding-left: 2.75rem;
+  }
   .attendee-surface:has(.attendee-trigger:focus-visible) {
     outline: 2px solid white;
     outline-offset: 3px;
@@ -257,10 +277,20 @@ const roles = [
     min-width: 0;
     gap: 0.5rem;
   }
-  .attendee-form :global(.attendee-manual-fields input),
-  .attendee-form :global(.attendee-manual-fields select) {
+  .attendee-form :global(.attendee-manual-fields input[type="text"]) {
     width: 100%;
     min-width: 0;
+  }
+  .attendee-form :global(.attendee-manual-roles) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .attendee-form :global(.attendee-manual-roles .volunteer-role-badge) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    cursor: pointer;
   }
   @media (min-width: 64rem) {
     @container event-card (min-width: 32rem) {

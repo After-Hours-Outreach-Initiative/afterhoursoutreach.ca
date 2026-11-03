@@ -13,7 +13,7 @@ const label =
     "volunteer-role-badge text-sm",
     { "event-roster-new-badge": role === "new-volunteer" },
   ]}
-  data-volunteer-role={role}>{label}</span
+  data-volunteer-role={role}><slot />{label}</span
 >
 
 <style>

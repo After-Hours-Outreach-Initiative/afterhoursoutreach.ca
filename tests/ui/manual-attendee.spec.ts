@@ -56,10 +56,33 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   const search = form.getByRole("combobox", { name: "Search volunteers" });
   const staged = form.getByRole("list", { name: "Volunteers to add" });
   const addManual = form.getByRole("button", { name: "Add name manually" });
+  const surface = card.locator(".attendee-surface");
+  await page.setViewportSize({ width: 375, height: 600 });
   await expect(form).toHaveAttribute("inert", "");
+  await trigger.evaluate((element) => element.scrollIntoView({ block: "end" }));
   await trigger.click();
   await expect(form).toHaveAccessibleName("Add volunteers");
-  await expect(search).toBeFocused();
+  await expect(form).toBeFocused();
+  await expect(search).not.toBeFocused();
+  await expect(search).toHaveAttribute("placeholder", "Search by name");
+  await expect(form.locator(".volunteer-search-icon")).toBeVisible();
+  await expect(form.locator('label[for$="-search"] > span')).toHaveClass(
+    "sr-only",
+  );
+  await expect
+    .poll(() =>
+      surface.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return (
+          bounds.top >= parseFloat(style.scrollMarginTop) - 1 &&
+          bounds.bottom <=
+            innerHeight - parseFloat(style.scrollMarginBottom) + 1
+        );
+      }),
+    )
+    .toBe(true);
+  await page.setViewportSize({ width: 1280, height: 900 });
   await expect(form.getByText("Preview", { exact: true })).toHaveCount(0);
   await form.getByRole("button", { name: "Add", exact: true }).click();
   await expect(form.getByRole("alert")).toHaveText(
@@ -115,10 +138,34 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   await name.pressSequentially("Avery Example");
   await expect(name).toHaveValue("Avery Example");
   await expect(name).toBeFocused();
-  const role = staged
-    .getByRole("combobox", { name: "Role", exact: true })
-    .first();
-  await role.selectOption("new-medic");
+  const manualRow = name.locator("xpath=ancestor::li[1]");
+  const medic = manualRow.getByRole("checkbox", { name: "Medic", exact: true });
+  const newVolunteer = manualRow.getByRole("checkbox", {
+    name: "New",
+    exact: true,
+  });
+  await expect(medic).not.toBeChecked();
+  await expect(newVolunteer).not.toBeChecked();
+  await expect(medic).toHaveAttribute("name", "medic");
+  await expect(newVolunteer).toHaveAttribute("name", "newVolunteer");
+  const medicId = await medic.getAttribute("id");
+  const newVolunteerId = await newVolunteer.getAttribute("id");
+  expect(medicId).toBeTruthy();
+  expect(newVolunteerId).not.toBe(medicId);
+  // Click the badge text/padding, not just its checkbox.
+  await manualRow.locator('[data-volunteer-role="medic"]').click({
+    position: { x: 60, y: 12 },
+  });
+  await expect(medic).toBeChecked();
+  await expect(medic).toBeFocused();
+  await medic.press("Space");
+  await expect(medic).not.toBeChecked();
+  await medic.press("Space");
+  await manualRow.locator('[data-volunteer-role="new-volunteer"]').click({
+    position: { x: 50, y: 12 },
+  });
+  await expect(newVolunteer).toBeChecked();
+  await expect(newVolunteer).toBeFocused();
   await expect(staged.locator(".event-roster-new-badge")).toHaveText("New");
   await expect(
     staged.locator('[data-avatar-decoration="medic-cross"]'),
@@ -131,7 +178,10 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   await staged
     .getByRole("button", { name: "Remove Discard me from list" })
     .click();
-  await expect(search).toBeFocused();
+  await expect(search).not.toBeFocused();
+  await expect(
+    staged.getByRole("button", { name: "Remove Avery Example from list" }),
+  ).toBeFocused();
   await addManual.click();
   await staged
     .getByRole("textbox", { name: "Name", exact: true })
@@ -139,9 +189,26 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
     .fill("   ");
   await form.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(trigger).toBeFocused();
+  await page.setViewportSize({ width: 320, height: 480 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await trigger.press("Enter");
-  await expect(search).toBeFocused();
+  await expect(form).toBeFocused();
+  await expect(search).not.toBeFocused();
+  await expect
+    .poll(() =>
+      surface.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const top = parseFloat(getComputedStyle(element).scrollMarginTop);
+        return (
+          bounds.height > innerHeight - top && Math.abs(bounds.top - top) < 1
+        );
+      }),
+    )
+    .toBe(true);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(name).toHaveValue("Avery Example");
+  await expect(medic).toBeChecked();
+  await expect(newVolunteer).toBeChecked();
   for (const width of [1280, 375, 320]) {
     await page.setViewportSize({ width, height: 900 });
     expect(
@@ -168,7 +235,8 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
       form.getByRole("button", { name: "Add", exact: true }).click(),
     pending: async () => {
       await expect(name).toBeDisabled();
-      await expect(role).toBeDisabled();
+      await expect(medic).toBeDisabled();
+      await expect(newVolunteer).toBeDisabled();
       await expect(addManual).toBeDisabled();
       await form.press("Escape");
       await expect(form).toBeVisible();
@@ -176,8 +244,8 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
     updated: async () => {
       await expect(form).not.toBeVisible();
       await expect(trigger).toBeFocused();
-      await expect(card.locator("[data-event-availability]")).toContainText(
-        "6 of 8 spots remaining",
+      await expect(card.locator("[data-event-availability]")).toHaveText(
+        "Registered",
       );
     },
   });
@@ -287,8 +355,8 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
         remove.getByRole("button", { name: "Remove", exact: true }).click(),
       updated: async () => {
         await expect(row).toHaveCount(0);
-        await expect(card.locator("[data-event-availability]")).toContainText(
-          "7 of 8 spots remaining",
+        await expect(card.locator("[data-event-availability]")).toHaveText(
+          "Registered",
         );
       },
     });

@@ -40,11 +40,20 @@ class AddAttendee extends HTMLElement {
         if (button?.type === "submit") this.closeSuggestions();
         if (button?.matches("[data-attendee-manual]")) this.addManual();
         if (button?.matches("[data-attendee-remove]")) {
-          button.closest("[data-staged-row]")!.remove();
+          const row = button.closest("[data-staged-row]")!;
+          const nextFocus =
+            row.nextElementSibling?.querySelector<HTMLButtonElement>(
+              "[data-attendee-remove]",
+            ) ??
+            row.previousElementSibling?.querySelector<HTMLButtonElement>(
+              "[data-attendee-remove]",
+            ) ??
+            this.querySelector<HTMLButtonElement>("[data-attendee-manual]")!;
+          row.remove();
           this.staged.hidden = !this.staged.children.length;
           this.announce("Removed from the list.");
           this.closeSuggestions();
-          this.search.focus();
+          nextFocus.focus({ preventScroll: true });
         }
         const option = event.target.closest<HTMLElement>(
           "[data-candidate-index]",
@@ -324,7 +333,6 @@ class AddAttendee extends HTMLElement {
       .setAttribute("aria-label", `Remove ${person.name} from list`);
     this.search.value = "";
     this.closeSuggestions();
-    this.search.focus({ preventScroll: true });
     this.announce(`${person.name} added to the list.`);
   }
 
@@ -334,11 +342,14 @@ class AddAttendee extends HTMLElement {
     if (!row) return;
     row.querySelector<HTMLElement>("[data-manual-fields]")!.hidden = false;
     const name = row.querySelector<HTMLInputElement>("[data-manual-name]")!;
-    const role = row.querySelector("select")!;
     name.id = `manual-name-${crypto.randomUUID()}`;
-    role.id = `${name.id}-role`;
     row.querySelector("[data-manual-name-label]")!.setAttribute("for", name.id);
-    row.querySelector("[data-manual-role-label]")!.setAttribute("for", role.id);
+    for (const checkbox of row.querySelectorAll<HTMLInputElement>(
+      'input[type="checkbox"]',
+    )) {
+      checkbox.id = `${name.id}-${checkbox.name}`;
+      checkbox.closest("label")!.htmlFor = checkbox.id;
+    }
     this.syncManual(row);
     name.focus();
   }
@@ -346,9 +357,11 @@ class AddAttendee extends HTMLElement {
   private syncManual(row: HTMLElement) {
     const name =
       row.querySelector<HTMLInputElement>("[data-manual-name]")!.value;
-    const role = row.querySelector("select")!.value;
-    const medic = role === "medic" || role === "new-medic";
-    const newVolunteer = role === "new-volunteer" || role === "new-medic";
+    const medic =
+      row.querySelector<HTMLInputElement>('[name="medic"]')!.checked;
+    const newVolunteer = row.querySelector<HTMLInputElement>(
+      '[name="newVolunteer"]',
+    )!.checked;
     const person = this.person({
       name: "",
       category: manualAttendeeCategory(medic, newVolunteer),
@@ -356,15 +369,14 @@ class AddAttendee extends HTMLElement {
     });
     // The textbox is the name in a manual row, not a separate name preview.
     person.querySelector(".compact-person-name")!.remove();
+    // The role checkboxes already provide the badges for manual entries.
+    for (const badge of person.querySelectorAll(".volunteer-role-badge"))
+      badge.remove();
     const fields = row.querySelector<HTMLElement>("[data-manual-fields]")!;
     const existingAvatar = row.querySelector(".attendee-avatar");
     if (existingAvatar) {
-      // Keep focused text/select controls in place while changing the role.
+      // Keep focused text/checkbox controls in place while changing the role.
       existingAvatar.replaceWith(person.querySelector(".attendee-avatar")!);
-      for (const badge of row.querySelectorAll(".volunteer-role-badge"))
-        badge.remove();
-      for (const badge of person.querySelectorAll(".volunteer-role-badge"))
-        row.querySelector(".event-roster-name")!.appendChild(badge);
     } else {
       row.querySelector("[data-staged-person]")!.replaceChildren(person);
       const identity = row.querySelector(".event-roster-name")!;
@@ -387,14 +399,42 @@ class AddAttendee extends HTMLElement {
     const trigger = this.querySelector<HTMLButtonElement>(
       "[data-attendee-open]",
     )!;
-    this.morph.run(surface, trigger, this.form, expanded, () => {
-      this.toggleAttribute("data-expanded", expanded);
-      trigger.setAttribute("aria-expanded", String(expanded));
-      this.form.inert = !expanded;
-      this.form.setAttribute("aria-hidden", String(!expanded));
-      trigger.inert = expanded;
-      (expanded ? this.search : trigger).focus({ preventScroll: true });
-    });
+    const finished = this.morph.run(
+      surface,
+      trigger,
+      this.form,
+      expanded,
+      () => {
+        this.toggleAttribute("data-expanded", expanded);
+        trigger.setAttribute("aria-expanded", String(expanded));
+        this.form.inert = !expanded;
+        this.form.setAttribute("aria-hidden", String(!expanded));
+        trigger.inert = expanded;
+        (expanded ? this.form : trigger).focus({ preventScroll: true });
+      },
+    );
+    if (expanded)
+      void finished.then((completed) => {
+        if (
+          !completed ||
+          !this.isConnected ||
+          !this.hasAttribute("data-expanded")
+        )
+          return;
+        // Measure after the morph, when the entire expanded section is laid out.
+        const style = getComputedStyle(surface);
+        const height =
+          surface.getBoundingClientRect().height +
+          parseFloat(style.scrollMarginTop) +
+          parseFloat(style.scrollMarginBottom);
+        surface.scrollIntoView({
+          block: height > window.innerHeight ? "start" : "nearest",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+            .matches
+            ? "instant"
+            : "smooth",
+        });
+      });
     if (!expanded)
       this.dispatchEvent(new Event("add-attendee-close", { bubbles: true }));
   }
