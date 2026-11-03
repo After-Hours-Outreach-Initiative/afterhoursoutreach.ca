@@ -178,7 +178,16 @@ test("event dialogs offer only cancellation for future events and keep ended his
     "Delete series",
     "Save series defaults",
   ]);
+  const seriesTime = settings.getByLabel("Start time");
+  await expect(seriesTime).toHaveAttribute("type", "time");
+  await expect(seriesTime).toHaveValue("21:00");
+  await expect(seriesTime).toHaveAttribute("required", "");
+  await expect(settings.locator("[data-native-date]").first()).toHaveAttribute(
+    "readonly",
+    "",
+  );
   await expectPinnedChrome(settings);
+  await seriesTime.fill("19:15");
   await settings
     .getByLabel("Meeting point", { exact: true })
     .fill("Saved series meeting point");
@@ -188,6 +197,8 @@ test("event dialogs offer only cancellation for future events and keep ended his
   await expect(
     settings.getByLabel("Meeting point", { exact: true }),
   ).toHaveValue("Saved series meeting point");
+  await expect(seriesTime).toHaveValue("19:15");
+  const seriesRequest = page.waitForRequest("**/api/v1/events/action");
   await settings
     .getByRole("button", { name: "Save series defaults", exact: true })
     .click();
@@ -196,6 +207,11 @@ test("event dialogs offer only cancellation for future events and keep ended his
     .click();
   await expect(settings).toBeHidden();
   await expect(seriesButton).toBeFocused();
+  expect((await seriesRequest).postDataJSON()).toMatchObject({
+    action: "save-series",
+    id: series.id,
+    series: { firstDate, localTime: "19:15" },
+  });
 
   const activeOccurrenceId = `patrol:${series.id}:${addCalendarDays(firstDate, 7)}`;
   for (const [id, editable, recurring] of [

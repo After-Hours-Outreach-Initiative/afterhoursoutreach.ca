@@ -86,7 +86,7 @@ test("meeting and volunteer-limit defaults are submitted without replacing draft
   };
   await expect(meeting).toHaveValue(defaults.meetingPoint);
   await expect(map).toHaveValue(defaults.meetingPointUrl);
-  await fillDateInput(form, "startsAt", "2030-01-01T21:00");
+  await fillDateInput(form, "startsAt", "2030-07-01T21:00");
   await page.route("**/api/v1/events/action", (route) =>
     route.fulfill({
       status: 503,
@@ -105,11 +105,14 @@ test("meeting and volunteer-limit defaults are submitted without replacing draft
     ).toBeEnabled();
     return body;
   };
-  expect(await submit()).toMatchObject({ action: "save", event: defaults });
+  expect(await submit()).toMatchObject({
+    action: "save",
+    event: { ...defaults, startsAt: "2030-07-02T04:00:00.000Z" },
+  });
   await form.getByLabel("Recurring patrol", { exact: true }).check();
   expect(await submit()).toMatchObject({
     action: "save-series",
-    series: defaults,
+    series: { ...defaults, firstDate: "2030-07-01", localTime: "21:00" },
   });
 
   await meeting.fill("Custom meeting point");

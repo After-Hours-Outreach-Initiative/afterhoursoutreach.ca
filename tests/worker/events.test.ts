@@ -1454,9 +1454,7 @@ describe(
             await expect(
               editor.locator("[data-native-date]").first(),
             ).toHaveValue("2031-04-12");
-            await expect(editor.getByLabel("Start time")).toHaveValue(
-              "8:30 PM",
-            );
+            await expect(editor.getByLabel("Start time")).toHaveValue("20:30");
             await expect(
               editor.locator('input[type="radio"][name="type"]'),
             ).toHaveCount(0);

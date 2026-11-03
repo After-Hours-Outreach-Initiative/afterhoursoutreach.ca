@@ -516,14 +516,18 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .getByRole("button", { name: "Edit series", exact: true })
       .click();
     await expect(manager.locator('[name="recurring"]')).toHaveCount(0);
-    await expect(manager.getByLabel("Start time")).toHaveValue("8:30 PM");
+    await expect(manager.getByLabel("Start time")).toHaveAttribute(
+      "type",
+      "time",
+    );
+    await expect(manager.getByLabel("Start time")).toHaveValue("20:30");
     await expect(manager.getByLabel("Interval (weeks)")).toBeEditable();
     await expect(manager.getByLabel("Start time")).toBeEditable();
     await expect(manager.locator("[data-native-date]").first()).toHaveAttribute(
       "readonly",
       "",
     );
-    await manager.getByLabel("Start time").fill("7:15 PM");
+    await manager.getByLabel("Start time").fill("19:15");
     await manager.getByLabel("Interval (weeks)").fill("3");
     await manager
       .getByRole("button", { name: "Save series defaults", exact: true })
