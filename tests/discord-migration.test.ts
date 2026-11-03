@@ -50,7 +50,12 @@ test("Discord migration preserves existing volunteers and drafts without inventi
               }
             : {}),
           ...(table === "signup"
-            ? { manual_name: null, manual_medic: 0, manual_new: 0 }
+            ? {
+                manual_name: null,
+                manual_medic: 0,
+                manual_new: 0,
+                added_by: null,
+              }
             : {}),
         })),
     );

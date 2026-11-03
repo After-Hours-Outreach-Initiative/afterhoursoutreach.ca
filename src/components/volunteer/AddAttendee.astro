@@ -1,10 +1,10 @@
 ---
 import type { EventRow } from "@/server/db/events";
 import { manualAttendeeCategory } from "@/data/event-roster";
-import FieldError from "@/components/FieldError.astro";
-import EllipsisIcon from "@/components/icons/EllipsisIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
+import TrashIcon from "@/components/icons/TrashIcon.astro";
 import RosterPerson from "./RosterPerson.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
 
 interface Props {
   event: EventRow;
@@ -29,7 +29,7 @@ const roles = [
       data-attendee-open
     >
       <PlusIcon class="btn-icon" />
-      Add volunteer
+      Add volunteers
     </button>
     <form
       id={`${id}-form`}
@@ -42,76 +42,104 @@ const roles = [
       tabindex="-1"
       inert
     >
-      <h4 id={`${id}-heading`} class="text-lg">Add volunteer</h4>
+      <h4 id={`${id}-heading`} class="text-lg">Add volunteers</h4>
       <input type="hidden" name="id" value={event.id} />
       <div class="volunteer-field">
-        <label for={`${id}-name`}>
-          Name <span class="volunteer-required" aria-hidden="true">*</span>
-        </label>
+        <label for={`${id}-search`}>Search volunteers</label>
         <input
-          id={`${id}-name`}
-          name="name"
+          id={`${id}-search`}
           type="text"
-          required
-          maxlength="200"
-          pattern=".*\S.*"
-          aria-describedby={`error-${id}-name`}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-controls={`${id}-suggestions`}
+          aria-describedby={`${id}-search-help`}
+          maxlength="100"
           autocomplete="off"
+          data-attendee-search
         />
-        <FieldError field={`${id}-name`} message="Enter a name." />
-      </div>
-      <div class="attendee-roles">
-        <label class="volunteer-check"
-          ><input type="checkbox" name="newVolunteer" /><span
-            >New volunteer</span
-          ></label
+        <span id={`${id}-search-help`} class="sr-only"
+          >Use arrow keys or Tab to choose a result, Enter to add it to the
+          list, and Escape to close suggestions.</span
         >
-        <label class="volunteer-check"
-          ><input type="checkbox" name="medic" /><span>Medic</span></label
+        <ul
+          id={`${id}-suggestions`}
+          class="event-roster-list attendee-suggestions"
+          role="listbox"
+          aria-label="Matching volunteers"
+          data-attendee-suggestions
+          hidden
         >
+        </ul>
+        <p class="volunteer-help" role="status" data-search-message hidden></p>
       </div>
-      <div
-        class="attendee-preview"
-        role="group"
-        aria-labelledby={`${id}-preview-label`}
+      <ul
+        class="event-roster-list attendee-staged"
+        role="list"
+        aria-label="Volunteers to add"
+        data-attendee-staged
+        hidden
       >
-        <span id={`${id}-preview-label`}>Preview</span>
-        <div
-          class="event-roster-row attendee-preview-row"
-          data-attendee-preview
-          aria-live="polite"
-          aria-atomic="true"
-        >
+      </ul>
+      <button
+        class="btn btn-quiet attendee-manual"
+        type="button"
+        data-attendee-manual
+      >
+        <PlusIcon class="btn-icon" /> Add name manually
+      </button>
+      <span class="sr-only" role="status" data-staged-message></span>
+      {
+        roles.map(({ medic, newVolunteer }) => (
+          <template
+            data-attendee-person-template={`${manualAttendeeCategory(medic, newVolunteer)}-${medic}`}
+          >
+            <RosterPerson
+              name="Name"
+              category={manualAttendeeCategory(medic, newVolunteer)}
+              medicMark={medic}
+              gradientId={`${id}-gradient-${medic}`}
+            />
+          </template>
+        ))
+      }
+      <template data-attendee-badges>
+        <VolunteerRoleBadge role="organizer" />
+        <VolunteerRoleBadge role="medic" />
+      </template>
+      <template data-attendee-row-template>
+        <li class="event-roster-row" data-staged-row>
+          <input type="hidden" name="volunteers" />
           <div class="event-roster-details">
-            {
-              roles.map(({ medic, newVolunteer }) => (
-                <div
-                  data-attendee-preview-medic={String(medic)}
-                  data-attendee-preview-new={String(newVolunteer)}
-                  hidden={medic || newVolunteer}
-                >
-                  <RosterPerson
-                    name="Name"
-                    category={manualAttendeeCategory(medic, newVolunteer)}
-                    medicMark={medic}
-                    gradientId={`${id}-gradient-${medic}`}
-                  />
-                </div>
-              ))
-            }
+            <div data-staged-person></div>
+            <div class="attendee-manual-fields" data-manual-fields hidden>
+              <label class="sr-only" data-manual-name-label>Name</label>
+              <input
+                type="text"
+                maxlength="200"
+                autocomplete="off"
+                placeholder="Name"
+                data-manual-name
+              />
+              <label class="sr-only" data-manual-role-label>Role</label>
+              <select data-manual-role>
+                <option value="outreach-volunteer">Outreach volunteer</option>
+                <option value="medic">Medic</option>
+                <option value="new-volunteer">New volunteer</option>
+                <option value="new-medic">New medic</option>
+              </select>
+            </div>
           </div>
           <div class="event-roster-actions">
             <button
               class="btn btn-quiet signup-menu-trigger"
               type="button"
-              aria-label="Registration actions (preview only)"
-              disabled
+              aria-label="Remove from list"
+              data-attendee-remove><TrashIcon class="size-5" /></button
             >
-              <EllipsisIcon class="size-5" />
-            </button>
           </div>
-        </div>
-      </div>
+        </li>
+      </template>
       <p data-form-message role="status" hidden></p>
       <div class="attendee-actions">
         <button class="btn btn-quiet" type="button" data-attendee-cancel
@@ -126,70 +154,7 @@ const roles = [
 </add-attendee>
 
 <script>
-  import { syncAttendeePreview } from "@/scripts/add-attendee";
-  import { InlineMorph } from "@/scripts/inline-morph";
-
-  class AddAttendee extends HTMLElement {
-    private controller?: AbortController;
-    private morph = new InlineMorph();
-
-    connectedCallback() {
-      this.controller?.abort();
-      this.controller = new AbortController();
-      const { signal } = this.controller;
-      this.addEventListener(
-        "click",
-        (event) => {
-          if (!(event.target instanceof Element)) return;
-          const button = event.target.closest<HTMLButtonElement>(
-            "[data-attendee-open], [data-attendee-cancel]",
-          );
-          if (button && !button.disabled)
-            this.expand(button.hasAttribute("data-attendee-open"));
-        },
-        { signal },
-      );
-      this.addEventListener(
-        "keydown",
-        (event) => {
-          if (event.key === "Escape" && this.hasAttribute("data-expanded")) {
-            event.preventDefault();
-            this.expand(false);
-          }
-        },
-        { signal },
-      );
-    }
-
-    disconnectedCallback() {
-      this.controller?.abort();
-      this.morph.cancel();
-    }
-
-    private expand(expanded: boolean) {
-      const form = this.querySelector<HTMLFormElement>("form")!;
-      if (form.dataset.submitting) return;
-      const surface = this.querySelector<HTMLElement>(".attendee-surface")!;
-      const trigger = this.querySelector<HTMLButtonElement>(
-        "[data-attendee-open]",
-      )!;
-      this.morph.run(surface, trigger, form, expanded, () => {
-        this.toggleAttribute("data-expanded", expanded);
-        trigger.setAttribute("aria-expanded", String(expanded));
-        form.inert = !expanded;
-        form.setAttribute("aria-hidden", String(!expanded));
-        trigger.inert = expanded;
-        if (expanded) syncAttendeePreview(form);
-        // Focus the form itself, not the name input or the hidden trigger.
-        (expanded ? form : trigger).focus({ preventScroll: true });
-      });
-      if (!expanded)
-        this.dispatchEvent(new Event("add-attendee-close", { bubbles: true }));
-    }
-  }
-
-  if (!customElements.get("add-attendee"))
-    customElements.define("add-attendee", AddAttendee);
+  import "@/scripts/add-attendee";
 </script>
 
 <style>
@@ -265,23 +230,37 @@ const roles = [
     outline: 2px solid white;
     outline-offset: 3px;
   }
-  .attendee-roles {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .attendee-preview {
-    display: grid;
-    gap: 0.5rem;
-  }
-  .attendee-preview-row {
+  .attendee-form :global(.attendee-staged),
+  .attendee-form :global(.attendee-suggestions) {
     border: 1px solid #3f3f46;
     border-radius: 0.5rem;
   }
-  .attendee-preview .signup-menu-trigger:disabled {
-    pointer-events: none;
-    cursor: default;
-    opacity: 1;
+  .attendee-suggestions {
+    max-height: 18rem;
+    overflow-y: auto;
+  }
+  .attendee-suggestions :global([role="option"]) {
+    cursor: pointer;
+  }
+  .attendee-suggestions :global([aria-selected="true"]) {
+    background: #213653;
+    box-shadow: inset 3px 0 var(--color-blue);
+  }
+  .attendee-manual.btn {
+    justify-self: start;
+    text-align: left;
+    white-space: normal;
+  }
+  .attendee-form :global(.attendee-manual-fields) {
+    display: grid;
+    flex: 1 1 100%;
+    min-width: 0;
+    gap: 0.5rem;
+  }
+  .attendee-form :global(.attendee-manual-fields input),
+  .attendee-form :global(.attendee-manual-fields select) {
+    width: 100%;
+    min-width: 0;
   }
   @media (min-width: 64rem) {
     @container event-card (min-width: 32rem) {

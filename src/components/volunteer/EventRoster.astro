@@ -49,7 +49,7 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
             />
             <span class="event-roster-status">
               <span class="event-roster-registration-label">
-                {person.userId ? (
+                {person.userId && !person.addedById ? (
                   "Registered "
                 ) : (
                   <>
@@ -108,7 +108,7 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
                 </form>
               )}
           </div>
-          {(future || (!person.userId && person.addedById)) && (
+          {(future || person.addedById) && (
             <div class="event-roster-actions">
               <SignupEditor
                 signup={person}

@@ -13,7 +13,6 @@ import {
   initVolunteerProfileContents,
 } from "./volunteer-profile-contents";
 import { initSignupMenus } from "./signup-menu";
-import { initAttendeePreviews } from "./add-attendee";
 import {
   initSignupMoveCalendars,
   syncSignupMoveCalendar,
@@ -81,7 +80,6 @@ for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
 initEventDates(document);
 initVolunteerProfileContents();
 initSignupMenus();
-initAttendeePreviews();
 initSignupMoveCalendars();
 
 function applyEventFilter(root: HTMLElement, type: string) {
@@ -753,7 +751,7 @@ function form(
               : element.matches("[data-manage-signup]")
                 ? "Registration changed"
                 : element.matches("[data-add-attendee]")
-                  ? "Volunteer added"
+                  ? "Volunteers added"
                   : element.matches("[data-organizer-role]")
                     ? "Account role saved"
                     : element.matches("[data-organizer-rejection]")
@@ -921,12 +919,12 @@ form("[data-live-signup]", "/api/v1/events/action", (v) => ({
   action: str(v, "action"),
   id: str(v, "id"),
 }));
-form("[data-add-attendee]", "/api/v1/events/action", (v) => ({
-  action: "add-attendee",
-  id: str(v, "id"),
-  name: str(v, "name"),
-  medic: v.has("medic"),
-  newVolunteer: v.has("newVolunteer"),
+form("[data-add-attendee]", "/api/v1/events/action", (values) => ({
+  action: "add-volunteers",
+  id: str(values, "id"),
+  volunteers: values
+    .getAll("volunteers")
+    .map((value) => JSON.parse(String(value))),
 }));
 form(
   "[data-event-save]",

@@ -17,7 +17,10 @@ import {
 import { RequestError } from "../http";
 import {
   approvedMedicSql,
+  applicationReadyForReviewSql,
+  attendeeCategorySql,
   includesOrientationSql,
+  medicMarkSql,
   nowMsSql,
   personDisplayNameSql,
   profileDisplayNameSql,
@@ -200,6 +203,165 @@ export const manualSignupSchema = z.strictObject({
   medic: z.boolean(),
   newVolunteer: z.boolean(),
 });
+
+export const addVolunteersSchema = z
+  .array(
+    z.union([
+      z.strictObject({ userId: z.string().min(1).max(200) }),
+      manualSignupSchema.extend({ name: z.string().trim().max(200) }),
+    ]),
+  )
+  .max(100)
+  .transform((rows) => rows.filter((row) => "userId" in row || row.name))
+  .refine((rows) => rows.length > 0, "Choose a volunteer or enter a name.")
+  .refine((rows) => {
+    const ids = rows.flatMap((row) => ("userId" in row ? [row.userId] : []));
+    return new Set(ids).size === ids.length;
+  }, "Each volunteer can only be added once.");
+
+export interface SignupCandidate {
+  id: string;
+  name: string;
+  role: "volunteer" | "organizer";
+  category: AttendeeCategory;
+  medicMark: number;
+}
+
+// Shared by organizer search and the atomic batch guard. Account roles always
+// come from the account, not from event-local manual role inputs.
+const signupCandidateSql = `u.deleted_at IS NULL AND u.email_verified = 1
+  AND v.active = 1 AND (v.registration_approved = 1 OR u.role = 'organizer')
+  AND (u.role = 'organizer' OR v.patrol_approved = 1 OR ${applicationReadyForReviewSql})
+  AND (${includesOrientationSql()} OR v.patrol_approved = 1)
+  AND NOT EXISTS(SELECT 1 FROM signup booked
+    WHERE booked.event_id = e.id AND booked.user_id = u.id AND booked.status = 'confirmed')
+  AND NOT (${includesOrientationSql()} AND v.patrol_approved = 0 AND EXISTS(
+    SELECT 1 FROM signup booked JOIN event other ON other.id = booked.event_id
+    WHERE booked.user_id = u.id AND booked.status = 'confirmed'
+      AND ${includesOrientationSql("other")} AND other.cancelled_at IS NULL
+      AND other.starts_at > ${nowMsSql}))`;
+
+/** Organizer-only autocomplete: names and roster presentation, never profiles. */
+export async function searchSignupCandidates(
+  db: Env["DB"],
+  actor: Actor,
+  eventId: string,
+  search: string,
+  exclude: string[] = [],
+) {
+  requireOrganizer(actor);
+  if (!search.trim()) return [];
+  const rows = await db
+    .prepare(
+      `SELECT u.id, u.role, ${profileDisplayNameSql} AS name,
+    ${attendeeCategorySql("u.id")} AS category, ${medicMarkSql("u.id")} AS medicMark
+    FROM user u JOIN profile p ON p.user_id = u.id
+    JOIN volunteer_status v ON v.user_id = u.id JOIN event e ON e.id = ?
+    WHERE ${signupCandidateSql} AND ${writePermission(true)}
+      AND e.open = 1 AND e.hidden = 0 AND e.cancelled_at IS NULL
+      AND e.starts_at > ${nowMsSql} AND ${recurringSignupWindowSql()}
+      AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
+      AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')
+      AND u.id NOT IN (SELECT value FROM json_each(?))
+      AND instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
+    ORDER BY name COLLATE NOCASE, u.id LIMIT 10`,
+    )
+    .bind(
+      eventId,
+      ...permissionValues(actor),
+      JSON.stringify(exclude.slice(0, 100)),
+      search.trim().slice(0, 100),
+    )
+    .all<SignupCandidate>();
+  return rows.results;
+}
+
+/** One INSERT and one audit in a transaction: no partially added staged lists. */
+export async function addEventVolunteers(
+  db: Env["DB"],
+  actor: Actor,
+  eventId: string,
+  input: unknown,
+) {
+  requireOrganizer(actor);
+  const parsed = addVolunteersSchema.safeParse(input);
+  if (!parsed.success)
+    throw new RequestError(
+      400,
+      parsed.error.issues.find((issue) => issue.code === "custom")?.message ??
+        "Choose up to 100 volunteers with names of at most 200 characters and valid roles.",
+    );
+  await ensurePatrolOccurrences(db);
+  const event = await findEvent(db, eventId);
+  if (event.startsAt <= Date.now())
+    throw new RequestError(409, "Registration closes when the event starts.");
+  if (
+    parsed.data.some((row) => !("userId" in row) && row.newVolunteer) &&
+    !event.includesOrientation
+  )
+    throw new RequestError(
+      409,
+      "New volunteers need an event with orientation.",
+    );
+  const rows = parsed.data.map((row) => ({ id: crypto.randomUUID(), ...row }));
+  const registered = rows.flatMap((row) =>
+    "userId" in row ? [row.userId] : [],
+  );
+  const operation = crypto.randomUUID();
+  const now = Date.now();
+  try {
+    const results = await db.batch([
+      db
+        .prepare(`SELECT ${writePermission(true)} AS allowed`)
+        .bind(...permissionValues(actor)),
+      db
+        .prepare(
+          `INSERT INTO signup (id, event_id, user_id, added_by, manual_name, manual_medic, manual_new, created_at, updated_at)
+        SELECT json_extract(j.value, '$.id'), ?, json_extract(j.value, '$.userId'), ?,
+          json_extract(j.value, '$.name'), coalesce(json_extract(j.value, '$.medic'), 0),
+          coalesce(json_extract(j.value, '$.newVolunteer'), 0), ?, ?
+        FROM json_each(?) j WHERE ${writePermission(true)} AND (
+          SELECT count(*) FROM user u JOIN profile p ON p.user_id = u.id
+          JOIN volunteer_status v ON v.user_id = u.id JOIN event e ON e.id = ?
+          WHERE u.id IN (SELECT value FROM json_each(?)) AND ${signupCandidateSql}
+        ) = ?`,
+        )
+        .bind(
+          eventId,
+          actor.id,
+          now,
+          now,
+          JSON.stringify(rows),
+          ...permissionValues(actor),
+          eventId,
+          JSON.stringify(registered),
+          registered.length,
+        ),
+      db
+        .prepare(
+          `INSERT INTO event_audit (id, event_id, actor_id, action, changed_fields, created_at)
+        SELECT ?, ?, ?, 'signup_manually_added', '["volunteers"]', ? WHERE changes() = ?`,
+        )
+        .bind(operation, eventId, actor.id, now, rows.length),
+    ]);
+    if (!(results[0].results[0] as { allowed: number })?.allowed)
+      throw new RequestError(403, "Your sign-in changed. Sign in again.");
+    if (!results[1].meta.changes)
+      throw new RequestError(
+        409,
+        "A selected volunteer is already registered or is no longer eligible for this event. Remove them or search again. No volunteers were added.",
+      );
+    return {
+      operation,
+      message:
+        rows.length === 1
+          ? "Volunteer added."
+          : `${rows.length} volunteers added.`,
+    };
+  } catch (error) {
+    return databaseWriteError(error);
+  }
+}
 
 export { eventDescription } from "../../data/email-templates";
 
@@ -1148,7 +1310,7 @@ export async function manageSignup(
             crypto.randomUUID(),
             next.id,
             row.userId,
-            row.userId ? null : actor.id,
+            actor.id,
             row.manualName,
             row.manualMedic,
             row.manualNew,

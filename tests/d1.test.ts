@@ -12,6 +12,8 @@ import { event } from "../src/server/db/schema";
 import {
   changeSignup,
   addManualSignup,
+  addEventVolunteers,
+  searchSignupCandidates,
   cancelEvent,
   findEvent,
   listEvents,
@@ -478,6 +480,150 @@ test("concurrent manual and account signups cannot take each other's reserved ca
   assert.deepEqual(
     [event.confirmed, event.medicConfirmed, event.newVolunteerConfirmed],
     [2, 1, 0],
+  );
+});
+
+test("organizer staged additions search eligible accounts and commit mixed lists atomically", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("staged-volunteer", "volunteer");
+  const inactive = await manualRosterActor("staged-inactive", "volunteer");
+  const newVolunteer = await manualRosterActor("staged-new", "volunteer");
+  await env.DB.batch([
+    env.DB.prepare("UPDATE volunteer_status SET active=0 WHERE user_id=?").bind(
+      inactive.id,
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id=?",
+    ).bind(newVolunteer.id),
+    env.DB.prepare(
+      `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,
+      min_medic_spots,min_new_volunteer_spots,max_new_volunteers,created_by,created_at,updated_at)
+      VALUES ('staged-event','patrol',1,?,'Point',4,1,1,2,?,0,0)`,
+    ).bind(Date.now() + 86_400_000, organizer.id),
+  ]);
+  await assert.rejects(
+    searchSignupCandidates(env.DB, volunteer, "staged-event", "staged"),
+    statusError(403),
+  );
+  const candidates = await searchSignupCandidates(
+    env.DB,
+    organizer,
+    "staged-event",
+    "staged",
+  );
+  assert.deepEqual(
+    candidates.map(({ id }) => id),
+    [newVolunteer.id, volunteer.id],
+  );
+  assert.equal(candidates[0].category, "new-volunteer");
+  assert.deepEqual(Object.keys(candidates[0]).sort(), [
+    "category",
+    "id",
+    "medicMark",
+    "name",
+    "role",
+  ]);
+  assert.deepEqual(
+    (
+      await searchSignupCandidates(
+        env.DB,
+        organizer,
+        "staged-event",
+        "staged",
+        [volunteer.id],
+      )
+    ).map(({ id }) => id),
+    [newVolunteer.id],
+  );
+
+  const manual = { name: "Medic Person", medic: true, newVolunteer: false };
+  await assert.rejects(
+    addEventVolunteers(env.DB, volunteer, "staged-event", [manual]),
+    statusError(403),
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      { ...manual, name: " " },
+    ]),
+    statusError(400),
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      { userId: volunteer.id },
+      { userId: volunteer.id },
+    ]),
+    statusError(400),
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      manual,
+      { userId: inactive.id },
+    ]),
+    statusError(409),
+  );
+  // The last insertion exceeds capacity; neither earlier rows nor audits survive.
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      manual,
+      { userId: newVolunteer.id },
+      { userId: volunteer.id },
+      { ...manual, name: "Fourth" },
+      { ...manual, name: "Fifth" },
+    ]),
+    statusError(409),
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM signup").first("n"),
+    0,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_audit").first("n"),
+    0,
+  );
+
+  await addEventVolunteers(env.DB, organizer, "staged-event", [
+    { userId: volunteer.id },
+    manual,
+    { userId: newVolunteer.id },
+    { ...manual, name: "  " },
+  ]);
+  const roster = await listRosters(env.DB, organizer, ["staged-event"]);
+  assert.equal(roster.length, 3);
+  assert.ok(roster.every(({ addedById }) => addedById === organizer.id));
+  assert.deepEqual(roster.map(({ category }) => category).sort(), [
+    "medic",
+    "new-volunteer",
+    "outreach-volunteer",
+  ]);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_audit").first("n"),
+    1,
+  );
+  assert.deepEqual(
+    await searchSignupCandidates(env.DB, organizer, "staged-event", "staged"),
+    [],
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      manual,
+      { userId: volunteer.id },
+    ]),
+    statusError(409),
+  );
+  await env.DB.prepare("DELETE FROM session WHERE id=?")
+    .bind(organizer.sessionId)
+    .run();
+  assert.deepEqual(
+    await searchSignupCandidates(env.DB, organizer, "staged-event", "staged"),
+    [],
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [manual]),
+    statusError(403),
+  );
+  assert.equal(
+    (await listRosters(env.DB, organizer, ["staged-event"])).length,
+    3,
   );
 });
 

@@ -41,7 +41,7 @@ const actions = editable ? (["move", "remove"] as const) : [];
   data-signup-menu
 >
   {
-    !signup.userId && signup.addedById && (
+    signup.addedById && (
       <a
         href={`/volunteers/${encodeURIComponent(signup.addedById)}`}
         data-volunteer-profile-link
