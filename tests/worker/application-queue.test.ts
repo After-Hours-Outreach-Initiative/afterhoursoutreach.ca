@@ -9,7 +9,7 @@ import {
   formatApplicationSubmittedTime,
 } from "../../src/data/application";
 
-test("organizers review applications separately from approved volunteers with persistent list context", async () => {
+test("organizers review pending and approved applications with persistent list context", async () => {
   const origin = "https://afterhoursoutreach.ca";
   const secret = "application-queue-test-secret-12345678901234567890";
   const server = createTestHarness({
@@ -134,7 +134,12 @@ test("organizers review applications separately from approved volunteers with pe
       ),
       "/applications?q=applicant&approval=awaiting&offset=50",
     );
-    for (const path of [listPath, "/volunteers", "/volunteers/applicant-50"])
+    for (const path of [
+      listPath,
+      "/applications/approved",
+      "/volunteers",
+      "/volunteers/applicant-50",
+    ])
       assert.equal((await get(path, volunteerCookie)).status, 403);
     for (const [oldPath, destination] of [
       [
@@ -188,11 +193,19 @@ test("organizers review applications separately from approved volunteers with pe
         "/volunteer?type=orientation&occurrence=a%2Fb",
         auth,
       );
-      assert.equal(landing.status, 200);
-      const landingHtml = await landing.text();
-      assert.match(landingHtml, /data-event-path="\/volunteer"/);
-      assert.match(landingHtml, /data-event-access="true"/);
-      assert.doesNotMatch(landingHtml, /data-event-view-link/);
+      if (auth === cookie) {
+        assert.equal(landing.status, 302);
+        assert.equal(
+          landing.headers.get("location"),
+          "/events?type=orientation&occurrence=a%2Fb",
+        );
+      } else {
+        assert.equal(landing.status, 200);
+        const landingHtml = await landing.text();
+        assert.match(landingHtml, /data-event-path="\/volunteer"/);
+        assert.match(landingHtml, /data-event-access="true"/);
+        assert.doesNotMatch(landingHtml, /data-event-view-link/);
+      }
       const events = await get("/events", auth);
       assert.equal(events.status, 200);
       assert.equal(events.headers.get("cache-control"), "no-store");
@@ -696,6 +709,9 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       applicationProgress.locator('[data-application-mini-step="review"]'),
     ).toHaveAttribute("data-state", "current");
+    await page.goto(`${origin}${applicationHref}`);
+    await page.locator('[data-application-mini-step="form"] summary').click();
+    const documentsBeforeApproval = documents.length;
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
@@ -705,6 +721,32 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       page.getByRole("button", { name: "Revoke application approval" }),
     ).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "Revoke application approval" }),
+    ).toBeFocused();
+    await expect(page).toHaveURL(`${origin}${applicationHref}`);
+    assert.equal(documents.length, documentsBeforeApproval);
+    const approvedReview = page.locator(
+      '[data-application-review] [data-application-mini-step="review"]',
+    );
+    await expect(approvedReview).toHaveAttribute("data-state", "complete");
+    await expect(
+      approvedReview.locator("[data-application-approved-by] dd"),
+    ).toHaveText("organizer (organizer@example.org)");
+    await expect(approvedReview.locator("time")).toHaveAttribute(
+      "datetime",
+      /T.*Z$/,
+    );
+    await expect(
+      page.locator('[data-application-mini-step="form"] details'),
+    ).toHaveAttribute("open");
+    await expect(page.locator("application-rejection")).toHaveCount(0);
+    // The dedicated application route renders the same approved review on reload.
+    await page.reload();
+    await expect(
+      approvedReview.locator("[data-application-approved-by]"),
+    ).toContainText("organizer@example.org");
+    await page.goto(`${origin}${profileHref}`);
     await expect(application).toBeVisible();
     await expect(profile).toBeVisible();
     await expect(patrolApproval.locator("[data-patrol-status]")).toHaveText(
@@ -869,16 +911,17 @@ test("organizers review applications separately from approved volunteers with pe
     );
     await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("52");
-    await expect(allCount).toHaveText("52");
+    await expect(allCount).toHaveText("53");
     await expect(results.locator("tbody tr")).toHaveCount(2);
     // Normal full-page links retain exactly the same list context.
-    await page.goto(`${origin}${profileHref}`);
+    await page.goto(`${origin}${applicationHref}`);
     await expect(
       page.getByRole("link", { name: "Back to applications" }),
     ).toHaveAttribute(
       "href",
       "/applications?q=applicant&approval=awaiting&offset=50",
     );
+    const documentsBeforeRevocation = documents.length;
     await page
       .getByRole("button", { name: "Revoke application approval" })
       .click();
@@ -888,6 +931,12 @@ test("organizers review applications separately from approved volunteers with pe
     await expect(
       page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "Approve application", exact: true }),
+    ).toBeFocused();
+    await expect(page).toHaveURL(`${origin}${applicationHref}`);
+    assert.equal(documents.length, documentsBeforeRevocation);
+    await expect(page.locator("[data-application-approved-by]")).toHaveCount(0);
     await page.getByRole("link", { name: "Back to applications" }).click();
     await page.waitForLoadState("load");
     await expect(count).toHaveText("53");
@@ -902,14 +951,17 @@ test("organizers review applications separately from approved volunteers with pe
     await search.fill("approved");
     await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("0");
+    await expect(allCount).toHaveText("1");
     await allApplicants.click();
-    await expect(results.locator("tbody tr")).toHaveCount(0);
+    await expect(results.locator("tbody tr")).toHaveCount(1);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("0");
+    await expect(allCount).toHaveText("1");
     await expect(
       results.getByRole("link", { name: "approved", exact: true }),
-    ).toHaveCount(0);
+    ).toBeVisible();
+    await expect(results.locator('[data-state="approved"]')).toHaveText(
+      "Approved",
+    );
     await expect(page).toHaveURL(`${origin}/applications?q=approved`);
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
@@ -1006,7 +1058,7 @@ test("organizers review applications separately from approved volunteers with pe
       ),
     );
     await expect(count).toHaveText("50");
-    await expect(allCount).toHaveText("50");
+    await expect(allCount).toHaveText("53");
     await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(
       results.getByText(
@@ -1022,7 +1074,7 @@ test("organizers review applications separately from approved volunteers with pe
     ).run();
     await page.goto(`${origin}/applications?approval=awaiting`);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("0");
+    await expect(allCount).toHaveText("55");
     await expect(
       results.getByText("No applications are ready for review."),
     ).toBeVisible();

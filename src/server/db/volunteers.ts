@@ -96,7 +96,7 @@ async function listPeople(
       JOIN volunteer_status v ON v.user_id = u.id
       WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
         AND u.deleted_at IS NULL
-        AND v.registration_approved = ${applications ? 0 : 1}`;
+        ${applications ? "" : "AND v.registration_approved = 1"}`;
   const query = search.slice(0, 100);
   const readyForReviewSql = `v.registration_approved = 0 AND v.application_rejection_reason IS NULL AND ${applicationReadyForReviewSql}`;
   // Application badges show submitted medic-team interest, not approval or
@@ -108,14 +108,15 @@ async function listPeople(
   // organizer approval, or patrol signup. SQLite max keeps missing steps null.
   const applicationCompletedAtSql =
     "max(p.registered_at, p.naloxone_completed_at)";
-  // Ascending status order is ready, in progress, rejected; descending reverses
-  // those groups, always keeping newest completions first within each group.
+  // Ascending status order is ready, in progress, rejected, approved; descending
+  // reverses those groups, keeping newest completions first within each group.
   // Match visible role badges, not raw account flags.
   // Only backend-owned expressions and directions enter ORDER BY. Sort the
   // entire matching directory before pagination, with stable name/id ties.
   const sortSql = applications
     ? sort === "progress"
-      ? `CASE WHEN coalesce(v.application_rejection_reason, '') <> '' THEN 2
+      ? `CASE WHEN v.registration_approved = 1 THEN 3
+             WHEN coalesce(v.application_rejection_reason, '') <> '' THEN 2
             WHEN ${applicationReadyForReviewSql} THEN 0
             ELSE 1 END`
       : sort === "role"

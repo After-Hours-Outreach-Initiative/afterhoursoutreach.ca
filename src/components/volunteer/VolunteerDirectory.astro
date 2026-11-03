@@ -215,18 +215,22 @@ const columns = (
                         <span
                           class="application-table-progress"
                           data-state={
-                            person.applicationRejectionReason
-                              ? "rejected"
-                              : person.applicationReadyForReview
-                                ? "ready"
-                                : "in-progress"
+                            person.applicationApproved
+                              ? "approved"
+                              : person.applicationRejectionReason
+                                ? "rejected"
+                                : person.applicationReadyForReview
+                                  ? "ready"
+                                  : "in-progress"
                           }
                         >
-                          {person.applicationRejectionReason
-                            ? "Rejected"
-                            : person.applicationReadyForReview
-                              ? "Ready for review"
-                              : "In Progress"}
+                          {person.applicationApproved
+                            ? "Approved"
+                            : person.applicationRejectionReason
+                              ? "Rejected"
+                              : person.applicationReadyForReview
+                                ? "Ready for review"
+                                : "In Progress"}
                         </span>
                       </td>
                       <td>

@@ -1058,7 +1058,7 @@ test("new medic marks require application approval and team selection without sa
   // Application presentation shows selected teams before approval, even while
   // the avatar category is new-volunteer; it does not change roster eligibility.
   assert.deepEqual(
-    (await listApplications(env.DB, organizer)).rows.map(
+    (await listApplications(env.DB, organizer, "pending-")).rows.map(
       ({ id, category, medicMark }) => ({ id, category, medicMark }),
     ),
     [
@@ -1304,7 +1304,7 @@ test("review queue counts only review-ready applications matching search indepen
   );
   assert.equal(
     (await listApplications(env.DB, actor)).allApplicantsCount,
-    count,
+    count + 2,
   );
   assert.equal(
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
@@ -1349,6 +1349,19 @@ test("review queue counts only review-ready applications matching search indepen
     (id) => !["pending-50", "pending-51"].includes(id),
   );
   const reviewByCompletion = ["pending-51", "pending-50", ...earlyCompletions];
+  const approved = ["approved", actor.id];
+  const reviewAndApprovedNames = [
+    ...ties,
+    "approved",
+    ...reviewNames.slice(ties.length),
+    actor.id,
+  ];
+  const earlyCompletionsAndApproved = [
+    ...ties,
+    "approved",
+    ...earlyCompletions.slice(ties.length),
+    actor.id,
+  ];
   const defaultPages = await Promise.all(
     [0, volunteerPageSize].map((offset) =>
       listApplications(env.DB, actor, "", offset),
@@ -1357,7 +1370,15 @@ test("review queue counts only review-ready applications matching search indepen
   const defaultRows = defaultPages.flatMap(({ rows }) => rows);
   assert.deepEqual(
     defaultRows.map(({ id }) => id),
-    [...reviewByCompletion, "pending-52", "pending-01"],
+    [...reviewByCompletion, "pending-52", "pending-01", "approved", actor.id],
+  );
+  assert.deepEqual(
+    defaultRows.slice(-2).map(({ applicationApproved }) => applicationApproved),
+    [1, 1],
+  );
+  assert.equal(
+    (await listApplications(env.DB, actor, "approved")).rows[0].id,
+    "approved",
   );
   for (const [id, completedAt] of [
     ["pending-00", 0],
@@ -1371,18 +1392,30 @@ test("review queue counts only review-ready applications matching search indepen
       completedAt,
     );
   for (const [sort, direction, expected] of [
-    ["name", "asc", [...ties, ...otherNames]],
-    ["name", "desc", [...otherNames.toReversed(), ...ties]],
-    ["progress", "asc", [...reviewByCompletion, "pending-52", "pending-01"]],
-    ["progress", "desc", ["pending-01", "pending-52", ...reviewByCompletion]],
-    ["role", "asc", [...reviewNames, "pending-01", "pending-52"]],
-    ["role", "desc", ["pending-01", "pending-52", ...reviewNames]],
+    ["name", "asc", [...ties, "approved", ...otherNames, actor.id]],
+    [
+      "name",
+      "desc",
+      [actor.id, ...otherNames.toReversed(), "approved", ...ties],
+    ],
+    [
+      "progress",
+      "asc",
+      [...reviewByCompletion, "pending-52", "pending-01", ...approved],
+    ],
+    [
+      "progress",
+      "desc",
+      [...approved, "pending-01", "pending-52", ...reviewByCompletion],
+    ],
+    ["role", "asc", [...reviewAndApprovedNames, "pending-01", "pending-52"]],
+    ["role", "desc", ["pending-01", "pending-52", ...reviewAndApprovedNames]],
     [
       "completed",
       "asc",
       [
         "pending-52",
-        ...earlyCompletions,
+        ...earlyCompletionsAndApproved,
         "pending-50",
         "pending-51",
         "pending-01",
@@ -1395,7 +1428,7 @@ test("review queue counts only review-ready applications matching search indepen
         "pending-01",
         "pending-51",
         "pending-50",
-        ...earlyCompletions,
+        ...earlyCompletionsAndApproved,
         "pending-52",
       ],
     ],
@@ -1414,7 +1447,7 @@ test("review queue counts only review-ready applications matching search indepen
       [true, false],
     );
     for (const page of pages) {
-      assert.equal(page.allApplicantsCount, count);
+      assert.equal(page.allApplicantsCount, count + 2);
       assert.equal(page.awaitingApprovalCount, count - 2);
     }
   }
@@ -1602,7 +1635,13 @@ test("review queue counts only review-ready applications matching search indepen
     "awaiting",
   );
   assert.deepEqual(after.rows, []);
+  assert.equal(after.allApplicantsCount, 1);
   assert.equal(after.awaitingApprovalCount, 0);
+  assert.equal(
+    (await listApplications(env.DB, actor, "pending-02")).rows[0]
+      .applicationApproved,
+    1,
+  );
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
       .applicationApproved,
