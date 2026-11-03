@@ -11,6 +11,7 @@ for (const javaScriptEnabled of [true, false]) {
       const filters = page.getByRole("group", { name: "Application status" });
       const buttons = filters.getByRole("button");
       await expect(buttons).toHaveCount(5);
+      await expect(buttons.locator(".volunteer-filter-count")).toHaveCount(5);
       await page.evaluate(() => document.fonts.ready);
 
       for (const width of [320, 375, 1440]) {
@@ -23,6 +24,7 @@ for (const javaScriptEnabled of [true, false]) {
           }),
         );
         const centers = bounds.map(({ top, height }) => top + height / 2);
+        expect(bounds.every(({ height }) => height >= 40)).toBe(true);
         expect(Math.max(...centers) - Math.min(...centers)).toBeLessThan(1);
         await expect(buttons.first()).toHaveCSS("white-space", "nowrap");
         expect(
@@ -62,7 +64,7 @@ for (const javaScriptEnabled of [true, false]) {
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(/approval=approved/);
       await expect(
-        filters.getByRole("button", { name: "Approved (0)", exact: true }),
+        filters.getByRole("button", { name: "Approved 0", exact: true }),
       ).toHaveAttribute("aria-pressed", "true");
     });
   });

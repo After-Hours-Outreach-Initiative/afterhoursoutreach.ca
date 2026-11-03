@@ -50,7 +50,7 @@ for (const kind of ["applications", "volunteers"]) {
 
     if (kind === "applications") {
       const ready = page.getByRole("button", {
-        name: "Ready for review (250)",
+        name: "Ready for review 250",
         exact: true,
       });
       await ready.click();
@@ -62,7 +62,7 @@ for (const kind of ["applications", "volunteers"]) {
       await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
         "0",
       );
-      await page.getByRole("button", { name: "All (1)", exact: true }).click();
+      await page.getByRole("button", { name: "All 1", exact: true }).click();
       await expect(rows).toHaveCount(1);
       await search.fill("");
     }

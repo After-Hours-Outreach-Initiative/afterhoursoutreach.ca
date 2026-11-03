@@ -446,7 +446,7 @@ test("filter counts track recurring dates, polling, actions and past events", as
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
   const filters = page.getByRole("group", { name: "Filter events" });
-  await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
+  await filters.getByRole("button", { name: /^Orientations \d+$/ }).click();
   const counts = filters.locator("[data-event-filter-count]");
   const before = (await counts.allTextContents()).map(Number);
   expect(before).toHaveLength(4);
@@ -583,13 +583,9 @@ test("filter counts track recurring dates, polling, actions and past events", as
     "open",
     "",
   );
-  await filters
-    .getByRole("button", { name: /^One-off events \(\d+\)$/ })
-    .click();
+  await filters.getByRole("button", { name: /^One-off events \d+$/ }).click();
   await expect(pastOccurrence).toBeHidden();
-  await filters
-    .getByRole("button", { name: /^Recurring events \(\d+\)$/ })
-    .click();
+  await filters.getByRole("button", { name: /^Recurring events \d+$/ }).click();
   await expect(pastOccurrence).toBeVisible();
   await page.goto(
     `/events?type=recurring&occurrence=${encodeURIComponent(occurrenceId)}`,
@@ -609,9 +605,9 @@ test("filter counts track recurring dates, polling, actions and past events", as
     await page.locator("[data-past-event-list] > li").count(),
   ).toBeGreaterThan(0);
   await expect(filters.getByRole("button")).toHaveText([
-    `All (${await cards.count()})`,
-    `One-off events (${await page.locator("[data-live-event]:not([data-event-series])").count()})`,
-    `Recurring events (${await page.locator("[data-live-event][data-event-series]").count()})`,
-    `Orientations (${await page.locator('[data-live-event][data-includes-orientation="true"]').count()})`,
+    `All ${await cards.count()}`,
+    `One-off events ${await page.locator("[data-live-event]:not([data-event-series])").count()}`,
+    `Recurring events ${await page.locator("[data-live-event][data-event-series]").count()}`,
+    `Orientations ${await page.locator('[data-live-event][data-includes-orientation="true"]').count()}`,
   ]);
 });

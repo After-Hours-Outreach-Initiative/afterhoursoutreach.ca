@@ -297,12 +297,12 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
                 data-event-filter={type}
                 aria-pressed={filter === type ? "true" : "false"}
               >
-                <span>
-                  {label} (
-                  <span data-event-filter-count={type}>
-                    {filterCount(type)}
-                  </span>
-                  )
+                <span>{label}</span>{" "}
+                <span
+                  class="volunteer-filter-count"
+                  data-event-filter-count={type}
+                >
+                  {filterCount(type)}
                 </span>
               </button>
             ))}

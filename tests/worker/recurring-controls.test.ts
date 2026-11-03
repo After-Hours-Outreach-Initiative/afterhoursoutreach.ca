@@ -363,7 +363,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       }),
     ).toHaveCount(0);
     await organizerPage
-      .getByRole("button", { name: /^One-off events \(\d+\)$/ })
+      .getByRole("button", { name: /^One-off events \d+$/ })
       .click();
     await expect(
       organizerPage.locator("[data-event-list] > li:visible"),
@@ -373,7 +373,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await expect(occurrences.first()).toBeHidden();
     await organizerPage.locator("[data-series-management] > summary").click();
     await organizerPage
-      .getByRole("button", { name: /^Recurring events \(\d+\)$/ })
+      .getByRole("button", { name: /^Recurring events \d+$/ })
       .click();
     await expect(
       organizerPage.locator("[data-event-list] > li:visible"),
@@ -381,7 +381,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await expect(emptyGroup).toBeVisible();
     await organizerPage.goBack();
     await expect(occurrences.first()).toBeHidden();
-    await organizerPage.getByRole("button", { name: /^All \(\d+\)$/ }).click();
+    await organizerPage.getByRole("button", { name: /^All \d+$/ }).click();
 
     // Polling updates occurrences without discarding the open series draft or
     // collapsing the date controls behind the modal.
@@ -460,7 +460,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     ).toBeFocused();
     await expect(initialGroup).toHaveCount(1);
     await organizerPage
-      .getByRole("button", { name: /^Recurring events \(\d+\)$/ })
+      .getByRole("button", { name: /^Recurring events \d+$/ })
       .click();
     await organizerPage
       .getByRole("button", { name: "Create", exact: true })
@@ -505,12 +505,12 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       organizerPage.locator(`[data-live-event="${oneOffId}"]`),
     ).toBeHidden();
     await organizerPage
-      .getByRole("button", { name: /^Orientations \(\d+\)$/ })
+      .getByRole("button", { name: /^Orientations \d+$/ })
       .click();
     await expect(uiGroup).toBeVisible();
     await expect(occurrences.first()).toBeHidden();
     await organizerPage
-      .getByRole("button", { name: /^Recurring events \(\d+\)$/ })
+      .getByRole("button", { name: /^Recurring events \d+$/ })
       .click();
     await uiGroup
       .getByRole("button", { name: "Edit series", exact: true })

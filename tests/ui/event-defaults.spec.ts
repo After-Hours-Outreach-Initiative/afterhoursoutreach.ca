@@ -29,7 +29,7 @@ test("organizers share the event calendar and cards with role-gated controls", a
       .locator('[data-live-event="local-fixture-event-orientation"]')
       .getByRole("button", { name: "Register", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /^Orientations \(/ }).click();
+  await page.getByRole("button", { name: /^Orientations \d+$/ }).click();
   expect(new URL(page.url()).searchParams.get("occurrence")).toBe(
     "local-fixture-event-orientation",
   );
@@ -39,7 +39,7 @@ test("organizers share the event calendar and cards with role-gated controls", a
     page.locator('[data-show-dialog="event-editor-new"]'),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /^Orientations \(/ }),
+    page.getByRole("button", { name: /^Orientations \d+$/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await (
     await openLocalAccountSwitcher(page)

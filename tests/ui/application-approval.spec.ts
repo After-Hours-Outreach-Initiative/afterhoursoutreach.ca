@@ -65,11 +65,11 @@ test("application table opens a focused review with guarded decisions and list c
     );
     const filters = page.getByRole("group", { name: "Application status" });
     await expect(filters.getByRole("button")).toHaveText([
-      "All (1)",
-      "Ready for review (0)",
-      "In Progress (1)",
-      "Rejected (0)",
-      "Approved (0)",
+      "All 1",
+      "Ready for review 0",
+      "In Progress 1",
+      "Rejected 0",
+      "Approved 0",
     ]);
     for (const value of ["awaiting", "rejected", "approved"]) {
       const filter = filters.locator(`[data-volunteer-filter="${value}"]`);
@@ -81,7 +81,7 @@ test("application table opens a focused review with guarded decisions and list c
       expect(new URL(page.url()).searchParams.get("direction")).toBe("desc");
     }
     const inProgress = filters.getByRole("button", {
-      name: "In Progress (1)",
+      name: "In Progress 1",
       exact: true,
     });
     await inProgress.focus();
@@ -115,7 +115,7 @@ test("application table opens a focused review with guarded decisions and list c
     expect(new URL(page.url()).searchParams.get("approval")).toBe(
       "in-progress",
     );
-    await filters.getByRole("button", { name: "All (1)", exact: true }).click();
+    await filters.getByRole("button", { name: "All 1", exact: true }).click();
     await expect(page).toHaveURL(new URL(listPath, baseURL!).href);
     await row.click({ position: { x: 2, y: 2 } });
     const review = page.locator("[data-application-review]");
@@ -493,9 +493,7 @@ test("pending applications poll every minute, then approval restores five-second
     expect(checks).toBe(2);
     await volunteer.clock.runFor(1);
     await expect.poll(() => checks).toBe(3);
-    await volunteer
-      .getByRole("button", { name: /^Orientations \(\d+\)$/ })
-      .click();
+    await volunteer.getByRole("button", { name: /^Orientations \d+$/ }).click();
     await expect(volunteer).toHaveURL(/\?type=orientation$/);
     const orientation = volunteer
       .locator('[data-live-event][data-includes-orientation="true"]')

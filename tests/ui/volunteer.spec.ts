@@ -137,23 +137,23 @@ test("event filters include orientation without excluding other patrols, preserv
       event.includesOrientation ? "Orientation + Patrol" : "Patrol",
     );
   }
-  await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
+  await filters.getByRole("button", { name: /^Orientations \d+$/ }).click();
   await expect(
-    filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
+    filters.getByRole("button", { name: /^Orientations \d+$/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   await expect(page).toHaveURL(/\?type=orientation$/);
-  await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
+  await filters.getByRole("button", { name: /^All \d+$/ }).click();
   await expectFilter("all");
   await page.goBack();
   await expect(
-    filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
+    filters.getByRole("button", { name: /^Orientations \d+$/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   expect(documents).toEqual([]);
   await page.reload();
   await expectFilter("orientation");
-  await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
+  await filters.getByRole("button", { name: /^All \d+$/ }).click();
   await expectFilter("all");
 });
 
@@ -311,7 +311,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
     "",
   );
 
-  await page.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: /^Orientations \d+$/ }).click();
   await expect(link(patrol.id)).toHaveCount(0);
   await expect(link(orientation.id)).toBeVisible();
   await expect(link(orientation.id)).toHaveAccessibleName(

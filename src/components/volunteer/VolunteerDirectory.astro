@@ -111,12 +111,13 @@ const columns = (
           aria-controls={`${kind}-table`}
           aria-pressed={approval === "all" ? "true" : "false"}
         >
-          <span>
-            All (
-            <span data-all-applicants-count data-volunteer-count="all">
-              {people.allApplicantsCount}
-            </span>
-            )
+          <span>All</span>{" "}
+          <span
+            class="volunteer-filter-count"
+            data-all-applicants-count
+            data-volunteer-count="all"
+          >
+            {people.allApplicantsCount}
           </span>
         </button>
         {Object.entries(applicationStatuses).map(([value, status]) => (
@@ -135,19 +136,21 @@ const columns = (
                 data-state={status.state}
               >
                 {status.label}
-              </span>{" "}
-              (
-              {value === "awaiting" ? (
-                <span data-awaiting-approval-count data-volunteer-count={value}>
-                  {people.awaitingApprovalCount}
-                </span>
-              ) : (
-                <span data-volunteer-count={value}>
-                  {statusCounts[value as keyof typeof statusCounts]}
-                </span>
-              )}
-              )
-            </span>
+              </span>
+            </span>{" "}
+            {value === "awaiting" ? (
+              <span
+                class="volunteer-filter-count"
+                data-awaiting-approval-count
+                data-volunteer-count={value}
+              >
+                {people.awaitingApprovalCount}
+              </span>
+            ) : (
+              <span class="volunteer-filter-count" data-volunteer-count={value}>
+                {statusCounts[value as keyof typeof statusCounts]}
+              </span>
+            )}
           </button>
         ))}
       </form>

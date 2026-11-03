@@ -508,7 +508,7 @@ test("organizers review pending and approved applications with persistent list c
     );
     const filters = page.getByRole("group", { name: "Application status" });
     const allApplicants = filters.getByRole("button", {
-      name: /^All \(\d+\)$/,
+      name: /^All \d+$/,
     });
     const awaitingApproval = filters.getByRole("button", {
       name: /^Ready for review/,
@@ -1041,12 +1041,12 @@ test("organizers review pending and approved applications with persistent list c
     expect(new URL(plain.url()).searchParams.get("sort")).toBe("progress");
     expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
-    await plain.getByRole("button", { name: "All (1)", exact: true }).click();
+    await plain.getByRole("button", { name: "All 1", exact: true }).click();
     expect(new URL(plain.url()).searchParams.get("q")).toBe("applicant-52");
     await expect(
-      plain.getByRole("button", { name: "All (1)", exact: true }),
+      plain.getByRole("button", { name: "All 1", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
-    await plain.getByRole("button", { name: "Ready for review (1)" }).click();
+    await plain.getByRole("button", { name: "Ready for review 1" }).click();
     expect(new URL(plain.url()).searchParams.get("sort")).toBe("progress");
     expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     await plain.locator("[data-volunteer-profile-link]").click();
@@ -1220,7 +1220,7 @@ test("organizers review pending and approved applications with persistent list c
     await page.goto(`${origin}/applications?approval=awaiting&q=applicant-50`);
     await expect(count).toHaveText("0");
     await expect(headerCount).toHaveCount(0);
-    await page.getByRole("button", { name: "All (1)", exact: true }).click();
+    await page.getByRole("button", { name: "All 1", exact: true }).click();
     await expect(results).toContainText("Rejected");
     assert.notEqual(
       await (await get("/api/v1/events/version", applicantCookie)).text(),
