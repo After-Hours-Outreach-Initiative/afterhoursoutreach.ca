@@ -21,6 +21,7 @@ import {
   nowMsSql,
   personDisplayNameSql,
   profileDisplayNameSql,
+  profileFullNameSql,
   signupCategorySql,
   signupMedicMarkSql,
   signupMedicSql,
@@ -157,6 +158,7 @@ export interface RosterRow {
   eventId: string;
   userId: string | null;
   name: string;
+  fullName: string;
   registeredAt: number;
   completed: number;
   patrolApproved: number;
@@ -1038,6 +1040,9 @@ export async function listRosters(
     .prepare(
       `SELECT s.id, s.event_id AS eventId, s.user_id AS userId, s.created_at AS registeredAt,
         ${rosterNameSql} AS name,
+        CASE WHEN s.user_id IS NULL THEN trim(s.manual_name)
+          ELSE coalesce(nullif(${profileFullNameSql}, ''), nullif(trim(u.name), ''), 'Outreach Volunteer')
+        END AS fullName,
         ${signupCategorySql()} AS category,
         ${signupMedicMarkSql()} AS medicMark,
          coalesce(v.patrol_approved, 0) AS patrolApproved, coalesce(v.updated_at, 0) AS statusVersion,

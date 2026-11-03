@@ -304,6 +304,10 @@ test("organizers add, move and remove name-only attendees with shared rosters, l
   assert.equal(roster.length, 4);
   assert.ok(roster.every(({ userId }) => userId === null));
   assert.deepEqual(
+    roster.map(({ fullName }) => fullName),
+    ["General Person", "Medic Person", "New Person", "NewMedic Person"],
+  );
+  assert.deepEqual(
     roster.map(({ name, category, medicMark }) => [name, category, medicMark]),
     [
       ["General P.", "outreach-volunteer", 0],
@@ -661,11 +665,16 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     assert.equal(organizerRoster.length, 5);
     assert.ok(organizerRoster.every(({ name }) => name === expectedName));
     assert.ok(
+      organizerRoster.every(
+        ({ fullName }) => fullName === "Alice PrivateSurname",
+      ),
+    );
+    assert.ok(
       organizerRoster.every((row) => row.registeredAt === registeredAt),
     );
     assert.doesNotMatch(
       JSON.stringify(organizerRoster),
-      /PrivateSurname|firstName|lastName|preferredName|legacyName/,
+      /PRIVATE|firstName|lastName|preferredName|legacyName/,
     );
   }
   const general = people[generals[0].status === "rejected" ? 0 : 1];

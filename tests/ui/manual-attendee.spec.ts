@@ -1,4 +1,5 @@
 import { expect, test, type Route } from "@playwright/test";
+import { formatEventDate } from "../../src/data/event-time";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 
@@ -22,13 +23,14 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
   const meetingPoint = `Manual attendees ${crypto.randomUUID()}`;
+  const startsAt = Date.now() + 86_400_000;
   const created = await page.request.post("/api/v1/events/action", {
     headers: { origin: baseURL! },
     data: {
       action: "save",
       event: {
         includesOrientation: true,
-        startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+        startsAt: new Date(startsAt).toISOString(),
         meetingPoint,
         meetingPointUrl: "",
         spots: 8,
@@ -383,9 +385,12 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       name: "Remove volunteer",
       exact: true,
     });
+    await expect(remove.locator(".dialog-body > p")).toHaveText(
+      `Remove Avery Example from event on ${formatEventDate(startsAt)}?`,
+    );
     await expect(remove.locator(".dialog-footer button")).toHaveText([
       "Cancel",
-      "Remove volunteer",
+      "Remove",
     ]);
     await expect(remove.locator("[data-dismiss-dialog]").last()).toHaveClass(
       "btn btn-quiet",
@@ -398,9 +403,7 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       form: remove.locator("form"),
       loadingLabel: "Removing…",
       trigger: () =>
-        remove
-          .getByRole("button", { name: "Remove volunteer", exact: true })
-          .click(),
+        remove.getByRole("button", { name: "Remove", exact: true }).click(),
       updated: async () => {
         await expect(card.locator(".volunteer-roster")).toHaveCount(0);
         await expect(

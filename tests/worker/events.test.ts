@@ -1790,7 +1790,7 @@ describe(
             trigger: () =>
               removeSignupDialog
                 .getByRole("button", {
-                  name: "Remove volunteer",
+                  name: "Remove",
                   exact: true,
                 })
                 .click(),

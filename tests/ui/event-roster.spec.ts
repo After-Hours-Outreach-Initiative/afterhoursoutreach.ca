@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { formatEventDate } from "../../src/data/event-time";
 import { inPlaceAction } from "../helpers/in-place-action";
 import {
   approveLocalApplication,
@@ -310,13 +311,14 @@ test("striped roster lists share avatar sizing and organizer-only keyboard actio
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
   const meetingPoint = `Roster menus ${crypto.randomUUID()}`;
+  const startsAt = Date.now() + 86_400_000;
   const created = await page.request.post("/api/v1/events/action", {
     headers: { origin: baseURL! },
     data: {
       action: "save",
       event: {
         includesOrientation: false,
-        startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+        startsAt: new Date(startsAt).toISOString(),
         meetingPoint,
         meetingPointUrl: "",
         spots: 8,
@@ -544,6 +546,9 @@ test("striped roster lists share avatar sizing and organizer-only keyboard actio
         name: "Remove volunteer",
       });
       await expect(dialog).toBeVisible();
+      await expect(dialog.locator(".dialog-body > p")).toHaveText(
+        `Remove Robin Morgan Vance from event on ${formatEventDate(startsAt)}?`,
+      );
       await expect(dialog.locator(".dialog-body")).toHaveCSS(
         "text-align",
         "left",
@@ -555,7 +560,7 @@ test("striped roster lists share avatar sizing and organizer-only keyboard actio
         dialog.locator("select, [data-signup-move-calendar]"),
       ).toHaveCount(0);
       await expect(
-        dialog.getByRole("button", { name: "Remove volunteer", exact: true }),
+        dialog.getByRole("button", { name: "Remove", exact: true }),
       ).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(trigger).toBeFocused();
@@ -731,7 +736,7 @@ test("move calendar and destination select stay synchronized across months and s
     remove.locator("select, [name=destination], [data-signup-move-calendar]"),
   ).toHaveCount(0);
   await expect(
-    remove.getByRole("button", { name: "Remove volunteer", exact: true }),
+    remove.getByRole("button", { name: "Remove", exact: true }),
   ).toBeVisible();
   await remove.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(trigger).toBeFocused();

@@ -151,6 +151,7 @@ test("view versions detect capacity, signups, visibility and access changes with
       eventId: event.id,
       userId: "attendee",
       name: "Attendee",
+      fullName: "Attendee Name",
       registeredAt: 1,
       completed: 0,
       patrolApproved: 0,
@@ -163,6 +164,7 @@ test("view versions detect capacity, signups, visibility and access changes with
   for (const change of [
     { id: "replacement-signup", userId: "replacement-attendee" },
     { name: "Updated name" },
+    { fullName: "Updated full name" },
     { registeredAt: 2 },
     { completed: 1 },
     { patrolApproved: 1 },
