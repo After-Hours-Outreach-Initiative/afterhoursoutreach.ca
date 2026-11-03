@@ -352,16 +352,47 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
     .locator(".event-roster-list > li")
     .filter({ hasText: "Avery E." });
   await expect(row).toHaveCount(1);
-  await expect(row.locator("time.event-roster-status")).toHaveText(
-    /^Manually added [^·]/,
-  );
+  for (const width of [1280, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    const status = row.locator(".event-roster-status").first();
+    const organizer = status.getByRole("link", { name: "Robin V." });
+    if (width === 1280) {
+      await expect(status).toHaveText(/^Added by Robin V\. on /);
+      await expect(organizer).toBeVisible();
+      await expect(organizer).toHaveAttribute(
+        "href",
+        "/volunteers/local-fixture-user-robin",
+      );
+    } else {
+      await expect(organizer).toBeHidden();
+      expect((await status.innerText()).trim()).toBe(
+        await status.locator("time").innerText(),
+      );
+    }
+    const menuTrigger = row.locator("[data-signup-menu-trigger]");
+    await menuTrigger.focus();
+    await menuTrigger.press("ArrowDown");
+    const addedBy = row.getByRole("menuitem", { name: "Added by Robin V." });
+    await expect(addedBy).toBeFocused();
+    await expect(addedBy).toHaveAttribute(
+      "href",
+      "/volunteers/local-fixture-user-robin",
+    );
+    await addedBy.press("ArrowDown");
+    await expect(
+      row.getByRole("menuitem", { name: "Move volunteer", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Escape");
+  }
   await expect(
     row.locator(
       ".attendee-new-volunteer [data-avatar-decoration='medic-cross']",
     ),
   ).toHaveCount(1);
   await expect(row.locator(".event-roster-new-badge")).toHaveText("New");
-  await expect(row.locator("a, [data-organizer-orientation]")).toHaveCount(0);
+  await expect(
+    row.locator(".event-roster-name a, [data-organizer-orientation]"),
+  ).toHaveCount(0);
 
   const viewerContext = await browser.newContext({ baseURL });
   try {
@@ -384,8 +415,10 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
     await expect(publicCard.locator("[data-event-availability]")).toHaveText(
       "Open · 7 of 8 spots remaining",
     );
-    await expect(publicCard.locator("time.event-roster-status")).toHaveCount(0);
-    await expect(publicCard.getByText(/Manually added/)).toHaveCount(0);
+    await expect(publicCard.locator(".event-roster-status time")).toHaveCount(
+      0,
+    );
+    await expect(publicCard.getByText(/Added by/)).toHaveCount(0);
     const publicSpacing = await publicCard.evaluate((card) => {
       const roster = card.querySelector(".public-event-roster")!;
       const layout = card.querySelector(".volunteer-event-layout")!;

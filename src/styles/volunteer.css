@@ -2069,7 +2069,7 @@ body:has(
   color: #f4f4f5;
   box-shadow: 0 0.5rem 1.5rem #0008;
 }
-.signup-menu button {
+.signup-menu :is(button, a) {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -2078,12 +2078,13 @@ body:has(
   padding: 0.5rem 0.75rem;
   border-radius: 0.25rem;
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
-.signup-menu button:is(:hover, :focus-visible):not(:disabled) {
+.signup-menu :is(button, a):is(:hover, :focus-visible):not(:disabled) {
   background: #16214a;
 }
-.signup-menu button:focus-visible {
+.signup-menu :is(button, a):focus-visible {
   outline: 2px solid #a5b4fc;
   outline-offset: -2px;
 }

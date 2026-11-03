@@ -12,8 +12,10 @@ interface Props {
   signup: RosterRow;
   event: EventRow;
   destinations: EventRow[];
+  editable?: boolean;
 }
-const { signup, event, destinations } = Astro.props;
+const { signup, event, destinations, editable = true } = Astro.props;
+const actions = editable ? (["move", "remove"] as const) : [];
 ---
 
 <button
@@ -25,8 +27,8 @@ const { signup, event, destinations } = Astro.props;
   aria-controls={`signup-menu-${signup.id}`}
   aria-haspopup="menu"
   aria-expanded="false"
-  aria-label={`Registration actions for ${signup.name}`}
-  title={`Registration actions for ${signup.name}`}
+  aria-label={`Registration ${editable ? "actions" : "details"} for ${signup.name}`}
+  title={`Registration ${editable ? "actions" : "details"} for ${signup.name}`}
 >
   <EllipsisIcon class="size-5" />
 </button>
@@ -38,30 +40,48 @@ const { signup, event, destinations } = Astro.props;
   aria-labelledby={`signup-menu-trigger-${signup.id}`}
   data-signup-menu
 >
-  <button
-    type="button"
-    role="menuitem"
-    tabindex="-1"
-    data-show-dialog={`signup-move-${signup.id}`}
-    data-signup-change="move"
-    disabled={destinations.length === 0}
-  >
-    <ArrowRightIcon class="size-5" />
-    Move volunteer
-  </button>
-  <button
-    type="button"
-    role="menuitem"
-    tabindex="-1"
-    data-show-dialog={`signup-remove-${signup.id}`}
-    data-signup-change="remove"
-  >
-    <TrashIcon class="size-5" />
-    Remove volunteer
-  </button>
+  {
+    !signup.userId && signup.addedById && (
+      <a
+        href={`/volunteers/${encodeURIComponent(signup.addedById)}`}
+        data-volunteer-profile-link
+        role="menuitem"
+        tabindex="-1"
+      >
+        Added by {signup.addedByName}
+      </a>
+    )
+  }
+  {
+    editable && (
+      <>
+        <button
+          type="button"
+          role="menuitem"
+          tabindex="-1"
+          data-show-dialog={`signup-move-${signup.id}`}
+          data-signup-change="move"
+          disabled={destinations.length === 0}
+        >
+          <ArrowRightIcon class="size-5" />
+          Move volunteer
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          tabindex="-1"
+          data-show-dialog={`signup-remove-${signup.id}`}
+          data-signup-change="remove"
+        >
+          <TrashIcon class="size-5" />
+          Remove volunteer
+        </button>
+      </>
+    )
+  }
 </div>
 {
-  (["move", "remove"] as const).map((action) => (
+  actions.map((action) => (
     <dialog
       class="dialog-pop dialog-frame volunteer-dialog"
       id={`signup-${action}-${signup.id}`}

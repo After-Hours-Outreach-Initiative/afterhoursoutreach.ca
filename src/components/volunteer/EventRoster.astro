@@ -47,14 +47,34 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
                   : undefined
               }
             />
-            <time
-              class="event-roster-status"
-              datetime={new Date(person.registeredAt).toISOString()}
-              title={fullRegistrationDateFormat.format(person.registeredAt)}
-            >
-              {person.userId ? "Registered" : "Manually added"}{" "}
-              {registrationDateFormat.format(person.registeredAt)}
-            </time>
+            <span class="event-roster-status">
+              <span class="event-roster-registration-label">
+                {person.userId ? (
+                  "Registered "
+                ) : (
+                  <>
+                    Added by{" "}
+                    {person.addedById ? (
+                      <a
+                        href={`/volunteers/${encodeURIComponent(person.addedById)}`}
+                        data-volunteer-profile-link
+                      >
+                        {person.addedByName}
+                      </a>
+                    ) : (
+                      "an organizer"
+                    )}{" "}
+                    on{" "}
+                  </>
+                )}
+              </span>
+              <time
+                datetime={new Date(person.registeredAt).toISOString()}
+                title={fullRegistrationDateFormat.format(person.registeredAt)}
+              >
+                {registrationDateFormat.format(person.registeredAt)}
+              </time>
+            </span>
             {Boolean(person.completed) && (
               <span class="event-roster-status">Orientation completed</span>
             )}
@@ -88,12 +108,13 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
                 </form>
               )}
           </div>
-          {future && (
+          {(future || (!person.userId && person.addedById)) && (
             <div class="event-roster-actions">
               <SignupEditor
                 signup={person}
                 event={event}
                 destinations={destinations}
+                editable={future}
               />
             </div>
           )}
@@ -102,3 +123,14 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
     }
   </ul>
 </details>
+
+<style>
+  .event-roster-registration-label {
+    display: none;
+  }
+  @container event-card (min-width: 32rem) {
+    .event-roster-registration-label {
+      display: inline;
+    }
+  }
+</style>

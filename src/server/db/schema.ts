@@ -446,6 +446,8 @@ export const signup = sqliteTable(
       .notNull()
       .references(() => event.id),
     user_id: text().references(() => user.id),
+    // The organizer who added this event-local registration; NULL for legacy rows.
+    added_by: text().references(() => user.id),
     manual_name: text(),
     manual_medic: integer({ mode: "boolean" }).notNull().default(false),
     manual_new: integer({ mode: "boolean" }).notNull().default(false),

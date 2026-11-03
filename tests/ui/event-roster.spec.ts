@@ -168,7 +168,7 @@ test("empty volunteer rosters reserve no space through first/last signup updates
         matchingBorder: true,
         transition: index === 1 ? "0s" : "0.18s",
       });
-      const registrations = roster(card).locator("time.event-roster-status");
+      const registrations = roster(card).locator(".event-roster-status time");
       await expect(registrations).toHaveCount(index === 0 ? 1 : 0);
       if (index === 0) {
         const actionSpace = await roster(card)
@@ -184,7 +184,9 @@ test("empty volunteer rosters reserve no space through first/last signup updates
             );
           });
         expect(actionSpace).toBeLessThan(1);
-        await expect(registrations.first()).toContainText("Registered ");
+        await expect(
+          roster(card).locator(".event-roster-registration-label"),
+        ).toBeHidden();
         await expect(registrations.first()).not.toContainText(
           /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/,
         );
@@ -420,7 +422,10 @@ test("striped roster lists share avatar sizing and organizer-only keyboard actio
             rowLayout.row - rowLayout.requiredActions,
             1,
           );
-          const timestamp = roster.locator("time.event-roster-status").first();
+          const timestamp = roster.locator(".event-roster-status time").first();
+          await expect(
+            roster.locator(".event-roster-registration-label").first(),
+          )[width === 320 ? "toBeHidden" : "toBeVisible"]();
           await expect(timestamp).not.toContainText(/\b\d{4}\b/);
           await expect(timestamp).toHaveAttribute(
             "datetime",
@@ -432,8 +437,7 @@ test("striped roster lists share avatar sizing and organizer-only keyboard actio
             range.selectNodeContents(element);
             return range.getClientRects().length;
           });
-          if (width === 320) expect(lines).toBeGreaterThan(1);
-          else expect(lines).toBe(1);
+          expect(lines).toBe(1);
         }
         expect(
           await summary

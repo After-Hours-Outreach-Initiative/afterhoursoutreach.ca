@@ -304,6 +304,12 @@ test("organizers add, move and remove name-only attendees with shared rosters, l
   const roster = await listRosters(env.DB, organizer, ["manual-source"]);
   assert.equal(roster.length, 4);
   assert.ok(roster.every(({ userId }) => userId === null));
+  assert.ok(
+    roster.every(
+      ({ addedById, addedByName }) =>
+        addedById === organizer.id && addedByName === organizer.id,
+    ),
+  );
   assert.deepEqual(
     roster.map(({ fullName }) => fullName),
     ["General Person", "Medic Person", "New Person", "NewMedic Person"],
@@ -331,7 +337,7 @@ test("organizers add, move and remove name-only attendees with shared rosters, l
   );
   assert.doesNotMatch(
     JSON.stringify(publicRoster),
-    /userId|Person|manual_name|manual_medic|manual_new/,
+    /userId|addedBy|Person|manual_name|manual_medic|manual_new/,
   );
   assert.equal(
     await env.DB.prepare("SELECT count(*) n FROM user").first("n"),
@@ -383,8 +389,14 @@ test("organizers add, move and remove name-only attendees with shared rosters, l
     await listRosters(env.DB, organizer, ["manual-destination"])
   )[0];
   assert.deepEqual(
-    [moved.userId, moved.name, moved.category, moved.medicMark],
-    [null, "NewMedic P.", "new-volunteer", 1],
+    [
+      moved.userId,
+      moved.name,
+      moved.category,
+      moved.medicMark,
+      moved.addedById,
+    ],
+    [null, "NewMedic P.", "new-volunteer", 1, organizer.id],
   );
   assert.notEqual(
     (await listPublicRosters(env.DB, volunteer, ["manual-source"])).version,

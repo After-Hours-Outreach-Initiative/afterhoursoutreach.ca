@@ -160,6 +160,8 @@ export interface RosterRow {
   name: string;
   fullName: string;
   registeredAt: number;
+  addedById: string | null;
+  addedByName: string | null;
   completed: number;
   patrolApproved: number;
   statusVersion: number;
@@ -937,12 +939,13 @@ export async function addManualSignup(
     const results = await db.batch([
       db
         .prepare(
-          `INSERT INTO signup (id, event_id, manual_name, manual_medic, manual_new, created_at, updated_at)
-        SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
+          `INSERT INTO signup (id, event_id, added_by, manual_name, manual_medic, manual_new, created_at, updated_at)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
         )
         .bind(
           crypto.randomUUID(),
           eventId,
+          actor.id,
           parsed.data.name,
           Number(parsed.data.medic),
           Number(parsed.data.newVolunteer),
@@ -1045,6 +1048,13 @@ export async function listRosters(
         END AS fullName,
         ${signupCategorySql()} AS category,
         ${signupMedicMarkSql()} AS medicMark,
+        adder.id AS addedById,
+        CASE WHEN adder.id IS NOT NULL THEN ${personDisplayNameSql({
+          firstName: "adder_profile.first_name",
+          lastName: "adder_profile.last_name",
+          preferredName: "adder_profile.preferred_name",
+          legacyName: "adder.name",
+        })} END AS addedByName,
          coalesce(v.patrol_approved, 0) AS patrolApproved, coalesce(v.updated_at, 0) AS statusVersion,
          EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
@@ -1053,6 +1063,8 @@ export async function listRosters(
       LEFT JOIN profile p ON p.user_id = s.user_id
        LEFT JOIN user u ON u.id = s.user_id
        LEFT JOIN volunteer_status v ON v.user_id = s.user_id
+       LEFT JOIN user adder ON adder.id = s.added_by AND adder.deleted_at IS NULL
+       LEFT JOIN profile adder_profile ON adder_profile.user_id = adder.id
        WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'
        ORDER BY s.event_id, s.created_at, s.id
        LIMIT 20000`,
@@ -1128,14 +1140,15 @@ export async function manageSignup(
       statements.push(
         db
           .prepare(
-            `INSERT INTO signup (id, event_id, user_id, manual_name, manual_medic, manual_new, status, created_at, updated_at)
-            SELECT ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?
+            `INSERT INTO signup (id, event_id, user_id, added_by, manual_name, manual_medic, manual_new, status, created_at, updated_at)
+            SELECT ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?
             WHERE EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
           )
           .bind(
             crypto.randomUUID(),
             next.id,
             row.userId,
+            row.userId ? null : actor.id,
             row.manualName,
             row.manualMedic,
             row.manualNew,

@@ -204,6 +204,13 @@
       "when": 1793659876102,
       "tag": "0028_manual_event_attendees",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1793684408390,
+      "tag": "0029_signup_added_by",
+      "breakpoints": true
     }
   ]
 }
