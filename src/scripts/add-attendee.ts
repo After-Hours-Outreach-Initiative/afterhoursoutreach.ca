@@ -399,29 +399,15 @@ class AddAttendee extends HTMLElement {
     const trigger = this.querySelector<HTMLButtonElement>(
       "[data-attendee-open]",
     )!;
-    const finished = this.morph.run(
-      surface,
-      trigger,
-      this.form,
-      expanded,
-      () => {
-        this.toggleAttribute("data-expanded", expanded);
-        trigger.setAttribute("aria-expanded", String(expanded));
-        this.form.inert = !expanded;
-        this.form.setAttribute("aria-hidden", String(!expanded));
-        trigger.inert = expanded;
-        (expanded ? this.form : trigger).focus({ preventScroll: true });
-      },
-    );
-    if (expanded)
-      void finished.then((completed) => {
-        if (
-          !completed ||
-          !this.isConnected ||
-          !this.hasAttribute("data-expanded")
-        )
-          return;
-        // Measure after the morph, when the entire expanded section is laid out.
+    this.morph.run(surface, trigger, this.form, expanded, () => {
+      this.toggleAttribute("data-expanded", expanded);
+      trigger.setAttribute("aria-expanded", String(expanded));
+      this.form.inert = !expanded;
+      this.form.setAttribute("aria-hidden", String(!expanded));
+      trigger.inert = expanded;
+      (expanded ? this.form : trigger).focus({ preventScroll: true });
+      if (expanded) {
+        // Measure and scroll the expanded layout before the morph resizes it.
         const style = getComputedStyle(surface);
         const height =
           surface.getBoundingClientRect().height +
@@ -429,12 +415,10 @@ class AddAttendee extends HTMLElement {
           parseFloat(style.scrollMarginBottom);
         surface.scrollIntoView({
           block: height > window.innerHeight ? "start" : "nearest",
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
-            .matches
-            ? "instant"
-            : "smooth",
+          behavior: "instant",
         });
-      });
+      }
+    });
     if (!expanded)
       this.dispatchEvent(new Event("add-attendee-close", { bubbles: true }));
   }

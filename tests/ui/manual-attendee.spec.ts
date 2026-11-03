@@ -60,7 +60,27 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   await page.setViewportSize({ width: 375, height: 600 });
   await expect(form).toHaveAttribute("inert", "");
   await trigger.evaluate((element) => element.scrollIntoView({ block: "end" }));
-  await trigger.click();
+  // Sample in the click's task, without waiting for animation or smooth scrolling.
+  expect(
+    await trigger.evaluate(async (element) => {
+      (element as HTMLButtonElement).click();
+      const surface = element.closest(".attendee-surface")!;
+      const inView = () => {
+        const bounds = surface.querySelector("form")!.getBoundingClientRect();
+        const style = getComputedStyle(surface);
+        return (
+          bounds.top >= parseFloat(style.scrollMarginTop) - 1 &&
+          bounds.bottom <=
+            innerHeight - parseFloat(style.scrollMarginBottom) + 1
+        );
+      };
+      const immediate = inView();
+      await Promise.all(
+        surface.getAnimations().map((animation) => animation.finished),
+      );
+      return { immediate, finished: inView() };
+    }),
+  ).toEqual({ immediate: true, finished: true });
   await expect(form).toHaveAccessibleName("Add volunteers");
   await expect(form).toBeFocused();
   await expect(search).not.toBeFocused();
@@ -69,19 +89,6 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   await expect(form.locator('label[for$="-search"] > span')).toHaveClass(
     "sr-only",
   );
-  await expect
-    .poll(() =>
-      surface.evaluate((element) => {
-        const bounds = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        return (
-          bounds.top >= parseFloat(style.scrollMarginTop) - 1 &&
-          bounds.bottom <=
-            innerHeight - parseFloat(style.scrollMarginBottom) + 1
-        );
-      }),
-    )
-    .toBe(true);
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(form.getByText("Preview", { exact: true })).toHaveCount(0);
   await form.getByRole("button", { name: "Add", exact: true }).click();
