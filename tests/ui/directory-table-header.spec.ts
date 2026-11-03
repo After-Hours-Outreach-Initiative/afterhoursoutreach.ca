@@ -193,7 +193,7 @@ for (const kind of ["applications", "volunteers"]) {
         element.scrollLeft = element.scrollWidth;
       });
       await expectColumnsAligned(shell);
-      if (width === 320)
+      if (width === 320 && kind === "applications")
         expect(
           await frame.evaluate((element) => element.scrollLeft),
         ).toBeGreaterThan(0);
@@ -309,11 +309,34 @@ for (const kind of ["applications", "volunteers"]) {
     const shell = page.locator(".volunteer-table-shell");
     await expect(shell).toHaveAttribute("data-table-header", "split");
     const labels =
-      kind === "applications"
-        ? ["Name", "Role", "Status", "Completed"]
-        : ["Name", "Role"];
+      kind === "applications" ? ["Name", "Status", "Completed"] : ["Name"];
     await expect(shell.getByRole("table")).toHaveCount(1);
     await expect(shell.getByRole("columnheader")).toHaveText(labels);
+    const badges = shell.locator("[data-volunteer-role]");
+    expect(await badges.count()).toBeGreaterThan(0);
+    await expect(
+      shell.locator(".volunteer-table-name > [data-volunteer-role]"),
+    ).toHaveCount(await badges.count());
+    if (kind === "applications") {
+      const search = page.locator("[data-volunteer-search-form]");
+      const filters = page.locator("[data-volunteer-filters]");
+      const searchBox = (await search.boundingBox())!;
+      expect((await filters.boundingBox())!.y).toBeGreaterThan(
+        searchBox.y + searchBox.height,
+      );
+      await expect(filters.locator('[data-state="approved"]')).toHaveCSS(
+        "color",
+        "rgb(147, 197, 253)",
+      );
+      await expect(filters.locator('[data-state="approved"]')).toHaveCSS(
+        "background-color",
+        "rgb(23, 37, 84)",
+      );
+      await expect(filters.locator('[data-state="ready"]')).toHaveCSS(
+        "color",
+        "rgb(74, 222, 128)",
+      );
+    }
     await expect(shell.locator(".volunteer-table-frame thead a")).toHaveCount(
       0,
     );
@@ -359,7 +382,7 @@ for (const hasTouch of [false, true]) {
         await page.goto(`/dev/ui/${kind}/preview?scenario=mixed&latency=0`);
         await expect(page.locator(".volunteer-table-header")).toHaveCount(0);
         await expect(page.getByRole("columnheader")).toHaveCount(
-          kind === "applications" ? 4 : 2,
+          kind === "applications" ? 3 : 1,
         );
         await page.locator('[data-volunteer-sort="name"]').click();
         await expect(page).toHaveURL(/sort=name/);
@@ -427,7 +450,7 @@ for (const javaScriptEnabled of [true, false]) {
   test.describe(`volunteer column sizing with JavaScript ${javaScriptEnabled ? "enabled" : "disabled"}`, () => {
     test.use({ javaScriptEnabled });
 
-    test("short names keep Name and Role visible at phone widths", async ({
+    test("short names keep names and role badges visible at phone widths", async ({
       page,
     }) => {
       await page.goto("/dev/ui/volunteers/preview?scenario=mixed&latency=0");
@@ -466,7 +489,7 @@ test("column widths update for long names, empty searches, and restored results"
     .fill("no-matching-fictional-volunteer");
   await expect(shell.locator("[data-volunteer-row]")).toHaveCount(0);
   await expectColumnsAligned(shell);
-  await expect(shell.getByRole("columnheader")).toHaveText(["Name", "Role"]);
+  await expect(shell.getByRole("columnheader")).toHaveText(["Name"]);
   await page.locator("[data-volunteer-search]").fill("");
   await expect(shell.locator("[data-volunteer-row]")).toHaveCount(8);
   await expectColumnsAligned(shell);

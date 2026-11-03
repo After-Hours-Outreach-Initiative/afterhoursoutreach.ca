@@ -64,14 +64,10 @@ const columns = (
   applications
     ? [
         { key: "name", label: "Name" },
-        { key: "role", label: "Role" },
         { key: "progress", label: "Status" },
         { key: "completed", label: "Completed" },
       ]
-    : [
-        { key: "name", label: "Name" },
-        { key: "role", label: "Role" },
-      ]
+    : [{ key: "name", label: "Name" }]
 ) satisfies { key: DirectorySort; label: string }[];
 ---
 
@@ -83,6 +79,31 @@ const columns = (
   <div class="volunteer-section-heading">
     <h2 id={`${kind}-heading`}>{title}</h2>
   </div>
+  <form class="volunteer-search" method="get" data-volunteer-search-form>
+    {
+      Object.entries(formFields).map(([name, value]) => (
+        <input type="hidden" name={name} value={value} />
+      ))
+    }
+    {applications && <input type="hidden" name="approval" value={approval} />}
+    <input type="hidden" name="sort" value={sort} />
+    <input type="hidden" name="direction" value={direction} />
+    <label class="volunteer-search-field">
+      <span class="sr-only">
+        {applications ? "Find an applicant" : "Find a volunteer"}
+      </span>
+      <SearchIcon class="volunteer-search-icon" />
+      <input
+        type="search"
+        name="q"
+        data-volunteer-search
+        value={search}
+        maxlength="100"
+        placeholder="Search by name"
+      />
+    </label>
+    <button class="btn btn-outline" type="submit">Search</button>
+  </form>
   {
     applications && (
       <form
@@ -144,31 +165,6 @@ const columns = (
       </form>
     )
   }
-  <form class="volunteer-search" method="get" data-volunteer-search-form>
-    {
-      Object.entries(formFields).map(([name, value]) => (
-        <input type="hidden" name={name} value={value} />
-      ))
-    }
-    {applications && <input type="hidden" name="approval" value={approval} />}
-    <input type="hidden" name="sort" value={sort} />
-    <input type="hidden" name="direction" value={direction} />
-    <label class="volunteer-search-field">
-      <span class="sr-only">
-        {applications ? "Find an applicant" : "Find a volunteer"}
-      </span>
-      <SearchIcon class="volunteer-search-icon" />
-      <input
-        type="search"
-        name="q"
-        data-volunteer-search
-        value={search}
-        maxlength="100"
-        placeholder="Search by name"
-      />
-    </label>
-    <button class="btn btn-outline" type="submit">Search</button>
-  </form>
   <div data-volunteer-results>
     <div class="volunteer-table-shell">
       <TableScrollFrame
@@ -240,16 +236,21 @@ const columns = (
                           href={profileHref(person.id)}
                           data-volunteer-profile-link
                         />
-                      </div>
-                    </div>
-                  </th>
-                  {applications ? (
-                    <>
-                      <td>
+                        {!applications && person.role === "organizer" && (
+                          <VolunteerRoleBadge role="organizer" />
+                        )}
+                        {!applications &&
+                          person.category === "new-volunteer" && (
+                            <NewVolunteerBadge />
+                          )}
                         {Boolean(person.medicMark) && (
                           <VolunteerRoleBadge role="medic" />
                         )}
-                      </td>
+                      </div>
+                    </div>
+                  </th>
+                  {applications && (
+                    <>
                       <td>
                         <span
                           class="application-table-progress application-status-text"
@@ -276,20 +277,6 @@ const columns = (
                         ) : null}
                       </td>
                     </>
-                  ) : (
-                    <td>
-                      <div class="flex flex-wrap gap-2">
-                        {person.role === "organizer" && (
-                          <VolunteerRoleBadge role="organizer" />
-                        )}
-                        {person.category === "new-volunteer" && (
-                          <NewVolunteerBadge />
-                        )}
-                        {Boolean(person.medicMark) && (
-                          <VolunteerRoleBadge role="medic" />
-                        )}
-                      </div>
-                    </td>
                   )}
                 </tr>
               ))

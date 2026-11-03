@@ -1586,9 +1586,11 @@ body:has(
   font-weight: 400;
   color: #d4d4d8;
 }
-.application-status-text[data-state="ready"],
-.application-status-text[data-state="approved"] {
+.application-status-text[data-state="ready"] {
   color: #4ade80;
+}
+.application-status-text[data-state="approved"] {
+  color: #93c5fd;
 }
 .application-status-text[data-state="rejected"] {
   color: #fca5a5;
@@ -1599,9 +1601,11 @@ body:has(
   border-radius: 0.375rem;
   background: #27272a;
 }
-.application-table-progress[data-state="ready"],
-.application-table-progress[data-state="approved"] {
+.application-table-progress[data-state="ready"] {
   background: #052e16;
+}
+.application-table-progress[data-state="approved"] {
+  background: #172554;
 }
 .application-table-progress[data-state="rejected"] {
   background: #450a0a;
