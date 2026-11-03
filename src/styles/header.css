@@ -96,7 +96,7 @@
 }
 .header-account-dropdown {
   right: 0;
-  width: 16.25rem;
+  width: 20rem;
   max-width: calc(100vw - 2rem);
 }
 .header-dropdown a,
