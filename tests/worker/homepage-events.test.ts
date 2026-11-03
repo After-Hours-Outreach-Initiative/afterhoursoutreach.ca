@@ -152,7 +152,7 @@ test("homepage exposes only the next two published dates and remaining spot coun
     ).run();
     const fullSection = await readHomepage();
     expect(fullSection).toMatch(
-      /<span class="volunteer-spots-full">Full<\/span> ·\s*1 spot taken/,
+      /<span class="volunteer-spots-full">Full<\/span> ·\s*0 of\s*1 spots remaining/,
     );
     expect(fullSection.match(/volunteer-spots-full/g)).toHaveLength(1);
     expect(fullSection).toMatch(
@@ -167,7 +167,7 @@ test("homepage exposes only the next two published dates and remaining spot coun
     ).run();
     const overCapacitySection = await readHomepage();
     expect(overCapacitySection).toMatch(
-      /<span class="volunteer-spots-full">Full<\/span> ·\s*2 spots taken/,
+      /<span class="volunteer-spots-full">Full<\/span> ·\s*0 of\s*1 spots remaining/,
     );
 
     const signedIn = await worker.fetch(

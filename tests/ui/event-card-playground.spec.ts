@@ -209,7 +209,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   const card = full.locator(".volunteer-event-card");
   await expect(card.locator("summary")).toHaveText("Volunteers (8)");
   await expect(card.locator("[data-event-availability]")).toHaveText(
-    "Full · 8 spots taken",
+    "Full · 0 of 8 spots remaining",
   );
   await expect(card.locator(".volunteer-spots-full")).toHaveCSS(
     "color",
@@ -368,7 +368,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   const oneLeft = page.frameLocator('[data-ui-event-frame="one-left"]');
   await oneLeft.getByRole("button", { name: "Register", exact: true }).click();
   await expect(oneLeft.locator("[data-event-availability]")).toHaveText(
-    "Registered · 8 spots taken",
+    "Registered · 0 of 8 spots remaining",
   );
   await expect(oneLeft.getByText("Registered", { exact: true })).toHaveCSS(
     "color",
