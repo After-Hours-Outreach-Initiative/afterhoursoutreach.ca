@@ -77,8 +77,7 @@ test("organizers review pending and approved applications with persistent list c
     await DB.prepare("UPDATE profile SET naloxone_completed_at=0").run();
     const submittedAt = "2026-09-15T18:30:00.000Z";
     const completedAt = "2026-09-16T19:45:00.000Z";
-    // Status sorting puts newest completions first. Keep the detailed subject
-    // on the second page rather than moving it ahead of the first 50 fixtures.
+    // Status sorting puts newest completions first, ahead of the detailed subject.
     await DB.prepare(
       "UPDATE profile SET naloxone_completed_at=? WHERE user_id >= 'applicant-00' AND user_id < 'applicant-50'",
     )
@@ -125,14 +124,14 @@ test("organizers review pending and approved applications with persistent list c
         redirect: "manual",
         headers: { cookie: auth },
       });
-    const listPath = "/applications?approval=awaiting&q=applicant&offset=50";
+    const listPath = "/applications?q=applicant&approval=awaiting";
     const anonymous = await get(listPath, "");
     assert.equal(anonymous.status, 302);
     assert.equal(
       new URL(anonymous.headers.get("location")!, origin).searchParams.get(
         "returnTo",
       ),
-      "/applications?q=applicant&approval=awaiting&offset=50",
+      listPath,
     );
     for (const path of [
       listPath,
@@ -157,7 +156,7 @@ test("organizers review pending and approved applications with persistent list c
       ["/manage/volunteers/applicant-50", "/volunteers/applicant-50"],
       [
         "/manage/applications?approval=awaiting&q=applicant&offset=50",
-        listPath,
+        "/applications?approval=awaiting&q=applicant&offset=50",
       ],
       [
         "/manage/events?type=orientation&occurrence=a%2Fb",
@@ -237,7 +236,7 @@ test("organizers review pending and approved applications with persistent list c
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("cache-control"), "no-store");
     const html = await response.text();
-    assert.match(html, /data-awaiting-approval-count>53</);
+    assert.match(html, /data-awaiting-approval-count[^>]*>53</);
     assert.doesNotMatch(
       html,
       /PRIVATE QUEUE ANSWER|SECRET DRAFT NAME|draft-only|account-only/,
@@ -400,10 +399,10 @@ test("organizers review pending and approved applications with persistent list c
     );
     await progressSort.click();
     await expect(
-      page.getByRole("link", { name: "Next applications" }),
-    ).toHaveAttribute(
-      "href",
-      "/applications?q=applicant&direction=desc&offset=50",
+      page.getByRole("link", { name: /^(Next|Previous) applications$/ }),
+    ).toHaveCount(0);
+    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
+      53,
     );
     await page.getByRole("button", { name: /^Ready for review/ }).click();
     await expect(progressSort.locator("..")).toHaveAttribute(
@@ -434,22 +433,23 @@ test("organizers review pending and approved applications with persistent list c
     const results = page.locator("[data-volunteer-results]");
     await expect(count).toHaveText("53");
     await expect(allCount).toHaveText("53");
-    await expect(results.locator("tbody tr")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(53);
     await expect(results.getByRole("columnheader")).toHaveText([
       "Name",
       "Status",
       "Completed",
     ]);
-    const completedTime = results.locator("tbody tr").first().locator("time");
+    const detailedRow = results.locator("tbody tr").filter({
+      has: page.locator(
+        '[data-volunteer-profile-link][href^="/applications/applicant-50?"]',
+      ),
+    });
+    const completedTime = detailedRow.locator("time");
     await expect(completedTime).toHaveAttribute("datetime", completedAt);
     await expect(completedTime).toHaveText(
       formatApplicationCompletedTime(completedAt),
     );
-    for (const cell of await results
-      .locator("tbody tr")
-      .first()
-      .locator("th, td")
-      .all())
+    for (const cell of await detailedRow.locator("th, td").all())
       await expect(cell).toHaveCSS("vertical-align", "middle");
     await expect(results.locator("tbody td [data-volunteer-role]")).toHaveCount(
       0,
@@ -475,8 +475,8 @@ test("organizers review pending and approved applications with persistent list c
     });
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
     await expect(
-      page.getByRole("link", { name: "Previous applications" }),
-    ).toHaveAttribute("href", /q=applicant&approval=awaiting/);
+      page.getByRole("link", { name: /^(Next|Previous) applications$/ }),
+    ).toHaveCount(0);
     const documents: string[] = [];
     page.on("request", (request) => {
       if (request.resourceType() === "document") documents.push(request.url());
@@ -484,7 +484,7 @@ test("organizers review pending and approved applications with persistent list c
     await allApplicants.click();
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await expect(allApplicants).toBeFocused();
-    await expect(results.locator("tbody tr")).toHaveCount(50);
+    await expect(results.locator("tbody tr")).toHaveCount(53);
     await expect(page).toHaveURL(`${origin}/applications?q=applicant`);
     await awaitingApproval.click();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
@@ -495,10 +495,10 @@ test("organizers review pending and approved applications with persistent list c
     await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
     await page.goBack();
     await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
-    await expect(results.locator("tbody tr")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(53);
     assert.equal(page.url(), `${origin}${listPath}`);
     assert.deepEqual(documents, []);
-    const reviewLink = results.locator("[data-volunteer-profile-link]").first();
+    const reviewLink = detailedRow.locator("[data-volunteer-profile-link]");
     const applicationHref = await reviewLink.getAttribute("href");
     assert.ok(applicationHref);
     const profileHref = applicationHref.replace(
@@ -629,7 +629,7 @@ test("organizers review pending and approved applications with persistent list c
     // Merely reading the application is not review completion.
     await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("53");
-    await expect(results.locator("tbody tr")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(53);
     // The table scrolls within the viewport on small screens.
     await page.setViewportSize({ width: 320, height: 640 });
     await expect
@@ -644,10 +644,7 @@ test("organizers review pending and approved applications with persistent list c
       ),
     ).toBe(true);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await results
-      .locator("tbody tr")
-      .first()
-      .click({ position: { x: 2, y: 2 } });
+    await detailedRow.click({ position: { x: 2, y: 2 } });
     await expect(page).toHaveURL(`${origin}${applicationHref}`);
     await page.goto(`${origin}${profileHref}`);
     await DB.prepare(
@@ -663,11 +660,14 @@ test("organizers review pending and approved applications with persistent list c
     const inProgressList = await get("/applications?q=applicant-50");
     const inProgressHtml = await inProgressList.text();
     assert.match(inProgressHtml, /data-state="in-progress">In Progress</);
-    assert.match(inProgressHtml, /data-awaiting-approval-count>0</);
+    assert.match(inProgressHtml, /data-awaiting-approval-count[^>]*>0</);
     const reviewQueue = await get(
       "/applications?q=applicant-50&approval=awaiting",
     );
-    assert.doesNotMatch(await reviewQueue.text(), /data-volunteer-row/);
+    assert.doesNotMatch(
+      (await reviewQueue.text()).replace(/<template[\s\S]*?<\/template>/g, ""),
+      /data-volunteer-row/,
+    );
     await page.goto(`${origin}/applications?q=applicant-50`);
     await expect(results.locator('[data-state="in-progress"]')).toHaveText(
       "In Progress",
@@ -834,7 +834,7 @@ test("organizers review pending and approved applications with persistent list c
     ).toHaveCount(1);
     await expect(
       summary.getByText("Additional certification answer", { exact: true }),
-    ).toHaveCount(1);
+    ).toHaveCount(0); // Legacy additional answers belong to the submitted application, not editable profile rows.
     await expect(
       summary.getByText("Other training and experience", { exact: true }),
     ).toHaveCount(1);
@@ -901,15 +901,12 @@ test("organizers review pending and approved applications with persistent list c
     await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("52");
     await expect(allCount).toHaveText("53");
-    await expect(results.locator("tbody tr")).toHaveCount(2);
+    await expect(results.locator("tbody tr")).toHaveCount(52);
     // Normal full-page links retain exactly the same list context.
     await page.goto(`${origin}${applicationHref}`);
     await expect(
       page.getByRole("link", { name: "Back to applications" }),
-    ).toHaveAttribute(
-      "href",
-      "/applications?q=applicant&approval=awaiting&offset=50",
-    );
+    ).toHaveAttribute("href", listPath);
     const documentsBeforeRevocation = documents.length;
     await page
       .getByRole("button", { name: "Revoke application approval" })
@@ -929,7 +926,7 @@ test("organizers review pending and approved applications with persistent list c
     await page.getByRole("link", { name: "Back to applications" }).click();
     await page.waitForLoadState("load");
     await expect(count).toHaveText("53");
-    await expect(results.locator("tbody tr")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(53);
     const search = page.locator("[data-volunteer-search]");
     await search.fill("applicant-52");
     await expect(results.locator("tbody tr")).toHaveCount(1);
@@ -963,9 +960,10 @@ test("organizers review pending and approved applications with persistent list c
     await expect(count).toHaveText("0");
     await expect(allCount).toHaveText("0");
     await search.fill("applicant");
-    await expect(results.locator("tbody tr")).toHaveCount(50);
-    await page.getByRole("link", { name: "Next applications" }).click();
-    await expect(results.locator("tbody tr")).toHaveCount(3);
+    await expect(results.locator("tbody tr")).toHaveCount(53);
+    await expect(
+      page.getByRole("link", { name: /^(Next|Previous) applications$/ }),
+    ).toHaveCount(0);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(page.url()).searchParams.get("q")).toBe("applicant");
     assert.deepEqual(errors, []);
@@ -1034,7 +1032,7 @@ test("organizers review pending and approved applications with persistent list c
       "organizer",
     );
     // Returning through bfcache must refresh approval changes without losing the
-    // restored search or page, even when the last page becomes empty.
+    // restored search or filter.
     await page.waitForLoadState("load");
     const restoredListUrl = page.url();
     await DB.prepare(
@@ -1047,15 +1045,8 @@ test("organizers review pending and approved applications with persistent list c
     );
     await expect(count).toHaveText("50");
     await expect(allCount).toHaveText("53");
-    await expect(results.locator("tbody tr")).toHaveCount(0);
-    await expect(
-      results.getByText(
-        "No applications ready for review on this page. Return to the previous page.",
-      ),
-    ).toBeVisible();
-    expect(page.url()).toBe(restoredListUrl);
-    await page.getByRole("link", { name: "Previous applications" }).click();
     await expect(results.locator("tbody tr")).toHaveCount(50);
+    expect(page.url()).toBe(restoredListUrl);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     await DB.prepare(
       "UPDATE volunteer_status SET registration_approved=1",

@@ -1,17 +1,12 @@
 ---
-import AttendeeAvatar from "./AttendeeAvatar.astro";
-import NewVolunteerBadge from "./NewVolunteerBadge.astro";
-import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
+import DirectoryRow from "./DirectoryRow.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
 import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
-import CompactPersonName from "./CompactPersonName.astro";
-import { formatApplicationCompletedTime } from "../../data/application";
 import {
   directoryListUrl,
   applicationStatuses,
-  applicationStatus,
-  volunteerPageSize,
+  directoryEmptyMessage,
   type DirectoryListState,
   type DirectorySort,
 } from "../../data/volunteer-list";
@@ -36,30 +31,15 @@ const profileHref =
   Astro.props.profileHref ??
   ((id: string) =>
     `/${kind}/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(listUrl)}`);
-const { search, offset, approval, sort, direction } = state;
+const { search, approval, sort, direction } = state;
+const visibleIds = new Set(people.rows.map(({ id }) => id));
+const cachedRows = people.allRows.filter(({ id }) => !visibleIds.has(id));
 const statusCounts = {
   awaiting: people.awaitingApprovalCount,
   "in-progress": people.inProgressCount,
   rejected: people.rejectedCount,
   approved: people.approvedCount,
 };
-const emptySubject = {
-  all: "applications",
-  awaiting: "applications ready for review",
-  "in-progress": "applications in progress",
-  rejected: "rejected applications",
-  approved: "approved applications",
-}[approval];
-const emptyApplications =
-  offset > 0
-    ? `No ${emptySubject} on this page. Return to the previous page.`
-    : search
-      ? `No ${emptySubject} match your search.`
-      : approval === "awaiting"
-        ? "No applications are ready for review."
-        : approval === "all"
-          ? "No applications to review."
-          : `No ${emptySubject}.`;
 const columns = (
   applications
     ? [
@@ -74,6 +54,7 @@ const columns = (
 <section
   class="volunteer-events"
   data-volunteer-browser
+  data-directory-kind={kind}
   aria-labelledby={`${kind}-heading`}
 >
   <div class="volunteer-section-heading">
@@ -102,7 +83,9 @@ const columns = (
         placeholder="Search by name"
       />
     </label>
-    <button class="btn btn-outline" type="submit">Search</button>
+    <button class="btn btn-outline" type="submit" data-volunteer-search-submit
+      >Search</button
+    >
   </form>
   {
     applications && (
@@ -116,7 +99,7 @@ const columns = (
         {Object.entries(formFields).map(([name, value]) => (
           <input type="hidden" name={name} value={value} />
         ))}
-        {search && <input type="hidden" name="q" value={search} />}
+        <input type="hidden" name="q" value={search} />
         <input type="hidden" name="sort" value={sort} />
         <input type="hidden" name="direction" value={direction} />
         <button
@@ -130,7 +113,10 @@ const columns = (
         >
           <span>
             All (
-            <span data-all-applicants-count>{people.allApplicantsCount}</span>)
+            <span data-all-applicants-count data-volunteer-count="all">
+              {people.allApplicantsCount}
+            </span>
+            )
           </span>
         </button>
         {Object.entries(applicationStatuses).map(([value, status]) => (
@@ -152,11 +138,13 @@ const columns = (
               </span>{" "}
               (
               {value === "awaiting" ? (
-                <span data-awaiting-approval-count>
+                <span data-awaiting-approval-count data-volunteer-count={value}>
                   {people.awaitingApprovalCount}
                 </span>
               ) : (
-                <span>{statusCounts[value as keyof typeof statusCounts]}</span>
+                <span data-volunteer-count={value}>
+                  {statusCounts[value as keyof typeof statusCounts]}
+                </span>
               )}
               )
             </span>
@@ -204,7 +192,6 @@ const columns = (
                           ...state,
                           sort: key,
                           direction: nextDirection,
-                          offset: 0,
                         })}
                         data-volunteer-sort={key}
                         aria-controls={`${kind}-table`}
@@ -222,108 +209,41 @@ const columns = (
           <tbody>
             {
               people.rows.map((person) => (
-                <tr data-volunteer-row>
-                  <th scope="row">
-                    <div class="volunteer-table-person">
-                      <AttendeeAvatar
-                        category={person.category}
-                        medicMark={Boolean(person.medicMark)}
-                        decorative
-                      />
-                      <div class="volunteer-table-name">
-                        <CompactPersonName
-                          name={person.name}
-                          href={profileHref(person.id)}
-                          data-volunteer-profile-link
-                        />
-                        {!applications && person.role === "organizer" && (
-                          <VolunteerRoleBadge role="organizer" />
-                        )}
-                        {!applications &&
-                          person.category === "new-volunteer" && (
-                            <NewVolunteerBadge />
-                          )}
-                        {Boolean(person.medicMark) && (
-                          <VolunteerRoleBadge role="medic" />
-                        )}
-                      </div>
-                    </div>
-                  </th>
-                  {applications && (
-                    <>
-                      <td>
-                        <span
-                          class="application-table-progress application-status-text"
-                          data-state={
-                            applicationStatuses[applicationStatus(person)].state
-                          }
-                        >
-                          {applicationStatuses[applicationStatus(person)].label}
-                        </span>
-                      </td>
-                      <td>
-                        {person.applicationCompletedAt !== null ? (
-                          <time
-                            datetime={new Date(
-                              person.applicationCompletedAt,
-                            ).toISOString()}
-                          >
-                            {formatApplicationCompletedTime(
-                              new Date(
-                                person.applicationCompletedAt,
-                              ).toISOString(),
-                            )}
-                          </time>
-                        ) : null}
-                      </td>
-                    </>
-                  )}
-                </tr>
+                <DirectoryRow
+                  person={person}
+                  applications={applications}
+                  href={profileHref(person.id)}
+                />
               ))
             }
           </tbody>
         </table>
       </TableScrollFrame>
     </div>
-    {
-      !people.rows.length && (
-        <p class="volunteer-notice">
-          {applications
-            ? emptyApplications
-            : offset > 0
-              ? "No volunteers on this page. Return to the previous page."
-              : search
-                ? "No volunteers match your search."
-                : "No approved volunteers yet."}
-        </p>
-      )
-    }
-    <div class="volunteer-actions">
-      {
-        offset > 0 && (
-          <a
-            class="btn btn-quiet"
-            href={urlForState({
-              ...state,
-              offset: Math.max(0, offset - volunteerPageSize),
-            })}
-          >
-            Previous {kind}
-          </a>
-        )
-      }
-      {
-        people.hasMore && (
-          <a
-            class="btn btn-quiet"
-            href={urlForState({ ...state, offset: offset + volunteerPageSize })}
-          >
-            Next {kind}
-          </a>
-        )
-      }
-    </div>
+    <p
+      class="volunteer-notice"
+      data-volunteer-empty
+      hidden={Boolean(people.rows.length)}
+    >
+      {directoryEmptyMessage(kind, state)}
+    </p>
+    <template data-volunteer-cached-rows>
+      <table>
+        <tbody>
+          {
+            cachedRows.map((person) => (
+              <DirectoryRow
+                person={person}
+                applications={applications}
+                href={profileHref(person.id)}
+              />
+            ))
+          }
+        </tbody>
+      </table>
+    </template>
   </div>
+  <p class="sr-only" role="status" data-volunteer-result-count></p>
   <p data-volunteer-search-error class="volunteer-notice" role="status" hidden>
   </p>
 </section>

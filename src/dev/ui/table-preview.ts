@@ -56,7 +56,7 @@ if (import.meta.env.DEV) {
     }
     const response = await fetch(url, { ...init, credentials: "omit" });
     report(
-      "Fictional results updated. Search, filters, and sort order stay in this preview.",
+      "Fictional directory refreshed. Search, filters, and sorting run locally and stay in this preview.",
     );
     return response;
   };

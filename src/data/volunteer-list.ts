@@ -1,3 +1,5 @@
+import type { AttendeeCategory } from "./event-roster";
+
 export type VolunteerApprovalFilter = "all" | "awaiting";
 // Preserve the existing review-queue URL while sharing the table's exact labels.
 export const applicationStatuses = {
@@ -37,7 +39,110 @@ export type ApplicationSort = "name" | "role" | "progress" | "completed";
 export type DirectoryKind = "applications" | "volunteers";
 export type DirectorySort = VolunteerSort | ApplicationSort;
 export type VolunteerSortDirection = "asc" | "desc";
-export const volunteerPageSize = 50;
+
+/** Only directory/search fields are sent to the browser, never profile answers. */
+export interface DirectoryPerson {
+  id: string;
+  name: string;
+  searchName: string;
+  role: "volunteer" | "organizer";
+  category: AttendeeCategory;
+  medicMark: number;
+  status: ApplicationStatus;
+  applicationCompletedAt: number | null;
+}
+
+// Preserve SQLite's ASCII-only lower()/NOCASE behavior in both renderers.
+const fold = (value: string) =>
+  value.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+const compare = (a: string | number, b: string | number) =>
+  a < b ? -1 : a > b ? 1 : 0;
+
+export function directoryView<T extends DirectoryPerson>(
+  people: readonly T[],
+  kind: DirectoryKind,
+  state: DirectoryListState,
+) {
+  const applications = kind === "applications";
+  const query = fold(state.search.slice(0, 100));
+  const matching = people.filter((person) =>
+    fold(person.searchName).includes(query),
+  );
+  const count = (status: ApplicationStatus) =>
+    matching.filter((person) => person.status === status).length;
+  const progress = { awaiting: 0, "in-progress": 1, rejected: 2, approved: 3 };
+  const primary = (person: T) => {
+    if (applications && state.sort === "progress")
+      return progress[person.status];
+    if (applications && state.sort === "completed")
+      return person.applicationCompletedAt ?? -Infinity;
+    if (state.sort === "role")
+      return applications
+        ? person.medicMark
+          ? "medic"
+          : ""
+        : person.role === "organizer"
+          ? "organizer"
+          : person.category === "new-volunteer"
+            ? "new"
+            : person.category === "medic"
+              ? "medic"
+              : "";
+    return fold(person.name);
+  };
+  const rows = matching
+    .filter(
+      (person) =>
+        !applications ||
+        state.approval === "all" ||
+        person.status === state.approval,
+    )
+    .sort(
+      (a, b) =>
+        compare(primary(a), primary(b)) *
+          (state.direction === "desc" ? -1 : 1) ||
+        (applications && state.sort === "progress"
+          ? compare(
+              b.applicationCompletedAt ?? -Infinity,
+              a.applicationCompletedAt ?? -Infinity,
+            )
+          : 0) ||
+        compare(fold(a.name), fold(b.name)) ||
+        compare(a.id, b.id),
+    );
+  return {
+    rows,
+    allApplicantsCount: matching.length,
+    awaitingApprovalCount: count("awaiting"),
+    inProgressCount: count("in-progress"),
+    rejectedCount: count("rejected"),
+    approvedCount: count("approved"),
+  };
+}
+
+export function directoryEmptyMessage(
+  kind: DirectoryKind,
+  state: DirectoryListState,
+) {
+  if (kind === "volunteers")
+    return state.search
+      ? "No volunteers match your search."
+      : "No approved volunteers yet.";
+  const subject = {
+    all: "applications",
+    awaiting: "applications ready for review",
+    "in-progress": "applications in progress",
+    rejected: "rejected applications",
+    approved: "approved applications",
+  }[state.approval];
+  return state.search
+    ? `No ${subject} match your search.`
+    : state.approval === "awaiting"
+      ? "No applications are ready for review."
+      : state.approval === "all"
+        ? "No applications to review."
+        : `No ${subject}.`;
+}
 
 export function volunteerListState(params: URLSearchParams) {
   return { ...listState(params), sort: volunteerSort(params.get("sort")) };
@@ -79,15 +184,10 @@ function listState(params: URLSearchParams) {
     search: (params.get("q") ?? "").slice(0, 100),
     approval: params.get("approval") === "awaiting" ? "awaiting" : "all",
     direction: params.get("direction") === "desc" ? "desc" : "asc",
-    offset: Math.min(
-      10000,
-      Math.max(0, Number.parseInt(params.get("offset") ?? "0", 10) || 0),
-    ),
   } satisfies {
     search: string;
     approval: VolunteerApprovalFilter;
     direction: VolunteerSortDirection;
-    offset: number;
   };
 }
 
@@ -116,7 +216,6 @@ export function directoryListUrl(
     params.set("approval", state.approval);
   if (sort !== (applications ? "progress" : "role")) params.set("sort", sort);
   if (state.direction !== "asc") params.set("direction", state.direction);
-  if (state.offset) params.set("offset", String(state.offset));
   const query = params.toString();
   return `/${applications ? "applications" : "volunteers"}${query ? `?${query}` : ""}`;
 }

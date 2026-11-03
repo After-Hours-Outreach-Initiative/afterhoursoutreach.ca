@@ -18,7 +18,7 @@ playground. Account controls load only when the panel is opened.
 Choose a website part from the playground navigation:
 
 - **Applications table** (`/dev/ui/applications`): try application progress states,
-  approval filters, live search, empty results, long names, and pagination.
+  approval filters, instant local search, empty results, long names, and 500-entry directories.
 - **Volunteers table** (`/dev/ui/volunteers`): inspect roles, avatars, patrol access,
   and ascending/descending sorting on all three columns. Both table playgrounds
   include viewport sizes and delayed, failed, or paused search/sort responses.

@@ -148,12 +148,12 @@ for (const kind of ["applications", "volunteers"]) {
         colorScheme: "light",
         reducedMotion: "reduce",
       });
-      await page.goto(`/dev/ui/${kind}/preview?scenario=paginated&latency=0`);
+      await page.goto(`/dev/ui/${kind}/preview?scenario=large&latency=0`);
       const shell = page.locator(".volunteer-table-shell");
       const frame = shell.locator(".volunteer-table-frame");
       const header = shell.locator(".volunteer-table-header");
       await expect(shell).toHaveAttribute("data-table-header", "split");
-      await expect(frame.locator("[data-volunteer-row]")).toHaveCount(50);
+      await expect(frame.locator("[data-volunteer-row]")).toHaveCount(500);
       await expect(header).toHaveCSS("position", "sticky");
       await expect(header).toHaveCSS("transform", "none");
       await expect(header.locator("thead")).toHaveCSS("animation-name", "none");
@@ -272,7 +272,7 @@ test("split headers need no scroll timeline support and stop at the table bottom
     CSS.supports = () => false;
   });
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/dev/ui/applications/preview?scenario=paginated&latency=0");
+  await page.goto("/dev/ui/applications/preview?scenario=large&latency=0");
   const shell = page.locator(".volunteer-table-shell");
   const header = shell.locator(".volunteer-table-header");
   await expect(shell).toHaveAttribute("data-table-header", "split");
@@ -305,7 +305,7 @@ for (const kind of ["applications", "volunteers"]) {
   test(`${kind} keep one semantic header and one set of keyboard sort controls`, async ({
     page,
   }) => {
-    await page.goto(`/dev/ui/${kind}/preview?scenario=paginated&latency=0`);
+    await page.goto(`/dev/ui/${kind}/preview?scenario=large&latency=0`);
     const shell = page.locator(".volunteer-table-shell");
     await expect(shell).toHaveAttribute("data-table-header", "split");
     const labels =

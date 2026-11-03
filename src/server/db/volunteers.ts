@@ -34,13 +34,14 @@ import {
 import type {
   ApplicationSort,
   ApplicationApprovalFilter,
-  DirectorySort,
   VolunteerSort,
   VolunteerSortDirection,
 } from "../../data/volunteer-list";
-import type { AttendeeCategory } from "../../data/event-roster";
-import { volunteerPageSize } from "../../data/volunteer-list";
-export { volunteerPageSize } from "../../data/volunteer-list";
+import {
+  directoryView,
+  type DirectoryPerson,
+  type DirectoryListState,
+} from "../../data/volunteer-list";
 
 export interface VolunteerRow {
   id: string;
@@ -60,45 +61,37 @@ export async function listVolunteers(
   db: Env["DB"],
   actor: Actor,
   search = "",
-  offset = 0,
   sort: VolunteerSort = "role",
   direction: VolunteerSortDirection = "asc",
 ) {
-  return listPeople(db, actor, search, offset, false, "all", sort, direction);
+  return listPeople(db, actor, false, {
+    search,
+    approval: "all",
+    sort,
+    direction,
+  });
 }
 
 export async function listApplications(
   db: Env["DB"],
   actor: Actor,
   search = "",
-  offset = 0,
   approval: ApplicationApprovalFilter = "all",
   sort: ApplicationSort = "progress",
   direction: VolunteerSortDirection = "asc",
 ) {
-  return listPeople(db, actor, search, offset, true, approval, sort, direction);
+  return listPeople(db, actor, true, { search, approval, sort, direction });
 }
 
 async function listPeople(
   db: Env["DB"],
   actor: Actor,
-  search: string,
-  offset: number,
   applications: boolean,
-  approval: ApplicationApprovalFilter = "all",
-  sort: DirectorySort = "name",
-  direction: VolunteerSortDirection = "asc",
+  state: DirectoryListState,
 ) {
   requireOrganizer(actor);
   // A profile is created only on submission; private drafts never enter either
-  // query. All filter counts respect search, but not approval or pagination.
-  const applicantsSql = `FROM user u
-      JOIN profile p ON p.user_id = u.id
-      JOIN volunteer_status v ON v.user_id = u.id
-      WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
-        AND u.deleted_at IS NULL
-        ${applications ? "" : "AND v.registration_approved = 1"}`;
-  const query = search.slice(0, 100);
+  // directory. Load the small directory once; server and browser share its view.
   // Application badges show submitted medic-team interest, not approval or
   // patrol eligibility. Approved volunteers retain the shared roster mark.
   const directoryMedicMarkSql = applications
@@ -108,86 +101,30 @@ async function listPeople(
   // organizer approval, or patrol signup. SQLite max keeps missing steps null.
   const applicationCompletedAtSql =
     "max(p.registered_at, p.naloxone_completed_at)";
-  // Ascending status order is ready, in progress, rejected, approved; descending
-  // reverses those groups, keeping newest completions first within each group.
-  // Match visible role badges, not raw account flags.
-  // Only backend-owned expressions and directions enter ORDER BY. Sort the
-  // entire matching directory before pagination, with stable name/id ties.
-  const sortSql = applications
-    ? sort === "progress"
-      ? `CASE ${applicationStatusSql} WHEN 'awaiting' THEN 0
-          WHEN 'in-progress' THEN 1 WHEN 'rejected' THEN 2 ELSE 3 END`
-      : sort === "role"
-        ? `CASE WHEN ${directoryMedicMarkSql} THEN 'Medic' ELSE '' END COLLATE NOCASE`
-        : sort === "completed"
-          ? "applicationCompletedAt"
-          : "name COLLATE NOCASE"
-    : sort === "role"
-      ? `CASE WHEN u.role = 'organizer' THEN 'Organizer'
-          WHEN category = 'new-volunteer' THEN 'New'
-          WHEN category = 'medic' THEN 'Medic'
-          ELSE '' END COLLATE NOCASE`
-      : "name COLLATE NOCASE";
-  const orderSql = [
-    `${sortSql} ${direction === "desc" ? "DESC" : "ASC"}`,
-    ...(applications && sort === "progress"
-      ? ["applicationCompletedAt DESC"]
-      : []),
-    "name COLLATE NOCASE",
-    "u.id",
-  ].join(", ");
-  const [rows, counts] = (await db.batch([
-    db
-      .prepare(
-        `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+  const { results: allRows } = await db
+    .prepare(
+      `SELECT u.id, ${profileDisplayNameSql} AS name,
+         ${profileDisplayNameSql} || ' ' || ${profileFullNameSql} AS searchName,
+         ${applicationStatusSql} AS status, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
         ${applicationReadyForReviewSql} AS applicationReadyForReview,
         ${applicationCompletedAtSql} AS applicationCompletedAt,
         ${attendeeCategorySql("u.id")} AS category,
         ${directoryMedicMarkSql} AS medicMark,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
-      ${applicantsSql}
-        AND (? = 'all' OR (${applicationStatusSql}) = ?)
-      ORDER BY ${orderSql}
-      LIMIT ? OFFSET ?`,
-      )
-      .bind(query, approval, approval, volunteerPageSize + 1, offset),
-    db
-      .prepare(
-        `SELECT count(*) AS allApplicantsCount,
-          count(CASE WHEN (${applicationStatusSql}) = 'awaiting' THEN 1 END) AS awaitingApprovalCount,
-          count(CASE WHEN (${applicationStatusSql}) = 'in-progress' THEN 1 END) AS inProgressCount,
-          count(CASE WHEN (${applicationStatusSql}) = 'rejected' THEN 1 END) AS rejectedCount,
-          count(CASE WHEN (${applicationStatusSql}) = 'approved' THEN 1 END) AS approvedCount
-        ${applicantsSql}`,
-      )
-      .bind(query),
-  ])) as [
-    D1Result<
-      VolunteerRow & {
-        category: AttendeeCategory;
-        medicMark: number;
-        applicationCompletedAt: number | null;
-      }
-    >,
-    D1Result<{
-      allApplicantsCount: number;
-      awaitingApprovalCount: number;
-      inProgressCount: number;
-      rejectedCount: number;
-      approvedCount: number;
-    }>,
-  ];
+       FROM user u JOIN profile p ON p.user_id = u.id
+       JOIN volunteer_status v ON v.user_id = u.id
+       WHERE u.deleted_at IS NULL
+         ${applications ? "" : "AND v.registration_approved = 1"}`,
+    )
+    .all<VolunteerRow & DirectoryPerson>();
   return {
-    rows: rows.results.slice(0, volunteerPageSize),
-    hasMore: rows.results.length > volunteerPageSize,
-    allApplicantsCount: Number(counts.results[0]?.allApplicantsCount ?? 0),
-    awaitingApprovalCount: Number(
-      counts.results[0]?.awaitingApprovalCount ?? 0,
+    ...directoryView(
+      allRows,
+      applications ? "applications" : "volunteers",
+      state,
     ),
-    inProgressCount: Number(counts.results[0]?.inProgressCount ?? 0),
-    rejectedCount: Number(counts.results[0]?.rejectedCount ?? 0),
-    approvedCount: Number(counts.results[0]?.approvedCount ?? 0),
+    allRows,
   };
 }
 

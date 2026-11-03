@@ -14,7 +14,7 @@ import "@/styles/volunteer.css";
 export const prerender = false;
 let applications: Awaited<ReturnType<typeof listApplications>> = {
   rows: [],
-  hasMore: false,
+  allRows: [],
   allApplicantsCount: 0,
   awaitingApprovalCount: 0,
   inProgressCount: 0,
@@ -26,7 +26,7 @@ let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
 const state = applicationListState(Astro.url.searchParams);
-const { search, offset, approval, sort, direction } = state;
+const { search, approval, sort, direction } = state;
 const listUrl = applicationListUrl(state);
 try {
   const { actor, headers, email, greetingName } = await accountContext(
@@ -54,7 +54,6 @@ try {
       env.DB,
       actor,
       search,
-      offset,
       approval,
       sort,
       direction,

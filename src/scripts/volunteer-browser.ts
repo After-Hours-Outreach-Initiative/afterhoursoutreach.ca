@@ -1,5 +1,35 @@
 import { actionFragment } from "./action-page";
 import { initDirectoryTableHeader } from "./directory-table-header";
+import {
+  directoryEmptyMessage,
+  directoryListState,
+  directoryListUrl,
+  directoryView,
+  type DirectoryKind,
+  type DirectoryListState,
+  type DirectoryPerson,
+} from "../data/volunteer-list";
+
+/** Rows and their small search index live only in this page's memory. */
+function readRows(root: HTMLElement) {
+  const template = root.querySelector<HTMLTemplateElement>(
+    "[data-volunteer-cached-rows]",
+  );
+  const nodes = [
+    ...root.querySelectorAll<HTMLTableRowElement>("[data-volunteer-row]"),
+    ...(template?.content.querySelectorAll<HTMLTableRowElement>(
+      "[data-volunteer-row]",
+    ) ?? []),
+  ];
+  const rows = new Map(
+    nodes.map((node) => {
+      const person: DirectoryPerson = JSON.parse(node.dataset.directoryPerson!);
+      return [person.id, { person, node }] as const;
+    }),
+  );
+  template?.remove();
+  return rows;
+}
 
 export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   const root = document.querySelector<HTMLElement>("[data-volunteer-browser]");
@@ -14,130 +44,194 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   const error = root?.querySelector<HTMLElement>(
     "[data-volunteer-search-error]",
   );
-  if (!root || !search || !form || !results || !error) return;
+  const empty = root?.querySelector<HTMLElement>("[data-volunteer-empty]");
+  const tbody = results?.querySelector("tbody");
+  const count = root?.querySelector<HTMLElement>(
+    "[data-volunteer-result-count]",
+  );
+  if (
+    !root ||
+    !search ||
+    !form ||
+    !results ||
+    !error ||
+    !empty ||
+    !tbody ||
+    !count
+  )
+    return;
+  const kind = root.dataset.directoryKind as DirectoryKind;
   const refreshTableHeader = initDirectoryTableHeader(results);
-  const people = filters ? "applications" : "volunteers";
-
-  let timer: number | undefined;
+  let rows = readRows(root);
   let pending: AbortController | undefined;
-  const cancelSearch = () => {
-    clearTimeout(timer);
-    pending?.abort();
-    results.removeAttribute("aria-busy");
-  };
-  const replaceResults = (page: Document) => {
-    // Read both before replacing either, so an expired organizer session cannot
-    // leave a new count attached to stale results (or the reverse).
-    const nextResults = actionFragment(page, "[data-volunteer-results]");
-    const nextFilters = filters
-      ? actionFragment(page, "[data-volunteer-filters]")
-      : undefined;
-    const focused = document.activeElement;
-    const tableFrame = results.querySelector<HTMLElement>(
-      ".volunteer-table-frame",
-    );
-    const scrollLeft = tableFrame?.scrollLeft ?? 0;
-    const focusedFilter =
-      focused instanceof HTMLButtonElement && filters?.contains(focused)
-        ? focused.dataset.volunteerFilter
-        : undefined;
-    const focusedSort =
-      focused instanceof HTMLAnchorElement && results.contains(focused)
-        ? focused.dataset.volunteerSort
-        : undefined;
-    results.replaceChildren(...nextResults.childNodes);
-    const nextFrame = results.querySelector<HTMLElement>(
-      ".volunteer-table-frame",
-    );
-    if (nextFrame) {
-      nextFrame.scrollLeft = scrollLeft;
-      if (focused === tableFrame) nextFrame.focus({ preventScroll: true });
-    }
-    if (filters && nextFilters) {
-      filters.replaceChildren(...nextFilters.childNodes);
-      form.querySelector<HTMLInputElement>('[name="approval"]')!.value =
-        filters.querySelector<HTMLButtonElement>(
-          '[aria-pressed="true"]',
-        )!.value;
-    }
-    if (focusedFilter)
-      filters
-        ?.querySelector<HTMLButtonElement>(
-          `[data-volunteer-filter="${focusedFilter}"]`,
-        )
-        ?.focus({ preventScroll: true });
-    for (const name of ["sort", "direction"]) {
-      const input = form.querySelector<HTMLInputElement>(`[name="${name}"]`);
-      const nextInput = page.querySelector<HTMLInputElement>(
-        `[data-volunteer-search-form] [name="${name}"]`,
-      );
-      if (input && nextInput) input.value = nextInput.value;
-    }
-    // Split the new header before restoring focus, so moving its original links
-    // out of the body scroller cannot drop the keyboard user's focus.
-    refreshTableHeader();
-    if (focusedSort)
-      results
-        .querySelector<HTMLAnchorElement>(
-          `[data-volunteer-sort="${focusedSort}"]`,
-        )
-        ?.focus({ preventScroll: true });
-  };
-  const searchUrl = (resetOffset = true) => {
+  const stateFor = (url = new URL(location.href)) =>
+    directoryListState(url.searchParams, kind);
+
+  // Preserve development fixture options while normalizing directory state and
+  // dropping obsolete pagination from bookmarked and profile-return URLs.
+  const urlFor = (state: DirectoryListState) => {
     const url = new URL(location.href);
-    if (search.value) url.searchParams.set("q", search.value);
-    else url.searchParams.delete("q");
-    if (resetOffset) url.searchParams.delete("offset");
+    for (const key of ["q", "approval", "sort", "direction", "offset"])
+      url.searchParams.delete(key);
+    new URL(directoryListUrl(kind, state), url).searchParams.forEach(
+      (value, key) => url.searchParams.set(key, value),
+    );
     return url;
   };
-  const loadResults = async (
-    url = searchUrl(),
+
+  const render = (
+    state: DirectoryListState,
     historyMode: "push" | "replace" | "none" = "replace",
   ) => {
-    cancelSearch();
+    const view = directoryView(
+      [...rows.values()].map(({ person }) => person),
+      kind,
+      state,
+    );
+    const url = urlFor(state);
+    search.value = state.search;
+    for (const [name, value] of Object.entries({
+      q: state.search,
+      approval: state.approval,
+      sort: state.sort,
+      direction: state.direction,
+    })) {
+      root
+        .querySelectorAll<HTMLInputElement>(
+          `input[type="hidden"][name="${name}"]`,
+        )
+        .forEach((input) => {
+          input.value = value;
+        });
+    }
+    const counts: Record<string, number> = {
+      all: view.allApplicantsCount,
+      awaiting: view.awaitingApprovalCount,
+      "in-progress": view.inProgressCount,
+      rejected: view.rejectedCount,
+      approved: view.approvedCount,
+    };
+    filters
+      ?.querySelectorAll<HTMLElement>("[data-volunteer-count]")
+      .forEach((element) => {
+        element.textContent = String(counts[element.dataset.volunteerCount!]);
+      });
+    filters
+      ?.querySelectorAll<HTMLButtonElement>("[data-volunteer-filter]")
+      .forEach((button) => {
+        button.setAttribute(
+          "aria-pressed",
+          String(button.value === state.approval),
+        );
+      });
+    results
+      .querySelectorAll<HTMLElement>("[data-directory-column]")
+      .forEach((column) => {
+        if (column.dataset.directoryColumn === state.sort)
+          column.setAttribute(
+            "aria-sort",
+            state.direction === "asc" ? "ascending" : "descending",
+          );
+        else column.removeAttribute("aria-sort");
+      });
+    results
+      .querySelectorAll<HTMLAnchorElement>("[data-volunteer-sort]")
+      .forEach((link) => {
+        const sort = link.dataset.volunteerSort as DirectoryListState["sort"];
+        const direction =
+          state.sort === sort && state.direction === "asc" ? "desc" : "asc";
+        link.href = urlFor({ ...state, sort, direction }).href;
+        link.setAttribute(
+          "aria-label",
+          `${link.textContent!.trim()}: sort ${direction === "asc" ? "ascending" : "descending"}`,
+        );
+      });
+    for (const { node } of rows.values()) {
+      const link = node.querySelector<HTMLAnchorElement>(
+        "[data-volunteer-profile-link]",
+      );
+      if (!link) continue;
+      const profileUrl = new URL(link.getAttribute("href")!, location.href);
+      if (profileUrl.searchParams.has("returnTo")) {
+        profileUrl.searchParams.set("returnTo", url.pathname + url.search);
+        link.setAttribute("href", profileUrl.pathname + profileUrl.search);
+      }
+    }
+    tbody.replaceChildren(...view.rows.map(({ id }) => rows.get(id)!.node));
+    empty.textContent = directoryEmptyMessage(kind, state);
+    empty.hidden = Boolean(view.rows.length);
+    count.textContent = `${view.rows.length} ${kind === "applications" ? (view.rows.length === 1 ? "application" : "applications") : view.rows.length === 1 ? "volunteer" : "volunteers"}`;
+    refreshTableHeader();
+    if (historyMode === "push") history.pushState(null, "", url);
+    else if (historyMode === "replace") history.replaceState(null, "", url);
+  };
+
+  // A refresh never owns the search state: typing, sorting and filtering remain
+  // instant while it runs, and its eventual rows use the latest local state.
+  const refresh = async () => {
+    if (pending || document.hidden) return;
     const controller = new AbortController();
     pending = controller;
     results.setAttribute("aria-busy", "true");
     error.hidden = true;
     try {
-      const response = await fetchPage(url, {
+      const response = await fetchPage(urlFor(stateFor()), {
         credentials: "same-origin",
         cache: "no-store",
         signal: controller.signal,
       });
       if (!response.ok || response.redirected)
-        throw new Error(
-          `Could not search ${people}. Check your organizer session.`,
-        );
+        throw new Error(`Could not refresh ${kind}. Please reload the page.`);
       const page = new DOMParser().parseFromString(
         await response.text(),
         "text/html",
       );
-      if (!controller.signal.aborted) {
-        replaceResults(page);
-        if (historyMode === "push") history.pushState(null, "", url);
-        else if (historyMode === "replace") history.replaceState(null, "", url);
-      }
+      const nextRoot = actionFragment(page, "[data-volunteer-browser]");
+      if (nextRoot.dataset.directoryKind !== kind)
+        throw new Error(`Could not refresh ${kind}. Please reload the page.`);
+      if (controller.signal.aborted) return;
+      const focused = document.activeElement;
+      const focusedId =
+        focused instanceof Element
+          ? focused.closest<HTMLTableRowElement>("[data-volunteer-row]")
+              ?.dataset.directoryPerson
+          : undefined;
+      rows = readRows(nextRoot);
+      render(stateFor(), "none");
+      if (focusedId)
+        rows
+          .get((JSON.parse(focusedId) as DirectoryPerson).id)
+          ?.node.querySelector<HTMLAnchorElement>(
+            "[data-volunteer-profile-link]",
+          )
+          ?.focus({ preventScroll: true });
     } catch (reason) {
       if (!controller.signal.aborted) {
         error.textContent =
           reason instanceof Error
             ? reason.message
-            : `Could not search ${people}. Please try again.`;
+            : `Could not refresh ${kind}. Please reload the page.`;
         error.hidden = false;
       }
     } finally {
-      if (!controller.signal.aborted) results.removeAttribute("aria-busy");
+      if (pending === controller) {
+        pending = undefined;
+        results.removeAttribute("aria-busy");
+      }
     }
   };
-  search.addEventListener("input", () => {
-    cancelSearch();
-    timer = window.setTimeout(() => void loadResults(), 180);
-  });
+
+  search.addEventListener("input", () =>
+    render({ ...stateFor(), search: search.value.slice(0, 100) }),
+  );
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    void loadResults();
+    render({ ...stateFor(), search: search.value.slice(0, 100) });
   });
+  const submit = form.querySelector<HTMLButtonElement>(
+    "[data-volunteer-search-submit]",
+  );
+  if (submit) submit.hidden = true;
   results.addEventListener("click", (event) => {
     if (
       event.defaultPrevented ||
@@ -154,14 +248,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     );
     if (!link) return;
     event.preventDefault();
-    const url = searchUrl();
-    const target = new URL(link.href);
-    for (const name of ["sort", "direction"]) {
-      const value = target.searchParams.get(name);
-      if (value) url.searchParams.set(name, value);
-      else url.searchParams.delete(name);
-    }
-    void loadResults(url, "push");
+    render(stateFor(new URL(link.href)), "push");
   });
   filters?.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
@@ -170,19 +257,22 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     );
     if (!button) return;
     event.preventDefault();
-    const url = searchUrl();
-    if (button.value !== "all") url.searchParams.set("approval", button.value);
-    else url.searchParams.delete("approval");
-    void loadResults(url, "push");
+    const url = urlFor(stateFor());
+    url.searchParams.set("approval", button.value);
+    render(stateFor(url), "push");
   });
-  window.addEventListener("popstate", () => {
-    const url = new URL(location.href);
-    search.value = url.searchParams.get("q") ?? "";
-    void loadResults(url, "none");
+  window.addEventListener("popstate", () => render(stateFor(), "none"));
+  window.addEventListener("focus", () => void refresh());
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void refresh();
   });
-  window.addEventListener("pagehide", cancelSearch);
+  window.addEventListener("pagehide", () => {
+    pending?.abort();
+    pending = undefined;
+    results.removeAttribute("aria-busy");
+  });
   window.addEventListener("pageshow", (event) => {
-    // Browser Back may restore the list from bfcache after a full-page approval.
-    if (event.persisted) void loadResults(searchUrl(false));
+    if (event.persisted) void refresh();
   });
+  render(stateFor());
 }

@@ -4,12 +4,15 @@ import {
   applicationListState,
   applicationStatuses,
   directoryListUrl,
+  directoryView,
+  directoryEmptyMessage,
+  type DirectoryPerson,
   volunteerListReturnUrl,
   volunteerListState,
   volunteerListUrl,
 } from "../src/data/volunteer-list";
 
-test("application list state preserves approval, search, sorting and pagination in profile return links", () => {
+test("application list state preserves approval, search and sorting, dropping obsolete pagination", () => {
   const state = applicationListState(
     new URLSearchParams(
       "approval=awaiting&q=Alex+%26+Sam&sort=progress&direction=desc&offset=50",
@@ -20,11 +23,11 @@ test("application list state preserves approval, search, sorting and pagination 
   expect(
     applicationListState(new URL(url, "https://example.org").searchParams),
   ).toEqual(state);
-  expect(applicationListUrl({ ...state, offset: 0 })).toBe(
+  expect(applicationListUrl(state)).toBe(
     "/applications?q=Alex+%26+Sam&approval=awaiting&direction=desc",
   );
   expect(applicationListUrl({ ...state, sort: "name", direction: "asc" })).toBe(
-    "/applications?q=Alex+%26+Sam&approval=awaiting&sort=name&offset=50",
+    "/applications?q=Alex+%26+Sam&approval=awaiting&sort=name",
   );
   expect(volunteerListReturnUrl("/manage/applications")).toBe("/applications");
   expect(
@@ -34,13 +37,13 @@ test("application list state preserves approval, search, sorting and pagination 
   ).toBe("/volunteers?q=Alex+%26+Sam");
   const sorted = { ...state, sort: "name", direction: "desc" } as const;
   expect(volunteerListReturnUrl(volunteerListUrl(sorted))).toBe(
-    "/volunteers?q=Alex+%26+Sam&sort=name&direction=desc&offset=50",
+    "/volunteers?q=Alex+%26+Sam&sort=name&direction=desc",
   );
   expect(directoryListUrl("applications", sorted)).toBe(
-    "/applications?q=Alex+%26+Sam&approval=awaiting&sort=name&direction=desc&offset=50",
+    "/applications?q=Alex+%26+Sam&approval=awaiting&sort=name&direction=desc",
   );
   expect(directoryListUrl("volunteers", state)).toBe(
-    "/volunteers?q=Alex+%26+Sam&direction=desc&offset=50",
+    "/volunteers?q=Alex+%26+Sam&direction=desc",
   );
   for (const approval of Object.keys(applicationStatuses)) {
     const filtered = applicationListState(
@@ -54,7 +57,7 @@ test("application list state preserves approval, search, sorting and pagination 
     );
     expect(filtered.approval).toBe(approval);
     expect(volunteerListReturnUrl(applicationListUrl(filtered))).toBe(
-      `/applications?q=Alex+%26+Sam&approval=${approval}&sort=completed&direction=desc&offset=50`,
+      `/applications?q=Alex+%26+Sam&approval=${approval}&sort=completed&direction=desc`,
     );
   }
   const volunteers = volunteerListState(new URLSearchParams("sort=role"));
@@ -86,7 +89,7 @@ test("list return destinations are restricted and untrusted filter inputs are no
     volunteerListReturnUrl(
       "/manage/applications?sort=progress&direction=desc&offset=50",
     ),
-  ).toBe("/applications?direction=desc&offset=50");
+  ).toBe("/applications?direction=desc");
   expect(applicationListState(new URLSearchParams()).sort).toBe("progress");
   for (const approval of ["unknown", "__proto__", "constructor"])
     expect(
@@ -109,16 +112,161 @@ test("list return destinations are restricted and untrusted filter inputs are no
   );
   expect(
     volunteerListReturnUrl("/volunteers?sort=patrol&direction=desc&offset=50"),
-  ).toBe("/volunteers?direction=desc&offset=50");
+  ).toBe("/volunteers?direction=desc");
   expect(
     volunteerListState(
       new URLSearchParams({ q: "x".repeat(200), offset: "999999" }),
     ),
   ).toEqual({
     search: "x".repeat(100),
-    offset: 10000,
     approval: "all",
     sort: "role",
     direction: "asc",
   });
+});
+
+const person = (
+  id: string,
+  overrides: Partial<DirectoryPerson> = {},
+): DirectoryPerson => ({
+  id,
+  name: id,
+  searchName: id,
+  role: "volunteer",
+  category: "new-volunteer",
+  medicMark: 0,
+  status: "awaiting",
+  applicationCompletedAt: 0,
+  ...overrides,
+});
+
+test("a complete 500-person directory can be searched without slicing or mutating its source", () => {
+  const people = Array.from({ length: 500 }, (_, i) =>
+    person(String(i).padStart(3, "0")),
+  );
+  const state = applicationListState(new URLSearchParams());
+  expect(directoryView(people, "applications", state).rows).toHaveLength(500);
+  expect(
+    directoryView(people, "applications", { ...state, search: "499" }).rows,
+  ).toEqual([people[499]]);
+  expect(
+    directoryView(people, "applications", {
+      ...state,
+      direction: "desc",
+      sort: "name",
+    }).rows[0],
+  ).toBe(people[499]);
+  expect(people[0].id).toBe("000");
+});
+
+test("full-name searches are literal, ASCII-insensitive and count all statuses before filtering", () => {
+  const people = [
+    person("alex", {
+      name: "Alex d.",
+      searchName: "Alex d. Alexander Jordan de la Cruz",
+      status: "awaiting",
+    }),
+    person("approved", { searchName: "alex approved", status: "approved" }),
+    person("rejected", { searchName: "alex rejected", status: "rejected" }),
+    person("pending", {
+      searchName: "alex in progress",
+      status: "in-progress",
+    }),
+  ];
+  const state = applicationListState(
+    new URLSearchParams("approval=awaiting&q=ALEX"),
+  );
+  expect(directoryView(people, "applications", state)).toMatchObject({
+    rows: [people[0]],
+    allApplicantsCount: 4,
+    awaitingApprovalCount: 1,
+    approvedCount: 1,
+    rejectedCount: 1,
+    inProgressCount: 1,
+  });
+  expect(
+    directoryView(people, "applications", {
+      ...state,
+      search: "JORDAN DE LA CRUZ",
+    }).rows,
+  ).toEqual([people[0]]);
+  for (const search of [".*", "%", "_"])
+    expect(
+      directoryView(people, "applications", { ...state, search }).rows,
+    ).toEqual([]);
+  expect(
+    directoryView([person("Élodie")], "applications", {
+      ...state,
+      search: "élodie",
+    }).rows,
+  ).toEqual([]);
+});
+
+test("application sorting preserves status precedence, latest completions, null dates and stable name/id ties", () => {
+  const people = [
+    person("b", { name: "ALPHA", applicationCompletedAt: 1 }),
+    person("a", { name: "alpha", applicationCompletedAt: 1 }),
+    person("newest", { applicationCompletedAt: 2 }),
+    person("pending", { status: "in-progress", applicationCompletedAt: null }),
+    person("rejected", { status: "rejected", applicationCompletedAt: 3 }),
+    person("approved", { status: "approved", applicationCompletedAt: 4 }),
+  ];
+  const state = applicationListState(new URLSearchParams());
+  const ids = (
+    sort: typeof state.sort,
+    direction: typeof state.direction = "asc",
+  ) =>
+    directoryView(people, "applications", {
+      ...state,
+      sort,
+      direction,
+    }).rows.map(({ id }) => id);
+  expect(ids("progress")).toEqual([
+    "newest",
+    "a",
+    "b",
+    "pending",
+    "rejected",
+    "approved",
+  ]);
+  expect(ids("progress", "desc")).toEqual([
+    "approved",
+    "rejected",
+    "pending",
+    "newest",
+    "a",
+    "b",
+  ]);
+  expect(ids("completed")).toEqual([
+    "pending",
+    "a",
+    "b",
+    "newest",
+    "rejected",
+    "approved",
+  ]);
+  expect(ids("completed", "desc")).toEqual([
+    "approved",
+    "rejected",
+    "newest",
+    "a",
+    "b",
+    "pending",
+  ]);
+});
+
+test("empty messages describe search and status, never removed pagination", () => {
+  const state = applicationListState(new URLSearchParams("approval=awaiting"));
+  expect(directoryEmptyMessage("applications", state)).toBe(
+    "No applications are ready for review.",
+  );
+  expect(
+    directoryEmptyMessage("applications", { ...state, search: "missing" }),
+  ).toBe("No applications ready for review match your search.");
+  expect(
+    directoryEmptyMessage(
+      "volunteers",
+      volunteerListState(new URLSearchParams()),
+    ),
+  ).toBe("No approved volunteers yet.");
 });

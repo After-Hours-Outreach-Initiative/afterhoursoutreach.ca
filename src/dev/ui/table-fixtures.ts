@@ -4,8 +4,8 @@ import { personDisplayName } from "../../data/person-name";
 import {
   directoryListState,
   directoryListUrl,
+  directoryView,
   applicationStatus,
-  volunteerPageSize,
   type DirectoryListState,
 } from "../../data/volunteer-list";
 
@@ -47,9 +47,10 @@ export function tableScenarios(kind: TableKind) {
         "Long, hyphenated, and unbroken names for checking horizontal table scrolling without wrapping or page overflow.",
     },
     {
-      id: "paginated",
-      label: "Multiple pages",
-      description: `63 fictional people, using the real ${volunteerPageSize}-row page size. Search, filtering, and sorting happen before pagination.`,
+      id: "large",
+      label: "Large directory",
+      description:
+        "500 fictional people on one page. Search, filtering, and sorting run instantly in the browser.",
     },
     {
       id: "empty",
@@ -144,33 +145,6 @@ const volunteerProfiles = [
   "inactive",
 ];
 
-function roleLabel(person: Person) {
-  return person.role === "organizer"
-    ? "Organizer"
-    : person.category === "new-volunteer"
-      ? "New"
-      : person.category === "medic"
-        ? "Medic"
-        : "";
-}
-
-function progressOrder(person: Person) {
-  return { awaiting: 0, "in-progress": 1, rejected: 2, approved: 3 }[
-    applicationStatus(person)
-  ];
-}
-
-// SQLite's NOCASE collation folds ASCII only; match its directory sort and ties.
-function compare(a: string | number, b: string | number) {
-  const fold = (value: string | number) =>
-    typeof value === "string"
-      ? value.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
-      : value;
-  const left = fold(a);
-  const right = fold(b);
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
 export function createTableFixture(
   kind: TableKind,
   options: TableOptions,
@@ -180,12 +154,11 @@ export function createTableFixture(
     throw new Error("UI fixtures are local-development only.");
   const applications = kind === "applications";
   const profiles = new Map<string, string>();
-  const searchNames = new Map<string, string>();
   const count =
     options.scenario === "empty"
       ? 0
-      : options.scenario === "paginated"
-        ? 63
+      : options.scenario === "large"
+        ? 500
         : names.length;
   const rows: Person[] = Array.from({ length: count }, (_, index) => {
     const variant = index % names.length;
@@ -212,12 +185,11 @@ export function createTableFixture(
       preferredName:
         options.scenario === "long-names" ? longPreferredNames[variant] : "",
     });
-    searchNames.set(id, fullName);
-    return {
+    const person = {
       id,
       name:
-        options.scenario === "paginated"
-          ? `${name} · sample ${String(index + 1).padStart(2, "0")}`
+        options.scenario === "large"
+          ? `${name} · sample ${String(index + 1).padStart(3, "0")}`
           : name,
       role: !applications && variant === 0 ? "organizer" : "volunteer",
       category:
@@ -248,60 +220,16 @@ export function createTableFixture(
       updatedAt: Date.UTC(2026, 9, 1),
       twoFactorEnabled: Number(!applications && variant === 0),
       orientations: Number(!applications && [0, 1, 2, 5, 7].includes(variant)),
+    } satisfies Omit<Person, "searchName" | "status">;
+    return {
+      ...person,
+      searchName: `${person.name} ${fullName}`,
+      status: applicationStatus(person),
     };
   });
-  const matching = rows.filter((person) =>
-    compareSearch(`${person.name} ${searchNames.get(person.id)}`, state.search),
-  );
-  const countStatus = (status: string) =>
-    matching.filter((person) => applicationStatus(person) === status).length;
-  const filtered =
-    applications && state.approval !== "all"
-      ? matching.filter(
-          (person) => applicationStatus(person) === state.approval,
-        )
-      : matching;
-  filtered.sort((a, b) => {
-    const primary = (person: Person) =>
-      applications
-        ? state.sort === "progress"
-          ? progressOrder(person)
-          : state.sort === "role"
-            ? person.medicMark
-              ? "Medic"
-              : ""
-            : state.sort === "completed"
-              ? (person.applicationCompletedAt ?? -Infinity)
-              : person.name
-        : state.sort === "role"
-          ? roleLabel(person)
-          : person.name;
-    return (
-      compare(primary(a), primary(b)) * (state.direction === "desc" ? -1 : 1) ||
-      (applications && state.sort === "progress"
-        ? compare(
-            b.applicationCompletedAt ?? -Infinity,
-            a.applicationCompletedAt ?? -Infinity,
-          )
-        : 0) ||
-      compare(a.name, b.name) ||
-      compare(a.id, b.id)
-    );
-  });
   const people: DirectoryPeople = {
-    rows: filtered.slice(state.offset, state.offset + volunteerPageSize),
-    hasMore: filtered.length > state.offset + volunteerPageSize,
-    allApplicantsCount: matching.length,
-    awaitingApprovalCount: countStatus("awaiting"),
-    inProgressCount: countStatus("in-progress"),
-    rejectedCount: countStatus("rejected"),
-    approvedCount: countStatus("approved"),
+    ...directoryView(rows, kind, state),
+    allRows: rows,
   };
   return { people, profiles };
-}
-
-function compareSearch(name: string, search: string) {
-  const fold = (text: string) =>
-    text.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
-  return fold(name).includes(fold(search));
 }

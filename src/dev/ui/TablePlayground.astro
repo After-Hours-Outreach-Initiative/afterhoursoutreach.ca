@@ -28,9 +28,9 @@ const frameUrl = tablePreviewUrl(kind, options);
         <div>
           <h2 id="table-playground-heading">{title}</h2>
           <p>
-            The production table, search, sortable columns, {
-              kind === "applications" ? "approval filters, and" : "and"
-            } pagination with fictional rows. Profile links open corresponding fictional
+            The production table with instant search, sortable columns{
+              kind === "applications" ? ", and approval filters" : ""
+            }, using fictional rows. Profile links open corresponding fictional
             organizer-profile states, not real accounts.
           </p>
         </div>
@@ -72,7 +72,7 @@ const frameUrl = tablePreviewUrl(kind, options);
           </select>
         </label>
         <label class="ui-field">
-          Search / sort response
+          Background refresh response
           <select name="outcome">
             <option value="success" selected={options.outcome === "success"}
               >Successful update</option
@@ -126,6 +126,7 @@ const frameUrl = tablePreviewUrl(kind, options);
             ? ", then switch approval filters and sort each column in both directions."
             : ", then sort each column in both directions."
         }
+        Switch away and return to the preview to try a background refresh.
       </p>
     </section>
   </main>

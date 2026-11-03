@@ -56,7 +56,6 @@ import {
   setVolunteerStatus,
   rejectApplication,
   viewVolunteerProfile,
-  volunteerPageSize,
   approveForPatrols,
   findVolunteerOrientation,
   findCompletedVolunteerOrientation,
@@ -1379,7 +1378,7 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
 
-test("volunteer directory defaults to displayed roles and sorts before applying offsets", async () => {
+test("volunteer directory defaults to displayed roles and sorts the entire directory", async () => {
   const actor: Actor = {
     ...(await draftActor("organizer")),
     role: "organizer",
@@ -1415,10 +1414,10 @@ test("volunteer directory defaults to displayed roles and sorts before applying 
     ["role", "asc", ["outreach", "medic", "tie", "new", "organizer"]],
     ["role", "desc", ["organizer", "tie", "new", "medic", "outreach"]],
   ] as const) {
-    const page = await listVolunteers(env.DB, actor, "", 1, sort, direction);
+    const page = await listVolunteers(env.DB, actor, "", sort, direction);
     assert.deepEqual(
       page.rows.map(({ id }) => id),
-      expected.slice(1),
+      expected,
     );
     assert.equal(page.allApplicantsCount, 5);
   }
@@ -1427,16 +1426,12 @@ test("volunteer directory defaults to displayed roles and sorts before applying 
     ["outreach", "medic", "tie", "new", "organizer"],
   );
   assert.deepEqual(
-    (await listVolunteers(env.DB, actor, "", 1)).rows.map(({ id }) => id),
-    ["medic", "tie", "new", "organizer"],
-  );
-  assert.deepEqual(
     (await listVolunteers(env.DB, actor, "AL")).rows.map(({ id }) => id),
     ["outreach", "tie"],
   );
 });
 
-test("review queue counts only review-ready applications matching search independently of pages and profile views", async () => {
+test("review queue loads every submitted entry and counts search matches independently of filters and profile views", async () => {
   const actor: Actor = {
     ...(await draftActor("queue-organizer")),
     role: "organizer",
@@ -1451,7 +1446,7 @@ test("review queue counts only review-ready applications matching search indepen
     actor.id,
     "approved",
     ...Array.from(
-      { length: volunteerPageSize + 3 },
+      { length: 53 },
       (_, index) => `pending-${String(index).padStart(2, "0")}`,
     ),
   ];
@@ -1484,39 +1479,26 @@ test("review queue counts only review-ready applications matching search indepen
   await env.DB.prepare(
     "INSERT INTO volunteer_status (user_id, updated_at) VALUES ('account-only', 0)",
   ).run();
-  const count = volunteerPageSize + 3;
-  const first = await listApplications(env.DB, actor, "", 0, "awaiting");
+  const count = 53;
+  const first = await listApplications(env.DB, actor, "", "awaiting");
   assert.equal(first.awaitingApprovalCount, count);
-  assert.equal(first.rows.length, volunteerPageSize);
-  assert.equal(first.hasMore, true);
+  assert.equal(first.rows.length, count);
+  assert.equal(first.allRows.length, count + 2);
   assert.equal(first.rows[0].active, 0); // Inactive is not an approval state.
   assert.equal(first.rows[1].patrolApproved, 1); // Neither is patrol approval.
-  const second = await listApplications(
-    env.DB,
-    actor,
-    "",
-    volunteerPageSize,
-    "awaiting",
-  );
-  assert.equal(second.awaitingApprovalCount, count);
-  assert.equal(second.rows.length, 3);
-  assert.equal(second.hasMore, false);
-  assert.equal(
-    new Set([...first.rows, ...second.rows].map((row) => row.id)).size,
-    count,
-  );
+  assert.equal(new Set(first.rows.map((row) => row.id)).size, count);
   for (const [search, expected] of [
     ["pending-02", 1],
     ["no match", 0],
     ["approved", 0],
   ] as const)
     assert.equal(
-      (await listApplications(env.DB, actor, search, 0, "awaiting"))
+      (await listApplications(env.DB, actor, search, "awaiting"))
         .awaitingApprovalCount,
       expected,
     );
   assert.deepEqual(
-    (await listApplications(env.DB, actor, "approved", 0, "awaiting")).rows,
+    (await listApplications(env.DB, actor, "approved", "awaiting")).rows,
     [],
   );
   assert.equal(
@@ -1535,7 +1517,7 @@ test("review queue counts only review-ready applications matching search indepen
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
     0,
   );
-  // Sort the full result before slicing pages, keeping newest completions first
+  // Sort the full result, keeping newest completions first
   // within status groups and case-insensitive name/id ties in either direction.
   await env.DB.batch([
     env.DB.prepare(
@@ -1587,14 +1569,9 @@ test("review queue counts only review-ready applications matching search indepen
     ...earlyCompletions.slice(ties.length),
     actor.id,
   ];
-  const defaultPages = await Promise.all(
-    [0, volunteerPageSize].map((offset) =>
-      listApplications(env.DB, actor, "", offset),
-    ),
-  );
-  const defaultRows = defaultPages.flatMap(({ rows }) => rows);
+  const defaultRows = (await listApplications(env.DB, actor)).rows;
   // Every visible status has a mutually exclusive filter. Counts include all
-  // search matches, independently of the selected status and page offset.
+  // search matches, independently of the selected status.
   const expectedCounts = {
     awaitingApprovalCount: count - 2,
     inProgressCount: 1,
@@ -1610,23 +1587,11 @@ test("review queue counts only review-ready applications matching search indepen
     const expected = defaultRows.filter(
       (row) => applicationStatus(row) === status,
     );
-    for (const offset of [0, volunteerPageSize]) {
-      const page = await listApplications(env.DB, actor, "", offset, status);
-      assert.deepEqual(
-        page.rows,
-        expected.slice(offset, offset + volunteerPageSize),
-      );
-      assert.equal(page.hasMore, expected.length > offset + volunteerPageSize);
-      for (const [key, value] of Object.entries(expectedCounts))
-        assert.equal(page[key as keyof typeof expectedCounts], value);
-    }
-    const searched = await listApplications(
-      env.DB,
-      actor,
-      "pending-",
-      0,
-      status,
-    );
+    const directory = await listApplications(env.DB, actor, "", status);
+    assert.deepEqual(directory.rows, expected);
+    for (const [key, value] of Object.entries(expectedCounts))
+      assert.equal(directory[key as keyof typeof expectedCounts], value);
+    const searched = await listApplications(env.DB, actor, "pending-", status);
     assert.equal(searched.allApplicantsCount, count - 2); // ALPHA names do not match.
     assert.equal(searched.approvedCount, 0);
     assert.deepEqual(
@@ -1634,7 +1599,7 @@ test("review queue counts only review-ready applications matching search indepen
       expected.filter((row) => row.name.startsWith("pending-")),
     );
     await assert.rejects(
-      listApplications(env.DB, { ...actor, role: "volunteer" }, "", 0, status),
+      listApplications(env.DB, { ...actor, role: "volunteer" }, "", status),
       statusError(403),
     );
   }
@@ -1703,23 +1668,20 @@ test("review queue counts only review-ready applications matching search indepen
       ],
     ],
   ] as const) {
-    const pages = await Promise.all(
-      [0, volunteerPageSize].map((offset) =>
-        listApplications(env.DB, actor, "", offset, "all", sort, direction),
-      ),
+    const directory = await listApplications(
+      env.DB,
+      actor,
+      "",
+      "all",
+      sort,
+      direction,
     );
     assert.deepEqual(
-      pages.flatMap(({ rows }) => rows.map(({ id }) => id)),
+      directory.rows.map(({ id }) => id),
       expected,
     );
-    assert.deepEqual(
-      pages.map(({ hasMore }) => hasMore),
-      [true, false],
-    );
-    for (const page of pages) {
-      assert.equal(page.allApplicantsCount, count + 2);
-      assert.equal(page.awaitingApprovalCount, count - 2);
-    }
+    assert.equal(directory.allApplicantsCount, count + 2);
+    assert.equal(directory.awaitingApprovalCount, count - 2);
   }
   assert.deepEqual(
     (
@@ -1727,7 +1689,6 @@ test("review queue counts only review-ready applications matching search indepen
         env.DB,
         actor,
         "ALPHA",
-        0,
         "awaiting",
         "progress",
         "desc",
@@ -1755,7 +1716,7 @@ test("review queue counts only review-ready applications matching search indepen
   assert.equal(profile?.codeOfConductAcceptedAt, null);
   assert.equal(profile?.submission, null);
   assert.equal(
-    (await listApplications(env.DB, actor, "pending-02", 0, "awaiting")).rows
+    (await listApplications(env.DB, actor, "pending-02", "awaiting")).rows
       .length,
     1,
   );
@@ -1784,7 +1745,7 @@ test("review queue counts only review-ready applications matching search indepen
     statusError(409),
   );
   assert.deepEqual(
-    (await listApplications(env.DB, actor, "pending-02", 0, "awaiting")).rows,
+    (await listApplications(env.DB, actor, "pending-02", "awaiting")).rows,
     [],
   );
   assert.equal(
@@ -1794,13 +1755,7 @@ test("review queue counts only review-ready applications matching search indepen
   await env.DB.prepare(
     "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='pending-02'",
   ).run();
-  const ready = await listApplications(
-    env.DB,
-    actor,
-    "pending-02",
-    0,
-    "awaiting",
-  );
+  const ready = await listApplications(env.DB, actor, "pending-02", "awaiting");
   assert.equal(ready.rows[0].applicationReadyForReview, 1);
   assert.equal(ready.awaitingApprovalCount, 1);
   assert.equal(
@@ -1897,13 +1852,7 @@ test("review queue counts only review-ready applications matching search indepen
     if (patrolApproved)
       assert.doesNotMatch(email!.body, /Naloxone|Volunteer page/);
   }
-  const after = await listApplications(
-    env.DB,
-    actor,
-    "pending-02",
-    0,
-    "awaiting",
-  );
+  const after = await listApplications(env.DB, actor, "pending-02", "awaiting");
   assert.deepEqual(after.rows, []);
   assert.equal(after.allApplicantsCount, 1);
   assert.equal(after.awaitingApprovalCount, 0);
@@ -1944,7 +1893,7 @@ test("review queue counts only review-ready applications matching search indepen
     /check your events|register for an available spot/,
   );
   assert.equal(
-    (await listApplications(env.DB, actor, "pending-02", 0, "awaiting"))
+    (await listApplications(env.DB, actor, "pending-02", "awaiting"))
       .awaitingApprovalCount,
     1,
   );
@@ -1959,7 +1908,7 @@ test("review queue counts only review-ready applications matching search indepen
     { ...actor, twoFactorEnabled: true, twoFactorVerified: false },
   ])
     await assert.rejects(
-      listApplications(env.DB, denied, "", 0, "awaiting"),
+      listApplications(env.DB, denied, "", "awaiting"),
       statusError(403),
     );
   // Organizer event access is a role exception, not application approval.
@@ -1972,7 +1921,6 @@ test("review queue counts only review-ready applications matching search indepen
     env.DB,
     { ...actor, applicationApproved: false },
     "queue-organizer",
-    0,
     "awaiting",
   );
   assert.equal(organizerQueue.awaitingApprovalCount, 1);
@@ -1990,7 +1938,7 @@ test("review queue counts only review-ready applications matching search indepen
     rejection.reason,
   );
   assert.equal(
-    (await listApplications(env.DB, actor, rejection.userId, 0, "awaiting"))
+    (await listApplications(env.DB, actor, rejection.userId, "awaiting"))
       .awaitingApprovalCount,
     0,
   );
