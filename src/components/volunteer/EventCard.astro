@@ -143,15 +143,15 @@ const blocked =
           !future ? (
             `${event.confirmed} ${event.confirmed === 1 ? "registration" : "registrations"}`
           ) : event.confirmed >= event.spots ? (
-            <span class="volunteer-spots-full">
-              Full · {event.confirmed}{" "}
+            <>
+              <span class="volunteer-spots-full">Full</span> · {event.confirmed}{" "}
               {event.confirmed === 1 ? "spot" : "spots"} taken
-            </span>
+            </>
           ) : registrationOpen ? (
-            <span class="volunteer-spots-open">
-              Open · {event.spots - event.confirmed} of {event.spots} spots
-              remaining
-            </span>
+            <>
+              <span class="volunteer-spots-open">Open</span> ·{" "}
+              {event.spots - event.confirmed} of {event.spots} spots remaining
+            </>
           ) : (
             `${Math.max(0, event.spots - event.confirmed)} of ${event.spots} spots remaining`
           )

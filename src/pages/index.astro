@@ -98,15 +98,17 @@ const [account, upcomingEvents] = await Promise.all([
                   </h3>
                   <p class="mt-1 text-base leading-normal text-zinc-400">
                     {event.confirmed >= event.spots ? (
-                      <span class="volunteer-spots-full">
-                        Full · {event.confirmed}{" "}
+                      <>
+                        <span class="volunteer-spots-full">Full</span> ·{" "}
+                        {event.confirmed}{" "}
                         {event.confirmed === 1 ? "spot" : "spots"} taken
-                      </span>
+                      </>
                     ) : (
-                      <span class="volunteer-spots-open">
-                        Open · {event.spots - event.confirmed} of {event.spots}{" "}
-                        spots remaining
-                      </span>
+                      <>
+                        <span class="volunteer-spots-open">Open</span> ·{" "}
+                        {event.spots - event.confirmed} of {event.spots} spots
+                        remaining
+                      </>
                     )}
                   </p>
                 </li>
