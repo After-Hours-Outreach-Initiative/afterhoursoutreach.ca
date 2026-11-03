@@ -34,11 +34,12 @@ const roles = [
       data-add-attendee
       action="/api/v1/events/action"
       method="post"
-      aria-label="Add volunteer"
+      aria-labelledby={`${id}-heading`}
       aria-hidden="true"
       tabindex="-1"
       inert
     >
+      <h4 id={`${id}-heading`} class="text-lg">Add volunteer</h4>
       <input type="hidden" name="id" value={event.id} />
       <div class="volunteer-field">
         <label for={`${id}-name`}>

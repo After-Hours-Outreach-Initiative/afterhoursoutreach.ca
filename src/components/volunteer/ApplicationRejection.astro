@@ -27,10 +27,11 @@ const id = `application-rejection-${person.id}`;
       data-organizer-rejection
       action="/api/v1/organizer/action"
       method="post"
-      aria-label="Reject application"
+      aria-labelledby={`${id}-heading`}
       aria-hidden="true"
       inert
     >
+      <h3 id={`${id}-heading`} class="text-lg">Reject application</h3>
       <input type="hidden" name="userId" value={person.id} />
       <input type="hidden" name="version" value={person.updatedAt} />
       <label class="volunteer-field">

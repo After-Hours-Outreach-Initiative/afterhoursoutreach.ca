@@ -69,6 +69,14 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
     "rgb(0, 0, 0)",
   );
   await expect(form).toBeVisible();
+  await expect(form).toHaveAccessibleName("Add volunteer");
+  await expect(
+    form.getByRole("heading", {
+      name: "Add volunteer",
+      level: 4,
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(name).not.toBeFocused();
   await expect(name).not.toHaveAttribute("autofocus");
   await expect(trigger).toHaveAttribute("aria-expanded", "true");

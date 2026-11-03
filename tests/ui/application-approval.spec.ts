@@ -141,6 +141,17 @@ test("application table opens a focused review with guarded decisions and list c
     );
     expect(morph[0].backgroundColor).toBe(morph[1].backgroundColor);
     const rejection = review.locator("application-rejection");
+    const rejectionForm = rejection.getByRole("form", {
+      name: "Reject application",
+      exact: true,
+    });
+    await expect(
+      rejectionForm.getByRole("heading", {
+        name: "Reject application",
+        level: 3,
+        exact: true,
+      }),
+    ).toBeVisible();
     const reason = review.getByRole("textbox", {
       name: "Reason for rejection",
     });
