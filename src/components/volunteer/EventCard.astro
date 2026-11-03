@@ -139,7 +139,7 @@ const blocked =
         }
         {
           future
-            ? `${event.confirmed} of ${event.spots} spots taken`
+            ? `${Math.max(0, event.spots - event.confirmed)} of ${event.spots} spots remaining`
             : `${event.confirmed} ${event.confirmed === 1 ? "registration" : "registrations"}`
         }
       </p>

@@ -256,7 +256,7 @@ test("other viewers see signups and cancellations through polling without losing
     // A numeric false signup flag must not render an extra zero before the count.
     for (const current of [page, viewer, attendee]) {
       const availability = card(current).locator("[data-event-availability]");
-      await expect(availability).toHaveText("0 of 4 spots taken");
+      await expect(availability).toHaveText("4 of 4 spots remaining");
       await expect(availability).toHaveAttribute("aria-live", "polite");
       await expect(availability).toHaveAttribute("aria-atomic", "true");
     }
@@ -268,7 +268,7 @@ test("other viewers see signups and cancellations through polling without losing
     for (const current of [viewer, attendee]) {
       await expect(
         card(current).locator("[data-event-availability]"),
-      ).toHaveText("1 of 4 spots taken", { timeout: 15_000 });
+      ).toHaveText("3 of 4 spots remaining", { timeout: 15_000 });
       await expect(
         card(current).getByRole("button", { name: "Register", exact: true }),
       ).toHaveClass("btn btn-green");
@@ -305,12 +305,12 @@ test("other viewers see signups and cancellations through polling without losing
     ).toBeVisible();
     await expect(
       card(attendee).locator("[data-event-availability]"),
-    ).toHaveText("Registered · 2 of 4 spots taken");
+    ).toHaveText("Registered · 2 of 4 spots remaining");
     await expect(
       card(attendee).getByRole("button", { name: "Unregister", exact: true }),
     ).toBeEnabled();
     await expect(card(viewer).locator("[data-event-availability]")).toHaveText(
-      "2 of 4 spots taken",
+      "2 of 4 spots remaining",
       { timeout: 15_000 },
     );
     await expect(
@@ -324,7 +324,7 @@ test("other viewers see signups and cancellations through polling without losing
     );
     await expect(card(viewer)).not.toContainText(/You can(?:’t)? register/);
     await expect(organizerCard.locator("[data-event-availability]")).toHaveText(
-      "Registered · 2 of 4 spots taken",
+      "Registered · 2 of 4 spots remaining",
       { timeout: 15_000 },
     );
     await expect(
@@ -373,7 +373,7 @@ test("other viewers see signups and cancellations through polling without losing
     ).toHaveCount(0);
     await expect(
       card(attendee).locator("[data-event-availability]"),
-    ).toHaveText("1 of 4 spots taken");
+    ).toHaveText("3 of 4 spots remaining");
     await expect(
       card(attendee).getByRole("button", { name: "Register", exact: true }),
     ).toBeEnabled();
@@ -383,7 +383,7 @@ test("other viewers see signups and cancellations through polling without losing
       document.dispatchEvent(new Event("visibilitychange"));
     });
     await expect(card(viewer).locator("[data-event-availability]")).toHaveText(
-      "1 of 4 spots taken",
+      "3 of 4 spots remaining",
       { timeout: 15_000 },
     );
     await expect(card(viewer)).not.toContainText(/You can(?:’t)? register/);

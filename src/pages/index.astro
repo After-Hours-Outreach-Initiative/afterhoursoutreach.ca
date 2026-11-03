@@ -97,7 +97,8 @@ const [account, upcomingEvents] = await Promise.all([
                     </time>
                   </h3>
                   <p class="mt-1 text-base leading-normal text-zinc-400">
-                    {event.confirmed} of {event.spots} spots taken
+                    {Math.max(0, event.spots - event.confirmed)} of{" "}
+                    {event.spots} spots remaining
                   </p>
                 </li>
               ))}

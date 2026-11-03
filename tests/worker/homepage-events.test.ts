@@ -48,7 +48,7 @@ test("homepage photo is already cropped to its displayed aspect ratio in product
   }
 });
 
-test("homepage exposes only the next two published dates and total confirmed counts to every visitor", async () => {
+test("homepage exposes only the next two published dates and remaining spot counts to every visitor", async () => {
   const origin = "https://afterhoursoutreach.ca";
   const secret = "homepage-events-test-secret-12345678901234567890";
   const server = createTestHarness({
@@ -139,8 +139,8 @@ test("homepage exposes only the next two published dates and total confirmed cou
         .trim(),
     );
     expect(entries).toEqual([
-      `${formatEventDate(first)} 1 of 8 spots taken`,
-      `${formatEventDate(second)} 0 of 6 spots taken`,
+      `${formatEventDate(first)} 7 of 8 spots remaining`,
+      `${formatEventDate(second)} 6 of 6 spots remaining`,
     ]);
     expect(publicSection).toContain(new Date(first).toISOString());
     expect(publicSection).toContain(new Date(second).toISOString());

@@ -1499,7 +1499,7 @@ describe(
               updated: () =>
                 expect(
                   createdCard.locator("[data-event-availability]"),
-                ).toHaveText(`0 of ${spots} spots taken`),
+                ).toHaveText(`${spots} of ${spots} spots remaining`),
               loadingLabel: "Saving…",
               pending: async () => {
                 for (const radio of await visibility.getByRole("radio").all())

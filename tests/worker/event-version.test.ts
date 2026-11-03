@@ -248,7 +248,7 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       );
       expect(history).toContain("Past event");
       expect(history).not.toMatch(
-        /data-live-signup|spots taken|public-event-roster|event-attendance/,
+        /data-live-signup|spots remaining|public-event-roster|event-attendance/,
       );
       expect(await readVersion(cookie)).toBe(await listingVersion(cookie));
     }

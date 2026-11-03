@@ -23,7 +23,7 @@ interface EventCardScenario {
 export const eventCardScenarios: EventCardScenario[] = [
   {
     id: "full",
-    label: "Full · 8 of 8 spots taken",
+    label: "Full · 0 of 8 spots remaining",
     description:
       "Two approved medics, two outreach volunteers and four new volunteers.",
     medics: 2,
