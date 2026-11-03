@@ -5,43 +5,50 @@ import {
   createLocalAccount,
   approveLocalApplication,
   openLocalAccountSwitcher,
+  signInLocalAuthenticatorAccount,
 } from "../helpers/local-account";
 
 test("event checks run every five seconds, retry failures, and pause without overlapping requests", async ({
   page,
+  baseURL,
 }) => {
+  await signInLocalAuthenticatorAccount(page.request, baseURL!);
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   let checks = 0;
   let finishedChecks = 0;
   page.on("requestfinished", (request) => {
-    if (request.url().endsWith("/api/v1/events/version")) finishedChecks++;
+    if (new URL(request.url()).pathname === "/api/v1/events/version")
+      finishedChecks++;
   });
   let version: string | null = null;
   let release!: () => void;
   const heldCheck = new Promise<void>((resolve) => (release = resolve));
-  await page.route("**/api/v1/events/version", async (route) => {
-    const check = ++checks;
-    version ??= await page
-      .locator("[data-event-browser]")
-      .getAttribute("data-event-version");
-    if (check === 5) await heldCheck;
-    await route.fulfill(
-      check === 3
-        ? { status: 503, body: "Temporary failure" }
-        : { json: { version } },
-    );
-  });
+  await page.route(
+    (url) => url.pathname === "/api/v1/events/version",
+    async (route) => {
+      const check = ++checks;
+      version ??= await page
+        .locator("[data-event-browser]")
+        .getAttribute("data-event-version");
+      if (check === 5) await heldCheck;
+      await route.fulfill(
+        check === 3
+          ? { status: 503, body: "Temporary failure" }
+          : { json: { version } },
+      );
+    },
+  );
   let pageRefreshes = 0;
   page.on("request", (request) => {
     if (
-      new URL(request.url()).pathname === "/volunteer" &&
+      new URL(request.url()).pathname === "/events" &&
       request.resourceType() !== "document"
     )
       pageRefreshes++;
   });
   try {
-    await page.goto("/volunteer");
+    await page.goto("/events");
     await expect.poll(() => checks).toBe(1);
     await expect.poll(() => finishedChecks).toBe(1);
     await page.clock.runFor(4_999);
@@ -62,7 +69,8 @@ test("event checks run every five seconds, retry failures, and pause without ove
     await page.clock.runFor(15_000);
     expect(checks).toBe(5);
     const completed = page.waitForEvent("requestfinished", {
-      predicate: (request) => request.url().endsWith("/api/v1/events/version"),
+      predicate: (request) =>
+        new URL(request.url()).pathname === "/api/v1/events/version",
     });
     release();
     await completed;
@@ -102,31 +110,37 @@ test("event checks run every five seconds, retry failures, and pause without ove
 
 test("event polling pauses after five idle minutes and checks for updates on return without reloading", async ({
   page,
+  baseURL,
 }) => {
+  await signInLocalAuthenticatorAccount(page.request, baseURL!);
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   let checks = 0;
   let finishedChecks = 0;
   let version: string | null = null;
   page.on("requestfinished", (request) => {
-    if (request.url().endsWith("/api/v1/events/version")) finishedChecks++;
+    if (new URL(request.url()).pathname === "/api/v1/events/version")
+      finishedChecks++;
   });
-  await page.route("**/api/v1/events/version", async (route) => {
-    const check = ++checks;
-    version ??= await page
-      .locator("[data-event-browser]")
-      .getAttribute("data-event-version");
-    await route.fulfill({
-      json: { version: check === 5 ? "0".repeat(64) : version },
-    });
-  });
-  await page.goto("/volunteer");
+  await page.route(
+    (url) => url.pathname === "/api/v1/events/version",
+    async (route) => {
+      const check = ++checks;
+      version ??= await page
+        .locator("[data-event-browser]")
+        .getAttribute("data-event-version");
+      await route.fulfill({
+        json: { version: check === 5 ? "0".repeat(64) : version },
+      });
+    },
+  );
+  await page.goto("/events");
   await expect.poll(() => finishedChecks).toBe(1);
   let documents = 0;
   let pageRefreshes = 0;
   page.on("request", (request) => {
     if (request.resourceType() === "document") documents++;
-    else if (new URL(request.url()).pathname === "/volunteer") pageRefreshes++;
+    else if (new URL(request.url()).pathname === "/events") pageRefreshes++;
   });
 
   await page.clock.fastForward(240_000);
@@ -214,6 +228,9 @@ test("other viewers see signups and cancellations through polling without losing
         meetingPoint,
         meetingPointUrl: "",
         spots: 4,
+        minMedicSpots: 2,
+        minNewVolunteerSpots: 0,
+        maxNewVolunteers: 4,
         open: true,
         hidden: false,
       },
@@ -238,8 +255,17 @@ test("other viewers see signups and cancellations through polling without losing
       attendee.request,
       baseURL!,
     );
-    await approveLocalApplication(page.request, baseURL!, viewerAccount.id);
-    await approveLocalApplication(page.request, baseURL!, attendeeAccount.id);
+    for (const [current, account] of [
+      [viewer, viewerAccount],
+      [attendee, attendeeAccount],
+    ] as const) {
+      const completed = await current.request.post("/api/v1/account/naloxone", {
+        headers: { origin: baseURL! },
+        data: { userId: account.id, completed: true },
+      });
+      expect(completed.status(), await completed.text()).toBe(200);
+      await approveLocalApplication(page.request, baseURL!, account.id);
+    }
     const errors: string[] = [];
     for (const current of [page, visitor, viewer, attendee])
       current.on("pageerror", (error) => errors.push(error.message));
@@ -331,9 +357,8 @@ test("other viewers see signups and cancellations through polling without losing
     await expect(
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
-    await expect(
-      viewer.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
-    ).toBeFocused();
+    // The focused registration action disappeared; keep focus on its event.
+    await expect(card(viewer)).toBeFocused();
     expect(failedRefreshes).toBeGreaterThanOrEqual(2);
     await viewer.unroute("**/events?type=orientation");
     await expect(
