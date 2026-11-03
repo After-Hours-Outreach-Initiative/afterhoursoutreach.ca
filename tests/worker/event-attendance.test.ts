@@ -526,19 +526,24 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         expect(crowdedLayout.scrollable).toBe(false);
         if (manage) {
           await card.locator(".volunteer-roster > summary").click();
-          await expect(card.locator(".volunteer-roster tbody tr")).toHaveCount(
-            8,
-          );
+          await expect(
+            card.locator(".volunteer-roster .event-roster-list > li"),
+          ).toHaveCount(8);
         } else {
           await card.locator(".public-event-roster > summary").click();
           const roster = card.locator(".public-event-roster");
-          await expect(roster.locator("tbody tr")).toHaveCount(8);
-          await expect(roster.locator("a, input, button")).toHaveCount(0);
-          await expect(roster.locator("tbody tr").first()).toHaveText(
-            publicName,
+          await expect(roster.locator(".event-roster-list > li")).toHaveCount(
+            8,
           );
+          await expect(roster.locator("a, input, button")).toHaveCount(0);
           await expect(
-            roster.locator("tbody tr").first().locator(".attendee-medic"),
+            roster.locator(".event-roster-list > li").first(),
+          ).toHaveText(publicName);
+          await expect(
+            roster
+              .locator(".event-roster-list > li")
+              .first()
+              .locator(".attendee-medic"),
           ).toHaveCSS("color", "rgb(65, 105, 225)");
           await expect(
             roster.locator(".attendee-outreach-volunteer").first(),
@@ -552,12 +557,11 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
               "UPDATE profile SET first_name='Live' WHERE user_id='avatar-attendee-0'",
             ).run();
             publicName = "Live P.";
-            await expect(roster.locator("tbody tr").first()).toHaveText(
-              publicName,
-              {
-                timeout: 15_000,
-              },
-            );
+            await expect(
+              roster.locator(".event-roster-list > li").first(),
+            ).toHaveText(publicName, {
+              timeout: 15_000,
+            });
             await expect(roster).toHaveAttribute("open", "");
             await expect(roster.locator("summary")).toBeFocused();
           }
@@ -583,7 +587,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         ).toHaveText(["New", "New", "New"]);
         await expect(
           expandedRoster
-            .locator("tbody tr")
+            .locator(".event-roster-list > li")
             .filter({ has: page.locator(".attendee-new-volunteer") })
             .locator(".event-roster-name .event-roster-new-badge"),
         ).toHaveCount(3);

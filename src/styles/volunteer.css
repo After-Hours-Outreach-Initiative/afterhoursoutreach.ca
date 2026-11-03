@@ -1972,46 +1972,44 @@ body:has(
     transition: opacity 180ms ease-out;
   }
 }
-.event-roster-table {
+.event-roster-list {
   width: 100%;
   margin: 0;
-  /* Let roster text wrap within the card, reserving only the actions gutter. */
-  table-layout: fixed;
+  padding: 0;
+  list-style: none;
   border: 1px solid var(--event-roster-open-border);
   border-top: 0;
   border-radius: 0 0 0.5rem 0.5rem;
-  border-collapse: separate;
-  border-spacing: 0;
   overflow: hidden;
   text-align: left;
 }
-/* Dialog calendars nested in roster actions keep their own cell spacing. */
-.event-roster-table > :is(thead, tbody) > tr > :is(th, td) {
-  padding: 0.625rem 0.75rem;
-  vertical-align: middle;
+.event-roster-row {
+  display: flex;
+  align-items: center;
   border-bottom: var(--volunteer-border);
-  font-weight: normal;
-}
-.event-roster-table > :is(thead, tbody) > tr > :first-child {
-  /* Match the summary's left inset without changing the actions gutter. */
-  padding-inline-start: 1rem;
-}
-.event-roster-table > tbody > tr:last-child > * {
-  border-bottom: 0;
-}
-.event-roster-table > tbody > tr {
   background: #0c0d10;
 }
-.event-roster-table > tbody > tr:nth-child(even) {
+.event-roster-row:last-child {
+  border-bottom: 0;
+}
+.event-roster-row:nth-child(even) {
   background: #171a20;
+}
+.event-roster-details {
+  flex: 1;
+  min-width: 0;
+  padding: 0.625rem 0.75rem 0.625rem 1rem;
 }
 .event-roster-person {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.625rem;
 }
 .event-roster-name {
   display: flex;
+  /* Wrap below the avatar only when the name/badge's minimum size needs it. */
+  flex: 1 1 min-content;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 0.5rem;
@@ -2035,11 +2033,8 @@ body:has(
   max-width: 100%;
   white-space: normal;
 }
-.event-roster-actions-column {
-  /* Fixed table layout reads column widths, not widths on later body cells. */
-  width: 4rem;
-}
-.event-roster-table .event-roster-actions {
+.event-roster-actions {
+  flex-shrink: 0;
   padding: 0.375rem 0.625rem;
   text-align: right;
 }

@@ -286,7 +286,9 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
   await form.press("Escape");
   await expect(addVolunteer).toBeFocused();
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  const row = roster.locator("tbody > tr").filter({ hasText: "Avery E." });
+  const row = roster
+    .locator(".event-roster-list > li")
+    .filter({ hasText: "Avery E." });
   await expect(row).toHaveCount(1);
   await expect(row.locator("time.event-roster-status")).toHaveText(
     /^Manually added [^·]/,
@@ -314,9 +316,9 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
       publicCard.getByRole("button", { name: "Add volunteer", exact: true }),
     ).toHaveCount(0);
     await publicCard.locator(".public-event-roster summary").click();
-    await expect(publicCard.locator("tbody .compact-person-name")).toHaveText(
-      "Avery E.",
-    );
+    await expect(
+      publicCard.locator(".event-roster-list .compact-person-name"),
+    ).toHaveText("Avery E.");
     await expect(publicCard.locator("time.event-roster-status")).toHaveCount(0);
     await expect(publicCard.getByText(/Manually added/)).toHaveCount(0);
     const publicSpacing = await publicCard.evaluate((card) => {

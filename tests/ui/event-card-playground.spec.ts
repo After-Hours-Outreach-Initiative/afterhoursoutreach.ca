@@ -269,7 +269,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   }
   await page.getByRole("checkbox", { name: "Expand all rosters" }).check();
   await expect(card.locator("details")).toHaveAttribute("open", "");
-  await expect(card.getByRole("row")).toHaveCount(9);
+  await expect(card.getByRole("listitem")).toHaveCount(8);
   await expect(
     card.locator(
       '.event-roster-person [data-avatar-decoration="new-gradient-horizontal"]',
@@ -283,9 +283,9 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   ]);
   await expect(
     card.locator(".event-roster-name").filter({ hasText: "Avery K." }),
-  ).toHaveText("Avery K. New");
+  ).toHaveText(/^Avery K\.\s*New$/);
   const newMedicRow = card
-    .locator(".event-roster-table tbody tr")
+    .locator(".event-roster-list > li")
     .filter({ hasText: "Avery K." });
   await expect(
     newMedicRow.locator('[data-avatar-decoration="medic-cross"]'),
@@ -293,7 +293,7 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   await expect(newMedicRow.locator(".event-roster-new-badge")).toHaveText(
     "New",
   );
-  for (const row of await card.locator(".event-roster-table tbody tr").all()) {
+  for (const row of await card.locator(".event-roster-list > li").all()) {
     await expect(row.locator(".event-roster-new-badge")).toHaveCount(
       await row.locator(".attendee-new-volunteer").count(),
     );
@@ -335,12 +335,10 @@ test("event card playground shows varied real rosters, resizes, and simulates re
     "Registered · 7 of 8 spots taken",
   );
   await expect(
-    mixed.getByRole("rowheader", { name: "Morgan P." }),
+    mixed.getByRole("listitem").filter({ hasText: "Morgan P." }),
   ).toBeVisible();
   await expect(
-    mixed.locator(
-      ".event-roster-table tbody tr:last-child .compact-person-name",
-    ),
+    mixed.locator(".event-roster-list > li:last-child .compact-person-name"),
   ).toHaveText("Morgan P.");
   expect(
     await mixed.locator(".volunteer-event-card").evaluate((element) => {

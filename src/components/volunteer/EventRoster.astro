@@ -3,7 +3,6 @@ import type { EventRow, RosterRow } from "@/server/db/events";
 import SignupEditor from "./SignupEditor.astro";
 import RosterPerson from "./RosterPerson.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
-import TableScrollFrame from "../TableScrollFrame.astro";
 
 interface Props {
   event: EventRow;
@@ -33,92 +32,73 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
 
 <details class="volunteer-roster event-roster">
   <EventRosterSummary roster={roster} event={event} />
-  <TableScrollFrame label="Registered volunteers">
-    <table class="event-roster-table">
-      <caption class="sr-only">Registered volunteers</caption>
-      <colgroup>
-        <col />
-        {future && <col class="event-roster-actions-column" />}
-      </colgroup>
-      <thead class="sr-only">
-        <tr>
-          <th scope="col">Volunteer</th>
-          {future && <th scope="col">Registration actions</th>}
-        </tr>
-      </thead>
-      <tbody>
-        {
-          roster.map((person) => (
-            <tr>
-              <th scope="row">
-                <RosterPerson
-                  name={person.name}
-                  category={person.category}
-                  medicMark={Boolean(person.medicMark)}
-                  href={
-                    person.userId
-                      ? `/volunteers/${encodeURIComponent(person.userId)}`
-                      : undefined
-                  }
-                />
-                <time
-                  class="event-roster-status"
-                  datetime={new Date(person.registeredAt).toISOString()}
-                  title={fullRegistrationDateFormat.format(person.registeredAt)}
+  <ul class="event-roster-list" role="list" aria-label="Registered volunteers">
+    {
+      roster.map((person) => (
+        <li class="event-roster-row">
+          <div class="event-roster-details">
+            <RosterPerson
+              name={person.name}
+              category={person.category}
+              medicMark={Boolean(person.medicMark)}
+              href={
+                person.userId
+                  ? `/volunteers/${encodeURIComponent(person.userId)}`
+                  : undefined
+              }
+            />
+            <time
+              class="event-roster-status"
+              datetime={new Date(person.registeredAt).toISOString()}
+              title={fullRegistrationDateFormat.format(person.registeredAt)}
+            >
+              {person.userId ? "Registered" : "Manually added"}{" "}
+              {registrationDateFormat.format(person.registeredAt)}
+            </time>
+            {Boolean(person.completed) && (
+              <span class="event-roster-status">Orientation completed</span>
+            )}
+            {person.userId &&
+              Boolean(event.includesOrientation) &&
+              !future &&
+              !event.cancelledAt &&
+              (!person.completed || !person.patrolApproved) && (
+                <form
+                  class="event-roster-orientation"
+                  data-organizer-orientation
+                  data-email-prompt="access"
+                  action="/api/v1/organizer/action"
+                  method="post"
                 >
-                  {person.userId ? "Registered" : "Manually added"}{" "}
-                  {registrationDateFormat.format(person.registeredAt)}
-                </time>
-                {Boolean(person.completed) && (
-                  <span class="event-roster-status">Orientation completed</span>
-                )}
-                {person.userId &&
-                  Boolean(event.includesOrientation) &&
-                  !future &&
-                  !event.cancelledAt &&
-                  (!person.completed || !person.patrolApproved) && (
-                    <form
-                      class="event-roster-orientation"
-                      data-organizer-orientation
-                      data-email-prompt="access"
-                      action="/api/v1/organizer/action"
-                      method="post"
-                    >
-                      <input
-                        name="userId"
-                        type="hidden"
-                        value={person.userId}
-                      />
-                      <input name="eventId" type="hidden" value={event.id} />
-                      <input
-                        name="version"
-                        type="hidden"
-                        value={person.statusVersion}
-                      />
-                      <button
-                        class="btn btn-outline"
-                        type="submit"
-                        data-loading-label="Saving…"
-                      >
-                        Approve for patrols
-                      </button>
-                      <p data-form-message role="status" hidden />
-                    </form>
-                  )}
-              </th>
-              {future && (
-                <td class="event-roster-actions">
-                  <SignupEditor
-                    signup={person}
-                    event={event}
-                    destinations={destinations}
+                  <input name="userId" type="hidden" value={person.userId} />
+                  <input name="eventId" type="hidden" value={event.id} />
+                  <input
+                    name="version"
+                    type="hidden"
+                    value={person.statusVersion}
                   />
-                </td>
+                  <button
+                    class="btn btn-outline"
+                    type="submit"
+                    data-loading-label="Saving…"
+                  >
+                    Approve for patrols
+                  </button>
+                  <p data-form-message role="status" hidden />
+                </form>
               )}
-            </tr>
-          ))
-        }
-      </tbody>
-    </table>
-  </TableScrollFrame>
+          </div>
+          {future && (
+            <div class="event-roster-actions">
+              <SignupEditor
+                signup={person}
+                event={event}
+                destinations={destinations}
+              />
+            </div>
+          )}
+        </li>
+      ))
+    }
+  </ul>
 </details>

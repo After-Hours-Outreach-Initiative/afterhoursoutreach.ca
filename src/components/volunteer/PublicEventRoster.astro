@@ -2,7 +2,6 @@
 import type { EventRow, PublicRosterRow } from "@/server/db/events";
 import RosterPerson from "./RosterPerson.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
-import TableScrollFrame from "../TableScrollFrame.astro";
 interface Props {
   event: EventRow;
   roster: PublicRosterRow[];
@@ -12,25 +11,19 @@ const { event, roster } = Astro.props;
 
 <details class="public-event-roster event-roster">
   <EventRosterSummary roster={roster} event={event} />
-  <TableScrollFrame label="Registered volunteers">
-    <table class="event-roster-table">
-      <caption class="sr-only">Registered volunteers</caption>
-      <thead class="sr-only"><tr><th scope="col">Volunteer</th></tr></thead>
-      <tbody>
-        {
-          roster.map((person) => (
-            <tr>
-              <th scope="row">
-                <RosterPerson
-                  name={person.name}
-                  category={person.category}
-                  medicMark={Boolean(person.medicMark)}
-                />
-              </th>
-            </tr>
-          ))
-        }
-      </tbody>
-    </table>
-  </TableScrollFrame>
+  <ul class="event-roster-list" role="list" aria-label="Registered volunteers">
+    {
+      roster.map((person) => (
+        <li class="event-roster-row">
+          <div class="event-roster-details">
+            <RosterPerson
+              name={person.name}
+              category={person.category}
+              medicMark={Boolean(person.medicMark)}
+            />
+          </div>
+        </li>
+      ))
+    }
+  </ul>
 </details>

@@ -138,19 +138,17 @@ test("empty volunteer rosters reserve no space through first/last signup updates
         "border-bottom-left-radius",
         "0px",
       );
-      await expect(
-        roster(card).locator(".event-roster-table > tbody > tr"),
-      ).toHaveCount(1);
+      await expect(roster(card).locator(".event-roster-list > li")).toHaveCount(
+        1,
+      );
       const disclosure = await roster(card).evaluate((element) => {
         const summary = element.querySelector("summary")!;
-        const frame = element.querySelector(".table-scroll-frame")!;
-        const panel = element.querySelector("table")!;
+        const panel = element.querySelector(".event-roster-list")!;
         const triggerBounds = summary.getBoundingClientRect();
         const panelBounds = panel.getBoundingClientRect();
         return {
           gap: panelBounds.top - triggerBounds.bottom,
-          sameWidth:
-            frame.getBoundingClientRect().width === triggerBounds.width,
+          sameWidth: panelBounds.width === triggerBounds.width,
           joinedRadii: [
             getComputedStyle(summary).borderBottomLeftRadius,
             getComputedStyle(panel).borderTopLeftRadius,
@@ -174,11 +172,11 @@ test("empty volunteer rosters reserve no space through first/last signup updates
       if (index === 0) {
         const actionSpace = await roster(card)
           .locator(".event-roster-actions")
-          .evaluate((cell) => {
-            const button = cell.querySelector("button")!;
-            const styles = getComputedStyle(cell);
+          .evaluate((actions) => {
+            const button = actions.querySelector("button")!;
+            const styles = getComputedStyle(actions);
             return (
-              cell.getBoundingClientRect().width -
+              actions.getBoundingClientRect().width -
               button.getBoundingClientRect().width -
               parseFloat(styles.paddingLeft) -
               parseFloat(styles.paddingRight)
@@ -194,19 +192,19 @@ test("empty volunteer rosters reserve no space through first/last signup updates
           roster(card).locator(".event-roster-name a").first(),
         ).toHaveCSS("font-size", "16px");
         const registrationLayout = await roster(card)
-          .locator("tbody th")
+          .locator(".event-roster-details")
           .first()
-          .evaluate((cell) => {
-            const avatar = cell
+          .evaluate((details) => {
+            const avatar = details
               .querySelector(".attendee-avatar")!
               .getBoundingClientRect();
-            const person = cell
+            const person = details
               .querySelector(".event-roster-person")!
               .getBoundingClientRect();
-            const name = cell
+            const name = details
               .querySelector(".event-roster-name")!
               .getBoundingClientRect();
-            const timestamp = cell
+            const timestamp = details
               .querySelector("time")!
               .getBoundingClientRect();
             return {
@@ -293,7 +291,7 @@ test("empty volunteer rosters reserve no space through first/last signup updates
   }
 });
 
-test("striped roster tables share avatar sizing and organizer-only keyboard action menus", async ({
+test("striped roster lists share avatar sizing and organizer-only keyboard action menus", async ({
   page,
   browser,
   baseURL,
@@ -385,41 +383,39 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           });
         }
         await expect(
-          roster.getByRole("table", { name: "Registered volunteers" }),
+          roster.getByRole("list", { name: "Registered volunteers" }),
         ).toBeVisible();
         await expect(summary.locator(".event-roster-chevron")).toHaveCSS(
           "transform",
           "matrix(-1, 0, 0, -1, 0, 0)",
         );
-        await expect(
-          roster.locator(".event-roster-table > tbody > tr"),
-        ).toHaveCount(2);
+        await expect(roster.locator(".event-roster-list > li")).toHaveCount(2);
         await expect(roster.locator(".compact-person-name")).toHaveText([
           "Robin V.",
           "Dana W.",
         ]);
         if (current === page) {
-          const columns = await roster
+          const rowLayout = await roster
             .locator(".event-roster-actions")
             .first()
-            .evaluate((cell) => {
-              const styles = getComputedStyle(cell);
+            .evaluate((actions) => {
+              const styles = getComputedStyle(actions);
               return {
-                actions: cell.getBoundingClientRect().width,
+                actions: actions.getBoundingClientRect().width,
                 requiredActions:
-                  cell
+                  actions
                     .querySelector("[data-signup-menu-trigger]")!
                     .getBoundingClientRect().width +
                   parseFloat(styles.paddingLeft) +
                   parseFloat(styles.paddingRight),
                 volunteer:
-                  cell.previousElementSibling!.getBoundingClientRect().width,
-                row: cell.parentElement!.getBoundingClientRect().width,
+                  actions.previousElementSibling!.getBoundingClientRect().width,
+                row: actions.parentElement!.getBoundingClientRect().width,
               };
             });
-          expect(columns.actions).toBeCloseTo(columns.requiredActions, 1);
-          expect(columns.volunteer).toBeCloseTo(
-            columns.row - columns.requiredActions,
+          expect(rowLayout.actions).toBeCloseTo(rowLayout.requiredActions, 1);
+          expect(rowLayout.volunteer).toBeCloseTo(
+            rowLayout.row - rowLayout.requiredActions,
             1,
           );
           const timestamp = roster.locator("time.event-roster-status").first();
@@ -448,17 +444,14 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           "Approved medic: registered",
         ]);
         const layout = await card.evaluate((element) => {
-          const rows = [
-            ...element.querySelectorAll(".event-roster-table > tbody > tr"),
-          ];
+          const rows = [...element.querySelectorAll(".event-roster-list > li")];
           const avatar = (selector: string) =>
             element.querySelector(selector)!.getBoundingClientRect().height;
           const summary = element.querySelector("details > summary")!;
           const title = summary.querySelector(":scope > span")!;
           const avatars = summary.querySelector(".event-avatar-row")!;
           const chevron = summary.querySelector(".event-roster-chevron")!;
-          const frame = element.querySelector(".table-scroll-frame")!;
-          const table = frame.querySelector("table")!;
+          const list = element.querySelector(".event-roster-list")!;
           const summaryBounds = summary.getBoundingClientRect();
           const chevronBounds = chevron.getBoundingClientRect();
           return {
@@ -481,8 +474,8 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
               (summaryBounds.top + summaryBounds.height / 2),
             rosterBorderTop: getComputedStyle(summary.parentElement!)
               .borderTopWidth,
-            rosterOverflow: frame.scrollWidth > frame.clientWidth,
-            tableWidth: table.getBoundingClientRect().width,
+            rosterOverflow: list.scrollWidth > list.clientWidth,
+            listWidth: list.getBoundingClientRect().width,
             chevron: getComputedStyle(chevron).transform,
             overflow: document.documentElement.scrollWidth > innerWidth,
           };
@@ -496,7 +489,7 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
         expect(Math.abs(layout.chevronCenterOffset)).toBeLessThan(1);
         expect(layout.rosterBorderTop).toBe("0px");
         expect(layout.rosterOverflow).toBe(false);
-        expect(layout.tableWidth).toBeCloseTo(layout.summaryWidth, 1);
+        expect(layout.listWidth).toBeCloseTo(layout.summaryWidth, 1);
         expect(layout.chevron).toBe("matrix(-1, 0, 0, -1, 0, 0)");
         expect(layout.overflow).toBe(false);
         await summary.focus();
@@ -509,7 +502,7 @@ test("striped roster tables share avatar sizing and organizer-only keyboard acti
           await expect(
             roster.locator("a, button, input, dialog, [role=menu]"),
           ).toHaveCount(0);
-          await expect(roster.locator("tbody")).not.toContainText(
+          await expect(roster.locator(".event-roster-list")).not.toContainText(
             /Vance|Whitfield/,
           );
         }
