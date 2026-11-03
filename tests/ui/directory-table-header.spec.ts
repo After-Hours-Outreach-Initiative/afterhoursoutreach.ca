@@ -342,31 +342,86 @@ for (const kind of ["applications", "volunteers"]) {
   });
 }
 
-test("sorting and semantic headers still work without JavaScript", async ({
-  browser,
-  baseURL,
-}) => {
-  const context = await browser.newContext({
+for (const hasTouch of [false, true]) {
+  test(`sorting, semantic headers, and native row links work without JavaScript ${hasTouch ? "on touch devices" : "with a mouse"}`, async ({
+    browser,
     baseURL,
-    javaScriptEnabled: false,
-    viewport: { width: 375, height: 800 },
+  }) => {
+    const context = await browser.newContext({
+      baseURL,
+      javaScriptEnabled: false,
+      hasTouch,
+      viewport: { width: 375, height: 800 },
+    });
+    try {
+      const page = await context.newPage();
+      for (const kind of ["applications", "volunteers"]) {
+        await page.goto(`/dev/ui/${kind}/preview?scenario=mixed&latency=0`);
+        await expect(page.locator(".volunteer-table-header")).toHaveCount(0);
+        await expect(page.getByRole("columnheader")).toHaveCount(
+          kind === "applications" ? 4 : 2,
+        );
+        await page.locator('[data-volunteer-sort="name"]').click();
+        await expect(page).toHaveURL(/sort=name/);
+        await expect(
+          page.getByRole("columnheader", { name: /Name/ }),
+        ).toHaveAttribute("aria-sort", "ascending");
+
+        const row = page.locator("[data-volunteer-row]").first();
+        const name = row.locator("[data-volunteer-profile-link]");
+        const cell = row.locator("th");
+        await row.scrollIntoViewIfNeeded();
+        expect(
+          await row.evaluate((row) => {
+            const bounds = row.getBoundingClientRect();
+            return (
+              document
+                .elementFromPoint(bounds.left + 2, bounds.top + 2)
+                ?.closest("a") ===
+              row.querySelector("[data-volunteer-profile-link]")
+            );
+          }),
+        ).toBe(true);
+        await row.hover({ position: { x: 2, y: 2 } });
+        await expect(cell).toHaveCSS(
+          "background-color",
+          hasTouch ? "rgb(12, 13, 16)" : "rgb(22, 33, 74)",
+        );
+        // Text remains above the overlay so selecting it does not follow the link.
+        const status = row.locator(".application-table-progress");
+        if (kind === "applications") {
+          await status.dblclick();
+          expect(
+            await page.evaluate(() => getSelection()?.toString()),
+          ).toBeTruthy();
+          await expect(page).toHaveURL(/sort=name/);
+        }
+        await name.focus();
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("Shift+Tab");
+        await expect(name).toBeFocused();
+        await expect(name).toHaveCSS("outline-style", "solid");
+        await expect(cell).toHaveCSS("background-color", "rgb(22, 33, 74)");
+
+        const href = await name.getAttribute("href");
+        // The blank row area is a real link, including modifier clicks.
+        const opened = context.waitForEvent("page");
+        await row.click({
+          position: { x: 2, y: 2 },
+          modifiers: ["ControlOrMeta"],
+        });
+        const popup = await opened;
+        await expect(popup).toHaveURL(new URL(href!, baseURL).href);
+        await popup.close();
+        await expect(page).toHaveURL(/sort=name/);
+        await row.click({ position: { x: 2, y: 2 } });
+        await expect(page).toHaveURL(new URL(href!, baseURL).href);
+      }
+    } finally {
+      await context.close();
+    }
   });
-  try {
-    const page = await context.newPage();
-    await page.goto(
-      "/dev/ui/applications/preview?scenario=paginated&latency=0",
-    );
-    await expect(page.locator(".volunteer-table-header")).toHaveCount(0);
-    await expect(page.getByRole("columnheader")).toHaveCount(4);
-    await page.locator('[data-volunteer-sort="name"]').click();
-    await expect(page).toHaveURL(/sort=name/);
-    await expect(
-      page.getByRole("columnheader", { name: /Name/ }),
-    ).toHaveAttribute("aria-sort", "ascending");
-  } finally {
-    await context.close();
-  }
-});
+}
 
 for (const javaScriptEnabled of [true, false]) {
   test.describe(`volunteer column sizing with JavaScript ${javaScriptEnabled ? "enabled" : "disabled"}`, () => {

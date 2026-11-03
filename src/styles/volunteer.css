@@ -1478,10 +1478,26 @@ body:has(
 .volunteer-table tbody :is(th, td) {
   background: #0c0d10;
 }
-[data-row-navigation] .volunteer-table tbody tr {
-  cursor: pointer;
+.volunteer-table tbody tr {
+  /* Contain the name link's hit area and stacking within this row. */
+  position: relative;
+  isolation: isolate;
 }
-.volunteer-table tbody tr:is(:hover, :focus-within) > :is(th, td) {
+.volunteer-table [data-volunteer-profile-link]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.volunteer-table-name > a > span:not(.sr-only),
+.volunteer-table
+  tbody
+  :is(.volunteer-role-badge, .application-table-progress, time) {
+  /* Keep actual text selectable above the stretched link; cell space is linked. */
+  position: relative;
+  z-index: 2;
+}
+.volunteer-table tbody tr:has(:focus-visible) > :is(th, td) {
   background: #16214a;
 }
 .volunteer-table a {
@@ -1520,10 +1536,17 @@ body:has(
   opacity: 0;
   transform: rotate(-90deg);
 }
-.volunteer-table thead th:hover .volunteer-table-sort-icon,
 .volunteer-table-sort:focus-visible .volunteer-table-sort-icon,
 [aria-sort] .volunteer-table-sort-icon {
   opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .volunteer-table tbody tr:hover > :is(th, td) {
+    background: #16214a;
+  }
+  .volunteer-table thead th:hover .volunteer-table-sort-icon {
+    opacity: 1;
+  }
 }
 [aria-sort="descending"] .volunteer-table-sort-icon {
   transform: rotate(90deg);

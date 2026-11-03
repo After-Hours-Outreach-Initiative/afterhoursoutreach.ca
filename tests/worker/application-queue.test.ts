@@ -372,7 +372,9 @@ test("organizers review pending and approved applications with persistent list c
       "href",
       `/volunteers/approved?returnTo=${encodeURIComponent(sortedReturn)}`,
     );
-    await page.locator("[data-volunteer-row] td").first().click();
+    await page
+      .locator("[data-volunteer-row]")
+      .click({ position: { x: 2, y: 2 } });
     await page.getByRole("link", { name: "Back to volunteers" }).click();
     await expect(page).toHaveURL(`${origin}${sortedReturn}`);
     await nameSort.click();
@@ -641,8 +643,7 @@ test("organizers review pending and approved applications with persistent list c
     await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("53");
     await expect(results.locator("tbody tr")).toHaveCount(3);
-    // The table scrolls within the viewport on small screens. Modifier clicks on
-    // ordinary cells do not hijack the native profile link's browsing behavior.
+    // The table scrolls within the viewport on small screens.
     await page.setViewportSize({ width: 320, height: 640 });
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
@@ -655,17 +656,11 @@ test("organizers review pending and approved applications with persistent list c
         (element) => element.scrollWidth > element.clientWidth,
       ),
     ).toBe(true);
+    await page.setViewportSize({ width: 1280, height: 900 });
     await results
       .locator("tbody tr")
       .first()
-      .locator("td")
-      .first()
-      .click({ modifiers: ["Control"] });
-    await expect(page).toHaveURL(
-      `${origin}/applications?q=applicant&approval=awaiting&offset=50`,
-    );
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await results.locator("tbody tr").first().locator("td").first().click();
+      .click({ position: { x: 2, y: 2 } });
     await expect(page).toHaveURL(`${origin}${applicationHref}`);
     await page.goto(`${origin}${profileHref}`);
     await DB.prepare(

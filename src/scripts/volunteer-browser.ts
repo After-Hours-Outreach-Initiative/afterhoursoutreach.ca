@@ -20,29 +20,6 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   const refreshTableHeader = initDirectoryTableHeader(results);
   const people = filters ? "applications" : "volunteers";
 
-  root.dataset.rowNavigation = "true";
-  results.addEventListener("click", (event) => {
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey ||
-      !(event.target instanceof Element) ||
-      event.target.closest(
-        "a, button, input, select, textarea, label, summary, [role='button'], [contenteditable]",
-      ) ||
-      window.getSelection()?.toString()
-    )
-      return;
-    const row = event.target.closest("[data-volunteer-row]");
-    const link = row?.querySelector<HTMLAnchorElement>(
-      "[data-volunteer-profile-link]",
-    );
-    if (link) location.assign(link.href);
-  });
-
   let timer: number | undefined;
   let pending: AbortController | undefined;
   const cancelSearch = () => {

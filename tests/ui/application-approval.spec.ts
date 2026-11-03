@@ -63,7 +63,7 @@ test("application table opens a focused review with guarded decisions and list c
       "href",
       `${applicationPath}?returnTo=${encodeURIComponent(listPath)}`,
     );
-    await row.locator("td").last().click();
+    await row.click({ position: { x: 2, y: 2 } });
     const review = page.locator("[data-application-review]");
     await expect(review.getByRole("heading", { level: 1 })).toContainText(
       account.name,
