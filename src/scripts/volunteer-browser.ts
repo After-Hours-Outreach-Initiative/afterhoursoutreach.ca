@@ -1,6 +1,5 @@
 import { actionFragment } from "./action-page";
 import { initDirectoryTableHeader } from "./directory-table-header";
-import { initCompactPersonNames } from "./compact-person-name";
 
 export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   const root = document.querySelector<HTMLElement>("[data-volunteer-browser]");
@@ -16,7 +15,6 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     "[data-volunteer-search-error]",
   );
   if (!root || !search || !form || !results || !error) return;
-  initCompactPersonNames();
   const refreshTableHeader = initDirectoryTableHeader(results);
   const people = filters ? "applications" : "volunteers";
 

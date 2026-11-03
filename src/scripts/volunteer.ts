@@ -13,7 +13,6 @@ import {
   initVolunteerProfileContents,
 } from "./volunteer-profile-contents";
 import { initSignupMenus } from "./signup-menu";
-import { initCompactPersonNames } from "./compact-person-name";
 import { initAttendeePreviews } from "./add-attendee";
 import {
   initSignupMoveCalendars,
@@ -82,7 +81,6 @@ for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
 initEventDates(document);
 initVolunteerProfileContents();
 initSignupMenus();
-initCompactPersonNames();
 initAttendeePreviews();
 initSignupMoveCalendars();
 
