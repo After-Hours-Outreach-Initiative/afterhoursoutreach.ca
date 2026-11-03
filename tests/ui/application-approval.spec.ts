@@ -167,6 +167,24 @@ test("application table opens a focused review with guarded decisions and list c
       "Reject and send email",
       "Cancel",
     ]);
+    for (const width of [1280, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      const rejectionBounds = (await rejection.boundingBox())!;
+      if (width === 1280) expect(rejectionBounds.width).toBeGreaterThan(576);
+      const surface = rejection.locator(".rejection-surface");
+      await expect
+        .poll(async () =>
+          Math.abs(
+            (await surface.boundingBox())!.width -
+              Math.min(rejectionBounds.width, 576),
+          ),
+        )
+        .toBeLessThan(1);
+      expect((await surface.boundingBox())!.x).toBeCloseTo(rejectionBounds.x);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width);
+    }
     await reason.fill("A draft reason");
     await review.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(rejectAction).toHaveAttribute("aria-expanded", "false");

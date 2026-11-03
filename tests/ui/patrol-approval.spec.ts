@@ -119,12 +119,22 @@ test("roster links open profile pages with one readable patrol approval card", a
         path: testInfo.outputPath(`patrol-approval-applicant-${width}.png`),
       });
       await application
-        .getByText("Reject application", { exact: true })
+        .getByRole("button", { name: "Reject application", exact: true })
         .click();
       const reason = application.getByRole("textbox", {
         name: "Reason for rejection",
       });
       await expect(reason).toBeVisible();
+      const rejection = application.locator("application-rejection");
+      const rejectionBounds = (await rejection.boundingBox())!;
+      if (width === 1280) expect(rejectionBounds.width).toBeGreaterThan(576);
+      const surfaceBounds = (await rejection
+        .locator(".rejection-surface")
+        .boundingBox())!;
+      expect(surfaceBounds.width).toBeCloseTo(
+        Math.min(rejectionBounds.width, 576),
+      );
+      expect(surfaceBounds.x).toBeCloseTo(rejectionBounds.x);
       const card = application.locator('[data-application-mini-step="review"]');
       const cardBounds = (await card.boundingBox())!;
       const reasonBounds = (await reason.boundingBox())!;
