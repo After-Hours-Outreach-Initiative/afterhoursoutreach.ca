@@ -1,7 +1,7 @@
 ---
 import { env } from "cloudflare:workers";
 import VolunteerPortal from "@/components/volunteer/VolunteerPortal.astro";
-import { accountContext } from "@/server/db/access";
+import { accountContext, canViewEvents } from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
 export const prerender = false;
 const account = env.BETTER_AUTH_SECRET
@@ -13,6 +13,9 @@ signInUrl.pathname = "/volunteer/sign-in";
 if (!account?.actor) return Astro.rewrite(signInUrl);
 if (account.actor.twoFactorEnabled && !account.actor.twoFactorVerified)
   return Astro.redirect(signInUrl.pathname + signInUrl.search);
+// Keep old portal links and account switches on the organizer's canonical view.
+if (account.actor.role === "organizer" && canViewEvents(account.actor))
+  return Astro.redirect(`/events${Astro.url.search}`);
 ---
 
 <VolunteerPortal {account} />

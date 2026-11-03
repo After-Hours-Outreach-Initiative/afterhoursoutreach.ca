@@ -30,6 +30,70 @@ test.beforeEach(async ({ page, baseURL }) => {
   ).toBeVisible();
 });
 
+test("organizer account states land in organizer events without changing volunteer or saved-account destinations", async ({
+  page,
+  baseURL,
+}) => {
+  const choose = async (key: string) => {
+    const profiles = await openLocalAccountSwitcher(page);
+    await profiles
+      .locator(`[data-switch-user="${accountStatePersona(key)}"]`)
+      .click();
+  };
+  await choose("organizer");
+  await expect(page).toHaveURL(/\/events$/);
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-view",
+    "manage",
+  );
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+
+  await page.goto("/volunteer?type=orientation");
+  await expect(page).toHaveURL(/\/events\?type=orientation$/);
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-view",
+    "manage",
+  );
+  const { user } = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  for (const returnTo of [
+    undefined,
+    "/volunteer/account?tab=sessions",
+    "/applications",
+  ]) {
+    const response = await page.request.post("/api/v1/auth/dev/switch-user", {
+      headers: { origin: baseURL! },
+      data: { userId: user.id, ...(returnTo && { returnTo }) },
+    });
+    expect(response.ok(), await response.text()).toBe(true);
+    expect((await response.json()).next).toBe(returnTo ?? "/events");
+  }
+
+  await choose("patrol");
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-view",
+    "volunteer",
+  );
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toHaveCount(0);
+  expect((await page.request.get("/events?view=organizer")).status()).toBe(403);
+
+  await choose("inactive-organizer");
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-access",
+    "false",
+  );
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("Alt+Z toggles the DEV panel and restores focus without changing form input", async ({
   page,
 }) => {
