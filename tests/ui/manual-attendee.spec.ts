@@ -50,6 +50,11 @@ test("inline add-volunteer forms preserve validation, previews and responsive ro
   const form = card.locator("[data-add-attendee]");
   const name = form.getByRole("textbox", { name: "Name", exact: true });
   await expect(trigger).toBeVisible();
+  await expect(trigger).toHaveAccessibleName("Add volunteer");
+  await expect(trigger.locator("svg.btn-icon")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
   await expect(form).toHaveAttribute("inert", "");
   const morph = await trigger.evaluate((button) => {
     (button as HTMLButtonElement).click();

@@ -2,6 +2,7 @@
 import type { EventRow } from "@/server/db/events";
 import { manualAttendeeCategory } from "@/data/event-roster";
 import FieldError from "@/components/FieldError.astro";
+import PlusIcon from "@/components/icons/PlusIcon.astro";
 import RosterPerson from "./RosterPerson.astro";
 
 interface Props {
@@ -26,6 +27,7 @@ const roles = [
       aria-controls={`${id}-form`}
       data-attendee-open
     >
+      <PlusIcon class="btn-icon" />
       Add volunteer
     </button>
     <form
