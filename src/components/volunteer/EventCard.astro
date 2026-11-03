@@ -130,18 +130,14 @@ const blocked =
       </p>
       <p data-event-availability aria-live="polite" aria-atomic="true">
         {
-          Boolean(event.signedUp) ? (
-            <>
-              <span class:list={{ "volunteer-spots": future }}>
-                {future ? "Registered" : "You registered"}
-              </span>{" "}
-              ·{" "}
-            </>
-          ) : null
-        }
-        {
           !future ? (
-            `${event.confirmed} ${event.confirmed === 1 ? "registration" : "registrations"}`
+            <>
+              {event.signedUp ? "You registered · " : ""}
+              {event.confirmed}{" "}
+              {event.confirmed === 1 ? "registration" : "registrations"}
+            </>
+          ) : event.signedUp ? (
+            <span class="volunteer-spots">Registered</span>
           ) : event.confirmed >= event.spots ? (
             <>
               <span class="volunteer-spots-full">Full</span> · {event.confirmed}{" "}
