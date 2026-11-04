@@ -1901,7 +1901,7 @@ body:has(
   min-width: 1.5rem;
   padding: 0.0625rem 0.375rem;
   border-radius: 999rem;
-  background: #3f3f46;
+  background: color-mix(in srgb, currentColor 12%, transparent);
   @apply text-sm;
   font-variant-numeric: tabular-nums;
 }
