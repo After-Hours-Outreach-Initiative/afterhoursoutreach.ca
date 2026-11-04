@@ -20,7 +20,7 @@ for (const javaScriptEnabled of [true, false]) {
       await expect(approved).toHaveCSS("color", "rgb(212, 212, 216)");
       await expect(buttons.first()).toHaveCSS(
         "background-color",
-        "rgb(63, 63, 70)",
+        "rgb(22, 33, 74)",
       );
       for (const [filter, background] of [
         ["all", "rgb(39, 39, 42)"],
@@ -86,8 +86,8 @@ for (const javaScriptEnabled of [true, false]) {
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(/approval=approved/);
       await expect(approved).toHaveAttribute("aria-pressed", "true");
-      await expect(approved).toHaveCSS("background-color", "rgb(63, 63, 70)");
-      await expect(approved).toHaveCSS("color", "rgb(255, 255, 255)");
+      await expect(approved).toHaveCSS("background-color", "rgb(22, 33, 74)");
+      await expect(approved).toHaveCSS("color", "rgb(224, 231, 255)");
       await expect(approved.locator(".volunteer-filter-count")).toHaveCSS(
         "background-color",
         "rgb(23, 37, 84)",
