@@ -40,6 +40,14 @@ export default defineConfig({
             prerender: false,
           });
           injectRoute({
+            pattern: "/dev/ui/filters",
+            entrypoint: new URL(
+              "./src/dev/ui/FiltersPlayground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
             pattern: "/dev/ui",
             entrypoint: new URL(
               "./src/dev/ui/Playground.astro",

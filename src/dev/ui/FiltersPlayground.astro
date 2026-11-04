@@ -1,0 +1,215 @@
+---
+import LocalLayout from "./LocalLayout.astro";
+import PlaygroundHeader from "./PlaygroundHeader.astro";
+import {
+  applicationStatuses,
+  type ApplicationStatus,
+} from "../../data/volunteer-list";
+import "../../styles/volunteer.css";
+import "./playground.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+Astro.response.headers.set("Content-Security-Policy", "form-action 'none'");
+
+const counts: Record<ApplicationStatus, number> = {
+  awaiting: 12,
+  "in-progress": 7,
+  rejected: 0,
+  approved: 105,
+};
+const filters = [
+  { id: "all", label: "All", state: undefined, count: 124 },
+  ...Object.entries(applicationStatuses).map(([id, status]) => ({
+    id,
+    ...status,
+    count: counts[id as ApplicationStatus],
+  })),
+];
+const variants = [
+  {
+    id: "inline",
+    title: "1. Plain inline",
+    description: "A quieter number, with no container or background.",
+  },
+  {
+    id: "separator",
+    title: "2. Thin separator",
+    description: "A small vertical rule separates the count from its label.",
+  },
+  {
+    id: "outline",
+    title: "3. Outlined badge",
+    description: "A compact, squared outline instead of a filled bubble.",
+  },
+  {
+    id: "segment",
+    title: "4. Integrated end-cap",
+    description:
+      "The count fills the end of the pill as one continuous segment.",
+  },
+  {
+    id: "current",
+    title: "Current bubbles · Reference",
+    description: "The live treatment, unchanged, for comparison.",
+  },
+];
+---
+
+<LocalLayout title="Filter counts">
+  <main class="ui-playground" data-ui-filters-playground>
+    <PlaygroundHeader active="filters" />
+    <section class="ui-section" aria-labelledby="filter-counts-heading">
+      <h2 id="filter-counts-heading">Filter counts</h2>
+      <p>
+        Four alternatives and the current bubbles, with identical application
+        counts and 32 px pills. Click a status in any example to compare
+        selection; each row is independent. Live filters are unchanged.
+      </p>
+      <div class="ui-gallery">
+        {variants.map(({ id, title, description }) => (
+          <section
+            class="ui-gallery-card"
+            aria-labelledby={`filter-${id}-heading`}
+            data-ui-filter-variant={id}
+          >
+            <div class="ui-gallery-description">
+              <h3 id={`filter-${id}-heading`}>{title}</h3>
+              <p>{description}</p>
+            </div>
+            <div class="ui-filter-preview">
+              <h4>Applications</h4>
+              <div
+                class="ui-filter-row"
+                role="group"
+                aria-label="Application status"
+              >
+                {filters.map(({ id: filterId, label, state, count }) => (
+                  <button
+                    type="button"
+                    class="volunteer-filter"
+                    data-state={state}
+                    data-ui-filter
+                    data-label={label}
+                    data-count={count}
+                    aria-label={`${label}: ${count} applications`}
+                    aria-pressed={filterId === "awaiting" ? "true" : "false"}
+                  >
+                    <span class="ui-filter-label">{label}</span>{" "}
+                    <span
+                      class:list={[
+                        "ui-filter-count",
+                        { "volunteer-filter-count": id === "current" },
+                      ]}
+                      aria-hidden="true"
+                    >
+                      {count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p role="status" data-ui-filter-selection>
+                12 applications · Ready for review
+              </p>
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
+  </main>
+</LocalLayout>
+
+<script>
+  document
+    .querySelectorAll<HTMLElement>("[data-ui-filter-variant]")
+    .forEach((card) => {
+      const filters =
+        card.querySelectorAll<HTMLButtonElement>("[data-ui-filter]");
+      const selection = card.querySelector<HTMLElement>(
+        "[data-ui-filter-selection]",
+      );
+      filters.forEach((button) => {
+        button.addEventListener("click", () => {
+          filters.forEach((filter) => {
+            filter.setAttribute("aria-pressed", String(filter === button));
+          });
+          if (selection) {
+            selection.textContent = `${button.dataset.count} applications · ${button.dataset.label}`;
+          }
+        });
+      });
+    });
+</script>
+
+<style>
+  .ui-gallery-card {
+    display: flex;
+    flex-direction: column;
+  }
+  .ui-gallery-description p {
+    margin-bottom: 0;
+  }
+  .ui-filter-preview {
+    flex: 1;
+    border-top: 1px solid #3f3f46;
+    padding: 1.25rem;
+    background: #050608;
+  }
+  .ui-filter-preview h4 {
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+  }
+  .ui-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    /* Keep every status visible, and focus rings clear of the card edges. */
+    padding-block: 0.5rem;
+  }
+  .ui-filter-preview p {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+  }
+  .ui-filter-count {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-ui-filter-variant="inline"] .ui-filter-count {
+    opacity: 0.8;
+    font-weight: 400;
+  }
+  [data-ui-filter-variant="separator"] .ui-filter-count {
+    margin-left: 0.125rem;
+    border-left: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+    padding-left: 0.5rem;
+    font-weight: 400;
+  }
+  [data-ui-filter-variant="outline"] .ui-filter-count {
+    min-width: 1.375rem;
+    height: 1.25rem;
+    border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+    border-radius: 0.25rem;
+    padding-inline: 0.25rem;
+    font-weight: 400;
+  }
+  [data-ui-filter-variant="segment"] .volunteer-filter {
+    gap: 0;
+    padding: 0;
+  }
+  [data-ui-filter-variant="segment"] .ui-filter-label {
+    padding: 0.125rem 0.625rem;
+  }
+  [data-ui-filter-variant="segment"] .ui-filter-count {
+    align-self: stretch;
+    min-width: 1.875rem;
+    border-left: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+    border-radius: 0 999rem 999rem 0;
+    padding: 0.125rem 0.5rem;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+</style>

@@ -2,6 +2,7 @@
 interface Props {
   active:
     | "buttons"
+    | "filters"
     | "discord"
     | "organizer-profile"
     | "event-card"
@@ -11,6 +12,7 @@ interface Props {
 const { active } = Astro.props;
 const examples = [
   { id: "buttons", label: "Buttons", href: "/dev/ui/buttons" },
+  { id: "filters", label: "Filters", href: "/dev/ui/filters" },
   { id: "event-card", label: "Event card", href: "/dev/ui/event-card" },
   {
     id: "applications",

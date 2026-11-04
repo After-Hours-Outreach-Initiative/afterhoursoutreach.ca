@@ -19,6 +19,7 @@ export async function assertHostedUiPlaygroundAbsent(configPath: string) {
     for (const path of [
       "/dev/ui",
       "/dev/ui/buttons",
+      "/dev/ui/filters",
       "/dev/ui/discord?scenario=connected",
       "/dev/ui/event-card",
       "/dev/ui/event-card/preview?scenario=full",
