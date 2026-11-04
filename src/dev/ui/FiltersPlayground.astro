@@ -50,7 +50,8 @@ const variants = [
   {
     id: "current",
     title: "Current bubbles · Reference",
-    description: "The live treatment, unchanged, for comparison.",
+    description:
+      "The live treatment: neutral pills with status-coloured count bubbles.",
   },
 ];
 ---
@@ -63,7 +64,7 @@ const variants = [
       <p>
         Four alternatives and the current bubbles, with identical application
         counts and 32 px pills. Click a status in any example to compare
-        selection; each row is independent. Live filters are unchanged.
+        selection; each row is independent and does not change the live filters.
       </p>
       <div class="ui-gallery">
         {variants.map(({ id, title, description }) => (

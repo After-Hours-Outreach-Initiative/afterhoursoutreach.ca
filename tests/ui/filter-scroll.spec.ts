@@ -16,7 +16,22 @@ for (const javaScriptEnabled of [true, false]) {
       });
       await expect(buttons).toHaveCount(5);
       await expect(buttons.locator(".volunteer-filter-count")).toHaveCount(5);
-      await expect(approved).toHaveCSS("background-color", "rgb(23, 37, 84)");
+      await expect(approved).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await expect(approved).toHaveCSS("color", "rgb(212, 212, 216)");
+      await expect(buttons.first()).toHaveCSS(
+        "background-color",
+        "rgb(63, 63, 70)",
+      );
+      for (const [filter, background] of [
+        ["all", "rgb(39, 39, 42)"],
+        ["awaiting", "rgb(5, 46, 22)"],
+        ["in-progress", "rgb(39, 39, 42)"],
+        ["rejected", "rgb(69, 10, 10)"],
+        ["approved", "rgb(23, 37, 84)"],
+      ])
+        await expect(
+          filters.locator(`[data-volunteer-count="${filter}"]`),
+        ).toHaveCSS("background-color", background);
       await page.evaluate(() => document.fonts.ready);
 
       for (const width of [320, 375, 1440]) {
@@ -71,7 +86,12 @@ for (const javaScriptEnabled of [true, false]) {
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(/approval=approved/);
       await expect(approved).toHaveAttribute("aria-pressed", "true");
-      await expect(approved).toHaveCSS("background-color", "rgb(23, 37, 84)");
+      await expect(approved).toHaveCSS("background-color", "rgb(63, 63, 70)");
+      await expect(approved).toHaveCSS("color", "rgb(255, 255, 255)");
+      await expect(approved.locator(".volunteer-filter-count")).toHaveCSS(
+        "background-color",
+        "rgb(23, 37, 84)",
+      );
     });
   });
 }

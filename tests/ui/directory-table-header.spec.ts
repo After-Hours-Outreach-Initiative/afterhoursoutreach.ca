@@ -324,18 +324,15 @@ for (const kind of ["applications", "volunteers"]) {
       expect((await filters.boundingBox())!.y).toBeGreaterThan(
         searchBox.y + searchBox.height,
       );
-      await expect(filters.locator('[data-state="approved"]')).toHaveCSS(
-        "color",
-        "rgb(147, 197, 253)",
-      );
-      await expect(filters.locator('[data-state="approved"]')).toHaveCSS(
-        "background-color",
-        "rgb(23, 37, 84)",
-      );
-      await expect(filters.locator('[data-state="ready"]')).toHaveCSS(
-        "color",
-        "rgb(74, 222, 128)",
-      );
+      await expect(
+        filters.locator('[data-state="approved"] .volunteer-filter-count'),
+      ).toHaveCSS("color", "rgb(147, 197, 253)");
+      await expect(
+        filters.locator('[data-state="approved"] .volunteer-filter-count'),
+      ).toHaveCSS("background-color", "rgb(23, 37, 84)");
+      await expect(
+        filters.locator('[data-state="ready"] .volunteer-filter-count'),
+      ).toHaveCSS("color", "rgb(74, 222, 128)");
     }
     await expect(shell.locator(".volunteer-table-frame thead a")).toHaveCount(
       0,
