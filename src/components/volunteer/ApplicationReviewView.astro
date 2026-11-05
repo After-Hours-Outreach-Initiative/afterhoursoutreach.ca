@@ -62,19 +62,23 @@ const contents = [
             data-volunteer-controls
           >
             <div class="organizer-application-review-actions">
-              <a
-                class="btn btn-outline"
-                href={`/volunteers/${encodeURIComponent(person.id)}`}
-              >
-                View volunteer profile
-                <ArrowRightIcon class="btn-icon" />
-              </a>
               <VolunteerAccessAction {person} kind="application" />
             </div>
           </div>
         )
       }
     </OrganizerApplicationSteps>
+    {
+      Boolean(person.applicationApproved) && (
+        <a
+          class="btn btn-outline mt-6"
+          href={`/volunteers/${encodeURIComponent(person.id)}`}
+        >
+          View volunteer profile
+          <ArrowRightIcon class="btn-icon" />
+        </a>
+      )
+    }
     {
       person.applicationRejectionReason && (
         <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
