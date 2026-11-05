@@ -13,6 +13,7 @@ import OrganizerApplicationSteps from "./OrganizerApplicationSteps.astro";
 import VolunteerAccessAction from "./VolunteerAccessAction.astro";
 import ApplicationRejection from "./ApplicationRejection.astro";
 import PageContents from "./PageContents.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 
 interface Props {
   profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
@@ -61,6 +62,13 @@ const contents = [
             data-volunteer-controls
           >
             <div class="organizer-application-review-actions">
+              <a
+                class="btn btn-outline"
+                href={`/volunteers/${encodeURIComponent(person.id)}`}
+              >
+                View volunteer profile
+                <ArrowRightIcon class="btn-icon" />
+              </a>
               <VolunteerAccessAction {person} kind="application" />
             </div>
           </div>

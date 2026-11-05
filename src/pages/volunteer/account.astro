@@ -275,6 +275,13 @@ const contents = [
                 )}
               </Fragment>
             </ApplicationProgressMini>
+            {
+              applicationProgress.applicationApproved && (
+                <a class="btn btn-outline mt-6" href="#account-profile-heading">
+                  View your profile
+                </a>
+              )
+            }
           </section>
         )
       }

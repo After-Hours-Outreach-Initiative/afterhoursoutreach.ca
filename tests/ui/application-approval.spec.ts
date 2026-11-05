@@ -452,6 +452,16 @@ test("pending applications poll every minute, then approval restores five-second
     await expect(
       approval.locator("[data-volunteer-profile-link]"),
     ).toHaveAttribute("href", "/volunteers/local-fixture-user-robin");
+    await expect(
+      page.getByRole("link", { name: "View volunteer profile", exact: true }),
+    ).toHaveAttribute("href", `/volunteers/${account.id}`);
+    const accountPage = await volunteerContext.newPage();
+    await accountPage.goto(`${baseURL}/volunteer/account`);
+    await accountPage
+      .getByRole("link", { name: "View your profile", exact: true })
+      .click();
+    await expect(accountPage).toHaveURL(/#account-profile-heading$/);
+    await accountPage.close();
     expect(
       (await page.request.get("/volunteers/local-fixture-user-robin")).status(),
     ).toBe(200);
