@@ -4,6 +4,7 @@ import { test } from "vitest";
 import {
   accessRegistrationCancelledEmail,
   accessRegistrationCancelledTemplate,
+  applicationRejectedEmail,
   applicationSubmittedEmail,
   applicationSubmittedTemplate,
   eventCancelledEmail,
@@ -20,7 +21,7 @@ import {
   volunteerAccessEmail,
   type EmailEvent,
 } from "../src/data/email-templates";
-import { emailTextSql } from "../src/server/db/email-text";
+import { emailHtmlSql, emailTextSql } from "../src/server/db/email-text";
 import { contactEmail } from "../src/data/site";
 
 const origin = "https://example.invalid";
@@ -80,7 +81,8 @@ test("sign-in formatting preserves the URL fragment and escapes HTML values", ()
     url,
     purpose: "change-email",
   });
-  assert.equal(change.html, undefined);
+  assert.match(change.html!, /654321/);
+  assert.ok(!change.html!.includes(url));
   assert.ok(!change.text.includes(url));
   assert.match(change.text, /654321/);
 });
@@ -92,7 +94,7 @@ test("approval and access messages retain the existing next-step branches", () =
         const status = { active, applicationApproved, patrolApproved };
         for (const approvalChanged of [true, false]) {
           const content = volunteerAccessEmail(status, approvalChanged);
-          assert.equal(content.html, undefined);
+          assert.ok(content.html?.includes("<h1"));
           if (!active) {
             assert.match(content.text, /currently inactive/);
             assert.ok(
@@ -149,7 +151,7 @@ test("event messages retain date, orientation, optional reasons and delivery foo
         `${content.text}\n\nEvents: ${origin}/events`,
       );
       assert.equal(delivered.text.includes("Reason:"), Boolean(reason));
-      assert.equal(delivered.html, undefined);
+      assert.ok(delivered.html?.includes(`href="${origin}/events"`));
     }
   }
   assert.match(
@@ -162,13 +164,13 @@ test("event messages retain date, orientation, optional reasons and delivery foo
   );
 });
 
-test("SQL-composed messages and pure formatting produce identical text", () => {
+test("SQL-composed messages match pure formatting, including escaped HTML", () => {
   const db = new DatabaseSync(":memory:");
   try {
     const values = {
-      applicant: "Sample O'Neil\r\n{{reviewUrl}}",
+      applicant: "Sample O'Neil & <tag>\r\n{{reviewUrl}}",
       submittedAt: "2026-10-23T18:30:00.000Z",
-      reviewUrl: `${origin}/volunteers/sample`,
+      reviewUrl: `${origin}/volunteers/sample#test&value="'`,
     };
     const submissionSql = emailTextSql(applicationSubmittedTemplate.text, {
       applicant: "replace(replace(?,char(13),' '),char(10),' ')",
@@ -179,6 +181,17 @@ test("SQL-composed messages and pure formatting produce identical text", () => {
       .prepare(`SELECT ${submissionSql} AS text`)
       .get(values.applicant, values.submittedAt, values.reviewUrl);
     assert.equal(submission?.text, applicationSubmittedEmail(values).text);
+    const submissionHtmlSql = emailHtmlSql(applicationSubmittedTemplate.html, {
+      applicant: "replace(replace(?,char(13),' '),char(10),' ')",
+      submittedAt: "?",
+      reviewUrl: "?",
+    });
+    const submissionHtml = db
+      .prepare(`SELECT ${submissionHtmlSql} AS html`)
+      .get(values.applicant, values.submittedAt, values.reviewUrl);
+    assert.equal(submissionHtml?.html, applicationSubmittedEmail(values).html);
+    assert.match(String(submissionHtml?.html), /O&#39;Neil &amp; &lt;tag&gt;/);
+    assert.match(String(submissionHtml?.html), /#test&amp;value=&quot;&#39;/);
 
     const cancellationSql = emailTextSql(
       accessRegistrationCancelledTemplate.text,
@@ -218,7 +231,7 @@ test("SQL-composed messages and pure formatting produce identical text", () => {
   }
 });
 
-test("role, series and medic notifications remain plain text", () => {
+test("role, series and medic notifications include HTML and plain text", () => {
   const messages = [
     roleChangedEmail("organizer"),
     roleChangedEmail("volunteer"),
@@ -228,14 +241,33 @@ test("role, series and medic notifications remain plain text", () => {
     medicCertificationEmail("expired", "2026-10-20", origin),
   ];
   for (const content of messages) {
-    assert.equal(content.html, undefined);
+    assert.ok(content.html?.includes("<h1"));
     assert.ok(content.subject);
     assert.ok(content.text);
   }
   assert.match(messages[0].text, /role is now organizer/);
   assert.match(messages[1].text, /role is now volunteer/);
   assert.match(messages[4].text, /remains valid through that date/);
-  assert.match(messages[5].text, /It is now expired/);
+  assert.match(messages[5].text, /expired on 2026-10-20/);
   for (const content of messages.slice(4))
     assert.ok(content.text.endsWith(`${origin}/volunteer/account`));
+});
+
+test("notification HTML escapes names, locations and organizer-provided reasons", () => {
+  const untrusted = `<img src=x onerror="alert('test')"> &`;
+  const messages = [
+    eventCancelledEmail({ ...event, meetingPoint: untrusted }, untrusted),
+    applicationRejectedEmail(untrusted),
+    volunteerAccessEmail(
+      { active: true, applicationApproved: true, patrolApproved: false },
+      true,
+      untrusted,
+    ),
+  ];
+  for (const content of messages) {
+    const delivered = eventNotificationEmail(content, origin);
+    assert.ok(delivered.text.includes(untrusted));
+    assert.ok(!delivered.html!.includes(untrusted));
+    assert.match(delivered.html!, /&lt;img src=x onerror=&quot;/);
+  }
 });

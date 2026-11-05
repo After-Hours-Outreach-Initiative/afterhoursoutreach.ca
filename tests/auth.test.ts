@@ -2747,7 +2747,8 @@ test("email-change messages contain a verification code rather than a sign-in li
       assert.equal(body.subject, "Confirm your email change");
       assert.match(body.text, /account settings.*123456/);
       assert.doesNotMatch(body.text, /Sign in:|sign-in\/complete/);
-      assert.equal(body.html, undefined);
+      assert.match(body.html, /123456/);
+      assert.doesNotMatch(body.html, /href=|sign-in\/complete/);
       return Response.json({ id: "email-id" });
     },
   );

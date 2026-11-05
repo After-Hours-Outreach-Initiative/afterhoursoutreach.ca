@@ -13,3 +13,16 @@ export function emailTextSql(template: string, values: Record<string, string>) {
     })
     .join(" || ");
 }
+
+/** Escape recipient values before substituting them into an HTML template. */
+export function emailHtmlSql(template: string, values: Record<string, string>) {
+  return emailTextSql(
+    template,
+    Object.fromEntries(
+      Object.entries(values).map(([key, expression]) => [
+        key,
+        `replace(replace(replace(replace(replace((${expression}),'&','&amp;'),'<','&lt;'),'>','&gt;'),'"','&quot;'),char(39),'&#39;')`,
+      ]),
+    ),
+  );
+}
