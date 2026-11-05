@@ -1864,7 +1864,9 @@ describe(
           );
           routeCookie = organizer.cookie;
           const attendance = await createEvent("orientation", 5);
+          await ok(await status(bob.id, true, false));
           await ok(await join(attendance.id, bob.cookie));
+          await ok(await join(attendance.id, alice.cookie));
           await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
             .bind(Date.now() - 1000, attendance.id)
             .run();
@@ -1873,9 +1875,16 @@ describe(
             `[data-live-event="${attendance.id}"]`,
           );
           await attendanceCard.locator(".volunteer-roster > summary").click();
+          const approvalForm = attendanceCard.locator(
+            "[data-organizer-orientation]",
+          );
+          await expect(approvalForm).toHaveCount(1);
+          await expect(approvalForm.locator('[name="userId"]')).toHaveValue(
+            bob.id,
+          );
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
-            form: attendanceCard.locator("[data-organizer-orientation]"),
+            form: approvalForm,
             notify: false,
             trigger: () =>
               attendanceCard
@@ -1890,6 +1899,7 @@ describe(
                 .waitFor(),
             loadingLabel: "Saving…",
           });
+          await expect(approvalForm).toHaveCount(0);
           await expect(
             attendanceCard.locator(".volunteer-roster"),
           ).toHaveAttribute("open", "");

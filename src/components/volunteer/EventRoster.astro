@@ -82,7 +82,7 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
               Boolean(event.includesOrientation) &&
               !future &&
               !event.cancelledAt &&
-              (!person.completed || !person.patrolApproved) && (
+              !person.patrolApproved && (
                 <form
                   class="event-roster-orientation"
                   data-organizer-orientation
