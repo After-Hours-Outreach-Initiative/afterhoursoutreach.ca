@@ -253,8 +253,9 @@ export async function searchSignupCandidates(
     FROM user u JOIN profile p ON p.user_id = u.id
     JOIN volunteer_status v ON v.user_id = u.id JOIN event e ON e.id = ?
     WHERE ${signupCandidateSql} AND ${writePermission(true)}
-      AND e.open = 1 AND e.hidden = 0 AND e.cancelled_at IS NULL
-      AND e.starts_at > ${nowMsSql} AND ${recurringSignupWindowSql()}
+      AND e.cancelled_at IS NULL
+      AND (e.starts_at <= ${nowMsSql} OR
+        (e.open = 1 AND e.hidden = 0 AND ${recurringSignupWindowSql()}))
       AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
       AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')
       AND u.id NOT IN (SELECT value FROM json_each(?))
@@ -288,8 +289,6 @@ export async function addEventVolunteers(
     );
   await ensurePatrolOccurrences(db);
   const event = await findEvent(db, eventId);
-  if (event.startsAt <= Date.now())
-    throw new RequestError(409, "Registration closes when the event starts.");
   if (
     parsed.data.some((row) => !("userId" in row) && row.newVolunteer) &&
     !event.includesOrientation
@@ -1111,8 +1110,6 @@ export async function addManualSignup(
     );
   await ensurePatrolOccurrences(db);
   const event = await findEvent(db, eventId);
-  if (event.startsAt <= Date.now())
-    throw new RequestError(409, "Registration closes when the event starts.");
   if (parsed.data.newVolunteer && !event.includesOrientation)
     throw new RequestError(
       409,

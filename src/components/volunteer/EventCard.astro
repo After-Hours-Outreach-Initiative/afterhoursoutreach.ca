@@ -44,11 +44,8 @@ const registrationOpen =
   Boolean(event.inSignupWindow);
 const canAddAttendee =
   organizer &&
-  future &&
   !event.cancelledAt &&
-  !event.hidden &&
-  Boolean(event.open) &&
-  Boolean(event.inSignupWindow) &&
+  (!future || registrationOpen) &&
   event.confirmed < event.spots;
 const blocked =
   future && event.seriesId && !event.inSignupWindow && !event.cancelledAt

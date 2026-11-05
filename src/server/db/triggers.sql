@@ -22,8 +22,15 @@ BEGIN
   SELECT RAISE(ABORT, 'signup_not_eligible')
   WHERE NOT EXISTS (
     SELECT 1 FROM event e
-    WHERE e.id = NEW.event_id AND e.open = 1
-      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+    WHERE e.id = NEW.event_id AND (
+      (e.open = 1 AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER))
+      -- Organizers can record past attendance after registration has closed.
+      OR (e.starts_at <= CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+        AND EXISTS (SELECT 1 FROM user u JOIN volunteer_status v ON v.user_id = u.id
+          JOIN profile p ON p.user_id = u.id
+          WHERE u.id = NEW.added_by AND u.role = 'organizer' AND u.deleted_at IS NULL
+            AND u.email_verified = 1 AND v.active = 1))
+      )
       AND ((NEW.user_id IS NULL AND (coalesce(e.includes_orientation, e.type = 'orientation') OR NEW.manual_new = 0))
         OR EXISTS (SELECT 1 FROM volunteer_status v JOIN profile p ON p.user_id = v.user_id
           WHERE v.user_id = NEW.user_id AND v.active = 1
@@ -66,7 +73,8 @@ BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
 BEGIN
   SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
     SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
-    WHERE e.id = NEW.event_id AND (
+    WHERE e.id = NEW.event_id
+      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER) AND (
       e.starts_at >= ps.generation_until OR
       (SELECT count(*) FROM event preceding
         WHERE preceding.series_id = e.series_id AND preceding.cancelled_at IS NULL
@@ -309,11 +317,17 @@ BEGIN
 END;
 --> statement-breakpoint
 
--- Existing spots survive hiding/closing; new confirmed spots must be visible.
+-- Existing spots survive hiding/closing. Organizers may also record historical
+-- attendance on hidden events; cancelled/deleted events remain unavailable.
 CREATE TRIGGER signup_visible_insert BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
 BEGIN
   SELECT RAISE(ABORT, 'signup_not_eligible') WHERE EXISTS (
-    SELECT 1 FROM event WHERE id = NEW.event_id AND (hidden = 1 OR cancelled_at IS NOT NULL)
+    SELECT 1 FROM event e WHERE e.id = NEW.event_id AND (
+      (e.hidden = 1 AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER))
+      OR e.cancelled_at IS NOT NULL
+      OR EXISTS (SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
+      OR EXISTS (SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')
+    )
   );
 END;
 --> statement-breakpoint

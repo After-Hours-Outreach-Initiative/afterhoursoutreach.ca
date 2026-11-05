@@ -264,6 +264,8 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
     const managementHtml = await (
       await send("/events", undefined, organizerCookie)
     ).text();
+    for (const id of ["past", "past-orientation", "hidden"])
+      expect(managementHtml).toContain(`id="add-attendee-${id}-form"`);
     expect(managementHtml).toContain('data-live-event="hidden"');
     expect(managementHtml).toContain('data-live-event="past"');
     expect(managementHtml).not.toContain("data-event-view-link");

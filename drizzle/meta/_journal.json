@@ -218,6 +218,13 @@
       "when": 1793696477908,
       "tag": "0030_remove_orientation_booking_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1793868120662,
+      "tag": "0031_past_event_volunteers",
+      "breakpoints": true
     }
   ]
 }

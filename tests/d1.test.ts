@@ -486,7 +486,7 @@ test("concurrent manual and account signups cannot take each other's reserved ca
   );
 });
 
-test("organizer staged additions search eligible accounts and commit mixed lists atomically", async () => {
+test("organizer staged additions to past events search eligible accounts and commit mixed lists atomically", async () => {
   const organizer = await manualRosterActor("manual-organizer", "organizer");
   const volunteer = await manualRosterActor("staged-volunteer", "volunteer");
   const inactive = await manualRosterActor("staged-inactive", "volunteer");
@@ -504,6 +504,20 @@ test("organizer staged additions search eligible accounts and commit mixed lists
       VALUES ('staged-event','patrol',1,?,'Point',4,1,1,2,?,0,0)`,
     ).bind(Date.now() + 86_400_000, organizer.id),
   ]);
+  await env.DB.prepare(
+    "UPDATE event SET starts_at=0,open=0,hidden=1 WHERE id='staged-event'",
+  ).run();
+  await assert.rejects(
+    changeSignup(env.DB, volunteer, "staged-event", "join"),
+    statusError(409),
+  );
+  // The database also keeps self-registration closed, even for an organizer.
+  await assert.rejects(
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('past-self','staged-event',?,0,0)",
+    ).bind(organizer.id).run(),
+    /signup_not_eligible/,
+  );
   await assert.rejects(
     searchSignupCandidates(env.DB, volunteer, "staged-event", "staged"),
     statusError(403),
@@ -540,6 +554,20 @@ test("organizer staged additions search eligible accounts and commit mixed lists
   );
 
   const manual = { name: "Medic Person", medic: true, newVolunteer: false };
+  await env.DB.prepare(
+    "UPDATE event SET cancelled_at=1 WHERE id='staged-event'",
+  ).run();
+  assert.deepEqual(
+    await searchSignupCandidates(env.DB, organizer, "staged-event", "staged"),
+    [],
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [manual]),
+    statusError(403),
+  );
+  await env.DB.prepare(
+    "UPDATE event SET cancelled_at=NULL WHERE id='staged-event'",
+  ).run();
   await assert.rejects(
     addEventVolunteers(env.DB, volunteer, "staged-event", [manual]),
     statusError(403),
