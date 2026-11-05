@@ -2792,16 +2792,12 @@ test("legacy patrol approval attribution retains its recorded organizer and epoc
   );
 });
 
-test("one patrol approval records orientation, approval, attribution and optional email atomically", async () => {
+test("roster patrol approval saves access, attribution and optional attendance history", async () => {
   const { organizer, volunteer, input } = await patrolApprovalFixture();
   const attendanceInput = { ...input, eventId: "patrol-orientation" };
   assert.equal(
     (await findVolunteerOrientation(env.DB, organizer, volunteer.id))?.eventId,
     "patrol-orientation",
-  );
-  await assert.rejects(
-    approveForPatrols(env.DB, organizer, attendanceInput),
-    statusError(409),
   );
   assert.equal(
     await env.DB.prepare(
@@ -2915,17 +2911,9 @@ test("one patrol approval records orientation, approval, attribution and optiona
   );
 });
 
-test("merged patrol approval rejects invalid attendance, unapproved applicants and revoked organizer sessions without partial writes", async () => {
+test("invalid attendance does not block approval; application and organizer permissions still apply", async () => {
   const { organizer, volunteer, input } = await patrolApprovalFixture();
-  await env.DB.prepare(
-    "UPDATE event SET starts_at=0 WHERE id='patrol-orientation'",
-  ).run();
   for (const [invalidate, restore] of [
-    ["UPDATE event SET cancelled_at=1", "UPDATE event SET cancelled_at=NULL"],
-    [
-      "UPDATE signup SET status='cancelled'",
-      "UPDATE signup SET status='confirmed'",
-    ],
     [
       "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='patrol-new-volunteer'",
       "UPDATE volunteer_status SET registration_approved=1 WHERE user_id='patrol-new-volunteer'",
@@ -2936,14 +2924,6 @@ test("merged patrol approval rejects invalid attendance, unapproved applicants a
     ],
   ]) {
     await env.DB.prepare(invalidate).run();
-    if (
-      invalidate.includes("registration_approved") ||
-      invalidate.includes("expires_at")
-    )
-      await assert.rejects(
-        approveForPatrols(env.DB, organizer, input),
-        statusError(409),
-      );
     await assert.rejects(
       approveForPatrols(env.DB, organizer, {
         ...input,
@@ -2952,69 +2932,69 @@ test("merged patrol approval rejects invalid attendance, unapproved applicants a
       }),
       statusError(409),
     );
-    // A past signup cannot be recreated through normal signup controls.
-    if (restore.includes("UPDATE signup"))
-      await env.DB.prepare("UPDATE event SET starts_at=?")
-        .bind(Date.now() + 86_400_000)
-        .run();
     await env.DB.prepare(restore).run();
-    await env.DB.prepare("UPDATE event SET starts_at=0").run();
   }
+  // A future/cancelled orientation, missing signup or unknown event cannot
+  // prevent the role change; only valid past attendance is recorded as history.
+  await env.DB.prepare("UPDATE event SET cancelled_at=1").run();
+  await env.DB.prepare("UPDATE signup SET status='cancelled'").run();
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    eventId: "patrol-orientation",
+  });
+  const version = await env.DB.prepare(
+    "SELECT updated_at FROM volunteer_status WHERE user_id=?",
+  )
+    .bind(volunteer.id)
+    .first<number>("updated_at");
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    version: version!,
+    eventId: "not-the-registered-event",
+  });
   assert.equal(
     await env.DB.prepare(
       "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
     )
       .bind(volunteer.id)
       .first("patrol_approved"),
-    0,
+    1,
   );
-  for (const table of [
-    "orientation_completion",
-    "audit_log",
-    "event_notification",
-  ])
-    assert.equal(
-      await env.DB.prepare(`SELECT count(*) AS n FROM ${table}`).first("n"),
-      0,
-    );
-  await assert.rejects(
-    approveForPatrols(env.DB, organizer, {
-      ...input,
-      eventId: "not-the-registered-event",
-    }),
-    statusError(409),
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM orientation_completion",
+    ).first("n"),
+    0,
   );
 });
 
-test("a failure during combined approval rolls back patrol access and orientation together", async () => {
+test("failed attendance recording cannot roll back patrol access or its notification", async () => {
   const { organizer, volunteer, input } = await patrolApprovalFixture();
   await env.DB.prepare("UPDATE event SET starts_at=0").run();
   await env.DB.prepare(
     `CREATE TRIGGER reject_orientation BEFORE INSERT ON orientation_completion BEGIN SELECT RAISE(ABORT, 'test_orientation_failure'); END`,
   ).run();
-  await assert.rejects(
-    approveForPatrols(env.DB, organizer, {
-      ...input,
-      eventId: "patrol-orientation",
-      notify: true,
-    }),
-  );
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    eventId: "patrol-orientation",
+    notify: true,
+  });
   assert.equal(
     await env.DB.prepare(
       "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
     )
       .bind(volunteer.id)
       .first("patrol_approved"),
-    0,
+    1,
   );
-  for (const table of [
-    "orientation_completion",
-    "audit_log",
-    "event_notification",
-  ])
+  for (const [table, expected] of [
+    ["orientation_completion", 0],
+    ["audit_log", 1],
+    ["event_notification", 1],
+  ] as const)
     assert.equal(
       await env.DB.prepare(`SELECT count(*) AS n FROM ${table}`).first("n"),
-      0,
+      expected,
     );
 });
 

@@ -75,8 +75,36 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
                 {registrationDateFormat.format(person.registeredAt)}
               </time>
             </span>
-            {Boolean(person.completed) && (
+            {Boolean(person.completed) && !person.patrolApproved && (
               <span class="event-roster-status">Orientation completed</span>
+            )}
+            {Boolean(person.patrolApproved) && !future && (
+              <span class="event-roster-status" data-patrol-approval-status>
+                {person.patrolApprovedAt !== null ? (
+                  <>
+                    Approved by{" "}
+                    {person.patrolApprovedById ? (
+                      <a
+                        href={`/volunteers/${encodeURIComponent(person.patrolApprovedById)}`}
+                        data-volunteer-profile-link
+                      >
+                        {person.patrolApprovedByName}
+                      </a>
+                    ) : (
+                      person.patrolApprovedByName || "an organizer"
+                    )}{" "}
+                    at{" "}
+                    <time
+                      datetime={new Date(person.patrolApprovedAt).toISOString()}
+                      title={fullRegistrationDateFormat.format(person.patrolApprovedAt)}
+                    >
+                      {registrationDateFormat.format(person.patrolApprovedAt)}
+                    </time>
+                  </>
+                ) : (
+                  "Approved for patrols"
+                )}
+              </span>
             )}
             {person.userId &&
               Boolean(event.includesOrientation) &&
@@ -85,7 +113,7 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
               !person.patrolApproved && (
                 <form
                   class="event-roster-orientation"
-                  data-organizer-orientation
+                  data-organizer-patrol-approval
                   data-email-prompt="access"
                   action="/api/v1/organizer/action"
                   method="post"

@@ -5,7 +5,6 @@ import { accountContext, requireOrganizer } from "@/server/db/access";
 import {
   setVolunteerStatus,
   setRole,
-  completeOrientation,
   approveForPatrols,
   patrolApprovalSchema,
   statusSchema,
@@ -26,12 +25,6 @@ const inputSchema = z.discriminatedUnion("action", [
     action: z.literal("role"),
     userId: id,
     role: z.enum(["volunteer", "organizer"]),
-    notify: z.boolean().default(false),
-  }),
-  z.strictObject({
-    action: z.literal("orientation"),
-    userId: id,
-    eventId: id,
     notify: z.boolean().default(false),
   }),
   z.strictObject({
@@ -101,21 +94,13 @@ export const POST: APIRoute = async ({ request }) => {
                   version: input.version,
                   reason: input.reason,
                 })
-              : input.action === "role"
-                ? await setRole(
-                    env.DB,
-                    actor,
-                    input.userId,
-                    input.role,
-                    input.notify,
-                  )
-                : await completeOrientation(
-                    env.DB,
-                    actor,
-                    input.userId,
-                    input.eventId,
-                    input.notify,
-                  );
+              : await setRole(
+                  env.DB,
+                  actor,
+                  input.userId,
+                  input.role,
+                  input.notify,
+                );
     const delivery = await actionEmailResult(
       bindings,
       result,

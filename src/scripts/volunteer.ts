@@ -1035,7 +1035,7 @@ form(
   }),
   refreshVolunteer,
 );
-form("[data-organizer-orientation]", "/api/v1/organizer/action", (v) => ({
+form("[data-organizer-patrol-approval]", "/api/v1/organizer/action", (v) => ({
   action: "approve-patrols",
   userId: str(v, "userId"),
   eventId: str(v, "eventId"),

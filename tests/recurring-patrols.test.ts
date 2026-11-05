@@ -36,10 +36,7 @@ import {
   type PatrolTemplate,
 } from "../src/server/db/patrol-series";
 import { RequestError } from "../src/server/http";
-import {
-  completeOrientation,
-  setVolunteerStatus,
-} from "../src/server/db/volunteers";
+import { setVolunteerStatus } from "../src/server/db/volunteers";
 import { sourceSchemaStatements } from "./helpers/source-schema";
 
 vi.stubEnv("DEV", false);
@@ -873,7 +870,12 @@ test("past events reject cancellation and legacy deletion; series removal preser
     .prepare("UPDATE event SET starts_at=0 WHERE id=?")
     .bind(past.id)
     .run();
-  await completeOrientation(db, organizer, alice.id, past.id);
+  await db
+    .prepare(
+      "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES (?,?,?,?,0)",
+    )
+    .bind(crypto.randomUUID(), alice.id, past.id, organizer.id)
+    .run();
   const attendance = (
     await db.prepare("SELECT * FROM orientation_completion").all()
   ).results;
@@ -2025,7 +2027,12 @@ test("orientation settings persist on series, future templates and individual ex
     .prepare("UPDATE event SET starts_at=0 WHERE id=?")
     .bind(events[0].id)
     .run();
-  await completeOrientation(db, organizer, alice.id, events[0].id);
+  await db
+    .prepare(
+      "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES (?,?,?,?,0)",
+    )
+    .bind(crypto.randomUUID(), alice.id, events[0].id, organizer.id)
+    .run();
   assert.equal(await count("orientation_completion"), 1);
 });
 

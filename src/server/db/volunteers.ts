@@ -795,7 +795,7 @@ export const patrolApprovalSchema = z.strictObject({
   notify: z.boolean().default(false),
 });
 
-/** Grant access independently; an explicit roster event also records attendance. */
+/** Grant patrol access independently of orientation attendance. */
 export async function approveForPatrols(
   db: Env["DB"],
   actor: Actor,
@@ -810,7 +810,6 @@ export async function approveForPatrols(
     );
   const { userId, version, eventId, notify } = parsed.data;
   const operation = crypto.randomUUID();
-  const completionId = crypto.randomUUID();
   const now = Math.max(Date.now(), version + 1);
   const volunteer = await db
     .prepare("SELECT active FROM volunteer_status WHERE user_id=?")
@@ -825,13 +824,6 @@ export async function approveForPatrols(
     },
     false,
   );
-  // The same predicate is checked in the transaction, not just in the UI.
-  const eligibleOrientation = `SELECT e.id FROM event e
-    JOIN signup s ON s.event_id=e.id
-    WHERE s.user_id=? AND s.status='confirmed'
-      AND ${includesOrientationSql()} AND e.cancelled_at IS NULL
-      AND e.starts_at <= ${nowMsSql} AND (? IS NULL OR e.id=?)
-    ORDER BY e.starts_at DESC, e.id LIMIT 1`;
   try {
     const results = await db.batch([
       db
@@ -842,7 +834,6 @@ export async function approveForPatrols(
            updated_at=?
          WHERE user_id=? AND updated_at=? AND registration_approved=1
            AND EXISTS(SELECT 1 FROM user WHERE id=? AND deleted_at IS NULL)
-            AND (? IS NULL OR EXISTS(${eligibleOrientation}))
            AND ${writePermission(true)}`,
         )
         .bind(
@@ -852,10 +843,6 @@ export async function approveForPatrols(
           userId,
           version,
           userId,
-          eventId ?? null,
-          userId,
-          eventId ?? null,
-          eventId ?? null,
           ...permissionValues(actor),
         ),
       db
@@ -864,31 +851,6 @@ export async function approveForPatrols(
          SELECT ?, ?, ?, 'approval_changed', '["patrolApproved"]', ? WHERE changes()=1`,
         )
         .bind(operation, actor.id, userId, now),
-      db
-        .prepare(
-          `INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
-          SELECT ?, ?, e.id, ?, ? FROM event e WHERE ? IS NOT NULL AND e.id=(${eligibleOrientation})
-            AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)
-         ON CONFLICT(user_id, event_id) DO NOTHING`,
-        )
-        .bind(
-          completionId,
-          userId,
-          actor.id,
-          now,
-          eventId ?? null,
-          userId,
-          eventId ?? null,
-          eventId ?? null,
-          operation,
-        ),
-      db
-        .prepare(
-          `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-         SELECT ?, ?, ?, 'orientation_completed', '["orientationCompletion"]', ?
-         WHERE changes()=1`,
-        )
-        .bind(crypto.randomUUID(), actor.id, userId, now),
       db
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
@@ -910,34 +872,50 @@ export async function approveForPatrols(
     if (!results[0].meta.changes)
       throw new RequestError(
         409,
-        "The application, selected orientation, or organizer access changed. Reload before approving patrols.",
+        "The application, volunteer status, or organizer access changed. Reload before approving patrols.",
       );
+    // Attendance is informational. Its absence or a failed history write must
+    // never prevent or roll back the role change already committed above.
+    if (eventId) {
+      try {
+        await db.batch([
+          db
+            .prepare(
+              `INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
+              SELECT ?, ?, e.id, ?, ? FROM event e JOIN signup s ON s.event_id=e.id
+              WHERE e.id=? AND s.user_id=? AND s.status='confirmed'
+                AND ${includesOrientationSql()} AND e.cancelled_at IS NULL
+                AND e.starts_at <= ${nowMsSql}
+                AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)
+                AND ${writePermission(true)}
+              ON CONFLICT(user_id, event_id) DO NOTHING`,
+            )
+            .bind(
+              crypto.randomUUID(),
+              userId,
+              actor.id,
+              now,
+              eventId,
+              userId,
+              operation,
+              ...permissionValues(actor),
+            ),
+          db
+            .prepare(
+              `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+              SELECT ?, ?, ?, 'orientation_completed', '["orientationCompletion"]', ?
+              WHERE changes()=1`,
+            )
+            .bind(crypto.randomUUID(), actor.id, userId, now),
+        ]);
+      } catch {
+        console.warn(
+          "Orientation history could not be recorded after patrol approval.",
+        );
+      }
+    }
     return { operation, message: "Volunteer access saved." };
   } catch (error) {
     return databaseWriteError(error);
   }
-}
-
-/** Compatibility for older event-roster clients; completion now grants patrol access. */
-export async function completeOrientation(
-  db: Env["DB"],
-  actor: Actor,
-  userId: string,
-  eventId: string,
-  notify = false,
-) {
-  requireOrganizer(actor);
-  const status = await db
-    .prepare(
-      "SELECT updated_at AS version FROM volunteer_status WHERE user_id=?",
-    )
-    .bind(userId)
-    .first<{ version: number }>();
-  if (!status) throw new RequestError(404, "Volunteer not found.");
-  return approveForPatrols(db, actor, {
-    userId,
-    version: status.version,
-    eventId,
-    notify,
-  });
 }

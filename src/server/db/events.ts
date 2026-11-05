@@ -166,6 +166,9 @@ export interface RosterRow {
   addedByName: string | null;
   completed: number;
   patrolApproved: number;
+  patrolApprovedById: string | null;
+  patrolApprovedByName: string | null;
+  patrolApprovedAt: number | null;
   statusVersion: number;
   category: AttendeeCategory;
   // Display-only marker; category and approvedMedicSql still govern capacity.
@@ -1238,6 +1241,14 @@ export async function listRosters(
           legacyName: "adder.name",
         })} END AS addedByName,
          coalesce(v.patrol_approved, 0) AS patrolApproved, coalesce(v.updated_at, 0) AS statusVersion,
+         approver_profile.user_id AS patrolApprovedById,
+         CASE WHEN approver.id IS NOT NULL THEN ${personDisplayNameSql({
+           firstName: "approver_profile.first_name",
+           lastName: "approver_profile.last_name",
+           preferredName: "approver_profile.preferred_name",
+           legacyName: "approver.name",
+         })} END AS patrolApprovedByName,
+         v.approved_at AS patrolApprovedAt,
          EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
       FROM signup s
@@ -1245,6 +1256,8 @@ export async function listRosters(
       LEFT JOIN profile p ON p.user_id = s.user_id
        LEFT JOIN user u ON u.id = s.user_id
        LEFT JOIN volunteer_status v ON v.user_id = s.user_id
+       LEFT JOIN user approver ON approver.id = v.approved_by AND approver.deleted_at IS NULL
+       LEFT JOIN profile approver_profile ON approver_profile.user_id = approver.id
        LEFT JOIN user adder ON adder.id = s.added_by AND adder.deleted_at IS NULL
        LEFT JOIN profile adder_profile ON adder_profile.user_id = adder.id
        WHERE s.event_id IN (SELECT value FROM json_each(?)) AND s.status = 'confirmed'

@@ -813,7 +813,7 @@ describe(
         );
       });
 
-      test("orientation completion requires actual past attendance and also approves patrols", async () => {
+      test("patrol approval records optional history and rejects the removed orientation action", async () => {
         const attendee = await DB.prepare(
           "SELECT user_id AS userId FROM signup WHERE event_id=? AND status='confirmed'",
         )
@@ -829,7 +829,7 @@ describe(
             },
             organizer.cookie,
           ),
-          409,
+          400,
         );
         await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
           .bind(Date.now() - 1000, destination.id)
@@ -845,24 +845,17 @@ describe(
           await send(
             "/api/v1/organizer/action",
             {
-              action: "orientation",
+              action: "approve-patrols",
               userId: attendee!.userId,
               eventId: destination.id,
+              version: await DB.prepare(
+                "SELECT updated_at FROM volunteer_status WHERE user_id=?",
+              )
+                .bind(attendee!.userId)
+                .first<number>("updated_at"),
             },
             organizer.cookie,
           ),
-        );
-        await ok(
-          await send(
-            "/api/v1/organizer/action",
-            {
-              action: "orientation",
-              userId: attendee!.userId,
-              eventId: patrol.id,
-            },
-            organizer.cookie,
-          ),
-          409,
         );
         assert.equal(
           (
@@ -1876,12 +1869,17 @@ describe(
           );
           await attendanceCard.locator(".volunteer-roster > summary").click();
           const approvalForm = attendanceCard.locator(
-            "[data-organizer-orientation]",
+            "[data-organizer-patrol-approval]",
           );
           await expect(approvalForm).toHaveCount(1);
           await expect(approvalForm.locator('[name="userId"]')).toHaveValue(
             bob.id,
           );
+          const approvedAttendee = attendanceCard
+            .locator(".event-roster-row")
+            .filter({
+              has: page.locator(`a[href="/volunteers/${bob.id}"]`),
+            });
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
             form: approvalForm,
@@ -1894,12 +1892,26 @@ describe(
                 })
                 .click(),
             updated: () =>
-              attendanceCard
-                .getByText("Orientation completed", { exact: true })
+              approvedAttendee
+                .locator("[data-patrol-approval-status]")
                 .waitFor(),
             loadingLabel: "Saving…",
           });
           await expect(approvalForm).toHaveCount(0);
+          await expect(
+            approvedAttendee.locator("[data-patrol-approval-status]"),
+          ).toContainText("Approved by");
+          await expect(
+            approvedAttendee.locator("[data-patrol-approval-status] a"),
+          ).toHaveAttribute("href", `/volunteers/${organizer.id}`);
+          await expect(
+            approvedAttendee.locator("[data-patrol-approval-status] time"),
+          ).toHaveAttribute("datetime", /.+/);
+          await expect(
+            approvedAttendee.getByText("Orientation completed", {
+              exact: true,
+            }),
+          ).toHaveCount(0);
           await expect(
             attendanceCard.locator(".volunteer-roster"),
           ).toHaveAttribute("open", "");
