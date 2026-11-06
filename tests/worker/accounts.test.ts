@@ -742,7 +742,7 @@ describe(
       );
     });
 
-    test("account application information appears after three milestones without Discord or orientation signup and stays read-only", async () => {
+    test("approved account applications show progress and read-only answers without Discord or orientation signup", async () => {
       await DB.prepare(
         "UPDATE profile SET naloxone_completed_at=1000 WHERE user_id=?",
       )
@@ -786,13 +786,22 @@ describe(
         html,
         /<a\b[^>]*href="#submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/a>/,
       );
-      assert.match(html, /Naloxone 101 completion/);
-      assert.match(html, /Application approved/);
+      const applicationSteps = html.match(
+        /<ol\b[^>]*data-application-progress-mini[^>]*>([\s\S]*?)<\/ol>/,
+      )?.[1];
+      assert.ok(applicationSteps);
+      assert.match(applicationSteps, /Naloxone 101/);
+      assert.match(applicationSteps, /Application review/);
+      assert.match(applicationSteps, /Approved/);
+      assert.doesNotMatch(
+        applicationSteps,
+        /<form\b|<input\b|<textarea\b|<select\b/,
+      );
       assert.doesNotMatch(
         html,
         /account-discord-heading|data-discord-connection|Discord connection verified/,
       );
-      assert.match(html, /Date not recorded/);
+      assert.match(applicationSteps, /Date and time not recorded/);
       assert.doesNotMatch(html, /Orientation registered/);
       assert.doesNotMatch(
         html,
@@ -806,7 +815,7 @@ describe(
       assert.ok(snapshot);
       const submission = JSON.parse(snapshot) as SubmittedApplication;
       const timestamp = html.match(
-        /<p>\s*Submitted:\s*<time datetime="([^"]+)">\s*([^<]+?)\s*<\/time>\s*<\/p>/,
+        /<summary\b[^>]*id="account-application-form-heading"[^>]*>[\s\S]*?<time datetime="([^"]+)">\s*([^<]+?)\s*<\/time>/,
       );
       assert.ok(timestamp);
       assert.equal(timestamp[1], submission.submittedAt);
@@ -885,7 +894,7 @@ describe(
       );
       assert.equal(ownPage.status, 200);
       const ownHTML = await ownPage.text();
-      assert.match(ownHTML, /View submitted application/);
+      assert.match(ownHTML, /data-submitted-application/);
       assert.doesNotMatch(
         ownHTML,
         /Legacy motivation|Changed legacy name|Legacy private answer/,
@@ -911,9 +920,10 @@ describe(
         completedLegacyHTML,
         /The original submitted answers were not captured for this account/,
       );
+      assert.match(completedLegacyHTML, /data-application-progress-mini/);
       assert.doesNotMatch(
         completedLegacyHTML,
-        /data-submitted-application|View submitted application|data-application-tracker|data-naloxone-confirm/,
+        /View submitted application|data-application-tracker|data-naloxone-confirm/,
       );
     });
 
