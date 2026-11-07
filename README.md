@@ -13,6 +13,16 @@ keeps Vancouver event times consistent with the Workers runtime after B.C.'s
 pnpm install
 ```
 
+## Home-screen icons
+
+iOS uses `public/apple-touch-icon.png`; Android uses the regular and maskable
+icons declared in `public/site.webmanifest`. The shared site layout links both.
+
+To change the home-screen artwork, replace `public/icons/app-icon.svg` with a
+square SVG and run `pnpm icons:generate`. Commit the generated PNGs alongside
+the source. Keep the artwork centered with padding so Android's icon masks
+don't crop it. Browser favicons are managed separately.
+
 ## Local UI playground
 
 Run `pnpm dev`, then open <http://localhost:4321/dev/ui> or choose **UI playground**
