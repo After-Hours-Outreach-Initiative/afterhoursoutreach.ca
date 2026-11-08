@@ -21,6 +21,12 @@ import {
 import { databaseWriteError } from "./errors";
 import { nowMsSql } from "./sql";
 import { orientationCapacityMessage, validOrientationCapacity } from "./policy";
+import {
+  eventLimitFields,
+  eventLimitInputFields,
+  withEventLimits,
+} from "./event-limits";
+import type { EventLimits } from "../../data/event-limits";
 
 export const patrolSeriesSchema = z
   .strictObject({
@@ -37,6 +43,7 @@ export const patrolSeriesSchema = z
         .refine((value) => new URL(value).protocol === "https:"),
     ]),
     spots: z.number().int().min(1).max(100),
+    ...eventLimitFields,
     open: z.boolean(),
     hidden: z.boolean(),
     includesOrientation: z.boolean().default(false),
@@ -47,7 +54,11 @@ export const patrolSeriesSchema = z
     path: ["spots"],
   });
 
-export interface PatrolSeriesRow {
+export const patrolSeriesRequestSchema = z
+  .strictObject(patrolSeriesSchema.shape)
+  .extend(eventLimitInputFields);
+
+export interface PatrolSeriesRow extends EventLimits {
   id: string;
   firstDate: string;
   localTime: string;
@@ -69,7 +80,9 @@ export interface PatrolSeriesRow {
 const seriesColumns = `id, first_date AS firstDate, local_time AS localTime,
   interval_weeks AS intervalWeeks, end_date AS endDate, stopped_from AS stoppedFrom, time_zone AS timeZone,
   meeting_point AS meetingPoint, meeting_point_url AS meetingPointUrl,
-   spots, open, hidden, includes_orientation AS includesOrientation, generation_until AS generationUntil,
+   spots, min_medic_spots AS minMedicSpots, min_new_volunteer_spots AS minNewVolunteerSpots,
+   max_new_volunteers AS maxNewVolunteers,
+   open, hidden, includes_orientation AS includesOrientation, generation_until AS generationUntil,
   created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt`;
 
 export const patrolTemplateSchema = z
@@ -79,6 +92,9 @@ export const patrolTemplateSchema = z
     meetingPoint: true,
     meetingPointUrl: true,
     spots: true,
+    minMedicSpots: true,
+    minNewVolunteerSpots: true,
+    maxNewVolunteers: true,
     open: true,
     hidden: true,
     includesOrientation: true,
@@ -89,6 +105,9 @@ export const patrolTemplateSchema = z
     path: ["spots"],
   });
 export type PatrolTemplateInput = z.infer<typeof patrolTemplateSchema>;
+export const patrolTemplateRequestSchema = z
+  .strictObject(patrolTemplateSchema.shape)
+  .extend(eventLimitInputFields);
 export interface PatrolTemplate extends Omit<
   PatrolTemplateInput,
   "open" | "hidden" | "meetingPointUrl" | "includesOrientation"
@@ -113,7 +132,9 @@ async function readTemplates(db: Env["DB"], seriesId: string) {
       .prepare(
         `SELECT effective_date AS effectiveDate, local_time AS localTime,
     day_offset AS dayOffset, meeting_point AS meetingPoint, meeting_point_url AS meetingPointUrl,
-     spots, open, hidden, includes_orientation AS includesOrientation FROM patrol_series_template WHERE series_id = ? ORDER BY effective_date`,
+     spots, min_medic_spots AS minMedicSpots, min_new_volunteer_spots AS minNewVolunteerSpots,
+     max_new_volunteers AS maxNewVolunteers,
+     open, hidden, includes_orientation AS includesOrientation FROM patrol_series_template WHERE series_id = ? ORDER BY effective_date`,
       )
       .bind(seriesId)
       .all<PatrolTemplate>()
@@ -288,11 +309,14 @@ function insertOccurrences(
     .prepare(
       `INSERT INTO event (
       id, type, series_id, occurrence_date, starts_at, meeting_point, meeting_point_url,
-       spots, open, hidden, includes_orientation, created_by, created_at, updated_at)
+       spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers,
+       open, hidden, includes_orientation, created_by, created_at, updated_at)
     SELECT 'patrol:' || ps.id || ':' || json_extract(j.value, '$.date'), 'patrol', ps.id,
       json_extract(j.value, '$.date'), json_extract(j.value, '$.startsAt'),
        json_extract(j.value, '$.meetingPoint'), json_extract(j.value, '$.meetingPointUrl'),
-        json_extract(j.value, '$.spots'), json_extract(j.value, '$.open'), json_extract(j.value, '$.hidden'), json_extract(j.value, '$.includesOrientation'), ps.created_by, ?, ?
+        json_extract(j.value, '$.spots'), json_extract(j.value, '$.minMedicSpots'),
+        json_extract(j.value, '$.minNewVolunteerSpots'), json_extract(j.value, '$.maxNewVolunteers'),
+        json_extract(j.value, '$.open'), json_extract(j.value, '$.hidden'), json_extract(j.value, '$.includesOrientation'), ps.created_by, ?, ?
     FROM patrol_series ps, json_each(?) j
     WHERE ps.id = ? AND ps.updated_at = ?
     ON CONFLICT(series_id, occurrence_date) DO NOTHING`,
@@ -333,7 +357,7 @@ export async function ensurePatrolOccurrences(
     ).results;
     const plan = planPatrolOccurrences(series, existing, now, templates);
     // Legacy undersized defaults remain readable, but must be edited before
-    // creating occurrences under the two-place/four-with-orientation minimum.
+    // creating occurrences under their reserved-place minimum.
     if (
       plan.occurrences.some(
         (event) =>
@@ -384,7 +408,10 @@ export async function savePatrolSeries(
   notify = false,
 ) {
   requireOrganizer(actor);
-  const parsed = patrolSeriesSchema.safeParse(input);
+  const old = id ? await findPatrolSeries(db, actor, id) : null;
+  const parsed = patrolSeriesSchema.safeParse(
+    withEventLimits(input, old ?? undefined),
+  );
   if (!parsed.success)
     throw new RequestError(
       400,
@@ -396,7 +423,6 @@ export async function savePatrolSeries(
   const data = parsed.data;
   const now = Date.now();
   const operation = crypto.randomUUID();
-  const old = id ? await findPatrolSeries(db, actor, id) : null;
   if (old && old.firstDate !== data.firstDate)
     throw new RequestError(
       409,
@@ -417,6 +443,9 @@ export async function savePatrolSeries(
     data.meetingPoint,
     data.meetingPointUrl || null,
     data.spots,
+    data.minMedicSpots,
+    data.minNewVolunteerSpots,
+    data.maxNewVolunteers,
     Number(data.open),
     Number(data.hidden),
     Number(data.includesOrientation),
@@ -425,7 +454,9 @@ export async function savePatrolSeries(
     const write = old
       ? db
           .prepare(
-            `UPDATE patrol_series SET meeting_point = ?, meeting_point_url = ?, spots = ?, open = ?, hidden = ?, includes_orientation = ?,
+            `UPDATE patrol_series SET meeting_point = ?, meeting_point_url = ?, spots = ?,
+           min_medic_spots = ?, min_new_volunteer_spots = ?, max_new_volunteers = ?,
+           open = ?, hidden = ?, includes_orientation = ?,
           local_time = ?, interval_weeks = ?, end_date = ?,
           generation_until = CASE WHEN local_time IS ? AND interval_weeks IS ? AND end_date IS ? THEN generation_until ELSE 0 END, updated_at = ?
         WHERE id = ? AND updated_at = ? AND ${writePermission(true)}`,
@@ -446,8 +477,9 @@ export async function savePatrolSeries(
       : db
           .prepare(
             `INSERT INTO patrol_series (id, first_date, local_time, interval_weeks, end_date,
-          meeting_point, meeting_point_url, spots, open, hidden, includes_orientation, created_by, created_at, updated_at)
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
+          meeting_point, meeting_point_url, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers,
+          open, hidden, includes_orientation, created_by, created_at, updated_at)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
           )
           .bind(
             id,
@@ -590,8 +622,9 @@ export async function materializePatrolOccurrence(
     db
       .prepare(
         `INSERT INTO event (id, type, series_id, occurrence_date, starts_at,
-      meeting_point, meeting_point_url, spots, open, hidden, includes_orientation, created_by, created_at, updated_at)
-       SELECT ?, 'patrol', id, ?, ?, ?, ?, ?, ?, ?, ?, created_by, ?, ?
+      meeting_point, meeting_point_url, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers,
+      open, hidden, includes_orientation, created_by, created_at, updated_at)
+       SELECT ?, 'patrol', id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, created_by, ?, ?
       FROM patrol_series WHERE id = ? AND changes() = 1
       ON CONFLICT(series_id, occurrence_date) DO NOTHING`,
       )
@@ -602,6 +635,9 @@ export async function materializePatrolOccurrence(
         template.meetingPoint,
         template.meetingPointUrl,
         template.spots,
+        template.minMedicSpots,
+        template.minNewVolunteerSpots,
+        template.maxNewVolunteers,
         template.open,
         template.hidden,
         template.includesOrientation,
@@ -667,7 +703,11 @@ export async function updatePatrolSeriesFrom(
   notify = false,
 ) {
   requireOrganizer(actor);
-  const parsed = patrolTemplateSchema.safeParse(input);
+  const series = await findPatrolSeries(db, actor, id);
+  const templates = await readTemplates(db, id);
+  const parsed = patrolTemplateSchema.safeParse(
+    withEventLimits(input, patrolTemplateFor(series, templates, date)),
+  );
   if (!parsed.success)
     throw new RequestError(
       400,
@@ -677,7 +717,6 @@ export async function updatePatrolSeriesFrom(
         "Check the recurring time, date offset, capacity, meeting point and HTTPS map link.",
     );
   const data = parsed.data;
-  const series = await findPatrolSeries(db, actor, id);
   await requireScheduledDate(db, series, date);
   if (templateStart(date, data) <= Date.now())
     throw new RequestError(400, "Choose a future recurring date and time.");
@@ -702,6 +741,9 @@ export async function updatePatrolSeriesFrom(
     data.meetingPoint,
     data.meetingPointUrl || null,
     data.spots,
+    data.minMedicSpots,
+    data.minNewVolunteerSpots,
+    data.maxNewVolunteers,
     Number(data.open),
     Number(data.hidden),
     Number(data.includesOrientation),
@@ -745,8 +787,8 @@ export async function updatePatrolSeriesFrom(
       db
         .prepare(
           `INSERT INTO patrol_series_template (id,series_id,effective_date,local_time,day_offset,
-         meeting_point,meeting_point_url,spots,open,hidden,includes_orientation)
-         SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
+         meeting_point,meeting_point_url,spots,min_medic_spots,min_new_volunteer_spots,max_new_volunteers,open,hidden,includes_orientation)
+         SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
         )
         .bind(operation, id, date, ...values, operation),
       db
@@ -755,7 +797,9 @@ export async function updatePatrolSeriesFrom(
         SELECT ? || ':' || e.id,e.id,?,'series_updated',?,? FROM event e JOIN json_each(?) j ON e.id = json_extract(j.value,'$.id')
         WHERE e.cancelled_at IS NULL AND e.starts_at > ${nowMsSql}
           AND NOT EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'updated')
-           AND (e.starts_at != json_extract(j.value,'$.startsAt') OR e.meeting_point != ? OR e.meeting_point_url IS NOT ? OR e.spots != ? OR e.open != ? OR e.hidden != ? OR coalesce(e.includes_orientation, e.type = 'orientation') != ?)
+           AND (e.starts_at != json_extract(j.value,'$.startsAt') OR e.meeting_point != ? OR e.meeting_point_url IS NOT ? OR e.spots != ?
+             OR e.min_medic_spots != ? OR e.min_new_volunteer_spots != ? OR e.max_new_volunteers != ?
+             OR e.open != ? OR e.hidden != ? OR coalesce(e.includes_orientation, e.type = 'orientation') != ?)
           AND EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
         )
         .bind(
@@ -770,7 +814,8 @@ export async function updatePatrolSeriesFrom(
       db
         .prepare(
           `UPDATE event SET starts_at = (SELECT json_extract(j.value,'$.startsAt') FROM json_each(?) j WHERE json_extract(j.value,'$.id') = event.id),
-         meeting_point = ?, meeting_point_url = ?, spots = ?, open = ?, hidden = ?, includes_orientation = ?, updated_at = max(updated_at + 1, ?)
+         meeting_point = ?, meeting_point_url = ?, spots = ?, min_medic_spots = ?, min_new_volunteer_spots = ?, max_new_volunteers = ?,
+         open = ?, hidden = ?, includes_orientation = ?, updated_at = max(updated_at + 1, ?)
         WHERE EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || event.id)`,
         )
         .bind(JSON.stringify(updates), ...values.slice(2), now, operation),

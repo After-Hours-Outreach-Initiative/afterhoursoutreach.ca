@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { createTestHarness } from "wrangler";
+import sharp from "sharp";
 import {
   previewEventFixtures,
   previewEventId,
@@ -29,11 +30,27 @@ test("preview builds support real account features but reject development endpoi
     ]) {
       const home = await worker.fetch(origin);
       assert.equal(home.status, 200);
-      assert.match(
-        await home.text(),
-        /<aside\b[^>]*aria-label="Preview environment"/,
-      );
+      const homeHtml = await home.text();
+      assert.match(homeHtml, /<aside\b[^>]*aria-label="Preview environment"/);
       assert.equal(home.headers.get("cache-control"), "no-store");
+      const image = homeHtml.match(
+        /<section\b[^>]*id="upcoming-events"[\s\S]*?<img\b[^>]*src="([^"]+)"/,
+      );
+      assert.ok(image);
+      const photo = await worker.fetch(
+        new URL(image[1].replaceAll("&amp;", "&"), origin),
+      );
+      assert.equal(photo.status, 200);
+      assert.equal(photo.headers.get("content-type"), "image/webp");
+      assert.equal(
+        photo.headers.get("cache-control"),
+        "public, max-age=31536000, immutable",
+      );
+      const metadata = await sharp(
+        Buffer.from(await photo.arrayBuffer()),
+      ).metadata();
+      assert.equal(metadata.width, 960);
+      assert.equal(metadata.height, 720);
       const page = await worker.fetch(`${origin}/volunteer`);
       assert.equal(page.status, 200);
       assert.match(

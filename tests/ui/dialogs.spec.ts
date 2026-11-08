@@ -13,6 +13,19 @@ async function expectPinnedChrome(dialog: Locator) {
   });
   const header = dialog.locator(".dialog-header");
   const footer = dialog.locator(".dialog-footer");
+  if (await footer.isVisible()) {
+    await expect(footer).toHaveCSS("justify-content", "flex-end");
+    expect(
+      await footer.evaluate((element) => {
+        const last = element.querySelector<HTMLElement>(".btn:last-child")!;
+        return Math.abs(
+          element.getBoundingClientRect().right -
+            parseFloat(getComputedStyle(element).paddingRight) -
+            last.getBoundingClientRect().right,
+        );
+      }),
+    ).toBeLessThan(1);
+  }
   const before = {
     header: await header.boundingBox(),
     footer: (await footer.count()) ? await footer.boundingBox() : null,
@@ -74,7 +87,6 @@ test("event dialogs offer only cancellation for future events and keep ended his
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -112,14 +124,33 @@ test("event dialogs offer only cancellation for future events and keep ended his
       startsAt: new Date(Date.now() + 86_400_000).toISOString(),
     },
   });
-  await page.goto("/manage/events");
+  await page.goto("/events");
   const standaloneId = await page
-    .locator("[data-event-list] > [data-live-event]")
+    .locator("[data-event-list] > [data-live-event]:not([data-event-series])")
     .filter({ hasText: fields.meetingPoint })
     .getAttribute("data-live-event");
   const occurrenceId = `patrol:${series.id}:${firstDate}`;
   for (const id of [standaloneId, occurrenceId]) {
     const form = page.locator(`[data-live-event="${id}"] [data-event-cancel]`);
+    if (id === standaloneId) {
+      const card = page.locator(`[data-live-event="${id}"]`);
+      await card.getByRole("button", { name: "Edit", exact: true }).click();
+      const dialog = card.getByRole("dialog", {
+        name: "Edit event",
+        exact: true,
+      });
+      await dialog
+        .getByRole("button", { name: "Cancel event", exact: true })
+        .click();
+      await expect(card).toBeVisible();
+      await expect(form).toBeFocused();
+      await expect(form.locator("[data-event-cancel-reason]")).toBeHidden();
+      await form
+        .getByRole("button", { name: "Confirm cancellation", exact: true })
+        .click();
+      await expect(card).toHaveCount(0);
+      continue;
+    }
     await action({
       action: "cancel-event",
       id,
@@ -131,6 +162,7 @@ test("event dialogs offer only cancellation for future events and keep ended his
     await expect(page.locator(`[data-live-event="${id}"]`)).toHaveCount(0);
   }
   const group = page.locator(`[data-series-card="${series.id}"]`);
+  await page.locator("[data-series-management] > summary").click();
   const seriesButton = group.getByRole("button", {
     name: "Edit series",
     exact: true,
@@ -142,7 +174,20 @@ test("event dialogs offer only cancellation for future events and keep ended his
     exact: true,
   });
   await expect(settings.locator("details")).toHaveCount(0);
+  await expect(settings.locator(".dialog-footer button")).toHaveText([
+    "Delete series",
+    "Save series defaults",
+  ]);
+  const seriesTime = settings.getByLabel("Start time");
+  await expect(seriesTime).toHaveAttribute("type", "time");
+  await expect(seriesTime).toHaveValue("21:00");
+  await expect(seriesTime).toHaveAttribute("required", "");
+  await expect(settings.locator("[data-native-date]").first()).toHaveAttribute(
+    "readonly",
+    "",
+  );
   await expectPinnedChrome(settings);
+  await seriesTime.fill("19:15");
   await settings
     .getByLabel("Meeting point", { exact: true })
     .fill("Saved series meeting point");
@@ -152,6 +197,8 @@ test("event dialogs offer only cancellation for future events and keep ended his
   await expect(
     settings.getByLabel("Meeting point", { exact: true }),
   ).toHaveValue("Saved series meeting point");
+  await expect(seriesTime).toHaveValue("19:15");
+  const seriesRequest = page.waitForRequest("**/api/v1/events/action");
   await settings
     .getByRole("button", { name: "Save series defaults", exact: true })
     .click();
@@ -160,7 +207,11 @@ test("event dialogs offer only cancellation for future events and keep ended his
     .click();
   await expect(settings).toBeHidden();
   await expect(seriesButton).toBeFocused();
-  await group.locator("[data-series-occurrences] > summary").click();
+  expect((await seriesRequest).postDataJSON()).toMatchObject({
+    action: "save-series",
+    id: series.id,
+    series: { firstDate, localTime: "19:15" },
+  });
 
   const activeOccurrenceId = `patrol:${series.id}:${addCalendarDays(firstDate, 7)}`;
   for (const [id, editable, recurring] of [
@@ -210,14 +261,49 @@ test("event dialogs offer only cancellation for future events and keep ended his
       ).toHaveValue("occurrence");
     }
     await expect(dialog.getByRole("button", { name: /Delete/ })).toHaveCount(0);
+    const cancel = dialog.locator("[data-event-cancel-open]");
+    const cancelForm = dialog.locator("[data-event-cancel]");
+    await expect(cancel).toHaveCount(1);
     await expect(
-      dialog.getByRole("button", { name: "Cancel event", exact: true }),
-    ).toHaveCount(editable ? 1 : 0);
-    if (editable) {
-      await expect(dialog.locator("[data-event-cancel-policy]")).toContainText(
-        "If anyone has ever registered",
+      dialog.locator(".dialog-footer [data-event-cancel-open]"),
+    ).toHaveCount(0);
+    await expect(
+      dialog.locator(".dialog-body [data-event-cancel-open]"),
+    ).toHaveCount(1);
+    await expect(dialog.getByText(/If anyone has ever registered/)).toHaveCount(
+      0,
+    );
+    await expect(cancelForm).toHaveAttribute("inert", "");
+    await expect(cancelForm).toHaveAttribute("aria-hidden", "true");
+    await cancel.focus();
+    await cancel.press("Enter");
+    await expect(cancel).toHaveAttribute("aria-expanded", "true");
+    await expect(cancelForm).toHaveAttribute("aria-hidden", "false");
+    await expect(cancelForm).toBeFocused();
+    await expect(
+      cancelForm.getByRole("heading", { name: "Cancel event?", exact: true }),
+    ).toBeVisible();
+    if (recurring) {
+      await expect(cancelForm.locator("[data-event-cancel-policy]")).toHaveText(
+        "The rest of the series will continue.",
       );
+      await cancelForm.locator('[name="scope"]').selectOption("future");
+      await expect(
+        cancelForm.locator("[data-event-cancel-policy]"),
+      ).toBeHidden();
+      await expect(
+        cancelForm.locator("[data-event-cancel-reason]"),
+      ).toBeHidden();
     }
+    await cancelForm.getByRole("button", { name: "Keep event" }).click();
+    await expect(cancel).toBeFocused();
+    await expect(cancel).toHaveAttribute("aria-expanded", "false");
+    await cancel.press("Space");
+    await expect(cancelForm).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeVisible();
+    await expect(cancel).toBeFocused();
+    await expect(cancelForm).toHaveAttribute("inert", "");
     await page.keyboard.press("Escape");
     await expect(edit).toBeFocused();
   }
@@ -231,6 +317,15 @@ test("event dialogs offer only cancellation for future events and keep ended his
   await settings
     .getByRole("button", { name: "Delete series", exact: true })
     .click();
+  const deletion = page.getByRole("dialog", {
+    name: "Delete series?",
+    exact: true,
+  });
+  await expect(deletion.locator(".dialog-footer button")).toHaveText([
+    "Keep",
+    "Delete",
+  ]);
+  await expectPinnedChrome(deletion);
   await page
     .getByRole("dialog", { name: "Delete series?", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
@@ -241,7 +336,120 @@ test("event dialogs offer only cancellation for future events and keep ended his
   await expect(group).toHaveCount(0);
 });
 
-test("event and profile dialogs preserve their layout and content throughout the exit transition", async ({
+test("event cancellation morphs in place and preserves its draft after notification dismissal and failure", async ({
+  page,
+}) => {
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+  await page.route("**/api/v1/events/action", (route) =>
+    route.fulfill({ status: 503, json: { message: "Please try again." } }),
+  );
+
+  for (const width of [1280, 320]) {
+    await page.emulateMedia({
+      reducedMotion: width === 320 ? "reduce" : "no-preference",
+    });
+    await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
+    await page.goto("/events");
+    const card = page.locator(
+      '[data-live-event="local-fixture-event-orientation"]',
+    );
+    await card.getByRole("button", { name: "Edit", exact: true }).click();
+    const dialog = card.getByRole("dialog", {
+      name: "Edit event",
+      exact: true,
+    });
+    const footer = dialog.locator(".dialog-footer");
+    await expect(footer.getByRole("button")).toHaveText(["Cancel", "Save"]);
+    await expect(footer.getByRole("button", { name: "Cancel" })).toHaveClass(
+      "btn btn-quiet",
+    );
+    await expect(
+      footer.getByRole("button", { name: "Cancel" }),
+    ).toHaveAttribute("type", "button");
+    await footer.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    await card.getByRole("button", { name: "Edit", exact: true }).click();
+    const form = dialog.locator("[data-event-cancel]");
+    const morph = dialog.locator("event-cancellation");
+    await dialog
+      .getByRole("button", { name: "Cancel event", exact: true })
+      .click();
+    await form.getByLabel("Reason (optional)").fill("Unsafe conditions");
+    await morph.locator(".cancellation-surface").evaluate(async (surface) => {
+      await Promise.allSettled(
+        surface.getAnimations().map((animation) => animation.finished),
+      );
+    });
+    await expectPinnedChrome(dialog);
+    expect(
+      await dialog.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      ),
+    ).toBe(false);
+    const confirm = form.getByRole("button", {
+      name: "Confirm cancellation",
+      exact: true,
+    });
+    await expect(form.locator(".cancellation-actions button")).toHaveText([
+      "Keep event",
+      "Confirm cancellation",
+    ]);
+    await expect(form.locator(".cancellation-actions")).toHaveCSS(
+      "justify-content",
+      "flex-end",
+    );
+    await confirm.click();
+    const notification = page.getByRole("dialog", {
+      name: "Send an email?",
+      exact: true,
+    });
+    await expect(notification).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(notification).toBeHidden();
+    await expect(confirm).toBeEnabled();
+    await expect(form.getByLabel("Reason (optional)")).toHaveValue(
+      "Unsafe conditions",
+    );
+
+    await inPlaceAction(page, {
+      endpoint: "/api/v1/events/action",
+      form,
+      trigger: () => confirm.click(),
+      updated: () =>
+        expect(form.locator("[data-form-message]")).toHaveText(
+          "Please try again.",
+        ),
+      loadingLabel: "Cancelling…",
+      pending: async () => {
+        await expect(
+          form.getByRole("button", { name: "Keep event" }),
+        ).toBeDisabled();
+        await expect(
+          dialog.getByRole("button", { name: "Save", exact: true }),
+        ).toBeDisabled();
+        await expect(morph).toHaveAttribute("data-expanded", "");
+      },
+    });
+    await expect(confirm).toBeEnabled();
+    await expect(form.getByLabel("Reason (optional)")).toHaveValue(
+      "Unsafe conditions",
+    );
+    await form.getByRole("button", { name: "Keep event" }).click();
+    await expect(
+      dialog.getByRole("button", { name: "Cancel event", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+  }
+});
+
+test("event dialogs preserve their exit layout and roster profiles navigate to pages", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -255,9 +463,25 @@ test("event and profile dialogs preserve their layout and content throughout the
 
   for (const width of [1280, 320]) {
     await page.setViewportSize({ width, height: width === 320 ? 568 : 900 });
-    await page.goto("/manage/events");
+    await page.goto("/events");
     await page.getByRole("button", { name: "Create", exact: true }).click();
-    await expectStableExit(page.locator("#event-editor-new"));
+    const create = page.locator("#event-editor-new");
+    const footer = create.locator(".dialog-footer");
+    await expect(footer.getByRole("button")).toHaveText(["Cancel", "Create"]);
+    const cancel = footer.getByRole("button", { name: "Cancel", exact: true });
+    await expect(cancel).toHaveClass("btn btn-quiet");
+    await expect(cancel).toHaveAttribute("type", "button");
+    await expect(
+      footer.getByRole("button", { name: "Create" }),
+    ).toHaveAttribute("form", "event-editor-new-save");
+    await expect(
+      footer.getByRole("button", { name: "Create" }),
+    ).toHaveAttribute("type", "submit");
+    await expectPinnedChrome(create);
+    await cancel.click();
+    await expect(create).toBeHidden();
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await expectStableExit(create);
     await page
       .locator('[data-live-event="local-fixture-event-orientation"]')
       .getByRole("button", { name: "Edit", exact: true })
@@ -268,10 +492,16 @@ test("event and profile dialogs preserve their layout and content throughout the
       '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',
     );
     await roster.locator("summary").click();
-    await roster.locator("[data-volunteer-profile-link]").first().click();
-    const profile = page.locator("[data-volunteer-profile-dialog]");
-    await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
-    await expect(profile.locator(".volunteer-profile-loading")).toHaveCount(0);
+    const link = roster.locator("[data-volunteer-profile-link]").first();
+    const profileUrl = new URL((await link.getAttribute("href"))!, page.url())
+      .href;
+    await link.click();
+    await expect(page).toHaveURL(profileUrl);
+    await expect(
+      page.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+    ).toHaveCount(0);
+    const profile = page.locator("[data-volunteer-profile]");
+    await expect(profile).toBeVisible();
     const profilePanel = profile.getByRole("region", {
       name: "Profile",
       exact: true,
@@ -293,21 +523,17 @@ test("event and profile dialogs preserve their layout and content throughout the
       exact: true,
     });
     await expect(applicationPanel).toBeVisible();
-    await applicationPanel
-      .getByText("View submitted application", { exact: true })
-      .click();
+    await expect(applicationPanel.locator("details")).toHaveCount(0);
     await expect(applicationPanel.getByRole("heading")).toHaveText([
       "Application",
-      "Submission details",
-      "Personal info",
-      "Emergency contact",
-      "Team interests",
-      "Training and safety",
-      "Personal statement",
     ]);
+    await expect(
+      applicationPanel.getByRole("link", {
+        name: "View application",
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(controls).toBeVisible();
-    await expectStableExit(profile);
-    await expect(profile.locator("[data-profile-dialog-content]")).toBeEmpty();
   }
 });
 
@@ -322,7 +548,7 @@ test("application dialogs keep their chrome visible while only their body scroll
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
   await expect(page.locator("[data-event-list]")).toBeVisible();
-  await page.goto("/manage/events");
+  await page.goto("/events");
   await page.route("**/api/v1/events/action", (route) =>
     route.fulfill({ status: 503, json: { message: "Please try again." } }),
   );
@@ -353,7 +579,7 @@ test("application dialogs keep their chrome visible while only their body scroll
       ).toBeGreaterThan(0);
     expect(
       await create
-        .getByRole("button", { name: "Create event" })
+        .getByRole("button", { name: "Create", exact: true })
         .evaluate((element: HTMLButtonElement) =>
           element.form?.hasAttribute("data-event-save"),
         ),
@@ -367,7 +593,7 @@ test("application dialogs keep their chrome visible while only their body scroll
         endpoint: "/api/v1/events/action",
         form: create.locator("[data-event-save]"),
         trigger: () =>
-          create.getByRole("button", { name: "Create event" }).click(),
+          create.getByRole("button", { name: "Create", exact: true }).click(),
         updated: () =>
           expect(create.locator("[data-form-message]")).toHaveText(
             "Please try again.",
@@ -385,7 +611,7 @@ test("application dialogs keep their chrome visible while only their body scroll
         },
       });
       await expect(
-        create.getByRole("button", { name: "Create event" }),
+        create.getByRole("button", { name: "Create", exact: true }),
       ).toBeEnabled();
       await expect(create.locator("[data-form-message]")).toBeInViewport();
       for (const name of [
@@ -410,22 +636,21 @@ test("application dialogs keep their chrome visible while only their body scroll
     await card.locator("[data-signup-menu-trigger]").first().click();
     await card.getByRole("menuitem", { name: "Remove volunteer" }).click();
     const registration = page.getByRole("dialog", {
-      name: "Change a registration",
+      name: "Remove volunteer",
     });
     await expectPinnedChrome(registration);
     await registration.locator(".dialog-close").click();
   }
 
-  await page
+  const link = page
     .locator(".volunteer-roster[open] [data-volunteer-profile-link]")
-    .first()
-    .click();
-  const profile = page.getByRole("dialog", {
-    name: "Volunteer profile",
-    exact: true,
-  });
-  await expect(profile.locator("[data-volunteer-profile]")).toBeVisible();
-  await expectPinnedChrome(profile);
-  await expect(profile.locator(".dialog-footer")).toHaveCount(0);
-  await profile.locator(".dialog-close").click();
+    .first();
+  const profileUrl = new URL((await link.getAttribute("href"))!, page.url())
+    .href;
+  await link.click();
+  await expect(page).toHaveURL(profileUrl);
+  await expect(page.locator("[data-volunteer-profile]")).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+  ).toHaveCount(0);
 });

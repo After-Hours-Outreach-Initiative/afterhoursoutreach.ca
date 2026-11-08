@@ -1,0 +1,334 @@
+---
+import type { EventRow } from "@/server/db/events";
+import { manualAttendeeCategory } from "@/data/event-roster";
+import PlusIcon from "@/components/icons/PlusIcon.astro";
+import SearchIcon from "@/components/icons/SearchIcon.astro";
+import TrashIcon from "@/components/icons/TrashIcon.astro";
+import WarningIcon from "@/components/icons/WarningIcon.astro";
+import RosterPerson from "./RosterPerson.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
+
+interface Props {
+  event: EventRow;
+}
+const { event } = Astro.props;
+const id = `add-attendee-${event.id}`;
+const roles = [
+  { medic: false, newVolunteer: false },
+  { medic: true, newVolunteer: false },
+  { medic: false, newVolunteer: true },
+  { medic: true, newVolunteer: true },
+];
+---
+
+<add-attendee>
+  <div class="attendee-surface">
+    <button
+      class="btn btn-outline attendee-trigger"
+      type="button"
+      aria-expanded="false"
+      aria-controls={`${id}-form`}
+      data-attendee-open
+    >
+      <PlusIcon class="btn-icon" />
+      Add volunteers
+    </button>
+    <form
+      id={`${id}-form`}
+      class="volunteer-form attendee-form"
+      data-add-attendee
+      action="/api/v1/events/action"
+      method="post"
+      aria-labelledby={`${id}-heading`}
+      aria-hidden="true"
+      tabindex="-1"
+      inert
+    >
+      <h4 id={`${id}-heading`} class="text-lg">Add volunteers</h4>
+      <input type="hidden" name="id" value={event.id} />
+      <div class="volunteer-field">
+        <label
+          class="volunteer-search-field attendee-search"
+          for={`${id}-search`}
+        >
+          <span class="sr-only">Search volunteers</span>
+          <SearchIcon class="volunteer-search-icon" />
+          <input
+            id={`${id}-search`}
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls={`${id}-suggestions`}
+            aria-describedby={`${id}-search-help`}
+            maxlength="100"
+            autocomplete="off"
+            placeholder="Search by name"
+            data-attendee-search
+          />
+        </label>
+        <span id={`${id}-search-help`} class="sr-only"
+          >Use arrow keys or Tab to choose a result, Enter to add it to the
+          list, and Escape to close suggestions.</span
+        >
+        <ul
+          id={`${id}-suggestions`}
+          class="event-roster-list attendee-suggestions"
+          role="listbox"
+          aria-label="Matching volunteers"
+          data-attendee-suggestions
+          hidden
+        >
+        </ul>
+        <div class="attendee-message">
+          <WarningIcon
+            class="attendee-error-icon mt-0.5 size-5 shrink-0 text-red-400"
+          />
+          <p class="volunteer-help" role="status" data-search-message hidden>
+          </p>
+        </div>
+      </div>
+      <ul
+        class="event-roster-list attendee-staged"
+        role="list"
+        aria-label="Volunteers to add"
+        data-attendee-staged
+        hidden
+      >
+      </ul>
+      <button
+        class="btn btn-outline attendee-manual"
+        type="button"
+        data-attendee-manual
+      >
+        <PlusIcon class="btn-icon" /> Add volunteer manually
+      </button>
+      <span class="sr-only" role="status" data-staged-message></span>
+      {
+        roles.map(({ medic, newVolunteer }) => (
+          <template
+            data-attendee-person-template={`${manualAttendeeCategory(medic, newVolunteer)}-${medic}`}
+          >
+            <RosterPerson
+              name="Name"
+              category={manualAttendeeCategory(medic, newVolunteer)}
+              medicMark={medic}
+              gradientId={`${id}-gradient-${medic}`}
+            />
+          </template>
+        ))
+      }
+      <template data-attendee-badges>
+        <VolunteerRoleBadge role="organizer" />
+        <VolunteerRoleBadge role="medic" />
+      </template>
+      <template data-attendee-row-template>
+        <li class="event-roster-row" data-staged-row>
+          <input type="hidden" name="volunteers" />
+          <div class="event-roster-details">
+            <div data-staged-person></div>
+            <div class="attendee-manual-fields" data-manual-fields hidden>
+              <label class="sr-only" data-manual-name-label>Name</label>
+              <input
+                type="text"
+                maxlength="200"
+                autocomplete="off"
+                placeholder="Name"
+                data-manual-name
+              />
+              <div class="attendee-manual-roles" role="group" aria-label="Role">
+                <label>
+                  <VolunteerRoleBadge role="medic">
+                    <input type="checkbox" name="medic" />
+                  </VolunteerRoleBadge>
+                </label>
+                <label>
+                  <VolunteerRoleBadge role="new-volunteer">
+                    <input type="checkbox" name="newVolunteer" />
+                  </VolunteerRoleBadge>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="event-roster-actions">
+            <button
+              class="btn btn-quiet signup-menu-trigger"
+              type="button"
+              aria-label="Remove from list"
+              data-attendee-remove><TrashIcon class="size-5" /></button
+            >
+          </div>
+        </li>
+      </template>
+      <div class="attendee-message">
+        <WarningIcon
+          class="attendee-error-icon mt-0.5 size-5 shrink-0 text-red-400"
+        />
+        <p data-form-message role="status" hidden></p>
+      </div>
+      <div class="attendee-actions">
+        <button class="btn btn-quiet" type="button" data-attendee-cancel
+          >Cancel</button
+        >
+        <button class="btn btn-green" type="submit" data-loading-label="Adding…"
+          >Add</button
+        >
+      </div>
+    </form>
+  </div>
+</add-attendee>
+
+<script>
+  import "@/scripts/add-attendee";
+</script>
+
+<style>
+  add-attendee {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .attendee-surface {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    overflow: clip;
+    border: 2px solid var(--color-blue);
+    border-radius: 0.5rem;
+    background: #000;
+  }
+  .attendee-trigger.btn {
+    width: 100%;
+    min-height: 2.5rem;
+    padding-inline: calc(1.25rem - 2px);
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+  }
+  add-attendee:not([data-expanded])
+    .attendee-surface:has(.attendee-trigger:hover:not(:disabled)) {
+    background: var(--color-blue);
+  }
+  .attendee-trigger,
+  .attendee-form {
+    transition:
+      opacity 160ms ease,
+      visibility 0s linear 160ms;
+  }
+  .attendee-form {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 1rem;
+    visibility: hidden;
+    opacity: 0;
+    outline: none;
+  }
+  [data-expanded] .attendee-surface {
+    width: 100%;
+  }
+  [data-expanded] .attendee-trigger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    opacity: 0;
+  }
+  [data-expanded] .attendee-form {
+    position: relative;
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  add-attendee:not([data-expanded]) .attendee-trigger {
+    transition-delay: 0s;
+  }
+  .attendee-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+  .attendee-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  .attendee-message:has(> [hidden]) {
+    display: none;
+  }
+  .attendee-message:not(:has(> [role="alert"])) :global(.attendee-error-icon) {
+    display: none;
+  }
+  .attendee-message > p {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .attendee-form .attendee-search input {
+    padding-left: 2.75rem;
+  }
+  .attendee-surface:has(.attendee-trigger:focus-visible) {
+    outline: 2px solid white;
+    outline-offset: 3px;
+  }
+  .attendee-form :global(.attendee-staged),
+  .attendee-form :global(.attendee-suggestions) {
+    border: 1px solid #3f3f46;
+    border-radius: 0.5rem;
+  }
+  .attendee-suggestions {
+    max-height: 18rem;
+    overflow-y: auto;
+  }
+  .attendee-suggestions :global([role="option"]) {
+    cursor: pointer;
+  }
+  .attendee-suggestions :global([aria-selected="true"]) {
+    background: #213653;
+    box-shadow: inset 3px 0 var(--color-blue);
+  }
+  .attendee-manual.btn {
+    justify-self: start;
+    text-align: left;
+    white-space: normal;
+  }
+  .attendee-form :global(.attendee-manual-fields) {
+    display: grid;
+    flex: 1 1 100%;
+    min-width: 0;
+    gap: 0.5rem;
+  }
+  .attendee-form :global(.attendee-manual-fields input[type="text"]) {
+    width: 100%;
+    min-width: 0;
+  }
+  .attendee-form :global(.attendee-manual-roles) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .attendee-form :global(.attendee-manual-roles .volunteer-role-badge) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+  }
+  @media (min-width: 64rem) {
+    @container event-card (min-width: 32rem) {
+      add-attendee:not([data-expanded]) .attendee-surface {
+        width: fit-content;
+      }
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .attendee-trigger,
+    .attendee-form {
+      transition: none;
+    }
+  }
+</style>

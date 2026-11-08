@@ -1,6 +1,7 @@
 import { authClient, showSecondFactor } from "./auth-client";
 import { signOut } from "./sign-out";
 import { initEmailSignIn } from "./email-sign-in";
+import { rememberSuccessfulSignIn } from "./sign-in-history";
 import { loadActionPage } from "./action-page";
 import {
   applicationDisplayName,
@@ -33,12 +34,6 @@ import {
   initRelevantTraining,
   showFormMessage as message,
 } from "./account-forms";
-
-if (import.meta.env.DEV) {
-  void import("../dev/scripts/account-switcher").then(
-    ({ initAccountSwitcher }) => initAccountSwitcher(),
-  );
-}
 
 const applicationDrafts = new WeakMap<
   HTMLFormElement,
@@ -121,7 +116,7 @@ function form(
         : (changes?.submitButton() ??
           element.querySelector<HTMLButtonElement>('button[type="submit"]'));
     if (
-      button?.disabled ||
+      button?.matches(":disabled") ||
       button?.closest("[hidden]") ||
       element.closest("[hidden]")
     )
@@ -169,7 +164,12 @@ function finish(result: object) {
   // The client plugin has already displayed the challenge. Do not navigate away.
   if ("twoFactorRedirect" in result && result.twoFactorRedirect === true)
     return;
-  location.assign(signInDestination);
+  rememberSuccessfulSignIn(result);
+  location.assign(
+    "next" in result && result.next === "/events"
+      ? result.next
+      : signInDestination,
+  );
 }
 
 const pendingFactor = new URLSearchParams(location.search).has("second-factor");
@@ -293,9 +293,10 @@ form("[data-account-profile]", async (element, values) => {
 });
 
 form("[data-naloxone-confirm]", async (element, values) => {
+  const controls = element.querySelector<HTMLFieldSetElement>("fieldset")!;
   const checkbox =
     element.querySelector<HTMLInputElement>('[name="completed"]')!;
-  checkbox.disabled = true;
+  controls.disabled = true;
   let saved = false;
   try {
     const result = await post("/api/v1/account/naloxone", {
@@ -304,8 +305,6 @@ form("[data-naloxone-confirm]", async (element, values) => {
     });
     saved = true;
     checkbox.checked = true;
-    element.querySelector<HTMLButtonElement>('button[type="submit"]')!.hidden =
-      true;
     message(element, result.message!, "success");
     const page = await loadActionPage();
     // The portal owns both progress and event-access transitions. Standalone
@@ -316,7 +315,9 @@ form("[data-naloxone-confirm]", async (element, values) => {
       );
     else syncApplicationProgress(page);
   } finally {
-    checkbox.disabled = saved;
+    // Keep saved controls disabled even when refresh fails and the shared form
+    // cleanup clears the submit button's own temporary disabled attribute.
+    controls.disabled = saved;
   }
 });
 

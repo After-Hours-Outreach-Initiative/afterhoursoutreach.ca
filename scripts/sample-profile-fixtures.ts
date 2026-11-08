@@ -168,7 +168,7 @@ export function sampleProfileFixtures(
           : `${key}.local@example.org`,
       answers: {
         ...answers,
-        preferredName: name,
+        preferredName: answers.firstName,
         phone: phone(0),
         emergencyPhone: phone(1),
       } satisfies ApplicationAnswers,

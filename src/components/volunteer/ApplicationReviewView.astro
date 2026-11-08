@@ -1,0 +1,187 @@
+---
+import type {
+  viewVolunteerProfile,
+  VolunteerRow,
+} from "@/server/db/volunteers";
+import {
+  isApplicationReadyForReview,
+  type ApplicationProgress,
+} from "@/server/db/application-progress";
+import { personFullName } from "@/data/person-name";
+import { submittedApplicationSections } from "@/data/application";
+import OrganizerApplicationSteps from "./OrganizerApplicationSteps.astro";
+import VolunteerAccessAction from "./VolunteerAccessAction.astro";
+import ApplicationRejection from "./ApplicationRejection.astro";
+import PageContents from "./PageContents.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+
+interface Props {
+  profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
+  person: VolunteerRow;
+  progress: ApplicationProgress;
+}
+const { profile, person, progress } = Astro.props;
+const ready = isApplicationReadyForReview(progress);
+const contents = [
+  { id: "application-review-overview", heading: "Overview" },
+  { id: "application-review-form-heading", heading: "Application form" },
+  ...submittedApplicationSections.map((section) => ({
+    id: `application-review-${section.key}`,
+    heading: section.heading,
+    nested: true,
+  })),
+  { id: "application-review-naloxone-heading", heading: "Naloxone 101" },
+];
+---
+
+<article class="application-review" data-application-review>
+  <h1
+    id="application-review-overview"
+    data-application-review-heading
+    tabindex="-1"
+  >
+    {personFullName((profile.submission ?? profile).answers, person.name)}
+  </h1>
+  <PageContents entries={contents} heading="Sections" idleHeading="Sections" />
+  <section
+    class="application-review-body"
+    aria-labelledby="application-review-progress-heading"
+  >
+    <h2 id="application-review-progress-heading">Application Steps</h2>
+    <OrganizerApplicationSteps
+      {profile}
+      {progress}
+      idPrefix="application-review"
+      showReview={Boolean(person.applicationApproved)}
+    >
+      {
+        Boolean(person.applicationApproved) && (
+          <div
+            slot="review"
+            class="application-decision-actions"
+            data-volunteer-controls
+          >
+            <div class="organizer-application-review-actions">
+              <VolunteerAccessAction {person} kind="application" />
+            </div>
+          </div>
+        )
+      }
+    </OrganizerApplicationSteps>
+    {
+      Boolean(person.applicationApproved) && (
+        <a
+          class="btn btn-outline mt-6"
+          href={`/volunteers/${encodeURIComponent(person.id)}`}
+        >
+          View volunteer profile
+          <ArrowRightIcon class="btn-icon" />
+        </a>
+      )
+    }
+    {
+      person.applicationRejectionReason && (
+        <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
+          Reason: {person.applicationRejectionReason}
+        </p>
+      )
+    }
+    {
+      !person.applicationApproved && (
+        <div
+          class="review-actions application-decision-actions mt-6"
+          data-volunteer-controls={ready ? "" : undefined}
+        >
+          <VolunteerAccessAction {person} kind="application" />
+          {!person.applicationRejectionReason &&
+            (ready ? (
+              <ApplicationRejection {person} />
+            ) : (
+              <button class="btn btn-red" type="button" disabled>
+                Reject application
+              </button>
+            ))}
+        </div>
+      )
+    }
+  </section>
+</article>
+
+<style>
+  .application-review h1 {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    margin-bottom: 2rem;
+    font-size: var(--text-3xl);
+    overflow-wrap: anywhere;
+  }
+  .application-review {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto var(--contents-bar-height, 4.875rem) auto;
+    margin-top: 2rem;
+  }
+  .application-review > :global(.volunteer-contents) {
+    grid-column: 1;
+    grid-row: 2 / -1;
+    top: var(--contents-sticky-offset, var(--site-header-height));
+  }
+  .application-review :global(.volunteer-contents-dropdown) {
+    max-height: max(
+      0rem,
+      calc(
+        var(--contents-viewport-height, 100dvh) -
+          var(--contents-sticky-offset, var(--site-header-height)) -
+          var(--contents-bar-height, 4.875rem)
+      )
+    );
+  }
+  .application-review-body {
+    grid-column: 1;
+    grid-row: 3;
+    min-width: 0;
+  }
+  .application-review :global([id]) {
+    scroll-margin-top: calc(
+      var(
+          --contents-scroll-offset,
+          calc(var(--site-header-height) + 4.875rem)
+        ) +
+        1rem
+    );
+  }
+  .application-review h2 {
+    font-size: var(--text-xl);
+  }
+  @media (min-width: 64rem) {
+    .application-review {
+      grid-template-columns: minmax(0, 1fr) 13rem;
+      grid-template-rows: auto auto;
+      column-gap: 2rem;
+    }
+    .application-review > :global(.volunteer-contents) {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      top: calc(
+        var(--contents-sticky-offset, var(--site-header-height)) + 1.5rem
+      );
+    }
+    .application-review-body {
+      grid-row: 2;
+    }
+  }
+  .review-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: 1rem;
+  }
+  .review-actions :global(.btn:disabled) {
+    background: #27272a;
+    border-color: #3f3f46;
+    color: #a1a1aa;
+    cursor: not-allowed;
+    opacity: 1;
+  }
+</style>

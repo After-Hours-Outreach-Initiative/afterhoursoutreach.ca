@@ -14,6 +14,7 @@ import {
   deletePatrolSeries,
   listPatrolSeries,
   changeSignup,
+  addManualSignup,
   ensurePatrolOccurrences,
   findEvent,
   findPatrolSeries,
@@ -35,10 +36,7 @@ import {
   type PatrolTemplate,
 } from "../src/server/db/patrol-series";
 import { RequestError } from "../src/server/http";
-import {
-  completeOrientation,
-  setVolunteerStatus,
-} from "../src/server/db/volunteers";
+import { setVolunteerStatus } from "../src/server/db/volunteers";
 import { sourceSchemaStatements } from "./helpers/source-schema";
 
 vi.stubEnv("DEV", false);
@@ -92,6 +90,31 @@ const all = async (seriesId: string) =>
   (await listEvents(db, organizer)).filter(
     (event) => event.seriesId === seriesId,
   );
+
+test("recurring patrols persist custom volunteer limits on generated occurrences", async () => {
+  const limits = {
+    minMedicSpots: 1,
+    minNewVolunteerSpots: 1,
+    maxNewVolunteers: 2,
+  };
+  const saved = await savePatrolSeries(db, organizer, {
+    ...input(),
+    includesOrientation: true,
+    ...limits,
+  });
+  const series = await findPatrolSeries(db, organizer, saved.id);
+  const occurrences = await all(saved.id);
+  assert.equal(occurrences.length, 3);
+  for (const settings of [series, ...occurrences])
+    assert.deepEqual(
+      [
+        settings.minMedicSpots,
+        settings.minNewVolunteerSpots,
+        settings.maxNewVolunteers,
+      ],
+      [1, 1, 2],
+    );
+});
 
 beforeAll(async () => {
   await harness.listen();
@@ -189,8 +212,8 @@ test("fortnightly October 20/November 3/November 17 preserve local wall time; De
     initial.occurrences.map((event) => new Date(event.startsAt).toISOString()),
     [
       "2026-10-21T03:30:00.000Z",
-      "2026-11-04T04:30:00.000Z",
-      "2026-11-18T04:30:00.000Z",
+      "2026-11-04T03:30:00.000Z",
+      "2026-11-18T03:30:00.000Z",
     ],
   );
   const existing = initial.occurrences.map((event) => ({
@@ -376,8 +399,8 @@ test("spring/fall recurrence DST policy is deterministic, including gaps and fol
     "2026-03-08T10:30:00.000Z",
   );
   assert.equal(
-    new Date(vancouverOccurrenceInstant("2026-11-01", "01:30")).toISOString(),
-    "2026-11-01T08:30:00.000Z",
+    new Date(vancouverOccurrenceInstant("2025-11-02", "01:30")).toISOString(),
+    "2025-11-02T08:30:00.000Z",
   );
   assert.equal(
     vancouverInput(vancouverOccurrenceInstant("2026-03-15", "02:30")),
@@ -412,6 +435,9 @@ test("effective day shifts plan the true earliest starts across template boundar
       open: 1,
       hidden: 0,
       includesOrientation: 0,
+      minMedicSpots: 2,
+      minNewVolunteerSpots: 2,
+      maxNewVolunteers: 4,
     }));
     const candidates = Array.from({ length: 63 }, (_, index) => {
       const date = addCalendarDays(firstDate, index * 7);
@@ -606,6 +632,55 @@ test("fourth occurrence is rejected by direct join, SQL reactivation/reassignmen
   );
 });
 
+test("manual attendees obey recurring windows and keep their history when the series stops", async () => {
+  const data = { ...input(), includesOrientation: true, spots: 8 };
+  const saved = await savePatrolSeries(db, organizer, data);
+  const first = (await all(saved.id))[0];
+  const fourth = await materializePatrolOccurrence(
+    db,
+    organizer,
+    saved.id,
+    addCalendarDays(data.firstDate, 42),
+  );
+  const attendee = { name: "Manual Medic", medic: true, newVolunteer: true };
+  await assert.rejects(
+    addManualSignup(db, organizer, fourth.id, attendee),
+    status(409),
+  );
+  await addManualSignup(db, organizer, first.id, attendee);
+  const signup = (await listRosters(db, organizer, [first.id]))[0];
+  await assert.rejects(
+    manageSignup(db, organizer, signup.id, fourth.id, ""),
+    status(409),
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE id=?")
+      .bind(signup.id)
+      .first("status"),
+    "confirmed",
+  );
+  const series = await findPatrolSeries(db, organizer, saved.id);
+  await stopPatrolSeries(
+    db,
+    organizer,
+    saved.id,
+    first.occurrenceDate!,
+    series.updatedAt,
+    "",
+    true,
+  );
+  assert.equal(
+    await db
+      .prepare("SELECT status FROM signup WHERE id=?")
+      .bind(signup.id)
+      .first("status"),
+    "cancelled",
+  );
+  assert.equal(await count("signup"), 1);
+  assert.equal(await count("event_notification"), 0);
+});
+
 test("closed/full/hidden occurrences consume slots; hidden recurring occurrences are invisible even with a booking", async () => {
   const data = input();
   const series = await savePatrolSeries(db, organizer, data);
@@ -785,6 +860,7 @@ test("legacy deletion uses versioned cancellation and keeps registered occurrenc
 test("past events reject cancellation and legacy deletion; series removal preserves attendance and unrelated data", async () => {
   const series = await savePatrolSeries(db, organizer, {
     ...input(),
+    spots: 5,
     includesOrientation: true,
   });
   const [past, future] = await all(series.id);
@@ -794,7 +870,12 @@ test("past events reject cancellation and legacy deletion; series removal preser
     .prepare("UPDATE event SET starts_at=0 WHERE id=?")
     .bind(past.id)
     .run();
-  await completeOrientation(db, organizer, alice.id, past.id);
+  await db
+    .prepare(
+      "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES (?,?,?,?,0)",
+    )
+    .bind(crypto.randomUUID(), alice.id, past.id, organizer.id)
+    .run();
   const attendance = (
     await db.prepare("SELECT * FROM orientation_completion").all()
   ).results;
@@ -1500,7 +1581,7 @@ test("validation and authorization reject invalid recurrence input or stale orga
   for (const extra of [
     { firstDate: "2026-02-30" },
     { firstDate: "2026-03-08", localTime: "02:30" },
-    { firstDate: "2026-11-01", localTime: "01:30" },
+    { firstDate: "2025-11-02", localTime: "01:30" },
     { intervalWeeks: 0 },
     { intervalWeeks: 53 },
     { localTime: "25:00" },
@@ -1740,6 +1821,7 @@ test("bulk capacity violations roll back template, event/audit changes, notifica
 test("revoking patrol approval preserves orientation bookings but cancels regular patrol bookings", async () => {
   const orientationSeries = await savePatrolSeries(db, organizer, {
     ...input(),
+    spots: 5,
     includesOrientation: true,
   });
   const patrolSeries = await savePatrolSeries(db, organizer, input());
@@ -1821,7 +1903,7 @@ test("orientation settings persist on series, future templates and individual ex
     (error: unknown) =>
       error instanceof RequestError &&
       error.status === 400 &&
-      /at least 2 total/.test(error.message),
+      /reserved medic places/.test(error.message),
   );
   await assert.rejects(
     updatePatrolSeriesFrom(
@@ -1835,7 +1917,7 @@ test("orientation settings persist on series, future templates and individual ex
     (error: unknown) =>
       error instanceof RequestError &&
       error.status === 400 &&
-      /at least 2 total/.test(error.message),
+      /reserved medic places/.test(error.message),
   );
   assert.ok(events.every((event) => event.includesOrientation === 1));
   await db
@@ -1847,13 +1929,13 @@ test("orientation settings persist on series, future templates and individual ex
     .prepare("UPDATE profile SET naloxone_completed_at=? WHERE user_id=?")
     .bind(Date.now(), bob.id)
     .run();
-  const orientee = {
+  const newVolunteer = {
     ...bob,
     patrolApproved: false,
     naloxoneCompleted: true,
     applicationComplete: true,
   };
-  await changeSignup(db, orientee, events[1].id, "join");
+  await changeSignup(db, newVolunteer, events[1].id, "join");
   const individual = {
     startsAt: new Date(events[1].startsAt).toISOString(),
     meetingPoint: data.meetingPoint,
@@ -1885,7 +1967,7 @@ test("orientation settings persist on series, future templates and individual ex
   assert.deepEqual(await all(series.id), booked);
   assert.equal(await count("patrol_series_template"), 0);
   assert.equal(await count("event_notification"), 0);
-  await changeSignup(db, orientee, events[1].id, "cancel");
+  await changeSignup(db, newVolunteer, events[1].id, "cancel");
   await updatePatrolSeriesFrom(
     db,
     organizer,
@@ -1923,7 +2005,7 @@ test("orientation settings persist on series, future templates and individual ex
   await ensurePatrolOccurrences(db);
   assert.equal((await findEvent(db, current.id)).includesOrientation, 1);
   assert.deepEqual(
-    (await listEvents(db, orientee)).map((event) => event.id).sort(),
+    (await listEvents(db, newVolunteer)).map((event) => event.id).sort(),
     [events[0].id, current.id].sort(),
   );
   assert.equal((await listEvents(db, alice)).length, 3);
@@ -1945,7 +2027,12 @@ test("orientation settings persist on series, future templates and individual ex
     .prepare("UPDATE event SET starts_at=0 WHERE id=?")
     .bind(events[0].id)
     .run();
-  await completeOrientation(db, organizer, alice.id, events[0].id);
+  await db
+    .prepare(
+      "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES (?,?,?,?,0)",
+    )
+    .bind(crypto.randomUUID(), alice.id, events[0].id, organizer.id)
+    .run();
   assert.equal(await count("orientation_completion"), 1);
 });
 

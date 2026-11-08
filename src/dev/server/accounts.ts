@@ -16,6 +16,7 @@ import { profile } from "../../server/db/schema";
 import { loadApplicationProgress } from "../../server/db/application-progress";
 import { RequestError, safeReturnTo } from "../../server/http";
 import type { AuthBindings } from "../../server/auth";
+import { signInDestinationForUser } from "../../server/auth/destination";
 import {
   accountStatePersona,
   manualAccountPresets,
@@ -174,11 +175,26 @@ export function developmentAccounts(bindings: AuthBindings) {
             columns: { user_id: true },
           });
           let next = state ? "/volunteer" : safeReturnTo(ctx.body.returnTo);
+          // Organizer presets and default sign-ins use the same access-aware
+          // landing as email sign-in; explicit saved-account destinations stay put.
+          if (
+            "role" in person &&
+            person.role === "organizer" &&
+            (state || !ctx.body.returnTo)
+          )
+            next = await signInDestinationForUser(
+              bindings.DB,
+              person.id,
+              twoFactorVerified,
+            );
           if (!applicationSubmitted) next = "/apply";
           else if (/^\/apply\/?(?:\?|$)/.test(next))
             next = "/volunteer/account";
           else if (
-            /^\/manage(?:\/|\?|$)/.test(next) &&
+            (/^\/(?:applications|volunteers)(?:\/|\?|$)/.test(next) ||
+              new URL(next, "https://local.invalid").searchParams.get(
+                "view",
+              ) === "organizer") &&
             !("role" in person && person.role === "organizer")
           )
             next = "/events";

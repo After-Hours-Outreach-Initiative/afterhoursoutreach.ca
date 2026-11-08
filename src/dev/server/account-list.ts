@@ -18,6 +18,7 @@ interface AccountRow {
   discordRequired: number;
   discordCompletedAt: number | null;
   applicationApproved: number | null;
+  applicationRejectionReason: string | null;
   active: number | null;
   patrolApproved: number | null;
   hasDraft: number;
@@ -36,7 +37,7 @@ export async function listLocalAccounts(db: Env["DB"], after?: string) {
     p.registered_at AS submittedAt, p.naloxone_completed_at AS naloxoneCompletedAt,
     EXISTS(SELECT 1 FROM discord_requirement WHERE user_id=u.id) AS discordRequired,
     (SELECT completed_at FROM discord_link WHERE user_id=u.id) AS discordCompletedAt,
-    v.registration_approved AS applicationApproved, v.active, v.patrol_approved AS patrolApproved,
+    v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.active, v.patrol_approved AS patrolApproved,
     u.two_factor_enabled AS twoFactorEnabled,
     EXISTS (SELECT 1 FROM application_draft WHERE user_id=u.id) AS hasDraft,
     EXISTS (SELECT 1 FROM orientation_completion WHERE user_id=u.id) AS orientationCompleted,
@@ -64,13 +65,14 @@ export async function listLocalAccounts(db: Env["DB"], after?: string) {
         discordRequired: Boolean(row.discordRequired),
         discordCompletedAt: row.discordCompletedAt,
         applicationApproved: Boolean(row.applicationApproved),
+        applicationRejectionReason: row.applicationRejectionReason,
         active: Boolean(row.active),
         patrolApproved: Boolean(row.patrolApproved),
         hasDraft: Boolean(row.hasDraft),
         orientationCompleted: Boolean(row.orientationCompleted),
         orientationBooked: Boolean(row.orientationBooked),
         medicSelected: Boolean(row.medicSelected),
-        medicEligible: Boolean(row.medicEligible),
+        medicEligible: Boolean(row.active && row.medicEligible),
         twoFactorEnabled: Boolean(row.twoFactorEnabled),
       } satisfies DevelopmentAccountState,
     })),

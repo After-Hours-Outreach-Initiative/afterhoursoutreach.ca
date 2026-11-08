@@ -1,6 +1,7 @@
 import { createAuthClient } from "better-auth/client";
 import { InferServerPlugin } from "better-auth/client/plugins";
 import type { AccountAuth } from "../../server/auth";
+import "../styles/account-switcher.css";
 import { authClient } from "../../scripts/auth-client";
 import { accountErrorMessage } from "../../scripts/account-forms";
 import {
@@ -10,6 +11,7 @@ import {
   manualAccountGroups,
   manualAccountPresets,
   manualAccountPresetIds,
+  isManualAccountPreset,
   newApplicationPersona,
   type DevelopmentApplicationStep,
 } from "../accounts";
@@ -37,7 +39,7 @@ type DevelopmentUsers = Awaited<
 >;
 type DevelopmentUser = DevelopmentUsers["users"][number];
 
-export async function initAccountSwitcher() {
+export function initAccountSwitcher() {
   const root = document.querySelector<HTMLDialogElement>(
     "dialog[data-account-switcher]",
   );
@@ -60,6 +62,7 @@ export async function initAccountSwitcher() {
     "[data-seed-accounts]",
   );
   let busy = true;
+  let loaded = false;
   let currentUserId: string | null = null;
   let currentAccountName: string | null = null;
   let progress: DevelopmentUsers["applicationProgress"] = null;
@@ -135,11 +138,19 @@ export async function initAccountSwitcher() {
   const trigger = document.querySelector<HTMLButtonElement>(
     "[data-open-account-switcher]",
   );
+  if (trigger) trigger.hidden = false;
   const toggle = () => {
     if (root.open) root.close();
     else {
       root.showModal();
       trigger?.setAttribute("aria-expanded", "true");
+      // Public pages and the fixture playground need no account API until opened.
+      if (!loaded) {
+        loaded = true;
+        setBusy(true);
+        message.hidden = true;
+        void loadAccounts();
+      }
     }
   };
   trigger?.addEventListener("click", toggle);
@@ -390,7 +401,7 @@ export async function initAccountSwitcher() {
         label,
         `${user.email}${user.role === "organizer" ? " · Organizer" : ""} · ${developmentAccountStatus(user.state)}`,
       );
-      if (manualAccountPresetIds.includes(user.id)) {
+      if (isManualAccountPreset(user.id)) {
         // Preserve old preset identities and any progressed applications without
         // presenting them as reusable state launchers or allowing their deletion.
         accounts.appendChild(button);
@@ -451,11 +462,14 @@ export async function initAccountSwitcher() {
         ),
       );
   };
-  try {
-    await refreshAccounts();
-  } catch (error) {
-    fail(error);
-  } finally {
-    setBusy(false);
-  }
+  const loadAccounts = async () => {
+    try {
+      await refreshAccounts();
+    } catch (error) {
+      loaded = false;
+      fail(error);
+    } finally {
+      setBusy(false);
+    }
+  };
 }

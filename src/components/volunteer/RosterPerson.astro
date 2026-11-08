@@ -1,0 +1,31 @@
+---
+import type { AttendeeCategory } from "@/data/event-roster";
+import AttendeeAvatar from "./AttendeeAvatar.astro";
+import CompactPersonName from "./CompactPersonName.astro";
+import NewVolunteerBadge from "./NewVolunteerBadge.astro";
+
+interface Props {
+  name: string;
+  category: AttendeeCategory;
+  medicMark: boolean;
+  href?: string;
+  gradientId?: string;
+}
+const { name, category, medicMark, href, gradientId } = Astro.props;
+---
+
+<div class="event-roster-person">
+  <AttendeeAvatar
+    category={category}
+    medicMark={medicMark}
+    gradientId={gradientId}
+  />
+  <div class="event-roster-name">
+    <CompactPersonName
+      name={name}
+      href={href}
+      data-volunteer-profile-link={href ? true : undefined}
+    />
+    {category === "new-volunteer" && <NewVolunteerBadge />}
+  </div>
+</div>

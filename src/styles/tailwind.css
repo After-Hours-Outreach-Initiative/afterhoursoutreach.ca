@@ -15,6 +15,11 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+    scrollbar-color: #71717a #171a20;
+  }
+
   /* One type scale for the whole site. Every heading level and every
      paragraph gets its size here, so pages carry layout classes only.
      h1 and h2 step up at md; the rest are one size at every width. */
@@ -62,7 +67,6 @@
   }
 
   dialog {
-    scrollbar-color: #52525b transparent;
     scrollbar-width: thin;
   }
 
@@ -88,6 +92,14 @@
 }
 
 @layer components {
+  .volunteer-spots-open {
+    color: #4ade80;
+  }
+
+  .volunteer-spots-full {
+    color: #f87171;
+  }
+
   /* One button size for the whole site. Variants change colour and border
      only, so a bordered button lines up with a filled one at the same
      height. Pair .btn with exactly one variant. */

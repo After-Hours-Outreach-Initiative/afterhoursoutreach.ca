@@ -1,6 +1,7 @@
 ---
 import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
+import { defaultEventLimits, minimumEventSpots } from "@/data/event-limits";
 import FieldError from "@/components/FieldError.astro";
 import RecurringIcon from "@/components/icons/RecurringIcon.astro";
 import MinusIcon from "@/components/icons/MinusIcon.astro";
@@ -15,6 +16,7 @@ interface Props {
 }
 const { id, event, series } = Astro.props;
 const settings = event ?? series;
+const limits = { ...defaultEventLimits, ...settings };
 const publicVisibility = settings
   ? Boolean(settings.open && !settings.hidden)
   : true;
@@ -117,7 +119,7 @@ const publicVisibility = settings
       id={`${id}-spots`}
       name="spots"
       type="number"
-      min={settings?.includesOrientation ? "4" : "2"}
+      min={minimumEventSpots(limits)}
       max="100"
       step="1"
       aria-describedby={`error-${id}-spots`}
@@ -135,11 +137,56 @@ const publicVisibility = settings
   </div>
   <FieldError
     field={`${id}-spots`}
-    message={settings?.includesOrientation
-      ? "Enter a whole number from 4 to 100 for a patrol that includes orientation."
-      : "Enter a whole number from 2 to 100."}
+    message={minimumEventSpots(limits) > 100
+      ? "Reduce reserved places to a combined maximum of 100."
+      : `Enter a whole number from ${minimumEventSpots(limits)} to 100, covering all reserved places.`}
   />
 </div>
+{
+  [
+    {
+      name: "minMedicSpots",
+      label: "Minimum medic spots",
+      help: "Places reserved for approved medics on every patrol.",
+    },
+    {
+      name: "minNewVolunteerSpots",
+      label: "Minimum new volunteer spots",
+      help: "Places reserved for volunteers awaiting patrol approval when orientation is included.",
+    },
+    {
+      name: "maxNewVolunteers",
+      label: "Maximum new volunteers",
+      help: "Limit for volunteers awaiting patrol approval when orientation is included.",
+    },
+  ].map(({ name, label, help }) => (
+    <div class="volunteer-field">
+      <label for={`${id}-${name}`}>{label}</label>
+      <input
+        id={`${id}-${name}`}
+        name={name}
+        type="number"
+        min="0"
+        max="100"
+        step="1"
+        required
+        value={limits[name as keyof typeof defaultEventLimits]}
+        aria-describedby={`${id}-${name}-help error-${id}-${name}`}
+      />
+      <p class="volunteer-help" id={`${id}-${name}-help`}>
+        {help}
+      </p>
+      <FieldError
+        field={`${id}-${name}`}
+        message={
+          name === "maxNewVolunteers"
+            ? "Enter a whole number from 0 to 100, at least the minimum new volunteer spots."
+            : "Enter a whole number from 0 to 100."
+        }
+      />
+    </div>
+  ))
+}
 <div class="volunteer-field">
   <label for={`${id}-meetingPoint`}>Meeting point</label>
   <input

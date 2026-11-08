@@ -22,50 +22,46 @@ BEGIN
   SELECT RAISE(ABORT, 'signup_not_eligible')
   WHERE NOT EXISTS (
     SELECT 1 FROM event e
-    JOIN volunteer_status v ON v.user_id = NEW.user_id
-    JOIN profile p ON p.user_id = v.user_id
-    WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1
-      AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
-      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
-      AND (coalesce(e.includes_orientation, e.type = 'orientation') OR v.patrol_approved = 1)
+    WHERE e.id = NEW.event_id AND (
+      (e.open = 1 AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER))
+      -- Organizers can record past attendance after registration has closed.
+      OR (e.starts_at <= CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+        AND EXISTS (SELECT 1 FROM user u JOIN volunteer_status v ON v.user_id = u.id
+          JOIN profile p ON p.user_id = u.id
+          WHERE u.id = NEW.added_by AND u.role = 'organizer' AND u.deleted_at IS NULL
+            AND u.email_verified = 1 AND v.active = 1))
+      )
+      AND ((NEW.user_id IS NULL AND (coalesce(e.includes_orientation, e.type = 'orientation') OR NEW.manual_new = 0))
+        OR EXISTS (SELECT 1 FROM volunteer_status v JOIN profile p ON p.user_id = v.user_id
+          WHERE v.user_id = NEW.user_id AND v.active = 1
+            AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
+            AND (coalesce(e.includes_orientation, e.type = 'orientation') OR v.patrol_approved = 1)))
   );
   SELECT RAISE(ABORT, 'event_full')
   WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed')
     >= (SELECT spots FROM event WHERE id = NEW.event_id);
-  -- First-time medics are ONLY orientees; each signup occupies one total place.
+  -- Volunteers awaiting patrol approval are new, regardless of attendance or team.
   SELECT RAISE(ABORT, 'orientation_places_full')
   WHERE EXISTS (SELECT 1 FROM event e WHERE e.id = NEW.event_id
       AND coalesce(e.includes_orientation, e.type = 'orientation'))
-    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND (CASE WHEN NEW.user_id IS NULL THEN NEW.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = NEW.user_id AND v.patrol_approved = 1) END)
     AND (SELECT count(*) FROM signup s WHERE s.event_id = NEW.event_id AND s.status = 'confirmed'
-      AND NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) >= 4;
+      AND (CASE WHEN s.user_id IS NULL THEN s.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1) END)) >=
+        (SELECT max_new_volunteers FROM event WHERE id = NEW.event_id);
   -- Count the candidate as well as existing bookings, then leave room for every
   -- outstanding reservation. Extras of either category share the general pool.
   SELECT RAISE(ABORT, 'signup_places_reserved')
   FROM event e CROSS JOIN (
     SELECT count(*) AS total,
-      coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+      coalesce(sum(CASE WHEN booked.user_id IS NULL THEN booked.manual_medic = 1 AND booked.manual_new = 0 ELSE EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
         WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
-          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
-          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS orientees
-    FROM (SELECT user_id FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed'
-      UNION ALL SELECT NEW.user_id) booked
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')) END), 0) AS medics,
+      coalesce(sum(CASE WHEN booked.user_id IS NULL THEN booked.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = booked.user_id AND v.patrol_approved = 1) END), 0) AS new_volunteers
+    FROM (SELECT user_id, manual_medic, manual_new FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed'
+      UNION ALL SELECT NEW.user_id, NEW.manual_medic, NEW.manual_new) booked
   ) counts
-  WHERE e.id = NEW.event_id AND counts.total + max(0, 2 - counts.medics)
-    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > e.spots;
-  -- Closed/hidden bookings still reserve a spot; past/cancelled events do not.
-  SELECT RAISE(ABORT, 'orientation_signup_limit')
-  WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
-    AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
-    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
-    AND EXISTS (
-      SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
-      WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
-        AND s.event_id != NEW.event_id
-        AND coalesce(e.includes_orientation, e.type = 'orientation') AND e.cancelled_at IS NULL
-        AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
-    );
+  WHERE e.id = NEW.event_id AND counts.total + max(0, e.min_medic_spots - counts.medics)
+    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, e.min_new_volunteer_spots - counts.new_volunteers) ELSE 0 END > e.spots;
 END;
 --> statement-breakpoint
 
@@ -77,7 +73,8 @@ BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
 BEGIN
   SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
     SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
-    WHERE e.id = NEW.event_id AND (
+    WHERE e.id = NEW.event_id
+      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER) AND (
       e.starts_at >= ps.generation_until OR
       (SELECT count(*) FROM event preceding
         WHERE preceding.series_id = e.series_id AND preceding.cancelled_at IS NULL
@@ -89,7 +86,7 @@ BEGIN
 END;
 --> statement-breakpoint
 CREATE TRIGGER signup_recurring_window_update
-BEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'
+BEFORE UPDATE OF status, event_id, user_id, manual_medic, manual_new ON signup WHEN NEW.status = 'confirmed'
 BEGIN
   SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
     SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
@@ -145,17 +142,18 @@ BEGIN
 END;
 --> statement-breakpoint
 CREATE TRIGGER signup_confirm_update
-BEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'
+BEFORE UPDATE OF status, event_id, user_id, manual_medic, manual_new ON signup WHEN NEW.status = 'confirmed'
 BEGIN
   SELECT RAISE(ABORT, 'signup_not_eligible')
   WHERE NOT EXISTS (
     SELECT 1 FROM event e
-    JOIN volunteer_status v ON v.user_id = NEW.user_id
-    JOIN profile p ON p.user_id = v.user_id
-    WHERE e.id = NEW.event_id AND e.open = 1 AND v.active = 1
-      AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
+    WHERE e.id = NEW.event_id AND e.open = 1
       AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
-      AND (coalesce(e.includes_orientation, e.type = 'orientation') OR v.patrol_approved = 1)
+      AND ((NEW.user_id IS NULL AND (coalesce(e.includes_orientation, e.type = 'orientation') OR NEW.manual_new = 0))
+        OR EXISTS (SELECT 1 FROM volunteer_status v JOIN profile p ON p.user_id = v.user_id
+          WHERE v.user_id = NEW.user_id AND v.active = 1
+            AND (v.registration_approved = 1 OR EXISTS (SELECT 1 FROM user WHERE id = v.user_id AND role = 'organizer'))
+            AND (coalesce(e.includes_orientation, e.type = 'orientation') OR v.patrol_approved = 1)))
   );
   SELECT RAISE(ABORT, 'event_full')
   WHERE (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id)
@@ -163,33 +161,22 @@ BEGIN
   SELECT RAISE(ABORT, 'orientation_places_full')
   WHERE EXISTS (SELECT 1 FROM event e WHERE e.id = NEW.event_id
       AND coalesce(e.includes_orientation, e.type = 'orientation'))
-    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
+    AND (CASE WHEN NEW.user_id IS NULL THEN NEW.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = NEW.user_id AND v.patrol_approved = 1) END)
     AND (SELECT count(*) FROM signup s WHERE s.event_id = NEW.event_id AND s.status = 'confirmed' AND s.id != OLD.id
-      AND NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)) >= 4;
+      AND (CASE WHEN s.user_id IS NULL THEN s.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1) END)) >=
+        (SELECT max_new_volunteers FROM event WHERE id = NEW.event_id);
   SELECT RAISE(ABORT, 'signup_places_reserved')
   FROM event e CROSS JOIN (
     SELECT count(*) AS total,
-      coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+      coalesce(sum(CASE WHEN booked.user_id IS NULL THEN booked.manual_medic = 1 AND booked.manual_new = 0 ELSE EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
         WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
-          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
-          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = booked.user_id)), 0) AS orientees
-    FROM (SELECT user_id FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id
-      UNION ALL SELECT NEW.user_id) booked
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')) END), 0) AS medics,
+      coalesce(sum(CASE WHEN booked.user_id IS NULL THEN booked.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = booked.user_id AND v.patrol_approved = 1) END), 0) AS new_volunteers
+    FROM (SELECT user_id, manual_medic, manual_new FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id
+      UNION ALL SELECT NEW.user_id, NEW.manual_medic, NEW.manual_new) booked
   ) counts
-  WHERE e.id = NEW.event_id AND counts.total + max(0, 2 - counts.medics)
-    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > e.spots;
-  SELECT RAISE(ABORT, 'orientation_signup_limit')
-  WHERE EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'))
-    AND EXISTS (SELECT 1 FROM volunteer_status WHERE user_id = NEW.user_id AND patrol_approved = 0)
-    AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id = NEW.user_id)
-    AND EXISTS (
-      SELECT 1 FROM signup s JOIN event e ON e.id = s.event_id
-      WHERE s.user_id = NEW.user_id AND s.status = 'confirmed'
-        AND s.id != OLD.id AND s.event_id != NEW.event_id
-        AND coalesce(e.includes_orientation, e.type = 'orientation') AND e.cancelled_at IS NULL
-        AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
-    );
+  WHERE e.id = NEW.event_id AND counts.total + max(0, e.min_medic_spots - counts.medics)
+    + CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation') THEN max(0, e.min_new_volunteer_spots - counts.new_volunteers) ELSE 0 END > e.spots;
 END;
 --> statement-breakpoint
 CREATE TRIGGER event_capacity_update
@@ -206,66 +193,95 @@ END;
 -- recurrence coverage maintenance do not require editing those legacy defaults.
 CREATE TRIGGER event_orientation_capacity_insert
 BEFORE INSERT ON event
-WHEN NEW.spots < CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN 4 ELSE 2 END
 BEGIN
-  SELECT RAISE(ABORT, 'event_minimum_capacity');
+  SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
+    typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.max_new_volunteers) != 'integer' OR NEW.max_new_volunteers NOT BETWEEN NEW.min_new_volunteer_spots AND 100;
+  SELECT RAISE(ABORT, 'event_minimum_capacity') WHERE NEW.spots < NEW.min_medic_spots
+    + CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN NEW.min_new_volunteer_spots ELSE 0 END;
 END;
 --> statement-breakpoint
 CREATE TRIGGER event_orientation_capacity_update
-BEFORE UPDATE OF type, includes_orientation, spots, starts_at, meeting_point, meeting_point_url, open, hidden ON event
-WHEN NEW.cancelled_at IS NULL AND NEW.spots < CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN 4 ELSE 2 END
+BEFORE UPDATE OF type, includes_orientation, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers, starts_at, meeting_point, meeting_point_url, open, hidden ON event
 BEGIN
-  SELECT RAISE(ABORT, 'event_minimum_capacity');
+  SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
+    typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.max_new_volunteers) != 'integer' OR NEW.max_new_volunteers NOT BETWEEN NEW.min_new_volunteer_spots AND 100;
+  SELECT RAISE(ABORT, 'event_minimum_capacity') WHERE NEW.cancelled_at IS NULL AND NEW.spots < NEW.min_medic_spots
+    + CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN NEW.min_new_volunteer_spots ELSE 0 END;
 END;
 --> statement-breakpoint
 CREATE TRIGGER patrol_series_orientation_capacity_insert
-BEFORE INSERT ON patrol_series WHEN NEW.spots < CASE WHEN NEW.includes_orientation = 1 THEN 4 ELSE 2 END
+BEFORE INSERT ON patrol_series
 BEGIN
-  SELECT RAISE(ABORT, 'event_minimum_capacity');
+  SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
+    typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.max_new_volunteers) != 'integer' OR NEW.max_new_volunteers NOT BETWEEN NEW.min_new_volunteer_spots AND 100;
+  SELECT RAISE(ABORT, 'event_minimum_capacity') WHERE NEW.spots < NEW.min_medic_spots
+    + CASE WHEN NEW.includes_orientation = 1 THEN NEW.min_new_volunteer_spots ELSE 0 END;
 END;
 --> statement-breakpoint
 CREATE TRIGGER patrol_series_orientation_capacity_update
-BEFORE UPDATE OF includes_orientation, spots, meeting_point, meeting_point_url, open, hidden, end_date ON patrol_series
-WHEN NEW.spots < CASE WHEN NEW.includes_orientation = 1 THEN 4 ELSE 2 END
+BEFORE UPDATE OF includes_orientation, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers, meeting_point, meeting_point_url, open, hidden, end_date ON patrol_series
 BEGIN
-  SELECT RAISE(ABORT, 'event_minimum_capacity');
+  SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
+    typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.max_new_volunteers) != 'integer' OR NEW.max_new_volunteers NOT BETWEEN NEW.min_new_volunteer_spots AND 100;
+  SELECT RAISE(ABORT, 'event_minimum_capacity') WHERE NEW.spots < NEW.min_medic_spots
+    + CASE WHEN NEW.includes_orientation = 1 THEN NEW.min_new_volunteer_spots ELSE 0 END;
 END;
 --> statement-breakpoint
 CREATE TRIGGER patrol_template_orientation_capacity_insert
-BEFORE INSERT ON patrol_series_template WHEN NEW.spots < CASE WHEN NEW.includes_orientation = 1 THEN 4 ELSE 2 END
+BEFORE INSERT ON patrol_series_template
 BEGIN
-  SELECT RAISE(ABORT, 'event_minimum_capacity');
+  SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
+    typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.max_new_volunteers) != 'integer' OR NEW.max_new_volunteers NOT BETWEEN NEW.min_new_volunteer_spots AND 100;
+  SELECT RAISE(ABORT, 'event_minimum_capacity') WHERE NEW.spots < NEW.min_medic_spots
+    + CASE WHEN NEW.includes_orientation = 1 THEN NEW.min_new_volunteer_spots ELSE 0 END;
 END;
 --> statement-breakpoint
 CREATE TRIGGER patrol_template_orientation_capacity_update
-BEFORE UPDATE ON patrol_series_template WHEN NEW.spots < CASE WHEN NEW.includes_orientation = 1 THEN 4 ELSE 2 END
+BEFORE UPDATE ON patrol_series_template
 BEGIN
-  SELECT RAISE(ABORT, 'event_minimum_capacity');
+  SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
+    typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
+    OR typeof(NEW.max_new_volunteers) != 'integer' OR NEW.max_new_volunteers NOT BETWEEN NEW.min_new_volunteer_spots AND 100;
+  SELECT RAISE(ABORT, 'event_minimum_capacity') WHERE NEW.spots < NEW.min_medic_spots
+    + CASE WHEN NEW.includes_orientation = 1 THEN NEW.min_new_volunteer_spots ELSE 0 END;
 END;
 --> statement-breakpoint
 CREATE TRIGGER event_orientation_update
-BEFORE UPDATE OF type, includes_orientation, spots ON event
-WHEN NEW.spots IS NOT OLD.spots OR coalesce(NEW.includes_orientation, NEW.type = 'orientation')
+BEFORE UPDATE OF type, includes_orientation, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers ON event
+WHEN NEW.spots IS NOT OLD.spots OR NEW.min_medic_spots IS NOT OLD.min_medic_spots
+  OR NEW.min_new_volunteer_spots IS NOT OLD.min_new_volunteer_spots OR NEW.max_new_volunteers IS NOT OLD.max_new_volunteers
+  OR coalesce(NEW.includes_orientation, NEW.type = 'orientation')
   IS NOT coalesce(OLD.includes_orientation, OLD.type = 'orientation')
 BEGIN
   SELECT RAISE(ABORT, 'orientation_edit_conflict')
   FROM (
     SELECT count(*) AS total,
-      coalesce(sum(EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+      coalesce(sum(CASE WHEN s.user_id IS NULL THEN s.manual_medic = 1 AND s.manual_new = 0 ELSE EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
         WHERE p.user_id = s.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
-          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')
-          AND EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = p.user_id))), 0) AS medics,
-      coalesce(sum(NOT EXISTS (SELECT 1 FROM orientation_completion o WHERE o.user_id = s.user_id)), 0) AS orientees
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')) END), 0) AS medics,
+      coalesce(sum(CASE WHEN s.user_id IS NULL THEN s.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1) END), 0) AS new_volunteers
     FROM signup s WHERE s.event_id = OLD.id AND s.status = 'confirmed'
   ) counts
-  WHERE counts.total + max(0, 2 - counts.medics)
-      + CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN max(0, 2 - counts.orientees) ELSE 0 END > NEW.spots
-    OR (coalesce(NEW.includes_orientation, NEW.type = 'orientation') AND counts.orientees > 4);
+  WHERE counts.total + max(0, NEW.min_medic_spots - counts.medics)
+      + CASE WHEN coalesce(NEW.includes_orientation, NEW.type = 'orientation') THEN max(0, NEW.min_new_volunteer_spots - counts.new_volunteers) ELSE 0 END > NEW.spots
+    OR (coalesce(NEW.includes_orientation, NEW.type = 'orientation') AND counts.new_volunteers > NEW.max_new_volunteers);
   SELECT RAISE(ABORT, 'orientation_edit_conflict')
   WHERE NOT coalesce(NEW.includes_orientation, NEW.type = 'orientation')
     AND coalesce(OLD.includes_orientation, OLD.type = 'orientation') AND (
-      EXISTS (SELECT 1 FROM signup s JOIN volunteer_status v ON v.user_id = s.user_id
-        WHERE s.event_id = OLD.id AND s.status = 'confirmed' AND v.patrol_approved = 0)
+      EXISTS (SELECT 1 FROM signup s
+        WHERE s.event_id = OLD.id AND s.status = 'confirmed'
+          AND (CASE WHEN s.user_id IS NULL THEN s.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1) END))
       OR EXISTS (SELECT 1 FROM orientation_completion WHERE event_id = OLD.id)
     );
 END;
@@ -301,15 +317,21 @@ BEGIN
 END;
 --> statement-breakpoint
 
--- Existing spots survive hiding/closing; new confirmed spots must be visible.
+-- Existing spots survive hiding/closing. Organizers may also record historical
+-- attendance on hidden events; cancelled/deleted events remain unavailable.
 CREATE TRIGGER signup_visible_insert BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
 BEGIN
   SELECT RAISE(ABORT, 'signup_not_eligible') WHERE EXISTS (
-    SELECT 1 FROM event WHERE id = NEW.event_id AND (hidden = 1 OR cancelled_at IS NOT NULL)
+    SELECT 1 FROM event e WHERE e.id = NEW.event_id AND (
+      (e.hidden = 1 AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER))
+      OR e.cancelled_at IS NOT NULL
+      OR EXISTS (SELECT 1 FROM event_audit a WHERE a.event_id = e.id AND a.action = 'deleted')
+      OR EXISTS (SELECT 1 FROM patrol_series_audit a WHERE a.series_id = e.series_id AND a.action = 'deleted')
+    )
   );
 END;
 --> statement-breakpoint
-CREATE TRIGGER signup_visible_update BEFORE UPDATE OF status, event_id, user_id ON signup WHEN NEW.status = 'confirmed'
+CREATE TRIGGER signup_visible_update BEFORE UPDATE OF status, event_id, user_id, manual_medic, manual_new ON signup WHEN NEW.status = 'confirmed'
 BEGIN
   SELECT RAISE(ABORT, 'signup_not_eligible') WHERE EXISTS (
     SELECT 1 FROM event WHERE id = NEW.event_id AND (hidden = 1 OR cancelled_at IS NOT NULL)
@@ -412,22 +434,6 @@ BEGIN
   UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
 END;
 --> statement-breakpoint
-CREATE TRIGGER discord_orientation_created AFTER INSERT ON orientation_completion
-BEGIN
-  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=NEW.user_id;
-END;
---> statement-breakpoint
-CREATE TRIGGER discord_orientation_deleted AFTER DELETE ON orientation_completion
-BEGIN
-  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id=OLD.user_id;
-END;
---> statement-breakpoint
-CREATE TRIGGER discord_orientation_changed AFTER UPDATE ON orientation_completion
-BEGIN
-  UPDATE discord_link SET version=version+1, next_attempt_at=0 WHERE user_id IN (OLD.user_id, NEW.user_id);
-END;
---> statement-breakpoint
-
 -- Reauthorization may refresh consent/tokens, but never silently swap identities.
 CREATE TRIGGER discord_identity_immutable BEFORE UPDATE OF user_id, discord_id, guild_id ON discord_link
 WHEN NEW.user_id IS NOT OLD.user_id OR NEW.discord_id IS NOT OLD.discord_id OR NEW.guild_id IS NOT OLD.guild_id

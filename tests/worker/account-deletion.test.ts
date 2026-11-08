@@ -349,7 +349,7 @@ test("self-service deletion requires fresh, confirmed same-origin authentication
         .run(),
       /account_deleted/,
     );
-    const management = await send("/manage/volunteers", bob.cookie);
+    const management = await send("/volunteers", bob.cookie);
     assert.equal(management.status, 200);
     assert.doesNotMatch(await management.text(), new RegExp(alice.email));
     const replacement = await login(alice.email);

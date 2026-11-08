@@ -1,0 +1,47 @@
+---
+interface Props {
+  active:
+    | "buttons"
+    | "filters"
+    | "discord"
+    | "organizer-profile"
+    | "event-card"
+    | "applications"
+    | "volunteers";
+}
+const { active } = Astro.props;
+const examples = [
+  { id: "buttons", label: "Buttons", href: "/dev/ui/buttons" },
+  { id: "filters", label: "Filters", href: "/dev/ui/filters" },
+  { id: "event-card", label: "Event card", href: "/dev/ui/event-card" },
+  {
+    id: "applications",
+    label: "Applications table",
+    href: "/dev/ui/applications",
+  },
+  { id: "volunteers", label: "Volunteers table", href: "/dev/ui/volunteers" },
+  {
+    id: "organizer-profile",
+    label: "Organizer profile",
+    href: "/dev/ui/organizer-profile",
+  },
+  { id: "discord", label: "Discord connection", href: "/dev/ui" },
+];
+---
+
+<header class="ui-page-header">
+  <h1>UI playground</h1>
+  <p>Local previews with fictional data.</p>
+  <nav class="ui-component-nav" aria-label="Website parts">
+    {
+      examples.map((example) => (
+        <a
+          href={example.href}
+          aria-current={active === example.id ? "page" : undefined}
+        >
+          {example.label}
+        </a>
+      ))
+    }
+  </nav>
+</header>

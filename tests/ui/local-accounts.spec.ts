@@ -30,6 +30,70 @@ test.beforeEach(async ({ page, baseURL }) => {
   ).toBeVisible();
 });
 
+test("organizer account states land in organizer events without changing volunteer or saved-account destinations", async ({
+  page,
+  baseURL,
+}) => {
+  const choose = async (key: string) => {
+    const profiles = await openLocalAccountSwitcher(page);
+    await profiles
+      .locator(`[data-switch-user="${accountStatePersona(key)}"]`)
+      .click();
+  };
+  await choose("organizer");
+  await expect(page).toHaveURL(/\/events$/);
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-view",
+    "manage",
+  );
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+
+  await page.goto("/volunteer?type=orientation");
+  await expect(page).toHaveURL(/\/events\?type=orientation$/);
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-view",
+    "manage",
+  );
+  const { user } = await (
+    await page.request.get("/api/v1/auth/get-session")
+  ).json();
+  for (const returnTo of [
+    undefined,
+    "/volunteer/account?tab=sessions",
+    "/applications",
+  ]) {
+    const response = await page.request.post("/api/v1/auth/dev/switch-user", {
+      headers: { origin: baseURL! },
+      data: { userId: user.id, ...(returnTo && { returnTo }) },
+    });
+    expect(response.ok(), await response.text()).toBe(true);
+    expect((await response.json()).next).toBe(returnTo ?? "/events");
+  }
+
+  await choose("patrol");
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-view",
+    "volunteer",
+  );
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toHaveCount(0);
+  expect((await page.request.get("/events?view=organizer")).status()).toBe(403);
+
+  await choose("inactive-organizer");
+  await expect(page).toHaveURL(/\/volunteer$/);
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-access",
+    "false",
+  );
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("Alt+Z toggles the DEV panel and restores focus without changing form input", async ({
   page,
 }) => {
@@ -123,7 +187,7 @@ test("DEV panel separates states from saved accounts and completes each applicat
         exact: true,
       });
       await expect(portal).toContainText(
-        "Join our Discord for the most up to date information.",
+        "Join our Discord for the most up-to-date information.",
       );
       await expect(invite).toHaveAttribute("href", social.discord);
       await expect(invite).toHaveAttribute("target", "_blank");
@@ -145,7 +209,7 @@ test("DEV panel separates states from saved accounts and completes each applicat
       await expect(
         page
           .locator('[data-application-progress-step="review"]')
-          .getByText("Pending approval", { exact: true }),
+          .getByText("Ready for review", { exact: true }),
       ).toHaveCount(0);
     if (index === 1) {
       await expect(
@@ -154,7 +218,7 @@ test("DEV panel separates states from saved accounts and completes each applicat
       await expect(
         page
           .locator('[data-application-progress-step="review"]')
-          .getByText("Pending approval", { exact: true }),
+          .getByText("Ready for review", { exact: true }),
       ).toBeVisible();
     }
     const refreshed = await openLocalAccountSwitcher(page);
@@ -206,7 +270,7 @@ test("DEV panel seeds presets in place without changing the current account or d
     );
     await expect(profiles).toHaveAttribute("aria-busy", "false");
     await expect(
-      profiles.locator('[data-switch-user^="local-account-user-"]'),
+      profiles.locator('[data-switch-user^="local-account-v2-user-"]'),
     ).toHaveCount(manualAccountPresets.length);
     await expect(seed).toBeEnabled();
   }
@@ -227,10 +291,10 @@ test("DEV panel seeds presets in place without changing the current account or d
       profiles.locator(`[data-switch-user="${preset.id}"]`),
     ).toBeVisible();
   for (const [key, count] of [
-    ["application", 4],
+    ["application", 8],
     ["orientation", 4],
     ["volunteers", 2],
-    ["access", 2],
+    ["access", 10],
   ] as const) {
     await expect(
       profiles.locator(`[data-account-category="${key}"] [data-switch-user]`),
@@ -245,7 +309,7 @@ test("DEV panel seeds presets in place without changing the current account or d
   ).toContainText("Patrol approved");
   const orientation = profiles.locator('[data-account-category="orientation"]');
   await expect(
-    orientation.locator('[data-switch-user="new-state:medic-orientee"]'),
+    orientation.locator('[data-switch-user="new-state:medic-new-volunteer"]'),
   ).toContainText("Not medic eligible");
   await expect(
     orientation.locator('[data-switch-user="new-state:orientation-booked"]'),
@@ -264,7 +328,7 @@ test("DEV panel seeds presets in place without changing the current account or d
   // Verify actual authenticator enrollment using a separate request cookie jar.
   const switched = await request.post("/api/v1/auth/dev/switch-user", {
     headers: { origin: baseURL! },
-    data: { userId: "local-account-user-organizer" },
+    data: { userId: "local-account-v2-user-organizer" },
   });
   expect(switched.ok()).toBe(true);
   const organizer = await (
@@ -272,7 +336,7 @@ test("DEV panel seeds presets in place without changing the current account or d
   ).json();
   expect(organizer.user.twoFactorEnabled).toBe(true);
   await expect(
-    profiles.locator('[data-switch-user="local-account-user-organizer"]'),
+    profiles.locator('[data-switch-user="local-account-v2-user-organizer"]'),
   ).toContainText("Patrol approved");
   const accountPage = await (await request.get("/volunteer/account")).text();
   expect(accountPage.match(/data-session-row/g)).toHaveLength(1);
@@ -286,16 +350,16 @@ test("DEV panel seeds presets in place without changing the current account or d
   ] as const) {
     const switched = await request.post("/api/v1/auth/dev/switch-user", {
       headers: { origin: baseURL! },
-      data: { userId: `local-account-user-${key}` },
+      data: { userId: `local-account-v2-user-${key}` },
     });
     expect(switched.ok()).toBe(true);
     const portal = await (await request.get("/volunteer")).text();
     expect(portal.match(/data-application-tracker/g) ?? []).toHaveLength(0);
     expect(
-      portal.includes('data-live-event="local-account-event-orientation"'),
+      portal.includes('data-live-event="local-account-v2-event-orientation"'),
     ).toBe(key !== "inactive");
     expect(
-      portal.includes('data-live-event="local-account-event-patrol"'),
+      portal.includes('data-live-event="local-account-v2-event-patrol"'),
     ).toBe(patrolAccess);
   }
 });
@@ -629,7 +693,9 @@ test("Discord linking stays hidden while applications advance to review and appr
     page.locator('[data-application-progress-step="review"]'),
   ).toHaveAttribute("data-state", "current");
   await expect(
-    page.getByText("Pending approval", { exact: true }),
+    page
+      .locator('[data-application-progress-step="review"]')
+      .getByText("Ready for review", { exact: true }),
   ).toBeVisible();
   await expectNoDiscord();
   await page.goto("/volunteer/account");
@@ -808,7 +874,7 @@ test.skip("Discord application step stays brief outside the current step", async
   const review = page.locator('[data-application-progress-step="review"]');
   await expect(review).toHaveAttribute("data-state", "current");
   await expect(
-    review.getByText("Pending approval", { exact: true }),
+    review.getByText("Ready for review", { exact: true }),
   ).toBeVisible();
   await expect(discord).toHaveAttribute("data-state", "complete");
   await discord.locator(":scope > summary").click();
@@ -911,9 +977,10 @@ test.skip("Connect Discord locally simulates consent, cancellation, failure and 
   );
   await expect(discord.locator("[data-discord-description]")).toBeHidden();
   await expect(discord).toHaveAttribute("data-state", "current");
-  await expect(page.getByText("Pending approval", { exact: true })).toHaveCount(
-    0,
-  );
+  const review = page.locator('[data-application-progress-step="review"]');
+  await expect(
+    review.getByText("Ready for review", { exact: true }),
+  ).toHaveCount(0);
   const pending = await (await page.request.get(endpoint)).json();
   expect(pending.completedAt).toBeNull();
   expect(pending.discordId).toBe(`local:${user.id}`);
@@ -929,10 +996,9 @@ test.skip("Connect Discord locally simulates consent, cancellation, failure and 
   expect(screened.ok(), await screened.text()).toBe(true);
   await page.reload();
   await expect(discord).toHaveAttribute("data-state", "complete");
-  const review = page.locator('[data-application-progress-step="review"]');
   await expect(review).toHaveAttribute("data-state", "current");
   await expect(
-    review.getByText("Pending approval", { exact: true }),
+    review.getByText("Ready for review", { exact: true }),
   ).toBeVisible();
   await discord.locator(":scope > summary").click();
   await discord

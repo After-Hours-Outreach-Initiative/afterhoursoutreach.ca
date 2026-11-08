@@ -1,4 +1,9 @@
 import { contactEmail } from "../../data/site";
+import {
+  defaultEventLimits,
+  minimumEventSpots,
+  type EventLimits,
+} from "../../data/event-limits";
 
 // User-facing previews of the rules enforced by database writes and triggers.sql.
 export interface SignupVolunteer {
@@ -9,38 +14,59 @@ export interface SignupVolunteer {
   role?: "volunteer" | "organizer";
 }
 
-export interface SignupEvent {
+export function canViewEvents(
+  actor:
+    | (SignupVolunteer & {
+        applicationComplete: boolean;
+        twoFactorEnabled: boolean | null | undefined;
+        twoFactorVerified: boolean;
+      })
+    | null,
+): boolean {
+  // Preserve existing patrol-approved volunteers and organizers, including legacy
+  // accounts without a self-reported course date. New volunteers need all milestones.
+  return Boolean(
+    actor?.applicationSubmitted &&
+    actor.active &&
+    (actor.applicationApproved || actor.role === "organizer") &&
+    (actor.applicationComplete ||
+      actor.patrolApproved ||
+      actor.role === "organizer") &&
+    (!actor.twoFactorEnabled || actor.twoFactorVerified),
+  );
+}
+
+export interface SignupEvent extends Partial<EventLimits> {
   // Legacy callers can keep supplying type; new forms use includesOrientation.
   type?: "patrol" | "orientation";
   includesOrientation?: boolean | number;
   startsAt: Date;
   open: boolean;
   spots: number;
-  orientationConfirmed?: number;
+  newVolunteerConfirmed?: number;
   medicConfirmed?: number;
-  // Server-derived: team selection, both organizer approvals and completion.
+  // Server-derived: team selection and both manual organizer approvals.
   medicEligible?: boolean | number;
-  // Whether the current volunteer has ANY recorded orientation completion.
-  orientationCompleted?: boolean | number;
-  orientationSignupBlocked?: boolean;
 }
 
-export const orientationSignupLimitMessage =
-  "You can book one upcoming orientation at a time until your first orientation is marked completed. Unregister from your current orientation before choosing another.";
-
-export const orientationFullMessage =
-  "All four places for volunteers who have not completed orientation are booked.";
+export const orientationFullMessage = "All new volunteer places are booked.";
 export const orientationReservedMessage =
-  "The remaining places are reserved for approved medics or volunteers who have not completed orientation.";
+  "The remaining places are reserved for approved medics or new volunteers awaiting patrol approval.";
 
 export const orientationCapacityMessage =
-  "Patrols need at least 2 total volunteer spots, or 4 when including orientation, to preserve reserved places.";
+  "Volunteer spots must cover the reserved medic places and, with orientation, reserved new volunteer places. The new volunteer maximum cannot be below its reserved places.";
 
-export function validOrientationCapacity(event: {
-  includesOrientation: boolean | number;
-  spots: number;
-}) {
-  return event.spots >= (event.includesOrientation ? 4 : 2);
+export function validOrientationCapacity(
+  event: Partial<EventLimits> & {
+    includesOrientation: boolean | number;
+    spots: number;
+  },
+) {
+  return (
+    event.spots >= minimumEventSpots(event) &&
+    (event.minNewVolunteerSpots ?? defaultEventLimits.minNewVolunteerSpots) <=
+      (event.maxNewVolunteers ?? defaultEventLimits.maxNewVolunteers)
+  );
 }
 
 export function eventIncludesOrientation(
@@ -56,30 +82,35 @@ export function availableSignupSpots(
     | "type"
     | "includesOrientation"
     | "spots"
-    | "orientationConfirmed"
-    | "orientationCompleted"
+    | "newVolunteerConfirmed"
     | "medicConfirmed"
     | "medicEligible"
+    | keyof EventLimits
   >,
   confirmed: number,
+  volunteer: Pick<SignupVolunteer, "patrolApproved">,
 ) {
   const orientation = eventIncludesOrientation(event);
-  const orientee = orientation && !event.orientationCompleted;
-  const medic = !orientee && Boolean(event.medicEligible);
+  const newVolunteer = orientation && !volunteer.patrolApproved;
+  const medic = !newVolunteer && Boolean(event.medicEligible);
   const medics = event.medicConfirmed ?? 0;
-  const orientees = event.orientationConfirmed ?? 0;
+  const newVolunteers = event.newVolunteerConfirmed ?? 0;
+  const limits = { ...defaultEventLimits, ...event };
   // Try successive additions in the viewer's mutually exclusive category. Each
   // addition must leave room for BOTH categories' outstanding reservations.
   let available = 0;
   for (let added = 1; added <= event.spots - confirmed; added++) {
-    const afterOrientees = orientees + (orientee ? added : 0);
-    if (orientee && afterOrientees > 4) break;
-    const outstandingMedics = Math.max(0, 2 - medics - (medic ? added : 0));
-    const outstandingOrientees = orientation
-      ? Math.max(0, 2 - afterOrientees)
+    const afterNewVolunteers = newVolunteers + (newVolunteer ? added : 0);
+    if (newVolunteer && afterNewVolunteers > limits.maxNewVolunteers) break;
+    const outstandingMedics = Math.max(
+      0,
+      limits.minMedicSpots - medics - (medic ? added : 0),
+    );
+    const outstandingNewVolunteers = orientation
+      ? Math.max(0, limits.minNewVolunteerSpots - afterNewVolunteers)
       : 0;
     if (
-      confirmed + added + outstandingMedics + outstandingOrientees >
+      confirmed + added + outstandingMedics + outstandingNewVolunteers >
       event.spots
     )
       break;
@@ -119,14 +150,13 @@ export function eventSignupBlockReason(
   if (!includesOrientation && !volunteer.patrolApproved)
     return "Organizer approval is required to register for patrols.";
   if (confirmed >= event.spots) return "This event is full.";
-  if (!availableSignupSpots(event, confirmed))
+  if (!availableSignupSpots(event, confirmed, volunteer))
     return includesOrientation &&
-      !event.orientationCompleted &&
-      (event.orientationConfirmed ?? 0) >= 4
+      !volunteer.patrolApproved &&
+      (event.newVolunteerConfirmed ?? 0) >=
+        (event.maxNewVolunteers ?? defaultEventLimits.maxNewVolunteers)
       ? orientationFullMessage
       : orientationReservedMessage;
-  if (includesOrientation && event.orientationSignupBlocked)
-    return orientationSignupLimitMessage;
   return null;
 }
 

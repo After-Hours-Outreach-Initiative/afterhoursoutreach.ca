@@ -5,43 +5,50 @@ import {
   createLocalAccount,
   approveLocalApplication,
   openLocalAccountSwitcher,
+  signInLocalAuthenticatorAccount,
 } from "../helpers/local-account";
 
 test("event checks run every five seconds, retry failures, and pause without overlapping requests", async ({
   page,
+  baseURL,
 }) => {
+  await signInLocalAuthenticatorAccount(page.request, baseURL!);
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   let checks = 0;
   let finishedChecks = 0;
   page.on("requestfinished", (request) => {
-    if (request.url().endsWith("/api/v1/events/version")) finishedChecks++;
+    if (new URL(request.url()).pathname === "/api/v1/events/version")
+      finishedChecks++;
   });
   let version: string | null = null;
   let release!: () => void;
   const heldCheck = new Promise<void>((resolve) => (release = resolve));
-  await page.route("**/api/v1/events/version", async (route) => {
-    const check = ++checks;
-    version ??= await page
-      .locator("[data-event-browser]")
-      .getAttribute("data-event-version");
-    if (check === 5) await heldCheck;
-    await route.fulfill(
-      check === 3
-        ? { status: 503, body: "Temporary failure" }
-        : { json: { version } },
-    );
-  });
+  await page.route(
+    (url) => url.pathname === "/api/v1/events/version",
+    async (route) => {
+      const check = ++checks;
+      version ??= await page
+        .locator("[data-event-browser]")
+        .getAttribute("data-event-version");
+      if (check === 5) await heldCheck;
+      await route.fulfill(
+        check === 3
+          ? { status: 503, body: "Temporary failure" }
+          : { json: { version } },
+      );
+    },
+  );
   let pageRefreshes = 0;
   page.on("request", (request) => {
     if (
-      new URL(request.url()).pathname === "/volunteer" &&
+      new URL(request.url()).pathname === "/events" &&
       request.resourceType() !== "document"
     )
       pageRefreshes++;
   });
   try {
-    await page.goto("/volunteer");
+    await page.goto("/events");
     await expect.poll(() => checks).toBe(1);
     await expect.poll(() => finishedChecks).toBe(1);
     await page.clock.runFor(4_999);
@@ -62,7 +69,8 @@ test("event checks run every five seconds, retry failures, and pause without ove
     await page.clock.runFor(15_000);
     expect(checks).toBe(5);
     const completed = page.waitForEvent("requestfinished", {
-      predicate: (request) => request.url().endsWith("/api/v1/events/version"),
+      predicate: (request) =>
+        new URL(request.url()).pathname === "/api/v1/events/version",
     });
     release();
     await completed;
@@ -102,31 +110,37 @@ test("event checks run every five seconds, retry failures, and pause without ove
 
 test("event polling pauses after five idle minutes and checks for updates on return without reloading", async ({
   page,
+  baseURL,
 }) => {
+  await signInLocalAuthenticatorAccount(page.request, baseURL!);
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   let checks = 0;
   let finishedChecks = 0;
   let version: string | null = null;
   page.on("requestfinished", (request) => {
-    if (request.url().endsWith("/api/v1/events/version")) finishedChecks++;
+    if (new URL(request.url()).pathname === "/api/v1/events/version")
+      finishedChecks++;
   });
-  await page.route("**/api/v1/events/version", async (route) => {
-    const check = ++checks;
-    version ??= await page
-      .locator("[data-event-browser]")
-      .getAttribute("data-event-version");
-    await route.fulfill({
-      json: { version: check === 5 ? "0".repeat(64) : version },
-    });
-  });
-  await page.goto("/volunteer");
+  await page.route(
+    (url) => url.pathname === "/api/v1/events/version",
+    async (route) => {
+      const check = ++checks;
+      version ??= await page
+        .locator("[data-event-browser]")
+        .getAttribute("data-event-version");
+      await route.fulfill({
+        json: { version: check === 5 ? "0".repeat(64) : version },
+      });
+    },
+  );
+  await page.goto("/events");
   await expect.poll(() => finishedChecks).toBe(1);
   let documents = 0;
   let pageRefreshes = 0;
   page.on("request", (request) => {
     if (request.resourceType() === "document") documents++;
-    else if (new URL(request.url()).pathname === "/volunteer") pageRefreshes++;
+    else if (new URL(request.url()).pathname === "/events") pageRefreshes++;
   });
 
   await page.clock.fastForward(240_000);
@@ -200,7 +214,6 @@ test("other viewers see signups and cancellations through polling without losing
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -215,6 +228,9 @@ test("other viewers see signups and cancellations through polling without losing
         meetingPoint,
         meetingPointUrl: "",
         spots: 4,
+        minMedicSpots: 2,
+        minNewVolunteerSpots: 0,
+        maxNewVolunteers: 4,
         open: true,
         hidden: false,
       },
@@ -239,8 +255,17 @@ test("other viewers see signups and cancellations through polling without losing
       attendee.request,
       baseURL!,
     );
-    await approveLocalApplication(page.request, baseURL!, viewerAccount.id);
-    await approveLocalApplication(page.request, baseURL!, attendeeAccount.id);
+    for (const [current, account] of [
+      [viewer, viewerAccount],
+      [attendee, attendeeAccount],
+    ] as const) {
+      const completed = await current.request.post("/api/v1/account/naloxone", {
+        headers: { origin: baseURL! },
+        data: { userId: account.id, completed: true },
+      });
+      expect(completed.status(), await completed.text()).toBe(200);
+      await approveLocalApplication(page.request, baseURL!, account.id);
+    }
     const errors: string[] = [];
     for (const current of [page, visitor, viewer, attendee])
       current.on("pageerror", (error) => errors.push(error.message));
@@ -257,7 +282,7 @@ test("other viewers see signups and cancellations through polling without losing
     // A numeric false signup flag must not render an extra zero before the count.
     for (const current of [page, viewer, attendee]) {
       const availability = card(current).locator("[data-event-availability]");
-      await expect(availability).toHaveText("0 of 4 spots taken");
+      await expect(availability).toHaveText("Open · 4 of 4 spots remaining");
       await expect(availability).toHaveAttribute("aria-live", "polite");
       await expect(availability).toHaveAttribute("aria-atomic", "true");
     }
@@ -269,7 +294,7 @@ test("other viewers see signups and cancellations through polling without losing
     for (const current of [viewer, attendee]) {
       await expect(
         card(current).locator("[data-event-availability]"),
-      ).toHaveText("1 of 4 spots taken", { timeout: 15_000 });
+      ).toHaveText("Open · 3 of 4 spots remaining", { timeout: 15_000 });
       await expect(
         card(current).getByRole("button", { name: "Register", exact: true }),
       ).toHaveClass("btn btn-green");
@@ -306,34 +331,34 @@ test("other viewers see signups and cancellations through polling without losing
     ).toBeVisible();
     await expect(
       card(attendee).locator("[data-event-availability]"),
-    ).toHaveText("Registered · 2 of 4 spots taken");
+    ).toHaveText("Registered · 2 of 4 spots remaining");
     await expect(
       card(attendee).getByRole("button", { name: "Unregister", exact: true }),
     ).toBeEnabled();
     await expect(card(viewer).locator("[data-event-availability]")).toHaveText(
-      "2 of 4 spots taken",
+      "Open · 2 of 4 spots remaining",
       { timeout: 15_000 },
     );
     await expect(
       card(viewer).getByText(
-        "The remaining places are reserved for approved medics or volunteers who have not completed orientation.",
+        "The remaining places are reserved for approved medics or new volunteers awaiting patrol approval.",
         { exact: true },
       ),
     ).toHaveCount(1);
+    await expect(card(viewer).locator(".volunteer-spots-full")).toHaveCount(0);
     await expect(card(viewer)).not.toContainText(/You can(?:’t)? register/);
     await expect(organizerCard.locator("[data-event-availability]")).toHaveText(
-      "2 of 4 spots taken",
+      "Registered · 2 of 4 spots remaining",
       { timeout: 15_000 },
     );
     await expect(
       organizerCard.locator(".volunteer-spots, [data-live-signup]"),
-    ).toHaveCount(0);
+    ).toHaveCount(2);
     await expect(
       card(viewer).getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
-    await expect(
-      viewer.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
-    ).toBeFocused();
+    // The focused registration action disappeared; keep focus on its event.
+    await expect(card(viewer)).toBeFocused();
     expect(failedRefreshes).toBeGreaterThanOrEqual(2);
     await viewer.unroute("**/events?type=orientation");
     await expect(
@@ -362,12 +387,16 @@ test("other viewers see signups and cancellations through polling without losing
     await card(attendee)
       .getByRole("button", { name: "Unregister", exact: true })
       .click();
+    await attendee
+      .getByRole("dialog", { name: "Unregister from this event?", exact: true })
+      .getByRole("button", { name: "Unregister", exact: true })
+      .click();
     await expect(
       card(attendee).getByText("Registered", { exact: true }),
     ).toHaveCount(0);
     await expect(
       card(attendee).locator("[data-event-availability]"),
-    ).toHaveText("1 of 4 spots taken");
+    ).toHaveText("Open · 3 of 4 spots remaining");
     await expect(
       card(attendee).getByRole("button", { name: "Register", exact: true }),
     ).toBeEnabled();
@@ -377,7 +406,7 @@ test("other viewers see signups and cancellations through polling without losing
       document.dispatchEvent(new Event("visibilitychange"));
     });
     await expect(card(viewer).locator("[data-event-availability]")).toHaveText(
-      "1 of 4 spots taken",
+      "Open · 3 of 4 spots remaining",
       { timeout: 15_000 },
     );
     await expect(card(viewer)).not.toContainText(/You can(?:’t)? register/);
@@ -401,7 +430,7 @@ test("other viewers see signups and cancellations through polling without losing
   }
 });
 
-test("filter counts track grouped series, polling, actions and past events", async ({
+test("filter counts track recurring dates, polling, actions and past events", async ({
   page,
   baseURL,
 }) => {
@@ -416,9 +445,8 @@ test("filter counts track grouped series, polling, actions and past events", asy
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   const filters = page.getByRole("group", { name: "Filter events" });
-  await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
+  await filters.getByRole("button", { name: /^Orientations \d+$/ }).click();
   const counts = filters.locator("[data-event-filter-count]");
   const before = (await counts.allTextContents()).map(Number);
   expect(before).toHaveLength(4);
@@ -445,12 +473,20 @@ test("filter counts track grouped series, polling, actions and past events", asy
   });
   expect(created.status(), await created.text()).toBe(200);
   const { id } = await created.json();
+  const occurrences = page.locator(
+    `[data-event-list] > [data-event-series="${id}"]`,
+  );
+  await expect
+    .poll(() => occurrences.count(), { timeout: 15_000 })
+    .toBeGreaterThan(1);
+  const added = await occurrences.count();
   await expect(counts).toHaveText(
-    [before[0] + 1, before[1], before[2] + 1, before[3] + 1].map(String),
+    [before[0] + added, before[1], before[2] + added, before[3] + added].map(
+      String,
+    ),
     { timeout: 15_000 },
   );
   const series = page.locator(`[data-series-card="${id}"]`);
-  expect(await series.locator("[data-live-event]").count()).toBeGreaterThan(1);
   await expect(selectedFilter).toBeFocused();
 
   await page.getByRole("button", { name: "Create", exact: true }).click();
@@ -458,12 +494,15 @@ test("filter counts track grouped series, polling, actions and past events", asy
   await fillDateInput(editor, "startsAt", `${firstDate}T21:30`);
   const meetingPoint = `One-off count ${crypto.randomUUID()}`;
   await editor.getByLabel("Meeting point", { exact: true }).fill(meetingPoint);
-  await editor
-    .getByRole("button", { name: "Create event", exact: true })
-    .click();
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).not.toBeVisible();
   await expect(counts).toHaveText(
-    [before[0] + 2, before[1] + 1, before[2] + 1, before[3] + 1].map(String),
+    [
+      before[0] + added + 1,
+      before[1] + 1,
+      before[2] + added,
+      before[3] + added,
+    ].map(String),
   );
   await expect(
     page.locator("[data-live-event]").filter({ hasText: meetingPoint }),
@@ -473,10 +512,9 @@ test("filter counts track grouped series, polling, actions and past events", asy
     "orientation",
   );
 
-  // An expanded occurrence/roster moves into management history at its start,
+  // An occurrence with an expanded roster moves into management history at its start,
   // without losing series tools, filter counts, or attendance actions.
-  await series.locator("[data-series-occurrences] > summary").click();
-  const occurrence = series.locator("[data-live-event]").first();
+  const occurrence = occurrences.first();
   const occurrenceId = (await occurrence.getAttribute("data-live-event"))!;
   const joined = await page.request.post("/api/v1/events/action", {
     headers: { origin: baseURL! },
@@ -510,7 +548,7 @@ test("filter counts track grouped series, polling, actions and past events", asy
   const pastOccurrence = past.locator(`[data-live-event="${occurrenceId}"]`);
   await expect(pastOccurrence).toBeVisible({ timeout: 25_000 });
   await expect(
-    series.locator(`[data-live-event="${occurrenceId}"]`),
+    page.locator(`[data-event-list] > [data-live-event="${occurrenceId}"]`),
   ).toHaveCount(0);
   await expect(page.locator(`[data-live-event="${occurrenceId}"]`)).toHaveCount(
     1,
@@ -525,10 +563,18 @@ test("filter counts track grouped series, polling, actions and past events", asy
     ),
   ).toHaveCount(0);
   await expect(counts).toHaveText(
-    [before[0] + 3, before[1] + 1, before[2] + 2, before[3] + 2].map(String),
+    [
+      before[0] + added + 2,
+      before[1] + 1,
+      before[2] + added + 1,
+      before[3] + added + 1,
+    ].map(String),
   );
   await pastOccurrence
-    .getByRole("button", { name: "Mark orientation completed", exact: true })
+    .getByRole("button", { name: "Approve for patrols", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Save without email", exact: true })
     .click();
   await expect(
     pastOccurrence.getByText("Orientation completed", { exact: true }),
@@ -537,21 +583,18 @@ test("filter counts track grouped series, polling, actions and past events", asy
     "open",
     "",
   );
-  await filters
-    .getByRole("button", { name: /^One-off events \(\d+\)$/ })
-    .click();
+  await filters.getByRole("button", { name: /^One-off events \d+$/ }).click();
   await expect(pastOccurrence).toBeHidden();
-  await filters
-    .getByRole("button", { name: /^Recurring series \(\d+\)$/ })
-    .click();
+  await filters.getByRole("button", { name: /^Recurring events \d+$/ }).click();
   await expect(pastOccurrence).toBeVisible();
   await page.goto(
-    `/manage/events?type=recurring&occurrence=${encodeURIComponent(occurrenceId)}`,
+    `/events?type=recurring&occurrence=${encodeURIComponent(occurrenceId)}`,
   );
   await expect(pastOccurrence).toBeVisible();
   await expect(
-    series.locator(`[data-live-event="${occurrenceId}"]`),
+    page.locator(`[data-event-list] > [data-live-event="${occurrenceId}"]`),
   ).toHaveCount(0);
+  await page.locator("[data-series-management] > summary").click();
   await expect(
     series.getByRole("button", { name: "Edit series", exact: true }),
   ).toBeVisible();
@@ -562,7 +605,9 @@ test("filter counts track grouped series, polling, actions and past events", asy
     await page.locator("[data-past-event-list] > li").count(),
   ).toBeGreaterThan(0);
   await expect(filters.getByRole("button")).toHaveText([
-    `All (${await cards.count()})`,
-    `Orientations (${await page.locator('[data-live-event][data-includes-orientation="true"]').count()})`,
+    `All ${await cards.count()}`,
+    `One-off events ${await page.locator("[data-live-event]:not([data-event-series])").count()}`,
+    `Recurring events ${await page.locator("[data-live-event][data-event-series]").count()}`,
+    `Orientations ${await page.locator('[data-live-event][data-includes-orientation="true"]').count()}`,
   ]);
 });

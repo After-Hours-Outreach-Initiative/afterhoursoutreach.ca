@@ -1,0 +1,122 @@
+---
+import type {
+  viewVolunteerProfile,
+  VolunteerRow,
+  VolunteerOrientation,
+} from "@/server/db/volunteers";
+import { profileFormSections } from "@/data/application";
+import { personFullName } from "@/data/person-name";
+import ApplicationProgressMini from "@/components/volunteer/ApplicationProgressMini.astro";
+import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.astro";
+import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
+import PatrolApproval from "@/components/volunteer/PatrolApproval.astro";
+import PageContents from "@/components/volunteer/PageContents.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import type { ApplicationProgress } from "@/server/db/application-progress";
+interface Props {
+  profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
+  person: VolunteerRow;
+  orientation: VolunteerOrientation | null;
+  completedOrientation: VolunteerOrientation | null;
+  progress: ApplicationProgress;
+}
+const { profile, person, orientation, completedOrientation, progress } =
+  Astro.props;
+const profileSections = profileFormSections();
+const contents = [
+  { id: "patrol-approval-heading", heading: "Patrol Approval" },
+  ...(person.applicationApproved
+    ? [
+        { id: "volunteer-profile-panel", heading: "Profile" },
+        ...profileSections.map((section) => ({
+          id: `volunteer-current-${section.key}`,
+          heading: section.heading,
+          nested: true,
+        })),
+      ]
+    : []),
+  { id: "volunteer-application-panel", heading: "Application" },
+  ...(person.applicationApproved
+    ? [
+        {
+          id: "volunteer-organizer-controls-heading",
+          heading: "Organizer controls",
+        },
+      ]
+    : []),
+];
+---
+
+<div data-volunteer-profile>
+  <div data-volunteer-profile-overview>
+    <h2>{personFullName(profile.answers, person.name)}</h2>
+  </div>
+  <PageContents entries={contents} heading="Sections" idleHeading="Sections" />
+  <div data-volunteer-profile-body>
+    <PatrolApproval
+      {person}
+      {orientation}
+      {completedOrientation}
+      accessChangedBy={profile.patrolAccessChangedBy}
+    />
+    {
+      Boolean(person.applicationApproved) && (
+        <section
+          id="volunteer-profile-panel"
+          data-volunteer-profile-panel="profile"
+          aria-labelledby="volunteer-profile-heading"
+        >
+          <h2 id="volunteer-profile-heading" data-contents-section>
+            Profile
+          </h2>
+          <div class="account-profile-summary mt-6 mb-8">
+            <dl>
+              <div>
+                <dt>Email</dt>
+                <dd>{profile.email}</dd>
+              </div>
+            </dl>
+          </div>
+          {profileSections.map((section) => (
+            <section class="volunteer-profile-section">
+              <h3
+                id={`volunteer-current-${section.key}`}
+                class="volunteer-profile-heading mb-6"
+                data-contents-section
+              >
+                {section.heading}
+              </h3>
+              <AccountProfileAnswers
+                section={section}
+                values={profile.answers}
+                hideEmptyMiddleNames
+              />
+            </section>
+          ))}
+        </section>
+      )
+    }
+    <section
+      id="volunteer-application-panel"
+      data-volunteer-profile-panel="application"
+      aria-labelledby="volunteer-application-heading"
+    >
+      <h2 id="volunteer-application-heading" data-contents-section>
+        Application
+      </h2>
+      <ApplicationProgressMini {progress} showTime />
+      <a
+        class="btn btn-outline mt-6"
+        href={`/applications/${encodeURIComponent(person.id)}`}
+      >
+        View application
+        <ArrowRightIcon class="btn-icon" />
+      </a>
+    </section>
+    {
+      Boolean(person.applicationApproved) && (
+        <VolunteerControls person={person} />
+      )
+    }
+  </div>
+</div>

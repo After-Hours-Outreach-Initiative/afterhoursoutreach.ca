@@ -21,12 +21,27 @@ import {
 import { RequestError } from "../http";
 import { databaseWriteError } from "./errors";
 import {
+  applicationReadyForReviewSql,
+  applicationStatusSql,
+  attendeeCategorySql,
   includesOrientationSql,
+  medicMarkSql,
   nowMsSql,
+  personDisplayNameSql,
   profileDisplayNameSql,
   profileFullNameSql,
 } from "./sql";
-import type { VolunteerApprovalFilter } from "../../data/volunteer-list";
+import type {
+  ApplicationSort,
+  ApplicationApprovalFilter,
+  VolunteerSort,
+  VolunteerSortDirection,
+} from "../../data/volunteer-list";
+import {
+  directoryView,
+  type DirectoryPerson,
+  type DirectoryListState,
+} from "../../data/volunteer-list";
 
 export interface VolunteerRow {
   id: string;
@@ -34,60 +49,97 @@ export interface VolunteerRow {
   role: "volunteer" | "organizer";
   active: number;
   applicationApproved: number;
+  applicationReadyForReview: number;
   applicationRejectionReason: string | null;
   patrolApproved: number;
   updatedAt: number;
   twoFactorEnabled: number;
   orientations: number;
 }
-export const volunteerPageSize = 50;
 
 export async function listVolunteers(
   db: Env["DB"],
   actor: Actor,
   search = "",
-  offset = 0,
-  approval: VolunteerApprovalFilter = "all",
+  sort: VolunteerSort = "role",
+  direction: VolunteerSortDirection = "asc",
+) {
+  return listPeople(db, actor, false, {
+    search,
+    approval: "all",
+    sort,
+    direction,
+  });
+}
+
+export async function listApplications(
+  db: Env["DB"],
+  actor: Actor,
+  search = "",
+  approval: ApplicationApprovalFilter = "all",
+  sort: ApplicationSort = "progress",
+  direction: VolunteerSortDirection = "asc",
+) {
+  return listPeople(db, actor, true, { search, approval, sort, direction });
+}
+
+/** Count the full review queue without loading directory rows or private answers. */
+export async function countReadyApplications(db: Env["DB"], actor: Actor) {
+  requireOrganizer(actor);
+  return (
+    (await db
+      .prepare(
+        `SELECT count(*) AS count
+         FROM user u JOIN profile p ON p.user_id = u.id
+         JOIN volunteer_status v ON v.user_id = u.id
+         WHERE u.deleted_at IS NULL AND (${applicationStatusSql}) = 'awaiting'`,
+      )
+      .first<number>("count")) ?? 0
+  );
+}
+
+async function listPeople(
+  db: Env["DB"],
+  actor: Actor,
+  applications: boolean,
+  state: DirectoryListState,
 ) {
   requireOrganizer(actor);
   // A profile is created only on submission; private drafts never enter either
-  // query. Both filter counts respect search, but not approval or pagination.
-  const applicantsSql = `FROM user u
-      JOIN profile p ON p.user_id = u.id
-      JOIN volunteer_status v ON v.user_id = u.id
-      WHERE instr(lower(${profileDisplayNameSql} || ' ' || ${profileFullNameSql}), lower(?)) > 0
-        AND u.deleted_at IS NULL`;
-  const query = search.slice(0, 100);
-  const [rows, counts] = (await db.batch([
-    db
-      .prepare(
-        `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+  // directory. Load the small directory once; server and browser share its view.
+  // Application badges show submitted medic-team interest, not approval or
+  // patrol eligibility. Approved volunteers retain the shared roster mark.
+  const directoryMedicMarkSql = applications
+    ? "EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')"
+    : medicMarkSql("u.id");
+  // Completion dates the last applicant prerequisite, not account creation,
+  // organizer approval, or patrol signup. SQLite max keeps missing steps null.
+  const applicationCompletedAtSql =
+    "max(p.registered_at, p.naloxone_completed_at)";
+  const { results: allRows } = await db
+    .prepare(
+      `SELECT u.id, ${profileDisplayNameSql} AS name,
+         ${profileDisplayNameSql} || ' ' || ${profileFullNameSql} AS searchName,
+         ${applicationStatusSql} AS status, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        ${applicationReadyForReviewSql} AS applicationReadyForReview,
+        ${applicationCompletedAtSql} AS applicationCompletedAt,
+        ${attendeeCategorySql("u.id")} AS category,
+        ${directoryMedicMarkSql} AS medicMark,
         (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
-      ${applicantsSql}
-        AND (? = 'all' OR (v.registration_approved = 0 AND v.application_rejection_reason IS NULL))
-      ORDER BY v.registration_approved, name, u.id
-      LIMIT ? OFFSET ?`,
-      )
-      .bind(query, approval, volunteerPageSize + 1, offset),
-    db
-      .prepare(
-        `SELECT count(*) AS allApplicantsCount,
-          count(CASE WHEN v.registration_approved = 0 AND v.application_rejection_reason IS NULL THEN 1 END) AS awaitingApprovalCount
-        ${applicantsSql}`,
-      )
-      .bind(query),
-  ])) as [
-    D1Result<VolunteerRow>,
-    D1Result<{ allApplicantsCount: number; awaitingApprovalCount: number }>,
-  ];
+       FROM user u JOIN profile p ON p.user_id = u.id
+       JOIN volunteer_status v ON v.user_id = u.id
+       WHERE u.deleted_at IS NULL
+         ${applications ? "" : "AND v.registration_approved = 1"}`,
+    )
+    .all<VolunteerRow & DirectoryPerson>();
   return {
-    rows: rows.results.slice(0, volunteerPageSize),
-    hasMore: rows.results.length > volunteerPageSize,
-    allApplicantsCount: Number(counts.results[0]?.allApplicantsCount ?? 0),
-    awaitingApprovalCount: Number(
-      counts.results[0]?.awaitingApprovalCount ?? 0,
+    ...directoryView(
+      allRows,
+      applications ? "applications" : "volunteers",
+      state,
     ),
+    allRows,
   };
 }
 
@@ -97,12 +149,65 @@ export function findVolunteer(db: Env["DB"], actor: Actor, userId: string) {
     .prepare(
       `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
+        ${applicationReadyForReviewSql} AS applicationReadyForReview,
         (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
       FROM user u JOIN profile p ON p.user_id=u.id
       JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=? AND u.deleted_at IS NULL`,
     )
     .bind(userId)
     .first<VolunteerRow>();
+}
+
+export interface VolunteerOrientation {
+  eventId: string;
+  startsAt: number;
+  meetingPoint: string;
+}
+
+export interface VolunteerPatrolAccessChange {
+  id: string;
+  /** Historical attribution can outlive the organizer's viewable profile. */
+  profileId: string | null;
+  name: string;
+  changedAt: number;
+}
+
+/** Prefer the next booked orientation, otherwise the latest started orientation. */
+export function findVolunteerOrientation(
+  db: Env["DB"],
+  actor: Actor,
+  userId: string,
+) {
+  requireOrganizer(actor);
+  return db
+    .prepare(
+      `SELECT e.id AS eventId, e.starts_at AS startsAt, e.meeting_point AS meetingPoint
+       FROM event e JOIN signup s ON s.event_id=e.id
+       WHERE s.user_id=? AND s.status='confirmed' AND e.cancelled_at IS NULL
+         AND ${includesOrientationSql()}
+       ORDER BY e.starts_at > ${nowMsSql} DESC,
+         CASE WHEN e.starts_at > ${nowMsSql} THEN e.starts_at ELSE -e.starts_at END, e.id
+       LIMIT 1`,
+    )
+    .bind(userId)
+    .first<VolunteerOrientation>();
+}
+
+/** Recorded attendance remains visible even if its registration or event changed. */
+export function findCompletedVolunteerOrientation(
+  db: Env["DB"],
+  actor: Actor,
+  userId: string,
+) {
+  requireOrganizer(actor);
+  return db
+    .prepare(
+      `SELECT e.id AS eventId, e.starts_at AS startsAt, e.meeting_point AS meetingPoint
+     FROM orientation_completion o JOIN event e ON e.id=o.event_id
+     WHERE o.user_id=? ORDER BY e.starts_at, o.marked_at, o.id LIMIT 1`,
+    )
+    .bind(userId)
+    .first<VolunteerOrientation>();
 }
 
 /** Log before reading sensitive answers; failed logging means no disclosure. */
@@ -161,10 +266,21 @@ export async function viewVolunteerProfile(
     // approved_by belongs to patrol approval. The latest application-status
     // audit identifies the current approver only while the application is approved.
     // Historical approvals without such an audit deliberately stay unattributed.
+    // Link only to profiles the organizer-only detail route can still resolve.
     db
       .prepare(
-        `SELECT approver.id, approver.name, approver.email, a.created_at AS approvedAt
+        `SELECT approver.id, ${personDisplayNameSql({
+          firstName: "approver_profile.first_name",
+          lastName: "approver_profile.last_name",
+          preferredName: "approver_profile.preferred_name",
+          legacyName: "approver.name",
+        })} AS name,
+           CASE WHEN approver.deleted_at IS NULL AND EXISTS (
+             SELECT 1 FROM volunteer_status WHERE user_id=approver.id
+           ) THEN approver_profile.user_id END AS profileId,
+           a.created_at AS approvedAt
         FROM audit_log a JOIN user approver ON approver.id=a.actor_id
+        LEFT JOIN profile approver_profile ON approver_profile.user_id=approver.id
         JOIN volunteer_status v ON v.user_id=a.subject_id
         WHERE a.subject_id=? AND v.registration_approved=1
           AND a.action='approval_changed'
@@ -174,6 +290,35 @@ export async function viewVolunteerProfile(
         ORDER BY a.created_at DESC, a.rowid DESC LIMIT 1`,
       )
       .bind(userId, accessId),
+    // Revocation clears approved_by/approved_at, so use the latest patrol-specific
+    // audit. Retain attribution for older approvals recorded only on the status.
+    db
+      .prepare(
+        `SELECT organizer.id, ${personDisplayNameSql({
+          firstName: "organizer_profile.first_name",
+          lastName: "organizer_profile.last_name",
+          preferredName: "organizer_profile.preferred_name",
+          legacyName: "organizer.name",
+        })} AS name,
+           CASE WHEN organizer.deleted_at IS NULL AND EXISTS (
+             SELECT 1 FROM volunteer_status WHERE user_id=organizer.id
+           ) THEN organizer_profile.user_id END AS profileId,
+           change.changedAt
+        FROM (
+          SELECT actor_id, created_at AS changedAt, rowid AS sequence FROM audit_log
+          WHERE subject_id=? AND action='approval_changed'
+            AND EXISTS (SELECT 1 FROM json_each(changed_fields) WHERE value='patrolApproved')
+          UNION ALL
+          SELECT approved_by, approved_at, 0 FROM volunteer_status
+          WHERE user_id=? AND patrol_approved=1
+            AND approved_by IS NOT NULL AND approved_at IS NOT NULL
+        ) change
+        JOIN user organizer ON organizer.id=change.actor_id
+        LEFT JOIN profile organizer_profile ON organizer_profile.user_id=organizer.id
+        WHERE EXISTS (SELECT 1 FROM audit_log WHERE id=?)
+        ORDER BY change.changedAt DESC, change.sequence DESC LIMIT 1`,
+      )
+      .bind(userId, userId, accessId),
   ]);
   if (!results[0].meta.changes)
     throw new RequestError(
@@ -213,7 +358,10 @@ export async function viewVolunteerProfile(
     ...answers
   } = row;
   const applicationApprovedBy = results[2].results[0] as
-    { id: string; name: string; email: string; approvedAt: number } | undefined;
+    | { id: string; profileId: string | null; name: string; approvedAt: number }
+    | undefined;
+  const patrolAccessChangedBy = results[3].results[0] as
+    VolunteerPatrolAccessChange | undefined;
   const sources = row.heardAboutUsSources
     ? (JSON.parse(row.heardAboutUsSources) as string[])
     : [];
@@ -243,6 +391,7 @@ export async function viewVolunteerProfile(
     } satisfies ApplicationAnswers,
     email,
     applicationApprovedBy: applicationApprovedBy ?? null,
+    patrolAccessChangedBy: patrolAccessChangedBy ?? null,
     submittedAt: new Date(submittedAt).toISOString(),
     naloxoneCompletedAt,
     codeOfConductVersion,
@@ -496,7 +645,8 @@ export async function rejectApplication(
         WHERE user_id=? AND updated_at=? AND registration_approved=0
           AND application_rejection_reason IS NULL
           AND EXISTS (SELECT 1 FROM profile p JOIN user u ON u.id=p.user_id
-            WHERE p.user_id=volunteer_status.user_id AND u.deleted_at IS NULL AND u.email_verified=1)
+            WHERE p.user_id=volunteer_status.user_id AND u.deleted_at IS NULL AND u.email_verified=1
+              AND ${applicationReadyForReviewSql})
           AND ${writePermission(true)}`,
         )
         .bind(reason, now, userId, version, ...permissionValues(actor)),
@@ -638,84 +788,152 @@ export async function setRole(
   }
 }
 
-export async function completeOrientation(
+export const patrolApprovalSchema = z.strictObject({
+  userId: z.string().min(1).max(200),
+  version: z.number().int().nonnegative(),
+  eventId: z.string().min(1).max(200).optional(),
+  notify: z.boolean().default(false),
+});
+
+/** Grant patrol access independently of orientation attendance. */
+export async function approveForPatrols(
   db: Env["DB"],
   actor: Actor,
-  userId: string,
-  eventId: string,
+  input: unknown,
 ) {
   requireOrganizer(actor);
-  const eligible = await db
-    .prepare(
-      `SELECT e.id
-      FROM event e
-      JOIN signup s ON s.event_id = e.id
-      WHERE e.id = ?
-        AND coalesce(e.includes_orientation, e.type = 'orientation')
-        AND e.cancelled_at IS NULL
-        AND e.starts_at <= ?
-        AND s.user_id = ?
-        AND s.status = 'confirmed'`,
-    )
-    .bind(eventId, Date.now(), userId)
-    .first();
-  if (!eligible)
+  const parsed = patrolApprovalSchema.safeParse(input);
+  if (!parsed.success)
     throw new RequestError(
-      409,
-      "Only attendees registered for an orientation that has started can be marked completed.",
+      400,
+      "Check the volunteer and patrol approval details.",
     );
+  const { userId, version, eventId, notify } = parsed.data;
   const operation = crypto.randomUUID();
-  const results = await db.batch([
-    db
-      .prepare(
-        `INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
-        SELECT ?, ?, ?, ?, ?
-        WHERE ${writePermission(true)}
-          AND EXISTS(
-            SELECT 1 FROM event e
-            JOIN signup s ON s.event_id = e.id
-            WHERE e.id = ?
-              AND s.user_id = ?
-              AND s.status = 'confirmed'
-              AND coalesce(e.includes_orientation, e.type = 'orientation')
-              AND e.cancelled_at IS NULL
-              AND e.starts_at <= ${nowMsSql}
-          )
-        ON CONFLICT(user_id, event_id) DO NOTHING`,
-      )
-      .bind(
-        crypto.randomUUID(),
-        userId,
-        eventId,
-        actor.id,
-        Date.now(),
-        ...permissionValues(actor),
-        eventId,
-        userId,
-      ),
-    db
-      .prepare(
-        `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-        SELECT ?, ?, ?, 'orientation_completed', '["orientationCompletion"]', ?
-        WHERE changes() = 1`,
-      )
-      .bind(operation, actor.id, userId, Date.now()),
-  ]);
-  if (!results[0].meta.changes) {
-    const recorded = await db
-      .prepare(
-        "SELECT id FROM orientation_completion WHERE user_id=? AND event_id=?",
-      )
-      .bind(userId, eventId)
-      .first();
-    if (!recorded)
+  const now = Math.max(Date.now(), version + 1);
+  const volunteer = await db
+    .prepare("SELECT active FROM volunteer_status WHERE user_id=?")
+    .bind(userId)
+    .first<{ active: number }>();
+  if (!volunteer) throw new RequestError(404, "Volunteer not found.");
+  const email = volunteerAccessEmail(
+    {
+      active: Boolean(volunteer.active),
+      applicationApproved: true,
+      patrolApproved: true,
+    },
+    false,
+  );
+  try {
+    const results = await db.batch([
+      db
+        .prepare(
+          `UPDATE volunteer_status SET patrol_approved=1,
+           approved_by=CASE WHEN patrol_approved=1 THEN approved_by ELSE ? END,
+           approved_at=CASE WHEN patrol_approved=1 THEN approved_at ELSE ? END,
+           updated_at=?
+         WHERE user_id=? AND updated_at=? AND registration_approved=1
+           AND EXISTS(SELECT 1 FROM user WHERE id=? AND deleted_at IS NULL)
+           AND ${writePermission(true)}`,
+        )
+        .bind(
+          actor.id,
+          now,
+          now,
+          userId,
+          version,
+          userId,
+          ...permissionValues(actor),
+        ),
+      db
+        .prepare(
+          `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+         SELECT ?, ?, ?, 'approval_changed', '["patrolApproved"]', ? WHERE changes()=1`,
+        )
+        .bind(operation, actor.id, userId, now),
+      db
+        .prepare(
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+         SELECT ?, ?, id, ?, ?, ?, email FROM user
+         WHERE id=? AND email_verified=1 AND ?=1
+           AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          operation,
+          email.subject,
+          email.text,
+          now,
+          userId,
+          Number(notify),
+          operation,
+        ),
+      db
+        .prepare(
+          `UPDATE signup SET patrol_approved_by=?, patrol_approved_at=?
+          WHERE user_id=? AND event_id=? AND status='confirmed'
+            AND EXISTS(SELECT 1 FROM event e WHERE e.id=signup.event_id
+              AND ${includesOrientationSql()} AND e.cancelled_at IS NULL
+              AND e.starts_at <= ${nowMsSql})
+            AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)
+            AND ${writePermission(true)}`,
+        )
+        .bind(
+          actor.id,
+          now,
+          userId,
+          eventId ?? null,
+          operation,
+          ...permissionValues(actor),
+        ),
+    ]);
+    if (!results[0].meta.changes)
       throw new RequestError(
         409,
-        "Attendance or organizer authorization changed. Reload the page.",
+        "The application, volunteer status, or organizer access changed. Reload before approving patrols.",
       );
+    // Attendance is informational. Its absence or a failed history write must
+    // never prevent or roll back the role change already committed above.
+    if (eventId) {
+      try {
+        await db.batch([
+          db
+            .prepare(
+              `INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
+              SELECT ?, ?, e.id, ?, ? FROM event e JOIN signup s ON s.event_id=e.id
+              WHERE e.id=? AND s.user_id=? AND s.status='confirmed'
+                AND ${includesOrientationSql()} AND e.cancelled_at IS NULL
+                AND e.starts_at <= ${nowMsSql}
+                AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)
+                AND ${writePermission(true)}
+              ON CONFLICT(user_id, event_id) DO NOTHING`,
+            )
+            .bind(
+              crypto.randomUUID(),
+              userId,
+              actor.id,
+              now,
+              eventId,
+              userId,
+              operation,
+              ...permissionValues(actor),
+            ),
+          db
+            .prepare(
+              `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+              SELECT ?, ?, ?, 'orientation_completed', '["orientationCompletion"]', ?
+              WHERE changes()=1`,
+            )
+            .bind(crypto.randomUUID(), actor.id, userId, now),
+        ]);
+      } catch {
+        console.warn(
+          "Orientation history could not be recorded after patrol approval.",
+        );
+      }
+    }
+    return { operation, message: "Volunteer access saved." };
+  } catch (error) {
+    return databaseWriteError(error);
   }
-  return {
-    operation,
-    message: "Orientation marked completed.",
-  };
 }

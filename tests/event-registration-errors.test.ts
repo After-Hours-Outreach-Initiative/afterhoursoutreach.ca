@@ -5,11 +5,9 @@ import { RequestError } from "../src/server/http";
 import {
   orientationCapacityMessage,
   orientationReservedMessage,
-  orientationSignupLimitMessage,
 } from "../src/server/db/policy";
 
 for (const [invariant, status, message] of [
-  ["orientation_signup_limit", 409, orientationSignupLimitMessage],
   ["orientation_minimum_capacity", 400, orientationCapacityMessage],
   ["event_minimum_capacity", 400, orientationCapacityMessage],
   ["signup_places_reserved", 409, orientationReservedMessage],

@@ -219,7 +219,7 @@ export const profile = sqliteTable("profile", {
   middle_names: text(),
   last_name: text(),
   // Legacy profiles retain their original full-or-preferred-name answer here.
-  // New profiles may leave this empty and use their full name for display.
+  // Optional preferred first name; display adds the surname initial.
   preferred_name: text().notNull(),
   pronouns: text(),
   phone: text().notNull(),
@@ -304,6 +304,9 @@ export const patrolSeries = sqliteTable(
     meeting_point: text().notNull(),
     meeting_point_url: text(),
     spots: integer().notNull(),
+    min_medic_spots: integer().notNull().default(2),
+    min_new_volunteer_spots: integer().notNull().default(2),
+    max_new_volunteers: integer().notNull().default(4),
     open: integer({ mode: "boolean" }).notNull().default(true),
     hidden: integer({ mode: "boolean" }).notNull().default(false),
     includes_orientation: integer({ mode: "boolean" }).notNull().default(false),
@@ -368,6 +371,9 @@ export const patrolSeriesTemplate = sqliteTable(
     meeting_point: text().notNull(),
     meeting_point_url: text(),
     spots: integer().notNull(),
+    min_medic_spots: integer().notNull().default(2),
+    min_new_volunteer_spots: integer().notNull().default(2),
+    max_new_volunteers: integer().notNull().default(4),
     open: integer({ mode: "boolean" }).notNull(),
     hidden: integer({ mode: "boolean" }).notNull(),
     includes_orientation: integer({ mode: "boolean" }).notNull().default(false),
@@ -403,6 +409,9 @@ export const event = sqliteTable(
     meeting_point: text().notNull(),
     meeting_point_url: text(),
     spots: integer().notNull(),
+    min_medic_spots: integer().notNull().default(2),
+    min_new_volunteer_spots: integer().notNull().default(2),
+    max_new_volunteers: integer().notNull().default(4),
     open: integer({ mode: "boolean" }).notNull().default(true),
     hidden: integer({ mode: "boolean" }).notNull().default(false),
     cancelled_at: timestamp(),
@@ -436,9 +445,15 @@ export const signup = sqliteTable(
     event_id: text()
       .notNull()
       .references(() => event.id),
-    user_id: text()
-      .notNull()
-      .references(() => user.id),
+    user_id: text().references(() => user.id),
+    // The organizer who added this event-local registration; NULL for legacy rows.
+    added_by: text().references(() => user.id),
+    // Attribution only for approval performed from this roster entry.
+    patrol_approved_by: text().references(() => user.id),
+    patrol_approved_at: timestamp(),
+    manual_name: text(),
+    manual_medic: integer({ mode: "boolean" }).notNull().default(false),
+    manual_new: integer({ mode: "boolean" }).notNull().default(false),
     status: text({ enum: ["confirmed", "cancelled"] })
       .notNull()
       .default("confirmed"),
@@ -447,6 +462,14 @@ export const signup = sqliteTable(
   },
   (table) => [
     check("signup_status", sql`${table.status} IN ('confirmed', 'cancelled')`),
+    check(
+      "signup_attendee",
+      sql`(${table.user_id} IS NOT NULL AND ${table.manual_name} IS NULL AND ${table.manual_medic} = 0 AND ${table.manual_new} = 0) OR (${table.user_id} IS NULL AND ${table.manual_name} IS NOT NULL AND length(trim(${table.manual_name})) BETWEEN 1 AND 200)`,
+    ),
+    check(
+      "signup_manual_roles",
+      sql`${table.manual_medic} IN (0, 1) AND ${table.manual_new} IN (0, 1)`,
+    ),
     uniqueIndex("signup_one_confirmed_spot")
       .on(table.event_id, table.user_id)
       .where(sql`${table.status} = 'confirmed'`),

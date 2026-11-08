@@ -74,6 +74,11 @@ test("a successful batch sends more than five private messages in one bounded pr
       assert.equal(email.to.length, 1);
       assert.equal(email.cc, undefined);
       assert.equal(email.bcc, undefined);
+      assert.ok(email.html.includes("<h1"));
+      assert.match(
+        email.html,
+        /href="https:\/\/afterhoursoutreach\.ca\/events"/,
+      );
     }
     assert.ok(init?.signal);
     return accepted(url, init);

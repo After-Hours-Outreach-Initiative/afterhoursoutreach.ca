@@ -31,18 +31,19 @@ completed milestones. Do not treat “linked” as “verified member” or “r
 All three roles require a submitted profile, an **active, application-approved**
 website account, a link, and verified full Discord membership.
 
-| Role      | Additional requirement                                                                 |
-| --------- | -------------------------------------------------------------------------------------- |
-| Volunteer | None                                                                                   |
-| Organizer | Website organizer status                                                               |
-| Medic     | Medic team selected, patrol approved, and at least one recorded orientation completion |
+| Role      | Additional requirement                           |
+| --------- | ------------------------------------------------ |
+| Volunteer | None                                             |
+| Organizer | Website organizer status                         |
+| Medic     | Medic team selected and manually patrol approved |
 
 There is **no Outreach or separate patrol-approved role**. Organizer status never
 bypasses active/application approval for Discord. Certification expiry is not an
 additional Discord eligibility condition. Deactivation or revoked application
 approval removes all managed roles. Reactivation or restored approval adds the
-currently eligible roles. Team edits, role changes, status changes and orientation
-insert/update/delete enqueue reconciliation atomically via SQLite triggers.
+currently eligible roles. Team edits, role changes and manual status changes enqueue
+reconciliation atomically via SQLite triggers. Orientation attendance does not affect
+role eligibility or enqueue role changes.
 
 Only individual add/remove-role REST endpoints are used. Unrelated roles,
 nicknames, channels, messages, and server membership are never replaced or removed.

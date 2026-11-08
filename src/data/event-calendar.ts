@@ -19,7 +19,7 @@ export function eventCalendar(
 ) {
   const today = vancouverInput(now).slice(0, 10);
   const dated = [...events]
-    .sort((a, b) => a.startsAt - b.startsAt || a.id.localeCompare(b.id))
+    .sort((a, b) => a.startsAt - b.startsAt)
     .map((event) => ({
       ...event,
       date: vancouverInput(event.startsAt).slice(0, 10),

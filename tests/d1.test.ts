@@ -3,15 +3,28 @@ import { test } from "vitest";
 import { env } from "cloudflare:workers";
 import { localEventFixtures } from "../scripts/local-event-fixtures";
 import { localAccountFixtures } from "../scripts/local-account-fixtures";
+import { personDisplayName } from "../src/data/person-name";
+import { applicationDisplayName } from "../src/data/application";
+import { applicationStatus } from "../src/data/volunteer-list";
+import { personDisplayNameSql } from "../src/server/db/sql";
 import { createDatabase } from "../src/server/db";
 import { event } from "../src/server/db/schema";
 import {
   changeSignup,
+  addManualSignup,
+  addEventVolunteers,
+  searchSignupCandidates,
+  cancelEvent,
+  findEvent,
   listEvents,
   listPublicRosters,
+  listRosters,
   manageSignup,
 } from "../src/server/db/events";
-import { orientationSignupLimitMessage } from "../src/server/db/policy";
+import {
+  orientationFullMessage,
+  orientationReservedMessage,
+} from "../src/server/db/policy";
 import {
   loadApplicationDraft,
   saveApplicationDraft,
@@ -38,10 +51,14 @@ import {
 import { RequestError } from "../src/server/http";
 import {
   listVolunteers,
+  listApplications,
+  countReadyApplications,
   setVolunteerStatus,
   rejectApplication,
   viewVolunteerProfile,
-  volunteerPageSize,
+  approveForPatrols,
+  findVolunteerOrientation,
+  findCompletedVolunteerOrientation,
 } from "../src/server/db/volunteers";
 import {
   medicNotificationDates,
@@ -63,6 +80,51 @@ import {
   developmentPresetStatus,
   developmentAccountStatus,
 } from "../src/dev/accounts";
+
+test("JS and SQL share preferred first name plus Unicode last initial formatting without changing answers", async () => {
+  for (const [firstName, lastName, preferredName, legacyName, expected] of [
+    ["Alexandra", "Montgomery", "Alex", "Stale Full Name", "Alex M."],
+    ["Alexandra", "Montgomery", "", "Stale Full Name", "Alexandra M."],
+    ["Mary", "Jones", "Mary  Jane", "Ignored", "Mary  Jane J."],
+    ["Élodie", "\t李\u00a0", " \u2003", "Ignored", "Élodie 李."],
+    ["Alex", "𠮷田", "Alex Montgomery", "Ignored", "Alex Montgomery 𠮷."],
+    [null, null, "Multiword Preferred", "Ignored", "Multiword Preferred"],
+    ["First", null, "", "Ignored Surname", "First"],
+    [null, "Surname", null, "Ignored Name", "S."],
+    [null, null, null, " Legacy\tMiddle\u00a0Surname ", "Legacy S."],
+    [null, null, null, "OneName", "OneName"],
+    [null, null, null, " ", ""],
+  ]) {
+    const names = { firstName, lastName, preferredName };
+    assert.equal(personDisplayName(names, legacyName!), expected);
+    if (firstName)
+      assert.equal(
+        applicationDisplayName({
+          firstName,
+          lastName: lastName ?? "",
+          preferredName: preferredName ?? "",
+          middleNames: "Marie",
+        }),
+        expected,
+      );
+    const sql = personDisplayNameSql({
+      firstName: "input.firstName",
+      lastName: "input.lastName",
+      preferredName: "input.preferredName",
+      legacyName: "input.legacyName",
+    });
+    assert.equal(
+      await env.DB.prepare(
+        `WITH input AS (
+      SELECT ? AS firstName, ? AS lastName, ? AS preferredName, ? AS legacyName
+    ) SELECT ${sql} AS name FROM input`,
+      )
+        .bind(firstName, lastName, preferredName, legacyName)
+        .first("name"),
+      expected,
+    );
+  }
+});
 
 test("Drizzle and capacity constraints work in the D1 runtime", async () => {
   const binding = env.DB;
@@ -169,6 +231,701 @@ async function draftActor(id = "draft-volunteer"): Promise<Actor> {
   };
 }
 
+async function manualRosterActor(
+  id: string,
+  role: Actor["role"],
+): Promise<Actor> {
+  const actor = {
+    ...(await draftActor(id)),
+    role,
+    applicationSubmitted: true,
+    applicationComplete: true,
+    naloxoneCompleted: true,
+    applicationApproved: true,
+    active: true,
+    patrolApproved: true,
+  };
+  await env.DB.prepare("UPDATE user SET role=? WHERE id=?")
+    .bind(role, id)
+    .run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO profile (user_id,preferred_name,phone,birth_date,emergency_contact_name,
+      emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,
+      medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+      VALUES (?,?,'555','2000-01-01','Contact','555','Friend','Friend','Help','[]','None','None',0,0,0)`,
+    ).bind(id, id),
+    env.DB.prepare(
+      `INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at)
+      VALUES (?,1,1,'manual-organizer',0,0)`,
+    ).bind(id),
+  ]);
+  return actor;
+}
+
+test("organizers add, move and remove name-only attendees with shared rosters, limits, audits and no mail", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("manual-viewer", "volunteer");
+  for (const [id, orientation] of [
+    ["manual-source", 1],
+    ["manual-destination", 1],
+    ["manual-patrol", 0],
+  ] as const)
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,
+      min_medic_spots,min_new_volunteer_spots,max_new_volunteers,created_by,created_at,updated_at)
+      VALUES (?,'patrol',?,?,'Point',4,1,1,2,?,0,0)`,
+    )
+      .bind(id, orientation, Date.now() + 86_400_000, organizer.id)
+      .run();
+  const input = { name: "General Person", medic: false, newVolunteer: false };
+  await assert.rejects(
+    addManualSignup(env.DB, volunteer, "manual-source", input),
+    statusError(403),
+  );
+  for (const name of ["", "   ", "x".repeat(201)])
+    await assert.rejects(
+      addManualSignup(env.DB, organizer, "manual-source", { ...input, name }),
+      statusError(400),
+    );
+  for (const [name, medic, newVolunteer] of [
+    [" General Person ", false, false],
+    ["Medic Person", true, false],
+    ["New Person", false, true],
+    ["NewMedic Person", true, true],
+  ] as const)
+    await addManualSignup(env.DB, organizer, "manual-source", {
+      name,
+      medic,
+      newVolunteer,
+    });
+  const counts = (
+    await listEvents(env.DB, volunteer, undefined, "volunteer")
+  ).find(({ id }) => id === "manual-source")!;
+  assert.deepEqual(
+    [counts.confirmed, counts.medicConfirmed, counts.newVolunteerConfirmed],
+    [4, 1, 2],
+  );
+  const roster = await listRosters(env.DB, organizer, ["manual-source"]);
+  assert.equal(roster.length, 4);
+  assert.ok(roster.every(({ userId }) => userId === null));
+  assert.ok(
+    roster.every(
+      ({ addedById, addedByName }) =>
+        addedById === organizer.id && addedByName === organizer.id,
+    ),
+  );
+  assert.deepEqual(
+    roster.map(({ fullName }) => fullName),
+    ["General Person", "Medic Person", "New Person", "NewMedic Person"],
+  );
+  assert.deepEqual(
+    roster.map(({ name, category, medicMark }) => [name, category, medicMark]),
+    [
+      ["General P.", "outreach-volunteer", 0],
+      ["Medic P.", "medic", 1],
+      ["New P.", "new-volunteer", 0],
+      ["NewMedic P.", "new-volunteer", 1],
+    ],
+  );
+  const publicRoster = await listPublicRosters(env.DB, volunteer, [
+    "manual-source",
+  ]);
+  assert.deepEqual(
+    publicRoster.people,
+    roster.map(({ eventId, name, category, medicMark }) => ({
+      eventId,
+      name,
+      category,
+      medicMark,
+    })),
+  );
+  assert.doesNotMatch(
+    JSON.stringify(publicRoster),
+    /userId|addedBy|Person|manual_name|manual_medic|manual_new/,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM user").first("n"),
+    2,
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM event_audit WHERE action='signup_manually_added' AND actor_id=?",
+    )
+      .bind(organizer.id)
+      .first("n"),
+    4,
+  );
+  await assert.rejects(
+    addManualSignup(env.DB, organizer, "manual-source", input),
+    statusError(409),
+  );
+  await assert.rejects(
+    changeSignup(env.DB, volunteer, "manual-source", "join"),
+    statusError(409),
+  );
+  const newMedic = roster.find(({ name }) => name === "NewMedic P.")!;
+  const auditCount = await env.DB.prepare(
+    "SELECT count(*) n FROM event_audit",
+  ).first("n");
+  await assert.rejects(
+    manageSignup(env.DB, organizer, newMedic.id, "manual-patrol", "", true),
+    statusError(403),
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT status FROM signup WHERE id=?")
+      .bind(newMedic.id)
+      .first("status"),
+    "confirmed",
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_audit").first("n"),
+    auditCount,
+  );
+  await manageSignup(
+    env.DB,
+    organizer,
+    newMedic.id,
+    "manual-destination",
+    "",
+    true,
+  );
+  const moved = (
+    await listRosters(env.DB, organizer, ["manual-destination"])
+  )[0];
+  assert.deepEqual(
+    [
+      moved.userId,
+      moved.name,
+      moved.category,
+      moved.medicMark,
+      moved.addedById,
+    ],
+    [null, "NewMedic P.", "new-volunteer", 1, organizer.id],
+  );
+  assert.notEqual(
+    (await listPublicRosters(env.DB, volunteer, ["manual-source"])).version,
+    publicRoster.version,
+  );
+  await manageSignup(env.DB, organizer, moved.id, undefined, "", true);
+  assert.equal(
+    (await listRosters(env.DB, organizer, ["manual-destination"])).length,
+    0,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_notification").first(
+      "n",
+    ),
+    0,
+  );
+  const source = await findEvent(env.DB, "manual-source");
+  await cancelEvent(env.DB, organizer, source.id, source.updatedAt, "", true);
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM signup WHERE event_id=? AND status='confirmed'",
+    )
+      .bind(source.id)
+      .first("n"),
+    0,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM signup WHERE event_id=?")
+      .bind(source.id)
+      .first("n"),
+    4,
+  );
+  await env.DB.prepare("DELETE FROM session WHERE id=?")
+    .bind(organizer.sessionId)
+    .run();
+  await assert.rejects(
+    addManualSignup(env.DB, organizer, "manual-destination", input),
+    statusError(403),
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM signup WHERE event_id='manual-destination'",
+    ).first("n"),
+    1,
+  );
+});
+
+test("concurrent manual and account signups cannot take each other's reserved capacity", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("manual-viewer", "volunteer");
+  await env.DB.prepare(
+    `INSERT INTO event (id,type,starts_at,meeting_point,spots,min_medic_spots,created_by,created_at,updated_at)
+    VALUES ('manual-race','patrol',?,'Point',2,1,?,0,0)`,
+  )
+    .bind(Date.now() + 86_400_000, organizer.id)
+    .run();
+  const attempts = await Promise.allSettled([
+    addManualSignup(env.DB, organizer, "manual-race", {
+      name: "General Person",
+      medic: false,
+      newVolunteer: false,
+    }),
+    changeSignup(env.DB, volunteer, "manual-race", "join"),
+  ]);
+  assert.equal(
+    attempts.filter(({ status }) => status === "fulfilled").length,
+    1,
+  );
+  const failure = attempts.find(({ status }) => status === "rejected");
+  assert.ok(failure?.status === "rejected" && statusError(409)(failure.reason));
+  await addManualSignup(env.DB, organizer, "manual-race", {
+    name: "Medic Person",
+    medic: true,
+    newVolunteer: false,
+  });
+  const event = (await listEvents(env.DB, volunteer)).find(
+    ({ id }) => id === "manual-race",
+  )!;
+  assert.deepEqual(
+    [event.confirmed, event.medicConfirmed, event.newVolunteerConfirmed],
+    [2, 1, 0],
+  );
+});
+
+test("organizers silently remove past account and name-only registrations without moving them or clearing orientation history", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("past-volunteer", "volunteer");
+  for (const id of ["past-source", "future-destination"])
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES (?,'orientation',?,'Point',8,?,0,0)`,
+    )
+      .bind(id, Date.now() + 86_400_000, organizer.id)
+      .run();
+  await changeSignup(env.DB, volunteer, "past-source", "join");
+  await addManualSignup(env.DB, organizer, "past-source", {
+    name: "Past Attendee",
+    medic: false,
+    newVolunteer: false,
+  });
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE event SET starts_at=0,open=0,hidden=1 WHERE id='past-source'",
+    ),
+    env.DB.prepare(
+      "INSERT INTO orientation_completion VALUES ('past-completion',?,'past-source',?,0)",
+    ).bind(volunteer.id, organizer.id),
+  ]);
+  const roster = await listRosters(env.DB, organizer, ["past-source"]);
+  assert.equal(roster.length, 2);
+  assert.equal(
+    roster.find(({ userId }) => userId === volunteer.id)?.addedById,
+    null,
+  );
+  for (const person of roster) {
+    await assert.rejects(
+      manageSignup(env.DB, volunteer, person.id, undefined, ""),
+      statusError(403),
+    );
+    await assert.rejects(
+      manageSignup(env.DB, organizer, person.id, "future-destination", ""),
+      { status: 409, message: "Past registrations cannot be moved." },
+    );
+    const removed = await manageSignup(
+      env.DB,
+      organizer,
+      person.id,
+      undefined,
+      "",
+      true,
+    );
+    assert.equal(removed.message, "Registration removed.");
+    assert.equal(
+      await env.DB.prepare("SELECT status FROM signup WHERE id=?")
+        .bind(person.id)
+        .first("status"),
+      "cancelled",
+    );
+    assert.equal(
+      await env.DB.prepare(
+        "SELECT action FROM event_audit WHERE id=? AND actor_id=?",
+      )
+        .bind(removed.operation, organizer.id)
+        .first("action"),
+      "signup_removed",
+    );
+    await assert.rejects(
+      manageSignup(env.DB, organizer, person.id, undefined, ""),
+      statusError(404),
+    );
+  }
+  assert.deepEqual(await listRosters(env.DB, organizer, ["past-source"]), []);
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM signup WHERE event_id='future-destination'",
+    ).first("n"),
+    0,
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM orientation_completion WHERE id='past-completion'",
+    ).first("n"),
+    1,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_notification").first(
+      "n",
+    ),
+    0,
+  );
+});
+
+test("organizer staged additions to past events search eligible accounts and commit mixed lists atomically", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("staged-volunteer", "volunteer");
+  const inactive = await manualRosterActor("staged-inactive", "volunteer");
+  const newVolunteer = await manualRosterActor("staged-new", "volunteer");
+  await env.DB.batch([
+    env.DB.prepare("UPDATE volunteer_status SET active=0 WHERE user_id=?").bind(
+      inactive.id,
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id=?",
+    ).bind(newVolunteer.id),
+    env.DB.prepare(
+      `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,
+      min_medic_spots,min_new_volunteer_spots,max_new_volunteers,created_by,created_at,updated_at)
+      VALUES ('staged-event','patrol',1,?,'Point',4,1,1,2,?,0,0)`,
+    ).bind(Date.now() + 86_400_000, organizer.id),
+  ]);
+  await env.DB.prepare(
+    "UPDATE event SET starts_at=0,open=0,hidden=1 WHERE id='staged-event'",
+  ).run();
+  await assert.rejects(
+    changeSignup(env.DB, volunteer, "staged-event", "join"),
+    statusError(409),
+  );
+  // The database also keeps self-registration closed, even for an organizer.
+  await assert.rejects(
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('past-self','staged-event',?,0,0)",
+    ).bind(organizer.id).run(),
+    /signup_not_eligible/,
+  );
+  await assert.rejects(
+    searchSignupCandidates(env.DB, volunteer, "staged-event", "staged"),
+    statusError(403),
+  );
+  const candidates = await searchSignupCandidates(
+    env.DB,
+    organizer,
+    "staged-event",
+    "staged",
+  );
+  assert.deepEqual(
+    candidates.map(({ id }) => id),
+    [newVolunteer.id, volunteer.id],
+  );
+  assert.equal(candidates[0].category, "new-volunteer");
+  assert.deepEqual(Object.keys(candidates[0]).sort(), [
+    "category",
+    "id",
+    "medicMark",
+    "name",
+    "role",
+  ]);
+  assert.deepEqual(
+    (
+      await searchSignupCandidates(
+        env.DB,
+        organizer,
+        "staged-event",
+        "staged",
+        [volunteer.id],
+      )
+    ).map(({ id }) => id),
+    [newVolunteer.id],
+  );
+
+  const manual = { name: "Medic Person", medic: true, newVolunteer: false };
+  await env.DB.prepare(
+    "UPDATE event SET cancelled_at=1 WHERE id='staged-event'",
+  ).run();
+  assert.deepEqual(
+    await searchSignupCandidates(env.DB, organizer, "staged-event", "staged"),
+    [],
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [manual]),
+    statusError(403),
+  );
+  await env.DB.prepare(
+    "UPDATE event SET cancelled_at=NULL WHERE id='staged-event'",
+  ).run();
+  await assert.rejects(
+    addEventVolunteers(env.DB, volunteer, "staged-event", [manual]),
+    statusError(403),
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      { ...manual, name: " " },
+    ]),
+    statusError(400),
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      { userId: volunteer.id },
+      { userId: volunteer.id },
+    ]),
+    statusError(400),
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      manual,
+      { userId: inactive.id },
+    ]),
+    statusError(409),
+  );
+  // Category restrictions are not total-capacity errors when the batch fits.
+  for (const [isNewVolunteer, message] of [
+    [false, orientationReservedMessage],
+    [true, orientationFullMessage],
+  ] as const)
+    await assert.rejects(
+      addEventVolunteers(
+        env.DB,
+        organizer,
+        "staged-event",
+        ["First", "Second", "Third"].map((name) => ({
+          name,
+          medic: false,
+          newVolunteer: isNewVolunteer,
+        })),
+      ),
+      { status: 409, message },
+    );
+  // Total capacity is insufficient even if a reserved-place guard fires first;
+  // neither earlier rows nor audits survive.
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      manual,
+      { userId: volunteer.id },
+      { ...manual, name: "Fourth" },
+      { ...manual, name: "Fifth" },
+      { userId: newVolunteer.id },
+      { ...manual, name: "  " },
+    ]),
+    {
+      status: 409,
+      message: "Can't add 5 volunteers. Only 4 spots remaining.",
+    },
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM signup").first("n"),
+    0,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_audit").first("n"),
+    0,
+  );
+
+  await addEventVolunteers(env.DB, organizer, "staged-event", [
+    { userId: volunteer.id },
+    manual,
+    { userId: newVolunteer.id },
+    { ...manual, name: "  " },
+  ]);
+  const roster = await listRosters(env.DB, organizer, ["staged-event"]);
+  assert.equal(roster.length, 3);
+  assert.ok(roster.every(({ addedById }) => addedById === organizer.id));
+  assert.deepEqual(roster.map(({ category }) => category).sort(), [
+    "medic",
+    "new-volunteer",
+    "outreach-volunteer",
+  ]);
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_audit").first("n"),
+    1,
+  );
+  assert.deepEqual(
+    await searchSignupCandidates(env.DB, organizer, "staged-event", "staged"),
+    [],
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      manual,
+      { userId: volunteer.id },
+    ]),
+    {
+      status: 409,
+      message:
+        "A selected volunteer is already registered or is no longer eligible for this event. Remove them or search again. No volunteers were added.",
+    },
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [
+      manual,
+      { ...manual, name: "Last" },
+      { ...manual, name: "  " },
+    ]),
+    {
+      status: 409,
+      message: "Can't add 2 volunteers. Only 1 spot remaining.",
+    },
+  );
+  const attempts = await Promise.allSettled([
+    addEventVolunteers(env.DB, organizer, "staged-event", [manual]),
+    addEventVolunteers(env.DB, organizer, "staged-event", [manual]),
+  ]);
+  assert.equal(
+    attempts.filter(({ status }) => status === "fulfilled").length,
+    1,
+  );
+  const failure = attempts.find(({ status }) => status === "rejected");
+  assert.ok(failure?.status === "rejected");
+  assert.equal(failure.reason.status, 409);
+  assert.equal(
+    failure.reason.message,
+    "Can't add 1 volunteer. Only 0 spots remaining.",
+  );
+  await env.DB.prepare("DELETE FROM session WHERE id=?")
+    .bind(organizer.sessionId)
+    .run();
+  assert.deepEqual(
+    await searchSignupCandidates(env.DB, organizer, "staged-event", "staged"),
+    [],
+  );
+  await assert.rejects(
+    addEventVolunteers(env.DB, organizer, "staged-event", [manual]),
+    statusError(403),
+  );
+  assert.equal(
+    (await listRosters(env.DB, organizer, ["staged-event"])).length,
+    4,
+  );
+});
+
+test.each(["search", "add"] as const)(
+  "organizer %s allows a booked new volunteer into another orientation's last available spot",
+  async (action) => {
+    const organizer = await manualRosterActor("manual-organizer", "organizer");
+    const volunteer = {
+      ...(await manualRosterActor("booked-new-volunteer", "volunteer")),
+      patrolApproved: false,
+    };
+    await env.DB.prepare(
+      "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .run();
+    for (const [id, orientation] of [
+      ["first-orientation", 1],
+      ["second-orientation", 1],
+      ["regular-patrol", 0],
+    ] as const)
+      await env.DB.prepare(
+        `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,
+        min_medic_spots,min_new_volunteer_spots,max_new_volunteers,created_by,created_at,updated_at)
+        VALUES (?,'patrol',?,?,'Point',10,2,2,4,?,0,0)`,
+      )
+        .bind(id, orientation, Date.now() + 86_400_000, organizer.id)
+        .run();
+    await changeSignup(env.DB, volunteer, "first-orientation", "join");
+    // Mirror the reported event: 9/10 filled, including two new volunteers and
+    // four medics. The last place is available to another new volunteer.
+    await addEventVolunteers(env.DB, organizer, "second-orientation", [
+      ...Array.from({ length: 4 }, (_, index) => ({
+        name: `Medic ${index}`,
+        medic: true,
+        newVolunteer: false,
+      })),
+      ...Array.from({ length: 2 }, (_, index) => ({
+        name: `New ${index}`,
+        medic: false,
+        newVolunteer: true,
+      })),
+      ...Array.from({ length: 3 }, (_, index) => ({
+        name: `General ${index}`,
+        medic: false,
+        newVolunteer: false,
+      })),
+    ]);
+    const target = (await listEvents(env.DB, organizer)).find(
+      ({ id }) => id === "second-orientation",
+    )!;
+    assert.deepEqual(
+      [target.confirmed, target.newVolunteerConfirmed, target.medicConfirmed],
+      [9, 2, 4],
+    );
+
+    if (action === "search") {
+      const candidates = await searchSignupCandidates(
+        env.DB,
+        organizer,
+        target.id,
+        volunteer.id,
+      );
+      assert.deepEqual(
+        candidates.map(({ id }) => id),
+        [volunteer.id],
+      );
+      assert.equal(candidates[0].category, "new-volunteer");
+      assert.deepEqual(
+        await searchSignupCandidates(
+          env.DB,
+          organizer,
+          target.id,
+          volunteer.id,
+          [volunteer.id],
+        ),
+        [],
+      );
+    } else {
+      await addEventVolunteers(env.DB, organizer, target.id, [
+        { userId: volunteer.id },
+      ]);
+      const registrations = await env.DB.prepare(
+        "SELECT event_id FROM signup WHERE user_id=? AND status='confirmed' ORDER BY event_id",
+      )
+        .bind(volunteer.id)
+        .all<{ event_id: string }>();
+      assert.deepEqual(
+        registrations.results.map(({ event_id }) => event_id),
+        ["first-orientation", "second-orientation"],
+      );
+      assert.equal(
+        (await listRosters(env.DB, organizer, [target.id])).length,
+        10,
+      );
+      assert.deepEqual(
+        await searchSignupCandidates(
+          env.DB,
+          organizer,
+          target.id,
+          volunteer.id,
+        ),
+        [],
+      );
+      await assert.rejects(
+        addEventVolunteers(env.DB, organizer, target.id, [
+          { userId: volunteer.id },
+        ]),
+        statusError(409),
+      );
+    }
+    // Removing the cross-event limit does not grant patrol access.
+    assert.deepEqual(
+      await searchSignupCandidates(
+        env.DB,
+        organizer,
+        "regular-patrol",
+        volunteer.id,
+      ),
+      [],
+    );
+    await assert.rejects(
+      addEventVolunteers(env.DB, organizer, "regular-patrol", [
+        { userId: volunteer.id },
+      ]),
+      statusError(409),
+    );
+  },
+);
+
 test("development application shortcuts preserve snapshots and advance without emails or patrol approval", async () => {
   const actor = await draftActor();
   await assert.rejects(
@@ -252,9 +1009,9 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
   for (const id of [
     "general-1",
     "general-2",
-    "orientee-1",
-    "orientee-2",
-    "orientee-3",
+    "new-volunteer-1",
+    "new-volunteer-2",
+    "new-volunteer-3",
     "medic-1",
     "medic-2",
     "medic-3",
@@ -262,21 +1019,26 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     const actor = {
       ...(await draftActor(id)),
       applicationSubmitted: true,
+      applicationComplete: true,
+      naloxoneCompleted: true,
+      naloxoneCompletedAt: 0,
       active: true,
       applicationApproved: true,
-      patrolApproved: true,
+      patrolApproved: !id.startsWith("new-volunteer"),
     };
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,emergency_contact_name,
         emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,medical_certification,training_experience,registered_at,updated_at)
-        VALUES (?, 'Alice', 'PrivateSurname', 'PRIVATE FULL NAME', 'PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None',0,0)`,
+        VALUES (?, 'Alice', 'PrivateSurname', ' Ally ', 'PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None',0,0)`,
       ).bind(id, id.startsWith("medic") ? '["medic"]' : "[]"),
       env.DB.prepare(
-        "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,1,'organizer',0,0)",
-      ).bind(id),
+        "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,?,'organizer',0,0)",
+      ).bind(id, Number(actor.patrolApproved)),
     ]);
-    if (!id.startsWith("orientee"))
+    // Deliberately record attendance only for unapproved volunteers: neither
+    // attendance nor its absence may determine these categories.
+    if (id.startsWith("new-volunteer"))
       await env.DB.prepare(
         "INSERT INTO orientation_completion VALUES (?,?, 'history','organizer',0)",
       )
@@ -306,9 +1068,15 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     await listEvents(env.DB, people[0], undefined, "volunteer")
   ).find((row) => row.id === "target")!;
   assert.deepEqual(
-    [target.confirmed, target.medicConfirmed, target.orientationConfirmed],
+    [target.confirmed, target.medicConfirmed, target.newVolunteerConfirmed],
     [5, 2, 2],
   );
+  const registeredAt = Date.parse("2026-01-02T03:04:05.000Z");
+  await env.DB.prepare(
+    "UPDATE signup SET created_at=?, updated_at=? WHERE event_id='target' AND status='confirmed'",
+  )
+    .bind(registeredAt, registeredAt + 3_600_000)
+    .run();
   const roster = await listPublicRosters(env.DB, people[0], [
     "target",
     "history",
@@ -318,8 +1086,8 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
   assert.ok(
     roster.people.every(
       (row) =>
-        row.name === "Alice P." &&
-        Object.keys(row).sort().join() === "category,eventId,name",
+        row.name === "Ally P." &&
+        Object.keys(row).sort().join() === "category,eventId,medicMark,name",
     ),
   );
   assert.doesNotMatch(
@@ -332,6 +1100,41 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     ]),
     statusError(403),
   );
+  await assert.rejects(
+    listRosters(env.DB, people[0], ["target"]),
+    statusError(403),
+  );
+  for (const [preferredName, expectedName] of [
+    [" AJ ", "AJ P."],
+    ["  ", "Alice P."],
+    ["", "Alice P."],
+    [" Ally ", "Ally P."],
+  ]) {
+    await env.DB.prepare("UPDATE profile SET preferred_name=?")
+      .bind(preferredName)
+      .run();
+    const publicRoster = await listPublicRosters(env.DB, people[0], ["target"]);
+    assert.ok(publicRoster.people.every(({ name }) => name === expectedName));
+    assert.equal(
+      publicRoster.version === roster.version,
+      expectedName === "Ally P.",
+    );
+    const organizerRoster = await listRosters(env.DB, organizer, ["target"]);
+    assert.equal(organizerRoster.length, 5);
+    assert.ok(organizerRoster.every(({ name }) => name === expectedName));
+    assert.ok(
+      organizerRoster.every(
+        ({ fullName }) => fullName === "Alice PrivateSurname",
+      ),
+    );
+    assert.ok(
+      organizerRoster.every((row) => row.registeredAt === registeredAt),
+    );
+    assert.doesNotMatch(
+      JSON.stringify(organizerRoster),
+      /PRIVATE|firstName|lastName|preferredName|legacyName/,
+    );
+  }
   const general = people[generals[0].status === "rejected" ? 0 : 1];
   const bookedGeneral = people[generals[0].status === "fulfilled" ? 0 : 1];
   // Same signup, abbreviated name and category: reassignment must still change
@@ -381,16 +1184,428 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
     0,
   );
   await changeSignup(env.DB, medic, "target", "join");
-  const orientee = people.find(
+  const newVolunteer = people.find(
     (_actor, index) =>
       index >= 2 && index < 5 && reserved[index - 2].status === "fulfilled",
   )!;
-  await changeSignup(env.DB, orientee, "target", "cancel");
+  await changeSignup(env.DB, newVolunteer, "target", "cancel");
   await assert.rejects(
     changeSignup(env.DB, general, "target", "join"),
     statusError(409),
   );
-  await changeSignup(env.DB, orientee, "target", "join");
+  await changeSignup(env.DB, newVolunteer, "target", "join");
+});
+
+test("public and organizer rosters share earliest-registration-first order with stable ties", async () => {
+  const organizer: Actor = {
+    ...(await draftActor("organizer")),
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+    applicationApproved: true,
+  };
+  await env.DB.prepare(
+    "UPDATE user SET role='organizer' WHERE id='organizer'",
+  ).run();
+  const registrations = [
+    { id: "z-signup", userId: "Zoe", registeredAt: 1000 },
+    { id: "b-signup", userId: "Yara", registeredAt: 2000 },
+    { id: "c-signup", userId: "Bella", registeredAt: 2000 },
+    { id: "a-signup", userId: "Alice", registeredAt: 3000 },
+  ];
+  const volunteers: Actor[] = [];
+  for (const { userId } of registrations) {
+    volunteers.push({
+      ...(await draftActor(userId)),
+      applicationSubmitted: true,
+      applicationComplete: true,
+      naloxoneCompleted: true,
+      active: true,
+      applicationApproved: true,
+      patrolApproved: true,
+    });
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,
+        emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,
+        motivation,teams,medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+        VALUES (?,?,'Volunteer','','555','2000-01-01','Contact','555','Friend','Friend','Help','[]','None','None',0,0,0)`,
+      ).bind(userId, userId),
+      env.DB.prepare(
+        `INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at)
+        VALUES (?,1,1,'organizer',0,0)`,
+      ).bind(userId),
+    ]);
+  }
+  for (const eventId of ["target", "other"])
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES (?,'patrol',?,'Meeting point',8,'organizer',0,0)`,
+    )
+      .bind(eventId, Date.now() + 86_400_000)
+      .run();
+  for (const { id, userId, registeredAt } of [...registrations].reverse())
+    await env.DB.prepare(
+      `INSERT INTO signup (id,event_id,user_id,created_at,updated_at)
+      VALUES (?,'target',?,?,?)`,
+    )
+      .bind(id, userId, registeredAt, 10_000 - registeredAt)
+      .run();
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('other-signup','other','Alice',0,0)",
+    ),
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,status,created_at,updated_at) VALUES ('cancelled','target','Zoe','cancelled',0,0)",
+    ),
+  ]);
+  const viewer = volunteers[0];
+  const eventIds = ["target", "other"];
+  const organizerRoster = await listRosters(env.DB, organizer, eventIds);
+  const publicRoster = await listPublicRosters(env.DB, viewer, eventIds);
+  const target = organizerRoster.filter(({ eventId }) => eventId === "target");
+  assert.deepEqual(
+    target.map(({ userId, registeredAt }) => ({ userId, registeredAt })),
+    registrations.map(({ userId, registeredAt }) => ({ userId, registeredAt })),
+  );
+  assert.deepEqual(
+    publicRoster.people,
+    organizerRoster.map(({ eventId, name, category, medicMark }) => ({
+      eventId,
+      name,
+      category,
+      medicMark,
+    })),
+  );
+  // Rejoining creates a fresh registration, placing the volunteer at the end.
+  await changeSignup(env.DB, viewer, "target", "cancel");
+  await changeSignup(env.DB, viewer, "target", "join");
+  const after = await listRosters(env.DB, organizer, ["target"]);
+  assert.deepEqual(
+    after.map(({ userId }) => userId),
+    ["Yara", "Bella", "Alice", "Zoe"],
+  );
+  assert.deepEqual(
+    (await listPublicRosters(env.DB, viewer, ["target"])).people.map(
+      ({ name }) => name,
+    ),
+    after.map(({ name }) => name),
+  );
+  assert.notEqual(
+    (await listPublicRosters(env.DB, viewer, eventIds)).version,
+    publicRoster.version,
+  );
+});
+
+test("manual approvals recolour existing signups consistently without inventing attendance", async () => {
+  const actors: Actor[] = [];
+  for (const id of ["organizer", "blue", "attended", "green", "red"]) {
+    const actor: Actor = {
+      ...(await draftActor(id)),
+      role: id === "organizer" ? "organizer" : "volunteer",
+      applicationSubmitted: true,
+      applicationComplete: true,
+      naloxoneCompleted: true,
+      active: true,
+      applicationApproved: true,
+    };
+    if (id === "organizer")
+      await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+        .bind(id)
+        .run();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,
+        emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,
+        motivation,teams,medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+        VALUES (?,?,'Volunteer',?,'555','2000-01-01','Contact','555','Friend','Friend','Help',?,'None','None',0,0,0)`,
+      ).bind(id, id, id, id === "red" ? '["medic"]' : '["outreach"]'),
+      env.DB.prepare(
+        "INSERT INTO volunteer_status (user_id,registration_approved,updated_at) VALUES (?,1,0)",
+      ).bind(id),
+    ]);
+    actors.push(actor);
+  }
+  const [organizer, ...volunteers] = actors;
+  for (const id of ["history", "november-patrol", "other-orientation"])
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES (?,'orientation',?,'Meeting point',8,'organizer',0,0)`,
+    )
+      .bind(id, id === "history" ? 0 : Date.now() + 86_400_000)
+      .run();
+  for (const actor of volunteers)
+    await changeSignup(env.DB, actor, "november-patrol", "join");
+  const before = await listPublicRosters(env.DB, organizer, [
+    "november-patrol",
+  ]);
+  assert.deepEqual(
+    before.people.map(({ category }) => category),
+    Array(4).fill("new-volunteer"),
+  );
+
+  await env.DB.prepare(
+    "INSERT INTO orientation_completion VALUES ('attendance','attended','history','organizer',0)",
+  ).run();
+  assert.deepEqual(
+    await listPublicRosters(env.DB, organizer, ["november-patrol"]),
+    before,
+  );
+  const attendedEvents = await listEvents(env.DB, volunteers[1]);
+  assert.ok(
+    attendedEvents.find(({ id }) => id === "other-orientation")!
+      .availableSpots > 0,
+  );
+  await changeSignup(env.DB, volunteers[1], "other-orientation", "join");
+
+  for (const userId of ["green", "red"])
+    await approveForPatrols(env.DB, organizer, { userId, version: 0 });
+  const target = (await listEvents(env.DB, organizer)).find(
+    ({ id }) => id === "november-patrol",
+  )!;
+  assert.deepEqual(
+    [target.confirmed, target.newVolunteerConfirmed, target.medicConfirmed],
+    [4, 2, 1],
+  );
+  const publicRoster = await listPublicRosters(env.DB, organizer, [target.id]);
+  assert.notEqual(publicRoster.version, before.version);
+  const expected = {
+    blue: "new-volunteer",
+    attended: "new-volunteer",
+    green: "outreach-volunteer",
+    red: "medic",
+  };
+  const roster = await listRosters(env.DB, organizer, [target.id]);
+  assert.deepEqual(
+    Object.fromEntries(
+      roster.map(({ userId, category }) => [userId, category]),
+    ),
+    expected,
+  );
+  const listed = (await listVolunteers(env.DB, organizer)).rows.filter(
+    ({ id }) => id !== organizer.id,
+  );
+  assert.deepEqual(
+    Object.fromEntries(listed.map(({ id, category }) => [id, category])),
+    expected,
+  );
+  assert.deepEqual(
+    publicRoster.people.map(({ category }) => category).sort(),
+    Object.values(expected).sort(),
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM orientation_completion WHERE user_id IN ('green','red')",
+    ).first("n"),
+    0,
+  );
+
+  await env.DB.prepare("DELETE FROM orientation_completion").run();
+  assert.deepEqual(
+    await listPublicRosters(env.DB, organizer, [target.id]),
+    publicRoster,
+  );
+  const red = { ...volunteers[3], patrolApproved: true };
+  assert.equal(
+    (await listEvents(env.DB, red)).find(({ id }) => id === "other-orientation")
+      ?.medicEligible,
+    1,
+  );
+  await changeSignup(env.DB, red, "other-orientation", "join");
+  await env.DB.prepare(
+    "UPDATE profile SET teams='[\"outreach\"]' WHERE user_id='red'",
+  ).run();
+  assert.equal(
+    (await listRosters(env.DB, organizer, [target.id])).find(
+      ({ userId }) => userId === "red",
+    )?.category,
+    "outreach-volunteer",
+  );
+  assert.notEqual(
+    (await listPublicRosters(env.DB, organizer, [target.id])).version,
+    publicRoster.version,
+  );
+});
+
+test("new medic marks require application approval and team selection without satisfying medic reservations", async () => {
+  const actors = new Map<string, Actor>();
+  for (const [id, approved, patrol, teams] of [
+    ["organizer", true, false, ["outreach"]],
+    ["new-medic", true, false, ["medic"]],
+    ["new-outreach", true, false, ["outreach"]],
+    ["outreach", true, true, ["outreach"]],
+    ["eligible-medic", true, true, ["medic"]],
+    ["pending-medic", false, false, ["medic"]],
+    ["pending-outreach", false, false, ["outreach"]],
+  ] as const) {
+    const actor: Actor = {
+      ...(await draftActor(id)),
+      role: id === "organizer" ? "organizer" : "volunteer",
+      applicationSubmitted: true,
+      applicationComplete: true,
+      naloxoneCompleted: true,
+      active: true,
+      applicationApproved: approved,
+      patrolApproved: patrol,
+    };
+    if (id === "organizer")
+      await env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
+        .bind(id)
+        .run();
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,
+        emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,
+        motivation,teams,medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+        VALUES (?,?,'Volunteer','','555','2000-01-01','Contact','555','Friend','Friend','Help',?,'None','None',0,0,0)`,
+      ).bind(id, id, JSON.stringify(teams)),
+      env.DB.prepare(
+        `INSERT INTO volunteer_status
+        (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at)
+        VALUES (?,?,?,'organizer',0,0)`,
+      ).bind(id, Number(approved), Number(patrol)),
+    ]);
+    actors.set(id, actor);
+  }
+  const organizer = actors.get("organizer")!;
+  const newMedic = actors.get("new-medic")!;
+  const outreach = actors.get("outreach")!;
+  await env.DB.prepare(
+    `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+    VALUES ('reserved','orientation',?,'Meeting point',4,'organizer',0,0)`,
+  )
+    .bind(Date.now() + 86_400_000)
+    .run();
+  await changeSignup(env.DB, newMedic, "reserved", "join");
+  await changeSignup(env.DB, actors.get("new-outreach")!, "reserved", "join");
+
+  const registrations = await listRosters(env.DB, organizer, ["reserved"]);
+  assert.deepEqual(
+    registrations.map(({ userId, category, medicMark, patrolApproved }) => ({
+      userId,
+      category,
+      medicMark,
+      patrolApproved,
+    })),
+    [
+      {
+        userId: "new-medic",
+        category: "new-volunteer",
+        medicMark: 1,
+        patrolApproved: 0,
+      },
+      {
+        userId: "new-outreach",
+        category: "new-volunteer",
+        medicMark: 0,
+        patrolApproved: 0,
+      },
+    ],
+  );
+  const before = await listPublicRosters(env.DB, organizer, ["reserved"]);
+  assert.equal(
+    before.people.find(({ name }) => name === "new-medic V.")?.medicMark,
+    1,
+  );
+  const directory = (await listVolunteers(env.DB, organizer)).rows;
+  assert.equal(directory.find(({ id }) => id === "new-medic")?.medicMark, 1);
+  assert.equal(
+    directory.find(({ id }) => id === "eligible-medic")?.medicMark,
+    1,
+  );
+  assert.equal(
+    directory.find(({ id }) => id === "pending-medic"),
+    undefined,
+  );
+  assert.equal(directory.find(({ id }) => id === "outreach")?.medicMark, 0);
+  // Application presentation shows selected teams before approval, even while
+  // the avatar category is new-volunteer; it does not change roster eligibility.
+  assert.deepEqual(
+    (await listApplications(env.DB, organizer, "pending-")).rows.map(
+      ({ id, category, medicMark }) => ({ id, category, medicMark }),
+    ),
+    [
+      { id: "pending-medic", category: "new-volunteer", medicMark: 1 },
+      { id: "pending-outreach", category: "new-volunteer", medicMark: 0 },
+    ],
+  );
+
+  const selected = (await listEvents(env.DB, newMedic)).find(
+    ({ id }) => id === "reserved",
+  )!;
+  assert.deepEqual(
+    [
+      selected.confirmed,
+      selected.newVolunteerConfirmed,
+      selected.medicConfirmed,
+      selected.medicEligible,
+    ],
+    [2, 2, 0, 0],
+  );
+  assert.equal(
+    (await listEvents(env.DB, outreach)).find(({ id }) => id === "reserved")
+      ?.availableSpots,
+    0,
+  );
+  await assert.rejects(
+    changeSignup(env.DB, outreach, "reserved", "join"),
+    statusError(409),
+  );
+
+  // A display-only team edit must refresh polling without changing capacity.
+  await env.DB.prepare(
+    "UPDATE profile SET teams='[\"outreach\"]' WHERE user_id='new-medic'",
+  ).run();
+  const unmarked = await listPublicRosters(env.DB, organizer, ["reserved"]);
+  assert.notEqual(unmarked.version, before.version);
+  assert.equal(
+    unmarked.people.find(({ name }) => name === "new-medic V.")?.category,
+    "new-volunteer",
+  );
+  assert.equal(
+    unmarked.people.find(({ name }) => name === "new-medic V.")?.medicMark,
+    0,
+  );
+  await env.DB.prepare(
+    "UPDATE profile SET teams='[\"medic\"]' WHERE user_id='new-medic'",
+  ).run();
+  assert.equal(
+    (await listPublicRosters(env.DB, organizer, ["reserved"])).version,
+    before.version,
+  );
+
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET registration_approved=1 WHERE user_id='pending-medic'",
+  ).run();
+  assert.equal(
+    (await listVolunteers(env.DB, organizer)).rows.find(
+      ({ id }) => id === "pending-medic",
+    )?.medicMark,
+    1,
+  );
+  await changeSignup(env.DB, actors.get("eligible-medic")!, "reserved", "join");
+  const after = (await listEvents(env.DB, newMedic)).find(
+    ({ id }) => id === "reserved",
+  )!;
+  assert.deepEqual(
+    [
+      after.confirmed,
+      after.newVolunteerConfirmed,
+      after.medicConfirmed,
+      after.medicEligible,
+    ],
+    [3, 2, 1, 0],
+  );
+  assert.equal(
+    (await listPublicRosters(env.DB, organizer, ["reserved"])).people.filter(
+      ({ medicMark }) => medicMark,
+    ).length,
+    2,
+  );
+  await assert.rejects(
+    changeSignup(env.DB, outreach, "reserved", "join"),
+    statusError(409),
+  );
 });
 
 const draftInput = (actor: Actor, revision: string | null = null) => ({
@@ -402,7 +1617,60 @@ const draftInput = (actor: Actor, revision: string | null = null) => ({
 const statusError = (status: number) => (error: unknown) =>
   error instanceof RequestError && error.status === status;
 
-test("application queue counts submitted unapproved applications matching search independently of pages and profile views", async () => {
+test("volunteer directory defaults to displayed roles and sorts the entire directory", async () => {
+  const actor: Actor = {
+    ...(await draftActor("organizer")),
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+    applicationApproved: true,
+  };
+  for (const [id, name, role, patrol, teams] of [
+    ["organizer", "bravo", "organizer", 0, "[]"],
+    ["medic", "zebra", "volunteer", 1, '["medic"]'],
+    ["new", "Zulu", "volunteer", 0, "[]"],
+    ["outreach", "Alpha", "volunteer", 1, "[]"],
+    ["tie", "alpha", "volunteer", 0, "[]"],
+  ] as const) {
+    if (id !== actor.id) await draftActor(id);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE user SET role=? WHERE id=?").bind(role, id),
+      env.DB.prepare(
+        `INSERT INTO profile (
+          user_id, preferred_name, phone, birth_date, emergency_contact_name,
+          emergency_contact_phone, emergency_contact_relationship, heard_about_us,
+          motivation, teams, medical_certification, training_experience, registered_at, updated_at
+        ) VALUES (?, ?, '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', ?, 'None', 'None', 0, 0)`,
+      ).bind(id, name, teams),
+      env.DB.prepare(
+        "INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at) VALUES (?, 1, 1, ?, ?, ?, 0)",
+      ).bind(id, patrol, patrol ? actor.id : null, patrol ? 0 : null),
+    ]);
+  }
+  for (const [sort, direction, expected] of [
+    ["name", "asc", ["outreach", "tie", "organizer", "medic", "new"]],
+    ["name", "desc", ["new", "medic", "organizer", "outreach", "tie"]],
+    ["role", "asc", ["outreach", "medic", "tie", "new", "organizer"]],
+    ["role", "desc", ["organizer", "tie", "new", "medic", "outreach"]],
+  ] as const) {
+    const page = await listVolunteers(env.DB, actor, "", sort, direction);
+    assert.deepEqual(
+      page.rows.map(({ id }) => id),
+      expected,
+    );
+    assert.equal(page.allApplicantsCount, 5);
+  }
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor)).rows.map(({ id }) => id),
+    ["outreach", "medic", "tie", "new", "organizer"],
+  );
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "AL")).rows.map(({ id }) => id),
+    ["outreach", "tie"],
+  );
+});
+
+test("review queue loads every submitted entry and counts search matches independently of filters and profile views", async () => {
   const actor: Actor = {
     ...(await draftActor("queue-organizer")),
     role: "organizer",
@@ -417,7 +1685,7 @@ test("application queue counts submitted unapproved applications matching search
     actor.id,
     "approved",
     ...Array.from(
-      { length: volunteerPageSize + 3 },
+      { length: 53 },
       (_, index) => `pending-${String(index).padStart(2, "0")}`,
     ),
   ];
@@ -428,8 +1696,8 @@ test("application queue counts submitted unapproved applications matching search
         `INSERT INTO profile (
         user_id, preferred_name, phone, birth_date, emergency_contact_name,
         emergency_contact_phone, emergency_contact_relationship, heard_about_us,
-        motivation, teams, medical_certification, training_experience, registered_at, updated_at
-      ) VALUES (?, ?, '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', '[]', 'None', 'None', 0, 0)`,
+        motivation, teams, medical_certification, training_experience, registered_at, naloxone_completed_at, updated_at
+      ) VALUES (?, ?, '555', '2000-01-01', 'Contact', '555', 'Friend', 'Friend', 'Help', '[]', 'None', 'None', 0, 0, 0)`,
       ).bind(id, id),
       env.DB.prepare(
         "INSERT INTO volunteer_status (user_id, active, registration_approved, patrol_approved, approved_by, approved_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0)",
@@ -450,49 +1718,236 @@ test("application queue counts submitted unapproved applications matching search
   await env.DB.prepare(
     "INSERT INTO volunteer_status (user_id, updated_at) VALUES ('account-only', 0)",
   ).run();
-  const count = volunteerPageSize + 3;
-  const first = await listVolunteers(env.DB, actor, "", 0, "awaiting");
+  const count = 53;
+  const first = await listApplications(env.DB, actor, "", "awaiting");
   assert.equal(first.awaitingApprovalCount, count);
-  assert.equal(first.rows.length, volunteerPageSize);
-  assert.equal(first.hasMore, true);
+  assert.equal(await countReadyApplications(env.DB, actor), count);
+  assert.equal(first.rows.length, count);
+  assert.equal(first.allRows.length, count + 2);
   assert.equal(first.rows[0].active, 0); // Inactive is not an approval state.
   assert.equal(first.rows[1].patrolApproved, 1); // Neither is patrol approval.
-  const second = await listVolunteers(
-    env.DB,
-    actor,
-    "",
-    volunteerPageSize,
-    "awaiting",
-  );
-  assert.equal(second.awaitingApprovalCount, count);
-  assert.equal(second.rows.length, 3);
-  assert.equal(second.hasMore, false);
-  assert.equal(
-    new Set([...first.rows, ...second.rows].map((row) => row.id)).size,
-    count,
-  );
+  assert.equal(new Set(first.rows.map((row) => row.id)).size, count);
   for (const [search, expected] of [
     ["pending-02", 1],
     ["no match", 0],
     ["approved", 0],
   ] as const)
     assert.equal(
-      (await listVolunteers(env.DB, actor, search, 0, "awaiting"))
+      (await listApplications(env.DB, actor, search, "awaiting"))
         .awaitingApprovalCount,
       expected,
     );
   assert.deepEqual(
-    (await listVolunteers(env.DB, actor, "approved", 0, "awaiting")).rows,
+    (await listApplications(env.DB, actor, "approved", "awaiting")).rows,
     [],
   );
   assert.equal(
     (await listVolunteers(env.DB, actor, "approved")).rows[0].id,
     "approved",
   );
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor)).rows.map(({ id }) => id).sort(),
+    ["approved", actor.id],
+  );
+  assert.equal(
+    (await listApplications(env.DB, actor)).allApplicantsCount,
+    count + 2,
+  );
   assert.equal(
     await env.DB.prepare("SELECT count(*) FROM audit_log").first("count(*)"),
     0,
   );
+  // Sort the full result, keeping newest completions first
+  // within status groups and case-insensitive name/id ties in either direction.
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id='pending-52'",
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET application_rejection_reason='Review decision' WHERE user_id='pending-01'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET preferred_name='ALPHA' WHERE user_id='pending-02'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET preferred_name='alpha' WHERE user_id='pending-03'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET teams='[\"medic\"]' WHERE user_id IN ('pending-01', 'pending-52')",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET registered_at=2000, naloxone_completed_at=3000 WHERE user_id='pending-50'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET registered_at=4000, naloxone_completed_at=1000 WHERE user_id='pending-51'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET naloxone_completed_at=5000 WHERE user_id='pending-01'",
+    ),
+  ]);
+  const pending = ids.filter((id) => id.startsWith("pending-"));
+  const ties = ["pending-02", "pending-03"];
+  const otherNames = pending.filter((id) => !ties.includes(id));
+  const reviewNames = [
+    ...ties,
+    ...otherNames.filter((id) => !["pending-01", "pending-52"].includes(id)),
+  ];
+  const earlyCompletions = reviewNames.filter(
+    (id) => !["pending-50", "pending-51"].includes(id),
+  );
+  const reviewByCompletion = ["pending-51", "pending-50", ...earlyCompletions];
+  const approved = ["approved", actor.id];
+  const reviewAndApprovedNames = [
+    ...ties,
+    "approved",
+    ...reviewNames.slice(ties.length),
+    actor.id,
+  ];
+  const earlyCompletionsAndApproved = [
+    ...ties,
+    "approved",
+    ...earlyCompletions.slice(ties.length),
+    actor.id,
+  ];
+  const defaultRows = (await listApplications(env.DB, actor)).rows;
+  assert.equal(await countReadyApplications(env.DB, actor), count - 2);
+  // Every visible status has a mutually exclusive filter. Counts include all
+  // search matches, independently of the selected status.
+  const expectedCounts = {
+    awaitingApprovalCount: count - 2,
+    inProgressCount: 1,
+    rejectedCount: 1,
+    approvedCount: 2,
+  };
+  for (const status of [
+    "awaiting",
+    "in-progress",
+    "rejected",
+    "approved",
+  ] as const) {
+    const expected = defaultRows.filter(
+      (row) => applicationStatus(row) === status,
+    );
+    const directory = await listApplications(env.DB, actor, "", status);
+    assert.deepEqual(directory.rows, expected);
+    for (const [key, value] of Object.entries(expectedCounts))
+      assert.equal(directory[key as keyof typeof expectedCounts], value);
+    const searched = await listApplications(env.DB, actor, "pending-", status);
+    assert.equal(searched.allApplicantsCount, count - 2); // ALPHA names do not match.
+    assert.equal(searched.approvedCount, 0);
+    assert.deepEqual(
+      searched.rows,
+      expected.filter((row) => row.name.startsWith("pending-")),
+    );
+    await assert.rejects(
+      listApplications(env.DB, { ...actor, role: "volunteer" }, "", status),
+      statusError(403),
+    );
+  }
+  assert.deepEqual(
+    defaultRows.map(({ id }) => id),
+    [...reviewByCompletion, "pending-52", "pending-01", "approved", actor.id],
+  );
+  assert.deepEqual(
+    defaultRows.slice(-2).map(({ applicationApproved }) => applicationApproved),
+    [1, 1],
+  );
+  assert.equal(
+    (await listApplications(env.DB, actor, "approved")).rows[0].id,
+    "approved",
+  );
+  for (const [id, completedAt] of [
+    ["pending-00", 0],
+    ["pending-50", 3000],
+    ["pending-51", 4000],
+    ["pending-52", null],
+    ["pending-01", 5000],
+  ] as const)
+    assert.equal(
+      defaultRows.find((row) => row.id === id)?.applicationCompletedAt,
+      completedAt,
+    );
+  for (const [sort, direction, expected] of [
+    ["name", "asc", [...ties, "approved", ...otherNames, actor.id]],
+    [
+      "name",
+      "desc",
+      [actor.id, ...otherNames.toReversed(), "approved", ...ties],
+    ],
+    [
+      "progress",
+      "asc",
+      [...reviewByCompletion, "pending-52", "pending-01", ...approved],
+    ],
+    [
+      "progress",
+      "desc",
+      [...approved, "pending-01", "pending-52", ...reviewByCompletion],
+    ],
+    ["role", "asc", [...reviewAndApprovedNames, "pending-01", "pending-52"]],
+    ["role", "desc", ["pending-01", "pending-52", ...reviewAndApprovedNames]],
+    [
+      "completed",
+      "asc",
+      [
+        "pending-52",
+        ...earlyCompletionsAndApproved,
+        "pending-50",
+        "pending-51",
+        "pending-01",
+      ],
+    ],
+    [
+      "completed",
+      "desc",
+      [
+        "pending-01",
+        "pending-51",
+        "pending-50",
+        ...earlyCompletionsAndApproved,
+        "pending-52",
+      ],
+    ],
+  ] as const) {
+    const directory = await listApplications(
+      env.DB,
+      actor,
+      "",
+      "all",
+      sort,
+      direction,
+    );
+    assert.deepEqual(
+      directory.rows.map(({ id }) => id),
+      expected,
+    );
+    assert.equal(directory.allApplicantsCount, count + 2);
+    assert.equal(directory.awaitingApprovalCount, count - 2);
+  }
+  assert.deepEqual(
+    (
+      await listApplications(
+        env.DB,
+        actor,
+        "ALPHA",
+        "awaiting",
+        "progress",
+        "desc",
+      )
+    ).rows.map(({ id }) => id),
+    ties,
+  );
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE profile SET registered_at=0, naloxone_completed_at=0, teams='[]' WHERE user_id IN ('pending-01', 'pending-50', 'pending-51', 'pending-52')",
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET application_rejection_reason=NULL WHERE user_id='pending-01'",
+    ),
+    env.DB.prepare(
+      "UPDATE profile SET preferred_name=user_id WHERE user_id IN ('pending-02', 'pending-03')",
+    ),
+  ]);
   const profile = await viewVolunteerProfile(env.DB, actor, "pending-02");
   assert.equal(profile?.email, "pending-02@example.org");
   assert.equal(profile?.answers.preferredName, "pending-02");
@@ -502,14 +1957,48 @@ test("application queue counts submitted unapproved applications matching search
   assert.equal(profile?.codeOfConductAcceptedAt, null);
   assert.equal(profile?.submission, null);
   assert.equal(
-    (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting")).rows
+    (await listApplications(env.DB, actor, "pending-02", "awaiting")).rows
       .length,
     1,
   );
   assert.equal(
-    (await listVolunteers(env.DB, actor)).awaitingApprovalCount,
+    (await listApplications(env.DB, actor)).awaitingApprovalCount,
     count,
   );
+  // A submitted form is still in progress until the earlier course step is complete.
+  await env.DB.prepare(
+    "UPDATE profile SET naloxone_completed_at=NULL WHERE user_id='pending-02'",
+  ).run();
+  const inProgress = await listApplications(env.DB, actor, "pending-02");
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "pending-02")).rows,
+    [],
+  );
+  assert.equal(inProgress.rows[0].applicationReadyForReview, 0);
+  assert.equal(inProgress.allApplicantsCount, 1);
+  assert.equal(inProgress.awaitingApprovalCount, 0);
+  await assert.rejects(
+    rejectApplication(env.DB, actor, {
+      userId: inProgress.rows[0].id,
+      version: inProgress.rows[0].updatedAt,
+      reason: "Cannot review an unfinished application.",
+    }),
+    statusError(409),
+  );
+  assert.deepEqual(
+    (await listApplications(env.DB, actor, "pending-02", "awaiting")).rows,
+    [],
+  );
+  assert.equal(
+    (await listApplications(env.DB, actor)).awaitingApprovalCount,
+    count - 1,
+  );
+  await env.DB.prepare(
+    "UPDATE profile SET naloxone_completed_at=0 WHERE user_id='pending-02'",
+  ).run();
+  const ready = await listApplications(env.DB, actor, "pending-02", "awaiting");
+  assert.equal(ready.rows[0].applicationReadyForReview, 1);
+  assert.equal(ready.awaitingApprovalCount, 1);
   assert.equal(
     await env.DB.prepare("SELECT action FROM audit_log").first("action"),
     "profile_viewed",
@@ -549,19 +2038,19 @@ test("application queue counts submitted unapproved applications matching search
     "Your volunteer application is approved",
   );
   assert.ok(approvalEmails[0].text.includes(`approved by ${actor.name}!`));
-  assert.match(approvalEmails[0].text, /Thanks for joining us/);
+  assert.match(approvalEmails[0].text, /Thank you for volunteering/);
   assert.match(
     approvalEmails[0].text,
-    /If Naloxone 101 completion is not yet confirmed, return to the Volunteer page, complete the course if needed, and confirm completion only after finishing it/,
+    /If needed, complete Naloxone 101, then confirm completion on the Volunteer page/,
   );
   assert.match(
     approvalEmails[0].text,
-    /Once completion is confirmed, choose an "Orientation \+ Patrol" event/,
+    /Register for an "Orientation \+ Patrol" event/,
   );
   assert.doesNotMatch(approvalEmails[0].text, /Includes orientation/);
   assert.match(
     approvalEmails[0].text,
-    /separate organizer approval for patrols without orientation/,
+    /Patrols without orientation require separate organizer approval/,
   );
   assert.match(
     approvalEmails[0].text,
@@ -571,13 +2060,13 @@ test("application queue counts submitted unapproved applications matching search
     [
       false,
       false,
-      /currently inactive.*contact an organizer at info@afterhoursoutreach\.ca to restore access before registering/,
+      /currently inactive.*contact an organizer at info@afterhoursoutreach\.ca to restore access/,
     ],
     [true, true, /browse upcoming patrols and register for an available spot/],
     [
       true,
       false,
-      /If Naloxone 101 completion is not yet confirmed.*Volunteer page.*only after finishing it.*Once completion is confirmed.*"Orientation \+ Patrol"/,
+      /complete Naloxone 101, then confirm completion on the Volunteer page.*"Orientation \+ Patrol"/,
     ],
   ] as const) {
     const current = (await listVolunteers(env.DB, actor, "pending-02")).rows[0];
@@ -604,15 +2093,15 @@ test("application queue counts submitted unapproved applications matching search
     if (patrolApproved)
       assert.doesNotMatch(email!.body, /Naloxone|Volunteer page/);
   }
-  const after = await listVolunteers(
-    env.DB,
-    actor,
-    "pending-02",
-    0,
-    "awaiting",
-  );
+  const after = await listApplications(env.DB, actor, "pending-02", "awaiting");
   assert.deepEqual(after.rows, []);
+  assert.equal(after.allApplicantsCount, 1);
   assert.equal(after.awaitingApprovalCount, 0);
+  assert.equal(
+    (await listApplications(env.DB, actor, "pending-02")).rows[0]
+      .applicationApproved,
+    1,
+  );
   assert.equal(
     (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
       .applicationApproved,
@@ -639,44 +2128,52 @@ test("application queue counts submitted unapproved applications matching search
   );
   assert.match(revokedEmail!.body, /awaiting organizer approval again/);
   assert.match(revokedEmail!.body, /application steps on the Volunteer page/);
-  assert.match(revokedEmail!.body, /Check Your account for any changes/);
+  assert.match(revokedEmail!.body, /Check your account for registration changes/);
   assert.doesNotMatch(
     revokedEmail!.body,
     /check your events|register for an available spot/,
   );
   assert.equal(
-    (await listVolunteers(env.DB, actor, "pending-02", 0, "awaiting"))
+    (await listApplications(env.DB, actor, "pending-02", "awaiting"))
       .awaitingApprovalCount,
     1,
+  );
+  assert.deepEqual(
+    (await listVolunteers(env.DB, actor, "pending-02")).rows,
+    [],
   );
   for (const denied of [
     { ...actor, role: "volunteer" as const },
     { ...actor, active: false },
     { ...actor, applicationSubmitted: false },
     { ...actor, twoFactorEnabled: true, twoFactorVerified: false },
-  ])
+  ]) {
     await assert.rejects(
-      listVolunteers(env.DB, denied, "", 0, "awaiting"),
+      listApplications(env.DB, denied, "", "awaiting"),
       statusError(403),
     );
+    await assert.rejects(
+      countReadyApplications(env.DB, denied),
+      statusError(403),
+    );
+  }
   // Organizer event access is a role exception, not application approval.
   await env.DB.prepare(
     "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
   )
     .bind(actor.id)
     .run();
-  const organizerQueue = await listVolunteers(
+  const organizerQueue = await listApplications(
     env.DB,
     { ...actor, applicationApproved: false },
     "queue-organizer",
-    0,
     "awaiting",
   );
   assert.equal(organizerQueue.awaitingApprovalCount, 1);
   assert.equal(organizerQueue.rows[0].id, actor.id);
   const rejection = {
     userId: "pending-02",
-    version: (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
+    version: (await listApplications(env.DB, actor, "pending-02")).rows[0]
       .updatedAt,
     reason: "We cannot accommodate your availability.",
   };
@@ -687,7 +2184,7 @@ test("application queue counts submitted unapproved applications matching search
     rejection.reason,
   );
   assert.equal(
-    (await listVolunteers(env.DB, actor, rejection.userId, 0, "awaiting"))
+    (await listApplications(env.DB, actor, rejection.userId, "awaiting"))
       .awaitingApprovalCount,
     0,
   );
@@ -708,6 +2205,11 @@ test("application queue counts submitted unapproved applications matching search
   );
   assert.ok(rejectionPayload[0].text.includes(rejection.reason));
   assert.deepEqual(rejectionPayload[0].to, ["pending-02@example.org"]);
+  const beforeDeletion = await countReadyApplications(env.DB, actor);
+  await env.DB.prepare(
+    "UPDATE user SET deleted_at=0 WHERE id='pending-00'",
+  ).run();
+  assert.equal(await countReadyApplications(env.DB, actor), beforeDeletion - 1);
   await env.DB.prepare("DELETE FROM session WHERE id=?")
     .bind(actor.sessionId)
     .run();
@@ -1119,6 +2621,14 @@ test("application progress and organizer attribution use application audits, not
     false,
   );
   const approver = await draftActor("application-approver");
+  await saveProfile(env.DB, approver.id, {
+    ...completeAnswers(),
+    firstName: "Alexandra",
+    middleNames: "Marie",
+    lastName: "Montgomery",
+    preferredName: "Alex",
+    codeOfConductAccepted: true,
+  });
   await env.DB.prepare(
     "UPDATE user SET role='organizer',name='Application Organizer' WHERE id=?",
   )
@@ -1138,8 +2648,8 @@ test("application progress and organizer attribution use application audits, not
       ?.applicationApprovedBy,
     {
       id: approver.id,
-      name: "Application Organizer",
-      email: "application-approver@example.org",
+      profileId: approver.id,
+      name: "Alex M.",
       approvedAt: 2000,
     },
   ); // A later, different patrol approver must not replace the application approver.
@@ -1167,6 +2677,31 @@ test("application progress and organizer attribution use application audits, not
     isApplicationComplete({ ...dated, naloxoneCompletedAt: null }),
     false,
   );
+  await env.DB.prepare("DELETE FROM profile WHERE user_id=?")
+    .bind(approver.id)
+    .run();
+  assert.deepEqual(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy,
+    {
+      id: approver.id,
+      profileId: null,
+      name: "Application O.",
+      approvedAt: 2000,
+    },
+  ); // Missing profiles retain name-only attribution without a broken link.
+  await saveProfile(env.DB, approver.id, {
+    ...completeAnswers(),
+    codeOfConductAccepted: true,
+  });
+  await env.DB.prepare("UPDATE user SET deleted_at=? WHERE id=?")
+    .bind(Date.now(), approver.id)
+    .run();
+  assert.equal(
+    (await viewVolunteerProfile(env.DB, reviewer, actor.id))
+      ?.applicationApprovedBy?.profileId,
+    null,
+  ); // Retained decision records do not link to a deleted account's profile.
   await env.DB.prepare(
     "UPDATE volunteer_status SET registration_approved=0 WHERE user_id=?",
   )
@@ -1201,7 +2736,495 @@ test("application progress and organizer attribution use application audits, not
   ); // Reapproval uses the latest applicationApproved audit, not the old approver.
 });
 
-test("orientees only see orientation events and rosters; patrol approval and organizers retain full access", async () => {
+async function patrolApprovalFixture() {
+  const organizer = {
+    ...(await draftActor("patrol-organizer")),
+    role: "organizer" as const,
+    applicationSubmitted: true,
+    active: true,
+  };
+  const volunteer = await draftActor("patrol-new-volunteer");
+  for (const actor of [organizer, volunteer])
+    await saveProfile(env.DB, actor.id, {
+      ...completeAnswers(),
+      codeOfConductAccepted: true,
+    });
+  await env.DB.batch([
+    env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?").bind(
+      organizer.id,
+    ),
+    env.DB.prepare(
+      "UPDATE volunteer_status SET registration_approved=1, active=1, updated_at=0",
+    ),
+    env.DB.prepare(
+      `INSERT INTO event (id,type,includes_orientation,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES ('patrol-orientation','patrol',1,?,'Orientation meeting point',8,?,0,0)`,
+    ).bind(Date.now() + 86_400_000, organizer.id),
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('patrol-orientation-signup','patrol-orientation',?,0,0)",
+    ).bind(volunteer.id),
+  ]);
+  await env.DB.prepare("DELETE FROM audit_log").run();
+  return { organizer, volunteer, input: { userId: volunteer.id, version: 0 } };
+}
+
+test("patrol access attribution follows approvals and revocations, not unrelated organizer changes", async () => {
+  const { organizer, volunteer, input } = await patrolApprovalFixture();
+  const reviewer: Actor = {
+    ...(await draftActor("patrol-reviewer")),
+    role: "organizer",
+    applicationSubmitted: true,
+    active: true,
+  };
+  await saveProfile(env.DB, reviewer.id, {
+    ...completeAnswers(),
+    firstName: "Taylor",
+    lastName: "Reviewer",
+    preferredName: "Taylor",
+    codeOfConductAccepted: true,
+  });
+  await env.DB.prepare(
+    "UPDATE user SET role='organizer', name='Taylor Reviewer' WHERE id=?",
+  )
+    .bind(reviewer.id)
+    .run();
+  const readChange = async () =>
+    (await viewVolunteerProfile(env.DB, organizer, volunteer.id))!
+      .patrolAccessChangedBy;
+  const version = async () =>
+    (await env.DB.prepare(
+      "SELECT updated_at FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first<number>("updated_at"))!;
+  assert.equal(await readChange(), null);
+  await approveForPatrols(env.DB, organizer, input);
+  const approval = await readChange();
+  assert.deepEqual(approval, {
+    id: organizer.id,
+    profileId: organizer.id,
+    name: applicationDisplayName(completeAnswers()),
+    changedAt: await version(),
+  });
+  await setVolunteerStatus(env.DB, reviewer, {
+    userId: volunteer.id,
+    version: await version(),
+    active: false,
+    applicationApproved: true,
+    patrolApproved: true,
+  });
+  await env.DB.prepare(
+    `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
+      VALUES ('unrelated-application-approval', ?, ?, 'approval_changed', '["applicationApproved"]', ?)`,
+  )
+    .bind(reviewer.id, volunteer.id, await version())
+    .run();
+  assert.deepEqual(await readChange(), approval);
+  await setVolunteerStatus(env.DB, reviewer, {
+    userId: volunteer.id,
+    version: await version(),
+    active: false,
+    applicationApproved: true,
+    patrolApproved: false,
+  });
+  const revocation = await readChange();
+  assert.deepEqual(revocation, {
+    id: reviewer.id,
+    profileId: reviewer.id,
+    name: "Taylor R.",
+    changedAt: await version(),
+  });
+  assert.ok(revocation!.changedAt > approval!.changedAt);
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT approved_by FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first("approved_by"),
+    null,
+  );
+  await approveForPatrols(env.DB, organizer, {
+    userId: volunteer.id,
+    version: await version(),
+  });
+  assert.deepEqual(await readChange(), {
+    ...approval,
+    changedAt: await version(),
+  });
+  assert.equal(
+    "patrolAccessChangedBy" in (await loadProfile(env.DB, volunteer.id))!,
+    false,
+  );
+  await assert.rejects(
+    viewVolunteerProfile(env.DB, volunteer, volunteer.id),
+    statusError(403),
+  );
+});
+
+test("legacy patrol approval attribution retains its recorded organizer and epoch timestamp without an audit", async () => {
+  const { organizer, volunteer } = await patrolApprovalFixture();
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=1, approved_by=?, approved_at=0 WHERE user_id=?",
+  )
+    .bind(organizer.id, volunteer.id)
+    .run();
+  assert.deepEqual(
+    (await viewVolunteerProfile(env.DB, organizer, volunteer.id))
+      ?.patrolAccessChangedBy,
+    {
+      id: organizer.id,
+      profileId: organizer.id,
+      name: applicationDisplayName(completeAnswers()),
+      changedAt: 0,
+    },
+  );
+});
+
+test("roster approval attribution belongs to the specific signup, independent of account approval and attendance", async () => {
+  const { organizer, volunteer, input } = await patrolApprovalFixture();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES ('other-orientation','orientation',?,'Other point',8,?,0,0)`,
+    ).bind(Date.now() + 86_400_000, organizer.id),
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('other-signup','other-orientation',?,0,0)",
+    ).bind(volunteer.id),
+    env.DB.prepare("UPDATE event SET starts_at=0"),
+    env.DB.prepare(
+      "INSERT INTO orientation_completion VALUES ('earlier-attendance',?,'other-orientation',?,0)",
+    ).bind(volunteer.id, organizer.id),
+  ]);
+  const rosters = () =>
+    listRosters(env.DB, organizer, ["patrol-orientation", "other-orientation"]);
+  const version = async () =>
+    (await env.DB.prepare(
+      "SELECT updated_at FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first<number>("updated_at"))!;
+  // Profile approval, even with recorded attendance, does not attribute any roster entry.
+  await approveForPatrols(env.DB, organizer, input);
+  for (const row of await rosters()) {
+    assert.equal(row.patrolApproved, 1);
+    assert.equal(row.patrolApprovedById, null);
+    assert.equal(row.patrolApprovedByName, null);
+    assert.equal(row.patrolApprovedAt, null);
+  }
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=0,approved_by=NULL,approved_at=NULL WHERE user_id=?",
+  )
+    .bind(volunteer.id)
+    .run();
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    version: await version(),
+    eventId: "patrol-orientation",
+  });
+  const approved = (await rosters()).find(
+    ({ eventId }) => eventId === "patrol-orientation",
+  )!;
+  assert.equal(approved.patrolApprovedById, organizer.id);
+  assert.equal(
+    approved.patrolApprovedByName,
+    applicationDisplayName(completeAnswers()),
+  );
+  assert.equal(approved.patrolApprovedAt, await version());
+  const other = (await rosters()).find(
+    ({ eventId }) => eventId === "other-orientation",
+  )!;
+  assert.equal(other.completed, 1);
+  assert.equal(other.patrolApprovedAt, null);
+  // Later profile approvals cannot rewrite the original entry's attribution.
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=0,approved_by=NULL,approved_at=NULL WHERE user_id=?",
+  )
+    .bind(volunteer.id)
+    .run();
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    version: await version(),
+  });
+  assert.equal(
+    (await rosters()).find(({ eventId }) => eventId === "patrol-orientation")
+      ?.patrolApprovedAt,
+    approved.patrolApprovedAt,
+  );
+  assert.equal(
+    (await rosters()).find(({ eventId }) => eventId === "other-orientation")
+      ?.patrolApprovedAt,
+    null,
+  );
+});
+
+test("roster patrol approval saves access, attribution and optional attendance history", async () => {
+  const { organizer, volunteer, input } = await patrolApprovalFixture();
+  const attendanceInput = { ...input, eventId: "patrol-orientation" };
+  assert.equal(
+    (await findVolunteerOrientation(env.DB, organizer, volunteer.id))?.eventId,
+    "patrol-orientation",
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM orientation_completion",
+    ).first("n"),
+    0,
+  );
+  await env.DB.prepare(
+    "UPDATE event SET starts_at=0 WHERE id='patrol-orientation'",
+  ).run();
+  await env.DB.prepare("UPDATE volunteer_status SET active=0 WHERE user_id=?")
+    .bind(volunteer.id)
+    .run();
+  const attempts = await Promise.allSettled(
+    Array.from({ length: 2 }, () =>
+      approveForPatrols(env.DB, organizer, {
+        ...attendanceInput,
+        notify: true,
+      }),
+    ),
+  );
+  const winner = attempts.find((attempt) => attempt.status === "fulfilled");
+  assert.ok(winner?.status === "fulfilled");
+  assert.equal(
+    attempts.filter((attempt) => attempt.status === "rejected").length,
+    1,
+  );
+  const result = winner.value;
+  assert.equal(
+    await env.DB.prepare("SELECT active FROM volunteer_status WHERE user_id=?")
+      .bind(volunteer.id)
+      .first("active"),
+    0,
+  );
+  const approval = await env.DB.prepare(
+    "SELECT patrol_approved, approved_by, approved_at, updated_at FROM volunteer_status WHERE user_id=?",
+  )
+    .bind(volunteer.id)
+    .first();
+  const completion = await env.DB.prepare(
+    "SELECT event_id, marked_by, marked_at FROM orientation_completion WHERE user_id=?",
+  )
+    .bind(volunteer.id)
+    .first();
+  assert.equal(approval?.patrol_approved, 1);
+  assert.equal(approval?.approved_by, organizer.id);
+  assert.equal(completion?.event_id, "patrol-orientation");
+  assert.equal(completion?.marked_by, organizer.id);
+  assert.equal(completion?.marked_at, approval?.approved_at);
+  assert.deepEqual(
+    await findCompletedVolunteerOrientation(env.DB, organizer, volunteer.id),
+    {
+      eventId: "patrol-orientation",
+      startsAt: 0,
+      meetingPoint: "Orientation meeting point",
+    },
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM audit_log WHERE action IN ('approval_changed','orientation_completed')",
+    ).first("n"),
+    2,
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM event_notification WHERE operation_id=?",
+    )
+      .bind(result.operation)
+      .first("n"),
+    1,
+  );
+  await assert.rejects(
+    approveForPatrols(env.DB, organizer, input),
+    statusError(409),
+  );
+  // Reapproval keeps recorded attendance, even if its original registration is gone.
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE volunteer_status SET patrol_approved=0, approved_by=NULL, approved_at=NULL WHERE user_id=?",
+    ).bind(volunteer.id),
+    env.DB.prepare("UPDATE signup SET status='cancelled' WHERE user_id=?").bind(
+      volunteer.id,
+    ),
+  ]);
+  assert.equal(
+    await findVolunteerOrientation(env.DB, organizer, volunteer.id),
+    null,
+  );
+  assert.equal(
+    (await findCompletedVolunteerOrientation(env.DB, organizer, volunteer.id))
+      ?.eventId,
+    "patrol-orientation",
+  );
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    version: Number(approval!.updated_at),
+  });
+  assert.deepEqual(
+    await env.DB.prepare(
+      "SELECT event_id, marked_by, marked_at FROM orientation_completion WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first(),
+    completion,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) AS n FROM event_notification").first(
+      "n",
+    ),
+    1,
+  );
+});
+
+test("invalid attendance does not block approval; application and organizer permissions still apply", async () => {
+  const { organizer, volunteer, input } = await patrolApprovalFixture();
+  for (const [invalidate, restore] of [
+    [
+      "UPDATE volunteer_status SET registration_approved=0 WHERE user_id='patrol-new-volunteer'",
+      "UPDATE volunteer_status SET registration_approved=1 WHERE user_id='patrol-new-volunteer'",
+    ],
+    [
+      "UPDATE session SET expires_at=0 WHERE user_id='patrol-organizer'",
+      `UPDATE session SET expires_at=${Date.now() + 3_600_000} WHERE user_id='patrol-organizer'`,
+    ],
+  ]) {
+    await env.DB.prepare(invalidate).run();
+    await assert.rejects(
+      approveForPatrols(env.DB, organizer, {
+        ...input,
+        eventId: "patrol-orientation",
+        notify: true,
+      }),
+      statusError(409),
+    );
+    await env.DB.prepare(restore).run();
+  }
+  // A future/cancelled orientation, missing signup or unknown event cannot
+  // prevent the role change; only valid past attendance is recorded as history.
+  await env.DB.prepare("UPDATE event SET cancelled_at=1").run();
+  await env.DB.prepare("UPDATE signup SET status='cancelled'").run();
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    eventId: "patrol-orientation",
+  });
+  const version = await env.DB.prepare(
+    "SELECT updated_at FROM volunteer_status WHERE user_id=?",
+  )
+    .bind(volunteer.id)
+    .first<number>("updated_at");
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    version: version!,
+    eventId: "not-the-registered-event",
+  });
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first("patrol_approved"),
+    1,
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM orientation_completion",
+    ).first("n"),
+    0,
+  );
+});
+
+test("failed attendance recording cannot roll back patrol access or its notification", async () => {
+  const { organizer, volunteer, input } = await patrolApprovalFixture();
+  await env.DB.prepare("UPDATE event SET starts_at=0").run();
+  await env.DB.prepare(
+    `CREATE TRIGGER reject_orientation BEFORE INSERT ON orientation_completion BEGIN SELECT RAISE(ABORT, 'test_orientation_failure'); END`,
+  ).run();
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    eventId: "patrol-orientation",
+    notify: true,
+  });
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first("patrol_approved"),
+    1,
+  );
+  for (const [table, expected] of [
+    ["orientation_completion", 0],
+    ["audit_log", 1],
+    ["event_notification", 1],
+  ] as const)
+    assert.equal(
+      await env.DB.prepare(`SELECT count(*) AS n FROM ${table}`).first("n"),
+      expected,
+    );
+});
+
+test.each(["unbooked", "booked", "started"] as const)(
+  "patrol approval supports the %s orientation state without inferring attendance",
+  async (state) => {
+    const { organizer, volunteer, input } = await patrolApprovalFixture();
+    if (state === "unbooked")
+      await env.DB.prepare(
+        "UPDATE signup SET status='cancelled' WHERE user_id=?",
+      )
+        .bind(volunteer.id)
+        .run();
+    if (state === "started")
+      await env.DB.prepare(
+        "UPDATE event SET starts_at=0 WHERE id='patrol-orientation'",
+      ).run();
+    await approveForPatrols(env.DB, organizer, { ...input, notify: true });
+    const saved = await env.DB.prepare(
+      "SELECT patrol_approved, approved_by, updated_at FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first();
+    assert.equal(saved?.patrol_approved, 1);
+    assert.equal(saved?.approved_by, organizer.id);
+    assert.equal(
+      await findCompletedVolunteerOrientation(env.DB, organizer, volunteer.id),
+      null,
+    );
+    assert.equal(
+      await env.DB.prepare(
+        "SELECT count(*) AS n FROM orientation_completion",
+      ).first("n"),
+      0,
+    );
+    assert.equal(
+      await env.DB.prepare(
+        "SELECT count(*) AS n FROM audit_log WHERE action='orientation_completed'",
+      ).first("n"),
+      0,
+    );
+    assert.equal(
+      await env.DB.prepare(
+        "SELECT count(*) AS n FROM event_notification",
+      ).first("n"),
+      1,
+    );
+    await assert.rejects(
+      approveForPatrols(env.DB, organizer, input),
+      statusError(409),
+    );
+    await env.DB.prepare("UPDATE session SET expires_at=0 WHERE user_id=?")
+      .bind(organizer.id)
+      .run();
+    await assert.rejects(
+      approveForPatrols(env.DB, organizer, {
+        ...input,
+        version: Number(saved!.updated_at),
+      }),
+      statusError(409),
+    );
+  },
+);
+
+test("new volunteers only see orientation events and rosters; patrol approval and organizers retain full access", async () => {
   const organizer = await draftActor("visibility-organizer");
   const actor = {
     ...(await draftActor("visibility-volunteer")),
@@ -1252,10 +3275,15 @@ test("orientees only see orientation events and rosters; patrol approval and org
   )
     .bind(actor.id)
     .run();
-  const incompleteOrientee = { ...actor, patrolApproved: false };
-  assert.deepEqual(await listEvents(env.DB, incompleteOrientee), []);
+  const incompleteNewVolunteer = { ...actor, patrolApproved: false };
+  assert.deepEqual(await listEvents(env.DB, incompleteNewVolunteer), []);
   await assert.rejects(
-    changeSignup(env.DB, incompleteOrientee, "included-orientation", "join"),
+    changeSignup(
+      env.DB,
+      incompleteNewVolunteer,
+      "included-orientation",
+      "join",
+    ),
     statusError(403),
   );
   await env.DB.prepare(
@@ -1264,8 +3292,8 @@ test("orientees only see orientation events and rosters; patrol approval and org
     .bind(actor.id)
     .run();
   await completeLocalApplicationStep(env.DB, actor, "discord");
-  const orientee = {
-    ...incompleteOrientee,
+  const newVolunteer = {
+    ...incompleteNewVolunteer,
     naloxoneCompleted: true,
     naloxoneCompletedAt: 0,
     applicationComplete: isApplicationComplete(
@@ -1274,19 +3302,24 @@ test("orientees only see orientation events and rosters; patrol approval and org
   };
   const expected = ["included-orientation", "legacy-orientation"];
   for (const view of ["volunteer", "manage"] as const) {
-    const events = await listEvents(env.DB, orientee, "regular-patrol", view);
+    const events = await listEvents(
+      env.DB,
+      newVolunteer,
+      "regular-patrol",
+      view,
+    );
     assert.deepEqual(events.map((row) => row.id).sort(), expected);
   }
   // Supplying known IDs (or having an existing booking) must not bypass visibility.
   assert.deepEqual(
-    (await listPublicRosters(env.DB, orientee, ids)).people
+    (await listPublicRosters(env.DB, newVolunteer, ids)).people
       .map((row) => row.eventId)
       .sort(),
     expected,
   );
-  await changeSignup(env.DB, orientee, "regular-patrol", "cancel");
+  await changeSignup(env.DB, newVolunteer, "regular-patrol", "cancel");
   await assert.rejects(
-    changeSignup(env.DB, orientee, "regular-patrol", "join"),
+    changeSignup(env.DB, newVolunteer, "regular-patrol", "join"),
     statusError(403),
   );
   await env.DB.prepare(
@@ -1295,7 +3328,7 @@ test("orientees only see orientation events and rosters; patrol approval and org
     .bind(actor.id, organizer.id)
     .run();
   assert.deepEqual(
-    (await listEvents(env.DB, orientee)).map((row) => row.id).sort(),
+    (await listEvents(env.DB, newVolunteer)).map((row) => row.id).sort(),
     expected,
   );
   await env.DB.batch([
@@ -1307,7 +3340,7 @@ test("orientees only see orientation events and rosters; patrol approval and org
     ).bind(actor.id),
   ]);
   const manager = {
-    ...orientee,
+    ...newVolunteer,
     role: "organizer" as const,
     applicationApproved: false,
   };
@@ -1360,7 +3393,7 @@ test("first completed orientation uses the earliest attended event, not when att
   );
 });
 
-test("concurrent first-orientation signups reserve one booking; cancellation and past/cancelled events allow rebooking", async () => {
+test("new volunteers can concurrently book multiple orientations and rebook while another booking is closed or hidden", async () => {
   const actor = {
     ...(await draftActor("orientation-volunteer")),
     applicationSubmitted: true,
@@ -1389,43 +3422,32 @@ test("concurrent first-orientation signups reserve one booking; cancellation and
       ).bind(id, Date.now() + 86_400_000, actor.id),
     ),
   ]);
-  const attempts = await Promise.allSettled(
+  const attempts = await Promise.all(
     eventIds.map((id) => changeSignup(env.DB, actor, id, "join")),
   );
+  assert.equal(attempts.length, 2);
+  const events = await listEvents(env.DB, actor);
+  assert.equal(events.filter((item) => item.signedUp).length, 2);
+  const [booked, other] = events;
+  assert.equal(await loadFirstCompletedOrientation(env.DB, actor.id), null);
+  await changeSignup(env.DB, actor, booked.id, "cancel");
   assert.equal(
-    attempts.filter((result) => result.status === "fulfilled").length,
+    (await listEvents(env.DB, actor)).filter((item) => item.signedUp).length,
     1,
   );
-  const failure = attempts.find((result) => result.status === "rejected");
-  assert.ok(
-    failure?.status === "rejected" && failure.reason instanceof RequestError,
-  );
-  assert.equal(failure.reason.status, 409);
-  assert.equal(failure.reason.message, orientationSignupLimitMessage);
-  const events = await listEvents(env.DB, actor);
-  const booked = events.find((item) => item.signedUp)!;
-  const other = events.find((item) => !item.signedUp)!;
-  assert.equal(await loadFirstCompletedOrientation(env.DB, actor.id), null);
-  assert.equal(other.orientationSignupBlocked, 1);
-  await changeSignup(env.DB, actor, booked.id, "cancel");
-  assert.ok(
-    (await listEvents(env.DB, actor)).every(
-      (item) => !item.orientationSignupBlocked,
-    ),
-  );
-  await changeSignup(env.DB, actor, other.id, "join");
-
-  // Hiding/closing does not release the reservation, but event cancellation does.
+  // Another existing booking never blocks registration, even when it is hidden.
   await env.DB.prepare("UPDATE event SET open=0, hidden=1 WHERE id=?")
     .bind(other.id)
     .run();
-  await assert.rejects(
-    changeSignup(env.DB, actor, booked.id, "join"),
-    statusError(409),
+  await changeSignup(env.DB, actor, booked.id, "join");
+  assert.equal(
+    (await listEvents(env.DB, actor)).filter((item) => item.signedUp).length,
+    2,
   );
   await env.DB.prepare("UPDATE event SET cancelled_at=1 WHERE id=?")
     .bind(other.id)
     .run();
+  await changeSignup(env.DB, actor, booked.id, "cancel");
   await changeSignup(env.DB, actor, booked.id, "join");
   await env.DB.prepare("UPDATE event SET starts_at=0 WHERE id=?")
     .bind(booked.id)
@@ -1589,7 +3611,7 @@ test("submission atomically removes drafts; failed submissions retain them and l
     await env.DB.prepare("SELECT name FROM user WHERE id=?")
       .bind(actor.id)
       .first("name"),
-    "Changed first Changed middle Changed last",
+    "Changed first C.",
   );
   const organizer: Actor = {
     ...(await draftActor("snapshot-reviewer")),
@@ -1612,6 +3634,11 @@ test("submission atomically removes drafts; failed submissions retain them and l
     .run();
   const review = await viewVolunteerProfile(env.DB, organizer, actor.id);
   assert.deepEqual(review?.answers, latest);
+  const directory = await listApplications(env.DB, organizer, "Changed last");
+  assert.equal(
+    directory.rows.find(({ id }) => id === actor.id)?.name,
+    "Changed first C.",
+  );
   assert.deepEqual(review?.submission, submission);
   assert.deepEqual(
     await loadSubmittedApplication(env.DB, actor.id),
@@ -1733,7 +3760,7 @@ test("new local applications preserve old fixtures; deletion protects only manua
   await env.DB.batch(localAccountFixtures().map((sql) => env.DB.prepare(sql)));
   // Renaming a preset cannot remove protection; ordinary names/roles above do not add it.
   await env.DB.prepare(
-    "UPDATE user SET name='Renamed preset' WHERE id LIKE 'local-account-user-%'",
+    "UPDATE user SET name='Renamed preset' WHERE id LIKE 'local-account-v2-user-%'",
   ).run();
   const snapshotTables = () =>
     Promise.all(
@@ -1748,6 +3775,21 @@ test("new local applications preserve old fixtures; deletion protects only manua
     await assert.rejects(deleteLocalAccount(env.DB, id), statusError(403));
     assert.deepEqual(await snapshotTables(), beforePresets);
   }
+  // A historical seeded ID remains protected after its preset key is renamed.
+  const retiredPreset = await draftActor("local-account-user-medic-orientee");
+  await saveProfile(env.DB, retiredPreset.id, answers);
+  const retiredSubmission = await loadSubmittedApplication(
+    env.DB,
+    retiredPreset.id,
+  );
+  await assert.rejects(
+    deleteLocalAccount(env.DB, retiredPreset.id),
+    statusError(403),
+  );
+  assert.deepEqual(
+    await loadSubmittedApplication(env.DB, retiredPreset.id),
+    retiredSubmission,
+  );
 });
 
 test("manual presets resolve real application completion, event access and roster categories", async () => {
@@ -1765,7 +3807,7 @@ test("manual presets resolve real application completion, event access and roste
     const complete = isApplicationComplete(progress);
     assert.equal(
       complete,
-      !["draft", "applied", "awaiting-review"].includes(preset.key),
+      !preset.draft && preset.naloxoneCompleted && preset.applicationApproved,
       preset.label,
     );
     if (complete) {
@@ -1812,8 +3854,8 @@ test("manual presets resolve real application completion, event access and roste
     true,
   );
   assert.equal(
-    users.find(({ id }) => id === localAccountUserId("medic-orientee"))!.state
-      .medicEligible,
+    users.find(({ id }) => id === localAccountUserId("medic-new-volunteer"))!
+      .state.medicEligible,
     false,
   );
   assert.equal(
@@ -1824,45 +3866,49 @@ test("manual presets resolve real application completion, event access and roste
   assert.ok(await loadApplicationDraft(env.DB, localAccountUserId("draft")));
   assert.equal(actors.get("organizer")!.applicationApproved, true);
   assert.equal(actors.get("organizer")!.patrolApproved, true);
+  const volunteers = await listVolunteers(env.DB, actors.get("organizer")!);
+  assert.deepEqual(
+    ["medic-new-volunteer", "medic", "patrol"].map(
+      (key) =>
+        volunteers.rows.find(({ id }) => id === localAccountUserId(key))!
+          .category,
+    ),
+    ["new-volunteer", "medic", "outreach-volunteer"],
+  );
   await changeSignup(
     env.DB,
     actors.get("organizer")!,
-    "local-account-event-patrol",
+    "local-account-v2-event-patrol",
     "join",
   );
   await changeSignup(
     env.DB,
     actors.get("organizer")!,
-    "local-account-event-patrol",
+    "local-account-v2-event-patrol",
     "cancel",
   );
   await changeSignup(
     env.DB,
     actors.get("medic")!,
-    "local-account-event-patrol",
+    "local-account-v2-event-patrol",
     "join",
   );
   await changeSignup(
     env.DB,
     actors.get("patrol")!,
-    "local-account-event-patrol",
+    "local-account-v2-event-patrol",
     "join",
   );
-  await changeSignup(
-    env.DB,
-    actors.get("medic-orientee")!,
-    "local-account-event-orientation",
-    "join",
-  );
+  // Jo is already booked alongside the long-name orientation sample.
   const roster = await listPublicRosters(env.DB, actors.get("organizer")!, [
-    "local-account-event-patrol",
-    "local-account-event-orientation",
+    "local-account-v2-event-patrol",
+    "local-account-v2-event-orientation",
   ]);
   assert.deepEqual(roster.people.map(({ category }) => category).sort(), [
     "medic",
-    "orientee",
-    "orientee",
-    "volunteer",
+    "new-volunteer",
+    "new-volunteer",
+    "outreach-volunteer",
   ]);
 
   const before = await loadSubmittedApplication(
@@ -2005,7 +4051,6 @@ test("every reusable state resolves its declared milestones, permissions and att
       medicEligible: Boolean(
         row.medicSelected &&
         row.patrol_approved &&
-        row.orientationCompleted &&
         row.active &&
         progress.applicationApproved,
       ),

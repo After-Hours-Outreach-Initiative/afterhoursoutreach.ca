@@ -12,7 +12,6 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
@@ -35,7 +34,7 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     });
     expect(response.status(), await response.text()).toBe(200);
   }
-  await page.goto("/manage/events?type=one-off");
+  await page.goto("/events?type=one-off");
   const cards = page.locator("[data-live-event]").filter({ hasText: label });
   const dates = await cards.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-event-start")),
@@ -45,14 +44,12 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   );
   await cards.first().locator("[data-bulk-event]").check();
   await expect(page.locator("[data-bulk-count]")).toHaveText("1 selected");
-  await page
-    .getByRole("button", { name: /^Recurring series \(\d+\)$/ })
-    .click();
+  await page.getByRole("button", { name: /^Recurring events \d+$/ }).click();
   await expect(page.locator("[data-bulk-count]")).toContainText("0 selected");
   await expect(
     page.getByRole("button", { name: "Bulk edit", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: /^One-off events \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: /^One-off events \d+$/ }).click();
   await page
     .getByRole("button", { name: "Select all shown", exact: true })
     .click();
@@ -69,6 +66,14 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     name: "Bulk edit events",
     exact: true,
   });
+  await expect(dialog.locator(".dialog-footer button")).toHaveText([
+    "Cancel",
+    "Save selected events",
+  ]);
+  await expect(dialog.locator(".dialog-footer")).toHaveCSS(
+    "justify-content",
+    "flex-end",
+  );
   await expect(dialog).toContainText("not entire recurring series");
   await expect(dialog.locator('[name="startsAt"]')).toHaveCount(0);
   await expect(

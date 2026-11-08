@@ -42,6 +42,23 @@ test("Discord migration preserves existing volunteers and drafts without inventi
           ...(table === "volunteer_status"
             ? { application_rejection_reason: null }
             : {}),
+          ...(table === "event"
+            ? {
+                min_medic_spots: 2,
+                min_new_volunteer_spots: 2,
+                max_new_volunteers: 4,
+              }
+            : {}),
+          ...(table === "signup"
+            ? {
+                manual_name: null,
+                manual_medic: 0,
+                manual_new: 0,
+                added_by: null,
+                patrol_approved_by: null,
+                patrol_approved_at: null,
+              }
+            : {}),
         })),
     );
     for (const file of files.slice(discord))

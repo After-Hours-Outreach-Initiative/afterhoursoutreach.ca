@@ -29,6 +29,9 @@ export function bulkEventAction(values: FormData) {
     "meetingPoint",
     "meetingPointUrl",
     "spots",
+    "minMedicSpots",
+    "minNewVolunteerSpots",
+    "maxNewVolunteers",
     "includesOrientation",
     "open",
     "hidden",
@@ -39,12 +42,16 @@ export function bulkEventAction(values: FormData) {
       (["includesOrientation", "open", "hidden"].includes(name) && value === "")
     )
       continue;
-    changes[name] =
-      name === "spots"
-        ? Number(value)
-        : ["includesOrientation", "open", "hidden"].includes(name)
-          ? value === "true"
-          : String(value);
+    changes[name] = [
+      "spots",
+      "minMedicSpots",
+      "minNewVolunteerSpots",
+      "maxNewVolunteers",
+    ].includes(name)
+      ? Number(value)
+      : ["includesOrientation", "open", "hidden"].includes(name)
+        ? value === "true"
+        : String(value);
   }
   return {
     action: "bulk-save",
@@ -129,7 +136,14 @@ export function initBulkEvents(root: HTMLElement) {
       form.querySelector<HTMLElement>("[data-form-message]")!.hidden = true;
       form.querySelector<HTMLInputElement>('[name="selection"]')!.value =
         versions(selected);
-      for (const name of ["meetingPoint", "meetingPointUrl", "spots"])
+      for (const name of [
+        "meetingPoint",
+        "meetingPointUrl",
+        "spots",
+        "minMedicSpots",
+        "minNewVolunteerSpots",
+        "maxNewVolunteers",
+      ])
         form.querySelector<HTMLInputElement>(`[name="${name}"]`)!.disabled =
           true;
       dialog.querySelector("[data-bulk-summary]")!.textContent =

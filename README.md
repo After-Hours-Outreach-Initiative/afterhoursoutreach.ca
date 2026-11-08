@@ -5,22 +5,50 @@ Cloudflare Workers.
 
 ## Setup
 
+Use Node.js 24.22.2 (see `.node-version`) and pnpm 11.9.0. Current timezone data
+keeps Vancouver event times consistent with the Workers runtime after B.C.'s
+2026 move to permanent UTC−7.
+
 ```sh
 pnpm install
 ```
 
+## Home-screen icons
+
+iOS uses `public/apple-touch-icon.png`; Android uses the regular and maskable
+icons declared in `public/site.webmanifest`. The shared site layout links both.
+
+To change the home-screen artwork, replace `public/icons/app-icon.svg` with a
+square SVG and run `pnpm icons:generate`. Commit the generated PNGs alongside
+the source. Keep the artwork centered with padding so Android's icon masks
+don't crop it. Browser favicons are managed separately.
+
 ## Local UI playground
 
 Run `pnpm dev`, then open <http://localhost:4321/dev/ui> or choose **UI playground**
-in the local **DEV panel** (Alt+Z).
+in the local **DEV panel** (Alt+Z), available on every page, including the
+playground. Account controls load only when the panel is opened.
 
-Discord is the first component: browse its state gallery or use the interactive
-preview to try fictional inputs, delayed responses, and success/error flows at
-different viewport sizes. Scenario URLs can be bookmarked or shared locally.
-Developer controls simulate background status updates without adding a refresh
-button to the actual component.
-The playground needs no sign-in and never changes accounts, writes to the
-database, or calls Discord. Its routes and simulations are excluded from both
+Choose a website part from the playground navigation:
+
+- **Applications table** (`/dev/ui/applications`): try application progress states,
+  approval filters, instant local search, empty results, long names, and 500-entry directories.
+- **Volunteers table** (`/dev/ui/volunteers`): inspect roles, avatars, patrol access,
+  and ascending/descending sorting on all three columns. Both table playgrounds
+  include viewport sizes and delayed, failed, or paused search/sort responses.
+- **Organizer profile**: inspect application review, rejection, orientation,
+  volunteer/medic access, organizer roles, and historical records. Preview
+  the profile page at different sizes, try long or sparse answers, and
+  simulate loading, failed saves, conflicts, pending actions, and email failures.
+- **Discord connection**: browse the state gallery or try fictional inputs,
+  delayed responses, and success/error flows. Developer controls simulate
+  background updates without adding a refresh button to the actual component.
+
+The previews use the website's real view components. Viewport settings and scenario URLs
+can be bookmarked or shared locally; reset restores the selected fictional state.
+The playground simulations need no sign-in and never change accounts, write to
+the database, or call Discord. The shared DEV panel still provides its usual
+local account controls. Playground routes and simulations are excluded from both
 production and hosted preview builds. Add future component examples under
 `src/dev/ui/`.
 

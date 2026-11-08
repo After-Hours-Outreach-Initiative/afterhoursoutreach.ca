@@ -41,9 +41,9 @@ export function chooseNotification(kind: string): Promise<boolean | null> {
   const actions = document.createElement("div");
   actions.className = "dialog-footer";
   for (const [value, label, variant] of [
-    ["skip", "Save without email", "btn-primary"],
-    ["send", "Save and send email", "btn-outline"],
     ["", "Cancel change", "btn-quiet"],
+    ["send", "Save and send email", "btn-outline"],
+    ["skip", "Save without email", "btn-primary"],
   ]) {
     const button = document.createElement("button");
     button.type = "button";

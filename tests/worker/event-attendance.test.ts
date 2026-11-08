@@ -4,6 +4,7 @@ import { chromium, expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { addCalendarDays, vancouverInput } from "../../src/data/event-time";
+import { inPlaceAction } from "../helpers/in-place-action";
 
 test("event avatars and abbreviated rosters render privately on desktop/mobile, including managed occurrences and maximum capacity", async () => {
   const origin = "https://afterhoursoutreach.ca";
@@ -55,13 +56,18 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
     await DB.prepare("UPDATE user SET role='organizer' WHERE id=?")
       .bind(organizer.id)
       .run();
-    const personStatements = (id: string, first: string, medic: boolean) => [
+    const personStatements = (
+      id: string,
+      first: string,
+      medic: boolean,
+      preferred = "",
+    ) => [
       DB.prepare(
         `INSERT INTO profile (user_id,first_name,last_name,preferred_name,phone,birth_date,
         emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,
         motivation,teams,medical_certification,training_experience,medical_conditions,registered_at,updated_at)
-        VALUES (?,?,'PrivateSurname','PRIVATE FULL NAME','PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None','PRIVATE HEALTH',0,0)`,
-      ).bind(id, first, medic ? '["medic"]' : "[]"),
+        VALUES (?,?,'PrivateSurname',?,'PRIVATE PHONE','2000-01-01','PRIVATE CONTACT','555','Friend','Friend','Help',?,'PRIVATE CERT','None','PRIVATE HEALTH',0,0)`,
+      ).bind(id, first, preferred, medic ? '["medic"]' : "[]"),
       DB.prepare(
         "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,1,?,0,0)",
       ).bind(id, organizer.id),
@@ -114,8 +120,8 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         empty,
       )
       .run();
-    // Three completed medics, three orientees (including a first-time medic),
-    // then only real green attendees. The crowded event exercises scrolling at 100.
+    // Three patrol-approved medics, three volunteers awaiting patrol approval
+    // (one with approved medic-team interest), then returning outreach volunteers.
     for (let index = 0; index < 100; index++) {
       const id = `avatar-attendee-${index}`;
       await DB.batch([
@@ -126,9 +132,10 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           id,
           index === 0 ? "Medic" : `Member${index}`,
           index < 3 || index === 3,
+          index === 1 ? " MJ " : "",
         ),
       ]);
-      if (index < 3 || index >= 6)
+      if (index >= 3 && index < 6)
         await DB.prepare(
           "INSERT INTO orientation_completion VALUES (?,?, 'history',?,0)",
         )
@@ -145,12 +152,22 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         )
           .bind(`booked-${index}`, booked, id)
           .run();
+      // Approval permits both bookings; revoking it preserves those historical
+      // spots while immediately changing their category, even with attendance.
+      if (index >= 3 && index < 6)
+        await DB.prepare(
+          "UPDATE volunteer_status SET patrol_approved=0 WHERE user_id=?",
+        )
+          .bind(id)
+          .run();
     }
     const html = await (await send("/events", viewer.cookie)).text();
     expect(html).not.toMatch(
       /PRIVATE|PrivateSurname|avatar-attendee|data-manage-signup|data-volunteer-profile-link/,
     );
     expect(html).toContain("Medic P.");
+    expect(html).toContain("MJ P.");
+    expect(html).not.toContain("Member1 P.");
     const version = async () =>
       (
         (await (
@@ -223,7 +240,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
       await setCookie(manage ? organizer.cookie : viewer.cookie);
       for (const width of [1280, 1920, 800, 375, 320]) {
         await page.setViewportSize({ width, height: 900 });
-        await page.goto(`${origin}${manage ? "/manage/events" : "/events"}`);
+        await page.goto(`${origin}/events`);
         const list = page.locator("[data-event-list]");
         await expect(
           page.getByRole("region", { name: "About these places" }),
@@ -236,9 +253,9 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(list).toHaveCSS("align-items", "start");
         expect(await list.evaluate(columns)).toBe(1);
         if (manage)
-          await expect(list.locator(":scope > [data-series-card]")).toHaveCount(
-            1,
-          );
+          await expect(
+            page.locator("[data-series-list] > [data-series-card]"),
+          ).toHaveCount(1);
         await list.evaluate((element) =>
           window.scrollTo({
             top: element.getBoundingClientRect().top + scrollY - 110,
@@ -248,16 +265,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await page.screenshot({
           path: `/tmp/opencode/event-attendance/${manage ? "manage" : "events"}-grid-${width}.png`,
         });
-        if (manage) {
-          await page
-            .locator(
-              `[data-series-card="${seriesId}"] > details[data-series-occurrences] > summary`,
-            )
-            .click();
-          expect(
-            await page.locator("[data-series-event-list]").evaluate(columns),
-          ).toBe(1);
-        }
         const card = page.locator(`[data-live-event="${booked}"]`);
         const rosterSelector = manage
           ? ".volunteer-roster"
@@ -267,7 +274,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(card.locator(".event-attendance-row")).toHaveCount(1);
         await expect(card.locator(".event-avatar-row")).toHaveAttribute(
           "aria-label",
-          "3 approved medics, 2 other volunteers and 3 orientees registered",
+          "3 approved medics, 2 outreach volunteers and 3 new volunteers registered",
         );
         await expect(
           card.locator(".event-avatar-row .attendee-avatar"),
@@ -311,15 +318,31 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           card.locator(".event-avatar-row .attendee-medic"),
         ).toHaveCount(3);
         await expect(
-          card.locator(".event-avatar-row .attendee-volunteer"),
+          card.locator(".event-avatar-row .attendee-outreach-volunteer"),
         ).toHaveCount(2);
         await expect(
-          card.locator(".event-avatar-row .attendee-orientee"),
+          card.locator(".event-avatar-row .attendee-new-volunteer"),
         ).toHaveCount(3);
+        await expect(
+          card.locator(".event-avatar-row .attendee-new-volunteer").first(),
+        ).toHaveAttribute("aria-label", "New medic: registered");
+        await expect(
+          card.locator(".event-avatar-row .attendee-new-volunteer").first(),
+        ).toHaveAttribute("title", "New medic: registered");
+        await expect(
+          card.locator(
+            '.event-avatar-row .attendee-new-volunteer [data-avatar-decoration="medic-cross"]',
+          ),
+        ).toHaveCount(1);
+        await expect(
+          card.locator(
+            '.event-avatar-row [data-avatar-decoration="medic-cross"]',
+          ),
+        ).toHaveCount(4);
         for (const [category, color] of [
-          ["medic", "rgb(185, 28, 28)"],
-          ["volunteer", "rgb(21, 128, 61)"],
-          ["orientee", "rgb(29, 78, 216)"],
+          ["medic", "rgb(65, 105, 225)"],
+          ["outreach-volunteer", "rgb(65, 105, 225)"],
+          ["new-volunteer", "rgb(65, 105, 225)"],
         ]) {
           const avatar = card
             .locator(`.event-avatar-row .attendee-${category} svg`)
@@ -333,15 +356,30 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             };
           });
           expect(bounds.artwork).toEqual(bounds.viewBox);
+          const gradient = avatar.locator("linearGradient");
+          let fill = "currentColor";
+          if (category === "new-volunteer") {
+            fill = `url(#${await gradient.getAttribute("id")})`;
+            await expect(gradient).toHaveAttribute(
+              "data-avatar-decoration",
+              "new-gradient-horizontal",
+            );
+            await expect(
+              avatar.locator('[data-avatar-decoration="new-dot"]'),
+            ).toHaveCount(0);
+          } else {
+            await expect(gradient).toHaveCount(0);
+          }
           for (const tag of ["circle", "path"]) {
-            const shape = avatar.locator(`${tag}[fill="currentColor"]`);
-            await expect(shape).toHaveAttribute("fill", "currentColor");
+            const shape = avatar.locator(`:scope > ${tag}`).first();
+            await expect(shape).toHaveAttribute("fill", fill);
             await expect(shape).toHaveAttribute("stroke", "none");
-            await expect(shape).toHaveCSS("fill", color);
+            if (category !== "new-volunteer")
+              await expect(shape).toHaveCSS("fill", color);
             await expect(shape).toHaveCSS("stroke", "none");
           }
         }
-        await expect(card.locator(".event-orientee-box")).toHaveCount(0);
+        await expect(card.locator(".event-new-volunteer-box")).toHaveCount(0);
         const emptyCard = page.locator(`[data-live-event="${empty}"]`);
         const emptyRoster = emptyCard.locator(rosterSelector);
         await expect(emptyRoster).toHaveCount(0);
@@ -415,7 +453,7 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         };
         await expectActionPosition();
         if (manage) {
-          await expect(emptyCard.locator("[data-live-signup]")).toHaveCount(0);
+          await expect(emptyCard.locator("[data-live-signup]")).toHaveCount(1);
           await expect(
             emptyCard.getByRole("button", { name: "Edit", exact: true }),
           ).toBeVisible();
@@ -438,6 +476,14 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
                   exact: true,
                 })
                 .click();
+              if (!join)
+                await page
+                  .getByRole("dialog", {
+                    name: "Unregister from this event?",
+                    exact: true,
+                  })
+                  .getByRole("button", { name: "Unregister", exact: true })
+                  .click();
               await expect(
                 emptyCard.getByRole("button", {
                   name: join ? "Unregister" : "Register",
@@ -481,44 +527,75 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         expect(crowdedLayout.scrollable).toBe(false);
         if (manage) {
           await card.locator(".volunteer-roster > summary").click();
-          await expect(card.locator(".volunteer-roster tbody tr")).toHaveCount(
-            8,
-          );
+          await expect(
+            card.locator(".volunteer-roster .event-roster-list > li"),
+          ).toHaveCount(8);
         } else {
           await card.locator(".public-event-roster > summary").click();
           const roster = card.locator(".public-event-roster");
-          await expect(roster.locator("tbody tr")).toHaveCount(8);
+          await expect(roster.locator(".event-roster-list > li")).toHaveCount(
+            8,
+          );
           await expect(roster.locator("a, input, button")).toHaveCount(0);
-          await expect(roster.locator("tbody tr").first()).toHaveText(
-            publicName,
-          );
           await expect(
-            roster.locator("tbody tr").first().locator(".attendee-medic"),
-          ).toHaveCSS("color", "rgb(185, 28, 28)");
-          await expect(roster.locator(".attendee-volunteer").first()).toHaveCSS(
-            "color",
-            "rgb(21, 128, 61)",
-          );
-          await expect(roster.locator(".attendee-orientee").first()).toHaveCSS(
-            "color",
-            "rgb(29, 78, 216)",
-          );
+            roster.locator(".event-roster-list > li").first(),
+          ).toHaveText(publicName);
+          await expect(
+            roster
+              .locator(".event-roster-list > li")
+              .first()
+              .locator(".attendee-medic"),
+          ).toHaveCSS("color", "rgb(65, 105, 225)");
+          await expect(
+            roster.locator(".attendee-outreach-volunteer").first(),
+          ).toHaveCSS("color", "rgb(65, 105, 225)");
+          await expect(
+            roster.locator(".attendee-new-volunteer").first(),
+          ).toHaveCSS("color", "rgb(65, 105, 225)");
           if (width === 1280) {
             await roster.locator("summary").focus();
             await DB.prepare(
               "UPDATE profile SET first_name='Live' WHERE user_id='avatar-attendee-0'",
             ).run();
             publicName = "Live P.";
-            await expect(roster.locator("tbody tr").first()).toHaveText(
-              publicName,
-              {
-                timeout: 15_000,
-              },
-            );
+            await expect(
+              roster.locator(".event-roster-list > li").first(),
+            ).toHaveText(publicName, {
+              timeout: 15_000,
+            });
             await expect(roster).toHaveAttribute("open", "");
             await expect(roster.locator("summary")).toBeFocused();
           }
         }
+        const expandedRoster = card.locator(rosterSelector);
+        await expect(expandedRoster).toContainText("MJ P.");
+        // Organizer-only confirmation dialogs intentionally use full names;
+        // the visible roster keeps the abbreviated presentation.
+        await expect(expandedRoster).not.toContainText("PrivateSurname", {
+          useInnerText: true,
+        });
+        if (manage) {
+          await expect(
+            expandedRoster.locator('a[href="/volunteers/avatar-attendee-1"]'),
+          ).toHaveText("MJ P.");
+          await expect(
+            expandedRoster.locator('a[href="/volunteers/avatar-attendee-0"]'),
+          ).toHaveText(publicName);
+        }
+        await expect(
+          expandedRoster.locator(
+            '.event-roster-person .attendee-new-volunteer [data-avatar-decoration="medic-cross"]',
+          ),
+        ).toHaveCount(1);
+        await expect(
+          expandedRoster.locator(".event-roster-new-badge"),
+        ).toHaveText(["New", "New", "New"]);
+        await expect(
+          expandedRoster
+            .locator(".event-roster-list > li")
+            .filter({ has: page.locator(".attendee-new-volunteer") })
+            .locator(".event-roster-name .event-roster-new-badge"),
+        ).toHaveCount(3);
         expect(
           await page.evaluate(
             () => document.documentElement.scrollWidth > innerWidth,
@@ -544,20 +621,103 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         if (manage) {
           await page.locator('[data-event-filter="recurring"]').click();
           expect(await list.evaluate(columns)).toBe(1);
-          const series = list.locator(":scope > [data-series-card]");
+          const occurrence = list
+            .locator(`[data-event-series="${seriesId}"]`)
+            .first();
           expect(
             Math.abs(
-              (await series.boundingBox())!.width -
+              (await occurrence.boundingBox())!.width -
                 (await list.boundingBox())!.width,
             ),
           ).toBeLessThan(1);
-          // A lone series and its nested occurrences each fill their own row.
-          expect(
-            await series.locator("[data-series-event-list]").evaluate(columns),
-          ).toBe(1);
         }
       }
     }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${origin}/volunteers?q=Member3`);
+    const newMedicDirectoryRow = page.locator("[data-volunteer-row]").filter({
+      has: page.locator('a[href^="/volunteers/avatar-attendee-3?"]'),
+    });
+    await expect(newMedicDirectoryRow).toHaveCount(1);
+    await expect(
+      newMedicDirectoryRow.locator(".event-roster-new-badge"),
+    ).toHaveText("New");
+    await expect(
+      newMedicDirectoryRow.locator(
+        '.attendee-new-volunteer [data-avatar-decoration="medic-cross"]',
+      ),
+    ).toHaveCount(1);
+
+    // Past rosters expose removal for self-registered and organizer-added entries.
+    await DB.prepare("UPDATE event SET starts_at=0 WHERE id='hidden'").run();
+    const added = await send("/api/v1/events/action", organizer.cookie, {
+      action: "add-volunteers",
+      id: "hidden",
+      volunteers: [
+        { name: "Past Attendee", medic: false, newVolunteer: false },
+      ],
+    });
+    expect(added.status, await added.clone().text()).toBe(200);
+    await page.goto(`${origin}/events`);
+    const pastCard = page.locator(
+      '[data-past-event-list] [data-live-event="hidden"]',
+    );
+    const pastRoster = pastCard.locator(".volunteer-roster");
+    await pastRoster.locator("summary").click();
+    await expect(pastRoster.locator("[data-signup-menu-trigger]")).toHaveCount(
+      2,
+    );
+    for (const remaining of [1, 0]) {
+      await pastRoster.locator("[data-signup-menu-trigger]").first().click();
+      await expect(
+        pastRoster.getByRole("menuitem", {
+          name: "Move volunteer",
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      await pastRoster
+        .getByRole("menuitem", { name: "Remove volunteer", exact: true })
+        .first()
+        .click();
+      const dialog = page.getByRole("dialog", {
+        name: "Remove volunteer",
+        exact: true,
+      });
+      await expect(dialog).toContainText("Remove");
+      await expect(dialog.locator("[data-manage-signup]")).not.toHaveAttribute(
+        "data-email-prompt",
+      );
+      await expect(dialog.locator("textarea")).toHaveCount(0);
+      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(
+        pastRoster.locator("[data-signup-menu-trigger]"),
+      ).toHaveCount(remaining + 1);
+      await pastRoster.locator("[data-signup-menu-trigger]").first().click();
+      await pastRoster
+        .getByRole("menuitem", { name: "Remove volunteer", exact: true })
+        .first()
+        .click();
+      await inPlaceAction(page, {
+        endpoint: "/api/v1/events/action",
+        form: dialog.locator("[data-manage-signup]"),
+        trigger: () =>
+          dialog.getByRole("button", { name: "Remove", exact: true }).click(),
+        updated: () =>
+          expect(pastRoster.locator("[data-signup-menu-trigger]")).toHaveCount(
+            remaining,
+          ),
+        loadingLabel: "Removing…",
+      });
+      await expect(dialog).not.toBeVisible();
+    }
+    expect(
+      await DB.prepare(
+        "SELECT count(*) n FROM signup WHERE event_id='hidden' AND status='confirmed'",
+      ).first("n"),
+    ).toBe(0);
+    expect(
+      await DB.prepare("SELECT count(*) n FROM event_notification").first("n"),
+    ).toBe(0);
   } finally {
     await browser.close();
     await server.close();

@@ -20,7 +20,7 @@ const equipmentNeeds = [
     unit: "each",
     url: "https://pacificfirstaid.ca/products/oxygen-tank-aluminum-d-cylinder-15-0-cu-ft-425l-with-toggle-valve",
     image:
-      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/Screenshot2025-09-16162413.png?v=1758065075",
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/Screenshot2025-09-16162413.png?v=1758065075&width=180&quality=80",
   },
   {
     name: "Adult bag-valve mask",
@@ -29,7 +29,7 @@ const equipmentNeeds = [
     unit: "each",
     url: "https://pacificfirstaid.ca/products/bag-valve-mask-adult",
     image:
-      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/Med-Rescuer.png?v=1730765369",
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/Med-Rescuer.png?v=1730765369&width=180&quality=80",
   },
   {
     name: "Assorted sterile gauze pads",
@@ -38,7 +38,7 @@ const equipmentNeeds = [
     unit: "per pack",
     url: "https://pacificfirstaid.ca/products/sterile-gauze-pad-100-assorted",
     image:
-      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/100ASTPads1.png?v=1734032678",
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/100ASTPads1.png?v=1734032678&width=180&quality=80",
   },
   {
     name: "Oropharyngeal airway set",
@@ -48,7 +48,7 @@ const equipmentNeeds = [
     unit: "per set",
     url: "https://pacificfirstaid.ca/products/oral-airway-set",
     image:
-      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/PFA-OAK.png?v=1752601748",
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/PFA-OAK.png?v=1752601748&width=180&quality=80",
   },
   {
     name: "Adhesive bandages",
@@ -57,7 +57,7 @@ const equipmentNeeds = [
     unit: "per box",
     url: "https://pacificfirstaid.ca/products/band-aid%C2%AE-brand-flexible-fabric-adhesive-bandages",
     image:
-      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/81tsrk9kp7L._AC_SX425.jpg?v=1717801370",
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/files/81tsrk9kp7L._AC_SX425.jpg?v=1717801370&width=180&quality=80",
   },
   {
     name: "Adult oxygen mask with tubing",
@@ -67,7 +67,7 @@ const equipmentNeeds = [
     unit: "each",
     url: "https://pacificfirstaid.ca/products/partial-non-rebreathing-oxygen-mask-with-tubing-adult",
     image:
-      "https://cdn.shopify.com/s/files/1/0757/3654/7609/products/partial_non_-_rebreathing_oxygen_mask_with_tubing_-_adult.jpg?v=1683401429",
+      "https://cdn.shopify.com/s/files/1/0757/3654/7609/products/partial_non_-_rebreathing_oxygen_mask_with_tubing_-_adult.jpg?v=1683401429&width=180&quality=80",
   },
 ];
 ---
@@ -81,17 +81,16 @@ const equipmentNeeds = [
     <div
       class="mx-auto grid w-full max-w-site items-center gap-14 px-6 pt-24 max-sm:px-4 max-sm:pt-18 lg:grid-cols-[minmax(0,1fr)_26.25rem] lg:gap-20"
     >
-      <div>
+      <div class="min-w-0">
         <h1>
           <span class="text-blue">Donate</span>
         </h1>
         <p class="mt-8 max-w-xl text-zinc-300">
-          We are a community run society, and we rely on community support to
+          We are a community-run society, and we rely on community support to
           provide outreach. Donations pay for medical equipment like oxygen
           tanks and wound care supplies, hygiene and feminine products, and the
           food, sleeping mats, and emergency blankets we hand out on patrol.
-          They also cover rent toward a space and the wagons we use to carry
-          everything.
+          They also cover the wagons we use to carry everything.
         </p>
         <div class="mt-9 flex flex-wrap gap-3.5 max-sm:flex-col">
           <a
@@ -117,6 +116,92 @@ const equipmentNeeds = [
             Donate on GoFundMe
           </a>
         </div>
+        <div class="mt-6 text-zinc-300">
+          <p>You can also donate by e-Transfer to:</p>
+          <div
+            class="mt-3 flex w-full max-w-full flex-col gap-2 rounded-lg bg-panel-soft p-2 sm:w-fit"
+          >
+            <pre
+              class="w-full min-w-0 overflow-x-auto px-2 py-1 text-base whitespace-pre text-white [scrollbar-width:thin]"
+              tabindex="0"
+              role="region"
+              aria-label="e-Transfer email address"><code data-etransfer-email>finance@afterhoursoutreach.ca</code></pre>
+            <button
+              type="button"
+              class="btn btn-primary min-h-8 w-full text-sm"
+              data-copy-etransfer-email
+              aria-label="Copy e-Transfer email address"
+              aria-live="polite"
+            >
+              <span class="grid">
+                <span
+                  class="etransfer-copy-state"
+                  data-etransfer-copy-state="copy"
+                  aria-hidden="false"
+                >
+                  {/* lucide: copy */}
+                  <svg
+                    class="lucide btn-icon"
+                    data-etransfer-copy-icon="copy"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <rect x="8" y="8" width="14" height="14" rx="2"></rect>
+                    <path
+                      d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"
+                    ></path>
+                  </svg>
+                  <span data-etransfer-copy-label>Copy</span>
+                </span>
+                <span
+                  class="etransfer-copy-state"
+                  data-etransfer-copy-state="copied"
+                  aria-hidden="true"
+                >
+                  {/* lucide: check */}
+                  <svg
+                    class="lucide btn-icon text-green-300"
+                    data-etransfer-copy-icon="copied"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path d="m20 6-11 11-5-5"></path>
+                  </svg>
+                  <span data-etransfer-copy-label>Copied</span>
+                </span>
+                <span
+                  class="etransfer-copy-state"
+                  data-etransfer-copy-state="error"
+                  aria-hidden="true"
+                >
+                  {/* lucide: circle-alert */}
+                  <svg
+                    class="lucide btn-icon text-red-300"
+                    data-etransfer-copy-icon="error"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 8v4"></path>
+                    <path d="M12 16h.01"></path>
+                  </svg>
+                  <span class="text-red-300" data-etransfer-copy-label
+                    >Error</span
+                  >
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="relative flex items-center justify-center max-lg:order-first">
@@ -136,15 +221,6 @@ const equipmentNeeds = [
     >
       <h2 class="max-w-3xl">Where the money goes</h2>
 
-      <div class="mt-10 border-l-4 border-blue bg-blue-deep p-6 sm:p-7">
-        <h3>DTES operations and storage space</h3>
-        <p class="mt-3 text-zinc-300">
-          Our biggest long-term need is a reliable location. It would give us a
-          base for general operations, volunteer coordination, and secure supply
-          storage close to the community we serve.
-        </p>
-      </div>
-
       <a
         class="group mt-5 block border border-blue bg-blue/10 p-6 transition-colors hover:bg-blue/15 sm:p-8"
         href="https://coastalreign.com/products/safety-vests/big-k-first-aid-safety-vest?selectedColour=Royal%20Blue"
@@ -157,7 +233,7 @@ const equipmentNeeds = [
           <div class="aspect-square overflow-hidden bg-white p-2 sm:p-3">
             <img
               class="size-full object-contain"
-              src="https://cdn.shopify.com/s/files/1/1016/5405/files/1013591.jpg?v=1758155758"
+              src="https://cdn.shopify.com/s/files/1/1016/5405/files/1013591.jpg?v=1758155758&width=240&quality=80"
               alt=""
               width="240"
               height="240"
@@ -233,3 +309,78 @@ const equipmentNeeds = [
     </div>
   </section>
 </Layout>
+
+<style>
+  .etransfer-copy-state {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.625rem;
+    visibility: hidden;
+    opacity: 0;
+    transition:
+      opacity 160ms ease,
+      visibility 160ms;
+  }
+
+  .etransfer-copy-state[aria-hidden="false"] {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .etransfer-copy-state {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  const email = document
+    .querySelector<HTMLElement>("[data-etransfer-email]")
+    ?.textContent?.trim();
+  const copyButton = document.querySelector<HTMLButtonElement>(
+    "[data-copy-etransfer-email]",
+  );
+
+  if (email && copyButton) {
+    const copyPanels = copyButton.querySelectorAll<HTMLElement>(
+      "[data-etransfer-copy-state]",
+    );
+    const copyDescriptions = {
+      copy: "Copy e-Transfer email address",
+      copied: "e-Transfer email address copied",
+      error: "Could not copy e-Transfer email address. Try again.",
+    };
+    let resetTimer: number | undefined;
+    let copyAttempt = 0;
+
+    const setCopyState = (state: keyof typeof copyDescriptions) => {
+      window.clearTimeout(resetTimer);
+      resetTimer = undefined;
+      copyButton.setAttribute("aria-label", copyDescriptions[state]);
+      for (const panel of copyPanels) {
+        panel.setAttribute(
+          "aria-hidden",
+          String(panel.dataset.etransferCopyState !== state),
+        );
+      }
+      if (state !== "copy") {
+        resetTimer = window.setTimeout(() => setCopyState("copy"), 3000);
+      }
+    };
+
+    copyButton.addEventListener("click", async () => {
+      const attempt = ++copyAttempt;
+      window.clearTimeout(resetTimer);
+      resetTimer = undefined;
+      try {
+        await navigator.clipboard.writeText(email);
+        if (attempt === copyAttempt) setCopyState("copied");
+      } catch {
+        if (attempt === copyAttempt) setCopyState("error");
+      }
+    });
+  }
+</script>

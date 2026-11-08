@@ -87,8 +87,8 @@ const medic = (
   AND EXISTS(SELECT 1 FROM json_each(mp.teams) WHERE value='medic')
   AND EXISTS(SELECT 1 FROM orientation_completion mo WHERE mo.user_id=mp.user_id))`;
 const category = `CASE WHEN coalesce(e.includes_orientation,e.type='orientation') AND NOT EXISTS(
-  SELECT 1 FROM orientation_completion o WHERE o.user_id=s.user_id) THEN 'Orientee'
-  WHEN ${medic("s.user_id")} THEN 'Medic' ELSE 'Volunteer' END`;
+  SELECT 1 FROM orientation_completion o WHERE o.user_id=s.user_id) THEN 'New volunteer'
+  WHEN ${medic("s.user_id")} THEN 'Medic' ELSE 'Outreach Volunteer' END`;
 
 export interface PreparedPlan extends Plan {
   databaseId: string;
@@ -165,7 +165,7 @@ export class Application {
         e.cancelled_at AS cancelledAt,e.series_id AS seriesId,coalesce(e.includes_orientation,e.type='orientation') AS includesOrientation,e.updated_at AS updatedAt,
         (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed') AS confirmed,
         (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed' AND ${medic("s.user_id")}) AS medics,
-        (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed' AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id=s.user_id)) AS orientees
+        (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed' AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id=s.user_id)) AS newVolunteers
         FROM event e ORDER BY (e.starts_at>?) DESC,CASE WHEN e.starts_at>? THEN e.starts_at END ASC,e.starts_at DESC LIMIT 60`,
         params: [now, now],
       },

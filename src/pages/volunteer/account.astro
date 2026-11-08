@@ -8,7 +8,8 @@ import AccountDeleteSettings from "@/components/volunteer/AccountDeleteSettings.
 // Discord connection is temporarily disabled; keep the integration for later.
 // import DiscordConnection from "@/components/volunteer/DiscordConnection.astro";
 // import DiscordConnectionNotice from "@/components/volunteer/DiscordConnectionNotice.astro";
-import SubmittedApplication from "@/components/volunteer/SubmittedApplication.astro";
+import ApplicationProgressMini from "@/components/volunteer/ApplicationProgressMini.astro";
+import ApplicationSummary from "@/components/volunteer/ApplicationSummary.astro";
 import {
   isApplicationComplete,
   loadApplicationProgress,
@@ -32,7 +33,6 @@ import { accountDeletionFreshAge } from "@/server/db/account-deletion";
 import { volunteerStatus } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
-  applicationDisplayName,
   profileFormSections,
   type ApplicationAnswers,
 } from "@/data/application";
@@ -47,6 +47,7 @@ const accountDate = new Intl.DateTimeFormat("en-CA", {
   dateStyle: "long",
 });
 let email = "";
+let legacyName = "";
 let userId = "";
 let currentId = "";
 let twoFactorEnabled = false;
@@ -78,6 +79,7 @@ try {
     current.user.id,
   );
   email = current.user.email;
+  legacyName = current.user.name;
   userId = current.user.id;
   const { sessionConfig } = await auth.$context;
   emailNeedsSignIn =
@@ -122,27 +124,6 @@ try {
   });
 }
 const applicationComplete = isApplicationComplete(applicationProgress);
-const completedMilestones = [
-  {
-    heading: "Naloxone 101 completion",
-    completedAt: applicationProgress.naloxoneCompletedAt,
-  },
-  /* Discord connection is temporarily disabled.
-  ...(applicationProgress.discordRequired ||
-  applicationProgress.discordCompletedAt != null
-    ? [
-        {
-          heading: "Discord connection verified",
-          completedAt: applicationProgress.discordCompletedAt ?? null,
-        },
-      ]
-    : []),
-  */
-  {
-    heading: "Application approved",
-    completedAt: applicationProgress.applicationApprovedAt,
-  },
-];
 const contents = [
   { id: "account-profile-heading", heading: "Your profile" },
   ...(values ? profileFormSections() : []).map((section) => ({
@@ -168,7 +149,7 @@ const contents = [
   },
   {
     id: "account-sessions-heading",
-    heading: "Signed in browsers",
+    heading: "Signed-in browsers",
     nested: true,
   },
   { id: "account-delete-heading", heading: "Delete account", nested: true },
@@ -177,11 +158,11 @@ const contents = [
 
 <AccountLayout
   title="Your account"
-  description="Edit your volunteer profile and manage your signed in browsers."
+  description="Edit your volunteer profile and manage your signed-in browsers."
   signedIn
   organizer={organizer}
-  name={values ? applicationDisplayName(values) : undefined}
-  greetingName={accountGreeting(values)}
+  name={accountGreeting(values, legacyName)}
+  greetingName={accountGreeting(values, legacyName)}
   email={email}
 >
   <h1 slot="heading" class="mb-6 text-2xl md:text-4xl">Account</h1>
@@ -261,46 +242,46 @@ const contents = [
             <h2 id="submitted-application-heading" data-contents-section>
               Volunteer Application
             </h2>
-            {applicationProgress.applicationRejectionReason && (
-              <div class="volunteer-notice" data-application-rejection>
-                <p>Application rejected</p>
-                <p class="mt-2 whitespace-pre-wrap">
-                  Reason: {applicationProgress.applicationRejectionReason}
-                </p>
-              </div>
-            )}
-            {submission ? (
-              <SubmittedApplication submission={submission} embedded />
-            ) : (
-              <p>
-                Your application form was submitted. The original submitted
-                answers were not captured for this account.
-              </p>
-            )}
-            {applicationComplete && (
-              <div class="account-profile-summary mt-6">
-                <dl>
-                  {completedMilestones.map((milestone) => (
-                    <div>
-                      <dt>{milestone.heading}</dt>
-                      <dd>
-                        {milestone.completedAt !== null ? (
-                          <time
-                            datetime={new Date(
-                              milestone.completedAt,
-                            ).toISOString()}
-                          >
-                            {accountDate.format(milestone.completedAt)}
-                          </time>
-                        ) : (
-                          "Date not recorded"
-                        )}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            )}
+            <ApplicationProgressMini
+              progress={applicationProgress}
+              idPrefix="account-application"
+              showTime
+            >
+              <section
+                slot="application"
+                class="px-3 pb-3"
+                aria-label="Submitted answers"
+              >
+                {submission ? (
+                  <ApplicationSummary
+                    {...submission}
+                    idPrefix="account-application"
+                  />
+                ) : (
+                  <p class="volunteer-help mt-4">
+                    Your application form was submitted. The original submitted
+                    answers were not captured for this account.
+                  </p>
+                )}
+              </section>
+              <Fragment slot="review">
+                {applicationProgress.applicationRejectionReason && (
+                  <p
+                    class="volunteer-help px-3 pb-3 whitespace-pre-wrap"
+                    data-application-rejection
+                  >
+                    Reason: {applicationProgress.applicationRejectionReason}
+                  </p>
+                )}
+              </Fragment>
+            </ApplicationProgressMini>
+            {
+              applicationProgress.applicationApproved && (
+                <a class="btn btn-outline mt-6" href="#account-profile-heading">
+                  View your profile
+                </a>
+              )
+            }
           </section>
         )
       }
@@ -347,7 +328,7 @@ const contents = [
         <div class="volunteer-setting" data-account-sessions>
           <div class="w-full">
             <h3 id="account-sessions-heading" data-contents-section>
-              Signed in browsers
+              Signed-in browsers
             </h3>
             {
               sessionsNeedSignIn && (
@@ -358,7 +339,7 @@ const contents = [
                   class="mt-6"
                 >
                   <p>
-                    Sign in again to view and manage your signed in browsers.
+                    Sign in again to view and manage your signed-in browsers.
                   </p>
                   <button class="btn btn-outline mt-4" type="submit">
                     Sign out to sign in again

@@ -1,6 +1,10 @@
 ---
 import { env } from "cloudflare:workers";
-import { accountContext, canViewEvents } from "@/server/db/access";
+import {
+  accountContext,
+  canViewEvents,
+  requireOrganizer,
+} from "@/server/db/access";
 import {
   listEvents,
   listRosters,
@@ -8,6 +12,7 @@ import {
   listPatrolSeries,
 } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
+import { countReadyApplications } from "@/server/db/volunteers";
 import AccountLayout from "./AccountLayout.astro";
 import EventCard from "./EventCard.astro";
 import EventCalendar from "./EventCalendar.astro";
@@ -19,7 +24,6 @@ import {
   matchesEventFilter,
   groupManagementEvents,
 } from "@/data/event-browser";
-import VolunteerProfileDialog from "./VolunteerProfileDialog.astro";
 import ApplicationProgress from "./ApplicationProgress.astro";
 // Discord connection is temporarily disabled.
 // import DiscordConnectionNotice from "./DiscordConnectionNotice.astro";
@@ -31,7 +35,6 @@ import {
 } from "@/server/db/application-progress";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
-import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import { contactEmail, social } from "@/data/site";
 import "@/styles/volunteer.css";
 
@@ -41,8 +44,9 @@ interface Props {
 }
 const { manage = false } = Astro.props;
 const { actor, email, greetingName } = Astro.props.account;
-// Callers authenticate first; the manage route also requires organizer access.
+// Callers authenticate first. Organizer controls always require authorization.
 if (!actor) throw new Error("VolunteerPortal requires a signed-in account.");
+if (manage) requireOrganizer(actor);
 const events = await listEvents(
   env.DB,
   actor,
@@ -57,7 +61,10 @@ const pastEvents = await listEvents(
 );
 const series = manage ? await listPatrolSeries(env.DB, actor) : [];
 const eventAccess = canViewEvents(actor);
-const organizer = actor.role === "organizer" && eventAccess;
+const readyApplicationCount =
+  actor.role === "organizer" && eventAccess
+    ? await countReadyApplications(env.DB, actor)
+    : 0;
 const showApplicationProgress =
   !manage && (!actor.twoFactorEnabled || actor.twoFactorVerified);
 const applicationProgress = showApplicationProgress
@@ -69,12 +76,11 @@ const submission =
   incompleteApplication && applicationProgress.submittedAt !== null
     ? await loadSubmittedApplication(env.DB, actor.id)
     : null;
-const title = manage
-  ? "Manage events"
-  : incompleteApplication && actor.role !== "organizer" && !actor.patrolApproved
+const title =
+  incompleteApplication && actor.role !== "organizer" && !actor.patrolApproved
     ? "Welcome"
     : "Events";
-const rosters = organizer
+const rosters = manage
   ? await listRosters(
       env.DB,
       actor,
@@ -82,7 +88,7 @@ const rosters = organizer
     )
   : [];
 const publicRoster =
-  !manage && eventAccess && !organizer
+  !manage && eventAccess
     ? await listPublicRosters(
         env.DB,
         actor,
@@ -107,7 +113,11 @@ const destinations = events.filter(
 );
 // Legacy ?type=patrol now means all patrols, including those with orientation.
 const filter = eventFilter(Astro.url.searchParams.get("type"), manage);
-const managementItems = manage ? groupManagementEvents(events, series) : [];
+const seriesItems = manage
+  ? groupManagementEvents(events, series).filter(
+      (item) => item.kind === "series",
+    )
+  : [];
 const selectedOccurrence = Astro.url.searchParams.get("occurrence");
 const countEvents = (items: typeof events, type: string) =>
   items.filter((event) =>
@@ -117,24 +127,10 @@ const countEvents = (items: typeof events, type: string) =>
       Boolean(event.includesOrientation),
     ),
   ).length;
-const countManagementItems = (type: string) =>
-  managementItems.filter((item) =>
-    matchesEventFilter(
-      type,
-      item.kind === "series",
-      item.kind === "series"
-        ? Boolean(item.series.includesOrientation) ||
-            item.events.some((event) => Boolean(event.includesOrientation))
-        : Boolean(item.event.includesOrientation),
-    ),
-  ).length;
-// Count top-level items in both sections: upcoming series once, history per date.
+// Count dates consistently in the calendar, upcoming list and history.
 const filterCount = (type: string) =>
-  (manage ? countManagementItems(type) : countEvents(events, type)) +
-  countEvents(pastEvents, type);
-const hasVisibleEvents = manage
-  ? countManagementItems(filter) > 0
-  : countEvents(events, filter) > 0;
+  countEvents(events, type) + countEvents(pastEvents, type);
+const hasVisibleEvents = countEvents(events, filter) > 0;
 const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
 ---
 
@@ -144,6 +140,7 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
   signedIn
   organizer={actor.role === "organizer"}
   eventAccess={eventAccess}
+  {readyApplicationCount}
   name={actor.name}
   greetingName={greetingName}
   email={email}
@@ -165,24 +162,12 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
       )
     }
   </Fragment>
-  {
-    manage && (
-      <a class="volunteer-back-link" href="/events">
-        <ArrowRightIcon class="size-[1.25em] shrink-0 rotate-180" />
-        <span>View events</span>
-      </a>
-    )
-  }
   <div
     data-event-browser
     data-event-view={manage ? "manage" : "volunteer"}
     data-event-version={eventVersion}
     data-event-access={String(eventAccess)}
-    data-event-path={manage
-      ? "/manage/events"
-      : eventAccess
-        ? Astro.url.pathname
-        : "/volunteer"}
+    data-event-path={eventAccess ? Astro.url.pathname : "/volunteer"}
     data-application-awaiting-approval={String(
       Boolean(
         actor.applicationSubmitted &&
@@ -243,7 +228,7 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
       !eventAccess && (
         <>
           <p class="mt-12 max-w-3xl text-zinc-300">
-            Join our Discord for the most up to date information.
+            Join our Discord for the most up-to-date information.
           </p>
           <div class="mt-6 flex flex-wrap gap-3.5 max-sm:flex-col">
             <a
@@ -265,12 +250,12 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
           <div class="volunteer-section-heading">
             <div>
               {manage ? (
-                <h1 id="events-heading">Manage events</h1>
+                <h1 id="events-heading">Events</h1>
               ) : (
                 <h2 id="events-heading">Events</h2>
               )}
             </div>
-            {manage ? (
+            {manage && (
               <button
                 class="btn btn-primary"
                 data-show-dialog="event-editor-new"
@@ -279,12 +264,7 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
                 <PlusIcon class="btn-icon" />
                 Create
               </button>
-            ) : actor.role === "organizer" ? (
-              <a class="btn btn-primary" href="/manage/events">
-                Manage events
-                <ArrowRightIcon class="btn-icon" />
-              </a>
-            ) : null}
+            )}
           </div>
           <form
             class="volunteer-filters"
@@ -292,12 +272,19 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
             role="group"
             aria-label="Filter events"
           >
+            {selectedOccurrence && (
+              <input
+                type="hidden"
+                name="occurrence"
+                value={selectedOccurrence}
+              />
+            )}
             {[
               ["all", "All"],
               ...(manage
                 ? [
                     ["one-off", "One-off events"],
-                    ["recurring", "Recurring series"],
+                    ["recurring", "Recurring events"],
                   ]
                 : []),
               ["orientation", "Orientations"],
@@ -310,85 +297,51 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
                 data-event-filter={type}
                 aria-pressed={filter === type ? "true" : "false"}
               >
-                <span>
-                  {label} (
-                  <span data-event-filter-count={type}>
-                    {filterCount(type)}
-                  </span>
-                  )
+                <span>{label}</span>{" "}
+                <span
+                  class="volunteer-filter-count"
+                  data-event-filter-count={type}
+                >
+                  {filterCount(type)}
                 </span>
               </button>
             ))}
           </form>
-          {manage && <BulkEventEditor />}
-          {manage && (
-            <div class="volunteer-section-heading">
-              <h2>Upcoming events and series</h2>
-            </div>
-          )}
-          <div class:list={{ "volunteer-event-schedule": !manage }}>
-            {!manage && (
-              <EventCalendar
-                events={events
-                  .filter((event) =>
-                    matchesEventFilter(
-                      filter,
-                      Boolean(event.seriesId),
-                      Boolean(event.includesOrientation),
-                    ),
-                  )
-                  .map((event) => ({
-                    id: event.id,
-                    startsAt: event.startsAt,
-                    label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
-                  }))}
-              />
-            )}
+          <div class="volunteer-event-schedule">
+            <EventCalendar
+              events={events
+                .filter((event) =>
+                  matchesEventFilter(
+                    filter,
+                    Boolean(event.seriesId),
+                    Boolean(event.includesOrientation),
+                  ),
+                )
+                .map((event) => ({
+                  id: event.id,
+                  startsAt: event.startsAt,
+                  label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
+                }))}
+            />
             <div class="volunteer-event-results">
+              {manage && <BulkEventEditor />}
               <ul class="volunteer-event-list" data-event-list>
-                {manage
-                  ? managementItems.map((item) =>
-                      item.kind === "series" ? (
-                        <PatrolSeriesCard
-                          series={item.series}
-                          events={item.events}
-                          actor={actor}
-                          rosters={rosters}
-                          destinations={destinations}
-                          filter={filter}
-                          selectedOccurrence={selectedOccurrence}
-                        />
-                      ) : (
-                        <EventCard
-                          event={item.event}
-                          actor={actor}
-                          organizer
-                          roster={rosters.filter(
-                            (person) => person.eventId === item.event.id,
-                          )}
-                          destinations={destinations}
-                          filter={filter}
-                        />
-                      ),
-                    )
-                  : events.map((event) => (
-                      <EventCard
-                        event={event}
-                        actor={actor}
-                        organizer={manage}
-                        publicRoster={publicRoster?.people.filter(
-                          (person) => person.eventId === event.id,
-                        )}
-                        roster={rosters.filter(
-                          (person) => person.eventId === event.id,
-                        )}
-                        destinations={destinations}
-                        filter={filter}
-                        series={series.find(
-                          (item) => item.id === event.seriesId,
-                        )}
-                      />
-                    ))}
+                {events.map((event) => (
+                  <EventCard
+                    event={event}
+                    actor={actor}
+                    organizer={manage}
+                    publicRoster={publicRoster?.people.filter(
+                      (person) => person.eventId === event.id,
+                    )}
+                    roster={rosters.filter(
+                      (person) => person.eventId === event.id,
+                    )}
+                    destinations={destinations}
+                    filter={filter}
+                    series={series.find((item) => item.id === event.seriesId)}
+                  />
+                ))}
               </ul>
               <p
                 class="volunteer-notice"
@@ -396,13 +349,9 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
                 role="status"
                 hidden={hasVisibleEvents}
               >
-                {manage
-                  ? managementItems.length
-                    ? "No upcoming events or series match this filter."
-                    : "No upcoming events or series are scheduled."
-                  : events.length
-                    ? "No upcoming events match this filter. Check back soon."
-                    : "No upcoming events are scheduled. Check back soon."}
+                {events.length
+                  ? "No upcoming events match this filter. Check back soon."
+                  : "No upcoming events are scheduled. Check back soon."}
               </p>
               <p
                 class="volunteer-help"
@@ -410,11 +359,28 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
                 hidden={events.length !== 100}
               >
                 {manage
-                  ? "Showing up to 100 loaded occurrences and one-off events. Open another recurring date under Occurrences."
+                  ? "Showing up to 100 events. Open another date under Manage recurring series."
                   : "Showing up to 100 events."}
               </p>
             </div>
           </div>
+          {manage && (
+            <details class="volunteer-series-management" data-series-management>
+              <summary>Manage recurring series</summary>
+              <ul class="volunteer-event-list" data-series-list>
+                {seriesItems.map((item) => (
+                  <PatrolSeriesCard series={item.series} events={item.events} />
+                ))}
+              </ul>
+              <p
+                class="volunteer-help"
+                data-empty-series
+                hidden={seriesItems.length > 0}
+              >
+                No recurring series have been created.
+              </p>
+            </details>
+          )}
         </section>
       )
     }
@@ -450,14 +416,13 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
             hidden={pastEvents.length !== 100}
           >
             {manage
-              ? "Showing up to 100 past events. Open another recurring date under Occurrences."
+              ? "Showing up to 100 past events. Open another date under Manage recurring series."
               : "Showing the 100 most recent past events."}
           </p>
         </section>
       )
     }
     {manage && <EventEditor />}
-    {organizer && <VolunteerProfileDialog />}
   </div>
   <noscript
     ><p class="volunteer-notice">
@@ -472,6 +437,24 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
 <style>
   [data-event-view="manage"] [data-past-event-list] {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .volunteer-series-management {
+    margin-top: 1.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid #3f3f46;
+    border-radius: 0.5rem;
+  }
+  .volunteer-series-management > summary {
+    min-height: 2rem;
+    color: #d4d4d8;
+    cursor: pointer;
+  }
+  .volunteer-series-management > summary:focus-visible {
+    outline: 3px solid #a5b4fc;
+    outline-offset: 0.25rem;
+  }
+  .volunteer-series-management > ul {
+    margin-top: 1rem;
   }
   .volunteer-event-schedule {
     container: event-schedule / inline-size;

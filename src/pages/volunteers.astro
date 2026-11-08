@@ -1,4 +1,80 @@
 ---
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import VolunteerDirectory from "@/components/volunteer/VolunteerDirectory.astro";
+import { env } from "cloudflare:workers";
+import { accountContext, requireOrganizer } from "@/server/db/access";
+import { listVolunteers } from "@/server/db/volunteers";
+import { forwardCookies } from "@/server/auth";
+import { RequestError } from "@/server/http";
+import { volunteerListState, volunteerListUrl } from "@/data/volunteer-list";
+import "@/styles/volunteer.css";
 export const prerender = false;
-return Astro.redirect("/manage/volunteers" + Astro.url.search, 301);
+let team: Awaited<ReturnType<typeof listVolunteers>> = {
+  rows: [],
+  allRows: [],
+  allApplicantsCount: 0,
+  awaitingApprovalCount: 0,
+  inProgressCount: 0,
+  rejectedCount: 0,
+  approvedCount: 0,
+};
+let lock = "";
+let accountName = "";
+let accountGreeting = "";
+let accountEmail = "";
+const state = volunteerListState(Astro.url.searchParams);
+const { search, sort, direction } = state;
+const listUrl = volunteerListUrl(state);
+try {
+  const { actor, headers, email, greetingName } = await accountContext(
+    env,
+    Astro.request,
+  );
+  forwardCookies(headers, Astro.response.headers);
+  if (!actor)
+    return Astro.redirect(
+      `/volunteer/sign-in?returnTo=${encodeURIComponent(listUrl)}`,
+    );
+  if (actor.role !== "organizer")
+    return new Response("Organizer access is required.", { status: 403 });
+  accountName = actor.name;
+  accountGreeting = greetingName;
+  accountEmail = email;
+  try {
+    requireOrganizer(actor);
+  } catch (error) {
+    if (error instanceof RequestError) lock = error.message;
+    else throw error;
+  }
+  if (!lock)
+    team = await listVolunteers(env.DB, actor, search, sort, direction);
+} catch {
+  return new Response("Volunteer management is temporarily unavailable.", {
+    status: 503,
+  });
+}
 ---
+
+<AccountLayout
+  title="Volunteers"
+  description="Organizer volunteer management."
+  signedIn
+  organizer
+  name={accountName}
+  greetingName={accountGreeting}
+  email={accountEmail}
+>
+  {
+    lock ? (
+      <p class="volunteer-notice">
+        {lock} <a href="/volunteer/account">Your account</a>
+      </p>
+    ) : (
+      <VolunteerDirectory kind="volunteers" people={team} state={state} />
+    )
+  }
+</AccountLayout>
+<script>
+  import { initVolunteerBrowser } from "@/scripts/volunteer-browser";
+  initVolunteerBrowser();
+</script>

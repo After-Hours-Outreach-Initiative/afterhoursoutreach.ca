@@ -44,7 +44,8 @@ Volunteer application terminology does not rename deployed storage:
   not rewritten. Event registration records describe event spots, not applications.
 
 An application is complete after form submission, Naloxone 101 confirmation,
-required Discord connection, and application approval. `discord_requirement` is
+and application approval. Discord linking is temporarily disabled; its recorded
+requirements and milestones are retained. `discord_requirement` is
 inserted atomically only for profiles submitted after migration 0020; existing
 profiles are not backfilled and retain access without linking. `discord_link`
 is both the unique identity mapping and a durable, versioned role-sync outbox.
@@ -52,14 +53,31 @@ Eligibility triggers enqueue changes in the same transaction as website writes.
 See the [Discord operations guide](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/docs/src/content/docs/discord.md).
 Orientation signup and attendance are tracked separately;
 neither is an application-completion milestone or a substitute for patrol approval.
+Organizer volunteer profiles display Applicant, New volunteer, and Outreach Volunteer/Medic
+progression, with a compact application tracker and separate orientation status.
+Unapproved applications are **Application in progress** until form submission and
+Naloxone 101 confirmation are complete, then **Ready for review**. The review
+filter and its count include only ready, unrejected applications.
+**Approve for patrols** is available after application approval, without requiring
+orientation booking or completion. It does not infer attendance. When the same action
+is used from a past orientation roster with an explicit event, it also records that
+entry's approver and approval time on `signup` in the version-guarded transaction.
+The roster's **Approved by** line uses only this attribution. Existing account-wide
+approvals and orientation attendance do not imply approval from a particular entry.
+The action also records the event's attendance separately. Both paths retain audit records
+and optional access emails, and do not alter the volunteer's active/inactive status.
 
 `profile.preferred_name` historically stored a combined full-or-preferred-name
 answer. The name-component migration adds nullable `first_name`, `middle_names`,
 and `last_name`, without modifying existing answers. New applications require
-first and last names; `preferred_name` may be empty. Profile saves synchronize
-`user.name` to the preferred name or assembled full name in the same transaction.
-Legacy profiles may retain their unsplit answer until the volunteer supplies both
-first and last names. No names are inferred or backfilled.
+first and last names; `preferred_name` is labelled **Preferred first name** and
+may be empty. Display names use the preferred first name (otherwise first name)
+and surname initial with a period, excluding middle names. Multiword preferred
+first names are preserved. Profile saves synchronize `user.name` to this display
+format in the same transaction; reads use current profile fields, not stale
+account display names. Full names remain searchable in organizer directories.
+Existing preferred values, including unsplit combined names, remain unchanged.
+No names are inferred, cleaned up, or backfilled.
 
 Referral multi-selects use nullable `heard_about_us_sources` (JSON) and
 `heard_about_us_other` (short text) columns. The original `heard_about_us`
@@ -94,29 +112,44 @@ when both are present the explicit orientation setting wins.
 `0015_patrol_orientation_capacity.sql` adds only columns and replacement triggers;
 apply it before deploying code that reads the new setting.
 
-Total capacity includes everyone, with two **medic** places reserved on every
-patrol. A medic must have `medic` in `profile.teams`, both authoritative organizer
-approvals (`registration_approved` and `patrol_approved`), and any
-`orientation_completion` record. No extra certification gate is imposed.
+Total capacity includes everyone. Organizer event settings control
+`minMedicSpots` (reserved **medic** places, default two),
+`minNewVolunteerSpots` (reserved **new volunteer** places with orientation, default
+two), and `maxNewVolunteers` (new volunteer cap with orientation, default four).
+These are reservations, not minimum attendance requirements. Limits are whole
+numbers from 0–100; zero removes that reservation or disallows new volunteers.
+The new volunteer maximum cannot be below its reserved places.
+A medic must have `medic` in `profile.teams`, both authoritative organizer
+approvals (`registration_approved` and `patrol_approved`). Orientation attendance
+is not a role requirement. No extra certification gate is imposed.
 
-Patrols with orientation also reserve two **orientee** places, with a maximum of
-four orientees and no minimum attendance. Anyone without a completion record,
-including a first-time medic or a patrol-approved first-timer, counts only as an
-orientee on these patrols. Each person occupies one place. Existing patrol approval
-still permits attending a regular patrol without completion, but never fills a
-medic reservation without completion.
+Patrols with orientation also apply their saved new volunteer reservation and cap.
+Anyone without manual patrol approval,
+including someone with recorded orientation attendance or medic team interest,
+counts only as a new volunteer. Patrol-approved volunteers are outreach volunteers
+or approved medics regardless of attendance. Each person occupies one place.
+The same categories drive event counts, public/organizer rosters, volunteer-list
+avatars, profile progression, capacity reservations, and Discord Medic eligibility.
 
-After a candidate is added, `total + max(0, 2 - medics) + outstandingOrientees`
-must not exceed capacity; `outstandingOrientees = max(0, 2 - orientees)` only when
-orientation is included. Extra medics and third/fourth orientees share the general
+After a candidate is added, `total + max(0, minMedicSpots - medics) + outstandingNewVolunteers`
+must not exceed capacity; `outstandingNewVolunteers = max(0, minNewVolunteerSpots - newVolunteers)` only when
+orientation is included. Extra medics and additional new volunteers share the general
 pool, without consuming the other category's outstanding reservations. Cancellations
 free the appropriate category. SQLite insert/update triggers enforce this atomically,
 including raw SQL, reactivation, reassignment and organizer moves (failed moves roll
 back cancellation, audits and notifications).
 
-New or edited events, series and templates need capacity two, or four with
-orientation. Apply `0017_medic_orientee_reservations.sql` before deploying this code.
-It replaces triggers only: legacy undersized rows and bookings are not rewritten or
+`0025_new_volunteer_terminology.sql` renames the internal reservation aliases to
+`new_volunteers`; eligibility rules and existing records are unchanged.
+`0026_manual_volunteer_progression.sql` switches category and booking-limit triggers
+to manual patrol approval and removes attendance-driven Discord sync triggers.
+It preserves all existing profiles, approvals, attendance and signups.
+
+New or edited events, series and templates need positive capacity covering all
+reserved places (two, or four with orientation, at the defaults).
+`0027_event_volunteer_limits.sql` adds defaulted limit columns to events, series
+and templates and replaces the enforcing triggers without rebuilding tables.
+Existing settings and bookings are not rewritten or
 deleted, remain readable/cancellable, and must be corrected before new bookings or
 relevant edits. Invalid recurring defaults do not generate new occurrences.
 
@@ -141,39 +174,52 @@ enforced in both queries, not by browser filters or supplied event IDs. Organize
 and patrol-approved volunteers retain full event visibility under the existing
 open/hidden/time-window rules, even without recorded orientation attendance.
 
-`listEvents` includes effective `includesOrientation`, `orientationConfirmed`
-(confirmed volunteers without any completion), `medicConfirmed` (approved,
-completed medics), `medicEligible` (the viewer's medic eligibility),
-`orientationCompleted` (the viewer's completion status), and category-aware `availableSpots`.
-`signupBlockReason` accepts these same values and explains full categories or
+`listEvents` includes effective `includesOrientation`, `newVolunteerConfirmed`
+(confirmed volunteers awaiting patrol approval), `medicConfirmed` (manually approved
+medics), `medicEligible` (the viewer's medic eligibility),
+`orientationCompleted` (attendance history only), and category-aware `availableSpots`.
+`signupBlockReason` accepts the manual approval and category counts and explains full categories or
 reserved places. Availability is capacity-only; the eligibility/booking-limit
 reason must still be checked. Both counts and viewer status participate in the
 existing view-version polling. `listPublicRosters` separately authorizes approved
 event access and rechecks volunteer visibility per event in SQL; its projection is
-only event ID, abbreviated name and mutually exclusive category. An opaque membership
-digest catches attendee swaps without exposing identifiers. Public names/categories
+only event ID, abbreviated name, mutually exclusive category and a display-only
+`medicMark` for application-approved volunteers who selected the medic team. New
+volunteers can show the plus while remaining in the new-volunteer capacity category;
+the marker never contributes to `medicConfirmed`, eligibility or reserved medic places.
+An opaque membership digest catches attendee swaps without exposing identifiers.
+Public names/categories, medic markers
 and that digest participate in `/events` polling; organizer-only full rosters never
 enter the volunteer view. Structured first/last names take precedence, with an
 abbreviated legacy fallback. No private profile answers or profile links are rendered.
 
-## First-orientation booking limit
+## Manual event attendees
 
-Application-approved volunteers with neither an `orientation_completion` record
-nor current `patrol_approved` status may hold one confirmed upcoming orientation
-booking at a time. Approval dates do not determine who is new: older accounts
-without either status follow the same rule. A recorded completion or explicit
-patrol approval lifts this cap; completion still does not grant patrol approval.
-Organizer role alone does not lift the cap (or grant patrol approval).
+Organizers can add an attendee using a name and independent Medic/New flags.
+These are `signup` rows with a null `user_id` and event-local `manual_name`,
+`manual_medic`, and `manual_new` fields, never placeholder accounts or profiles.
+Manual attendees share total capacity, reservations, new-volunteer caps, recurring
+signup windows, cancellation history, and atomic move/removal workflows with account
+registrations. New medics count only as new volunteers for capacity while retaining
+the medic avatar mark. New attendees require an event with orientation.
+Both rosters abbreviate manual names using the existing display policy. Manual
+entries have no profile/approval actions and never receive notifications. Writes
+recheck the organizer's live session and create event audits. Migration
+`0028_manual_event_attendees.sql` preserves all existing registrations.
 
-Confirmed bookings for future, non-cancelled orientations count even when an
-event is closed or hidden. Cancelled signups, cancelled events, and events that
-have started do not count, so cancellation/rebooking and rebooking after a missed
-orientation are allowed. The insert/update triggers check the limit inside the
-write, including reactivation and organizer moves, not in a race-prone preflight.
-The migration does not change existing bookings. Accounts already above the cap
-keep those spots but cannot add another until none count or the cap is lifted.
-No over-cap cleanup runs on event edits or status changes; existing access-revocation
-and event-cancellation workflows are unchanged.
+## Orientation bookings
+
+Application-approved new volunteers may hold multiple upcoming orientation
+bookings. Rebooking, reactivation, and organizer moves follow the same rule.
+Each event still enforces its capacity, reserved places, new-volunteer maximum,
+and one confirmed registration per account. Recurring signup windows also apply.
+
+Account age and recorded attendance do not determine who is new. Only explicit
+manual patrol approval changes that status or grants access to patrols without
+orientation. The organizer's combined roster approval action explicitly records
+both attendance and patrol approval; orientation completion alone grants neither
+patrol access nor a different capacity category. Existing bookings and cancellation
+history are preserved.
 
 ## Recurring patrol controls
 
@@ -199,7 +245,9 @@ notify?)` provides actual **this-and-future** editing, including already-generat
   occurrences. The template contains `localTime`, `dayOffset` (−366…366 relative to
   each nominal date), meeting point/link, capacity, open and hidden. The effective
   template applies during generation too. Both series defaults and effective
-  templates include `includesOrientation`, which is copied to every new snapshot;
+  templates include `includesOrientation` and all three volunteer limits, copied
+  to every new snapshot. Older API clients omitting limits retain saved values on
+  edits; new records use the defaults. Bulk edits change only selected fields;
   individual overrides use the same setting through `saveEvent`. An earlier edit
   replaces later templates,
   but preserves earlier templates, individual `saveEvent` exceptions, cancellation

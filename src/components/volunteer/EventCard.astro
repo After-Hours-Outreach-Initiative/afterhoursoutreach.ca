@@ -12,6 +12,7 @@ import { matchesEventFilter } from "@/data/event-browser";
 import EventEditor from "./EventEditor.astro";
 import EventRoster from "./EventRoster.astro";
 import PublicEventRoster from "./PublicEventRoster.astro";
+import AddAttendee from "./AddAttendee.astro";
 
 interface Props {
   event: EventRow;
@@ -35,8 +36,17 @@ const {
   publicRoster = [],
 } = Astro.props;
 const future = event.startsAt > Date.now();
-// The volunteer view keeps self-registration while organizers can manage its roster.
-const organizerRoster = actor.role === "organizer" && (organizer || future);
+const registrationOpen =
+  future &&
+  Boolean(event.open) &&
+  !event.hidden &&
+  !event.cancelledAt &&
+  Boolean(event.inSignupWindow);
+const canAddAttendee =
+  organizer &&
+  !event.cancelledAt &&
+  (!future || registrationOpen) &&
+  event.confirmed < event.spots;
 const blocked =
   future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
     ? "Registration is available only for the next three patrol occurrences in this series."
@@ -46,7 +56,6 @@ const blocked =
           ...event,
           startsAt: new Date(event.startsAt),
           open: Boolean(event.open) && !event.hidden && !event.cancelledAt,
-          orientationSignupBlocked: Boolean(event.orientationSignupBlocked),
         },
         event.confirmed,
       );
@@ -117,32 +126,54 @@ const blocked =
       </p>
       <p data-event-availability aria-live="polite" aria-atomic="true">
         {
-          !organizer && Boolean(event.signedUp) && (
+          !future ? (
             <>
-              <span class:list={{ "volunteer-spots": future }}>
-                {future ? "Registered" : "You registered"}
-              </span>{" "}
-              ·{" "}
+              {event.signedUp ? "You registered · " : ""}
+              {event.confirmed}{" "}
+              {event.confirmed === 1 ? "registration" : "registrations"}
             </>
+          ) : event.signedUp ? (
+            <>
+              <span class="volunteer-spots">Registered</span> ·{" "}
+              {Math.max(0, event.spots - event.confirmed)} of {event.spots}{" "}
+              spots remaining
+            </>
+          ) : event.confirmed >= event.spots ? (
+            <>
+              <span class="volunteer-spots-full">Full</span> · 0 of{" "}
+              {event.spots} spots remaining
+            </>
+          ) : registrationOpen ? (
+            <>
+              <span class="volunteer-spots-open">Open</span> ·{" "}
+              {event.spots - event.confirmed} of {event.spots} spots remaining
+            </>
+          ) : (
+            `${Math.max(0, event.spots - event.confirmed)} of ${event.spots} spots remaining`
           )
         }
-        {
-          future
-            ? `${event.confirmed} of ${event.spots} spots taken`
-            : `${event.confirmed} ${event.confirmed === 1 ? "registration" : "registrations"}`
-        }
       </p>
-      {!organizer && future && !event.signedUp && blocked && <p>{blocked}</p>}
+      {
+        future &&
+          !event.signedUp &&
+          (!organizer || Boolean(event.inSignupWindow)) &&
+          !event.hidden &&
+          !event.cancelledAt &&
+          Boolean(event.open) &&
+          blocked &&
+          blocked !== "This event is full." && <p>{blocked}</p>
+      }
     </div>
     <div class="volunteer-actions">
       {
-        organizer || !future ? null : event.signedUp ? (
+        !future ? null : event.signedUp ? (
           <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="cancel" />
             <button
               class="btn btn-red"
               type="submit"
+              aria-haspopup="dialog"
               data-loading-label="Unregistering…"
             >
               Unregister
@@ -180,12 +211,12 @@ const blocked =
     </div>
   </div>
   {
-    !organizerRoster && future && publicRoster.length > 0 && (
+    !organizer && future && publicRoster.length > 0 && (
       <PublicEventRoster event={event} roster={publicRoster} />
     )
   }
   {
-    organizerRoster && roster.length > 0 && (
+    organizer && roster.length > 0 && (
       <EventRoster
         event={event}
         roster={roster}
@@ -194,11 +225,19 @@ const blocked =
       />
     )
   }
+  {
+    canAddAttendee && (
+      <div class="volunteer-roster-add">
+        <AddAttendee event={event} />
+      </div>
+    )
+  }
   {organizer && future && <EventEditor event={event} series={series} />}
 </li>
 
 <style>
   .volunteer-event-card {
+    --event-card-gap: 1rem;
     container: event-card / inline-size;
     padding: 1rem;
     scroll-margin-top: calc(
@@ -229,7 +268,7 @@ const blocked =
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    gap: 0.75rem;
+    gap: var(--event-card-gap);
   }
   .volunteer-event-info {
     min-width: 0;
@@ -252,12 +291,22 @@ const blocked =
   .volunteer-actions:empty {
     display: none;
   }
+  .volunteer-actions {
+    gap: var(--event-card-gap);
+  }
   .volunteer-actions > :is(form, .btn),
   .volunteer-actions > form > .btn {
     width: 100%;
   }
   .volunteer-actions > form > .btn {
     white-space: nowrap;
+  }
+  .volunteer-event-card > :global(.event-roster) {
+    margin-top: var(--event-card-gap);
+  }
+  .volunteer-roster-add {
+    width: 100%;
+    padding-top: var(--event-card-gap);
   }
   @container event-card (min-width: 32rem) {
     .volunteer-event-layout:has(> .volunteer-actions:not(:empty)) {

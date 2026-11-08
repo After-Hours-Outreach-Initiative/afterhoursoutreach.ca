@@ -743,7 +743,7 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(upcomingCourse).toHaveAttribute("data-state", "upcoming");
   await upcomingCourse.locator("summary").click();
   const courseDescription =
-    "Naloxone 101 is an online course that teaches you how to recognize and respond to an opioid overdose, and how to administer naloxone. It takes about 1 hour to complete";
+    "Naloxone 101 is an online course that teaches you how to recognize and respond to an opioid overdose, and how to administer naloxone. It takes about 1 hour to complete.";
   await expect(upcomingCourse.locator("[data-naloxone-step] > p")).toHaveText(
     courseDescription,
   );
@@ -759,8 +759,25 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(upcomingCourseLink).toHaveAttribute("target", "_blank");
   await expect(upcomingCourseLink).toHaveAttribute("rel", "noreferrer");
   await expect(upcomingCourseLink).toHaveClass("btn btn-outline mt-6");
-  await expect(upcomingCourse.locator("[data-naloxone-confirm]")).toHaveCount(
-    0,
+  const upcomingCheckbox = upcomingCourse.getByRole("checkbox", {
+    name: "I confirm I have completed Naloxone 101.",
+  });
+  const upcomingConfirm = upcomingCourse.getByRole("button", {
+    name: "Confirm completion",
+    exact: true,
+  });
+  await expect(upcomingCheckbox).toBeVisible();
+  await expect(upcomingCheckbox).toBeDisabled();
+  await expect(upcomingCheckbox).not.toBeChecked();
+  await expect(upcomingConfirm).toBeVisible();
+  await expect(upcomingConfirm).toBeDisabled();
+  await expect(upcomingConfirm).toHaveCSS(
+    "background-color",
+    "rgb(39, 39, 42)",
+  );
+  await expect(upcomingCourse.locator(".volunteer-check")).toHaveCSS(
+    "color",
+    "rgb(161, 161, 170)",
   );
   await page.goto("/apply");
   const form = page.locator(formSelector);
@@ -798,6 +815,11 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   // A resumed draft is not a submission, even when all answers are complete.
   await portal.reload();
   await expect(formTitle).toHaveText("Step 1: Application Form");
+  await upcomingCourse.locator("summary").click();
+  await expect(upcomingCheckbox).toBeVisible();
+  await expect(upcomingCheckbox).toBeDisabled();
+  await expect(upcomingConfirm).toBeVisible();
+  await expect(upcomingConfirm).toBeDisabled();
   await submitLocalApplication(page);
   await expect(page).toHaveURL(/\/volunteer$/);
   expect(
@@ -810,15 +832,30 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   expect(result.draft).toBe(null);
   expect(result.submitted).toBe(true);
   await expect(
-    page.locator('[data-application-progress-step="form"] > summary'),
-  ).toContainText("Application Form Submitted");
-  // The already-open portal adopts the submitted title without navigation.
+    page.locator(
+      '[data-application-progress-step="form"] .application-progress-title',
+    ),
+  ).toHaveText("Step 1: Application Form");
+  // The already-open portal adopts completion without changing the title.
   await portal.clock.runFor(5_000);
-  await expect(formTitle).toHaveText("Step 1: Application Form Submitted");
-  await expect(upcomingCourse).toHaveAttribute("data-state", "current");
+  await expect(formTitle).toHaveText("Step 1: Application Form");
+  const completedForm = portal.locator(
+    '[data-application-progress-step="form"]',
+  );
+  await expect(completedForm).toHaveAttribute("data-state", "complete");
   await expect(
-    upcomingCourse.getByRole("button", { name: "Confirm completion" }),
-  ).toBeVisible();
+    completedForm.locator(".application-progress-status"),
+  ).toHaveText(
+    /^Completed: (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}$/,
+  );
+  await expect(completedForm.locator("summary time")).toHaveAttribute(
+    "datetime",
+    /T.*Z$/,
+  );
+  await expect(upcomingCourse).toHaveAttribute("data-state", "current");
+  await expect(upcomingCheckbox).toBeEnabled();
+  await expect(upcomingConfirm).toBeVisible();
+  await expect(upcomingConfirm).toBeEnabled();
   await expect(upcomingCourseLink).toHaveCount(1);
   await portal.close();
   const course = page.locator("[data-naloxone-step]");
@@ -834,8 +871,10 @@ test("resuming requires fresh consent; submission clears drafts and course confi
     course.getByRole("link", { name: "Take Naloxone 101" }),
   ).toHaveAttribute("href", "https://towardtheheart.com/naloxone-course");
   await expect(checkbox).not.toBeChecked();
+  await expect(checkbox).toBeEnabled();
   await page.reload();
   await expect(checkbox).not.toBeChecked();
+  await expect(checkbox).toBeEnabled();
   // Submitted answers stay available inline while the application is incomplete.
   await page
     .locator('[data-application-progress-step="form"] > summary')
@@ -866,6 +905,20 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   );
   await expect(courseStep).toHaveAttribute("data-state", "complete");
   await expect(courseStep).not.toHaveAttribute("open");
+  const confirm = course.getByRole("button", {
+    name: "Confirm completion",
+    exact: true,
+  });
+  await courseStep.locator("summary").click();
+  await expect(checkbox).toBeVisible();
+  await expect(checkbox).toBeChecked();
+  await expect(checkbox).toBeDisabled();
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toBeDisabled();
+  await expect(confirm).toHaveCSS("background-color", "rgb(39, 39, 42)");
+  await expect(course.locator("[data-form-message]")).toHaveText(
+    "Completion saved to your account.",
+  );
   await page.goto("/volunteer/account");
   await expect(
     page.locator("#submitted-application-heading, [data-naloxone-confirm]"),
@@ -882,9 +935,8 @@ test("resuming requires fresh consent; submission clears drafts and course confi
   await expect(course.locator("[data-form-message]")).toHaveText(
     "Completion saved to your account.",
   );
-  await expect(
-    course.getByRole("button", { name: "Confirm completion", exact: true }),
-  ).toBeHidden();
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toBeDisabled();
 });
 
 test("signing out removes synced browser drafts but retains the account draft", async ({

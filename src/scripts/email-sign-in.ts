@@ -7,6 +7,7 @@ import {
 } from "./account-forms";
 import { signInDestination } from "../data/account-navigation";
 import type { SignInEmail } from "../server/auth/services";
+import { forgetSignInEmails, rememberedSignInEmails } from "./sign-in-history";
 
 const resendCooldownMs = 30_000;
 const initializedPanels = new WeakSet<HTMLElement>();
@@ -50,11 +51,48 @@ export function initEmailSignIn(finish: (result: object) => void) {
     let proof: string | null = null;
     let proofRejected = false;
 
+    const savedEmails = request?.querySelector<HTMLElement>(
+      "[data-sign-in-history]",
+    );
+    const emailChoices: HTMLButtonElement[] = [];
+    if (savedEmails && emailInput) {
+      const list = savedEmails.querySelector<HTMLElement>(
+        "[data-remembered-emails]",
+      )!;
+      for (const address of rememberedSignInEmails()) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "btn btn-quiet volunteer-signin-email";
+        button.textContent = address;
+        button.addEventListener("click", () => {
+          if (busy || emailInput.disabled || emailInput.readOnly) return;
+          emailInput.value = address;
+          emailInput.dispatchEvent(new Event("input", { bubbles: true }));
+          emailInput.dispatchEvent(new Event("change", { bubbles: true }));
+          emailInput.focus();
+        });
+        list.appendChild(button);
+        emailChoices.push(button);
+      }
+      savedEmails.hidden = emailChoices.length === 0;
+      savedEmails
+        .querySelector("[data-forget-emails]")!
+        .addEventListener("click", () => {
+          forgetSignInEmails();
+          list.replaceChildren();
+          emailChoices.length = 0;
+          savedEmails.hidden = true;
+          emailInput.focus();
+        });
+    }
+
     const options = () => ({ query: { returnTo } });
     const update = () => {
       clearTimeout(timer);
       const remaining = Math.max(0, resendAt - Date.now());
       const seconds = Math.ceil(remaining / 1000);
+      for (const button of emailChoices)
+        button.disabled = busy || !ready || Boolean(emailInput?.readOnly);
       resend.disabled = busy || !email || seconds > 0;
       // Reveal after a real cooldown ends, then keep the guidance through resends.
       if (resendAt > 0 && !resend.disabled) {
@@ -113,6 +151,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
         clearFormMessage(request);
         emailInput!.value = email;
         emailInput!.readOnly = true;
+        if (savedEmails) savedEmails.hidden = true;
         requestButton!.hidden = true;
       }
       code.hidden = false;
@@ -249,6 +288,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
       reset.hidden = true;
       request.hidden = false;
       emailInput!.readOnly = false;
+      if (savedEmails) savedEmails.hidden = emailChoices.length === 0;
       requestButton!.hidden = false;
       update();
       emailInput!.focus();

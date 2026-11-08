@@ -1,6 +1,6 @@
 ---
 import type { EventRow, PublicRosterRow } from "@/server/db/events";
-import AttendeeAvatar from "./AttendeeAvatar.astro";
+import RosterPerson from "./RosterPerson.astro";
 import EventRosterSummary from "./EventRosterSummary.astro";
 interface Props {
   event: EventRow;
@@ -9,30 +9,21 @@ interface Props {
 const { event, roster } = Astro.props;
 ---
 
-<details class="public-event-roster">
-  <EventRosterSummary count={roster.length} event={event} />
-  <table class="event-roster-table">
-    <caption class="sr-only">Registered volunteers</caption>
-    <thead class="sr-only"><tr><th scope="col">Volunteer</th></tr></thead>
-    <tbody>
-      {
-        roster.map((person) => (
-          <tr>
-            <th scope="row">
-              <div class="event-roster-person">
-                <AttendeeAvatar category={person.category} />
-                <span>{person.name}</span>
-              </div>
-            </th>
-          </tr>
-        ))
-      }
-    </tbody>
-  </table>
+<details class="public-event-roster event-roster">
+  <EventRosterSummary roster={roster} event={event} />
+  <ul class="event-roster-list" role="list" aria-label="Registered volunteers">
+    {
+      roster.map((person) => (
+        <li class="event-roster-row">
+          <div class="event-roster-details">
+            <RosterPerson
+              name={person.name}
+              category={person.category}
+              medicMark={Boolean(person.medicMark)}
+            />
+          </div>
+        </li>
+      ))
+    }
+  </ul>
 </details>
-
-<style>
-  .public-event-roster {
-    margin-top: 0.5rem;
-  }
-</style>

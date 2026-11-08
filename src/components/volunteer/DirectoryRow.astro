@@ -1,0 +1,89 @@
+---
+import AttendeeAvatar from "./AttendeeAvatar.astro";
+import NewVolunteerBadge from "./NewVolunteerBadge.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
+import CompactPersonName from "./CompactPersonName.astro";
+import { formatApplicationCompletedTime } from "../../data/application";
+import {
+  applicationStatuses,
+  type DirectoryPerson,
+} from "../../data/volunteer-list";
+
+interface Props {
+  person: DirectoryPerson;
+  applications: boolean;
+  href: string;
+}
+const { person, applications, href } = Astro.props;
+// Explicitly allowlist browser data: server rows also contain account flags and
+// review decisions that are unnecessary for instant directory search.
+const {
+  id,
+  name,
+  searchName,
+  role,
+  category,
+  medicMark,
+  status,
+  applicationCompletedAt,
+} = person;
+const data: DirectoryPerson = {
+  id,
+  name,
+  searchName,
+  role,
+  category,
+  medicMark,
+  status,
+  applicationCompletedAt,
+};
+---
+
+<tr data-volunteer-row data-directory-person={JSON.stringify(data)}>
+  <th scope="row">
+    <div class="volunteer-table-person">
+      <AttendeeAvatar
+        category={category}
+        medicMark={Boolean(medicMark)}
+        decorative
+      />
+      <div class="volunteer-table-name">
+        <CompactPersonName
+          name={name}
+          href={href}
+          data-volunteer-profile-link
+        />
+        {
+          !applications && role === "organizer" && (
+            <VolunteerRoleBadge role="organizer" />
+          )
+        }
+        {!applications && category === "new-volunteer" && <NewVolunteerBadge />}
+        {Boolean(medicMark) && <VolunteerRoleBadge role="medic" />}
+      </div>
+    </div>
+  </th>
+  {
+    applications && (
+      <>
+        <td>
+          <span
+            class="application-table-progress application-status-text"
+            data-state={applicationStatuses[status].state}
+          >
+            {applicationStatuses[status].label}
+          </span>
+        </td>
+        <td>
+          {applicationCompletedAt !== null && (
+            <time datetime={new Date(applicationCompletedAt).toISOString()}>
+              {formatApplicationCompletedTime(
+                new Date(applicationCompletedAt).toISOString(),
+              )}
+            </time>
+          )}
+        </td>
+      </>
+    )
+  }
+</tr>

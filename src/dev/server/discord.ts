@@ -108,14 +108,12 @@ export async function loadLocalDiscordStatus(
     `SELECT d.version,coalesce(v.active,0) AS active,
       CASE WHEN p.user_id IS NOT NULL THEN coalesce(v.registration_approved,0) ELSE 0 END AS approved,
       u.role='organizer' AS organizer,coalesce(v.patrol_approved,0) AS patrol,
-      EXISTS(SELECT 1 FROM json_each(p.teams) WHERE value='medic') AS medic,
-      EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id=d.user_id) AS orientations
+      EXISTS(SELECT 1 FROM json_each(p.teams) WHERE value='medic') AS medic
       FROM discord_link d JOIN user u ON u.id=d.user_id
       LEFT JOIN profile p ON p.user_id=d.user_id
       LEFT JOIN volunteer_status v ON v.user_id=d.user_id
       WHERE d.user_id=? AND d.discord_id=? AND d.guild_id='local-only'
-        AND d.member_verified_at IS NOT NULL AND d.last_error IS NULL
-        AND d.version!=d.synced_version`,
+        AND d.member_verified_at IS NOT NULL AND d.last_error IS NULL`,
   )
     .bind(userId, `local:${userId}`)
     .first<Eligibility & { version: number }>();
@@ -125,17 +123,20 @@ export async function loadLocalDiscordStatus(
       organizer: "local-organizer",
       medic: "local-medic",
     });
+    const observedRoles = JSON.stringify(roles);
     await env.DB.prepare(
       `UPDATE discord_link SET observed_roles=?,synced_version=version,last_synced_at=?
         WHERE user_id=? AND discord_id=? AND guild_id='local-only' AND version=?
-          AND member_verified_at IS NOT NULL AND last_error IS NULL`,
+          AND member_verified_at IS NOT NULL AND last_error IS NULL
+          AND (synced_version!=version OR observed_roles IS NOT ?)`,
     )
       .bind(
-        JSON.stringify(roles),
+        observedRoles,
         Date.now(),
         userId,
         `local:${userId}`,
         link.version,
+        observedRoles,
       )
       .run();
   }

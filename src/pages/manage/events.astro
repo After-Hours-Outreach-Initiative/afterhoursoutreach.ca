@@ -1,23 +1,6 @@
 ---
-import VolunteerPortal from "@/components/volunteer/VolunteerPortal.astro";
-import { env } from "cloudflare:workers";
-import { accountContext, requireOrganizer } from "@/server/db/access";
-import { forwardCookies } from "@/server/auth";
-import { RequestError } from "@/server/http";
 export const prerender = false;
-const account = await accountContext(env, Astro.request);
-forwardCookies(account.headers, Astro.response.headers);
-if (!account.actor)
-  return Astro.redirect(
-    `/volunteer/sign-in?returnTo=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`,
-  );
-try {
-  requireOrganizer(account.actor);
-} catch (error) {
-  if (error instanceof RequestError)
-    return new Response(error.message, { status: error.status });
-  throw error;
-}
+const params = new URLSearchParams(Astro.url.search);
+params.set("view", "organizer");
+return Astro.redirect(`/events?${params}`, 301);
 ---
-
-<VolunteerPortal {account} manage />

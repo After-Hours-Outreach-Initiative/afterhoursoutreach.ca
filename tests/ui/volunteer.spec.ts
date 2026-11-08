@@ -137,23 +137,23 @@ test("event filters include orientation without excluding other patrols, preserv
       event.includesOrientation ? "Orientation + Patrol" : "Patrol",
     );
   }
-  await filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
+  await filters.getByRole("button", { name: /^Orientations \d+$/ }).click();
   await expect(
-    filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
+    filters.getByRole("button", { name: /^Orientations \d+$/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   await expect(page).toHaveURL(/\?type=orientation$/);
-  await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
+  await filters.getByRole("button", { name: /^All \d+$/ }).click();
   await expectFilter("all");
   await page.goBack();
   await expect(
-    filters.getByRole("button", { name: /^Orientations \(\d+\)$/ }),
+    filters.getByRole("button", { name: /^Orientations \d+$/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await expectFilter("orientation");
   expect(documents).toEqual([]);
   await page.reload();
   await expectFilter("orientation");
-  await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
+  await filters.getByRole("button", { name: /^All \d+$/ }).click();
   await expectFilter("all");
 });
 
@@ -167,11 +167,10 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
-  await expect(page.locator("[data-event-calendar]")).toHaveCount(0);
+  await expect(page.locator("[data-event-calendar]")).toBeVisible();
   const today = vancouverInput(Date.now()).slice(0, 10);
   const date = addCalendarDays(today, 2);
   const makeEvent = async (
@@ -205,7 +204,24 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   const patrol = await makeEvent(date, "18:00", false);
   const orientation = await makeEvent(date, "19:00", true);
   const distant = await makeEvent(addCalendarDays(today, 49), "20:00", true);
-  await page.goto(`/events?occurrence=${orientation.id}`);
+  const laterDistant = await makeEvent(
+    addCalendarDays(today, 50),
+    "21:00",
+    true,
+  );
+  const rendered = await page.goto(`/volunteer?occurrence=${orientation.id}`);
+  const renderedLinks = await page.evaluate(
+    ({ html, date }) =>
+      [
+        ...new DOMParser()
+          .parseFromString(html, "text/html")
+          .querySelectorAll(
+            `[data-event-calendar] [data-calendar-date="${date}"] a`,
+          ),
+      ].map((link) => link.getAttribute("data-calendar-event")),
+    { html: await rendered!.text(), date },
+  );
+  expect(renderedLinks).toEqual([patrol.id]);
   const documents: string[] = [];
   page.on("request", (request) => {
     if (request.resourceType() === "document") documents.push(request.url());
@@ -241,17 +257,21 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   ).toBe(true);
   await expect(
     calendar.locator(`[data-calendar-date="${date}"] a`),
-  ).toHaveCount(2);
+  ).toHaveCount(1);
+  await expect(link(orientation.id)).toHaveCount(0);
+  await expect(
+    calendar.locator(".event-calendar-dot, .event-calendar-extra-events"),
+  ).toHaveCount(0);
   await expect(
     calendar.locator(`[data-calendar-date="${date}"] .event-calendar-circle`),
   ).toHaveCount(1);
   await expect(link(patrol.id)).toHaveAccessibleName(
-    new RegExp(patrol.event.meetingPoint),
+    new RegExp(` · Patrol at ${patrol.event.meetingPoint}$`),
   );
   await expect(
     calendar.locator("td:not(:has(a))").first().locator("a"),
   ).toHaveCount(0);
-  await card(orientation.id).evaluate((element: HTMLElement) => {
+  await card(patrol.id).evaluate((element: HTMLElement) => {
     element.addEventListener("animationstart", (event) => {
       if (event.target !== element) return;
       const bounds = element.getBoundingClientRect();
@@ -261,20 +281,17 @@ test("event calendar links visible cards, reaches later weeks, and survives live
       );
     });
   });
-  await link(orientation.id).focus();
+  await link(patrol.id).focus();
   await page.keyboard.press("Enter");
-  await expect(card(orientation.id)).toBeFocused();
-  await expect(card(orientation.id)).toBeInViewport();
-  await expect(card(orientation.id)).toHaveAttribute(
-    "data-calendar-highlight",
-    "",
-  );
+  await expect(card(patrol.id)).toBeFocused();
+  await expect(card(patrol.id)).toBeInViewport();
+  await expect(card(patrol.id)).toHaveAttribute("data-calendar-highlight", "");
   expect(
-    await card(orientation.id).evaluate(
+    await card(patrol.id).evaluate(
       (element) => getComputedStyle(element).animationName,
     ),
   ).not.toBe("none");
-  await expect(card(orientation.id)).toHaveAttribute(
+  await expect(card(patrol.id)).toHaveAttribute(
     "data-highlight-started-in-view",
     "true",
   );
@@ -287,16 +304,24 @@ test("event calendar links visible cards, reaches later weeks, and survives live
     }),
   ).toBeGreaterThanOrEqual(15);
   await expect(page).toHaveURL(
-    new RegExp(`occurrence=${orientation.id}#event-${orientation.id}$`),
+    new RegExp(`occurrence=${orientation.id}#event-${patrol.id}$`),
   );
-  await expect(card(orientation.id)).not.toHaveAttribute(
+  await expect(card(patrol.id)).not.toHaveAttribute(
     "data-calendar-highlight",
     "",
   );
 
-  await page.getByRole("button", { name: /^Orientations \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: /^Orientations \d+$/ }).click();
   await expect(link(patrol.id)).toHaveCount(0);
   await expect(link(orientation.id)).toBeVisible();
+  await expect(link(orientation.id)).toHaveAccessibleName(
+    new RegExp(
+      ` · Orientation \\+ Patrol at ${orientation.event.meetingPoint}$`,
+    ),
+  );
+  await expect(
+    calendar.locator(`[data-calendar-date="${date}"] a`),
+  ).toHaveCount(1);
   // Every date/event link must still target a real, visible card after filtering.
   expect(
     await calendar.locator("a").evaluateAll((links) =>
@@ -363,11 +388,10 @@ test("event calendar links visible cards, reaches later weeks, and survives live
     "",
   );
   await expect(link(distant.id)).toBeVisible();
+  await expect(link(laterDistant.id)).toBeVisible();
   const start = await calendar.getAttribute("data-calendar-start");
   const version = async () => {
-    const response = await page.request.get(
-      `/manage/events?occurrence=${distant.id}`,
-    );
+    const response = await page.request.get(`/events?occurrence=${distant.id}`);
     expect(response.ok()).toBe(true);
     const value = (await response.text()).match(
       new RegExp(
@@ -398,6 +422,10 @@ test("event calendar links visible cards, reaches later weeks, and survives live
       `[data-calendar-date="${movedDate}"] [data-calendar-event="${distant.id}"]`,
     ),
   ).toBeVisible({ timeout: 15_000 });
+  await expect(
+    calendar.locator(`[data-calendar-date="${movedDate}"] a`),
+  ).toHaveCount(1);
+  await expect(link(laterDistant.id)).toHaveCount(0);
   await expect(link(distant.id)).toBeFocused();
   await expect(calendar).toHaveAttribute("data-calendar-start", start!);
   const cancelled = await page.request.post("/api/v1/events/action", {
@@ -407,6 +435,12 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   expect(cancelled.status(), await cancelled.text()).toBe(200);
   await expect(card(distant.id)).toHaveCount(0, { timeout: 15_000 });
   await expect(link(distant.id)).toHaveCount(0);
+  await expect(link(laterDistant.id)).toBeVisible();
+  await expect(link(laterDistant.id)).toHaveAccessibleName(
+    new RegExp(
+      ` · Orientation \\+ Patrol at ${laterDistant.event.meetingPoint}$`,
+    ),
+  );
   await expect(page).toHaveURL(
     new RegExp(
       `occurrence=${orientation.id}&type=orientation#event-${orientation.id}$`,
@@ -463,7 +497,7 @@ test("View as has a button for every seeded profile and supports keyboard switch
     page
       .getByRole("navigation", { name: "Mobile navigation" })
       .getByRole("button", { name: "Manage", exact: true }),
-  ).toHaveAttribute("aria-expanded", "true");
+  ).toHaveCount(0);
   await expect(
     page
       .getByRole("navigation", { name: "Mobile navigation" })
@@ -627,11 +661,11 @@ test("account navigation and profile controls are usable on desktop and mobile",
         .getByRole("button", { name: "Open navigation", exact: true })
         .click();
       await expect(menu.locator("[data-account-menu-name]")).toHaveText(
-        user.name,
+        `${user.name} V.`,
       );
     } else {
       await expect(menu.locator("summary")).toHaveAccessibleName(
-        `Account for ${user.name}`,
+        `Account for ${user.name} V.`,
       );
       await menu.locator("summary").click();
     }
@@ -662,7 +696,7 @@ test("account navigation and profile controls are usable on desktop and mobile",
     await expect(
       form.getByRole("group", { name: "Personal statement", exact: true }),
     ).toHaveCount(0);
-    const name = page.getByLabel("Preferred name", { exact: false });
+    const name = page.getByLabel("Preferred first name", { exact: false });
     await expect(name).toHaveValue(sampleAnswers.preferredName);
     await expect(name).toBeEditable();
     for (const heading of await form.getByRole("heading", { level: 3 }).all()) {

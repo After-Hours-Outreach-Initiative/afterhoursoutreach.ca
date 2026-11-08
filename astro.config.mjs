@@ -2,12 +2,16 @@
 import { defineConfig, fontProviders } from "astro/config";
 import cloudflare from "@astrojs/cloudflare";
 import { chmod } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
 export default defineConfig({
-  adapter: cloudflare({ imageService: "compile", remoteBindings: false }),
+  adapter: cloudflare({
+    imageService: { build: "compile", runtime: "cloudflare-binding" },
+    remoteBindings: false,
+  }),
   fonts: [
     {
       provider: fontProviders.google(),
@@ -28,6 +32,22 @@ export default defineConfig({
           // Register no routes or playground imports in either hosted build.
           if (command !== "dev") return;
           injectRoute({
+            pattern: "/dev/ui/buttons",
+            entrypoint: new URL(
+              "./src/dev/ui/ButtonsPlayground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
+            pattern: "/dev/ui/filters",
+            entrypoint: new URL(
+              "./src/dev/ui/FiltersPlayground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
             pattern: "/dev/ui",
             entrypoint: new URL(
               "./src/dev/ui/Playground.astro",
@@ -43,6 +63,56 @@ export default defineConfig({
             ),
             prerender: false,
           });
+          injectRoute({
+            pattern: "/dev/ui/event-card",
+            entrypoint: new URL(
+              "./src/dev/ui/EventCardPlayground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
+            pattern: "/dev/ui/event-card/preview",
+            entrypoint: new URL(
+              "./src/dev/ui/EventCardPreview.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
+            pattern: "/dev/ui/organizer-profile",
+            entrypoint: new URL(
+              "./src/dev/ui/OrganizerProfilePlayground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
+            pattern: "/dev/ui/organizer-profile/preview",
+            entrypoint: new URL(
+              "./src/dev/ui/OrganizerProfilePreview.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          for (const kind of ["applications", "volunteers"]) {
+            injectRoute({
+              pattern: `/dev/ui/${kind}`,
+              entrypoint: new URL(
+                "./src/dev/ui/TablePlayground.astro",
+                import.meta.url,
+              ),
+              prerender: false,
+            });
+            injectRoute({
+              pattern: `/dev/ui/${kind}/preview`,
+              entrypoint: new URL(
+                "./src/dev/ui/TablePreview.astro",
+                import.meta.url,
+              ),
+              prerender: false,
+            });
+          }
         },
       },
     },
@@ -67,6 +137,13 @@ export default defineConfig({
     },
   ],
   vite: {
+    // Check/sync/build must not replace dependencies used by the running dev Worker.
+    cacheDir: fileURLToPath(
+      new URL(
+        `./node_modules/.vite/${process.env.NODE_ENV === "production" ? "production" : "development"}/`,
+        import.meta.url,
+      ),
+    ),
     plugins: [tailwindcss()],
     // Discover account dependencies before a cold-start reload can reset a form.
     optimizeDeps: {

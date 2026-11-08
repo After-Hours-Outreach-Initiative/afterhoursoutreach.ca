@@ -1,5 +1,6 @@
 ---
 import { Font } from "astro:assets";
+import DevPanel from "../DevPanel.astro";
 import "../../styles/tailwind.css";
 
 interface Props {
@@ -25,5 +26,6 @@ Astro.response.headers.set("Referrer-Policy", "no-referrer");
     class="m-0 min-h-dvh bg-ink font-body text-base leading-relaxed text-zinc-100 antialiased"
   >
     <slot />
+    <DevPanel />
   </body>
 </html>

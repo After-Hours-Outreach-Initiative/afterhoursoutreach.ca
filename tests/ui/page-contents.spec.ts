@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   createLocalAccount,
   openLocalAccountSwitcher,
+  signInLocalAuthenticatorAccount,
 } from "../helpers/local-account";
 
 for (const width of [390, 1280]) {
@@ -95,7 +96,156 @@ for (const width of [390, 1280]) {
   }
 }
 
-test("organizer profile contents reveal application details on the page and in dialogs", async ({
+test("application reviews link to the overview, form sections and naloxone on mobile and desktop", async ({
+  page,
+  baseURL,
+}) => {
+  test.skip(!baseURL?.startsWith("http://localhost:"));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await signInLocalAuthenticatorAccount(page.request, baseURL!);
+  const path = "/applications/local-fixture-user-robin";
+
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${path}#application-review-emergency-contact`);
+    const review = page.locator("article[data-application-review]");
+    const contents = review.getByRole("navigation", { name: "Sections" });
+    const menu = contents.locator("[data-contents-menu]");
+    const answers = review.locator("[data-submitted-application] details");
+    for (const list of await contents.locator("ol").all()) {
+      await expect(list.locator("a")).toHaveText([
+        "Overview",
+        "Application form",
+        "Personal info",
+        "Emergency contact",
+        "Team interests",
+        "Training and safety",
+        "Personal statement",
+        "Submission details",
+        "Naloxone 101",
+      ]);
+      await expect(list.locator(".volunteer-contents-nested a")).toHaveText([
+        "Personal info",
+        "Emergency contact",
+        "Team interests",
+        "Training and safety",
+        "Personal statement",
+        "Submission details",
+      ]);
+      await expect(list.locator("a").first()).toHaveAttribute(
+        "href",
+        "#application-review-overview",
+      );
+    }
+    await expect(answers).toHaveAttribute("open");
+    await expect(
+      review.locator("#application-review-emergency-contact"),
+    ).toBeInViewport({ ratio: 1 });
+    const jump = async (id: string) => {
+      if (width < 1024) await menu.locator("summary").click();
+      await contents.locator(`a[href="#${id}"]:visible`).click();
+      await expect(page).toHaveURL(`${baseURL}${path}#${id}`);
+      const heading = review.locator(`#${id}`);
+      await expect(heading).toBeInViewport({ ratio: 1 });
+      const header = (await page.locator(".site-header").boundingBox())!;
+      const bar = (await menu.boundingBox())?.height ?? 0;
+      expect((await heading.boundingBox())!.y).toBeGreaterThanOrEqual(
+        header.y + header.height + bar,
+      );
+      if (width < 1024) await expect(menu).not.toHaveAttribute("open");
+    };
+    await answers.locator("summary").click();
+    await expect(answers).not.toHaveAttribute("open");
+    await jump("application-review-naloxone-heading");
+    await expect(answers).not.toHaveAttribute("open");
+    await jump("application-review-form-heading");
+    await expect(answers).toHaveAttribute("open");
+    await page.reload();
+    await expect(answers).toHaveAttribute("open");
+    await expect(
+      review.locator("#application-review-form-heading"),
+    ).toBeInViewport({ ratio: 1 });
+    await answers.locator("summary").click();
+    await jump("application-review-about-volunteering");
+    await expect(answers).toHaveAttribute("open");
+    await page.reload();
+    await expect(
+      review.locator("#application-review-about-volunteering"),
+    ).toBeInViewport({ ratio: 1 });
+    await jump("application-review-overview");
+    await expect(contents.locator('a[aria-current="location"]')).toHaveText([
+      "Overview",
+      "Overview",
+    ]);
+    await page.reload();
+    await expect(review.locator("#application-review-overview")).toBeInViewport(
+      { ratio: 1 },
+    );
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
+  }
+});
+
+test("organizer profiles keep only the compact contents bar sticky", async ({
+  page,
+  baseURL,
+}) => {
+  test.skip(!baseURL?.startsWith("http://localhost:"));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await signInLocalAuthenticatorAccount(page.request, baseURL!);
+
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/volunteers/local-fixture-user-robin");
+    const contents = page.locator(
+      "[data-volunteer-profile] > [data-page-contents]",
+    );
+    const bar = contents.locator("[data-contents-bar]");
+    const summary = contents.locator("[data-contents-menu] > summary");
+    await expect(contents).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(bar).toHaveCSS("padding", "0px");
+    expect(
+      await contents.evaluate(
+        (nav) => getComputedStyle(nav, "::before").content,
+      ),
+    ).toBe("none");
+    const initial = (await contents.boundingBox())!;
+    expect(initial.height).toBe((await summary.boundingBox())!.height);
+    const body = (await page
+      .locator("[data-volunteer-profile-body]")
+      .boundingBox())!;
+    expect(body.y - initial.y - initial.height).toBe(16);
+
+    await page.evaluate(
+      (top) => scrollTo({ top, behavior: "instant" }),
+      body.y + 150,
+    );
+    await expect(contents).toHaveAttribute("data-contents-stuck", "");
+    await expect
+      .poll(async () => {
+        const header = (await page.locator(".site-header").boundingBox())!;
+        const bounds = (await contents.boundingBox())!;
+        return Math.abs(bounds.y - header.y - header.height);
+      })
+      .toBeLessThan(1);
+    const stuck = (await contents.boundingBox())!;
+    expect(stuck.height).toBe((await summary.boundingBox())!.height);
+    expect(
+      await contents.evaluate((nav) => {
+        const bounds = nav.getBoundingClientRect();
+        return nav.contains(
+          document.elementFromPoint(
+            bounds.left + bounds.width / 2,
+            bounds.bottom + 8,
+          ),
+        );
+      }),
+    ).toBe(false);
+  }
+});
+
+test("profile pages opened directly or from rosters keep section navigation", async ({
   page,
   baseURL,
 }) => {
@@ -111,18 +261,29 @@ test("organizer profile contents reveal application details on the page and in d
 
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const dialog of [false, true]) {
-      if (dialog) {
-        await page.goto("/manage/events");
+    for (const fromRoster of [false, true]) {
+      if (fromRoster) {
+        await page.goto("/events");
         const roster = page.locator(
           '[data-live-event="local-fixture-event-orientation"] .volunteer-roster',
         );
         await roster.locator("summary").click();
-        await roster.locator("[data-volunteer-profile-link]").first().click();
+        const link = roster.locator("[data-volunteer-profile-link]").first();
+        const href = new URL((await link.getAttribute("href"))!, page.url())
+          .href;
+        await link.click();
+        await expect(page).toHaveURL(href);
       } else {
-        await page.goto("/manage/volunteers/local-fixture-user-robin");
+        await page.goto("/volunteers/local-fixture-user-robin");
       }
+      const applicationPath = new URL(page.url()).pathname.replace(
+        "/volunteers/",
+        "/applications/",
+      );
       const profile = page.locator("[data-volunteer-profile]");
+      await expect(
+        page.getByRole("dialog", { name: "Volunteer profile", exact: true }),
+      ).toHaveCount(0);
       await expect(profile.getByRole("tablist")).toHaveCount(0);
       await expect(
         profile.getByRole("heading", { name: "Profile", exact: true }),
@@ -149,25 +310,27 @@ test("organizer profile contents reveal application details on the page and in d
       };
       await jump("volunteer-profile-panel");
       await jump("volunteer-application-panel");
-      await jump("volunteer-emergency-contact");
       await expect(
         profile.locator('[data-volunteer-profile-panel="application"] details'),
-      ).toHaveAttribute("open");
+      ).toHaveCount(0);
+      await expect(
+        contents.locator('a[href="#volunteer-emergency-contact"]'),
+      ).toHaveCount(0);
       await expect(
         profile.locator('[data-volunteer-profile-panel="profile"]'),
       ).toBeVisible();
       await jump("volunteer-current-emergency-contact");
       await page.goBack();
       await expect(
-        profile.locator("#volunteer-emergency-contact"),
-      ).toBeInViewport({ ratio: 1 });
+        profile.locator("#volunteer-application-panel"),
+      ).toBeInViewport();
       expect(
         await profile.evaluate((element) => {
           const panel = element.querySelector<HTMLElement>(
             '[data-volunteer-profile-panel="application"]',
           )!;
           const controls = element.querySelector<HTMLElement>(
-            "[data-volunteer-controls]",
+            ".volunteer-profile-controls",
           )!;
           return (
             controls.getBoundingClientRect().top -
@@ -181,24 +344,49 @@ test("organizer profile contents reveal application details on the page and in d
         await expect(menu).not.toHaveAttribute("open");
         await expect(menu.locator("summary")).toBeFocused();
       }
-      if (dialog) {
-        await expect(
-          page.locator("[data-volunteer-profile-dialog]"),
-        ).toBeVisible();
-        await page
-          .getByRole("button", { name: "Close volunteer profile" })
-          .click();
-      } else {
-        await page.reload();
-        await expect(
-          profile.locator(
-            '[data-volunteer-profile-panel="application"] details',
-          ),
-        ).toHaveAttribute("open");
-        await expect(
-          profile.locator("#volunteer-emergency-contact"),
-        ).toBeInViewport({ ratio: 1 });
+      await page.reload();
+      await expect(
+        profile.locator('[data-volunteer-profile-panel="application"] details'),
+      ).toHaveCount(0);
+      await expect(
+        profile.locator("#volunteer-application-panel"),
+      ).toBeInViewport();
+      await expect(
+        profile.locator(
+          '[data-access-kind="application"], application-rejection',
+        ),
+      ).toHaveCount(0);
+      const application = profile.locator(
+        '[data-volunteer-profile-panel="application"]',
+      );
+      await expect(
+        application.locator(".application-progress-mini-title"),
+      ).toHaveText(["Application form", "Naloxone 101", "Application review"]);
+      await expect(application.locator("time")).toHaveCount(1);
+      await expect(
+        application.locator('[data-application-mini-step="review"]'),
+      ).toContainText("Date and time not recorded");
+      for (const time of await application.locator("time").all()) {
+        await expect(time).toHaveAttribute("datetime", /T.*Z$/);
+        await expect(time).toHaveText(/\d{1,2}:\d{2}/);
       }
+      await application
+        .getByRole("link", { name: "View application", exact: true })
+        .click();
+      await expect(page).toHaveURL(`${baseURL}${applicationPath}`);
+      const review = page.locator("[data-application-review]");
+      await review
+        .locator('[data-application-mini-step="form"] summary')
+        .click();
+      await expect(
+        review.locator("#application-review-emergency-contact"),
+      ).toBeVisible();
+      await expect(
+        review.getByRole("button", {
+          name: "Revoke application approval",
+          exact: true,
+        }),
+      ).toBeEnabled();
     }
   }
 });

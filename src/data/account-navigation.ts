@@ -1,3 +1,5 @@
+import { personDisplayName, type PersonName } from "./person-name";
+
 export const signInDestination = "/volunteer";
 
 export interface AccountNavigation {
@@ -7,16 +9,9 @@ export interface AccountNavigation {
   email: string;
   organizer: boolean;
   eventAccess: boolean;
+  readyApplicationCount: number;
 }
 
-export function accountGreeting(
-  answers?: { firstName?: string | null; preferredName?: string | null } | null,
-  name?: string,
-) {
-  return (
-    answers?.preferredName?.trim() ||
-    answers?.firstName?.trim() ||
-    name?.trim().split(/\s+/)[0] ||
-    "Account"
-  );
+export function accountGreeting(answers?: PersonName | null, name?: string) {
+  return personDisplayName(answers, name, "Account");
 }

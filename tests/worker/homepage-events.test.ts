@@ -1,9 +1,54 @@
 import { expect, test } from "vitest";
 import { createTestHarness } from "wrangler";
+import sharp from "sharp";
 import { formatEventDate } from "../../src/data/event-time";
 import { createSignInOTP } from "../helpers/email-otp";
 
-test("homepage exposes only the next two published dates and total confirmed counts to every visitor", async () => {
+test("homepage photo is already cropped to its displayed aspect ratio in production", async () => {
+  const origin = "https://afterhoursoutreach.ca";
+  const server = createTestHarness({
+    workers: [
+      {
+        configPath: "dist/server/wrangler.json",
+        vars: { APP_ENV: "production", AUTH_BASE_URL: origin },
+        secrets: {
+          BETTER_AUTH_SECRET: "homepage-image-test-secret-12345678901234567890",
+          RESEND_API_KEY: "",
+        },
+      },
+    ],
+  });
+  try {
+    await server.listen();
+    const worker = server.getWorker<Env>();
+    await worker.applyD1Migrations("DB");
+    const response = await worker.fetch(origin);
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    const section = html.match(
+      /<section\b[^>]*id="upcoming-events"[\s\S]*?<\/section>/,
+    )?.[0];
+    const image = section?.match(/<img\b[^>]*>/)?.[0];
+    expect(image).toBeDefined();
+    expect(image).not.toMatch(/object-bottom|position=|fit=/);
+    const src = image!.match(/\bsrc="([^"]+)"/)?.[1];
+    expect(src).toBeDefined();
+    const photo = await worker.fetch(
+      new URL(src!.replaceAll("&amp;", "&"), origin),
+    );
+    expect(photo.status).toBe(200);
+    expect(photo.headers.get("content-type")).toMatch(/^image\//);
+    const { width, height } = await sharp(
+      Buffer.from(await photo.arrayBuffer()),
+    ).metadata();
+    expect(width! / height!).toBe(4 / 3);
+    expect(image).toContain('width="960" height="720"');
+  } finally {
+    await server.close();
+  }
+});
+
+test("homepage exposes only the next two published dates and remaining spot counts to every visitor", async () => {
   const origin = "https://afterhoursoutreach.ca";
   const secret = "homepage-events-test-secret-12345678901234567890";
   const server = createTestHarness({
@@ -94,11 +139,36 @@ test("homepage exposes only the next two published dates and total confirmed cou
         .trim(),
     );
     expect(entries).toEqual([
-      `${formatEventDate(first)} 1 of 8 spots taken`,
-      `${formatEventDate(second)} 0 of 6 spots taken`,
+      `${formatEventDate(first)} Open · 7 of 8 spots remaining`,
+      `${formatEventDate(second)} Open · 6 of 6 spots remaining`,
     ]);
     expect(publicSection).toContain(new Date(first).toISOString());
     expect(publicSection).toContain(new Date(second).toISOString());
+    expect(publicSection).not.toContain("Full");
+    expect(publicSection.match(/volunteer-spots-open/g)).toHaveLength(2);
+
+    await DB.prepare(
+      "UPDATE event SET spots = 1, min_medic_spots = 0 WHERE id = 'first'",
+    ).run();
+    const fullSection = await readHomepage();
+    expect(fullSection).toMatch(
+      /<span class="volunteer-spots-full">Full<\/span> ·\s*0 of\s*1 spots remaining/,
+    );
+    expect(fullSection.match(/volunteer-spots-full/g)).toHaveLength(1);
+    expect(fullSection).toMatch(
+      /<span class="volunteer-spots-open">Open<\/span> ·\s*6 of\s*6 spots remaining/,
+    );
+
+    // Exercise defensive rendering of legacy over-capacity data in this isolated DB.
+    await DB.prepare("DROP TRIGGER signup_confirm_insert").run();
+    await DB.prepare(
+      `INSERT INTO signup (id,event_id,manual_name,status,created_at,updated_at)
+      VALUES ('extra','first','PRIVATE ATTENDEE','confirmed',0,0)`,
+    ).run();
+    const overCapacitySection = await readHomepage();
+    expect(overCapacitySection).toMatch(
+      /<span class="volunteer-spots-full">Full<\/span> ·\s*0 of\s*1 spots remaining/,
+    );
 
     const signedIn = await worker.fetch(
       `${origin}/api/v1/auth/sign-in/email-otp`,
@@ -116,7 +186,7 @@ test("homepage exposes only the next two published dates and total confirmed cou
       .filter((value) => !value.includes("Max-Age=0"))
       .map((value) => value.split(";")[0])
       .join("; ");
-    expect(await readHomepage(cookie)).toBe(publicSection);
+    expect(await readHomepage(cookie)).toBe(overCapacitySection);
     // The summary must not relax the protected event/roster API.
     expect((await worker.fetch(`${origin}/api/v1/events`)).status).toBe(401);
   } finally {

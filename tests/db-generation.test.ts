@@ -52,6 +52,70 @@ test("checked-in migrations are generated, unedited, and match the current sourc
   assert.equal(await generateDatabaseMigration({ check: true }), null);
 });
 
+test("manual attendee migration preserves account signups, cancellations, attendance and notifications", () => {
+  const db = database();
+  db.exec("PRAGMA foreign_keys=ON");
+  const migrate = (tag: string) => {
+    db.exec("BEGIN");
+    db.exec(
+      readFileSync(new URL(`../drizzle/${tag}.sql`, import.meta.url), "utf8"),
+    );
+    db.exec("COMMIT");
+  };
+  const manual = journal.entries.find(({ tag }) =>
+    tag.endsWith("_manual_event_attendees"),
+  )!;
+  for (const { tag } of journal.entries.filter(({ idx }) => idx < manual.idx))
+    migrate(tag);
+  db.exec(`INSERT INTO user (id,name,email,role,created_at,updated_at) VALUES ('existing','Existing','existing@example.org','organizer',1,2);
+    INSERT INTO profile (user_id,preferred_name,phone,birth_date,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,medical_certification,training_experience,registered_at,updated_at)
+      VALUES ('existing','Existing','555','2000-01-01','Contact','555','Friend','Friend','Help','[]','None','None',1,2);
+    INSERT INTO volunteer_status (user_id,registration_approved,updated_at) VALUES ('existing',1,2);
+    INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at) VALUES ('event','orientation',${Date.now() + 86_400_000},'Point',8,'existing',1,2);
+    INSERT INTO signup (id,event_id,user_id,status,created_at,updated_at) VALUES ('confirmed','event','existing','confirmed',1,2),('cancelled','event','existing','cancelled',3,4);
+    INSERT INTO orientation_completion VALUES ('completion','existing','event','existing',5);
+    INSERT INTO event_audit VALUES ('audit','event','existing','signup_joined','[]',2);
+    INSERT INTO event_notification (id,operation_id,user_id,subject,body,created_at) VALUES ('mail','audit','existing','Subject','Body',2);`);
+  const tables = [
+    "user",
+    "profile",
+    "volunteer_status",
+    "event",
+    "orientation_completion",
+    "event_audit",
+    "event_notification",
+  ];
+  const before = tables.map((table) =>
+    db.prepare(`SELECT * FROM ${table}`).all(),
+  );
+  const signups = db.prepare("SELECT * FROM signup ORDER BY id").all();
+  migrate(manual.tag);
+  assert.deepEqual(
+    tables.map((table) => db.prepare(`SELECT * FROM ${table}`).all()),
+    before,
+  );
+  assert.deepEqual(
+    db
+      .prepare("SELECT * FROM signup ORDER BY id")
+      .all()
+      .map((row) => ({ ...row })),
+    signups.map((row) => ({
+      ...row,
+      manual_name: null,
+      manual_medic: 0,
+      manual_new: 0,
+    })),
+  );
+  assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+  db.exec(
+    "INSERT INTO signup (id,event_id,manual_name,manual_new,created_at,updated_at) VALUES ('manual','event','Guest',1,6,6)",
+  );
+  assert.equal(
+    db.prepare("SELECT user_id FROM signup WHERE id='manual'").get()?.user_id,
+    null,
+  );
+});
+
 test("recurrence and orientation migrations preserve existing events, bookings, completions, audits and pending email", () => {
   const db = database();
   db.exec("PRAGMA foreign_keys=ON");

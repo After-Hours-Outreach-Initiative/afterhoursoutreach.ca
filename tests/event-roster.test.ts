@@ -1,5 +1,15 @@
 import { expect, test } from "vitest";
-import { publicAttendeeName } from "../src/data/event-roster";
+import {
+  manualAttendeeCategory,
+  publicAttendeeName,
+} from "../src/data/event-roster";
+
+test("manual attendee checkboxes keep new medics in the new-volunteer category", () => {
+  expect(manualAttendeeCategory(false, false)).toBe("outreach-volunteer");
+  expect(manualAttendeeCategory(true, false)).toBe("medic");
+  expect(manualAttendeeCategory(false, true)).toBe("new-volunteer");
+  expect(manualAttendeeCategory(true, true)).toBe("new-volunteer");
+});
 
 test("public rosters use first names and last initials, with an abbreviated legacy fallback", () => {
   expect(
@@ -8,7 +18,33 @@ test("public rosters use first names and last initials, with an abbreviated lega
   expect(publicAttendeeName(null, null, "Legacy Middle PrivateSurname")).toBe(
     "Legacy P.",
   );
-  expect(publicAttendeeName(null, null, "OneName")).toBe("O.");
-  expect(publicAttendeeName(null, null, " ")).toBe("Volunteer");
+  expect(publicAttendeeName(null, null, "OneName")).toBe("OneName");
+  expect(publicAttendeeName(null, null, " ")).toBe("Outreach Volunteer");
   expect(publicAttendeeName("Élodie", "李", "Ignored")).toBe("Élodie 李.");
+});
+
+test("rosters prefer a defined preferred name and keep the last name abbreviated", () => {
+  expect(
+    publicAttendeeName("Alice", "PrivateSurname", "Ignored", " Ally "),
+  ).toBe("Ally P.");
+  expect(publicAttendeeName("Mary", "Jones", "Ignored", "Mary Jane")).toBe(
+    "Mary Jane J.",
+  );
+  for (const preferredName of [null, "", "  "])
+    expect(
+      publicAttendeeName(
+        " Alice ",
+        " PrivateSurname ",
+        "Ignored",
+        preferredName,
+      ),
+    ).toBe("Alice P.");
+  expect(
+    publicAttendeeName(
+      null,
+      null,
+      "Legacy Middle PrivateSurname",
+      "Legacy Middle PrivateSurname",
+    ),
+  ).toBe("Legacy Middle PrivateSurname");
 });

@@ -2,22 +2,26 @@ import { RequestError } from "../http";
 import {
   orientationFullMessage,
   orientationReservedMessage,
-  orientationSignupLimitMessage,
   orientationCapacityMessage,
 } from "./policy";
+
+/** D1 can report a trigger invariant on the error or its cause. */
+export function databaseErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
+    : "";
+}
 
 /** Translate database invariants into responses without exposing SQL or values. */
 export function databaseWriteError(error: unknown): never {
   if (error instanceof RequestError) throw error;
-  const message =
-    error instanceof Error
-      ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
-      : "";
+  const message = databaseErrorMessage(error);
   if (message.includes("event_full"))
     throw new RequestError(409, "This event is full.");
   if (
     message.includes("orientation_minimum_capacity") ||
-    message.includes("event_minimum_capacity")
+    message.includes("event_minimum_capacity") ||
+    message.includes("event_invalid_limits")
   )
     throw new RequestError(400, orientationCapacityMessage);
   if (message.includes("orientation_places_full"))
@@ -30,10 +34,8 @@ export function databaseWriteError(error: unknown): never {
   if (message.includes("orientation_edit_conflict"))
     throw new RequestError(
       409,
-      "These changes conflict with existing registrations or completion history. Keep two medic places and, with orientation, two orientee places reserved (maximum four orientees). Retain orientation where booked volunteers need it.",
+      "These changes conflict with existing registrations or completion history. Keep enough capacity for the event's reserved places and existing new volunteers. Retain orientation where booked volunteers need it.",
     );
-  if (message.includes("orientation_signup_limit"))
-    throw new RequestError(409, orientationSignupLimitMessage);
   if (message.includes("recurring_signup_window"))
     throw new RequestError(
       409,

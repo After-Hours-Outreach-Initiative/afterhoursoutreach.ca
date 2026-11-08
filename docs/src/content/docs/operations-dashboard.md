@@ -124,7 +124,7 @@ change an upcoming occurrence's registration state, visibility or capacity;
 cancel an event; remove a registration; or mark a registered attendee's
 orientation completed after the event starts.
 
-Capacity edits remain subject to the database's medic/orientee reservations,
+Capacity edits remain subject to the database's reservations for medics and new volunteers,
 total-capacity and existing-registration guards. Hiding/closing an event does
 not cancel bookings. Cancelling an event does; recurring cancellation tombstones
 remain permanent. Actions affect **only the selected occurrence**, not future

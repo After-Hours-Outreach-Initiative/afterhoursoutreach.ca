@@ -1,19 +1,21 @@
 ---
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
-import type { EventRow } from "@/server/db/events";
+import type { EventRow, PublicRosterRow } from "@/server/db/events";
 import EventAttendance from "./EventAttendance.astro";
 
 interface Props {
-  count: number;
+  roster: Pick<PublicRosterRow, "category" | "medicMark">[];
   event: EventRow;
 }
-const { count, event } = Astro.props;
+const { roster, event } = Astro.props;
 ---
 
 <summary class="event-roster-toggle">
-  <span>Volunteers ({count})</span>
+  <span class="text-sm @[32rem]/event-card:text-base"
+    >Volunteers ({roster.length})</span
+  >
   <ChevronDownIcon class="event-roster-chevron size-5 shrink-0" />
-  <EventAttendance event={event} />
+  <EventAttendance event={event} roster={roster} />
 </summary>
 
 <style>
@@ -53,11 +55,17 @@ const { count, event } = Astro.props;
     outline-offset: 3px;
   }
   :global(details[open]) > .event-roster-toggle {
-    border-color: #818cf8;
+    border-color: var(--event-roster-open-border);
+    border-radius: 0.5rem 0.5rem 0 0;
     background: #16214a;
   }
   :global(details[open]) > .event-roster-toggle :global(.event-roster-chevron) {
     transform: rotate(180deg);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .event-roster-toggle > :global(.event-roster-chevron) {
+      transition: transform 180ms ease-out;
+    }
   }
   @container event-card (min-width: 32rem) {
     .event-roster-toggle {

@@ -6,12 +6,17 @@ import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
 import { chooseNotification } from "./notification-choice";
 import { confirmSeriesDeletion } from "./event-deletion";
+import { confirmEventUnregistration } from "./event-unregistration";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
   disposeVolunteerProfileContents,
   initVolunteerProfileContents,
 } from "./volunteer-profile-contents";
 import { initSignupMenus } from "./signup-menu";
+import {
+  initSignupMoveCalendars,
+  syncSignupMoveCalendar,
+} from "./signup-move-calendar";
 import {
   initBulkEvents,
   syncBulkEventSelection,
@@ -25,6 +30,7 @@ import {
   seriesSaveAction,
   syncSeriesControls,
   eventEmailPrompt,
+  eventFields,
 } from "./event-recurrence";
 import {
   actionEmailNeedsFeedback,
@@ -74,6 +80,7 @@ for (const card of document.querySelectorAll<HTMLElement>("[data-live-event]"))
 initEventDates(document);
 initVolunteerProfileContents();
 initSignupMenus();
+initSignupMoveCalendars();
 
 function applyEventFilter(root: HTMLElement, type: string) {
   const selected = eventFilter(type, root.dataset.eventView === "manage");
@@ -84,11 +91,11 @@ function applyEventFilter(root: HTMLElement, type: string) {
     let visible = 0;
     const list = root.querySelector(listSelector);
     for (const card of list?.querySelectorAll<HTMLElement>(
-      ":scope > [data-live-event], :scope > [data-series-card]",
+      ":scope > [data-live-event]",
     ) ?? []) {
       card.hidden = !matchesEventFilter(
         selected,
-        Boolean(card.dataset.seriesCard || card.dataset.eventSeries),
+        Boolean(card.dataset.eventSeries),
         card.dataset.includesOrientation === "true",
       );
       if (!card.hidden) visible++;
@@ -257,7 +264,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       card.querySelector("dialog[open], [data-signup-menu]:popover-open") ||
       [
         ...card.querySelectorAll<HTMLFormElement>(
-          'form[data-submitting="true"]',
+          'form[data-submitting="true"], add-attendee[data-expanded] form',
         ),
       ].some((form) => form !== element),
     );
@@ -265,7 +272,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     card.dataset.seriesCard
       ? `series:${card.dataset.seriesCard}`
       : `event:${card.dataset.liveEvent}`;
-  // A date can move between sections (or out of a series group) as it starts.
+  // A date can move between upcoming events and history as it starts.
   // Reuse its roster expansion state, and never duplicate an open editor.
   const existingEvents = new Map(
     [...root.querySelectorAll<HTMLElement>("[data-live-event]")].map((card) => [
@@ -294,10 +301,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       if (updated.dataset.seriesCard) {
         if (!card) {
           card = document.importNode(updated, true);
-          for (const occurrence of card.querySelectorAll<HTMLElement>(
-            "[data-live-event]",
-          ))
-            renderedCards.set(occurrence, occurrence.outerHTML);
           added ??= card;
         } else {
           card.dataset.includesOrientation =
@@ -314,10 +317,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           }
           deferredEventRefresh =
             syncSeriesControls(card, updated, element) || deferredEventRefresh;
-          syncList(
-            card.querySelector("[data-series-event-list]")!,
-            updated.querySelector("[data-series-event-list]")!,
-          );
         }
         if (card !== position) list.insertBefore(card, position);
         position = card.nextElementSibling;
@@ -325,18 +324,21 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       }
       // Don't discard an unrelated editor's draft or another action in flight.
       const protectedCard = card && protectedEvent(card);
-      if (
-        card &&
-        protectedCard &&
-        renderedCards.get(card) !== updated.outerHTML
-      ) {
-        deferredEventRefresh = true;
+      if (card && protectedCard) {
+        if (renderedCards.get(card) !== updated.outerHTML)
+          deferredEventRefresh = true;
         // A live count must not overwrite an open editor or an in-flight signup.
+        // Compare the live region itself: after a partial update, a return to
+        // the cached full-card snapshot must still restore its original count.
         const availability = card.querySelector("[data-event-availability]");
         const nextAvailability = updated.querySelector(
           "[data-event-availability]",
         );
-        if (availability && nextAvailability)
+        if (
+          availability &&
+          nextAvailability &&
+          availability.outerHTML !== nextAvailability.outerHTML
+        )
           availability.replaceWith(document.importNode(nextAvailability, true));
         // Signup counts can change while an editor is open. Refresh only email
         // eligibility; leave the organizer's fields, reason and scope draft intact.
@@ -382,6 +384,10 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     }
   };
   syncList(list, refreshed.querySelector("[data-event-list]")!);
+  const seriesList = root.querySelector<HTMLElement>("[data-series-list]");
+  const nextSeriesList =
+    refreshed.querySelector<HTMLElement>("[data-series-list]");
+  if (seriesList && nextSeriesList) syncList(seriesList, nextSeriesList);
   let pastList = root.querySelector<HTMLElement>("[data-past-event-list]");
   const nextPastList = refreshed.querySelector<HTMLElement>(
     "[data-past-event-list]",
@@ -398,7 +404,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   }
   if (pastList && nextPastList) syncList(pastList, nextPastList);
   // Adopt authoritative counts after polling/actions without replacing a
-  // focused filter button or counting nested occurrences as extra series.
+  // focused filter button. Recurring events count once per date, just like cards.
   for (const count of root.querySelectorAll<HTMLElement>(
     "[data-event-filter-count]",
   )) {
@@ -412,6 +418,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     "[data-event-limit]",
     "[data-empty-past-events]",
     "[data-past-event-limit]",
+    "[data-empty-series]",
   ]) {
     const target = root.querySelector(selector);
     if (target) target.replaceWith(actionFragment(page, selector));
@@ -429,7 +436,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           (card) => card.dataset.liveEvent === eventId,
         )
       : seriesId
-        ? [...list.querySelectorAll<HTMLElement>("[data-series-card]")].find(
+        ? [...root.querySelectorAll<HTMLElement>("[data-series-card]")].find(
             (card) => card.dataset.seriesCard === seriesId,
           )
         : added;
@@ -447,15 +454,18 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
                 ? card?.dataset.seriesCard
                   ? "[data-series-occurrences] > summary"
                   : "[data-show-dialog]"
-                : !element && focusedSeriesSummary
-                  ? focusedSeriesSummary
-                  : !element && focusedEventSummary
-                    ? focusedEventSummary
-                    : !element &&
-                        focused instanceof HTMLElement &&
-                        focused.dataset.showDialog
-                      ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
-                      : ".volunteer-roster summary";
+                : element?.matches("[data-add-attendee]") ||
+                    (!element && focused?.matches("[data-attendee-open]"))
+                  ? "[data-attendee-open]"
+                  : !element && focusedSeriesSummary
+                    ? focusedSeriesSummary
+                    : !element && focusedEventSummary
+                      ? focusedEventSummary
+                      : !element &&
+                          focused instanceof HTMLElement &&
+                          focused.dataset.showDialog
+                        ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+                        : ".volunteer-roster summary";
     (card && !card.hidden
       ? !element && focused === focusedCard
         ? card
@@ -475,18 +485,14 @@ async function refreshEvents(element: HTMLFormElement) {
 }
 
 async function refreshVolunteer(element: HTMLFormElement) {
-  const userId = element.querySelector<HTMLInputElement>(
-    'input[name="userId"]',
-  )!.value;
-  const profile = element.closest<HTMLElement>("[data-volunteer-profile]")!;
-  const hostUrl = location.href;
-  const profileUrl = `/manage/volunteers/${encodeURIComponent(userId)}`;
-  const onProfilePage = location.pathname === profileUrl;
-  const [page, host] = await Promise.all([
-    loadActionPage(profileUrl),
-    onProfilePage ? Promise.resolve(null) : loadActionPage(hostUrl),
-  ]);
-  const replacement = actionFragment(page, "[data-volunteer-profile]");
+  const profile = element.closest<HTMLElement>(
+    "[data-volunteer-profile], [data-application-review]",
+  )!;
+  const rootSelector = profile.matches("[data-application-review]")
+    ? "[data-application-review]"
+    : "[data-volunteer-profile]";
+  const page = await loadActionPage();
+  const replacement = actionFragment(page, rootSelector);
   initVolunteerControls(replacement);
   const applicationOpen = profile.querySelector<HTMLDetailsElement>(
     "[data-submitted-application] details",
@@ -495,13 +501,7 @@ async function refreshVolunteer(element: HTMLFormElement) {
     "[data-submitted-application] details",
   );
   if (nextApplication && applicationOpen) nextApplication.open = true;
-  // Keep the dialog itself (and its scroll position) open; replace all status
-  // forms together so their versions and hidden checkbox values stay in sync.
-  const dialog = element.closest<HTMLDialogElement>("dialog");
-  const scrollContainer = dialog?.querySelector<HTMLElement>(
-    "[data-profile-dialog-content]",
-  );
-  const scroll = scrollContainer?.scrollTop;
+  // Replace all status forms together to keep versions and hidden values in sync.
   const active = document.activeElement;
   const restoreFocus = element.contains(active) || active === document.body;
   const selector = element.matches("[data-organizer-role]")
@@ -511,19 +511,17 @@ async function refreshVolunteer(element: HTMLFormElement) {
       : element.hasAttribute("data-submit-on-change")
         ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
         : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
-  if (profile.isConnected && (!dialog || dialog.open)) {
+  if (profile.isConnected) {
     disposeVolunteerProfileContents(profile);
     profile.replaceWith(replacement);
     initVolunteerProfileContents(replacement, true);
-    if (scrollContainer && scroll !== undefined)
-      scrollContainer.scrollTop = scroll;
     if (restoreFocus)
-      replacement
-        .querySelector<HTMLElement>(selector)
-        ?.focus({ preventScroll: true });
-  }
-  if (host && location.href === hostUrl) {
-    syncEvents(host);
+      (
+        replacement.querySelector<HTMLElement>(selector) ??
+        replacement.querySelector<HTMLElement>(
+          "[data-application-review-heading]",
+        )
+      )?.focus({ preventScroll: true });
   }
 }
 
@@ -583,7 +581,7 @@ if (eventBrowser) {
         const needsDeferredRefresh =
           deferredEventRefresh &&
           !eventBrowser.querySelector(
-            'dialog[open], [data-signup-menu]:popover-open, [data-live-series][open], form[data-submitting="true"]',
+            'dialog[open], add-attendee[data-expanded], [data-signup-menu]:popover-open, [data-live-series][open], form[data-submitting="true"]',
           );
         if (
           !forceRefresh &&
@@ -690,6 +688,9 @@ if (eventBrowser) {
     },
     true,
   );
+  document.addEventListener("add-attendee-close", () => {
+    if (deferredEventRefresh) refreshDeferredEvents();
+  });
   startPolling();
 }
 
@@ -705,6 +706,9 @@ function form(
       return;
     event.preventDefault();
     const scope =
+      element.closest<HTMLElement>(
+        "[data-volunteer-profile], [data-application-review]",
+      ) ??
       element.closest<HTMLElement>("[data-volunteer-controls], dialog") ??
       element;
     if (scope.dataset.submitting) return;
@@ -746,11 +750,13 @@ function form(
               ? "Event cancelled"
               : element.matches("[data-manage-signup]")
                 ? "Registration changed"
-                : element.matches("[data-organizer-role]")
-                  ? "Account role saved"
-                  : element.matches("[data-organizer-rejection]")
-                    ? "Application rejected"
-                    : "Volunteer access saved";
+                : element.matches("[data-add-attendee]")
+                  ? "Volunteers added"
+                  : element.matches("[data-organizer-role]")
+                    ? "Account role saved"
+                    : element.matches("[data-organizer-rejection]")
+                      ? "Application rejected"
+                      : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -758,6 +764,12 @@ function form(
     }
     let saved = false;
     try {
+      if (
+        element.matches("[data-live-signup]") &&
+        values.get("action") === "cancel" &&
+        !(await confirmEventUnregistration(element))
+      )
+        return;
       if (
         element.matches("[data-event-delete]") &&
         !(await confirmSeriesDeletion())
@@ -907,6 +919,13 @@ form("[data-live-signup]", "/api/v1/events/action", (v) => ({
   action: str(v, "action"),
   id: str(v, "id"),
 }));
+form("[data-add-attendee]", "/api/v1/events/action", (values) => ({
+  action: "add-volunteers",
+  id: str(values, "id"),
+  volunteers: values
+    .getAll("volunteers")
+    .map((value) => JSON.parse(String(value))),
+}));
 form(
   "[data-event-save]",
   "/api/v1/events/action",
@@ -917,14 +936,8 @@ form(
         ? { id: str(v, "id"), version: Number(v.get("version")) }
         : {}),
       event: {
-        includesOrientation: v.has("includesOrientation"),
+        ...eventFields(v),
         startsAt: vancouverInstant(str(v, "startsAt")),
-        meetingPoint: str(v, "meetingPoint"),
-        meetingPointUrl: str(v, "meetingPointUrl"),
-        spots: Number(v.get("spots")),
-        // Keep the existing API/storage flags in sync from the single control.
-        open: str(v, "publicVisibility") === "true",
-        hidden: str(v, "publicVisibility") !== "true",
       },
     },
 );
@@ -959,6 +972,8 @@ form(
     const id = `patrol:${value("seriesId")}:${value("occurrenceDate")}`;
     const url = new URL(location.href);
     url.searchParams.set("occurrence", id);
+    // An explicitly requested date must not stay hidden by an unrelated filter.
+    url.searchParams.delete("type");
     const page = await loadActionPage(url.href);
     history.replaceState(null, "", url);
     syncEvents(page, element);
@@ -982,14 +997,21 @@ form("[data-manage-signup]", "/api/v1/events/action", (v) => ({
 form(
   "[data-organizer-status]",
   "/api/v1/organizer/action",
-  (v) => ({
-    action: "status",
-    userId: str(v, "userId"),
-    version: Number(v.get("version")),
-    active: v.has("active"),
-    applicationApproved: v.has("applicationApproved"),
-    patrolApproved: v.has("patrolApproved"),
-  }),
+  (v) =>
+    v.has("approvePatrols")
+      ? {
+          action: "approve-patrols",
+          userId: str(v, "userId"),
+          version: Number(v.get("version")),
+        }
+      : {
+          action: "status",
+          userId: str(v, "userId"),
+          version: Number(v.get("version")),
+          active: v.has("active"),
+          applicationApproved: v.has("applicationApproved"),
+          patrolApproved: v.has("patrolApproved"),
+        },
   refreshVolunteer,
 );
 form(
@@ -1013,10 +1035,11 @@ form(
   }),
   refreshVolunteer,
 );
-form("[data-organizer-orientation]", "/api/v1/organizer/action", (v) => ({
-  action: "orientation",
+form("[data-organizer-patrol-approval]", "/api/v1/organizer/action", (v) => ({
+  action: "approve-patrols",
   userId: str(v, "userId"),
   eventId: str(v, "eventId"),
+  version: Number(v.get("version")),
 }));
 document.addEventListener("change", (event) => {
   if (!(event.target instanceof Element)) return;
@@ -1056,136 +1079,11 @@ document.addEventListener("click", (event) => {
     const dialog = document.getElementById(button.dataset.showDialog ?? "");
     if (dialog instanceof HTMLDialogElement) {
       initEventDates(dialog);
+      syncSignupMoveCalendar(dialog);
       dialog.showModal();
     }
   }
 });
-
-const profileDialog = document.querySelector<HTMLDialogElement>(
-  "[data-volunteer-profile-dialog]",
-);
-const profileContent = profileDialog?.querySelector<HTMLElement>(
-  "[data-profile-dialog-content]",
-);
-if (profileDialog && profileContent) {
-  const loadingTemplate = profileDialog.querySelector<HTMLTemplateElement>(
-    "[data-profile-dialog-loading]",
-  );
-  let pending: AbortController | undefined;
-  profileDialog.addEventListener("close", async () => {
-    if (profileDialog.open) return;
-    const closingRequest = pending;
-    closingRequest?.abort();
-    // The native close event precedes the visible exit. Wait only for the
-    // dialog's own transitions, not animations inside the fetched profile.
-    await Promise.allSettled(
-      profileDialog.getAnimations().map((animation) => animation.finished),
-    );
-    // A rapid reopen (even followed by another close) owns its own cleanup.
-    if (profileDialog.open || pending !== closingRequest) return;
-    pending = undefined;
-    disposeVolunteerProfileContents(profileContent);
-    profileContent.replaceChildren();
-    profileContent.removeAttribute("aria-busy");
-    profileContent.scrollTop = 0;
-  });
-  document.addEventListener("click", async (event) => {
-    if (
-      !(event.target instanceof Element) ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    )
-      return;
-    const link = event.target.closest<HTMLAnchorElement>(
-      "[data-volunteer-profile-link]",
-    );
-    if (!link) return;
-    event.preventDefault();
-    pending?.abort();
-    const controller = new AbortController();
-    pending = controller;
-    disposeVolunteerProfileContents(profileContent);
-    if (loadingTemplate)
-      profileContent.replaceChildren(loadingTemplate.content.cloneNode(true));
-    else profileContent.textContent = "Loading";
-    profileContent.setAttribute("aria-busy", "true");
-    profileContent.scrollTop = 0;
-    profileDialog.showModal();
-    try {
-      // The normal private page still authenticates, checks organizer access,
-      // and records the profile view before returning any answers.
-      const response = await fetch(link.href, {
-        credentials: "same-origin",
-        signal: controller.signal,
-      });
-      if (!response.ok || response.redirected)
-        throw new Error(
-          "Could not load the profile. Check your organizer session and try again.",
-        );
-      const page = new DOMParser().parseFromString(
-        await response.text(),
-        "text/html",
-      );
-      const content = page.querySelector<HTMLElement>(
-        "[data-volunteer-profile]",
-      );
-      if (!content) throw new Error("The volunteer profile is unavailable.");
-      if (!controller.signal.aborted && profileDialog.open) {
-        const loading = profileContent.querySelector<HTMLElement>(
-          ".volunteer-profile-loading",
-        );
-        const loadingHeight = profileContent.clientHeight;
-        const profile = document.importNode(content, true);
-        initVolunteerControls(profile);
-        const animate = !window.matchMedia("(prefers-reduced-motion: reduce)")
-          .matches;
-        if (animate) {
-          profile.setAttribute("data-profile-entering", "");
-          const finishEntering = (event: Event) => {
-            if (event.target === profile)
-              profile.removeAttribute("data-profile-entering");
-          };
-          profile.addEventListener("animationend", finishEntering, {
-            once: true,
-          });
-          profile.addEventListener("animationcancel", finishEntering, {
-            once: true,
-          });
-        }
-        profileContent.replaceChildren(profile);
-        initVolunteerProfileContents(profile);
-        if (loading && animate) {
-          // Keep the outgoing loader in place as the full profile grows below it.
-          loading.style.height = `${loadingHeight}px`;
-          loading.style.bottom = "auto";
-          loading.setAttribute("aria-hidden", "true");
-          loading.dataset.fading = "true";
-          const removeLoading = (event: Event) => {
-            if (event.target === loading) loading.remove();
-          };
-          loading.addEventListener("animationend", removeLoading, {
-            once: true,
-          });
-          loading.addEventListener("animationcancel", removeLoading, {
-            once: true,
-          });
-          profileContent.appendChild(loading);
-        }
-      }
-    } catch (error) {
-      if (!controller.signal.aborted)
-        profileContent.textContent =
-          error instanceof Error
-            ? error.message
-            : "The volunteer profile is unavailable.";
-    } finally {
-      if (pending === controller) profileContent.removeAttribute("aria-busy");
-    }
-  });
-}
 
 document.addEventListener("click", (event) => {
   const dialog = event.target;

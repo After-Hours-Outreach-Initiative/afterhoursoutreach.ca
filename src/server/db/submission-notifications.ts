@@ -3,10 +3,11 @@ import {
   applicationSubmittedTemplate,
   emailSenders,
 } from "../../data/email-templates";
-import { emailTextSql } from "./email-text";
+import { emailHtmlSql, emailTextSql } from "./email-text";
 import type { NaloxoneCompletionOptions } from "./naloxone";
 import { emailPolicy } from "./policy";
 import { hashAuthValue } from "./rate-limits";
+import { personDisplayNameSql } from "./sql";
 
 export const submissionNotificationRecipients = [
   "ivan.zheng@afterhoursoutreach.ca",
@@ -36,6 +37,16 @@ export function submissionNotificationStatements(
   bindings: AuthBindings,
 ): NonNullable<NaloxoneCompletionOptions["reviewStatements"]> {
   const mode = submissionNotificationMode(bindings);
+  const values = {
+    applicant: `replace(replace(${personDisplayNameSql({
+      firstName: "json_extract(submitted_application,'$.answers.firstName')",
+      lastName: "json_extract(submitted_application,'$.answers.lastName')",
+      preferredName:
+        "json_extract(submitted_application,'$.answers.preferredName')",
+    })},char(13),' '),char(10),' ')`,
+    submittedAt: "json_extract(submitted_application,'$.submittedAt')",
+    reviewUrl: "?",
+  };
   return ({ userId, operationId, writeGuard }) =>
     submissionNotificationRecipients.map((recipient) =>
       bindings.DB.prepare(
@@ -46,18 +57,8 @@ export function submissionNotificationStatements(
             'from',?,
             'to',json_array(?),
             'subject',?,
-            'text',${emailTextSql(applicationSubmittedTemplate.text, {
-              applicant: `replace(replace(coalesce(
-                nullif(trim(json_extract(submitted_application,'$.answers.preferredName')),''),
-                trim(json_extract(submitted_application,'$.answers.firstName') || ' ' ||
-                  CASE WHEN json_extract(submitted_application,'$.answers.middleNames') != ''
-                    THEN json_extract(submitted_application,'$.answers.middleNames') || ' ' ELSE '' END ||
-                  json_extract(submitted_application,'$.answers.lastName'))
-              ),char(13),' '),char(10),' ')`,
-              submittedAt:
-                "json_extract(submitted_application,'$.submittedAt')",
-              reviewUrl: "?",
-            })}
+            'text',${emailTextSql(applicationSubmittedTemplate.text, values)},
+            'html',${emailHtmlSql(applicationSubmittedTemplate.html, values)}
           ) END,?,naloxone_completed_at,naloxone_completed_at
         FROM profile WHERE user_id=? AND submitted_application IS NOT NULL
           AND naloxone_completed_at IS NOT NULL AND ${writeGuard}
@@ -74,7 +75,8 @@ export function submissionNotificationStatements(
         recipient,
         applicationSubmittedTemplate.subject,
         // Not a capability URL; the existing route enforces organizer access.
-        `https://afterhoursoutreach.ca/manage/volunteers/${encodeURIComponent(userId)}`,
+        `https://afterhoursoutreach.ca/volunteers/${encodeURIComponent(userId)}`,
+        `https://afterhoursoutreach.ca/volunteers/${encodeURIComponent(userId)}`,
         mode === "preview" ? "suppressed" : "pending",
         userId,
         operationId,

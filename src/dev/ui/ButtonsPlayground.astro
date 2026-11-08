@@ -1,0 +1,246 @@
+---
+import LocalLayout from "./LocalLayout.astro";
+import PlaygroundHeader from "./PlaygroundHeader.astro";
+import ArrowRightIcon from "../../components/icons/ArrowRightIcon.astro";
+import ArrowUpRightIcon from "../../components/icons/ArrowUpRightIcon.astro";
+import CheckIcon from "../../components/icons/CheckIcon.astro";
+import CloseIcon from "../../components/icons/CloseIcon.svg";
+import EllipsisIcon from "../../components/icons/EllipsisIcon.astro";
+import MinusIcon from "../../components/icons/MinusIcon.astro";
+import PlusIcon from "../../components/icons/PlusIcon.astro";
+import "../../styles/volunteer.css";
+import "../../styles/dialog.css";
+import "./playground.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+Astro.response.headers.set("Content-Security-Policy", "form-action 'none'");
+
+const variants = [
+  {
+    id: "primary",
+    title: "Primary",
+    description: "Filled blue for the main action on a page.",
+    label: "Save changes",
+    busy: "Saving…",
+    Icon: CheckIcon,
+  },
+  {
+    id: "outline",
+    title: "Outline",
+    description: "Blue outline for an action beside the primary one.",
+    label: "Add volunteer",
+    busy: "Adding…",
+    Icon: PlusIcon,
+  },
+  {
+    id: "subtle",
+    title: "Subtle",
+    description: "Light outline for a secondary action on a dark surface.",
+    label: "Learn more",
+    busy: "Loading…",
+    Icon: ArrowUpRightIcon,
+  },
+  {
+    id: "green",
+    title: "Green",
+    description: "Filled green for registering and taking a spot.",
+    label: "Register",
+    busy: "Registering…",
+    Icon: PlusIcon,
+  },
+  {
+    id: "red",
+    title: "Red",
+    description: "Filled red for unregistering and giving up a spot.",
+    label: "Unregister",
+    busy: "Unregistering…",
+    Icon: MinusIcon,
+  },
+  {
+    id: "quiet",
+    title: "Quiet",
+    description: "Grey outline for small controls grouped together.",
+    label: "Edit details",
+    busy: "Updating…",
+    Icon: ArrowRightIcon,
+  },
+];
+---
+
+<LocalLayout title="Buttons">
+  <main class="ui-playground" data-ui-buttons-playground>
+    <PlaygroundHeader active="buttons" />
+    <section class="ui-section" aria-labelledby="buttons-heading">
+      <h2 id="buttons-heading">Buttons</h2>
+      <p>
+        The six shared styles, using the real website classes. Hover or Tab to
+        compare their interactive states; these examples do not submit anything.
+      </p>
+      <p>
+        Pair <code>.btn</code> with one colour variant. Icons use
+        <code>.btn-icon</code>; disabled and loading examples use the volunteer
+        portal’s form styles.
+      </p>
+      <div class="ui-gallery">
+        {
+          variants.map(({ id, title, description, label, busy, Icon }) => (
+            <section
+              class="ui-gallery-card"
+              aria-labelledby={`button-${id}`}
+              data-ui-button-variant={id}
+            >
+              <div class="ui-gallery-description">
+                <h3 id={`button-${id}`}>{title}</h3>
+                <code>.btn .btn-{id}</code>
+                <p>{description}</p>
+              </div>
+              <div class="volunteer-portal ui-button-surface">
+                <form
+                  class="ui-button-examples"
+                  aria-label={`${title} examples`}
+                >
+                  <div class="ui-button-example">
+                    <span>Text only</span>
+                    <button type="button" class={`btn btn-${id}`}>
+                      {label}
+                    </button>
+                  </div>
+                  <div class="ui-button-example">
+                    <span>With an icon</span>
+                    <button type="button" class={`btn btn-${id}`}>
+                      <Icon class="btn-icon" />
+                      {label}
+                    </button>
+                  </div>
+                  <div class="ui-button-example">
+                    <span>Disabled</span>
+                    <button type="button" class={`btn btn-${id}`} disabled>
+                      {label}
+                    </button>
+                  </div>
+                  <div class="ui-button-example">
+                    <span>Loading</span>
+                    <button
+                      type="button"
+                      class={`btn btn-${id}`}
+                      disabled
+                      aria-busy="true"
+                    >
+                      {busy}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </section>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="ui-section" aria-labelledby="button-contexts-heading">
+      <h2 id="button-contexts-heading">In context</h2>
+      <p>Existing form-specific states and compact, labelled icon controls.</p>
+      <div class="ui-gallery">
+        <section class="ui-gallery-card" aria-labelledby="button-save-heading">
+          <div class="ui-gallery-description">
+            <h3 id="button-save-heading">Save controls</h3>
+            <p>
+              Save-changes forms use a neutral disabled state, including while a
+              save is in progress.
+            </p>
+            <code>form[data-save-changes] .btn:disabled</code>
+          </div>
+          <div class="volunteer-portal ui-button-surface">
+            <form
+              class="ui-button-examples"
+              data-save-changes
+              aria-label="Save examples"
+            >
+              <div class="ui-button-example">
+                <span>No changes</span>
+                <button type="button" class="btn btn-primary" disabled
+                  >Save changes</button
+                >
+              </div>
+              <div class="ui-button-example">
+                <span>Saving</span>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  disabled
+                  aria-busy="true">Saving…</button
+                >
+              </div>
+            </form>
+          </div>
+        </section>
+        <section class="ui-gallery-card" aria-labelledby="button-icons-heading">
+          <div class="ui-gallery-description">
+            <h3 id="button-icons-heading">Icon-only controls</h3>
+            <p>
+              Round registration actions and the square dialog close control.
+            </p>
+            <code>.btn .btn-quiet</code>
+          </div>
+          <div class="ui-button-surface ui-button-icon-examples">
+            <div class="ui-button-example">
+              <code>.signup-menu-trigger</code>
+              <button
+                type="button"
+                class="btn btn-quiet signup-menu-trigger"
+                aria-label="Registration actions example"
+              >
+                <EllipsisIcon class="size-5" />
+              </button>
+            </div>
+            <div class="ui-button-example">
+              <code>.dialog-header .dialog-close</code>
+              <div class="dialog-header">
+                <button
+                  type="button"
+                  class="btn btn-quiet dialog-close"
+                  aria-label="Close example"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</LocalLayout>
+
+<style>
+  code {
+    font-size: 0.875rem;
+    color: #d4d4d8;
+    overflow-wrap: anywhere;
+  }
+  .ui-button-surface {
+    padding: 1.25rem;
+    border-top: 1px solid #3f3f46;
+  }
+  .ui-button-examples {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: 1.5rem;
+  }
+  .ui-button-example {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: start;
+    gap: 0.75rem;
+  }
+  .ui-button-example > span {
+    color: #b8bbc5;
+  }
+  .ui-button-icon-examples {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    gap: 1.5rem;
+  }
+</style>

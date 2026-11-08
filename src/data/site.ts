@@ -13,7 +13,6 @@ export const navLinks = [
 interface NavigationLink {
   label: string;
   href: string;
-  children?: { label: string; href: string }[];
 }
 
 export function siteNavigation(
@@ -27,14 +26,8 @@ export function siteNavigation(
           eventAccess ? { label: "Events", href: "/events" } : link,
           ...(organizer
             ? [
-                {
-                  label: "Manage",
-                  href: "/manage/events",
-                  children: [
-                    { label: "Events", href: "/manage/events" },
-                    { label: "Volunteers", href: "/manage/volunteers" },
-                  ],
-                },
+                { label: "Applications", href: "/applications" },
+                { label: "Volunteers", href: "/volunteers" },
               ]
             : []),
         ]

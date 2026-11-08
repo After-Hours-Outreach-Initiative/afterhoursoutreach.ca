@@ -477,15 +477,44 @@ test("real passwordless sign-in creates a verified volunteer and a host-only sec
   );
 });
 
-test.each([
-  { role: "volunteer", submitted: false, approved: false, active: true },
-  { role: "volunteer", submitted: true, approved: false, active: true },
-  { role: "volunteer", submitted: true, approved: true, active: true },
-  { role: "volunteer", submitted: true, approved: true, active: false },
-  { role: "organizer", submitted: true, approved: true, active: true },
-])(
-  "sign-in always lands on /volunteer for $role ($submitted, $approved, $active)",
-  async ({ role, submitted, approved, active }) => {
+test.each(
+  [
+    { name: "new account", submitted: false },
+    { name: "pending application" },
+    { name: "approved but missing Naloxone 101", approved: true },
+    {
+      name: "completed application",
+      approved: true,
+      naloxone: true,
+      next: "/events",
+    },
+    {
+      name: "legacy patrol approval",
+      approved: true,
+      patrol: true,
+      next: "/events",
+    },
+    {
+      name: "inactive volunteer",
+      approved: true,
+      naloxone: true,
+      active: false,
+    },
+    { name: "organizer", role: "organizer", next: "/events" },
+    { name: "inactive organizer", role: "organizer", active: false },
+  ].map((state) => ({
+    role: "volunteer",
+    submitted: true,
+    approved: false,
+    active: true,
+    naloxone: false,
+    patrol: false,
+    next: "/volunteer",
+    ...state,
+  })),
+)(
+  "sign-in lands on $next for $name regardless of returnTo",
+  async ({ role, submitted, approved, active, naloxone, patrol, next }) => {
     const email = "redirect@example.org";
     const initial = await signIn(email);
     const current = await auth.api.getSession({
@@ -500,17 +529,29 @@ test.each([
     await bindings.DB.prepare(
       "INSERT INTO user (id, name, email, email_verified, role, created_at, updated_at) VALUES ('approver', 'Organizer', 'approver@example.org', 1, 'organizer', 0, 0)",
     ).run();
+    await saveProfile(bindings.DB, "approver", {
+      ...answers,
+      codeOfConductAccepted: true,
+    });
     await bindings.DB.prepare("UPDATE user SET role=? WHERE id=?")
       .bind(role, id)
       .run();
     if (submitted)
       await bindings.DB.prepare(
-        "UPDATE volunteer_status SET registration_approved=?, active=?, approved_by='approver' WHERE user_id=?",
+        "UPDATE volunteer_status SET registration_approved=?, patrol_approved=?, active=?, approved_by='approver', approved_at=0 WHERE user_id=?",
       )
-        .bind(Number(approved), Number(active), id)
+        .bind(Number(approved), Number(patrol), Number(active), id)
+        .run();
+    if (naloxone)
+      await bindings.DB.prepare(
+        "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",
+      )
+        .bind(Date.now(), id)
         .run();
     for (const returnTo of [
       undefined,
+      "/volunteer",
+      "/events",
       "/manage/events",
       "https://evil.example",
     ]) {
@@ -524,10 +565,7 @@ test.each([
         proof,
       );
       assert.equal(response.status, 200, await response.clone().text());
-      assert.equal(
-        ((await response.json()) as { next: string }).next,
-        "/volunteer",
-      );
+      assert.equal(((await response.json()) as { next: string }).next, next);
     }
   },
 );
@@ -595,9 +633,9 @@ test("automatic email links require an unexpired signed requesting-browser bindi
       .bind(`sign-in-otp-${email}`)
       .first();
   const original = await readChallenge();
-  const budgets = await bindings.DB.prepare(
-    "SELECT * FROM auth_rate_limit",
-  ).all();
+  const budgets = (
+    await bindings.DB.prepare("SELECT * FROM auth_rate_limit").all()
+  ).results;
   for (const response of [
     await activate(), // A JS-enabled scanner has the entire link but no cookie.
     await activate(cookie + "forged"),
@@ -618,7 +656,7 @@ test("automatic email links require an unexpired signed requesting-browser bindi
   vi.useRealTimers();
   assert.deepEqual(await readChallenge(), original);
   assert.deepEqual(
-    await bindings.DB.prepare("SELECT * FROM auth_rate_limit").all(),
+    (await bindings.DB.prepare("SELECT * FROM auth_rate_limit").all()).results,
     budgets,
   );
   const signedIn = await activate(cookie);
@@ -1165,10 +1203,7 @@ test("application/editing persists all answers, keeps approval, and audits only 
     "/sign-in/email-otp?returnTo=%2Fvolunteer%2Faccount%3Ftab%3Dprofile",
     applicationSignIn,
   );
-  assert.equal(
-    ((await response.json()) as { next: string }).next,
-    "/volunteer",
-  );
+  assert.equal(((await response.json()) as { next: string }).next, "/events");
 });
 
 test("profile edits preserve unsplit legacy names and birthdays without revalidation", async () => {
@@ -1215,7 +1250,7 @@ test("profile edits preserve unsplit legacy names and birthdays without revalida
   const session = await auth.api.getSession({
     headers: new Headers({ cookie }),
   });
-  assert.equal(session?.user.name, "Renamed Volunteer");
+  assert.equal(session?.user.name, "Renamed V.");
   assert.deepEqual(await loadSubmittedApplication(bindings.DB, id), submission);
   await saveProfile(bindings.DB, id, {
     ...editable,
@@ -2250,6 +2285,82 @@ test("existing addresses cannot be taken over and failed delivery leaves no usab
   );
 });
 
+test.each(["organizer", "volunteer"])(
+  "%s with event access lands on /events after TOTP or a backup code",
+  async (role) => {
+    const signedIn = await signIn();
+    const initial = await auth.api.getSession({
+      headers: new Headers({ cookie: signedIn.cookie }),
+    });
+    const userId = initial!.user.id;
+    await saveProfile(bindings.DB, userId, {
+      ...answers,
+      codeOfConductAccepted: true,
+    });
+    await bindings.DB.prepare("UPDATE user SET role=? WHERE id=?")
+      .bind(role, userId)
+      .run();
+    await bindings.DB.prepare(
+      "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+    )
+      .bind(userId)
+      .run();
+    if (role === "volunteer")
+      await bindings.DB.prepare(
+        "UPDATE profile SET naloxone_completed_at=? WHERE user_id=?",
+      )
+        .bind(Date.now(), userId)
+        .run();
+    const enabled = await request(
+      "/two-factor/enable",
+      { method: "totp" },
+      signedIn.cookie,
+    );
+    assert.equal(enabled.status, 200, await enabled.clone().text());
+    const setup = (await enabled.json()) as {
+      totpURI: string;
+      backupCodes: string[];
+    };
+    const secret = new URL(setup.totpURI).searchParams.get("secret")!;
+    const confirmed = await request(
+      "/two-factor/verify-totp",
+      { code: totpFromSetupKey(secret) },
+      signedIn.cookie,
+    );
+    assert.equal(confirmed.status, 200, await confirmed.clone().text());
+    await request("/sign-out", {}, cookies(confirmed));
+    for (const method of ["totp", "backup-code"]) {
+      const proof = await createSignInOTP(
+        bindings.DB,
+        bindings.BETTER_AUTH_SECRET!,
+        "volunteer@example.org",
+      );
+      const pending = await request("/sign-in/email-otp", proof);
+      assert.equal(pending.status, 200, await pending.clone().text());
+      const challenge = (await pending.json()) as {
+        twoFactorRedirect: boolean;
+        next?: string;
+      };
+      assert.equal(challenge.twoFactorRedirect, true);
+      assert.equal(challenge.next, undefined);
+      const verified = await request(
+        `/two-factor/verify-${method}`,
+        {
+          code:
+            method === "totp" ? totpFromSetupKey(secret) : setup.backupCodes[0],
+        },
+        cookies(pending),
+      );
+      assert.equal(verified.status, 200, await verified.clone().text());
+      assert.equal(
+        ((await verified.json()) as { next: string }).next,
+        "/events",
+      );
+      await request("/sign-out", {}, cookies(verified));
+    }
+  },
+);
+
 test("passwordless two-factor enrollment and login cannot bypass the authenticator", async () => {
   const signedIn = await signIn();
   const initial = await auth.api.getSession({
@@ -2636,7 +2747,8 @@ test("email-change messages contain a verification code rather than a sign-in li
       assert.equal(body.subject, "Confirm your email change");
       assert.match(body.text, /account settings.*123456/);
       assert.doesNotMatch(body.text, /Sign in:|sign-in\/complete/);
-      assert.equal(body.html, undefined);
+      assert.match(body.html, /123456/);
+      assert.doesNotMatch(body.html, /href=|sign-in\/complete/);
       return Response.json({ id: "email-id" });
     },
   );
@@ -2687,9 +2799,11 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     "/volunteer/sign-in",
     "/api/v1/auth/get-session",
     "/events-other",
+    "/applications-other",
     "/volunteers-other",
     "/manage/events-other",
     "/manage/volunteers-other",
+    "/manage/applications-other",
     "/manage/unrelated",
   ])
     assert.equal(safeReturnTo(value), "/volunteer/account");
@@ -2701,14 +2815,27 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     ["/volunteer?type=orientation", "/events?type=orientation"],
     [
       "/volunteers?approval=awaiting&q=Alex+Lee",
-      "/manage/volunteers?approval=awaiting&q=Alex+Lee",
+      "/volunteers?approval=awaiting&q=Alex+Lee",
     ],
     [
       "/volunteer/volunteers/alex?returnTo=%2Fvolunteers",
-      "/manage/volunteers/alex?returnTo=%2Fvolunteers",
+      "/volunteers/alex?returnTo=%2Fvolunteers",
     ],
-    ["/manage/events?occurrence=a%2Fb", "/manage/events?occurrence=a%2Fb"],
-    ["/manage/volunteers?q=Alex", "/manage/volunteers?q=Alex"],
+    [
+      "/manage/events?occurrence=a%2Fb",
+      "/events?occurrence=a%2Fb&view=organizer",
+    ],
+    ["/events?view=volunteer", "/events?view=volunteer"],
+    ["/manage/volunteers?q=Alex", "/volunteers?q=Alex"],
+    [
+      "/manage/applications?approval=awaiting&q=Alex",
+      "/applications?approval=awaiting&q=Alex",
+    ],
+    ["/applications?q=Alex", "/applications?q=Alex"],
+    [
+      "/applications/alex?returnTo=%2Fapplications%3Fq%3DAlex",
+      "/applications/alex?returnTo=%2Fapplications%3Fq%3DAlex",
+    ],
   ])
     assert.equal(safeReturnTo(value), expected);
   const request = new Request(origin, {

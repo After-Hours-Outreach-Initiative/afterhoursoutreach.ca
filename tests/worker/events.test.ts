@@ -261,13 +261,13 @@ describe(
         403,
       );
       await ok(
-        await send(`/manage/volunteers/${alice.id}`, undefined, alice.cookie),
+        await send(`/volunteers/${alice.id}`, undefined, alice.cookie),
         403,
       );
-      await ok(await send("/manage/volunteers"), 302);
+      await ok(await send("/volunteers"), 302);
     });
 
-    const createEvent = async (type = "orientation", spots = 4) => {
+    const createEvent = async (type = "orientation", spots = 5) => {
       const data = eventInput(type, spots);
       await ok(
         await send(
@@ -346,7 +346,7 @@ describe(
             await send("/volunteer", undefined, person.cookie),
           );
           const html = await page.text();
-          assert.match(html, /Application Form Submitted/);
+          assert.match(html, /Application Form\s*<\/span>/);
           assert.match(html, /data-application-awaiting-approval="true"/);
           assert.doesNotMatch(
             html,
@@ -577,11 +577,7 @@ describe(
           ),
         );
         const response = await ok(
-          await send(
-            `/manage/volunteers/${alice.id}`,
-            undefined,
-            organizer.cookie,
-          ),
+          await send(`/volunteers/${alice.id}`, undefined, organizer.cookie),
         );
         const profileHtml = await response.text();
         assert.match(profileHtml, /PRIVATE HEALTH ANSWER/);
@@ -598,7 +594,7 @@ describe(
         );
         assert.equal(response.headers.get("referrer-policy"), "no-referrer");
         const team = await ok(
-          await send("/manage/volunteers", undefined, organizer.cookie),
+          await send("/volunteers", undefined, organizer.cookie),
         );
         assert.doesNotMatch(await team.text(), /PRIVATE HEALTH ANSWER/);
       });
@@ -724,13 +720,34 @@ describe(
 
       test("move rollback preserves source signup when destination is full", async () => {
         const signedUp = await DB.prepare(
-          "SELECT id,user_id AS userId FROM signup WHERE event_id=? AND status='confirmed'",
+          "SELECT id,user_id AS userId FROM signup WHERE event_id=? AND user_id=? AND status='confirmed'",
         )
-          .bind(orientation.id)
+          .bind(orientation.id, organizer.id)
           .first<{ id: string; userId: string }>();
-        const other = signedUp!.userId === alice.id ? bob : alice;
-        await ok(await join(destination.id, alice.cookie));
-        await ok(await join(destination.id, bob.cookie));
+        // Fill the destination's four real places, respecting both manual
+        // progression categories instead of treating approved volunteers as new.
+        for (const [index, medic] of [true, true, false, false].entries()) {
+          const id = `destination-attendee-${index}`;
+          await DB.batch([
+            DB.prepare(
+              "INSERT INTO user (id,name,email,created_at,updated_at) VALUES (?,'Destination attendee',?,0,0)",
+            ).bind(id, `${id}@example.org`),
+            DB.prepare(
+              `INSERT INTO profile (user_id,preferred_name,phone,birth_date,emergency_contact_name,
+              emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,teams,
+              medical_certification,training_experience,registered_at,naloxone_completed_at,updated_at)
+              SELECT ?,'Destination attendee',phone,birth_date,emergency_contact_name,
+              emergency_contact_phone,emergency_contact_relationship,heard_about_us,motivation,?,
+              medical_certification,training_experience,0,0,0 FROM profile WHERE user_id=?`,
+            ).bind(id, medic ? '["medic"]' : '["outreach"]', alice.id),
+            DB.prepare(
+              "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,?,?,0,0)",
+            ).bind(id, Number(medic), organizer.id),
+            DB.prepare(
+              "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES (?,?,?,0,0)",
+            ).bind(id, destination.id, id),
+          ]);
+        }
         await ok(
           await send(
             "/api/v1/events/action",
@@ -756,17 +773,13 @@ describe(
         await ok(
           await send(
             "/api/v1/events/action",
-            { action: "cancel", id: destination.id },
-            other.cookie,
-          ),
-        );
-        // Free the original attendee's destination signup as well, then move.
-        const attendee = signedUp!.userId === alice.id ? alice : bob;
-        await ok(
-          await send(
-            "/api/v1/events/action",
-            { action: "cancel", id: destination.id },
-            attendee.cookie,
+            {
+              action: "manage-signup",
+              id: "destination-attendee-3",
+              reason: "",
+              notify: false,
+            },
+            organizer.cookie,
           ),
         );
         await ok(
@@ -800,7 +813,7 @@ describe(
         );
       });
 
-      test("orientation completion requires an actual past attendance and never approves patrols", async () => {
+      test("patrol approval records optional history and rejects the removed orientation action", async () => {
         const attendee = await DB.prepare(
           "SELECT user_id AS userId FROM signup WHERE event_id=? AND status='confirmed'",
         )
@@ -816,33 +829,33 @@ describe(
             },
             organizer.cookie,
           ),
-          409,
+          400,
         );
         await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
           .bind(Date.now() - 1000, destination.id)
+          .run();
+        // The moved attendee may be the bootstrapped organizer, whose application
+        // has not needed review for event access. Set up this approval prerequisite.
+        await DB.prepare(
+          "UPDATE volunteer_status SET registration_approved=1 WHERE user_id=?",
+        )
+          .bind(attendee!.userId)
           .run();
         await ok(
           await send(
             "/api/v1/organizer/action",
             {
-              action: "orientation",
+              action: "approve-patrols",
               userId: attendee!.userId,
               eventId: destination.id,
+              version: await DB.prepare(
+                "SELECT updated_at FROM volunteer_status WHERE user_id=?",
+              )
+                .bind(attendee!.userId)
+                .first<number>("updated_at"),
             },
             organizer.cookie,
           ),
-        );
-        await ok(
-          await send(
-            "/api/v1/organizer/action",
-            {
-              action: "orientation",
-              userId: attendee!.userId,
-              eventId: patrol.id,
-            },
-            organizer.cookie,
-          ),
-          409,
         );
         assert.equal(
           (
@@ -852,6 +865,14 @@ describe(
               .bind(attendee!.userId)
               .first()
           )?.n,
+          1,
+        );
+        assert.equal(
+          await DB.prepare(
+            "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
+          )
+            .bind(attendee!.userId)
+            .first("patrol_approved"),
           1,
         );
       });
@@ -1035,7 +1056,7 @@ describe(
           0,
         );
         bob.cookie = await signIn(bob.email);
-        await ok(await send("/manage/volunteers", undefined, bob.cookie));
+        await ok(await send("/volunteers", undefined, bob.cookie));
         await ok(
           await send(
             "/api/v1/organizer/action",
@@ -1054,7 +1075,7 @@ describe(
           0,
         );
         bob.cookie = await signIn(bob.email);
-        await ok(await send("/manage/volunteers", undefined, bob.cookie), 403);
+        await ok(await send("/volunteers", undefined, bob.cookie), 403);
         const audit = await DB.prepare(
           "SELECT changed_fields FROM audit_log WHERE action='role_changed' AND subject_id=?",
         )
@@ -1067,6 +1088,19 @@ describe(
       });
 
       test("browser organizer and volunteer workflows save in place and remain usable on mobile", async () => {
+        // Alice needs actual attendance for the merged approval action.
+        await DB.prepare(
+          `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+          VALUES ('browser-orientation','orientation',?,'Browser orientation',8,?,0,0)`,
+        )
+          .bind(Date.now() + 86_400_000, organizer.id)
+          .run();
+        await ok(await status(alice.id, true, false));
+        await ok(await join("browser-orientation", alice.cookie));
+        await DB.prepare(
+          "UPDATE event SET starts_at=0 WHERE id='browser-orientation'",
+        ).run();
+        await ok(await status(alice.id, false, false));
         // Earlier API cases share this actor; give the browser its own action budget.
         const start = Math.floor(Date.now() / 60_000) * 60_000;
         const eventRateKey = await hashAuthValue(
@@ -1117,7 +1151,7 @@ describe(
           };
           await page.route("**/_astro/*.js", holdScripts);
           try {
-            await page.goto(`${origin}/manage/volunteers/${alice.id}`, {
+            await page.goto(`${origin}/volunteers/${alice.id}`, {
               waitUntil: "commit",
             });
             await expect(page.getByLabel("Account role")).toBeDisabled();
@@ -1143,27 +1177,27 @@ describe(
             (
               await nav.locator("[data-account-menu-name]").textContent()
             )?.trim(),
-            "Sample Organizer",
+            "Sample Organizer V.",
           );
           await account.waitFor();
-          await page.goto(`${origin}/manage/volunteers`);
+          await page.goto(`${origin}/volunteers`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
           const teamSearch = page.getByRole("searchbox", {
             name: "Find a volunteer",
           });
           await teamSearch.fill("Sample Alice");
-          await page.waitForURL(`${origin}/manage/volunteers?q=Sample+Alice`);
+          await page.waitForURL(`${origin}/volunteers?q=Sample+Alice`);
           await page
             .locator("[data-volunteer-results]")
-            .getByRole("link", { name: "Sample Alice", exact: true })
+            .getByRole("link", { name: "Sample Alice V.", exact: true })
             .waitFor();
           await page
-            .getByRole("link", { name: "Sample Alice", exact: true })
+            .getByRole("link", { name: "Sample Alice V.", exact: true })
             .click();
           const profileView = page.locator("[data-volunteer-profile]");
           await profileView
-            .getByRole("heading", { name: "Sample Alice", exact: true })
+            .getByRole("heading", { name: "Sample Volunteer", exact: true })
             .waitFor();
           await expect(
             profileView.getByLabel("Active volunteer", { exact: true }),
@@ -1176,7 +1210,7 @@ describe(
           assert.match(await profileView.innerText(), /PRIVATE HEALTH ANSWER/);
           await expect(
             page.getByRole("link", { name: "Back to volunteers" }),
-          ).toHaveAttribute("href", "/manage/volunteers?q=Sample+Alice");
+          ).toHaveAttribute("href", "/volunteers?q=Sample+Alice");
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
             form: profileView.locator(
@@ -1229,8 +1263,13 @@ describe(
           await expect(
             page
               .locator("[data-volunteer-results]")
-              .getByText("Approved for patrols", { exact: true }),
+              .getByRole("link", { name: "Sample Alice V.", exact: true }),
           ).toBeVisible();
+          await expect(
+            page.locator(
+              '[data-volunteer-results] [data-volunteer-role="new-volunteer"]',
+            ),
+          ).toHaveCount(0);
           assert.deepEqual(
             await DB.prepare(
               "SELECT active, patrol_approved AS approved FROM volunteer_status WHERE user_id=?",
@@ -1239,7 +1278,7 @@ describe(
               .first(),
             { active: 0, approved: 1 },
           );
-          await page.goto(`${origin}/manage/volunteers/${alice.id}`);
+          await page.goto(`${origin}/volunteers/${alice.id}`);
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           await account.waitFor();
           await inPlaceAction(page, {
@@ -1267,10 +1306,10 @@ describe(
               .first(),
             { active: 1, approved: 1 },
           );
-          await page.goto(`${origin}/manage/volunteers?q=Sample+Alice`);
+          await page.goto(`${origin}/volunteers?q=Sample+Alice`);
           await page
             .getByRole("link", {
-              name: "Sample Alice",
+              name: "Sample Alice V.",
               exact: true,
             })
             .click();
@@ -1338,7 +1377,7 @@ describe(
           ).toBeEnabled();
           await page.unroute("**/api/v1/organizer/action");
           alice.cookie = await signIn(alice.email);
-          await page.goto(`${origin}/manage/events`);
+          await page.goto(`${origin}/events`);
           await page.locator('[data-show-dialog="event-editor-new"]').click();
           const dialog = page.getByRole("dialog", {
             name: "Create event",
@@ -1387,7 +1426,7 @@ describe(
             form: dialog.locator("[data-event-save]"),
             trigger: () =>
               dialog
-                .getByRole("button", { name: "Create event", exact: true })
+                .getByRole("button", { name: "Create", exact: true })
                 .click(),
             updated: () => createdCard.waitFor(),
             loadingLabel: "Creating…",
@@ -1413,9 +1452,7 @@ describe(
             await expect(
               editor.locator("[data-native-date]").first(),
             ).toHaveValue("2031-04-12");
-            await expect(editor.getByLabel("Start time")).toHaveValue(
-              "8:30 PM",
-            );
+            await expect(editor.getByLabel("Start time")).toHaveValue("20:30");
             await expect(
               editor.locator('input[type="radio"][name="type"]'),
             ).toHaveCount(0);
@@ -1455,12 +1492,14 @@ describe(
               form: editor.locator("[data-event-save]"),
               trigger: () =>
                 editor
-                  .getByRole("button", { name: "Save event", exact: true })
+                  .getByRole("button", { name: "Save", exact: true })
                   .click(),
               updated: () =>
                 expect(
                   createdCard.locator("[data-event-availability]"),
-                ).toHaveText(`0 of ${spots} spots taken`),
+                ).toHaveText(
+                  `${spots === 9 ? "" : "Open · "}${spots} of ${spots} spots remaining`,
+                ),
               loadingLabel: "Saving…",
               pending: async () => {
                 for (const radio of await visibility.getByRole("radio").all())
@@ -1502,7 +1541,7 @@ describe(
             form: dialog.locator("[data-event-save]"),
             trigger: () =>
               dialog
-                .getByRole("button", { name: "Create event", exact: true })
+                .getByRole("button", { name: "Create", exact: true })
                 .click(),
             updated: () => destinationCard.waitFor(),
             loadingLabel: "Creating…",
@@ -1512,7 +1551,7 @@ describe(
             exact: true,
           });
           await filters
-            .getByRole("button", { name: /^Orientations \(\d+\)$/ })
+            .getByRole("button", { name: /^Orientations \d+$/ })
             .click();
           assert.equal(
             await page
@@ -1522,12 +1561,12 @@ describe(
               .count(),
             0,
           );
-          await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
+          await filters.getByRole("button", { name: /^All \d+$/ }).click();
           assert.equal(
             await page.locator("[data-live-event][hidden]").count(),
             0,
           );
-          await filters.getByRole("button", { name: /^All \(\d+\)$/ }).click();
+          await filters.getByRole("button", { name: /^All \d+$/ }).click();
           assert.equal(
             await page.evaluate(
               () => document.documentElement.scrollWidth <= innerWidth,
@@ -1570,8 +1609,17 @@ describe(
             inPlaceAction(page, {
               endpoint: "/api/v1/events/action",
               form: target.locator("[data-live-signup]"),
-              trigger: () =>
-                target.locator("[data-live-signup] button").click(),
+              trigger: async () => {
+                await target.locator("[data-live-signup] button").click();
+                if (action === "cancel")
+                  await page
+                    .getByRole("dialog", {
+                      name: "Unregister from this event?",
+                      exact: true,
+                    })
+                    .getByRole("button", { name: "Unregister", exact: true })
+                    .click();
+              },
               updated,
               loadingLabel:
                 action === "join" ? "Registering…" : "Unregistering…",
@@ -1585,7 +1633,7 @@ describe(
             exact: true,
           });
           await volunteerFilters
-            .getByRole("button", { name: /^All \(\d+\)$/ })
+            .getByRole("button", { name: /^All \d+$/ })
             .click();
           await changeSpot("join", () =>
             card.getByText("Registered", { exact: true }).waitFor(),
@@ -1598,11 +1646,11 @@ describe(
           ).toBeFocused();
           await expect(page).toHaveURL(/\/events$/);
           await volunteerFilters
-            .getByRole("button", { name: /^Orientations \(\d+\)$/ })
+            .getByRole("button", { name: /^Orientations \d+$/ })
             .click();
           await expect(card).toBeHidden();
           await volunteerFilters
-            .getByRole("button", { name: /^All \(\d+\)$/ })
+            .getByRole("button", { name: /^All \d+$/ })
             .click();
           await expect(card).toBeVisible();
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
@@ -1613,21 +1661,21 @@ describe(
             0,
           );
           routeCookie = organizer.cookie;
-          await page.goto(`${origin}/manage/events`);
+          await page.goto(`${origin}/events`);
           await card.locator(".volunteer-roster > summary").click();
           await card.locator("[data-signup-menu-trigger]").click();
           await card
             .getByRole("menuitem", { name: "Move volunteer", exact: true })
             .click();
           const signupDialog = page.getByRole("dialog", {
-            name: "Change a registration",
+            name: "Move volunteer",
             exact: true,
           });
           const sourceId = (await card.getAttribute("data-live-event"))!;
           const destinationId =
             (await destinationCard.getAttribute("data-live-event"))!;
           await signupDialog
-            .getByLabel("Destination")
+            .getByLabel("Destination", { exact: true })
             .selectOption(destinationId);
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
@@ -1636,7 +1684,7 @@ describe(
             trigger: () =>
               signupDialog
                 .getByRole("button", {
-                  name: "Save change",
+                  name: "Move volunteer",
                   exact: true,
                 })
                 .click(),
@@ -1699,14 +1747,16 @@ describe(
           await destinationCard
             .getByRole("menuitem", { name: "Move volunteer", exact: true })
             .click();
-          await signupDialog.getByLabel("Destination").selectOption(sourceId);
+          await signupDialog
+            .getByLabel("Destination", { exact: true })
+            .selectOption(sourceId);
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
             form: signupDialog.locator("[data-manage-signup]"),
             trigger: () =>
               signupDialog
                 .getByRole("button", {
-                  name: "Save change",
+                  name: "Move volunteer",
                   exact: true,
                 })
                 .click(),
@@ -1718,31 +1768,35 @@ describe(
                 destinationCard.locator(".volunteer-roster"),
               ).toHaveCount(0);
             },
-            loadingLabel: "Saving…",
+            loadingLabel: "Moving…",
           });
           await card.locator(".volunteer-roster > summary").click();
           await card.locator("[data-signup-menu-trigger]").click();
           await card
             .getByRole("menuitem", { name: "Remove volunteer", exact: true })
             .click();
-          await signupDialog
+          const removeSignupDialog = page.getByRole("dialog", {
+            name: "Remove volunteer",
+            exact: true,
+          });
+          await removeSignupDialog
             .getByLabel("Reason (optional)")
             .fill("Browser-tested cancellation");
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
-            form: signupDialog.locator("[data-manage-signup]"),
+            form: removeSignupDialog.locator("[data-manage-signup]"),
             trigger: () =>
-              signupDialog
+              removeSignupDialog
                 .getByRole("button", {
-                  name: "Save change",
+                  name: "Remove",
                   exact: true,
                 })
                 .click(),
             updated: () =>
               expect(card.locator(".volunteer-roster")).toHaveCount(0),
-            loadingLabel: "Saving…",
+            loadingLabel: "Removing…",
           });
-          assert.equal(await signupDialog.isVisible(), false);
+          assert.equal(await removeSignupDialog.isVisible(), false);
           routeCookie = bob.cookie;
           await page.goto(`${origin}/events`);
           await changeSpot("join", () =>
@@ -1787,7 +1841,7 @@ describe(
           await changeSpot("cancel", () => card.waitFor({ state: "detached" }));
           await expect(
             volunteerFilters.getByRole("button", {
-              name: /^All \(\d+\)$/,
+              name: /^All \d+$/,
             }),
           ).toBeFocused();
           await account.click();
@@ -1799,35 +1853,82 @@ describe(
             (
               await nav.locator("[data-account-menu-name]").textContent()
             )?.trim(),
-            "Sample Bob",
+            "Sample Bob V.",
           );
           routeCookie = organizer.cookie;
           const attendance = await createEvent("orientation", 5);
+          const otherAttendance = await createEvent("orientation", 5);
+          await ok(await status(bob.id, true, false));
           await ok(await join(attendance.id, bob.cookie));
-          await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
-            .bind(Date.now() - 1000, attendance.id)
+          await ok(await join(attendance.id, alice.cookie));
+          await ok(await join(otherAttendance.id, bob.cookie));
+          await DB.prepare("UPDATE event SET starts_at=? WHERE id IN (?,?)")
+            .bind(Date.now() - 1000, attendance.id, otherAttendance.id)
             .run();
-          await page.goto(`${origin}/manage/events`);
+          await page.goto(`${origin}/events`);
           const attendanceCard = page.locator(
             `[data-live-event="${attendance.id}"]`,
           );
+          const otherAttendanceCard = page.locator(
+            `[data-live-event="${otherAttendance.id}"]`,
+          );
+          await expect(
+            attendanceCard.locator("[data-patrol-approval-status]"),
+          ).toHaveCount(0);
+          await expect(
+            otherAttendanceCard.locator("[data-patrol-approval-status]"),
+          ).toHaveCount(0);
           await attendanceCard.locator(".volunteer-roster > summary").click();
+          const approvalForm = attendanceCard.locator(
+            "[data-organizer-patrol-approval]",
+          );
+          await expect(approvalForm).toHaveCount(1);
+          await expect(approvalForm.locator('[name="userId"]')).toHaveValue(
+            bob.id,
+          );
+          const approvedAttendee = attendanceCard
+            .locator(".event-roster-row")
+            .filter({
+              has: page.locator(`a[href="/volunteers/${bob.id}"]`),
+            });
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
-            form: attendanceCard.locator("[data-organizer-orientation]"),
+            form: approvalForm,
+            notify: false,
             trigger: () =>
               attendanceCard
                 .getByRole("button", {
-                  name: "Mark orientation completed",
+                  name: "Approve for patrols",
                   exact: true,
                 })
                 .click(),
             updated: () =>
-              attendanceCard
-                .getByText("Orientation completed", { exact: true })
+              approvedAttendee
+                .locator("[data-patrol-approval-status]")
                 .waitFor(),
             loadingLabel: "Saving…",
           });
+          await expect(approvalForm).toHaveCount(0);
+          await expect(
+            attendanceCard.locator("[data-patrol-approval-status]"),
+          ).toHaveCount(1);
+          await expect(
+            otherAttendanceCard.locator("[data-patrol-approval-status]"),
+          ).toHaveCount(0);
+          await expect(
+            approvedAttendee.locator("[data-patrol-approval-status]"),
+          ).toContainText("Approved by");
+          await expect(
+            approvedAttendee.locator("[data-patrol-approval-status] a"),
+          ).toHaveAttribute("href", `/volunteers/${organizer.id}`);
+          await expect(
+            approvedAttendee.locator("[data-patrol-approval-status] time"),
+          ).toHaveAttribute("datetime", /.+/);
+          await expect(
+            approvedAttendee.getByText("Orientation completed", {
+              exact: true,
+            }),
+          ).toHaveCount(0);
           await expect(
             attendanceCard.locator(".volunteer-roster"),
           ).toHaveAttribute("open", "");
@@ -1836,13 +1937,16 @@ describe(
             name: "Edit event",
             exact: true,
           });
+          await cancelEditor
+            .getByRole("button", { name: "Cancel event", exact: true })
+            .click();
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
             form: cancelEditor.locator("[data-event-cancel]"),
             trigger: () =>
               cancelEditor
                 .getByRole("button", {
-                  name: "Cancel event",
+                  name: "Confirm cancellation",
                   exact: true,
                 })
                 .click(),

@@ -2,7 +2,65 @@ import { expect, test } from "@playwright/test";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 import { fillDateInput } from "../helpers/date-input";
 
-test("meeting defaults are submitted for new events without replacing drafts or saved values", async ({
+test("organizers share the event calendar and cards with role-gated controls", async ({
+  page,
+}) => {
+  await page.goto("/volunteer");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await expect(page.locator("[data-event-list]")).toBeVisible();
+  await page.goto("/events?occurrence=local-fixture-event-orientation");
+  await expect(page.locator("[data-event-view-link]")).toHaveCount(0);
+  await expect(
+    page.getByText("Upcoming events and series", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator("[data-event-calendar]")).toBeVisible();
+  expect(
+    await page.locator("[data-event-list] > [data-live-event]").count(),
+  ).toBeGreaterThan(0);
+  await expect(
+    page.locator('[data-show-dialog="event-editor-new"]'),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('[data-live-event="local-fixture-event-orientation"]')
+      .getByRole("button", { name: "Register", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /^Orientations \d+$/ }).click();
+  expect(new URL(page.url()).searchParams.get("occurrence")).toBe(
+    "local-fixture-event-orientation",
+  );
+  // Old volunteer-view links cannot hide organizer capabilities anymore.
+  await page.goto("/events?view=volunteer&type=orientation");
+  await expect(
+    page.locator('[data-show-dialog="event-editor-new"]'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /^Orientations \d+$/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-dana"]')
+    .click();
+  await expect(page.locator("[data-event-browser]")).toHaveAttribute(
+    "data-event-view",
+    "volunteer",
+  );
+  await expect(page.locator("[data-event-calendar]")).toBeVisible();
+  await expect(
+    page.locator(
+      "[data-event-save], [data-manage-signup], [data-series-management]",
+    ),
+  ).toHaveCount(0);
+  expect((await page.request.get("/events?view=organizer")).status()).toBe(403);
+  await expect(page.locator('a[href^="/manage"]')).toHaveCount(0);
+});
+
+test("meeting and volunteer-limit defaults are submitted without replacing drafts or saved values", async ({
   page,
 }) => {
   await page.goto("/volunteer");
@@ -10,7 +68,6 @@ test("meeting defaults are submitted for new events without replacing drafts or 
   await profiles
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   const create = page.locator('[data-show-dialog="event-editor-new"]');
   await create.click();
   const dialog = page.getByRole("dialog", {
@@ -23,10 +80,13 @@ test("meeting defaults are submitted for new events without replacing drafts or 
   const defaults = {
     meetingPoint: "Lord Strathcona Elementary",
     meetingPointUrl: "https://maps.app.goo.gl/4ommJyZFCRJRGf9F9",
+    minMedicSpots: 2,
+    minNewVolunteerSpots: 2,
+    maxNewVolunteers: 4,
   };
   await expect(meeting).toHaveValue(defaults.meetingPoint);
   await expect(map).toHaveValue(defaults.meetingPointUrl);
-  await fillDateInput(form, "startsAt", "2030-01-01T21:00");
+  await fillDateInput(form, "startsAt", "2030-07-01T21:00");
   await page.route("**/api/v1/events/action", (route) =>
     route.fulfill({
       status: 503,
@@ -35,34 +95,50 @@ test("meeting defaults are submitted for new events without replacing drafts or 
   );
   const submit = async () => {
     const request = page.waitForRequest("**/api/v1/events/action");
-    await dialog
-      .getByRole("button", { name: "Create event", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Create", exact: true }).click();
     const body = (await request).postDataJSON();
     await expect(form.locator("[data-form-message]")).toHaveText(
       "Request inspected without saving.",
     );
     await expect(
-      dialog.getByRole("button", { name: "Create event", exact: true }),
+      dialog.getByRole("button", { name: "Create", exact: true }),
     ).toBeEnabled();
     return body;
   };
-  expect(await submit()).toMatchObject({ action: "save", event: defaults });
+  expect(await submit()).toMatchObject({
+    action: "save",
+    event: { ...defaults, startsAt: "2030-07-02T04:00:00.000Z" },
+  });
   await form.getByLabel("Recurring patrol", { exact: true }).check();
   expect(await submit()).toMatchObject({
     action: "save-series",
-    series: defaults,
+    series: { ...defaults, firstDate: "2030-07-01", localTime: "21:00" },
   });
 
   await meeting.fill("Custom meeting point");
   await map.fill("");
+  await form.getByLabel("Minimum medic spots", { exact: true }).fill("3");
+  await form
+    .getByLabel("Minimum new volunteer spots", { exact: true })
+    .fill("1");
+  await form.getByLabel("Maximum new volunteers", { exact: true }).fill("2");
+  await form.getByLabel("Includes orientation", { exact: true }).check();
+  await expect(
+    form.getByLabel("Volunteer spots", { exact: true }),
+  ).toHaveAttribute("min", "4");
   await page.keyboard.press("Escape");
   await create.click();
   await expect(meeting).toHaveValue("Custom meeting point");
   await expect(map).toHaveValue("");
   expect(await submit()).toMatchObject({
     action: "save-series",
-    series: { meetingPoint: "Custom meeting point", meetingPointUrl: "" },
+    series: {
+      meetingPoint: "Custom meeting point",
+      meetingPointUrl: "",
+      minMedicSpots: 3,
+      minNewVolunteerSpots: 1,
+      maxNewVolunteers: 2,
+    },
   });
   await form.evaluate((element: HTMLFormElement) => element.reset());
   await expect(meeting).toHaveValue(defaults.meetingPoint);

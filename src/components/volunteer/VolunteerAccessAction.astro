@@ -1,0 +1,68 @@
+---
+import type { VolunteerRow } from "@/server/db/volunteers";
+
+interface Props {
+  person: VolunteerRow;
+  kind: "application" | "patrol";
+}
+const { person, kind } = Astro.props;
+const approved =
+  kind === "application"
+    ? Boolean(person.applicationApproved)
+    : Boolean(person.patrolApproved);
+---
+
+<form
+  class="volunteer-form"
+  data-organizer-status
+  data-access-kind={kind}
+  data-email-prompt="access"
+  action="/api/v1/organizer/action"
+  method="post"
+>
+  <input type="hidden" name="userId" value={person.id} />
+  <input type="hidden" name="version" value={person.updatedAt} />
+  {
+    kind === "patrol" && !approved && (
+      <input type="hidden" name="approvePatrols" value="true" />
+    )
+  }
+  <input
+    type="checkbox"
+    name="active"
+    checked={Boolean(person.active)}
+    hidden
+  />
+  <input
+    type="checkbox"
+    name="applicationApproved"
+    checked={kind === "application"
+      ? !approved
+      : Boolean(person.applicationApproved)}
+    hidden
+  />
+  <input
+    type="checkbox"
+    name="patrolApproved"
+    checked={kind === "patrol" ? !approved : Boolean(person.patrolApproved)}
+    hidden
+  />
+  <p data-form-message role="status" hidden></p>
+  <button
+    class:list={["btn", approved ? "btn-red" : "btn-green"]}
+    type="submit"
+    data-loading-label="Saving…"
+    data-volunteer-control
+    disabled
+  >
+    {
+      kind === "application"
+        ? approved
+          ? "Revoke application approval"
+          : "Approve application"
+        : approved
+          ? "Revoke patrol approval"
+          : "Approve for patrols"
+    }
+  </button>
+</form>

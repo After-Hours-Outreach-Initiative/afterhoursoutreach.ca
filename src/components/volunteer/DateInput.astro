@@ -3,7 +3,6 @@ import FieldError from "@/components/FieldError.astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
 import { dateParts, canonicalDate } from "@/data/date-input";
 import NativePickerInput from "./NativePickerInput.astro";
-import { formatTimeInput } from "@/data/event-time";
 
 interface Props {
   name: string;
@@ -128,9 +127,9 @@ const describedBy = `error-${errorField}${help ? ` help-${id}` : ""}`;
         <input
           id={`${id}-time`}
           data-date-time-input
-          type="text"
-          value={formatTimeInput(time)}
-          placeholder="9:00 PM"
+          type="time"
+          step="60"
+          value={time}
           readonly={!active}
           required={required && active}
           aria-describedby={describedBy}

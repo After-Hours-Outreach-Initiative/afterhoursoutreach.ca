@@ -269,7 +269,7 @@ describe(
       assert.equal(updated.profile?.first_name, "Changed");
       assert.equal(updated.profile?.middle_names, "Middle");
       assert.equal(updated.profile?.last_name, "Name");
-      assert.equal(updated.user?.name, "Changed Middle Name");
+      assert.equal(updated.user?.name, "Changed N.");
       assert.equal(
         updated.profile?.submitted_application,
         saved.profile?.submitted_application,
@@ -277,7 +277,7 @@ describe(
       const session = (await (
         await send("/api/v1/auth/get-session", undefined, ageCookie)
       ).json()) as { user: { name: string } };
-      assert.equal(session.user.name, "Changed Middle Name");
+      assert.equal(session.user.name, "Changed N.");
     });
 
     test("applications require explicit Outreach and leave optional teams optional without rewriting legacy edits", async () => {
@@ -668,7 +668,7 @@ describe(
       assert.equal(submittedProgress.status, 200);
       assert.match(
         await submittedProgress.text(),
-        /Application Form Submitted/,
+        /Application Form\s*<\/span>/,
       );
       const acknowledgement = await DB.prepare(
         "SELECT code_of_conduct_version, code_of_conduct_accepted_at FROM profile WHERE user_id=?",
@@ -693,13 +693,10 @@ describe(
         html,
         /submitted-application-heading|data-submitted-application|data-application-tracker|data-naloxone-confirm|account-naloxone-heading/,
       );
-      assert.doesNotMatch(
-        html,
-        /Please tell us what motivates you volunteer with us\?/,
-      );
+      assert.doesNotMatch(html, /What motivates you to volunteer with us\?/);
       assert.doesNotMatch(
         html.match(/<form\b[^>]*data-account-profile[\s\S]*?<\/form>/)![0],
-        /How did you find out about us\?|Please tell us what motivates you volunteer with us\?|code-of-conduct-heading/,
+        /How did you find out about us\?|What motivates you to volunteer with us\?|code-of-conduct-heading/,
       );
       assert.doesNotMatch(
         html,
@@ -745,7 +742,7 @@ describe(
       );
     });
 
-    test("account application information appears after three milestones without Discord or orientation signup and stays read-only", async () => {
+    test("approved account applications show progress and read-only answers without Discord or orientation signup", async () => {
       await DB.prepare(
         "UPDATE profile SET naloxone_completed_at=1000 WHERE user_id=?",
       )
@@ -789,13 +786,22 @@ describe(
         html,
         /<a\b[^>]*href="#submitted-application-heading"[^>]*>\s*Volunteer Application\s*<\/a>/,
       );
-      assert.match(html, /Naloxone 101 completion/);
-      assert.match(html, /Application approved/);
+      const applicationSteps = html.match(
+        /<ol\b[^>]*data-application-progress-mini[^>]*>([\s\S]*?)<\/ol>/,
+      )?.[1];
+      assert.ok(applicationSteps);
+      assert.match(applicationSteps, /Naloxone 101/);
+      assert.match(applicationSteps, /Application review/);
+      assert.match(applicationSteps, /Approved/);
+      assert.doesNotMatch(
+        applicationSteps,
+        /<form\b|<input\b|<textarea\b|<select\b/,
+      );
       assert.doesNotMatch(
         html,
         /account-discord-heading|data-discord-connection|Discord connection verified/,
       );
-      assert.match(html, /Date not recorded/);
+      assert.match(applicationSteps, /Date and time not recorded/);
       assert.doesNotMatch(html, /Orientation registered/);
       assert.doesNotMatch(
         html,
@@ -809,7 +815,7 @@ describe(
       assert.ok(snapshot);
       const submission = JSON.parse(snapshot) as SubmittedApplication;
       const timestamp = html.match(
-        /<p>\s*Submitted:\s*<time datetime="([^"]+)">\s*([^<]+?)\s*<\/time>\s*<\/p>/,
+        /<summary\b[^>]*id="account-application-form-heading"[^>]*>[\s\S]*?<time datetime="([^"]+)">\s*([^<]+?)\s*<\/time>/,
       );
       assert.ok(timestamp);
       assert.equal(timestamp[1], submission.submittedAt);
@@ -818,14 +824,10 @@ describe(
         new Date(submission.submittedAt)
           .toLocaleString("en-CA", {
             timeZone: "America/Vancouver",
-            timeZoneName: "short",
           })
           .replace(/\s+/g, " "),
       );
-      assert.match(
-        html,
-        /Please tell us what motivates you volunteer with us\?/,
-      );
+      assert.match(html, /What motivates you to volunteer with us\?/);
     });
 
     test("submitted applications stay private and legacy profile edits do not invent an original snapshot", async () => {
@@ -892,7 +894,7 @@ describe(
       );
       assert.equal(ownPage.status, 200);
       const ownHTML = await ownPage.text();
-      assert.match(ownHTML, /View submitted application/);
+      assert.match(ownHTML, /data-submitted-application/);
       assert.doesNotMatch(
         ownHTML,
         /Legacy motivation|Changed legacy name|Legacy private answer/,
@@ -918,9 +920,10 @@ describe(
         completedLegacyHTML,
         /The original submitted answers were not captured for this account/,
       );
+      assert.match(completedLegacyHTML, /data-application-progress-mini/);
       assert.doesNotMatch(
         completedLegacyHTML,
-        /data-submitted-application|View submitted application|data-application-tracker|data-naloxone-confirm/,
+        /View submitted application|data-application-tracker|data-naloxone-confirm/,
       );
     });
 
@@ -938,7 +941,10 @@ describe(
         }
         const signedInHTML = await signedIn.text();
         const header = signedInHTML.match(/<header\b[\s\S]*?<\/header>/)![0];
-        assert.match(header, /aria-label="Account for Worker Test Volunteer"/);
+        assert.match(
+          header,
+          /aria-label="Account for Worker Test Volunteer V\."/,
+        );
         assert.match(header, /data-account-menu(?:=""|[\s>])/);
         assert.match(header, /data-header-discord[^>]*hidden/);
         assert.doesNotMatch(signedInHTML, /Sample private answer/);
@@ -1298,7 +1304,7 @@ describe(
         );
         const fragment = new URLSearchParams({
           ...proof,
-          returnTo: "/manage/events",
+          returnTo: "/events",
         });
         await page.goto(`${origin}/volunteer/sign-in/complete#${fragment}`);
         await expect(page.getByLabel("Six-digit code")).toBeVisible();
@@ -1398,7 +1404,7 @@ describe(
           (
             await menu.locator("[data-account-menu-name]").textContent()
           )?.trim(),
-          answers.preferredName,
+          `${answers.preferredName} V.`,
         );
         await menu.locator("summary").click();
         assert.equal(
@@ -1409,7 +1415,7 @@ describe(
         );
         await menu.locator("summary").click();
         const changedName = "Worker Updated Volunteer";
-        await page.getByLabel("Preferred name").fill(changedName);
+        await page.getByLabel("Preferred first name").fill(changedName);
         await page
           .getByLabel(
             "Medical conditions/allergies/anything else we should know",
@@ -1434,7 +1440,7 @@ describe(
             updated: () => expect(sessionForm).toHaveCount(0),
             loadingLabel: "Signing out…",
           });
-          await expect(page.getByLabel("Preferred name")).toHaveValue(
+          await expect(page.getByLabel("Preferred first name")).toHaveValue(
             changedName,
           );
           await expect(
@@ -1477,7 +1483,7 @@ describe(
           (
             await menu.locator("[data-account-menu-name]").textContent()
           )?.trim(),
-          changedName,
+          `${changedName} V.`,
         );
         await page.reload();
         const submittedApplication = page.locator(
@@ -1515,7 +1521,7 @@ describe(
           (
             await menu.locator("[data-account-menu-name]").textContent()
           )?.trim(),
-          changedName,
+          `${changedName} V.`,
         );
         assert.equal(
           await page
@@ -1696,8 +1702,8 @@ describe(
           answers.preferredName,
         );
         await expect(newPage.locator("[data-account-menu-name]")).toHaveText([
-          answers.preferredName,
-          answers.preferredName,
+          `${answers.preferredName} V.`,
+          `${answers.preferredName} V.`,
         ]);
         assert.equal(newPage.url(), `${origin}/volunteer/account`);
         await expect(

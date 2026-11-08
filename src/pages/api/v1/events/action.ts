@@ -13,10 +13,14 @@ import {
   deleteEvent,
   deletePatrolSeries,
   changeSignup,
+  addManualSignup,
+  addEventVolunteers,
+  addVolunteersSchema,
+  manualSignupSchema,
   manageSignup,
-  eventSchema,
-  patrolSeriesSchema,
-  patrolTemplateSchema,
+  eventRequestSchema,
+  patrolSeriesRequestSchema,
+  patrolTemplateRequestSchema,
   savePatrolSeries,
   updatePatrolSeriesFrom,
   stopPatrolSeries,
@@ -42,7 +46,7 @@ const inputSchema = z.discriminatedUnion("action", [
     action: z.literal("save-series"),
     id: id.optional(),
     version: z.number().int().nonnegative().optional(),
-    series: patrolSeriesSchema,
+    series: patrolSeriesRequestSchema,
     notify: z.boolean().default(false),
   }),
   z.strictObject({
@@ -50,7 +54,7 @@ const inputSchema = z.discriminatedUnion("action", [
     id,
     occurrenceDate: z.iso.date(),
     version: z.number().int().nonnegative(),
-    template: patrolTemplateSchema,
+    template: patrolTemplateRequestSchema,
     notify: z.boolean().default(false),
   }),
   z.strictObject({
@@ -70,7 +74,7 @@ const inputSchema = z.discriminatedUnion("action", [
     action: z.literal("save"),
     id: id.optional(),
     version: z.number().int().nonnegative().optional(),
-    event: eventSchema,
+    event: eventRequestSchema,
     notify: z.boolean().default(false),
   }),
   z.strictObject({
@@ -81,6 +85,12 @@ const inputSchema = z.discriminatedUnion("action", [
     notify: z.boolean().default(false),
   }),
   z.strictObject({ action: z.enum(["join", "cancel"]), id }),
+  manualSignupSchema.extend({ action: z.literal("add-attendee"), id }),
+  z.strictObject({
+    action: z.literal("add-volunteers"),
+    id,
+    volunteers: addVolunteersSchema,
+  }),
   z.strictObject({
     action: z.literal("manage-signup"),
     id,
@@ -102,13 +112,20 @@ export const POST: APIRoute = async ({ request }) => {
       true,
     );
     if (!actor) throw new RequestError(401, "Sign in to continue.");
-    const parsed = inputSchema.safeParse(await readJson(request));
+    // A staged list can contain up to 100 full-length manual names.
+    const parsed = inputSchema.safeParse(await readJson(request, 65_536));
     if (!parsed.success)
       throw new RequestError(
         400,
         parsed.error.issues.find(
           (issue) => issue.message === orientationCapacityMessage,
-        )?.message ?? "Check the event action and form fields.",
+        )?.message ??
+          parsed.error.issues.find((issue) => issue.code === "custom")
+            ?.message ??
+          (parsed.error.issues.some((issue) => issue.path[0] === "volunteers")
+            ? "Choose up to 100 volunteers with names of at most 200 characters and valid roles."
+            : undefined) ??
+          "Check the event action and form fields.",
       );
     const input = parsed.data;
     await takeRateLimit(
@@ -225,6 +242,21 @@ export const POST: APIRoute = async ({ request }) => {
           input.destination,
           input.reason,
           input.notify,
+        );
+        break;
+      case "add-attendee":
+        result = await addManualSignup(env.DB, actor, input.id, {
+          name: input.name,
+          medic: input.medic,
+          newVolunteer: input.newVolunteer,
+        });
+        break;
+      case "add-volunteers":
+        result = await addEventVolunteers(
+          env.DB,
+          actor,
+          input.id,
+          input.volunteers,
         );
         break;
       case "retry-notifications":

@@ -641,8 +641,16 @@ export async function saveProfile(
           : ""),
       motivation: old?.motivation ?? submitted.motivation!,
     };
-    if (!applicationDisplayName(answers))
-      throw new RequestError(400, "Enter a preferred name.");
+    // Preserve the existing legacy-name requirement independently of display format.
+    if (
+      ![
+        answers.preferredName,
+        answers.firstName,
+        answers.middleNames,
+        answers.lastName,
+      ].some((part) => part.trim())
+    )
+      throw new RequestError(400, "Enter a name.");
     const changedFields = (
       Object.keys(answers) as (keyof ApplicationAnswers)[]
     ).filter(

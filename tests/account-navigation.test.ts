@@ -8,17 +8,29 @@ import {
 } from "../src/server/db/access";
 import { isApplicationComplete } from "../src/server/db/application-progress";
 
-test("account greeting preserves preferred names and falls back to the first name", () => {
-  expect(accountGreeting({ firstName: "Alex", preferredName: "  AJ  " })).toBe(
-    "AJ",
-  );
+test("account greeting uses preferred first name or first name plus last initial", () => {
   expect(
-    accountGreeting({ firstName: "Mary", preferredName: "Mary Jane" }),
-  ).toBe("Mary Jane");
-  expect(accountGreeting({ firstName: "  Taylor  ", preferredName: " " })).toBe(
-    "Taylor",
-  );
-  expect(accountGreeting(undefined, "Jamie Park")).toBe("Jamie");
+    accountGreeting({
+      firstName: "Alex",
+      lastName: "Rivera",
+      preferredName: "  AJ  ",
+    }),
+  ).toBe("AJ R.");
+  expect(
+    accountGreeting({
+      firstName: "Mary",
+      lastName: "Jones",
+      preferredName: "Mary Jane",
+    }),
+  ).toBe("Mary Jane J.");
+  expect(
+    accountGreeting({
+      firstName: "  Taylor  ",
+      lastName: "Park",
+      preferredName: " ",
+    }),
+  ).toBe("Taylor P.");
+  expect(accountGreeting(undefined, "Jamie Park")).toBe("Jamie P.");
   expect(accountGreeting()).toBe("Account");
 });
 
@@ -43,17 +55,15 @@ test("site navigation keeps Volunteer until event access is available", () => {
   ]);
   expect(siteNavigation(true, true, true).map((link) => link.href)).toEqual([
     "/events",
-    "/manage/events",
+    "/applications",
+    "/volunteers",
     "/donate",
     "/about",
   ]);
-  expect(siteNavigation(true, true)[1]).toMatchObject({
-    label: "Manage",
-    children: [
-      { label: "Events", href: "/manage/events" },
-      { label: "Volunteers", href: "/manage/volunteers" },
-    ],
-  });
+  expect(siteNavigation(true, true).slice(1, 3)).toEqual([
+    { label: "Applications", href: "/applications" },
+    { label: "Volunteers", href: "/volunteers" },
+  ]);
 });
 
 test("event access uses all three application milestones, not orientation attendance", () => {

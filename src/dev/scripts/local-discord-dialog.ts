@@ -30,16 +30,15 @@ export function localDiscordDialog(): Promise<DiscordOutcome | null> {
   }
   const actions = document.createElement("div");
   actions.className = "dialog-footer";
-  for (const [outcome, label] of [
-    ["authorize", "Authorize connection"],
-    ["screening", "Simulate server rules required"],
-    ["unavailable", "Simulate Discord unavailable"],
-    ["", "Cancel"],
+  for (const [outcome, label, variant] of [
+    ["", "Cancel", "btn-quiet"],
+    ["screening", "Simulate server rules required", "btn-outline"],
+    ["unavailable", "Simulate Discord unavailable", "btn-outline"],
+    ["authorize", "Authorize connection", "btn-primary"],
   ]) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className =
-      outcome === "authorize" ? "btn btn-primary" : "btn btn-outline";
+    button.className = `btn ${variant}`;
     button.textContent = label;
     button.addEventListener("click", () => dialog.close(outcome));
     actions.appendChild(button);

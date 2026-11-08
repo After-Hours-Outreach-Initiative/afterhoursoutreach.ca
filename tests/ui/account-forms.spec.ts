@@ -718,7 +718,7 @@ test("account contents navigate profile and settings sections on desktop and mob
     ).toHaveCount(0);
     for (const [id, heading] of [
       ["account-profile-emergency-contact", "Emergency contact"],
-      ["account-sessions-heading", "Signed in browsers"],
+      ["account-sessions-heading", "Signed-in browsers"],
     ]) {
       if (width < 1024) await summary.click();
       const link = contents.getByRole("link", { name: heading, exact: true });
@@ -1080,7 +1080,7 @@ test("application shows all required errors and saves after they are corrected",
   ).toBeVisible();
   await expect(
     form.getByRole("textbox", {
-      name: "Please tell us what motivates you volunteer with us?",
+      name: "What motivates you to volunteer with us?",
       exact: true,
     }),
   ).toBeVisible();
@@ -1332,7 +1332,7 @@ test("application shows all required errors and saves after they are corrected",
   for (const field of ["firstName", "middleNames", "lastName"] as const)
     await expect(form.locator(`[name="${field}"]`)).toBeEditable();
   await expect(
-    page.getByRole("textbox", { name: /^Preferred name/ }),
+    page.getByRole("textbox", { name: /^Preferred first name/ }),
   ).toHaveValue(sampleAnswers.preferredName);
   await expect(
     page.getByRole("region", { name: "Code of Conduct", exact: true }),
@@ -1349,7 +1349,7 @@ test("application shows all required errors and saves after they are corrected",
   ).toBeDisabled();
   // Editing reuses validation and returns to saved text without a success message.
   await page
-    .getByRole("textbox", { name: /^Preferred name/ })
+    .getByRole("textbox", { name: /^Preferred first name/ })
     .fill("Updated volunteer");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   const saved = form.locator('[data-profile-answer="preferredName"] dd');
@@ -1364,7 +1364,7 @@ test("application shows all required errors and saves after they are corrected",
   await page.reload();
   await page.getByRole("button", { name: "Edit personal info" }).click();
   await expect(
-    page.getByRole("textbox", { name: /^Preferred name/ }),
+    page.getByRole("textbox", { name: /^Preferred first name/ }),
   ).toHaveValue("Updated volunteer");
 });
 
@@ -2743,10 +2743,10 @@ test("profile sections edit in isolation, preserve saved answers, and cancel to 
   ).toBeVisible();
   await expect(form.locator("[data-form-message]")).toBeHidden();
   await expect(page.locator("[data-account-menu-name]").first()).toHaveText(
-    "Changed first Changed middle Changed last",
+    "Changed first C.",
   );
   await expect(page.locator("[data-account-greeting]")).toHaveText(
-    "Changed first",
+    "Changed first C.",
   );
   await expect(answer("firstName")).toHaveText("Changed first");
   await expect(answer("middleNames")).toHaveText("Changed middle");
@@ -2970,7 +2970,7 @@ test("email changes verify the new address in place and preserve unsaved profile
   await page.goto("/volunteer/account");
   await page.getByRole("button", { name: "Edit personal info" }).click();
   const name = page.getByRole("textbox", {
-    name: /^Preferred name/,
+    name: /^Preferred first name/,
   });
   await name.fill("Unsaved email-change draft");
   const request = page.locator("[data-email-change-request]");
@@ -3114,7 +3114,6 @@ test("event editor shows native number and URL errors without submitting invalid
   await profiles
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
-  await page.getByRole("link", { name: "Manage events", exact: true }).click();
   await page.locator('[data-show-dialog="event-editor-new"]').click();
   const dialog = page.getByRole("dialog", {
     name: "Create event",
@@ -3183,8 +3182,10 @@ test("event editor shows native number and URL errors without submitting invalid
       .toBe(`3px solid ${invalid ? "rgb(248, 113, 113)" : "rgba(0, 0, 0, 0)"}`);
   };
   await expectDateErrorRail(false);
-  await expect(time).toHaveAttribute("type", "text");
-  await expect(time).toHaveValue("9:00 PM");
+  await expect(time).toHaveAttribute("type", "time");
+  await expect(time).toHaveAttribute("step", "60");
+  await expect(time).toHaveAttribute("required", "");
+  await expect(time).toHaveValue("21:00");
   await expect(time).not.toHaveAttribute("data-empty");
   await expect(time.locator("+ .volunteer-picker-placeholder")).toHaveCount(0);
   const placeholder = date.locator("+ .volunteer-picker-placeholder");
@@ -3227,10 +3228,17 @@ test("event editor shows native number and URL errors without submitting invalid
   await expect(form.locator('[name="startsAt"]')).toHaveValue(
     "2030-01-01T21:00",
   );
-  await time.fill("8:00 PM");
+  for (const value of ["00:00", "12:00", "20:31"]) {
+    await time.fill(value);
+    await expect(time).toHaveValue(value);
+    await expect(form.locator('[name="startsAt"]')).toHaveValue(
+      `2030-01-01T${value}`,
+    );
+  }
+  await time.fill("20:00");
   await form.evaluate((element: HTMLFormElement) => element.reset());
   await expect(date).toHaveValue("");
-  await expect(time).toHaveValue("9:00 PM");
+  await expect(time).toHaveValue("21:00");
   await expect(form.locator('[name="startsAt"]')).toHaveValue("");
   const expectDateFieldsToFit = async () => {
     const viewport = page.viewportSize()!;
@@ -3282,17 +3290,18 @@ test("event editor shows native number and URL errors without submitting invalid
   await page.clock.setFixedTime(new Date("2026-07-03T03:30:00Z"));
   await fillDateInput(form, "startsAt", "2026-07-02T20:29");
   await expect(warning).toBeVisible();
-  await time.fill("8:31 PM");
+  await time.fill("20:31");
   await expect(warning).toBeHidden();
   await page.clock.setFixedTime(new Date());
   for (const value of [
     "",
+    "2030-01-01T20:00:30",
     // Historical transitions are stable across browser/runtime tzdata versions.
     "2025-03-09T02:30",
     "2025-11-02T01:30",
   ]) {
     await fillDateInput(form, "startsAt", value);
-    await dialog.getByRole("button", { name: "Create event" }).click();
+    await dialog.getByRole("button", { name: "Create", exact: true }).click();
     await expect(value ? time : date).toBeFocused();
     await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
     await expectDateErrorRail(false);
@@ -3312,24 +3321,24 @@ test("event editor shows native number and URL errors without submitting invalid
     "2030-01-01T20:00",
   );
   await date.fill("");
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(date).toBeFocused();
   await expectDateErrorRail(false);
   await expect(date).toHaveAttribute("aria-invalid", "true");
   await expect(time).not.toHaveAttribute("aria-invalid");
   await date.fill("2030-01-01");
   await time.fill("");
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(time).toBeFocused();
   await expect(form.locator("[data-error$='-startsAt']")).toBeVisible();
   await expectDateErrorRail(false);
   await expect(date).not.toHaveAttribute("aria-invalid");
   expect(requests).toEqual([]);
-  await time.fill("8:00 PM");
+  await time.fill("20:00");
   await page.keyboard.press("Escape");
   await page.locator('[data-show-dialog="event-editor-new"]').click();
   await expect(date).toHaveValue("2030-01-01");
-  await expect(time).toHaveValue("8:00 PM");
+  await expect(time).toHaveValue("20:00");
   await expect(
     dateGroup.locator(".volunteer-picker-placeholder:visible"),
   ).toHaveCount(0);
@@ -3337,7 +3346,10 @@ test("event editor shows native number and URL errors without submitting invalid
   await form
     .getByLabel("Meeting point", { exact: true })
     .fill("Test meeting point");
-  const spots = form.getByRole("spinbutton", { name: "Volunteer spots" });
+  const spots = form.getByRole("spinbutton", {
+    name: "Volunteer spots",
+    exact: true,
+  });
   const decrease = form.getByRole("button", {
     name: "Decrease volunteer spots",
   });
@@ -3393,7 +3405,7 @@ test("event editor shows native number and URL errors without submitting invalid
   const map = form.getByLabel("Map link (optional)");
   await spots.fill("0");
   await map.fill("not-a-url");
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(form.locator("[data-error$='-spots']")).toBeVisible();
   await expect(form.locator("[data-error$='-meetingPointUrl']")).toBeVisible();
   await expect(spots).toBeFocused();
@@ -3410,7 +3422,7 @@ test("event editor shows native number and URL errors without submitting invalid
     ["", "2"],
   ]) {
     await spots.fill(invalid);
-    await dialog.getByRole("button", { name: "Create event" }).click();
+    await dialog.getByRole("button", { name: "Create", exact: true }).click();
     await expect(form.locator("[data-error$='-spots']")).toBeVisible();
     expect(requests).toEqual([]);
     await increase.click();
@@ -3438,7 +3450,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await orientation.check();
   await expect(spots).toHaveAttribute("min", "4");
   await expect(spots).toHaveValue("1");
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(form.locator('[data-error$="-spots"]')).toBeVisible();
   await expect(form.locator('[data-error$="-spots"]')).toContainText(
     "from 4 to 100",
@@ -3462,7 +3474,7 @@ test("event editor shows native number and URL errors without submitting invalid
       json: { message: "Submission reached the server." },
     }),
   );
-  await dialog.getByRole("button", { name: "Create event" }).click();
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(form.locator("[data-form-message]")).toHaveText(
     "Submission reached the server.",
   );
@@ -3477,6 +3489,7 @@ test("event editor shows native number and URL errors without submitting invalid
   const editForm = edit.locator("[data-event-save]");
   const editSpots = editForm.getByRole("spinbutton", {
     name: "Volunteer spots",
+    exact: true,
   });
   const savedSpots = await editSpots.inputValue();
   await editForm
@@ -3504,7 +3517,8 @@ test("event editor shows native number and URL errors without submitting invalid
   const editDateGroup = editForm.locator('[data-date-input="startsAt"]');
   const editDate = editDateGroup.locator("[data-native-date]");
   const editTime = editForm.getByLabel("Start time");
-  await expect(editTime).toHaveValue("6:00 PM");
+  await expect(editTime).toHaveAttribute("type", "time");
+  await expect(editTime).toHaveValue("18:00");
   await expect(editTime.locator("+ .volunteer-picker-placeholder")).toHaveCount(
     0,
   );
@@ -3533,7 +3547,7 @@ test("event editor shows native number and URL errors without submitting invalid
     await editForm.evaluate((element: HTMLFormElement) => element.reset());
     await expect(input).toHaveValue(saved);
   }
-  await expect(editTime).toHaveValue("6:00 PM");
+  await expect(editTime).toHaveValue("18:00");
   await expect(
     editDate.locator("+ .volunteer-picker-placeholder"),
   ).toBeHidden();
@@ -3714,7 +3728,7 @@ test("signed-in browser cards stay framed after reload and removal", async ({
   }
   await expect(
     sessions.getByRole("heading", {
-      name: "Signed in browsers",
+      name: "Signed-in browsers",
       exact: true,
     }),
   ).toBeFocused();
@@ -3732,7 +3746,7 @@ test("authenticator sign-in shows native inline code errors", async ({
   await page.goto("/volunteer/account");
   await page.getByRole("button", { name: "Edit personal info" }).click();
   const name = page.getByRole("textbox", {
-    name: /^Preferred name/,
+    name: /^Preferred first name/,
   });
   await name.fill("Unsaved authenticator draft");
   await expect(page.locator("[data-factor-settings]")).toContainText(
