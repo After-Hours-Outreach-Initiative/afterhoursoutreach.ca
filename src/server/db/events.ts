@@ -1248,7 +1248,7 @@ export async function listRosters(
            preferredName: "approver_profile.preferred_name",
            legacyName: "approver.name",
          })} END AS patrolApprovedByName,
-         v.approved_at AS patrolApprovedAt,
+         s.patrol_approved_at AS patrolApprovedAt,
          EXISTS(SELECT 1 FROM orientation_completion o
           WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
       FROM signup s
@@ -1256,7 +1256,7 @@ export async function listRosters(
       LEFT JOIN profile p ON p.user_id = s.user_id
        LEFT JOIN user u ON u.id = s.user_id
        LEFT JOIN volunteer_status v ON v.user_id = s.user_id
-       LEFT JOIN user approver ON approver.id = v.approved_by AND approver.deleted_at IS NULL
+       LEFT JOIN user approver ON approver.id = s.patrol_approved_by AND approver.deleted_at IS NULL
        LEFT JOIN profile approver_profile ON approver_profile.user_id = approver.id
        LEFT JOIN user adder ON adder.id = s.added_by AND adder.deleted_at IS NULL
        LEFT JOIN profile adder_profile ON adder_profile.user_id = adder.id
@@ -1296,11 +1296,8 @@ export async function manageSignup(
     }>();
   if (!row) throw new RequestError(404, "Registration not found.");
   const old = await findEvent(db, row.eventId);
-  if (old.startsAt <= Date.now())
-    throw new RequestError(
-      409,
-      "Past registrations cannot be removed or moved.",
-    );
+  if (destination && old.startsAt <= Date.now())
+    throw new RequestError(409, "Past registrations cannot be moved.");
   if (destination === row.eventId)
     throw new RequestError(400, "Choose a different event.");
   const next = destination ? await findEvent(db, destination) : null;
@@ -1318,7 +1315,7 @@ export async function manageSignup(
             AND EXISTS(
               SELECT 1 FROM event e
               WHERE e.id = signup.event_id
-                AND e.starts_at > ${nowMsSql}
+                ${next ? `AND e.starts_at > ${nowMsSql}` : ""}
             )
             AND ${writePermission(true)}`,
         )
@@ -1357,7 +1354,8 @@ export async function manageSignup(
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
           SELECT ?, ?, ?, ?, ?, ?, email FROM user
-          WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?) AND ? = 1`,
+          WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?) AND ? = 1
+            AND EXISTS(SELECT 1 FROM event e WHERE e.id = ? AND e.starts_at > ${nowMsSql})`,
         )
         .bind(
           crypto.randomUUID(),
@@ -1369,6 +1367,7 @@ export async function manageSignup(
           row.userId,
           operation,
           Number(notify),
+          row.eventId,
         ),
     );
     const results = await db.batch(statements);

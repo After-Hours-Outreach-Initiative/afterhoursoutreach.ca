@@ -1857,16 +1857,27 @@ describe(
           );
           routeCookie = organizer.cookie;
           const attendance = await createEvent("orientation", 5);
+          const otherAttendance = await createEvent("orientation", 5);
           await ok(await status(bob.id, true, false));
           await ok(await join(attendance.id, bob.cookie));
           await ok(await join(attendance.id, alice.cookie));
-          await DB.prepare("UPDATE event SET starts_at=? WHERE id=?")
-            .bind(Date.now() - 1000, attendance.id)
+          await ok(await join(otherAttendance.id, bob.cookie));
+          await DB.prepare("UPDATE event SET starts_at=? WHERE id IN (?,?)")
+            .bind(Date.now() - 1000, attendance.id, otherAttendance.id)
             .run();
           await page.goto(`${origin}/events`);
           const attendanceCard = page.locator(
             `[data-live-event="${attendance.id}"]`,
           );
+          const otherAttendanceCard = page.locator(
+            `[data-live-event="${otherAttendance.id}"]`,
+          );
+          await expect(
+            attendanceCard.locator("[data-patrol-approval-status]"),
+          ).toHaveCount(0);
+          await expect(
+            otherAttendanceCard.locator("[data-patrol-approval-status]"),
+          ).toHaveCount(0);
           await attendanceCard.locator(".volunteer-roster > summary").click();
           const approvalForm = attendanceCard.locator(
             "[data-organizer-patrol-approval]",
@@ -1898,6 +1909,12 @@ describe(
             loadingLabel: "Saving…",
           });
           await expect(approvalForm).toHaveCount(0);
+          await expect(
+            attendanceCard.locator("[data-patrol-approval-status]"),
+          ).toHaveCount(1);
+          await expect(
+            otherAttendanceCard.locator("[data-patrol-approval-status]"),
+          ).toHaveCount(0);
           await expect(
             approvedAttendee.locator("[data-patrol-approval-status]"),
           ).toContainText("Approved by");

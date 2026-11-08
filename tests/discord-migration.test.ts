@@ -55,6 +55,8 @@ test("Discord migration preserves existing volunteers and drafts without inventi
                 manual_medic: 0,
                 manual_new: 0,
                 added_by: null,
+                patrol_approved_by: null,
+                patrol_approved_at: null,
               }
             : {}),
         })),

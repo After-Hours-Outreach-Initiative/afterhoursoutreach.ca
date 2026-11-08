@@ -12,10 +12,10 @@ interface Props {
   signup: RosterRow;
   event: EventRow;
   destinations: EventRow[];
-  editable?: boolean;
+  movable?: boolean;
 }
-const { signup, event, destinations, editable = true } = Astro.props;
-const actions = editable ? (["move", "remove"] as const) : [];
+const { signup, event, destinations, movable = true } = Astro.props;
+const actions = movable ? (["move", "remove"] as const) : (["remove"] as const);
 ---
 
 <button
@@ -27,8 +27,8 @@ const actions = editable ? (["move", "remove"] as const) : [];
   aria-controls={`signup-menu-${signup.id}`}
   aria-haspopup="menu"
   aria-expanded="false"
-  aria-label={`Registration ${editable ? "actions" : "details"} for ${signup.name}`}
-  title={`Registration ${editable ? "actions" : "details"} for ${signup.name}`}
+  aria-label={`Registration actions for ${signup.name}`}
+  title={`Registration actions for ${signup.name}`}
 >
   <EllipsisIcon class="size-5" />
 </button>
@@ -53,32 +53,30 @@ const actions = editable ? (["move", "remove"] as const) : [];
     )
   }
   {
-    editable && (
-      <>
-        <button
-          type="button"
-          role="menuitem"
-          tabindex="-1"
-          data-show-dialog={`signup-move-${signup.id}`}
-          data-signup-change="move"
-          disabled={destinations.length === 0}
-        >
-          <ArrowRightIcon class="size-5" />
-          Move volunteer
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          tabindex="-1"
-          data-show-dialog={`signup-remove-${signup.id}`}
-          data-signup-change="remove"
-        >
-          <TrashIcon class="size-5" />
-          Remove volunteer
-        </button>
-      </>
+    movable && (
+      <button
+        type="button"
+        role="menuitem"
+        tabindex="-1"
+        data-show-dialog={`signup-move-${signup.id}`}
+        data-signup-change="move"
+        disabled={destinations.length === 0}
+      >
+        <ArrowRightIcon class="size-5" />
+        Move volunteer
+      </button>
     )
   }
+  <button
+    type="button"
+    role="menuitem"
+    tabindex="-1"
+    data-show-dialog={`signup-remove-${signup.id}`}
+    data-signup-change="remove"
+  >
+    <TrashIcon class="size-5" />
+    Remove volunteer
+  </button>
 </div>
 {
   actions.map((action) => (
@@ -101,7 +99,7 @@ const actions = editable ? (["move", "remove"] as const) : [];
           id={`signup-${action}-form-${signup.id}`}
           class="volunteer-form"
           data-manage-signup
-          data-email-prompt={signup.userId ? "signup" : undefined}
+          data-email-prompt={signup.userId && movable ? "signup" : undefined}
           action="/api/v1/events/action"
           method="post"
         >
@@ -136,7 +134,7 @@ const actions = editable ? (["move", "remove"] as const) : [];
               </div>
             </>
           )}
-          {signup.userId && (
+          {signup.userId && movable && (
             <div class="volunteer-field">
               <label for={`signup-${action}-reason-${signup.id}`}>
                 Reason (optional)
@@ -154,7 +152,7 @@ const actions = editable ? (["move", "remove"] as const) : [];
               />
             </div>
           )}
-          {signup.userId && !import.meta.env.DEV && (
+          {signup.userId && movable && !import.meta.env.DEV && (
             <p class="volunteer-help">
               Included in the email if you choose to send one. Do not include
               medical or other sensitive information.

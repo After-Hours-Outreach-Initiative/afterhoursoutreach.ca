@@ -486,6 +486,94 @@ test("concurrent manual and account signups cannot take each other's reserved ca
   );
 });
 
+test("organizers silently remove past account and name-only registrations without moving them or clearing orientation history", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("past-volunteer", "volunteer");
+  for (const id of ["past-source", "future-destination"])
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES (?,'orientation',?,'Point',8,?,0,0)`,
+    )
+      .bind(id, Date.now() + 86_400_000, organizer.id)
+      .run();
+  await changeSignup(env.DB, volunteer, "past-source", "join");
+  await addManualSignup(env.DB, organizer, "past-source", {
+    name: "Past Attendee",
+    medic: false,
+    newVolunteer: false,
+  });
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE event SET starts_at=0,open=0,hidden=1 WHERE id='past-source'",
+    ),
+    env.DB.prepare(
+      "INSERT INTO orientation_completion VALUES ('past-completion',?,'past-source',?,0)",
+    ).bind(volunteer.id, organizer.id),
+  ]);
+  const roster = await listRosters(env.DB, organizer, ["past-source"]);
+  assert.equal(roster.length, 2);
+  assert.equal(
+    roster.find(({ userId }) => userId === volunteer.id)?.addedById,
+    null,
+  );
+  for (const person of roster) {
+    await assert.rejects(
+      manageSignup(env.DB, volunteer, person.id, undefined, ""),
+      statusError(403),
+    );
+    await assert.rejects(
+      manageSignup(env.DB, organizer, person.id, "future-destination", ""),
+      { status: 409, message: "Past registrations cannot be moved." },
+    );
+    const removed = await manageSignup(
+      env.DB,
+      organizer,
+      person.id,
+      undefined,
+      "",
+      true,
+    );
+    assert.equal(removed.message, "Registration removed.");
+    assert.equal(
+      await env.DB.prepare("SELECT status FROM signup WHERE id=?")
+        .bind(person.id)
+        .first("status"),
+      "cancelled",
+    );
+    assert.equal(
+      await env.DB.prepare(
+        "SELECT action FROM event_audit WHERE id=? AND actor_id=?",
+      )
+        .bind(removed.operation, organizer.id)
+        .first("action"),
+      "signup_removed",
+    );
+    await assert.rejects(
+      manageSignup(env.DB, organizer, person.id, undefined, ""),
+      statusError(404),
+    );
+  }
+  assert.deepEqual(await listRosters(env.DB, organizer, ["past-source"]), []);
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM signup WHERE event_id='future-destination'",
+    ).first("n"),
+    0,
+  );
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) n FROM orientation_completion WHERE id='past-completion'",
+    ).first("n"),
+    1,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT count(*) n FROM event_notification").first(
+      "n",
+    ),
+    0,
+  );
+});
+
 test("organizer staged additions to past events search eligible accounts and commit mixed lists atomically", async () => {
   const organizer = await manualRosterActor("manual-organizer", "organizer");
   const volunteer = await manualRosterActor("staged-volunteer", "volunteer");
@@ -2789,6 +2877,83 @@ test("legacy patrol approval attribution retains its recorded organizer and epoc
       name: applicationDisplayName(completeAnswers()),
       changedAt: 0,
     },
+  );
+});
+
+test("roster approval attribution belongs to the specific signup, independent of account approval and attendance", async () => {
+  const { organizer, volunteer, input } = await patrolApprovalFixture();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES ('other-orientation','orientation',?,'Other point',8,?,0,0)`,
+    ).bind(Date.now() + 86_400_000, organizer.id),
+    env.DB.prepare(
+      "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('other-signup','other-orientation',?,0,0)",
+    ).bind(volunteer.id),
+    env.DB.prepare("UPDATE event SET starts_at=0"),
+    env.DB.prepare(
+      "INSERT INTO orientation_completion VALUES ('earlier-attendance',?,'other-orientation',?,0)",
+    ).bind(volunteer.id, organizer.id),
+  ]);
+  const rosters = () =>
+    listRosters(env.DB, organizer, ["patrol-orientation", "other-orientation"]);
+  const version = async () =>
+    (await env.DB.prepare(
+      "SELECT updated_at FROM volunteer_status WHERE user_id=?",
+    )
+      .bind(volunteer.id)
+      .first<number>("updated_at"))!;
+  // Profile approval, even with recorded attendance, does not attribute any roster entry.
+  await approveForPatrols(env.DB, organizer, input);
+  for (const row of await rosters()) {
+    assert.equal(row.patrolApproved, 1);
+    assert.equal(row.patrolApprovedById, null);
+    assert.equal(row.patrolApprovedByName, null);
+    assert.equal(row.patrolApprovedAt, null);
+  }
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=0,approved_by=NULL,approved_at=NULL WHERE user_id=?",
+  )
+    .bind(volunteer.id)
+    .run();
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    version: await version(),
+    eventId: "patrol-orientation",
+  });
+  const approved = (await rosters()).find(
+    ({ eventId }) => eventId === "patrol-orientation",
+  )!;
+  assert.equal(approved.patrolApprovedById, organizer.id);
+  assert.equal(
+    approved.patrolApprovedByName,
+    applicationDisplayName(completeAnswers()),
+  );
+  assert.equal(approved.patrolApprovedAt, await version());
+  const other = (await rosters()).find(
+    ({ eventId }) => eventId === "other-orientation",
+  )!;
+  assert.equal(other.completed, 1);
+  assert.equal(other.patrolApprovedAt, null);
+  // Later profile approvals cannot rewrite the original entry's attribution.
+  await env.DB.prepare(
+    "UPDATE volunteer_status SET patrol_approved=0,approved_by=NULL,approved_at=NULL WHERE user_id=?",
+  )
+    .bind(volunteer.id)
+    .run();
+  await approveForPatrols(env.DB, organizer, {
+    ...input,
+    version: await version(),
+  });
+  assert.equal(
+    (await rosters()).find(({ eventId }) => eventId === "patrol-orientation")
+      ?.patrolApprovedAt,
+    approved.patrolApprovedAt,
+  );
+  assert.equal(
+    (await rosters()).find(({ eventId }) => eventId === "other-orientation")
+      ?.patrolApprovedAt,
+    null,
   );
 });
 

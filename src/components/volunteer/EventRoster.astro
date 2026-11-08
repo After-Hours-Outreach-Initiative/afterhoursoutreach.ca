@@ -78,7 +78,7 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
             {Boolean(person.completed) && !person.patrolApproved && (
               <span class="event-roster-status">Orientation completed</span>
             )}
-            {Boolean(person.patrolApproved) && !future && (
+            {person.patrolApprovedAt !== null && !future && (
               <span class="event-roster-status" data-patrol-approval-status>
                 {person.patrolApprovedAt !== null ? (
                   <>
@@ -136,16 +136,14 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
                 </form>
               )}
           </div>
-          {(future || person.addedById) && (
-            <div class="event-roster-actions">
-              <SignupEditor
-                signup={person}
-                event={event}
-                destinations={destinations}
-                editable={future}
-              />
-            </div>
-          )}
+          <div class="event-roster-actions">
+            <SignupEditor
+              signup={person}
+              event={event}
+              destinations={destinations}
+              movable={future}
+            />
+          </div>
         </li>
       ))
     }

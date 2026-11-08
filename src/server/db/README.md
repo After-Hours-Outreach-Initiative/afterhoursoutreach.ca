@@ -61,7 +61,10 @@ filter and its count include only ready, unrejected applications.
 **Approve for patrols** is available after application approval, without requiring
 orientation booking or completion. It does not infer attendance. When the same action
 is used from a past orientation roster with an explicit event, it also records that
-event's attendance in the version-guarded transaction. Both paths retain audit records
+entry's approver and approval time on `signup` in the version-guarded transaction.
+The roster's **Approved by** line uses only this attribution. Existing account-wide
+approvals and orientation attendance do not imply approval from a particular entry.
+The action also records the event's attendance separately. Both paths retain audit records
 and optional access emails, and do not alter the volunteer's active/inactive status.
 
 `profile.preferred_name` historically stored a combined full-or-preferred-name

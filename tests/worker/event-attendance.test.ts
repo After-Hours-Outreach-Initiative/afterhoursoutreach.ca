@@ -4,6 +4,7 @@ import { chromium, expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { addCalendarDays, vancouverInput } from "../../src/data/event-time";
+import { inPlaceAction } from "../helpers/in-place-action";
 
 test("event avatars and abbreviated rosters render privately on desktop/mobile, including managed occurrences and maximum capacity", async () => {
   const origin = "https://afterhoursoutreach.ca";
@@ -646,6 +647,77 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         '.attendee-new-volunteer [data-avatar-decoration="medic-cross"]',
       ),
     ).toHaveCount(1);
+
+    // Past rosters expose removal for self-registered and organizer-added entries.
+    await DB.prepare("UPDATE event SET starts_at=0 WHERE id='hidden'").run();
+    const added = await send("/api/v1/events/action", organizer.cookie, {
+      action: "add-volunteers",
+      id: "hidden",
+      volunteers: [
+        { name: "Past Attendee", medic: false, newVolunteer: false },
+      ],
+    });
+    expect(added.status, await added.clone().text()).toBe(200);
+    await page.goto(`${origin}/events`);
+    const pastCard = page.locator(
+      '[data-past-event-list] [data-live-event="hidden"]',
+    );
+    const pastRoster = pastCard.locator(".volunteer-roster");
+    await pastRoster.locator("summary").click();
+    await expect(pastRoster.locator("[data-signup-menu-trigger]")).toHaveCount(
+      2,
+    );
+    for (const remaining of [1, 0]) {
+      await pastRoster.locator("[data-signup-menu-trigger]").first().click();
+      await expect(
+        pastRoster.getByRole("menuitem", {
+          name: "Move volunteer",
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      await pastRoster
+        .getByRole("menuitem", { name: "Remove volunteer", exact: true })
+        .first()
+        .click();
+      const dialog = page.getByRole("dialog", {
+        name: "Remove volunteer",
+        exact: true,
+      });
+      await expect(dialog).toContainText("Remove");
+      await expect(dialog.locator("[data-manage-signup]")).not.toHaveAttribute(
+        "data-email-prompt",
+      );
+      await expect(dialog.locator("textarea")).toHaveCount(0);
+      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(
+        pastRoster.locator("[data-signup-menu-trigger]"),
+      ).toHaveCount(remaining + 1);
+      await pastRoster.locator("[data-signup-menu-trigger]").first().click();
+      await pastRoster
+        .getByRole("menuitem", { name: "Remove volunteer", exact: true })
+        .first()
+        .click();
+      await inPlaceAction(page, {
+        endpoint: "/api/v1/events/action",
+        form: dialog.locator("[data-manage-signup]"),
+        trigger: () =>
+          dialog.getByRole("button", { name: "Remove", exact: true }).click(),
+        updated: () =>
+          expect(pastRoster.locator("[data-signup-menu-trigger]")).toHaveCount(
+            remaining,
+          ),
+        loadingLabel: "Removing…",
+      });
+      await expect(dialog).not.toBeVisible();
+    }
+    expect(
+      await DB.prepare(
+        "SELECT count(*) n FROM signup WHERE event_id='hidden' AND status='confirmed'",
+      ).first("n"),
+    ).toBe(0);
+    expect(
+      await DB.prepare("SELECT count(*) n FROM event_notification").first("n"),
+    ).toBe(0);
   } finally {
     await browser.close();
     await server.close();

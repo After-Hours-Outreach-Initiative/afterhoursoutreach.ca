@@ -868,6 +868,24 @@ export async function approveForPatrols(
           Number(notify),
           operation,
         ),
+      db
+        .prepare(
+          `UPDATE signup SET patrol_approved_by=?, patrol_approved_at=?
+          WHERE user_id=? AND event_id=? AND status='confirmed'
+            AND EXISTS(SELECT 1 FROM event e WHERE e.id=signup.event_id
+              AND ${includesOrientationSql()} AND e.cancelled_at IS NULL
+              AND e.starts_at <= ${nowMsSql})
+            AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)
+            AND ${writePermission(true)}`,
+        )
+        .bind(
+          actor.id,
+          now,
+          userId,
+          eventId ?? null,
+          operation,
+          ...permissionValues(actor),
+        ),
     ]);
     if (!results[0].meta.changes)
       throw new RequestError(

@@ -448,6 +448,9 @@ export const signup = sqliteTable(
     user_id: text().references(() => user.id),
     // The organizer who added this event-local registration; NULL for legacy rows.
     added_by: text().references(() => user.id),
+    // Attribution only for approval performed from this roster entry.
+    patrol_approved_by: text().references(() => user.id),
+    patrol_approved_at: timestamp(),
     manual_name: text(),
     manual_medic: integer({ mode: "boolean" }).notNull().default(false),
     manual_new: integer({ mode: "boolean" }).notNull().default(false),
