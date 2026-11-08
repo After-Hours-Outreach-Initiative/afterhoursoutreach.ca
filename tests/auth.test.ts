@@ -633,9 +633,9 @@ test("automatic email links require an unexpired signed requesting-browser bindi
       .bind(`sign-in-otp-${email}`)
       .first();
   const original = await readChallenge();
-  const budgets = await bindings.DB.prepare(
-    "SELECT * FROM auth_rate_limit",
-  ).all();
+  const budgets = (
+    await bindings.DB.prepare("SELECT * FROM auth_rate_limit").all()
+  ).results;
   for (const response of [
     await activate(), // A JS-enabled scanner has the entire link but no cookie.
     await activate(cookie + "forged"),
@@ -656,7 +656,7 @@ test("automatic email links require an unexpired signed requesting-browser bindi
   vi.useRealTimers();
   assert.deepEqual(await readChallenge(), original);
   assert.deepEqual(
-    await bindings.DB.prepare("SELECT * FROM auth_rate_limit").all(),
+    (await bindings.DB.prepare("SELECT * FROM auth_rate_limit").all()).results,
     budgets,
   );
   const signedIn = await activate(cookie);
