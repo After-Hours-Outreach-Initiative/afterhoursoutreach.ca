@@ -52,7 +52,18 @@
 
 .diagram-controls button:disabled {
   opacity: 0.5;
-  cursor: wait;
+  cursor: default;
+}
+
+.diagram-controls .diagram-save {
+  color: var(--sl-color-text-invert);
+  background: var(--sl-color-text-accent);
+  border-color: transparent;
+}
+
+.diagram-controls .diagram-save:hover:not(:disabled) {
+  background: var(--sl-color-accent-high);
+  border-color: transparent;
 }
 
 .diagram-controls .diagram-filename {
@@ -96,4 +107,50 @@
 .diagram-canvas > .excalidraw {
   position: absolute;
   inset: 0;
+}
+
+.diagram-inline,
+.diagram-surface {
+  min-width: 0;
+}
+
+.diagram-dialog {
+  box-sizing: border-box;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: clamp(0.5rem, 2vw, 1rem);
+  overflow: hidden;
+  border: 0;
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  overscroll-behavior: contain;
+}
+
+.diagram-dialog[open] {
+  display: flex;
+}
+
+.diagram-dialog::backdrop {
+  background: var(--sl-color-bg);
+}
+
+.diagram-dialog > .diagram-surface {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.diagram-dialog .diagram-controls {
+  flex: 0 0 auto;
+}
+
+.diagram-dialog .diagram-canvas {
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
 }
