@@ -8,6 +8,20 @@ import localDashboard from "./src/integrations/local-dashboard.ts";
 
 // This is a standalone local reader, not part of the application's build.
 export default defineConfig({
+  // Keep bookmarked guide URLs working after the documentation reorganization.
+  redirects: {
+    "/accounts": "/specification/accounts/",
+    "/events": "/specification/events/",
+    "/discord": "/specification/discord/",
+    "/privacy": "/planning/privacy/",
+    "/backend": "/implementation/backend/",
+    "/system-architecture": "/implementation/system-architecture/",
+    "/deployment": "/implementation/deployment/",
+    "/operations-dashboard": "/implementation/operations-dashboard/",
+    "/testing": "/implementation/testing/",
+    "/docs-site": "/implementation/docs-site/",
+    "/emails": "/implementation/emails/",
+  },
   server: {
     host: "127.0.0.1",
     port: 4322,
@@ -51,45 +65,65 @@ export default defineConfig({
       pagefind: false,
       sidebar: [
         { label: "Overview", slug: "" },
-        { label: "Operations dashboard", link: "/dashboard/" },
         {
-          label: "Application workflows",
+          label: "Planning",
           items: [
-            { label: "Accounts", slug: "accounts" },
-            { label: "Discord", slug: "discord" },
-            { label: "Events", slug: "events" },
-            { label: "Email previews", slug: "emails" },
+            { label: "Plans and open decisions", slug: "planning" },
+            { label: "Privacy planning", slug: "planning/privacy" },
           ],
         },
         {
-          label: "Architecture and operations",
+          label: "Specification",
           items: [
-            { label: "System architecture", slug: "system-architecture" },
-            { label: "Backend", slug: "backend" },
-            { label: "Deployment", slug: "deployment" },
-            { label: "Dashboard administration", slug: "operations-dashboard" },
+            { label: "Product overview", slug: "specification" },
+            { label: "Accounts", slug: "specification/accounts" },
+            { label: "Events", slug: "specification/events" },
+            { label: "Discord", slug: "specification/discord" },
+            { label: "Notifications", slug: "specification/notifications" },
+            { label: "Privacy", slug: "specification/privacy" },
           ],
         },
-        { label: "Privacy review", slug: "privacy" },
         {
-          label: "Testing",
+          label: "Implementation",
           items: [
-            { label: "Testing guide", slug: "testing" },
+            { label: "Overview", slug: "implementation" },
             {
-              label: "Historical benchmarks",
-              collapsed: true,
-              items: [
-                { label: "Original baseline", slug: "test-benchmarks" },
-                {
-                  label: "Simplified suite",
-                  slug: "test-benchmarks-simplified",
-                },
-                { label: "Vitest migration", slug: "test-benchmarks-vitest" },
-              ],
+              label: "System architecture",
+              slug: "implementation/system-architecture",
+            },
+            { label: "Backend and database", slug: "implementation/backend" },
+            { label: "Local development", slug: "implementation/development" },
+            {
+              label: "Accounts and authentication",
+              slug: "implementation/accounts",
+            },
+            {
+              label: "Events and registrations",
+              slug: "implementation/events",
+            },
+            { label: "Discord integration", slug: "implementation/discord" },
+            {
+              label: "Notification delivery",
+              slug: "implementation/notifications",
+            },
+            { label: "Deployment", slug: "implementation/deployment" },
+            { label: "Testing", slug: "implementation/testing" },
+            {
+              label: "Privacy implementation review",
+              slug: "implementation/privacy",
+            },
+            { label: "Email previews", slug: "implementation/emails" },
+            { label: "Operations dashboard", link: "/dashboard/" },
+            {
+              label: "Dashboard administration",
+              slug: "implementation/operations-dashboard",
+            },
+            {
+              label: "Maintaining these docs",
+              slug: "implementation/docs-site",
             },
           ],
         },
-        { label: "Docs site", slug: "docs-site" },
       ],
     }),
   ],

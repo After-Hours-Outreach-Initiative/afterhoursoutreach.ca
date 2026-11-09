@@ -91,7 +91,7 @@ their CSP, no-store, and noindex protections in all deployed builds; public
 production pages can be indexed and cached.
 Account secrets: `BETTER_AUTH_SECRET`, `RESEND_API_KEY`.
 Discord additionally needs private client/bot/encryption secrets and the server
-and three role IDs documented in [Discord setup](/discord/#dedicated-bot-and-server-setup).
+and three role IDs documented in [Discord setup](/implementation/discord/#dedicated-bot-and-server-setup).
 Blank IDs disable Discord without affecting email sign-in; configure before
 accepting new applications. No production Discord credentials belong in previews.
 Use `wrangler preview base-config secret put NAME` for new previews, or
@@ -99,7 +99,7 @@ Use `wrangler preview base-config secret put NAME` for new previews, or
 Account secrets are configured in Previews Base. Email requests remain rate limited.
 `pnpm test:accounts` uses local data only.
 `pnpm test:preview` checks preview account behavior and rejection of development
-endpoints using a local Worker and test database. See [testing.md](/testing/)
+endpoints using a local Worker and test database. See [Testing guide](/implementation/testing/)
 for the Vitest projects and browser-test commands.
 
 Production: `pnpm build` followed by `pnpm deploy`. The deploy script applies
@@ -114,54 +114,7 @@ domain were retired after live preview checks; the shared D1 database was retain
 
 ## Medic certification reminders
 
-`src/worker.ts` preserves Astro's fetch handler and adds Cron Triggers from
-`wrangler.jsonc`: daily discovery at **16:00 UTC** (08:00 PST / 09:00 PDT), and
-delivery/retries at **30 minutes past each hour**. Daily discovery also delivers
-one batch. Deploy the built `dist/server/wrangler.json` as usual, not the source
-Worker directly. Trigger changes can take up to 15 minutes to propagate.
-
-- Only verified accounts with an active volunteer status, the structured `medic`
-  team, a recognized structured certification, and a valid expiry date qualify.
-  Legacy free-text certification answers are never inferred. Approval/medic-role
-  registration requirements are unchanged.
-- Warning: once when the expiry enters the **30-calendar-day** window, including
-  the expiry day. Expired: a separate message starting **the following day**.
-  All comparisons use `America/Vancouver`, including DST; the certificate remains
-  valid through its expiry date. Account links use the configured HTTPS
-  `AUTH_BASE_URL`, never a request host.
-- Activation/outage catch-up is explicitly bounded: existing certificates within
-  the warning window qualify, but expired messages cover only the previous
-  **seven calendar dates**. Older expired profiles are not backfilled. A missed
-  discovery catches up on the next daily run within these windows.
-- Each run sends at most **five** emails, serially paced like event mail, sharing
-  the existing **80/day** budget with sign-in/event mail. Unattempted backlog can
-  wait while still relevant; budget exhaustion does not start its retry clock.
-- Migration `0011_medic_certification_notifications.sql` adds the persistent
-  outbox/ledger. A unique `(user_id, expiry, kind)` key, atomic token-owned leases,
-  and stable Resend idempotency keys prevent concurrent/replayed sends. Renewing
-  to a different date creates a new cycle; never delete ledger rows to retry mail.
-- The exact recipient and request are frozen on the first provider attempt.
-  Failures (including an ambiguous timeout or a failed post-send database write)
-  retry hourly for **less than 23 hours from that attempt**, within Resend's
-  24-hour idempotency lifetime. After that, status `expired` requires manual
-  delivery investigation; automatic resend is deliberately disabled to prevent
-  duplicates. This status means delivery is unresolved, not certificate expiry.
-  Renewal, loss of eligibility, a changed recipient, or leaving the applicable
-  date window cancels stale mail. Cancelled cycles are not automatically restarted.
-  Payloads are cleared on terminal states; logs contain aggregate counts only.
-- Monitor the `medic_certification_notifications` aggregate log and failed Cron
-  Events, especially pending backlog and expired delivery counts. Inspect only
-  status/count fields when diagnosing; do not export recipient/payload fields.
-
-Before production deployment, verify the dedicated production D1 binding,
-configure `BETTER_AUTH_SECRET` and `RESEND_API_KEY`, and verify the Resend
-sender/domain. `pnpm deploy` applies generated migrations to the guarded
-production database before uploading the Worker. No new secrets or services
-are needed. Local/dev and `APP_ENV != production` (including branch previews)
-skip the job without sending or consuming notifications; automated tests inject a
-mock provider against isolated D1. No remote migration, deployment, or real email
-is performed by the build or tests.
-
-References: [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/),
-[Astro custom Worker entrypoint](https://docs.astro.build/en/guides/integrations-guide/cloudflare/#changed-custom-entrypoint-api),
-[Resend idempotency lifetime](https://resend.com/docs/dashboard/emails/idempotency-keys).
+Cron configuration, outbox behavior, and monitoring are documented under
+[Notification delivery](/implementation/notifications/#medic-certification-reminders).
+The product timing and eligibility rules live in the
+[Notifications specification](/specification/notifications/#medic-certification-reminders).

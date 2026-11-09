@@ -3,6 +3,9 @@ title: Events
 description: Patrol and orientation visibility, sign-ups, and organizer management.
 ---
 
+Product rules for patrols, orientations, sign-ups, and organizer management. See
+[Event implementation](/implementation/events/) for API and persistence details.
+
 Patrols and orientations show up at the bottom of the `/volunteer` page. An
 active account with an organizer-approved application is required to view events or
 sign up for either. Organizers retain access through their role.
@@ -29,12 +32,8 @@ A list of event cards for patrols and orientations, each consists of the date,
 the start time, the meeting location, and how many spots are left. Event signups
 should be closed when the start time passes.
 
-The browser checks `/api/v1/events/version` every five seconds, or every 60 seconds
-while awaiting application approval, and refreshes event cards only when their
-scoped version changes. Approval is detected automatically and restores five-second
-polling. Polling pauses in hidden tabs and checks immediately when returning to the
-page. Your own saved changes still refresh immediately; filters, focus, and open
-editor drafts are preserved.
+Event cards update when events or application approval change. Updates preserve
+filters, focus, and unsaved editor drafts.
 
 ## Views per type of user
 
@@ -47,8 +46,8 @@ There are 3 types of users:
 ### 1. Visitors
 
 The homepage links to volunteer application/sign-in. Applications use `/apply`. Event details are not
-available to visitors, including through `/api/v1/events`. Polling versions contain
-no event details and do not change with event activity for visitors or pending accounts.
+available to visitors, including through direct requests. Background updates must not reveal event
+activity to visitors or pending accounts.
 
 ### 2. Volunteers
 
@@ -73,11 +72,6 @@ registrants can see it, and new registrations are blocked. Existing spots are
 not cancelled. New events default to off. “Public” does not grant visitor or
 pending-account access.
 
-The existing `open`/`hidden` API and database fields remain compatible. The
-editor saves them together (`true`/`false` when on, `false`/`true` when off).
-Older events with either registration closed or the event hidden are treated
-as off until an organizer explicitly turns visibility on.
-
 ### Event volunteers list
 
 The bottom of the event card has a roster details element that shows the list
@@ -89,12 +83,3 @@ unless they choose to send one. Event edits/cancellations and volunteer
 access/role changes use the same optional email prompt.
 
 On an orientation, the list also has a completed checkbox for each volunteer.
-
-## TODO
-
-- TODO: decide if cancelled signups are kept, or deleted.
-- TODO: decide how long past events and their rosters are kept.
-- TODO: decide if volunteers who have completed an orientation still see
-  upcoming orientations
-- TODO: should events in the past show up at all, maybe they stay visible for
-  a week or so, or maybe we have a full history visible to any visitor?

@@ -1140,7 +1140,8 @@ export default function OperationsDashboard() {
       <p className="ops-intro">
         Local administration of remote D1 databases. Uses your Wrangler login on
         this computer. Nothing here is available in a deployed build.{" "}
-        <a href="/operations-dashboard/">Setup and safeguards</a>.
+        <a href="/implementation/operations-dashboard/">Setup and safeguards</a>
+        .
       </p>
       <div className="ops-toolbar ops-connection">
         <label>

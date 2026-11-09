@@ -1,0 +1,203 @@
+---
+title: Accounts
+description: Volunteer applications, passwordless sign-in, profiles, and organizer roles.
+---
+
+import Diagram from "../../../components/Diagram.astro";
+
+<Diagram
+  name="accounts"
+  title="Volunteer progression"
+  description="Create an email account, submit the application and Code of Conduct, and confirm Naloxone 101 completion before organizer review. An approved active applicant can view events and book orientation places; rejected applicants cannot access events. Orientation is the usual route to a separate organizer patrol-approval decision, but approval may be granted without recorded orientation. Patrol-approved volunteers can book regular patrols; medic places also require the Medic team and a recognized certification valid for the event. Discord is currently paused as an application requirement."
+/>
+
+Product rules for volunteer applications, sign-in, profiles, and organizer
+access. Technical details are in [Account implementation](/implementation/accounts/).
+
+## Authentication
+
+Authentication is passwordless, using an emailed link or code.
+
+1. The person enters their email address.
+2. The email holds a sign in link and a 6 digit code. Having both lets someone
+   open the email on a different device from the one they are signing in on.
+3. The link opens a confirmation page on whichever device opens it, then
+   redirects to the page they started from. The code signs in the device that
+   asked for it.
+4. Using one spends the other. Both expire after 10 minutes. 3 wrong codes cancel
+   the request and a new one has to be asked for.
+5. Requesting another email replaces the previous code and link.
+
+The first sign in with a new address creates the account and goes to the
+application form at `/apply`. See [Application](#application).
+
+## Application
+
+1. `/volunteer` has a button to create an account.
+2. The person signs in. See [Authentication](#authentication).
+3. A new account goes to the application form at `/apply`. The privacy notice is shown at
+   the top.
+4. The applicant can read the full Code of Conduct and must explicitly acknowledge
+   it before completing the application. The acknowledgement starts unchecked
+   and stays visible when the rules are collapsed or expanded.
+
+The acknowledgement records the rules version and time. Editing a profile does
+not require fresh acknowledgement or alter the original record. Existing profiles
+are not assigned invented consent.
+
+After submitting the form, new applicants confirm Naloxone 101 completion before
+organizer review. The Discord application requirement is currently paused.
+The intended connection step requires consent to join and verified full server
+membership, including any Membership Screening. See
+[Discord](/specification/discord/) for the linking rules and current status.
+
+Volunteers then wait for an organizer to approve their application
+from **Volunteers**, then **View profile and approval**, then **Approve application**. Until then,
+they can edit their account but cannot view events or sign up for orientations.
+Pending applications appear first in the volunteer list. Organizers retain event
+and review access through their role, with an active, completed application.
+
+Application approval enables event viewing and orientation sign-ups. Patrol
+approval remains a separate decision; completing orientation does not grant it
+automatically. Both approval changes are audited, and emails require organizer
+opt-in. Revoking application approval cancels future volunteer event sign-ups.
+
+`/apply` is the application URL. Applications and accounts are private pages.
+Event registrations reserve event spots; they are separate from volunteer applications.
+
+### Profile
+
+Application answers are saved with the person's profile. Ongoing contact,
+safety, training, and team-interest answers can be seen and edited at
+`/volunteer/account`.
+
+Email appears first during application. On the account page it appears in
+**Account settings**, not in the profile form.
+
+Profile questions are grouped into personal information, emergency contact,
+training and safety, and team interests. Applications also ask for a personal
+statement and Code of Conduct acknowledgement.
+
+**Save profile** is greyed out until an answer or team selection differs from
+the saved profile. Reverting every change disables it again. Successful saves
+establish the new baseline; failed saves remain retryable, and edits made while
+a save is pending stay unsaved. **Complete application** is unaffected.
+
+“How did you find out about us?”,
+“What motivates you to volunteer with us?”, and the Code of
+Conduct are editable only during application, not on the volunteer's profile.
+Organizers can view referral answers on profile pages/dialogs; motivation and
+the acknowledgement are not displayed there. Profile edits preserve the original
+application-only answers and acknowledgement. New applications require both
+questions and the acknowledgement.
+
+Volunteers can edit ongoing profile answers. Changes are logged without copying
+sensitive answers into the log and do not change patrol approval. Email changes
+use the separate verification flow described below. All organizers can view
+profile fields, and each profile view is logged. Accounts with an authenticator
+enabled must verify it when signing in.
+
+### Fields
+
+Questions are based on the current Google Form. The referral and motivation
+questions and Code of Conduct confirmation are application-only. Organizers can
+view referral answers and the remaining profile answers.
+
+| Field                                                     | Required                                             |
+| --------------------------------------------------------- | ---------------------------------------------------- |
+| First name                                                | Yes                                                  |
+| Middle name(s)                                            | No                                                   |
+| Last name                                                 | Yes                                                  |
+| Preferred name                                            | No                                                   |
+| Email (from the account)                                  | Yes                                                  |
+| Pronouns                                                  | No                                                   |
+| Phone number                                              | Yes                                                  |
+| Date of birth                                             | Yes                                                  |
+| Emergency contact name                                    | Yes                                                  |
+| Emergency contact phone                                   | Yes                                                  |
+| Emergency contact relationship                            | Yes                                                  |
+| How did you find out about us                             | At least one choice; short detail required for Other |
+| What motivates you to volunteer with us?                  | Yes                                                  |
+| Teams (outreach, medic, non-patrol)                       | Yes                                                  |
+| Highest medical certification                             | Yes                                                  |
+| Other training and experience, and other                  | Yes                                                  |
+| Medical conditions/allergies/anything else we should know | No                                                   |
+| Code of Conduct acknowledgement                           | On application                                       |
+
+New applicants must provide first and last names. Middle names, preferred name,
+and pronouns are optional. Account menus, volunteer lists, and event rosters use
+the preferred name when supplied, otherwise the first, middle, and last names
+together. Organizers can view each component and search by full or preferred name.
+
+Referral choices are Social Media, Friend/Word of mouth, Internet, and Other.
+Other requires a nonblank detail of at most 200 characters. Unchecking Other
+clears its text; the server ignores stale detail text when Other is not selected.
+
+Date of birth, emergency contact, and medical conditions each have a short line
+under them saying what the information is used for.
+
+Certification verification, uploads, and volunteer hours remain in
+[Planning](/planning/#applications-and-qualifications). Certification reminder
+behavior is covered in [Notifications](/specification/notifications/#medic-certification-reminders).
+
+### Discord
+
+Email sign-in is unchanged. The linked identity is not a social sign-in method.
+One Discord identity can belong to only one website account, and an account cannot
+silently swap Discord identities. Consent authorizes automatic server joining and
+role synchronization by a new dedicated bot. Only Volunteer, Organizer, and Medic
+roles are managed; there is no Outreach or separate patrol-approved role.
+See [Discord](/specification/discord/) for the complete connection workflow and role rules.
+
+## Two-factor authentication
+
+Two-factor authentication is optional for both organizers and volunteers. They
+can add an authenticator app (TOTP) from their account settings. Backup codes are
+given when TOTP is set up. Once enabled, the authenticator or a backup code is
+required each time that account signs in.
+
+## Sessions
+
+Sessions last 30 days and renew while the person keeps using the site. Signing out ends the session on that device. `/volunteer/account` lists
+active sessions and can end them.
+
+## Changing email
+
+1. The volunteer enters the new address on `/volunteer/account`.
+2. A verification code is sent to the new address. Nothing changes until the
+   person confirms it.
+3. The account stays the same, so the profile, signups, and orientation
+   completion carry over.
+
+If the new address already has an account, the change is blocked.
+
+Recovery when the old address is inaccessible needs operator assistance; it
+must not create a second volunteer identity.
+
+## Roles
+
+Every account has one role:
+
+- `volunteer`: the default for new accounts.
+- `organizer`: can manage events and volunteers.
+
+Organizers can promote an active account with a verified email and an approved
+application, or remove organizer status, without needing another organizer to
+agree. The last active organizer cannot be demoted or deactivated. Organizers sign in the same way as
+everyone else. There is no separate organizer login.
+
+The first organizer is provisioned by an operator. After that, organizers manage
+roles through the website. Role changes end the affected account's sessions.
+
+## Abuse protection
+
+Sign in requests are rate limited to reduce fake accounts and mailbombing.
+Requests are counted by both the address being sent to and the IP asking,
+since either one on its own is easy to work around.
+
+Sign-in emails have a 30-second per-address cooldown; email-change requests keep
+a one-minute cooldown. Both share limits of ten per address per hour, ten per
+IP per hour, and 80 total per day.
+
+Code verification: 3 attempts per code, plus 10 submissions per address per hour
+and 30 per IP per minute. The per-address budget survives resends and code rotation.

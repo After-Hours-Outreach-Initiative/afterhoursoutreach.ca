@@ -50,7 +50,7 @@ inserted atomically only for profiles submitted after migration 0020; existing
 profiles are not backfilled and retain access without linking. `discord_link`
 is both the unique identity mapping and a durable, versioned role-sync outbox.
 Eligibility triggers enqueue changes in the same transaction as website writes.
-See the [Discord operations guide](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/docs/src/content/docs/discord.md).
+See the [Discord operations guide](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/docs/src/content/docs/implementation/discord.md).
 Orientation signup and attendance are tracked separately;
 neither is an application-completion milestone or a substitute for patrol approval.
 Organizer volunteer profiles display Applicant, New volunteer, and Outreach Volunteer/Medic

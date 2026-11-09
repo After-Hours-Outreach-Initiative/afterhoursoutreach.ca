@@ -1,44 +1,15 @@
 ---
-title: Backend
-description: Server architecture, local testing, database workflows, organizer access, and email delivery.
+title: Local development
+description: Run the application locally, simulate integrations, and use reusable development accounts.
 ---
 
-The server side behind accounts, applications, and event signups.
+Use these tools to exercise the [account](/specification/accounts/) and
+[event](/specification/events/) workflows with local data.
 
-## Stack
-
-- `@astrojs/cloudflare` adapter. The application at `/apply` and account/event
-  pages under `/volunteer` render on the server; public content can be static.
-- Cloudflare D1 for the database.
-- Drizzle for the schema and migrations.
-- Better Auth with the official Email OTP plugin for sign in and sessions. See
-  [accounts.md](/accounts/).
-- Resend for sign in and notification emails.
-
-All HTTP API endpoints use `/api/v1/`, including authentication and health checks.
-The unversioned routes are no longer served. This keeps event requests outside the
-`workers.dev/api/event` adblock rule.
-
-## Database and business rules
-
-Database queries and persisted business workflows are grouped in
-[`src/server/db/`](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/src/server/db/README.md). Constraints are declared in
-`schema.ts`, atomic invariants in `triggers.sql`, and workflows in the event,
-volunteer, profile, access, session, outbox, and rate-limit modules there.
-HTTP handling, authentication integration, and email transport stay outside.
-
-Run `pnpm db:generate` after changing schema or trigger definitions. Everything
-in `drizzle/` is generated and committed; do not edit it. `pnpm db:check` and
-the tests detect stale or hand-edited SQL output.
-
-The pre-production migration history was consolidated into generated
-`0000_database.sql`. Old-history local/preview databases require an explicit
-rebuild before applying this baseline; generation never resets a database.
-
-## Local testing
+## Run the application
 
 Apply `pnpm db:migrate:local`, configure a local `BETTER_AUTH_SECRET` of at least
-32 characters in `.dev.vars`, then start `pnpm dev --background`. No extra
+32 characters in `.dev.vars`, then start `pnpm dev`. No extra
 frontend mode is needed. Dev, production builds, and Worker previews use the same components and
 account/event backend. D1 persists under `.wrangler/state/`; remote bindings
 are disabled. A Resend key is not required locally. Sign-in links and codes
@@ -46,7 +17,7 @@ appear in a dialog, not an inbox. Local D1 rate limits still apply.
 
 Automated browser tests use `pnpm test:ui`, which starts its own server and
 disposable D1 database; it never adds test accounts to this persistent dev database.
-See [testing.md](/testing/).
+See [Testing guide](/implementation/testing/).
 
 On localhost or the dev server's LAN address, the shared account layout includes
 a **DEV panel** button. Press **Alt+Z** to open or close it. **Account states** holds
@@ -135,7 +106,7 @@ snapshots, Code of Conduct acknowledgement, and milestone dates. Submitted sampl
 personas model existing volunteers exempt from Discord linking, rather than
 inventing real OAuth consent. Temporary states use the new four-step flow with
 simulated Discord membership, never real OAuth credentials.
-See [Discord](/discord/) for configuration and isolation. The command
+See [Discord](/implementation/discord/) for configuration and isolation. The command
 also adds an open patrol with orientation, an open regular patrol, and a hidden
 past orientation with attendance. It does not reset the database, remove users,
 restore cancelled bookings or discarded drafts, or overwrite subsequent edits.
@@ -162,109 +133,21 @@ from public builds. Worker previews still use preview D1 and real,
 rate-limited email delivery. Accounts and events are always included in production
 builds; deployment readiness is controlled by the developer, not a feature flag.
 
-## Organizer access
+## Excluding development tools from hosted builds
 
-Outside the explicit local fixtures, the first organizer must sign in and finish
-their application. A developer then runs one of:
+Development-only browser scripts and email-dialog styles live in `src/dev/`,
+alongside the server account-switching plugin. Shared application code loads
+them through dynamic imports guarded by `import.meta.env.DEV`. The guard is
+replaced at build time, so both production and preview builds exclude these
+modules. The folder name itself does not exclude code from a build; keep every
+runtime import from outside `src/dev/` behind the guard. Type-only imports are
+safe because TypeScript removes them.
 
-```sh
-pnpm organizer:bootstrap --local --email verified@example.org
-pnpm organizer:bootstrap --preview --email verified@example.org
-```
-
-This is a one-time, audited D1 transaction. It ends the account's sessions;
-sign in again. It cannot target production. No organizer
-is promoted automatically or based on the email address supplied to a web form.
-
-Organizers manage application approval, active status, patrol approval, and roles at
-`/volunteer/volunteers`. Promotions require an active account with
-a verified email and approved application. Role changes revoke
-the target's sessions. The last active organizer cannot be demoted/deactivated.
-Two-factor authentication is optional for organizers and volunteers; accounts
-that enable it must complete it when signing in. Full profile
-views are logged atomically before answers are returned; lists/rosters contain
-names, not sensitive answers.
-
-Account and organizer mutations show loading states and update the affected
-server-rendered controls, lists, and delivery counts without reloading the page.
-Volunteer profiles always open as pages. Session/authenticator changes preserve
-unsaved profile answers. If a change revokes the current session or organizer
-access, the browser still navigates to sign-in or the volunteer portal.
-
-## Events
-
-`/volunteer` is request-rendered and lists D1 events, never invented fixtures.
-Visitors and volunteers awaiting application approval cannot view event details
-on pages or through the event API. Existing volunteers also require application
-approval after applying `0002_registration_approval.sql`; organizers retain access.
-Organizers create/edit events, separately close signups or hide listings, view
-rosters, move/remove signups with an optional emailed reason, and mark past
-orientation attendance. Volunteers can sign up and cancel before the event
-starts. These self-service actions are confirmed on screen without sending email.
-D1 triggers enforce eligibility and capacity across concurrent requests.
-Edits use version checks to prevent overwriting another organizer's changes.
-
-Event cancellation requires creating another event to reschedule, not a
-permanent deletion: it retains the event and cancelled signup records. Hiding
-or closing an event preserves existing spots; signed-up volunteers can still
-see a hidden event. Access revocation cancels affected future signups.
-Orientation completion never grants patrol approval.
-
-Organizer emails are opt-in. Access/approval changes, role changes, signup
-moves/removals, and event edits/cancellations prompt for “Save without email” or
-“Save and send email” before the change is submitted. Cancelling the prompt
-saves nothing. The API also defaults to no email unless `notify: true` is
-explicitly provided. Access revocation still cancels affected future spots;
-their cancellation emails are only included when the organizer opts in.
-Sign-in emails are unchanged, and event creation and orientation completion
-remain silent.
-
-Opted-in notification records are written in the same transaction as the change.
-Skipping email creates no outbox records, so there is nothing to send on retry.
-Delivery failure leaves the change saved and the notification pending. Public
-requests attempt at most five notifications to keep Worker subrequests bounded;
-organizers can retry pending notifications from `/volunteer`. There is no
-scheduled dispatcher yet. Resend idempotency keys plus D1 leases protect
-against concurrent duplicate sends. The original sending origin is frozen so
-retries on branches sharing preview D1 keep the same provider payload.
-Retries stop 23 hours after
-creation; older pending records require manual follow-up, not a blind resend.
-Sign-in and notification sends share the 80/day budget. Local D1 delivery never
-contacts Resend; DEV-only dialogs simulate notification success/failure.
-
-Before deploying production, complete the privacy review, approved retention and
-deletion safeguards, and production D1 provisioning. These are launch requirements,
-not application feature gates. Email changes and account deletion are not
-implemented. Use sample profile answers in public tests.
-
-## Hosting
-
-The same `afterhoursoutreach-ca` Worker, with a D1 binding in `wrangler.jsonc`.
-The Resend API key is a Worker secret.
-
-Everything runs on the Workers free plan:
-
-- 100,000 requests a day.
-- 10ms of CPU per request. Sign in has no password hashing, so this is enough,
-  but a request that goes over fails with error 1102.
-- D1: 5 million rows read and 100,000 rows written a day, and 5 GB of storage.
-
-The paid plan ($5/month) raises all of these if we ever hit them.
-
-D1 has no Canadian region, so the data is stored in the US. The privacy page
-has to say so. See [privacy.md](/privacy/).
-
-## Email
-
-Notifications are sent through Resend's API from `info@afterhoursoutreach.ca`.
-Sign-in and email-change messages use `accounts@afterhoursoutreach.ca`.
-Emails include "Questions? Ask us on Discord" and a link to the Discord server.
-
-The Resend free plan allows 3,000 emails a month and 100 a day. The sign in
-rate limit in [accounts.md](/accounts/) also protects this quota.
-
-## TODO
-
-- TODO: decide on database backups. D1 Time Travel covers 7 days on the free
-  plan. Decide if we also want periodic exports, and where those would be
-  stored safely given what is in them.
+The development controls are available only in the local dev server. Built
+Worker tests check that `GET /api/v1/auth/dev/users`,
+`POST /api/v1/auth/dev/switch-user`, `POST /api/v1/auth/dev/delete-user`,
+`POST /api/v1/auth/dev/application-step`, and `POST /api/v1/auth/dev/seed-accounts`
+return `404` in production and preview builds;
+local browser tests exercise account switching, application-step shortcuts, and
+simulated email delivery.
+Dev-tool assets must not be placed in `public/`, which is copied into builds.

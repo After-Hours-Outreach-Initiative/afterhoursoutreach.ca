@@ -3,52 +3,25 @@ title: Discord
 description: Dedicated bot setup, consented account linking, authoritative role synchronization, and recovery.
 ---
 
-## Application and account workflow
+Implements the [Discord specification](/specification/discord/), including the
+[managed-role rules](/specification/discord/#managed-roles).
 
-New applications proceed through form submission, Naloxone 101, **Connect Discord**,
-then organizer review. Applicants consent on the website and on Discord to identity
-access and joining the After Hours Outreach server (`identify guilds.join`). A
-successful OAuth callback links the identity but does **not** complete the step:
-the bot must GET that specific server member and verify full membership. If
-Membership Screening is enabled, the applicant must accept the rules in Discord;
-the bot does not bypass screening by assigning a role.
+## Linking and membership checks
 
-Migration `0020_discord_connect.sql` adds requirements only on future profile
-inserts. Existing submitted profiles are not backfilled, including currently
-unapproved volunteers, and keep website access without linking. Unsubmitted
-accounts/drafts become new applicants when they submit. Existing volunteers may
-connect from **Account settings → Discord**, without backfilling old course dates. Linking does not
-change email sign-in, enable Discord login, merge accounts by email, or grant
-website privileges from Discord roles.
+A successful OAuth callback records a linked identity. Completion requires a
+separate GET of the specific server member and verified full membership;
+Membership Screening cannot be bypassed by assigning a role.
 
-The application tracker, account settings, and organizer's authorized profile
-review display connection/sync status. Account status polls for two minutes and
-has a manual refresh button. A separate application-page refresh reveals newly
-completed milestones. Do not treat “linked” as “verified member” or “roles synced”.
+The generated database baseline adds the linking requirement only to new profile
+inserts. Existing submitted profiles are exempt; unsubmitted accounts/drafts
+become new applicants when submitted. The application tracker, account settings,
+and authorized organizer review expose separate connection, membership, and sync
+states. Account status polls for two minutes and offers manual refresh; the
+application page refresh reveals completed milestones.
 
-## Authoritative role rules
-
-All three roles require a submitted profile, an **active, application-approved**
-website account, a link, and verified full Discord membership.
-
-| Role      | Additional requirement                           |
-| --------- | ------------------------------------------------ |
-| Volunteer | None                                             |
-| Organizer | Website organizer status                         |
-| Medic     | Medic team selected and manually patrol approved |
-
-There is **no Outreach or separate patrol-approved role**. Organizer status never
-bypasses active/application approval for Discord. Certification expiry is not an
-additional Discord eligibility condition. Deactivation or revoked application
-approval removes all managed roles. Reactivation or restored approval adds the
-currently eligible roles. Team edits, role changes and manual status changes enqueue
-reconciliation atomically via SQLite triggers. Orientation attendance does not affect
-role eligibility or enqueue role changes.
-
-Only individual add/remove-role REST endpoints are used. Unrelated roles,
-nicknames, channels, messages, and server membership are never replaced or removed.
-The bot never kicks or bans. Role changes made manually in Discord do not alter
-website eligibility and are corrected by periodic reconciliation.
+Eligibility changes enqueue reconciliation atomically through SQLite triggers.
+Only individual role add/remove endpoints are used; unrelated roles and other
+member properties are never replaced. See the specification for eligibility.
 
 ## Dedicated bot and server setup
 

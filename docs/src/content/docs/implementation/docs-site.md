@@ -11,7 +11,7 @@ starting the application server.
 The optional [Operations dashboard](/dashboard/) adds privileged, local-only
 administration of remote D1 databases and monitoring of Resend limits. It uses
 Wrangler credentials separately from ordinary reading; see
-[Dashboard administration](/operations-dashboard/) for setup and safeguards.
+[Dashboard administration](/implementation/operations-dashboard/) for setup and safeguards.
 
 ## Read locally
 
@@ -38,14 +38,15 @@ Manage the documentation server from the repository root:
 ## Navigation and search
 
 Navigate using the sidebar, the [project overview](/), and each page's table of
-contents. The sidebar's **Historical benchmarks** group is collapsed by default.
+contents. The sidebar has three main sections: **Planning**, **Specification**, and
+**Implementation**.
 
 Pagefind requires a production build, so search is disabled for this dev-server
 reader; there is no custom search service.
 
 ## Email previews
 
-[Email previews](/emails/) is a read-only gallery of all outgoing application
+[Email previews](/implementation/emails/) is a read-only gallery of all outgoing application
 emails. Search by message content or workflow, filter by category, then select an
 email and an example. The sign-in email also offers rendered HTML, HTML source,
 and desktop/mobile widths; other messages show their actual plain-text format.
@@ -63,9 +64,21 @@ email type or content branch, add a fictional example in
 
 ## Edit the documentation
 
-The canonical documentation source is `docs/src/content/docs/`. Edit the Markdown or MDX
-files there directly rather than creating duplicate guides elsewhere in `docs/`.
-The local reader updates as you save changes.
+The canonical documentation source is `docs/src/content/docs/`. Its folders match
+the reader's three main sections:
+
+| Folder            | Purpose                                                        |
+| ----------------- | -------------------------------------------------------------- |
+| `planning/`       | Proposals, priorities, open decisions, and launch preparation. |
+| `specification/`  | Agreed workflows, permissions, and product behavior.           |
+| `implementation/` | Architecture, code, integrations, development, and operations. |
+
+Keep requirements in Specification and link to them from plans and implementation
+guides. Mark agreed but unbuilt behavior as **Planned**; ideas awaiting a decision
+stay in Planning.
+
+Edit the Markdown or MDX files in these folders directly. The local reader
+updates as you save changes.
 
 Use standard Markdown with `title` and `description` frontmatter:
 
@@ -84,9 +97,10 @@ Write the section here.
 
 Starlight renders the title as the page's H1, so do not repeat it as a `#` heading
 in the body. Use lowercase, hyphen-separated filenames and keep routes
-filename-based without custom `slug` frontmatter: `accounts.md` becomes
-`/accounts/`, and `index.mdx` is the project overview at `/`. Link to reader routes
-such as `[Accounts](/accounts/)`, not `.md` source paths. Add new guides to the
+based on the folder and filename, without custom `slug` frontmatter:
+`specification/accounts.mdx` becomes `/specification/accounts/`, each section's
+`index.md` becomes its landing page, and the root `index.mdx` is the overview at `/`. Link to reader routes
+such as `[Accounts](/specification/accounts/)`, not `.md` source paths. Add new guides to the
 explicit sidebar in `docs/astro.config.mjs`, then run `pnpm docs:check`.
 
 After changing the site configuration, restart the reader with `pnpm docs:stop`
@@ -116,12 +130,20 @@ its copy icon to copy the filename to the clipboard.
 1. Open its docs page; the Excalidraw editor is already available.
 2. Move shapes, change labels, and adjust connectors directly on the canvas.
    Undo/redo works inside the focused editor with the usual keyboard shortcuts.
-3. **Fit diagram** brings all shapes back into view without changing the diagram.
-4. **Save** writes the current scene, including its embedded logos, to the matching
+3. **Center diagram** centers all shapes and fits them inside the current canvas.
+4. **Full screen** opens a viewport-sized popup with the filename and the same
+   controls at the top. **Close full screen** or Escape returns to the page.
+   Edits and undo history carry across both views.
+5. **Save** writes the current scene, including its embedded logos, to the matching
    `.excalidraw` file in `docs/public/diagrams/`. The controls show when saving
    succeeds or fails. Saving does not reload the page or clear undo history.
-5. **Reset to saved** restores the most recently saved scene, or the scene loaded
+6. **Reset to saved** restores the most recently saved scene, or the scene loaded
    from disk if you have not saved yet. Reset is itself undoable.
+
+**Save** and **Reset to saved** stay disabled while the drawing matches the saved
+version. Panning, zooming, centering, selecting shapes, and opening full screen
+do not enable them. Saving, resetting, or undoing back to the saved drawing
+disables them again. Save uses the primary button color.
 
 Saving is explicit, not automatic. Unsaved changes are discarded on reload or
 navigation; saved changes persist and appear as ordinary Git changes. Commit
@@ -145,7 +167,7 @@ Use an `.mdx` page and import the shared component. The filename still determine
 the route; changing `.md` to `.mdx` does not change the URL.
 
 ```mdx
-import Diagram from "../../components/Diagram.astro";
+import Diagram from "../../../components/Diagram.astro";
 
 <Diagram
   name="system-overview"
@@ -185,5 +207,7 @@ requested change needs them to move. This preserves hand-tuned layouts.
 Preserve embedded logo assets and their node groups when editing a scene. Do not
 write or run tests for this documentation site; see the repository's `AGENTS.md`.
 
-Keep authoring instructions on this page, the high-level system map on
-[Overview](/), and detailed system diagrams on their architecture pages.
+Keep authoring instructions on this page and system diagrams in
+[System architecture](/implementation/system-architecture/). The root
+[Documentation overview](/) introduces the three documentation sections. Legacy guide URLs
+redirect through `docs/astro.config.mjs`; use the section routes in new links.
