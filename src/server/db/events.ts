@@ -43,6 +43,7 @@ import {
 } from "./event-settings";
 import type { EventLimits } from "../../data/event-limits";
 import { eventUnregisterDeadline } from "../../data/event-unregistration";
+import { vancouverInput, vancouverInstant } from "../../data/event-time";
 import {
   ensurePatrolOccurrences,
   recurringSignupWindowSql,
@@ -126,7 +127,14 @@ export const bulkEventSchema = z.strictObject({
       hidden: true,
     })
     .partial()
-    .extend(eventSettingInputFields)
+    .extend({
+      ...eventSettingInputFields,
+      // Vancouver wall time applied to each event's own date.
+      startTime: z
+        .string()
+        .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+        .optional(),
+    })
     .refine((changes) =>
       Object.values(changes).some((value) => value !== undefined),
     ),
@@ -754,6 +762,7 @@ export async function saveEvent(
 }
 
 /** One transaction for existing snapshots only; never changes dates or templates.
+ * A start time moves each event to that wall time on its own Vancouver date.
  * The audit insert is gated on EVERY selected version and current permission.
  * Event policy triggers abort the batch (including audits/mail) on any conflict. */
 export async function bulkSaveEvents(
@@ -769,7 +778,10 @@ export async function bulkSaveEvents(
       400,
       "Select 1–100 distinct events and choose supported fields to change.",
     );
-  const { selection, changes } = parsed.data;
+  const {
+    selection,
+    changes: { startTime, ...changes },
+  } = parsed.data;
   const oldRows = (
     await db
       .prepare(
@@ -795,6 +807,23 @@ export async function bulkSaveEvents(
         409,
         "A selected event changed or is no longer editable. Reload and select again. No events were saved.",
       );
+    let startsAt = old.startsAt;
+    if (startTime) {
+      try {
+        startsAt = Date.parse(
+          vancouverInstant(
+            `${vancouverInput(old.startsAt).slice(0, 10)}T${startTime}`,
+          ),
+        );
+      } catch (error) {
+        throw new RequestError(400, (error as Error).message);
+      }
+      if (startsAt <= now)
+        throw new RequestError(
+          400,
+          "That start time is in the past for a selected event. No events were saved.",
+        );
+    }
     const next = {
       ...old,
       includesOrientation:
@@ -817,6 +846,7 @@ export async function bulkSaveEvents(
             : value;
       return value !== undefined && old[key as keyof EventRow] !== normalized;
     });
+    if (startsAt !== old.startsAt) fields.push("startsAt");
     const auditId = fields.length
       ? changedCount++ === 0
         ? operation
@@ -826,12 +856,14 @@ export async function bulkSaveEvents(
       {
         ...old,
         includesOrientation: Number(next.includesOrientation),
+        startsAt,
         meetingPoint: changes.meetingPoint ?? old.meetingPoint,
       },
       changes.open ?? Boolean(old.open),
     );
     return {
       ...selected,
+      startsAt,
       fields,
       auditId,
       subject: content.subject,
@@ -866,6 +898,15 @@ export async function bulkSaveEvents(
   const entries = Object.entries(changes).filter(
     ([, value]) => value !== undefined,
   );
+  const assignments = [
+    ...entries.map(([key]) => `${columns[key as keyof typeof columns]} = ?`),
+    ...(startTime
+      ? [
+          `starts_at = (SELECT json_extract(s.value,'$.startsAt') FROM json_each(?) s
+            WHERE json_extract(s.value,'$.id') = event.id)`,
+        ]
+      : []),
+  ];
   try {
     const results = await db.batch<{ valid?: number }>([
       db.prepare(`SELECT (${guard}) AS valid`).bind(...guardValues()),
@@ -878,7 +919,7 @@ export async function bulkSaveEvents(
         .bind(actor.id, now, snapshots, ...guardValues()),
       db
         .prepare(
-          `UPDATE event SET ${entries.map(([key]) => `${columns[key as keyof typeof columns]} = ?`).join(", ")}, updated_at=max(updated_at+1,?)
+          `UPDATE event SET ${assignments.join(", ")}, updated_at=max(updated_at+1,?)
         WHERE id IN (SELECT json_extract(j.value,'$.id') FROM json_each(?) j
           JOIN event_audit a ON a.id=json_extract(j.value,'$.auditId'))`,
         )
@@ -890,6 +931,7 @@ export async function bulkSaveEvents(
                 ? value || null
                 : value,
           ),
+          ...(startTime ? [snapshots] : []),
           now,
           snapshots,
         ),
@@ -911,6 +953,11 @@ export async function bulkSaveEvents(
         409,
         "A selected event or your organizer authorization changed. Reload and select again. No events were saved.",
       );
+    if (startTime && changedCount)
+      for (const seriesId of new Set(
+        oldRows.flatMap((row) => (row.seriesId ? [row.seriesId] : [])),
+      ))
+        await ensurePatrolOccurrences(db, seriesId);
     return {
       ...(changedCount ? { operation } : {}),
       message: changedCount

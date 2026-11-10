@@ -394,6 +394,27 @@ test("bulk event edits change only chosen existing occurrences, preserve dates/t
   );
 });
 
+test("bulk start times move each selected event on its own Vancouver date", async () => {
+  const series = await savePatrolSeries(db, organizer, input());
+  const rows = (await all(series.id)).slice(0, 2);
+  const selection = rows.map((row) => ({ id: row.id, version: row.updatedAt }));
+  for (const startTime of ["25:00", "8:15"])
+    await assert.rejects(
+      bulkSaveEvents(db, organizer, { selection, changes: { startTime } }),
+      status(400),
+    );
+  const result = await bulkSaveEvents(db, organizer, {
+    selection,
+    changes: { startTime: "18:15" },
+  });
+  assert.ok(result.operation);
+  for (const row of rows)
+    assert.equal(
+      vancouverInput((await findEvent(db, row.id)).startsAt),
+      `${vancouverInput(row.startsAt).slice(0, 10)}T18:15`,
+    );
+});
+
 test("spring/fall recurrence DST policy is deterministic, including gaps and folds", () => {
   assert.equal(
     new Date(vancouverOccurrenceInstant("2026-03-08", "02:30")).toISOString(),

@@ -69,6 +69,11 @@ Each event has an extra edit button and a roster details dropdown.
 selecting, a bar at the bottom of the screen shows the selection count with
 **Select all**, **Clear**, and **Bulk edit**.
 
+Bulk edit lists the selected events as compact cards above the event fields.
+Fields shared by every selected event are prefilled; fields that differ are
+blank and stay unchanged unless filled in. Only edited fields are saved. A new
+start time applies to each event on its own date.
+
 ### Edit view
 
 A popup for editing event details, public visibility, or cancelling the event.

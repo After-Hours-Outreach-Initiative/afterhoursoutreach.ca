@@ -7,7 +7,12 @@ import type {
   PatrolSeriesRow,
 } from "@/server/db/events";
 import { eventSignupBlockReason } from "@/server/db/policy";
-import { formatEventDate } from "@/data/event-time";
+import {
+  formatEventDate,
+  formatEventDay,
+  formatEventTime,
+  vancouverInput,
+} from "@/data/event-time";
 import { eventUnregisterDeadline } from "@/data/event-unregistration";
 import { matchesEventFilter } from "@/data/event-browser";
 import EventEditor from "./EventEditor.astro";
@@ -76,42 +81,56 @@ const blocked =
   data-event-label={`${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`}
   data-event-type="patrol"
   data-includes-orientation={String(Boolean(event.includesOrientation))}
-  hidden={!matchesEventFilter(
-    filter,
-    Boolean(event.seriesId),
-    Boolean(event.includesOrientation),
-  )}
->
-  {
-    organizer && future && !event.cancelledAt && (
-      <label class="volunteer-event-select">
-        <input
-          type="checkbox"
-          data-bulk-event={event.id}
-          data-bulk-version={event.updatedAt}
-          data-bulk-label={`${formatEventDate(event.startsAt)} · ${event.meetingPoint}${event.seriesId ? " (occurrence)" : ""}`}
-        />
-        <span>
-          Select
-          <span class="sr-only">
-            {" "}
-            {formatEventDate(event.startsAt)} at {event.meetingPoint}
-          </span>
-        </span>
-      </label>
+  hidden={
+    !matchesEventFilter(
+      filter,
+      Boolean(event.seriesId),
+      Boolean(event.includesOrientation),
     )
   }
+>
+  {organizer && future && !event.cancelledAt && (
+    <label class="volunteer-event-select">
+      <input
+        type="checkbox"
+        data-bulk-event={event.id}
+        data-bulk-version={event.updatedAt}
+        data-bulk-day={formatEventDay(event.startsAt)}
+        data-bulk-time={formatEventTime(event.startsAt)}
+        data-bulk-place={event.meetingPoint}
+        data-bulk-recurring={event.seriesId ? "" : undefined}
+        data-bulk-values={JSON.stringify({
+          startTime: vancouverInput(event.startsAt).slice(11),
+          meetingPoint: event.meetingPoint,
+          meetingPointUrl: event.meetingPointUrl ?? "",
+          spots: String(event.spots),
+          minMedicSpots: String(event.minMedicSpots),
+          minNewVolunteerSpots: String(event.minNewVolunteerSpots),
+          maxNewVolunteers: String(event.maxNewVolunteers),
+          unregisterMinutes: String(event.unregisterMinutes),
+          includesOrientation: String(Boolean(event.includesOrientation)),
+          open: String(Boolean(event.open)),
+          hidden: String(Boolean(event.hidden)),
+        })}
+      />
+      <span>
+        Select
+        <span class="sr-only">
+          {" "}
+          {formatEventDate(event.startsAt)} at {event.meetingPoint}
+        </span>
+      </span>
+    </label>
+  )}
   <div class="volunteer-event-layout">
     <div class="volunteer-event-info">
-      {
-        event.cancelledAt ? (
-          <p class="volunteer-hidden">Cancelled</p>
-        ) : event.hidden ? (
-          <p class="volunteer-hidden">Public visibility off</p>
-        ) : !event.open ? (
-          <p class="volunteer-hidden">Registration closed</p>
-        ) : null
-      }
+      {event.cancelledAt ? (
+        <p class="volunteer-hidden">Cancelled</p>
+      ) : event.hidden ? (
+        <p class="volunteer-hidden">Public visibility off</p>
+      ) : !event.open ? (
+        <p class="volunteer-hidden">Registration closed</p>
+      ) : null}
       <h3>{formatEventDate(event.startsAt)}</h3>
       <p>
         {!future && "Past event · "}
@@ -119,124 +138,108 @@ const blocked =
       </p>
       <p>
         Meeting at{" "}
-        {
-          event.meetingPointUrl ? (
-            <a href={event.meetingPointUrl} target="_blank" rel="noreferrer">
-              {event.meetingPoint}
-            </a>
-          ) : (
-            event.meetingPoint
-          )
-        }
+        {event.meetingPointUrl ? (
+          <a href={event.meetingPointUrl} target="_blank" rel="noreferrer">
+            {event.meetingPoint}
+          </a>
+        ) : (
+          event.meetingPoint
+        )}
       </p>
       <p data-event-availability aria-live="polite" aria-atomic="true">
-        {
-          !future ? (
-            <>
-              {event.signedUp ? "You registered · " : ""}
-              {event.confirmed}{" "}
-              {event.confirmed === 1 ? "registration" : "registrations"}
-            </>
-          ) : event.signedUp ? (
-            <>
-              <span class="volunteer-spots">Registered</span> ·{" "}
-              {Math.max(0, event.spots - event.confirmed)} of {event.spots}{" "}
-              spots remaining
-            </>
-          ) : event.confirmed >= event.spots ? (
-            <>
-              <span class="volunteer-spots-full">Full</span> · 0 of{" "}
-              {event.spots} spots remaining
-            </>
-          ) : registrationOpen ? (
-            <>
-              <span class="volunteer-spots-open">Open</span> ·{" "}
-              {event.spots - event.confirmed} of {event.spots} spots remaining
-            </>
-          ) : (
-            `${Math.max(0, event.spots - event.confirmed)} of ${event.spots} spots remaining`
-          )
-        }
+        {!future ? (
+          <>
+            {event.signedUp ? "You registered · " : ""}
+            {event.confirmed}{" "}
+            {event.confirmed === 1 ? "registration" : "registrations"}
+          </>
+        ) : event.signedUp ? (
+          <>
+            <span class="volunteer-spots">Registered</span> ·{" "}
+            {Math.max(0, event.spots - event.confirmed)} of {event.spots} spots
+            remaining
+          </>
+        ) : event.confirmed >= event.spots ? (
+          <>
+            <span class="volunteer-spots-full">Full</span> · 0 of {event.spots}{" "}
+            spots remaining
+          </>
+        ) : registrationOpen ? (
+          <>
+            <span class="volunteer-spots-open">Open</span> ·{" "}
+            {event.spots - event.confirmed} of {event.spots} spots remaining
+          </>
+        ) : (
+          `${Math.max(0, event.spots - event.confirmed)} of ${event.spots} spots remaining`
+        )}
       </p>
-      {
-        future &&
-          !event.signedUp &&
-          (!organizer || Boolean(event.inSignupWindow)) &&
-          !event.hidden &&
-          !event.cancelledAt &&
-          Boolean(event.open) &&
-          blocked &&
-          blocked !== "This event is full." && <p>{blocked}</p>
-      }
+      {future &&
+        !event.signedUp &&
+        (!organizer || Boolean(event.inSignupWindow)) &&
+        !event.hidden &&
+        !event.cancelledAt &&
+        Boolean(event.open) &&
+        blocked &&
+        blocked !== "This event is full." && <p>{blocked}</p>}
     </div>
     <div class="volunteer-actions">
-      {
-        unregisterOpen ? (
-          <form data-live-signup action="/api/v1/events/action" method="post">
-            <input name="id" type="hidden" value={event.id} />
-            <input name="action" type="hidden" value="cancel" />
-            <button
-              class="btn btn-red"
-              type="submit"
-              aria-haspopup="dialog"
-              data-loading-label="Unregistering…"
-            >
-              Unregister
-            </button>
-            <p data-form-message role="status" hidden />
-          </form>
-        ) : future && !event.signedUp && !blocked ? (
-          <form data-live-signup action="/api/v1/events/action" method="post">
-            <input name="id" type="hidden" value={event.id} />
-            <input name="action" type="hidden" value="join" />
-            <button
-              class="btn btn-green"
-              type="submit"
-              data-loading-label="Registering…"
-            >
-              Register
-            </button>
-            <p data-form-message role="status" hidden />
-          </form>
-        ) : null
-      }
-      {
-        organizer && future && (
+      {unregisterOpen ? (
+        <form data-live-signup action="/api/v1/events/action" method="post">
+          <input name="id" type="hidden" value={event.id} />
+          <input name="action" type="hidden" value="cancel" />
           <button
-            class="btn btn-quiet"
-            type="button"
-            data-show-dialog={`event-editor-${event.id}`}
+            class="btn btn-red"
+            type="submit"
             aria-haspopup="dialog"
-            aria-controls={`event-editor-${event.id}`}
+            data-loading-label="Unregistering…"
           >
-            Edit
+            Unregister
           </button>
-        )
-      }
+          <p data-form-message role="status" hidden />
+        </form>
+      ) : future && !event.signedUp && !blocked ? (
+        <form data-live-signup action="/api/v1/events/action" method="post">
+          <input name="id" type="hidden" value={event.id} />
+          <input name="action" type="hidden" value="join" />
+          <button
+            class="btn btn-green"
+            type="submit"
+            data-loading-label="Registering…"
+          >
+            Register
+          </button>
+          <p data-form-message role="status" hidden />
+        </form>
+      ) : null}
+      {organizer && future && (
+        <button
+          class="btn btn-quiet"
+          type="button"
+          data-show-dialog={`event-editor-${event.id}`}
+          aria-haspopup="dialog"
+          aria-controls={`event-editor-${event.id}`}
+        >
+          Edit
+        </button>
+      )}
     </div>
   </div>
-  {
-    !organizer && future && publicRoster.length > 0 && (
-      <PublicEventRoster event={event} roster={publicRoster} />
-    )
-  }
-  {
-    organizer && roster.length > 0 && (
-      <EventRoster
-        event={event}
-        roster={roster}
-        future={future}
-        destinations={destinations.filter((other) => other.id !== event.id)}
-      />
-    )
-  }
-  {
-    canAddAttendee && (
-      <div class="volunteer-roster-add">
-        <AddAttendee event={event} />
-      </div>
-    )
-  }
+  {!organizer && future && publicRoster.length > 0 && (
+    <PublicEventRoster event={event} roster={publicRoster} />
+  )}
+  {organizer && roster.length > 0 && (
+    <EventRoster
+      event={event}
+      roster={roster}
+      future={future}
+      destinations={destinations.filter((other) => other.id !== event.id)}
+    />
+  )}
+  {canAddAttendee && (
+    <div class="volunteer-roster-add">
+      <AddAttendee event={event} />
+    </div>
+  )}
   {organizer && future && <EventEditor event={event} series={series} />}
 </li>
 

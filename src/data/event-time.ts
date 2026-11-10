@@ -11,6 +11,28 @@ export function formatEventDate(instant: number) {
   }).format(new Date(instant));
 }
 
+const vancouverFormat = (options: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Vancouver",
+    ...options,
+  });
+
+export function formatEventDay(instant: number) {
+  return vancouverFormat({
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(instant));
+}
+
+export function formatEventTime(instant: number) {
+  return vancouverFormat({
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(instant));
+}
+
 /** Display series summaries with explicit AM/PM, independent of the browser's clock locale. */
 export function formatTimeInput(time: string) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return "";

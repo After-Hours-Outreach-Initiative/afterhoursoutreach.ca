@@ -74,15 +74,19 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     "justify-content",
     "flex-end",
   );
-  await expect(dialog).toContainText("not entire recurring series");
+  await expect(dialog.locator("[data-bulk-targets] li")).toHaveCount(2);
+  await expect(dialog.locator('[type="checkbox"]')).toHaveCount(0);
   await expect(dialog.locator('[name="startsAt"]')).toHaveCount(0);
   await expect(
     dialog.getByRole("button", { name: "Save selected events" }),
   ).toBeDisabled();
-  await dialog.getByLabel("Change meeting point", { exact: true }).check();
-  await dialog
-    .getByLabel("Meeting point", { exact: true })
-    .fill(`${label} updated`);
+  const meetingPoint = dialog.getByLabel("Meeting point", { exact: true });
+  await expect(meetingPoint).toHaveValue("");
+  await expect(meetingPoint).toHaveAttribute("placeholder", "Varies");
+  await expect(
+    dialog.getByLabel("Volunteer spots", { exact: true }),
+  ).toHaveValue("8");
+  await meetingPoint.fill(`${label} updated`);
   const submitted = page.waitForRequest(
     (request) =>
       request.url().endsWith("/api/v1/events/action") &&

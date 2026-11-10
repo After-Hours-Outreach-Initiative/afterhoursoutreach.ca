@@ -1,8 +1,27 @@
 interface SelectedEvent {
   id: string;
   version: number;
-  label: string;
+  day: string;
+  time: string;
+  place: string;
+  recurring: boolean;
+  values: Record<string, string>;
 }
+const numberFields = [
+  "spots",
+  "minMedicSpots",
+  "minNewVolunteerSpots",
+  "maxNewVolunteers",
+  "unregisterMinutes",
+];
+const booleanFields = ["includesOrientation", "open", "hidden"];
+const fields = [
+  "startTime",
+  "meetingPoint",
+  "meetingPointUrl",
+  ...numberFields,
+  ...booleanFields,
+];
 const selections = new WeakMap<HTMLElement, Map<string, SelectedEvent>>();
 const selectedFor = (root: HTMLElement) => {
   let selected = selections.get(root);
@@ -18,48 +37,90 @@ const shown = (input: HTMLInputElement) =>
 const target = (input: HTMLInputElement): SelectedEvent => ({
   id: input.dataset.bulkEvent!,
   version: Number(input.dataset.bulkVersion),
-  label: input.dataset.bulkLabel!,
+  day: input.dataset.bulkDay!,
+  time: input.dataset.bulkTime!,
+  place: input.dataset.bulkPlace!,
+  recurring: "bulkRecurring" in input.dataset,
+  values: JSON.parse(input.dataset.bulkValues!),
 });
 const versions = (rows: SelectedEvent[]) =>
   JSON.stringify(rows.map(({ id, version }) => ({ id, version })));
 
+/** Send only fields that differ from the value every selected event shares.
+ * A blank field whose events vary stays unchanged. */
 export function bulkEventAction(values: FormData) {
+  const initial: Record<string, string | null> = JSON.parse(
+    String(values.get("initial") || "{}"),
+  );
   const changes: Record<string, string | number | boolean> = {};
-  for (const name of [
-    "meetingPoint",
-    "meetingPointUrl",
-    "spots",
-    "minMedicSpots",
-    "minNewVolunteerSpots",
-    "maxNewVolunteers",
-    "unregisterMinutes",
-    "includesOrientation",
-    "open",
-    "hidden",
-  ]) {
-    const value = values.get(name);
-    if (
-      value === null ||
-      (["includesOrientation", "open", "hidden"].includes(name) && value === "")
-    )
-      continue;
-    changes[name] = [
-      "spots",
-      "minMedicSpots",
-      "minNewVolunteerSpots",
-      "maxNewVolunteers",
-      "unregisterMinutes",
-    ].includes(name)
+  for (const name of fields) {
+    const value = String(values.get(name) ?? "");
+    const shared = initial[name] ?? null;
+    if (shared === null ? value === "" : value === shared) continue;
+    changes[name] = numberFields.includes(name)
       ? Number(value)
-      : ["includesOrientation", "open", "hidden"].includes(name)
+      : booleanFields.includes(name)
         ? value === "true"
-        : String(value);
+        : value;
   }
   return {
     action: "bulk-save",
     selection: JSON.parse(String(values.get("selection"))),
     changes,
   };
+}
+
+function fillBulkForm(dialog: HTMLDialogElement, selected: SelectedEvent[]) {
+  const form = dialog.querySelector<HTMLFormElement>("form")!;
+  form.reset();
+  form.querySelector<HTMLElement>("[data-form-message]")!.hidden = true;
+  form.querySelector<HTMLInputElement>('[name="selection"]')!.value =
+    versions(selected);
+  const initial: Record<string, string | null> = {};
+  for (const name of fields) {
+    const values = new Set(selected.map((row) => row.values[name]));
+    const shared = values.size === 1 ? [...values][0] : null;
+    initial[name] = shared;
+    const control = form.elements.namedItem(name) as
+      HTMLInputElement | HTMLSelectElement;
+    if (control instanceof HTMLSelectElement) {
+      const mixed =
+        control.querySelector<HTMLOptionElement>("[data-bulk-mixed]")!;
+      mixed.hidden = mixed.disabled = shared !== null;
+    } else {
+      control.placeholder =
+        shared === null
+          ? "Varies"
+          : name === "meetingPointUrl"
+            ? "https://"
+            : "";
+      control.required = shared !== null && name !== "meetingPointUrl";
+    }
+    control.value = shared ?? "";
+  }
+  form.querySelector<HTMLInputElement>('[name="initial"]')!.value =
+    JSON.stringify(initial);
+  form.querySelector("[data-bulk-time-help]")!.textContent =
+    initial.startTime === null
+      ? "Start times vary. Each event keeps its date."
+      : "Each event keeps its date.";
+  dialog.querySelector("[data-bulk-summary]")!.textContent =
+    `${selected.length} selected ${selected.length === 1 ? "event" : "events"}`;
+  const template = dialog.querySelector<HTMLTemplateElement>(
+    "[data-bulk-target-template]",
+  )!;
+  dialog.querySelector("[data-bulk-targets]")!.replaceChildren(
+    ...selected.map((row) => {
+      const card = template.content.firstElementChild!.cloneNode(
+        true,
+      ) as HTMLElement;
+      card.querySelector("[data-day]")!.textContent = row.day;
+      card.querySelector("[data-time]")!.textContent = row.time;
+      card.querySelector("[data-place]")!.textContent = row.place;
+      if (!row.recurring) card.querySelector("[data-recurring]")!.remove();
+      return card;
+    }),
+  );
 }
 
 /** Keep only visible, still-current targets. Never silently upgrade edit versions. */
@@ -147,31 +208,7 @@ export function initBulkEvents(root: HTMLElement) {
       const dialog =
         root.querySelector<HTMLDialogElement>("#bulk-event-editor")!;
       if (dialog.dataset.submitting) return;
-      const form = dialog.querySelector<HTMLFormElement>("form")!;
-      form.reset();
-      form.querySelector<HTMLElement>("[data-form-message]")!.hidden = true;
-      form.querySelector<HTMLInputElement>('[name="selection"]')!.value =
-        versions(selected);
-      for (const name of [
-        "meetingPoint",
-        "meetingPointUrl",
-        "spots",
-        "minMedicSpots",
-        "minNewVolunteerSpots",
-        "maxNewVolunteers",
-        "unregisterMinutes",
-      ])
-        form.querySelector<HTMLInputElement>(`[name="${name}"]`)!.disabled =
-          true;
-      dialog.querySelector("[data-bulk-summary]")!.textContent =
-        `${selected.length} selected ${selected.length === 1 ? "event" : "events"}`;
-      dialog.querySelector("[data-bulk-targets]")!.replaceChildren(
-        ...selected.map((row) => {
-          const li = document.createElement("li");
-          li.textContent = row.label;
-          return li;
-        }),
-      );
+      fillBulkForm(dialog, selected);
       dialog.showModal();
       syncBulkEventSelection(root);
     }
@@ -190,12 +227,14 @@ export function initBulkEvents(root: HTMLElement) {
         selectedFor(root).set(input.dataset.bulkEvent!, target(input));
       else selectedFor(root).delete(input.dataset.bulkEvent!);
     }
-    if (input instanceof HTMLInputElement && input.dataset.bulkEnable) {
-      input.form!.querySelector<HTMLInputElement>(
-        `[name="${input.dataset.bulkEnable}"]`,
-      )!.disabled = !input.checked;
-    }
     syncBulkEventSelection(root);
+  });
+  root.addEventListener("input", (event) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-bulk-event-save]")
+    )
+      syncBulkEventSelection(root);
   });
   // Collapsed series occurrences are not "shown" and cannot remain hidden targets.
   root.addEventListener(

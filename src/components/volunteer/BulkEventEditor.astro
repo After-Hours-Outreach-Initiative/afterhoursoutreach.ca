@@ -1,11 +1,8 @@
 ---
 import DialogHeader from "@/components/DialogHeader.astro";
 import FieldError from "@/components/FieldError.astro";
-import { defaultEventLimits } from "@/data/event-limits";
-import {
-  defaultUnregisterMinutes,
-  maxUnregisterMinutes,
-} from "@/data/event-unregistration";
+import RecurringIcon from "@/components/icons/RecurringIcon.astro";
+import { maxUnregisterMinutes } from "@/data/event-unregistration";
 ---
 
 <div
@@ -19,39 +16,46 @@ import {
     0 selected
   </p>
   <div class="volunteer-bulk-buttons">
-    <button class="btn btn-quiet" type="button" data-bulk-select-all
-      >Select all</button
-    >
-    <button class="btn btn-quiet" type="button" data-bulk-clear disabled
-      >Clear</button
-    >
+    <button class="btn btn-quiet" type="button" data-bulk-select-all>
+      Select all
+    </button>
+    <button class="btn btn-quiet" type="button" data-bulk-clear disabled>
+      Clear
+    </button>
     <button
       class="btn btn-primary"
       type="button"
       data-bulk-open
       aria-haspopup="dialog"
       aria-controls="bulk-event-editor"
-      disabled>Bulk edit</button
+      disabled
     >
+      Bulk edit
+    </button>
   </div>
 </div>
 <dialog
   id="bulk-event-editor"
   class="dialog-pop dialog-frame volunteer-dialog"
   aria-labelledby="bulk-event-heading"
-  aria-describedby="bulk-event-scope"
 >
   <DialogHeader id="bulk-event-heading" title="Bulk edit events" />
   <div class="dialog-body">
-    <p id="bulk-event-scope">
-      Only the selected existing events and occurrences will change, not entire
-      recurring series. Each date and time stays unchanged. Unchosen fields stay
-      unchanged.
-    </p>
-    <details class="volunteer-roster">
-      <summary data-bulk-summary>Selected events</summary>
-      <ul data-bulk-targets></ul>
-    </details>
+    <p class="volunteer-bulk-summary" data-bulk-summary></p>
+    <ul class="volunteer-bulk-targets" data-bulk-targets></ul>
+    <template data-bulk-target-template>
+      <li class="volunteer-bulk-target">
+        <span class="volunteer-bulk-target-when">
+          <span data-day></span>
+          <span data-time></span>
+          <span class="volunteer-bulk-target-recurring" data-recurring>
+            <RecurringIcon />
+            <span class="sr-only">Recurring</span>
+          </span>
+        </span>
+        <span class="volunteer-bulk-target-place" data-place></span>
+      </li>
+    </template>
     <form
       id="bulk-event-save"
       class="volunteer-form"
@@ -61,60 +65,28 @@ import {
       method="post"
     >
       <input type="hidden" name="selection" />
+      <input type="hidden" name="initial" />
       <div class="volunteer-fields">
         <div class="volunteer-field">
-          <label class="volunteer-check"
-            ><input type="checkbox" data-bulk-enable="meetingPoint" /><span
-              >Change meeting point</span
-            ></label
-          >
-          <label class="sr-only" for="bulk-meeting-point">Meeting point</label>
+          <label for="bulk-startTime">Start time</label>
           <input
-            id="bulk-meeting-point"
-            name="meetingPoint"
-            required
-            maxlength="500"
-            pattern={String.raw`.*\S.*`}
-            aria-describedby="error-bulk-meeting-point"
-            disabled
+            id="bulk-startTime"
+            name="startTime"
+            type="time"
+            step="60"
+            aria-describedby="bulk-startTime-help error-bulk-startTime"
           />
-          <FieldError
-            field="bulk-meeting-point"
-            message="Enter a meeting point (up to 500 characters)."
-          />
-        </div>
-        <div class="volunteer-field">
-          <label class="volunteer-check"
-            ><input type="checkbox" data-bulk-enable="meetingPointUrl" /><span
-              >Change map link</span
-            ></label
+          <p
+            id="bulk-startTime-help"
+            class="volunteer-help"
+            data-bulk-time-help
           >
-          <label class="sr-only" for="bulk-map-link">Map link</label>
-          <input
-            id="bulk-map-link"
-            name="meetingPointUrl"
-            type="url"
-            maxlength="2048"
-            pattern="https://.*"
-            placeholder="https://"
-            aria-describedby="bulk-map-help error-bulk-map-link"
-            disabled
-          />
-          <p id="bulk-map-help" class="volunteer-help">
-            Leave blank to remove the map links.
+            Each event keeps its date.
           </p>
-          <FieldError
-            field="bulk-map-link"
-            message="Enter a valid HTTPS map link, or leave blank to remove it."
-          />
+          <FieldError field="bulk-startTime" message="Enter a valid time." />
         </div>
         <div class="volunteer-field">
-          <label class="volunteer-check"
-            ><input type="checkbox" data-bulk-enable="spots" /><span
-              >Change volunteer spots</span
-            ></label
-          >
-          <label class="sr-only" for="bulk-spots">Volunteer spots</label>
+          <label for="bulk-spots">Volunteer spots</label>
           <input
             id="bulk-spots"
             name="spots"
@@ -122,96 +94,115 @@ import {
             min="1"
             max="100"
             step="1"
-            required
             aria-describedby="bulk-capacity-help error-bulk-spots"
-            disabled
           />
           <FieldError
             field="bulk-spots"
             message="Enter a whole number from 1 to 100, covering the event's reserved places."
           />
         </div>
-        {
+        <div class="volunteer-field">
+          <label for="bulk-meetingPoint">Meeting point</label>
+          <input
+            id="bulk-meetingPoint"
+            name="meetingPoint"
+            maxlength="500"
+            pattern={String.raw`.*\S.*`}
+            aria-describedby="error-bulk-meetingPoint"
+          />
+          <FieldError
+            field="bulk-meetingPoint"
+            message="Enter a meeting point (up to 500 characters)."
+          />
+        </div>
+        <div class="volunteer-field">
+          <label for="bulk-meetingPointUrl">Map link (optional)</label>
+          <input
+            id="bulk-meetingPointUrl"
+            name="meetingPointUrl"
+            type="url"
+            maxlength="2048"
+            pattern="https://.*"
+            aria-describedby="error-bulk-meetingPointUrl"
+          />
+          <FieldError
+            field="bulk-meetingPointUrl"
+            message="Enter a valid HTTPS map link."
+          />
+        </div>
+        {(
           [
-            ...(
+            ["minMedicSpots", "Minimum medic spots", 100],
+            ["minNewVolunteerSpots", "Minimum new volunteer spots", 100],
+            ["maxNewVolunteers", "Maximum new volunteers", 100],
+            [
+              "unregisterMinutes",
+              "Unregister until (minutes after start)",
+              maxUnregisterMinutes,
+            ],
+          ] as const
+        ).map(([name, label, max]) => (
+          <div class="volunteer-field">
+            <label for={`bulk-${name}`}>{label}</label>
+            <input
+              id={`bulk-${name}`}
+              name={name}
+              type="number"
+              min="0"
+              max={max}
+              step="1"
+              aria-describedby={`error-bulk-${name}`}
+            />
+            <FieldError
+              field={`bulk-${name}`}
+              message={`Enter a whole number from 0 to ${max}.`}
+            />
+          </div>
+        ))}
+        {(
+          [
+            [
+              "includesOrientation",
+              "Includes orientation",
               [
-                ["minMedicSpots", "Minimum medic spots"],
-                ["minNewVolunteerSpots", "Minimum new volunteer spots"],
-                ["maxNewVolunteers", "Maximum new volunteers"],
-              ] as const
-            ).map(([name, label]) => ({
-              name,
-              label,
-              change: `Change ${label.toLowerCase()}`,
-              max: 100,
-              value: defaultEventLimits[name],
-            })),
-            {
-              name: "unregisterMinutes",
-              label: "Unregister until (minutes after start)",
-              change: "Change unregister time",
-              max: maxUnregisterMinutes,
-              value: defaultUnregisterMinutes,
-            },
-          ].map(({ name, label, change, max, value }) => (
-            <div class="volunteer-field">
-              <label class="volunteer-check">
-                <input type="checkbox" data-bulk-enable={name} />
-                <span>{change}</span>
-              </label>
-              <label class="sr-only" for={`bulk-${name}`}>
-                {label}
-              </label>
-              <input
-                id={`bulk-${name}`}
-                name={name}
-                type="number"
-                min="0"
-                max={max}
-                step="1"
-                required
-                disabled
-                value={value}
-                aria-describedby={`error-bulk-${name}`}
-              />
-              <FieldError
-                field={`bulk-${name}`}
-                message={`Enter a whole number from 0 to ${max}.`}
-              />
-            </div>
-          ))
-        }
-        <label class="volunteer-field"
-          >Includes orientation
-          <select name="includesOrientation"
-            ><option value="">Leave unchanged</option><option value="true"
-              >Includes orientation</option
-            ><option value="false">Patrol only</option></select
-          >
-        </label>
-        <label class="volunteer-field"
-          >Registration
-          <select name="open"
-            ><option value="">Leave unchanged</option><option value="true"
-              >Open</option
-            ><option value="false">Closed</option></select
-          >
-        </label>
-        <label class="volunteer-field"
-          >Public visibility
-          <select name="hidden"
-            ><option value="">Leave unchanged</option><option value="false"
-              >Visible</option
-            ><option value="true">Hidden</option></select
-          >
-        </label>
+                ["true", "Includes orientation"],
+                ["false", "Patrol only"],
+              ],
+            ],
+            [
+              "open",
+              "Registration",
+              [
+                ["true", "Open"],
+                ["false", "Closed"],
+              ],
+            ],
+            [
+              "hidden",
+              "Public visibility",
+              [
+                ["false", "Visible"],
+                ["true", "Hidden"],
+              ],
+            ],
+          ] as const
+        ).map(([name, label, options]) => (
+          <label class="volunteer-field">
+            {label}
+            <select name={name}>
+              <option value="" data-bulk-mixed>
+                Varies
+              </option>
+              {options.map(([value, text]) => (
+                <option value={value}>{text}</option>
+              ))}
+            </select>
+          </label>
+        ))}
       </div>
       <p id="bulk-capacity-help" class="volunteer-help">
-        Capacity and orientation must work for every selected event and its
-        registrations. Capacity must cover reserved medic places and, with
-        orientation, reserved new volunteer places. The new volunteer maximum
-        cannot be below its reserved places. If any event conflicts, none are
-        saved.
+        Capacity and limits must fit each event's registrations. If any event
+        conflicts, nothing is saved.
       </p>
       <p data-bulk-stale role="alert" hidden>
         The selection changed while this dialog was open. Close it, review the
@@ -221,16 +212,18 @@ import {
     </form>
   </div>
   <div class="dialog-footer">
-    <button class="btn btn-quiet" type="button" data-dismiss-dialog
-      >Cancel</button
-    >
+    <button class="btn btn-quiet" type="button" data-dismiss-dialog>
+      Cancel
+    </button>
     <button
       class="btn btn-primary"
       type="submit"
       form="bulk-event-save"
       data-loading-label="Saving…"
-      disabled>Save selected events</button
+      disabled
     >
+      Save selected events
+    </button>
   </div>
 </dialog>
 
@@ -274,11 +267,54 @@ import {
       padding-inline: 0.75rem;
     }
   }
-  [data-bulk-targets] {
-    padding-left: 1.5em;
-    list-style: disc;
+  .volunteer-bulk-summary {
+    margin-bottom: 0.75rem;
+    color: #d4d4d8;
   }
-  #bulk-event-scope {
-    margin-bottom: 1rem;
+  .volunteer-bulk-targets {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+    gap: 0.5rem;
+    max-height: 11.5rem;
+    margin-bottom: 1.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .volunteer-bulk-target {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #3f3f46;
+    border-radius: 0.5rem;
+    background: var(--color-panel-soft);
+    font-size: 0.875rem;
+    line-height: 1.35;
+  }
+  .volunteer-bulk-target-when {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: #f4f4f5;
+    font-weight: 500;
+  }
+  .volunteer-bulk-target-recurring {
+    display: flex;
+    margin-left: auto;
+    color: #a1a1aa;
+  }
+  .volunteer-bulk-target-recurring :global(svg) {
+    width: 1em;
+    height: 1em;
+  }
+  .volunteer-bulk-target-place {
+    overflow: hidden;
+    color: #a1a1aa;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #bulk-capacity-help {
+    margin-top: 1.5rem;
   }
 </style>
