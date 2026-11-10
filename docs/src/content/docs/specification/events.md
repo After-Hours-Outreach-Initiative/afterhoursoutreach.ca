@@ -12,15 +12,14 @@ sign up for either. Organizers retain access through their role.
 
 ## Orientations
 
-New volunteers usually sign up for an orientation first. After the orientation,
-an organizer marks each person who attended as completed. Patrol signups require
-explicit organizer approval. Completing orientation is the most common path to
-approval, but is not required and does not automatically grant approval.
+New volunteers usually sign up for an orientation first. Patrol signups require
+an organizer's patrol approval, usually given from the orientation roster. An
+orientation booking is not required for approval and does not grant it.
 
 Progression and avatar colours follow manual approval everywhere: volunteers awaiting
 patrol approval are blue, patrol-approved outreach volunteers are green, and
-patrol-approved medic-team volunteers are red. Recorded orientation attendance never
-changes a category, medic eligibility, or reserved-place counts. Volunteers awaiting
+patrol-approved medic-team volunteers are red. Orientation bookings never change a
+category, medic eligibility, or reserved-place counts. Volunteers awaiting
 patrol approval may book multiple upcoming orientations, subject to each event's
 capacity, reserved places, and recurring signup window.
 

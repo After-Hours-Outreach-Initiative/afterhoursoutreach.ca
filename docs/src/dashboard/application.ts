@@ -45,13 +45,6 @@ const required: Record<string, string[]> = {
     "updated_at",
   ],
   signup: ["id", "user_id", "event_id", "status", "updated_at"],
-  orientation_completion: [
-    "id",
-    "user_id",
-    "event_id",
-    "marked_by",
-    "marked_at",
-  ],
   event_audit: [
     "id",
     "event_id",
@@ -73,8 +66,7 @@ export function missingApplicationSchema(tables: SchemaTable[]) {
 const userSelect = `SELECT u.id,u.name,u.email,u.role,u.email_verified AS verified,u.updated_at AS updatedAt,
   coalesce(v.active,0) AS active,coalesce(v.registration_approved,0) AS applicationApproved,
   coalesce(v.patrol_approved,0) AS patrolApproved,coalesce(v.updated_at,0) AS statusUpdatedAt,
-  EXISTS(SELECT 1 FROM profile p WHERE p.user_id=u.id) AS submitted,
-  EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id=u.id) AS orientationCompleted
+  EXISTS(SELECT 1 FROM profile p WHERE p.user_id=u.id) AS submitted
   FROM user u LEFT JOIN volunteer_status v ON v.user_id=u.id`;
 const usableOrganizer = `SELECT u.id FROM user u JOIN volunteer_status v ON v.user_id=u.id
   JOIN profile p ON p.user_id=u.id WHERE u.role='organizer' AND v.active=1 AND u.email_verified=1`;
@@ -84,10 +76,10 @@ const medic = (
   id: string,
 ) => `EXISTS(SELECT 1 FROM profile mp JOIN volunteer_status mv ON mv.user_id=mp.user_id
   WHERE mp.user_id=${id} AND mv.registration_approved=1 AND mv.patrol_approved=1
-  AND EXISTS(SELECT 1 FROM json_each(mp.teams) WHERE value='medic')
-  AND EXISTS(SELECT 1 FROM orientation_completion mo WHERE mo.user_id=mp.user_id))`;
-const category = `CASE WHEN coalesce(e.includes_orientation,e.type='orientation') AND NOT EXISTS(
-  SELECT 1 FROM orientation_completion o WHERE o.user_id=s.user_id) THEN 'New volunteer'
+  AND EXISTS(SELECT 1 FROM json_each(mp.teams) WHERE value='medic'))`;
+const newVolunteer = (id: string) =>
+  `NOT EXISTS(SELECT 1 FROM volunteer_status nv WHERE nv.user_id=${id} AND nv.patrol_approved=1)`;
+const category = `CASE WHEN ${newVolunteer("s.user_id")} THEN 'New volunteer'
   WHEN ${medic("s.user_id")} THEN 'Medic' ELSE 'Outreach Volunteer' END`;
 
 export interface PreparedPlan extends Plan {
@@ -165,7 +157,7 @@ export class Application {
         e.cancelled_at AS cancelledAt,e.series_id AS seriesId,coalesce(e.includes_orientation,e.type='orientation') AS includesOrientation,e.updated_at AS updatedAt,
         (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed') AS confirmed,
         (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed' AND ${medic("s.user_id")}) AS medics,
-        (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed' AND NOT EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id=s.user_id)) AS newVolunteers
+        (SELECT count(*) FROM signup s WHERE s.event_id=e.id AND s.status='confirmed' AND ${newVolunteer("s.user_id")}) AS newVolunteers
         FROM event e ORDER BY (e.starts_at>?) DESC,CASE WHEN e.starts_at>? THEN e.starts_at END ASC,e.starts_at DESC LIMIT 60`,
         params: [now, now],
       },
@@ -262,8 +254,7 @@ export class Application {
   async roster(db: Database, eventId: string) {
     return this.cf.rows(
       db,
-      `SELECT s.id,s.user_id AS userId,u.name,s.status,${category} AS category,
-      EXISTS(SELECT 1 FROM orientation_completion o WHERE o.event_id=s.event_id AND o.user_id=s.user_id) AS completed
+      `SELECT s.id,s.user_id AS userId,u.name,s.status,${category} AS category
       FROM signup s JOIN user u ON u.id=s.user_id JOIN event e ON e.id=s.event_id
       WHERE s.event_id=? AND s.status='confirmed' ORDER BY u.name LIMIT 100`,
       [eventId],
@@ -477,7 +468,6 @@ export class Application {
           ["profile", "user_id"],
           ["volunteer_status", "user_id"],
           ["signup", "user_id"],
-          ["orientation_completion", "user_id"],
           ["event_notification", "user_id"],
           ["medic_certification_notification", "user_id"],
           ["application_submission_notification", "user_id"],
@@ -530,7 +520,6 @@ export class Application {
         // and rolls back the entire batch if history appears after this preview.
         for (const table of [
           "audit_log",
-          "orientation_completion",
           "event_notification",
           "signup",
           "organizer_bootstrap",
@@ -576,10 +565,7 @@ export class Application {
       return plan;
     }
 
-    const registrationAction = [
-      "remove-registration",
-      "complete-orientation",
-    ].includes(input.action);
+    const registrationAction = input.action === "remove-registration";
     let signup: Row | undefined;
     let eventId = input.id;
     if (registrationAction) {
@@ -622,17 +608,14 @@ export class Application {
     plan.statements.push(
       assertion(
         `EXISTS(SELECT 1 FROM event WHERE id=? AND updated_at=? AND cancelled_at IS NULL
-          AND starts_at ${input.action === "complete-orientation" ? "<=" : ">"}
+          AND starts_at >
           CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER))`,
         [eventId, event.updated_at],
       ),
     );
     if (event.cancelled_at)
       plan.blocked.push("This event is already cancelled.");
-    if (
-      input.action !== "complete-orientation" &&
-      Number(event.starts_at) <= now
-    )
+    if (Number(event.starts_at) <= now)
       plan.blocked.push(
         "Past events and registrations cannot be changed here.",
       );
@@ -753,36 +736,6 @@ export class Application {
           params: [now, input.id],
         });
         break;
-      case "complete-orientation": {
-        plan.title = "Mark orientation completed";
-        if (
-          Number(event.starts_at) > now ||
-          !(event.includes_orientation ?? event.type === "orientation")
-        )
-          plan.blocked.push(
-            "Only registered attendees of an orientation that has started can be marked completed.",
-          );
-        const organizer = (
-          await this.cf.rows(db, `${usableOrganizer} ORDER BY u.id LIMIT 1`)
-        )[0];
-        if (!organizer)
-          plan.blocked.push(
-            "An active organizer is needed to reference the completion record.",
-          );
-        else {
-          plan.statements.push(
-            assertion(`EXISTS(${usableOrganizer} AND u.id=?)`, [organizer.id]),
-          );
-          plan.statements.push({
-            sql: "INSERT INTO orientation_completion(id,user_id,event_id,marked_by,marked_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,event_id) DO NOTHING",
-            params: [randomUUID(), signup!.user_id, eventId, organizer.id, now],
-          });
-          plan.details.push(
-            "This records attendance, not automatic patrol approval. The completion references an active organizer; this local operation is recorded in the dashboard log.",
-          );
-        }
-        break;
-      }
       default:
         throw new DashboardError(
           400,

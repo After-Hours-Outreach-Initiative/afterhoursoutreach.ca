@@ -61,6 +61,8 @@ export async function listAuditLog(
       FROM audit_log a JOIN user subject ON subject.id = a.subject_id
       LEFT JOIN profile sp ON sp.user_id = subject.id
       LEFT JOIN volunteer_status sv ON sv.user_id = subject.id
+      -- Legacy rows duplicated the patrol approval entry recorded beside them.
+      WHERE a.action <> 'orientation_completed'
       UNION ALL
       SELECT a.id, 'event', a.created_at, a.action, a.actor_id, a.event_id,
         CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation')
@@ -132,7 +134,7 @@ export async function listAuditUsers(
     .prepare(
       `
     WITH actors AS (
-      SELECT actor_id AS id FROM audit_log
+      SELECT actor_id AS id FROM audit_log WHERE action <> 'orientation_completed'
       UNION SELECT actor_id FROM event_audit
       UNION SELECT actor_id FROM patrol_series_audit
     )

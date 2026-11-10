@@ -39,7 +39,7 @@ Started events stay in the past list, where the unregister button remains until
 that time. Organizer roster removals are unaffected.
 
 Cancelled events disappear from event lists and calendars. Their details,
-registration and attendance records, and audit history are retained. Organizers
+registration records, and audit history are retained. Organizers
 can see cancellations in the audit log, including events with no registrations.
 Recurring cancellation tombstones prevent regeneration. Hiding/closing updates
 visibility and registration state without cancelling existing bookings.

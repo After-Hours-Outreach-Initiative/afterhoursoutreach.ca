@@ -10,11 +10,11 @@ const retiredSamples = [
   ["awaiting-review", "casey", true, false, "none"],
   ["accepted", "alex", true, true, "none"],
   ["orientation-booked", "alex", true, true, "booked"],
-  ["orientation-completed", "alex", true, true, "completed"],
+  ["orientation-completed", "alex", true, true, "attended"],
   ["medic-orientee", "dana", true, true, "none"],
   ["medic-new-volunteer", "dana", true, true, "none"],
-  ["patrol", "alex", true, true, "completed"],
-  ["medic", "dana", true, true, "completed"],
+  ["patrol", "alex", true, true, "attended"],
+  ["medic", "dana", true, true, "attended"],
 ] as const;
 
 /** Any activity outside the original seed is saved work, including browser drafts. */
@@ -34,7 +34,6 @@ function noSavedActivity(now: number) {
     ["application_submission_notification", "user_id"],
     ["medic_certification_notification", "user_id"],
     ["organizer_bootstrap", "user_id"],
-    ["orientation_completion", "marked_by"],
     ["audit_log", "actor_id"],
     ["volunteer_status", "approved_by"],
   ];
@@ -73,11 +72,7 @@ export function localAccountCleanupCandidates(now = Date.now()) {
           AND s.created_at=s.updated_at AND e.id=${quote(`local-account-event-${orientation === "booked" ? "orientation" : "past-orientation"}`)}
           AND e.created_at=v.updated_at AND e.updated_at=e.created_at AND e.cancelled_at IS NULL
           AND coalesce(e.includes_orientation,e.type='orientation')=1
-          AND s.created_at=${orientation === "booked" ? "v.updated_at" : "e.starts_at-86400000"}))
-        AND NOT EXISTS(SELECT 1 FROM orientation_completion o JOIN event e ON e.id=o.event_id WHERE o.user_id=u.id AND NOT
-          (${orientation === "completed" ? 1 : 0}=1 AND o.id=${quote(`local-account-completion-${key}`)}
-          AND e.id='local-account-event-past-orientation' AND o.marked_by='local-account-user-organizer'
-          AND o.marked_at=e.starts_at))`;
+          AND s.created_at=${orientation === "booked" ? "v.updated_at" : "e.starts_at-86400000"}))`;
     },
   );
   const emptyApplications = `SELECT u.id FROM user u WHERE u.role='volunteer' AND u.name='New application'
@@ -92,7 +87,6 @@ export function localAccountCleanupCandidates(now = Date.now()) {
     AND NOT EXISTS(SELECT 1 FROM profile WHERE user_id=u.id)
     AND NOT EXISTS(SELECT 1 FROM volunteer_status WHERE user_id=u.id)
     AND NOT EXISTS(SELECT 1 FROM signup WHERE user_id=u.id)
-    AND NOT EXISTS(SELECT 1 FROM orientation_completion WHERE user_id=u.id)
     AND NOT EXISTS(SELECT 1 FROM audit_log WHERE subject_id=u.id)
     AND ${noSavedActivity(now)}`;
   // Keep each identity separate: D1 has tighter expression/compound-query limits.
@@ -102,7 +96,7 @@ export function localAccountCleanupCandidates(now = Date.now()) {
 /** Never resets accounts, rewrites snapshots, or removes shared event records. */
 export function localAccountCleanup(now = Date.now()) {
   return localAccountCleanupCandidates(now).flatMap((candidates) =>
-    ["orientation_completion", "signup", "audit_log", "user"].map(
+    ["signup", "audit_log", "user"].map(
       (table) =>
         `DELETE FROM ${table} WHERE ${table === "user" ? "id" : table === "audit_log" ? "subject_id" : "user_id"} IN (${candidates})`,
     ),

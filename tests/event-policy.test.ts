@@ -49,7 +49,7 @@ test("saved limits govern reservations and newcomer caps", () => {
   );
 });
 
-test("approval allows patrol signup without orientation completion", () => {
+test("approval allows patrol signup without an orientation", () => {
   assert.equal(signupBlockReason(volunteer, event, 0, now), null);
 });
 
@@ -148,26 +148,23 @@ test("dynamic reservations use approval even for medics with no attendance", () 
   );
 });
 
-test("attendance alone neither advances progression nor changes reserved-place availability", () => {
-  for (const orientationCompleted of [false, true]) {
-    const historicalEvent = {
-      ...event,
-      includesOrientation: true,
-      newVolunteerConfirmed: 4,
-      medicConfirmed: 0,
-      orientationCompleted,
-    };
-    assert.equal(
-      signupBlockReason(
-        { ...volunteer, patrolApproved: false },
-        historicalEvent,
-        4,
-        now,
-      ),
-      orientationFullMessage,
-    );
-    assert.equal(availableSignupSpots(historicalEvent, 4, volunteer), 2);
-  }
+test("full new volunteer places block unapproved volunteers without changing general availability", () => {
+  const historicalEvent = {
+    ...event,
+    includesOrientation: true,
+    newVolunteerConfirmed: 4,
+    medicConfirmed: 0,
+  };
+  assert.equal(
+    signupBlockReason(
+      { ...volunteer, patrolApproved: false },
+      historicalEvent,
+      4,
+      now,
+    ),
+    orientationFullMessage,
+  );
+  assert.equal(availableSignupSpots(historicalEvent, 4, volunteer), 2);
 });
 
 test("pending applications cannot sign up for any event; organizers retain access", () => {

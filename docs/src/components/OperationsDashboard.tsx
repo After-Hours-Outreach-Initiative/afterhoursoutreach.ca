@@ -378,11 +378,6 @@ function Users({
                             ? "Patrol approved"
                             : "Patrol not approved"}
                         </span>
-                        <span>
-                          {user.orientationCompleted
-                            ? "Orientation completed"
-                            : "Orientation not recorded"}
-                        </span>
                       </div>
                     </td>
                     <td>
@@ -616,13 +611,10 @@ function EventItem({
                   <div>
                     <strong>{person.name}</strong>
                     <br />
-                    <span className="ops-muted">
-                      {person.category}
-                      {person.completed ? " · Completed this orientation" : ""}
-                    </span>
+                    <span className="ops-muted">{person.category}</span>
                   </div>
                   <div className="ops-buttons">
-                    {future ? (
+                    {future && (
                       <button
                         disabled={!editable}
                         onClick={() =>
@@ -634,22 +626,6 @@ function EventItem({
                       >
                         Remove
                       </button>
-                    ) : (
-                      Boolean(event.includesOrientation) &&
-                      !person.completed &&
-                      !event.cancelledAt && (
-                        <button
-                          disabled={!canWrite}
-                          onClick={() =>
-                            prepare({
-                              action: "complete-orientation",
-                              id: String(person.id),
-                            })
-                          }
-                        >
-                          Mark orientation completed
-                        </button>
-                      )
                     )}
                   </div>
                 </li>

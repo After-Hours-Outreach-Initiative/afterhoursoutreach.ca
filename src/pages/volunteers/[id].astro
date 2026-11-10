@@ -4,7 +4,6 @@ import { accountContext, requireOrganizer } from "@/server/db/access";
 import {
   findVolunteer,
   findVolunteerOrientation,
-  findCompletedVolunteerOrientation,
   viewVolunteerProfile,
   type VolunteerRow,
   type VolunteerOrientation,
@@ -23,7 +22,6 @@ export const prerender = false;
 let profile;
 let person: VolunteerRow | null = null;
 let orientation: VolunteerOrientation | null = null;
-let completedOrientation: VolunteerOrientation | null = null;
 let applicationProgress: Awaited<ReturnType<typeof loadApplicationProgress>>;
 let accountName = "";
 let accountGreeting = "";
@@ -46,11 +44,6 @@ try {
   person = await findVolunteer(env.DB, actor, Astro.params.id ?? "");
   applicationProgress = await loadApplicationProgress(
     env.DB,
-    Astro.params.id ?? "",
-  );
-  completedOrientation = await findCompletedVolunteerOrientation(
-    env.DB,
-    actor,
     Astro.params.id ?? "",
   );
   orientation = await findVolunteerOrientation(
@@ -99,7 +92,6 @@ const returnUrl = volunteerListReturnUrl(
       {profile}
       {person}
       {orientation}
-      {completedOrientation}
       progress={applicationProgress}
     />
   </section>

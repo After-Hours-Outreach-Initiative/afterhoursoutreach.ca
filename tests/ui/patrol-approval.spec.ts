@@ -65,7 +65,7 @@ test("roster links open profile pages with one readable patrol approval card", a
     await expectReadableCard(patrolApproval);
     await expect(
       patrolApproval.locator("[data-orientation-status]"),
-    ).toHaveText("Orientation not completed");
+    ).toHaveCount(0);
     await expect(
       patrolApproval.getByRole("button", {
         name: "Approve for patrols",

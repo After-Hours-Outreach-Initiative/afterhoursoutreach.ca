@@ -34,7 +34,7 @@ import {
   codeOfConductVersion,
 } from "../../data/code-of-conduct";
 import { createDatabase } from ".";
-import { profile, event, orientationCompletion } from "./schema";
+import { profile } from "./schema";
 import { RequestError } from "../http";
 import { mergeAnswers } from "../../data/answer-merge";
 import { permissionValues, writePermission, type Actor } from "./access";
@@ -358,21 +358,6 @@ export async function loadSubmittedApplication(
     columns: { submitted_application: true },
   });
   return row?.submitted_application ?? null;
-}
-
-export async function loadFirstCompletedOrientation(
-  binding: Env["DB"],
-  userId: string,
-) {
-  const row = await createDatabase(binding)
-    .select({ startsAt: event.starts_at })
-    .from(orientationCompletion)
-    .innerJoin(event, eq(event.id, orientationCompletion.event_id))
-    .where(eq(orientationCompletion.user_id, userId))
-    .orderBy(event.starts_at)
-    .limit(1)
-    .get();
-  return row?.startsAt ?? null;
 }
 
 export async function saveProfile(

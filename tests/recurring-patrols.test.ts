@@ -876,7 +876,7 @@ test("legacy deletion uses versioned cancellation and retains registered occurre
   );
 });
 
-test("past events reject cancellation and legacy deletion; series removal preserves attendance and unrelated data", async () => {
+test("past events reject cancellation and legacy deletion; series removal preserves past registrations and unrelated data", async () => {
   const series = await savePatrolSeries(db, organizer, {
     ...input(),
     spots: 5,
@@ -889,15 +889,6 @@ test("past events reject cancellation and legacy deletion; series removal preser
     .prepare("UPDATE event SET starts_at=0 WHERE id=?")
     .bind(past.id)
     .run();
-  await db
-    .prepare(
-      "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES (?,?,?,?,0)",
-    )
-    .bind(crypto.randomUUID(), alice.id, past.id, organizer.id)
-    .run();
-  const attendance = (
-    await db.prepare("SELECT * FROM orientation_completion").all()
-  ).results;
   await assert.rejects(
     deleteEvent(db, organizer, past.id, past.updatedAt),
     status(409),
@@ -952,10 +943,6 @@ test("past events reject cancellation and legacy deletion; series removal preser
       .bind(past.id)
       .first("status"),
     "confirmed",
-  );
-  assert.deepEqual(
-    (await db.prepare("SELECT * FROM orientation_completion").all()).results,
-    attendance,
   );
   assert.deepEqual(
     await db.prepare("SELECT * FROM event WHERE series_id IS NULL").first(),
@@ -2068,20 +2055,8 @@ test("orientation settings persist on series, future templates and individual ex
   const preview = (await listEvents(db, alice)).find(
     (event) => event.id === events[0].id,
   )!;
-  assert.equal(preview.orientationCompleted, 0);
   assert.equal(preview.availableSpots, 4);
   await changeSignup(db, alice, events[0].id, "join");
-  await db
-    .prepare("UPDATE event SET starts_at=0 WHERE id=?")
-    .bind(events[0].id)
-    .run();
-  await db
-    .prepare(
-      "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES (?,?,?,?,0)",
-    )
-    .bind(crypto.randomUUID(), alice.id, events[0].id, organizer.id)
-    .run();
-  assert.equal(await count("orientation_completion"), 1);
 });
 
 test("an occurrence generated between the bulk read and write cannot retain stale defaults unnoticed", async () => {

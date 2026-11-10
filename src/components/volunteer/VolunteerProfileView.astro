@@ -17,11 +17,9 @@ interface Props {
   profile: NonNullable<Awaited<ReturnType<typeof viewVolunteerProfile>>>;
   person: VolunteerRow;
   orientation: VolunteerOrientation | null;
-  completedOrientation: VolunteerOrientation | null;
   progress: ApplicationProgress;
 }
-const { profile, person, orientation, completedOrientation, progress } =
-  Astro.props;
+const { profile, person, orientation, progress } = Astro.props;
 const profileSections = profileFormSections();
 const contents = [
   { id: "patrol-approval-heading", heading: "Patrol Approval" },
@@ -56,46 +54,43 @@ const contents = [
     <PatrolApproval
       {person}
       {orientation}
-      {completedOrientation}
       accessChangedBy={profile.patrolAccessChangedBy}
     />
-    {
-      Boolean(person.applicationApproved) && (
-        <section
-          id="volunteer-profile-panel"
-          data-volunteer-profile-panel="profile"
-          aria-labelledby="volunteer-profile-heading"
-        >
-          <h2 id="volunteer-profile-heading" data-contents-section>
-            Profile
-          </h2>
-          <div class="account-profile-summary mt-6 mb-8">
-            <dl>
-              <div>
-                <dt>Email</dt>
-                <dd>{profile.email}</dd>
-              </div>
-            </dl>
-          </div>
-          {profileSections.map((section) => (
-            <section class="volunteer-profile-section">
-              <h3
-                id={`volunteer-current-${section.key}`}
-                class="volunteer-profile-heading mb-6"
-                data-contents-section
-              >
-                {section.heading}
-              </h3>
-              <AccountProfileAnswers
-                section={section}
-                values={profile.answers}
-                hideEmptyMiddleNames
-              />
-            </section>
-          ))}
-        </section>
-      )
-    }
+    {Boolean(person.applicationApproved) && (
+      <section
+        id="volunteer-profile-panel"
+        data-volunteer-profile-panel="profile"
+        aria-labelledby="volunteer-profile-heading"
+      >
+        <h2 id="volunteer-profile-heading" data-contents-section>
+          Profile
+        </h2>
+        <div class="account-profile-summary mt-6 mb-8">
+          <dl>
+            <div>
+              <dt>Email</dt>
+              <dd>{profile.email}</dd>
+            </div>
+          </dl>
+        </div>
+        {profileSections.map((section) => (
+          <section class="volunteer-profile-section">
+            <h3
+              id={`volunteer-current-${section.key}`}
+              class="volunteer-profile-heading mb-6"
+              data-contents-section
+            >
+              {section.heading}
+            </h3>
+            <AccountProfileAnswers
+              section={section}
+              values={profile.answers}
+              hideEmptyMiddleNames
+            />
+          </section>
+        ))}
+      </section>
+    )}
     <section
       id="volunteer-application-panel"
       data-volunteer-profile-panel="application"
@@ -113,10 +108,8 @@ const contents = [
         <ArrowRightIcon class="btn-icon" />
       </a>
     </section>
-    {
-      Boolean(person.applicationApproved) && (
-        <VolunteerControls person={person} />
-      )
-    }
+    {Boolean(person.applicationApproved) && (
+      <VolunteerControls person={person} />
+    )}
   </div>
 </div>

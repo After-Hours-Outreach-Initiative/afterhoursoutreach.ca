@@ -165,7 +165,7 @@ test("manual presets cover application, orientation, patrol, medic and access st
           EXISTS(SELECT 1 FROM application_draft WHERE user_id=u.id) AS draft,
           p.naloxone_completed_at IS NOT NULL AS naloxone,
           coalesce(v.registration_approved, 0), coalesce(v.active, 0), coalesce(v.patrol_approved, 0),
-          EXISTS(SELECT 1 FROM orientation_completion WHERE user_id=u.id) AS orientation,
+          EXISTS(SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id WHERE s.user_id=u.id AND s.status='confirmed' AND e.starts_at<=${now}) AS attended,
           EXISTS(SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id WHERE s.user_id=u.id AND s.status='confirmed' AND e.starts_at>${now}) AS booked,
           ${approvedMedicSql("u.id")} AS medic, u.role
           FROM user u LEFT JOIN profile p ON p.user_id = u.id
@@ -183,7 +183,7 @@ test("manual presets cover application, orientation, patrol, medic and access st
           Number(preset.applicationApproved),
           Number(!preset.draft && preset.active),
           Number(preset.patrolApproved),
-          Number(preset.orientation === "completed"),
+          Number(preset.orientation === "attended"),
           Number(preset.orientation === "booked"),
           Number(
             preset.sampleKey === "dana" &&
@@ -295,7 +295,7 @@ test("manual presets cover application, orientation, patrol, medic and access st
       "UPDATE signup SET status='cancelled' WHERE id='local-account-v2-signup-orientation-booked'",
     );
     db.exec(
-      "DELETE FROM orientation_completion WHERE user_id='local-account-v2-user-patrol'",
+      "UPDATE signup SET status='cancelled' WHERE id='local-account-v2-signup-patrol'",
     );
     db.exec(
       "INSERT INTO application_draft_generation (user_id,generation) VALUES ('local-account-v2-user-draft','discarded')",
@@ -306,7 +306,6 @@ test("manual presets cover application, orientation, patrol, medic and access st
       "volunteer_status",
       "event",
       "signup",
-      "orientation_completion",
       "audit_log",
       "application_draft",
       "application_draft_generation",
@@ -336,12 +335,18 @@ test("cleanup removes only untouched known legacy samples and empty marked appli
       .map((sql) =>
         sql
           .replaceAll("local-account-v2-", "local-account-")
-          .replaceAll(".v2.local@", ".local@"),
+          .replaceAll(".v2.local@", ".local@")
+          // The previous generation used the retired preset key.
+          .replaceAll("orientation-attended", "orientation-completed"),
       );
     // Its identities/profiles must use the original shared names and answers.
     db.exec(previous.join(";\n"));
     for (const preset of manualAccountPresets.filter(({ draft }) => !draft)) {
-      const id = `local-account-user-${preset.key}`;
+      const key =
+        preset.key === "orientation-attended"
+          ? "orientation-completed"
+          : preset.key;
+      const id = `local-account-user-${key}`;
       const sample = sampleProfileFixtures("local", now).find(
         ({ key }) => key === preset.sampleKey,
       )!;
@@ -349,7 +354,7 @@ test("cleanup removes only untouched known legacy samples and empty marked appli
       db.prepare("UPDATE user SET name=? WHERE id=?").run(sample.name, id);
       db.exec(
         sampleProfileStatement(
-          { ...sample, id, email: `${preset.key}.local@example.org` },
+          { ...sample, id, email: `${key}.local@example.org` },
           now - 14 * 86400000,
           {
             naloxoneCompletedAt: preset.naloxoneCompleted
@@ -431,20 +436,14 @@ test("cleanup removes only untouched known legacy samples and empty marked appli
       "user",
       "profile",
       "signup",
-      "orientation_completion",
       "audit_log",
       "application_draft",
     ].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all());
     db.exec(localAccountFixtures(now + 2000).join(";\n"));
     assert.deepEqual(
-      [
-        "user",
-        "profile",
-        "signup",
-        "orientation_completion",
-        "audit_log",
-        "application_draft",
-      ].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()),
+      ["user", "profile", "signup", "audit_log", "application_draft"].map(
+        (table) => db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
+      ),
       before,
     );
     assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
@@ -722,7 +721,7 @@ test("account descriptions follow edited database state rather than preset names
     hasDraft: false,
     active: true,
     patrolApproved: true,
-    orientationCompleted: true,
+    orientationAttended: true,
     orientationBooked: false,
     medicSelected: true,
     medicEligible: true,
@@ -788,10 +787,6 @@ test("local fixtures restore open, full, hidden, and past events in the real sch
       ) < now,
     );
     assert.equal(
-      db.prepare("SELECT count(*) AS n FROM orientation_completion").get()!.n,
-      1,
-    );
-    assert.equal(
       db
         .prepare(
           "SELECT patrol_approved FROM volunteer_status WHERE user_id = ?",
@@ -833,14 +828,7 @@ test("rerunning the local seed preserves edits, cancellations, approvals, and un
     db.exec(
       "INSERT INTO user (id, name, email, created_at, updated_at) VALUES ('unrelated', 'Keep me', 'keep@example.org', 0, 0)",
     );
-    const tables = [
-      "user",
-      "profile",
-      "volunteer_status",
-      "event",
-      "signup",
-      "orientation_completion",
-    ];
+    const tables = ["user", "profile", "volunteer_status", "event", "signup"];
     const before = tables.map((table) =>
       db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(),
     );
@@ -919,7 +907,6 @@ test("local reseeding atomically repairs only old synthetic profiles, without lo
       "volunteer_status",
       "event",
       "signup",
-      "orientation_completion",
       "session",
       "two_factor",
       "account",

@@ -5,23 +5,23 @@ operations. Edit files here, not generated SQL in `drizzle/`.
 
 ## Where rules live
 
-| Source                        | Responsibility                                                                                                                                              |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema.ts`                   | Tables, defaults, relationships, checks, and unique indexes.                                                                                                |
-| `triggers.sql`                | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation places/completion, visibility, and organizer protection/bootstrap. |
-| `events.ts`                   | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                              |
-| `volunteers.ts`               | Approval, activation, roles, attendance, access-related cancellations, and sensitive-profile auditing.                                                      |
-| `profiles.ts`                 | Application validation and transactional profile updates.                                                                                                   |
-| `application-drafts.ts`       | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                              |
-| `access.ts`                   | Verified account context and authorization, rechecked inside writes.                                                                                        |
-| `policy.ts`                   | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                                       |
-| `sessions.ts`                 | Ownership-scoped session lookup and second-factor verification markers.                                                                                     |
-| `notifications.ts`            | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                                     |
-| `medic-certifications.ts`     | Certification reminder eligibility, renewal-cycle ledger, atomic claims, and bounded retry state.                                                           |
-| `submission-notifications.ts` | Fixed-recipient review-entry ledger, transactional intents, production claims and shared budget reservations; Preview/legacy suppression.                   |
-| `rate-limits.ts`              | Persistent request/email counters and cleanup.                                                                                                              |
-| `errors.ts`                   | Safe translation of database invariant errors into application errors.                                                                                      |
-| `index.ts`, `sql.ts`          | Request-scoped Drizzle connection and shared SQL clock.                                                                                                     |
+| Source                        | Responsibility                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `schema.ts`                   | Tables, defaults, relationships, checks, and unique indexes.                                                                                     |
+| `triggers.sql`                | Atomic database invariants: signup eligibility/capacity, organizer approval, orientation places, visibility, and organizer protection/bootstrap. |
+| `events.ts`                   | Event/sign-up queries and workflows, version checks, audit records, and notification creation.                                                   |
+| `volunteers.ts`               | Approval, activation, roles, access-related cancellations, and sensitive-profile auditing.                                                       |
+| `profiles.ts`                 | Application validation and transactional profile updates.                                                                                        |
+| `application-drafts.ts`       | Owner-only incomplete application snapshots, optimistic revision checks, and atomic session/submission guards.                                   |
+| `access.ts`                   | Verified account context and authorization, rechecked inside writes.                                                                             |
+| `policy.ts`                   | User-facing signup eligibility previews and shared email policy. Previews do not replace atomic database enforcement.                            |
+| `sessions.ts`                 | Ownership-scoped session lookup and second-factor verification markers.                                                                          |
+| `notifications.ts`            | Outbox queries, retry eligibility, delivery leases, and delivery state.                                                                          |
+| `medic-certifications.ts`     | Certification reminder eligibility, renewal-cycle ledger, atomic claims, and bounded retry state.                                                |
+| `submission-notifications.ts` | Fixed-recipient review-entry ledger, transactional intents, production claims and shared budget reservations; Preview/legacy suppression.        |
+| `rate-limits.ts`              | Persistent request/email counters and cleanup.                                                                                                   |
+| `errors.ts`                   | Safe translation of database invariant errors into application errors.                                                                           |
+| `index.ts`, `sql.ts`          | Request-scoped Drizzle connection and shared SQL clock.                                                                                          |
 
 HTTP request parsing and responses remain in `src/pages/api/v1/`. Better Auth's
 integration remains in `src/server/auth/`. Email transport and delivery orchestration
@@ -51,20 +51,20 @@ profiles are not backfilled and retain access without linking. `discord_link`
 is both the unique identity mapping and a durable, versioned role-sync outbox.
 Eligibility triggers enqueue changes in the same transaction as website writes.
 See the [Discord operations guide](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/docs/src/content/docs/implementation/discord.md).
-Orientation signup and attendance are tracked separately;
-neither is an application-completion milestone or a substitute for patrol approval.
+Orientation signup is neither an application-completion milestone nor a
+substitute for patrol approval. Only an organizer's patrol approval turns a new
+volunteer into an Outreach Volunteer.
 Organizer volunteer profiles display Applicant, New volunteer, and Outreach Volunteer/Medic
-progression, with a compact application tracker and separate orientation status.
+progression, with a compact application tracker and the registered orientation.
 Unapproved applications are **Application in progress** until form submission and
 Naloxone 101 confirmation are complete, then **Ready for review**. The review
 filter and its count include only ready, unrejected applications.
 **Approve for patrols** is available after application approval, without requiring
-orientation booking or completion. It does not infer attendance. When the same action
+an orientation booking. When the same action
 is used from a past orientation roster with an explicit event, it also records that
 entry's approver and approval time on `signup` in the version-guarded transaction.
 The roster's **Approved by** line uses only this attribution. Existing account-wide
-approvals and orientation attendance do not imply approval from a particular entry.
-The action also records the event's attendance separately. Both paths retain audit records
+approvals do not imply approval from a particular entry. Both paths retain audit records
 and optional access emails, and do not alter the volunteer's active/inactive status.
 
 `profile.preferred_name` historically stored a combined full-or-preferred-name
@@ -120,14 +120,14 @@ These are reservations, not minimum attendance requirements. Limits are whole
 numbers from 0–100; zero removes that reservation or disallows new volunteers.
 The new volunteer maximum cannot be below its reserved places.
 A medic must have `medic` in `profile.teams`, both authoritative organizer
-approvals (`registration_approved` and `patrol_approved`). Orientation attendance
-is not a role requirement. No extra certification gate is imposed.
+approvals (`registration_approved` and `patrol_approved`). Orientation
+registration is not a role requirement. No extra certification gate is imposed.
 
 Patrols with orientation also apply their saved new volunteer reservation and cap.
 Anyone without manual patrol approval,
-including someone with recorded orientation attendance or medic team interest,
+including someone registered for a past orientation or with medic team interest,
 counts only as a new volunteer. Patrol-approved volunteers are outreach volunteers
-or approved medics regardless of attendance. Each person occupies one place.
+or approved medics regardless of orientation registrations. Each person occupies one place.
 The same categories drive event counts, public/organizer rosters, volunteer-list
 avatars, profile progression, capacity reservations, and Discord Medic eligibility.
 
@@ -161,23 +161,22 @@ coverage maintenance itself does not change those defaults.
 
 Insert, reassignment/move and reactivation triggers enforce these limits inside
 the write. Orientation/capacity edits reject incompatible existing bookings,
-including removing orientation needed by a volunteer without patrol approval,
-and cannot remove recorded completion history. Bulk edits roll back their
-templates, versions, audits and notifications too. Existing historical excess
-bookings are not removed; completion/status changes never silently cancel spots.
-Approval and completion remain independent, and all existing access, visibility,
-session and application-readiness checks still apply.
+including removing orientation needed by a volunteer without patrol approval.
+Bulk edits roll back their templates, versions, audits and notifications too.
+Existing historical excess bookings are not removed; status changes never
+silently cancel spots. All existing access, visibility, session and
+application-readiness checks still apply.
 
 Event lists and public rosters restrict volunteers without patrol approval to
 events that include orientation, including legacy and recurring events. This is
 enforced in both queries, not by browser filters or supplied event IDs. Organizers
 and patrol-approved volunteers retain full event visibility under the existing
-open/hidden/time-window rules, even without recorded orientation attendance.
+open/hidden/time-window rules, even without an orientation registration.
 
 `listEvents` includes effective `includesOrientation`, `newVolunteerConfirmed`
 (confirmed volunteers awaiting patrol approval), `medicConfirmed` (manually approved
-medics), `medicEligible` (the viewer's medic eligibility),
-`orientationCompleted` (attendance history only), and category-aware `availableSpots`.
+medics), `medicEligible` (the viewer's medic eligibility), and category-aware
+`availableSpots`.
 `signupBlockReason` accepts the manual approval and category counts and explains full categories or
 reserved places. Availability is capacity-only; the eligibility/booking-limit
 reason must still be checked. Both counts and viewer status participate in the
@@ -214,12 +213,15 @@ bookings. Rebooking, reactivation, and organizer moves follow the same rule.
 Each event still enforces its capacity, reserved places, new-volunteer maximum,
 and one confirmed registration per account. Recurring signup windows also apply.
 
-Account age and recorded attendance do not determine who is new. Only explicit
-manual patrol approval changes that status or grants access to patrols without
-orientation. The organizer's combined roster approval action explicitly records
-both attendance and patrol approval; orientation completion alone grants neither
-patrol access nor a different capacity category. Existing bookings and cancellation
-history are preserved.
+Account age and orientation registrations do not determine who is new. Only
+explicit manual patrol approval changes that status or grants access to patrols
+without orientation. Approving from an orientation roster records the approver on
+that signup. Existing bookings and cancellation history are preserved.
+
+`0034_remove_orientation_completion.sql` drops the `orientation_completion` table,
+which duplicated patrol approval. Its legacy `orientation_completed` audit rows
+remain stored but are left out of the audit log, beside the approval entry each
+was recorded with.
 
 ## Recurring patrol controls
 

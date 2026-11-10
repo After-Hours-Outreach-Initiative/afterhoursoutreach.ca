@@ -577,8 +577,8 @@ test("filter counts track recurring dates, polling, actions and past events", as
     .getByRole("button", { name: "Save without email", exact: true })
     .click();
   await expect(
-    pastOccurrence.getByText("Orientation completed", { exact: true }),
-  ).toBeVisible();
+    pastOccurrence.locator("[data-patrol-approval-status]"),
+  ).toContainText("Approved by");
   await expect(pastOccurrence.locator(".volunteer-roster")).toHaveAttribute(
     "open",
     "",

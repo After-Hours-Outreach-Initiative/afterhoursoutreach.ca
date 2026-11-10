@@ -43,11 +43,11 @@ Related specification: [Events](/specification/events/).
 - Decide which past events volunteers and organizers should be able to browse,
   and for how long. Any visitor-facing history needs an explicit privacy and
   visibility decision.
-- Decide whether volunteers who have completed orientation should continue to
+- Decide whether volunteers who have attended an orientation should continue to
   see upcoming orientations. The current rules allow multiple orientation bookings.
 
 These questions concern future retention and presentation. Existing cancellation
-and attendance mechanisms are described in
+mechanisms are described in
 [Event implementation](/implementation/events/).
 
 ## Privacy and launch preparation

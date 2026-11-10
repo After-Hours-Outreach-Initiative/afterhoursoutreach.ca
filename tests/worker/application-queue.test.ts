@@ -770,7 +770,7 @@ test("organizers review pending and approved applications with persistent list c
     );
     await expect(
       patrolApproval.locator("[data-orientation-status]"),
-    ).toHaveText("Orientation not completed");
+    ).toHaveCount(0);
     await expect(
       applicationProgress.locator('[data-state="complete"]'),
     ).toHaveCount(3);
@@ -788,8 +788,7 @@ test("organizers review pending and approved applications with persistent list c
     await expect(
       application.getByText("PRIVATE QUEUE ANSWER", { exact: true }),
     ).toHaveCount(0);
-    // An organizer can approve patrols before any orientation is booked, without
-    // recording attendance that has not happened.
+    // An organizer can approve patrols before any orientation is booked.
     const approvePatrols = patrolApproval.getByRole("button", {
       name: "Approve for patrols",
       exact: true,
@@ -811,12 +810,6 @@ test("organizers review pending and approved applications with persistent list c
     await expect(
       patrolApproval.locator("[data-orientation-status]"),
     ).toHaveCount(0);
-    assert.equal(
-      await DB.prepare(
-        "SELECT count(*) AS n FROM orientation_completion WHERE user_id='applicant-50'",
-      ).first("n"),
-      0,
-    );
     await patrolApproval
       .getByRole("button", { name: "Revoke patrol approval", exact: true })
       .click();
@@ -850,13 +843,7 @@ test("organizers review pending and approved applications with persistent list c
     await DB.prepare(
       `UPDATE profile SET teams='["medic"]' WHERE user_id='applicant-50'`,
     ).run();
-    await DB.prepare(
-      "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES ('queue-completion','applicant-50','queue-orientation','organizer',1)",
-    ).run();
     await page.reload();
-    await expect(
-      patrolApproval.locator("[data-orientation-status]"),
-    ).toHaveText("Orientation completed");
     const summary = profile.locator(".account-profile-summary");
     await expect(
       summary.getByText("Highest medical certification or licence", {
@@ -885,12 +872,6 @@ test("organizers review pending and approved applications with persistent list c
       .getByRole("button", { name: "Cancel change", exact: true })
       .click();
     await expect(approvePatrols).toBeEnabled();
-    assert.equal(
-      await DB.prepare(
-        "SELECT count(*) AS n FROM orientation_completion WHERE user_id='applicant-50'",
-      ).first("n"),
-      1,
-    );
     await approvePatrols.click();
     await page
       .getByRole("button", { name: "Save without email", exact: true })
@@ -909,20 +890,20 @@ test("organizers review pending and approved applications with persistent list c
       page.getByRole("button", { name: "Revoke patrol approval", exact: true }),
     ).toBeFocused();
     const recorded = await DB.prepare(
-      "SELECT v.patrol_approved, o.marked_by, o.marked_at, v.approved_at FROM volunteer_status v JOIN orientation_completion o ON o.user_id=v.user_id WHERE v.user_id='applicant-50'",
+      "SELECT patrol_approved, approved_by, approved_at FROM volunteer_status WHERE user_id='applicant-50'",
     ).first();
     assert.equal(recorded?.patrol_approved, 1);
-    assert.equal(recorded?.marked_by, "organizer");
-    assert.equal(recorded?.marked_at, 1);
+    assert.equal(recorded?.approved_by, "organizer");
     assert.ok(Number(recorded?.approved_at) > 1);
     const approvedDirectory = await get("/volunteers?q=applicant-50");
     assert.match(
       await approvedDirectory.text(),
       /data-volunteer-profile-link[^>]*><span>applicant-50 d\.</,
     );
+    // Approval replaces the registered orientation in the summary.
     await expect(
       patrolApproval.locator("[data-orientation-event]"),
-    ).toContainText("Queue orientation");
+    ).toHaveCount(0);
     assert.equal(
       await DB.prepare(
         "SELECT count(*) AS n FROM event_notification WHERE user_id='applicant-50'",

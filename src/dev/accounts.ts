@@ -24,7 +24,7 @@ interface PresetState {
   rejected: boolean;
   naloxoneCompleted: boolean;
   applicationApproved: boolean;
-  orientation: "none" | "booked" | "completed";
+  orientation: "none" | "booked" | "attended";
   patrolApproved: boolean;
   active: boolean;
   role: "volunteer" | "organizer";
@@ -123,12 +123,12 @@ export const manualAccountPresets = [
     },
   ),
   preset(
-    "orientation-completed",
-    "Orientation completed",
+    "orientation-attended",
+    "Attended orientation",
     "orientation",
     "Sage Hart",
     {
-      orientation: "completed",
+      orientation: "attended",
     },
   ),
   preset(
@@ -147,7 +147,7 @@ export const manualAccountPresets = [
     "volunteers",
     "Alexanderthegreatesteverlastingunbrokenvolunteernamefortablewrapping",
     {
-      orientation: "completed",
+      orientation: "attended",
       patrolApproved: true,
     },
   ),
@@ -158,7 +158,7 @@ export const manualAccountPresets = [
     "Gabriella Dominique Josephine Montgomery-Fitzgerald",
     {
       sampleKey: "dana",
-      orientation: "completed",
+      orientation: "attended",
       patrolApproved: true,
     },
   ),
@@ -273,7 +273,7 @@ export interface DevelopmentAccountState extends Pick<
   hasDraft: boolean;
   active: boolean;
   patrolApproved: boolean;
-  orientationCompleted: boolean;
+  orientationAttended: boolean;
   orientationBooked: boolean;
   medicSelected: boolean;
   medicEligible: boolean;
@@ -299,11 +299,11 @@ export function developmentAccountStatus(state: DevelopmentAccountState) {
   if (state.naloxoneCompletedAt === null && !state.applicationApproved)
     labels.push("Application not approved");
   labels.push(
-    state.orientationCompleted
-      ? "Orientation completed"
-      : state.orientationBooked
-        ? "Orientation booked"
-        : "Orientation not completed",
+    state.orientationBooked
+      ? "Orientation booked"
+      : state.orientationAttended
+        ? "Attended orientation"
+        : "No orientation booked",
   );
   labels.push(state.patrolApproved ? "Patrol approved" : "Not patrol approved");
   if (state.medicSelected)
@@ -332,7 +332,7 @@ export function developmentPresetStatus(
     hasDraft: preset.draft,
     active: preset.active,
     patrolApproved: preset.patrolApproved,
-    orientationCompleted: preset.orientation === "completed",
+    orientationAttended: preset.orientation === "attended",
     orientationBooked: preset.orientation === "booked",
     medicSelected: preset.sampleKey === "dana",
     medicEligible:

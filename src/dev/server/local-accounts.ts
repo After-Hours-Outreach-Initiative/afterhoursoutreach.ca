@@ -5,7 +5,6 @@ import {
   auditLog,
   eventNotification,
   discordLink,
-  orientationCompletion,
   signup,
   user,
 } from "../../server/db/schema";
@@ -48,15 +47,12 @@ export async function deleteLocalAccount(binding: Env["DB"], userId: string) {
   // Demote in the same transaction so the existing last-organizer trigger applies.
   // Cascades remove auth sessions, drafts, profile, status, and linked accounts.
   // Keep organizer-owned records: their FKs roll back the entire batch if referenced.
-  const [, , , , , , deleted] = await db.batch([
+  const [, , , , , deleted] = await db.batch([
     db
       .update(user)
       .set({ role: "volunteer" })
       .where(and(eq(user.id, userId), eq(user.role, "organizer"))),
     db.delete(eventNotification).where(eq(eventNotification.user_id, userId)),
-    db
-      .delete(orientationCompletion)
-      .where(eq(orientationCompletion.user_id, userId)),
     db.delete(signup).where(eq(signup.user_id, userId)),
     db
       .delete(auditLog)

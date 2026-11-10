@@ -28,7 +28,6 @@ export interface User extends Row {
   applicationApproved: number;
   patrolApproved: number;
   submitted: number;
-  orientationCompleted: number;
   updatedAt: number;
   statusUpdatedAt: number;
 }
@@ -40,8 +39,7 @@ export type Action =
   | "event-visibility"
   | "event-capacity"
   | "cancel-event"
-  | "remove-registration"
-  | "complete-orientation";
+  | "remove-registration";
 export interface ActionInput {
   action: Action;
   id: string;

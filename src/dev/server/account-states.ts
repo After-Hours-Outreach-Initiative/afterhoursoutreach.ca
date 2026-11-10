@@ -124,7 +124,6 @@ export async function resetAccountState(
       .bind(id),
     db.prepare("DELETE FROM event_notification WHERE user_id=?").bind(id),
     db.prepare("DELETE FROM signup WHERE user_id=?").bind(id),
-    db.prepare("DELETE FROM orientation_completion WHERE user_id=?").bind(id),
     db.prepare("DELETE FROM audit_log WHERE subject_id=?").bind(id),
     db.prepare("DELETE FROM profile WHERE user_id=?").bind(id),
     db.prepare("DELETE FROM volunteer_status WHERE user_id=?").bind(id),
@@ -201,13 +200,12 @@ export async function resetAccountState(
     if (preset.orientation !== "none") {
       const eventId = `${id}-orientation-${preset.orientation}`;
       // Keep sample events bounded too. Never discard another volunteer's
-      // booking or attendance to reset a state that has become a shared event.
+      // booking to reset a state that has become a shared event.
       const shared = await db
         .prepare(
-          `SELECT 1 WHERE EXISTS(SELECT 1 FROM signup WHERE event_id=? AND user_id!=?)
-        OR EXISTS(SELECT 1 FROM orientation_completion WHERE event_id=? AND user_id!=?)`,
+          `SELECT 1 WHERE EXISTS(SELECT 1 FROM signup WHERE event_id=? AND user_id!=?)`,
         )
-        .bind(eventId, id, eventId, id)
+        .bind(eventId, id)
         .first();
       if (shared)
         throw new RequestError(
@@ -229,23 +227,24 @@ export async function resetAccountState(
           )
           .bind(crypto.randomUUID(), id, eventId, now, now),
       );
-      if (preset.orientation === "completed")
+      if (preset.orientation === "attended")
         statements.push(
           db
+            .prepare("UPDATE event SET starts_at=?,open=0,hidden=1 WHERE id=?")
+            .bind(approvedAt - 3 * 3_600_000, eventId),
+          // Approved presets record approval from the orientation roster.
+          db
             .prepare(
-              `INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at)
-          VALUES (?,?,?,?,?)`,
+              `UPDATE signup SET patrol_approved_by=?,patrol_approved_at=?
+          WHERE user_id=? AND event_id=? AND ?=1`,
             )
             .bind(
-              crypto.randomUUID(),
+              organizer,
+              approvedAt,
               id,
               eventId,
-              organizer,
-              now - 7 * 86_400_000,
+              Number(preset.patrolApproved),
             ),
-          db
-            .prepare("UPDATE event SET starts_at=?,open=0,hidden=1 WHERE id=?")
-            .bind(now - 7 * 86_400_000, eventId),
         );
     }
   }

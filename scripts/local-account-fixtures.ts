@@ -74,7 +74,6 @@ export function localAccountFixtures(now = Date.now()) {
         AND v.patrol_approved=0 AND ${unchangedProfile}
         AND NOT EXISTS (SELECT 1 FROM audit_log WHERE subject_id=${id})
         AND NOT EXISTS (SELECT 1 FROM signup WHERE user_id=${id})
-        AND NOT EXISTS (SELECT 1 FROM orientation_completion WHERE user_id=${id})
         AND EXISTS (SELECT 1 FROM user WHERE id=${organizer} AND email='organizer.v2.local@example.org' AND role='organizer')
         ON CONFLICT(id) DO NOTHING`);
       statements.push(`UPDATE profile SET naloxone_completed_at=${now}
@@ -151,22 +150,22 @@ export function localAccountFixtures(now = Date.now()) {
   }
   const past = quote(eventId("past-orientation"));
   // Historical attendance is inserted only with its newly-created hidden event;
-  // reseeding never restores a developer-deleted signup or completion.
+  // reseeding never restores a developer-deleted signup.
   for (const preset of manualAccountPresets.filter(
     ({ orientation }) => orientation !== "none",
   )) {
     const id = quote(preset.id);
     const email = quote(manualProfileFixture(preset, now).email);
     const signup = quote(`local-account-v2-signup-${preset.key}`);
-    const completed = preset.orientation === "completed";
-    const target = completed ? past : quote(eventId("orientation"));
+    const attended = preset.orientation === "attended";
+    const target = attended ? past : quote(eventId("orientation"));
     statements.push(`INSERT INTO signup (id, user_id, event_id, created_at, updated_at)
-        SELECT ${signup}, ${id}, ${target}, ${completed ? date(-8, "18:00") : now}, ${completed ? date(-8, "18:00") : now}
+        SELECT ${signup}, ${id}, ${target}, ${attended ? date(-8, "18:00") : now}, ${attended ? date(-8, "18:00") : now}
         FROM event e JOIN volunteer_status v ON v.user_id=${id} JOIN profile p ON p.user_id=v.user_id
         WHERE e.id=${target} AND e.open=1 AND e.hidden=0 AND e.cancelled_at IS NULL
         AND coalesce(e.includes_orientation, e.type='orientation') AND e.starts_at>${now}
         AND ${
-          completed
+          attended
             ? `e.created_at=${now} AND e.updated_at=${now}`
             : `EXISTS (SELECT 1 FROM user WHERE id=${id} AND created_at=${now - 15 * 86_400_000} AND updated_at=${now})`
         }
@@ -187,15 +186,5 @@ export function localAccountFixtures(now = Date.now()) {
   }
   statements.push(`UPDATE event SET starts_at=${date(-7, "18:00")}, open=0, hidden=1
     WHERE id=${past} AND created_at=${now} AND updated_at=${now}`);
-  for (const preset of manualAccountPresets.filter(
-    ({ orientation }) => orientation === "completed",
-  )) {
-    statements.push(`INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
-      SELECT ${quote(`local-account-v2-completion-${preset.key}`)}, ${quote(preset.id)}, ${past}, ${organizer}, ${date(-7, "18:00")}
-      WHERE EXISTS (SELECT 1 FROM event WHERE id=${past} AND created_at=${now} AND updated_at=${now})
-      AND EXISTS (SELECT 1 FROM signup WHERE id=${quote(`local-account-v2-signup-${preset.key}`)} AND status='confirmed')
-      AND EXISTS (SELECT 1 FROM user WHERE id=${quote(preset.id)} AND email=${quote(manualProfileFixture(preset, now).email)})
-      ON CONFLICT(user_id, event_id) DO NOTHING`);
-  }
   return statements;
 }

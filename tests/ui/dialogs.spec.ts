@@ -238,9 +238,10 @@ test("event dialogs offer only cancellation for future events and keep ended his
         card.getByRole("button", { name: "Cancel event", exact: true }),
       ).toHaveCount(0);
       await card.locator(".volunteer-roster > summary").click();
-      await expect(
-        card.getByText("Orientation completed", { exact: true }),
-      ).toBeVisible();
+      await expect(card.locator(".volunteer-roster")).toHaveAttribute(
+        "open",
+        "",
+      );
       continue;
     }
     await edit.focus();

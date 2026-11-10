@@ -336,12 +336,6 @@ test("local Discord simulation preserves consent and screening, then reconciles 
     "local-volunteer",
     "local-medic",
   ]);
-  assert.equal(
-    await env.DB.prepare(
-      "SELECT count(*) AS n FROM orientation_completion",
-    ).first("n"),
-    0,
-  );
   // Reconcile already-synced simulations created under the old attendance rule.
   const syncedVersion = (await local())!.version;
   await env.DB.prepare(
@@ -700,12 +694,6 @@ test("website changes automatically remove and restore eligible roles without to
   await env.DB.prepare(
     "UPDATE user SET role='organizer' WHERE id='alice'",
   ).run();
-  await env.DB.prepare(
-    "INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at) VALUES ('orientation','orientation',0,'Point',4,'organizer',0,0)",
-  ).run();
-  await env.DB.prepare(
-    "INSERT INTO orientation_completion (id,user_id,event_id,marked_by,marked_at) VALUES ('done','alice','orientation','organizer',0)",
-  ).run();
   await processDiscordSync(config, server.send);
   assert.equal((await loadDiscordStatus(config, actor.id)).notice, null);
   assert.deepEqual(
@@ -739,16 +727,6 @@ test("website changes automatically remove and restore eligible roles without to
   await due();
   await processDiscordSync(config, server.send);
   assert.equal(server.state.roles.length, 4);
-  const versionBeforeAttendance = await env.DB.prepare(
-    "SELECT version FROM discord_link WHERE user_id='alice'",
-  ).first("version");
-  await env.DB.prepare("DELETE FROM orientation_completion").run();
-  assert.equal(
-    await env.DB.prepare(
-      "SELECT version FROM discord_link WHERE user_id='alice'",
-    ).first("version"),
-    versionBeforeAttendance,
-  );
   await due();
   await processDiscordSync(config, server.send);
   assert.equal(server.state.roles.includes(config.DISCORD_MEDIC_ROLE_ID), true);

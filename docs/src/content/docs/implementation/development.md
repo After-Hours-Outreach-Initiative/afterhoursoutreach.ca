@@ -33,17 +33,17 @@ accounts through the regular sign-in form.
 by a signed HttpOnly development cookie. Choosing **Draft application** always
 resets it to a sample draft, even after completing all application steps. **Not
 applied** resets it to an empty application. The other buttons similarly restore
-their named milestones, access, and attendance. Progress remains usable while
+their named milestones, access, and orientation bookings. Progress remains usable while
 testing but is discarded on the next state selection; clicks do not create a new
 account each time or add the sandbox to Existing accounts. Browsers have separate
 sandboxes. Switching to a saved account or Visitor does not reset saved work.
 
 Resets are atomic and limited to the marked temporary identity. They revoke its
 old sessions and rotate the draft generation so old browser backups cannot restore
-discarded test answers. A fixed internal sample organizer supports patrol approvals
-and attendance; it is not listed as a saved account. Sample orientation events are
-reused too, and refuse to reset if that would affect another volunteer's booking
-or attendance. A real Discord link must be handled before resetting the sandbox;
+discarded test answers. A fixed internal sample organizer supports patrol approvals;
+it is not listed as a saved account. Sample orientation events are
+reused too, and refuse to reset if that would affect another volunteer's booking.
+A real Discord link must be handled before resetting the sandbox;
 the reset never drops its role-removal obligations. These are actual local D1
 records needed to exercise the normal backend, not a frontend-only mock.
 
@@ -85,11 +85,10 @@ session, and sends no emails. **Visitor** signs out; the remaining choices are g
 - **Application:** Not applied (always empty), Draft application (sample draft, not
   submitted), Form submitted (Naloxone incomplete), Awaiting review (Naloxone
   complete, application unapproved).
-- **Orientation:** Ready for orientation, Orientation booked, Orientation completed
-  (not yet patrol approved), Medic awaiting orientation.
+- **Orientation:** Ready for orientation, Orientation booked, Attended orientation
+  (past orientation, not yet patrol approved), Medic awaiting orientation.
 - **Active volunteers:** Patrol volunteer and Medic. Both have completed
-  applications, recorded orientation attendance and organizer-granted patrol
-  approval. Medic also has the medic team and a valid fictional certification;
+  applications, a past orientation and organizer-granted patrol approval. Medic also has the medic team and a valid fictional certification;
   selecting the team alone does not qualify for reserved medic places.
 - **Access:** Inactive (completed application, inactive account) and Organizer
   (active organizer with application and patrol approval). The older seeded
@@ -108,7 +107,7 @@ inventing real OAuth consent. Temporary states use the new four-step flow with
 simulated Discord membership, never real OAuth credentials.
 See [Discord](/implementation/discord/) for configuration and isolation. The command
 also adds an open patrol with orientation, an open regular patrol, and a hidden
-past orientation with attendance. It does not reset the database, remove users,
+past orientation with a registration. It does not reset the database, remove users,
 restore cancelled bookings or discarded drafts, or overwrite subsequent edits.
 Reseeding repairs missing Naloxone/application-approval milestones only for
 unchanged original Accepted, Inactive and Organizer fixtures, checked against
@@ -119,7 +118,7 @@ account** (or its submitted name if already completed); its application/draft is
 never reset when choosing the reusable Not applied option.
 
 This is the only manual seed command. Automated browser tests use their broader
-event, signup, and attendance fixtures only in their own disposable database;
+event and signup fixtures only in their own disposable database;
 you do not need to seed those manually. Existing accounts and events from older
 seed commands remain untouched. The manual seed only targets local D1 and never
 runs during a build or deployment. Dev UI has no privacy disclosures; storage

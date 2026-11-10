@@ -59,7 +59,7 @@ website account, a link, and verified full Discord membership.
 There is no Outreach or separate patrol-approved role. Organizer status does not
 bypass active-account or application-approval requirements for Discord.
 Certification expiry is not an additional Discord-role eligibility condition.
-Orientation attendance does not change role eligibility.
+Orientation bookings do not change role eligibility.
 
 Deactivation or revoked application approval removes all managed roles.
 Reactivation, restored approval, team edits, and website role changes reconcile

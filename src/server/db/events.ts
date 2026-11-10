@@ -159,7 +159,6 @@ export interface EventRow extends EventLimits {
   newVolunteerConfirmed: number;
   medicConfirmed: number;
   medicEligible: number;
-  orientationCompleted: number;
   availableSpots: number;
   // This and later nominal occurrences, including bookings outside the page/window.
   futureConfirmed: number;
@@ -175,7 +174,6 @@ export interface RosterRow {
   registeredAt: number;
   addedById: string | null;
   addedByName: string | null;
-  completed: number;
   patrolApproved: number;
   patrolApprovedById: string | null;
   patrolApprovedByName: string | null;
@@ -472,7 +470,6 @@ export async function listEvents(
     ${confirmedSignupsSql} AS confirmed,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
       AND ${signupNewVolunteerSql()}) AS newVolunteerConfirmed,
-    EXISTS(SELECT 1 FROM orientation_completion o WHERE o.user_id = ?) AS orientationCompleted,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
       AND ${signupMedicSql()}) AS medicConfirmed,
     ${approvedMedicSql("?")} AS medicEligible,
@@ -506,12 +503,7 @@ export async function listEvents(
           e.starts_at DESC
         LIMIT 100`,
         )
-        .bind(
-          actor?.id ?? "",
-          actor?.id ?? "",
-          actor?.id ?? "",
-          selectedOccurrence ?? "",
-        )
+        .bind(actor?.id ?? "", actor?.id ?? "", selectedOccurrence ?? "")
     : db
         .prepare(
           `${select}
@@ -531,7 +523,6 @@ export async function listEvents(
         LIMIT 100`,
         )
         .bind(
-          actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
           actor?.id ?? "",
@@ -1261,9 +1252,7 @@ export async function listRosters(
            preferredName: "approver_profile.preferred_name",
            legacyName: "approver.name",
          })} END AS patrolApprovedByName,
-         s.patrol_approved_at AS patrolApprovedAt,
-         EXISTS(SELECT 1 FROM orientation_completion o
-          WHERE o.event_id = s.event_id AND o.user_id = s.user_id) AS completed
+         s.patrol_approved_at AS patrolApprovedAt
       FROM signup s
       JOIN event e ON e.id = s.event_id
       LEFT JOIN profile p ON p.user_id = s.user_id

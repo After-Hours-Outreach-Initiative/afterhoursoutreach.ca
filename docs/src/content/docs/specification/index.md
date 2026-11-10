@@ -21,7 +21,7 @@ Configuration and deployment readiness are documented in
 | Applicant                 | Complete the application steps and manage their account while awaiting organizer review. |
 | Approved volunteer        | View events and book orientations. Patrol booking needs separate patrol approval.        |
 | Patrol-approved volunteer | Book eligible patrols; medic places have additional qualification rules.                 |
-| Organizer                 | Review applications, manage access and events, and record orientation completion.        |
+| Organizer                 | Review applications, manage access and events, and approve volunteers for patrols.       |
 
 Applicant and approval milestones describe account progress; the account roles
 are Volunteer and Organizer. Role-based access does not replace the separate
@@ -35,9 +35,9 @@ active-account, application, patrol, or qualification checks.
    currently paused; the intended linking rules are described separately.
 3. Wait for organizer application approval. Account editing remains available;
    events are unavailable until approval.
-4. Book an orientation. An organizer records completion after attendance.
-5. Receive a separate organizer decision on patrol approval. Orientation completion
-   does not automatically grant it, and is not the only possible path to approval.
+4. Book an orientation.
+5. Receive an organizer's patrol approval. Only this approval makes a new volunteer
+   an outreach volunteer; an orientation booking is not required for it.
 6. Book patrols and maintain contact and qualification details.
 
 ## Specifications
@@ -47,7 +47,7 @@ active-account, application, patrol, or qualification checks.
 - [Accounts](/specification/accounts/): authentication, applications, profile fields,
   sessions, email changes, and roles.
 - [Events](/specification/events/): eligibility, capacity, visibility, sign-ups,
-  organizer changes, and attendance.
+  and organizer changes.
 - [Discord](/specification/discord/): consent, membership, identity linking, and
   managed-role eligibility.
 - [Notifications](/specification/notifications/): required account messages,

@@ -33,7 +33,6 @@ import {
 } from "../src/server/db/application-drafts";
 import {
   hasApplied,
-  loadFirstCompletedOrientation,
   loadProfile,
   loadSubmittedApplication,
   saveProfile,
@@ -59,7 +58,6 @@ import {
   viewVolunteerProfile,
   approveForPatrols,
   findVolunteerOrientation,
-  findCompletedVolunteerOrientation,
 } from "../src/server/db/volunteers";
 import {
   medicNotificationDates,
@@ -612,7 +610,7 @@ test("volunteers can unregister until the event's unregister window closes", asy
   );
 });
 
-test("organizers silently remove past account and name-only registrations without moving them or clearing orientation history", async () => {
+test("organizers silently remove past account and name-only registrations without moving them", async () => {
   const organizer = await manualRosterActor("manual-organizer", "organizer");
   const volunteer = await manualRosterActor("past-volunteer", "volunteer");
   for (const id of ["past-source", "future-destination"])
@@ -628,14 +626,9 @@ test("organizers silently remove past account and name-only registrations withou
     medic: false,
     newVolunteer: false,
   });
-  await env.DB.batch([
-    env.DB.prepare(
-      "UPDATE event SET starts_at=0,open=0,hidden=1 WHERE id='past-source'",
-    ),
-    env.DB.prepare(
-      "INSERT INTO orientation_completion VALUES ('past-completion',?,'past-source',?,0)",
-    ).bind(volunteer.id, organizer.id),
-  ]);
+  await env.DB.prepare(
+    "UPDATE event SET starts_at=0,open=0,hidden=1 WHERE id='past-source'",
+  ).run();
   const roster = await listRosters(env.DB, organizer, ["past-source"]);
   assert.equal(roster.length, 2);
   assert.equal(
@@ -685,12 +678,6 @@ test("organizers silently remove past account and name-only registrations withou
       "SELECT count(*) n FROM signup WHERE event_id='future-destination'",
     ).first("n"),
     0,
-  );
-  assert.equal(
-    await env.DB.prepare(
-      "SELECT count(*) n FROM orientation_completion WHERE id='past-completion'",
-    ).first("n"),
-    1,
   );
   assert.equal(
     await env.DB.prepare("SELECT count(*) n FROM event_notification").first(
@@ -1164,14 +1151,6 @@ test("concurrent D1 registrations preserve both reservations; cancellations and 
         "INSERT INTO volunteer_status (user_id,registration_approved,patrol_approved,approved_by,approved_at,updated_at) VALUES (?,1,?,'organizer',0,0)",
       ).bind(id, Number(actor.patrolApproved)),
     ]);
-    // Deliberately record attendance only for unapproved volunteers: neither
-    // attendance nor its absence may determine these categories.
-    if (id.startsWith("new-volunteer"))
-      await env.DB.prepare(
-        "INSERT INTO orientation_completion VALUES (?,?, 'history','organizer',0)",
-      )
-        .bind(`${id}-completion`, id)
-        .run();
     people.push(actor);
   }
   const generals = await Promise.allSettled(
@@ -1425,7 +1404,7 @@ test("public and organizer rosters share earliest-registration-first order with 
   );
 });
 
-test("manual approvals recolour existing signups consistently without inventing attendance", async () => {
+test("manual approvals recolour existing signups consistently", async () => {
   const actors: Actor[] = [];
   for (const id of ["organizer", "blue", "attended", "green", "red"]) {
     const actor: Actor = {
@@ -1472,13 +1451,6 @@ test("manual approvals recolour existing signups consistently without inventing 
     Array(4).fill("new-volunteer"),
   );
 
-  await env.DB.prepare(
-    "INSERT INTO orientation_completion VALUES ('attendance','attended','history','organizer',0)",
-  ).run();
-  assert.deepEqual(
-    await listPublicRosters(env.DB, organizer, ["november-patrol"]),
-    before,
-  );
   const attendedEvents = await listEvents(env.DB, volunteers[1]);
   assert.ok(
     attendedEvents.find(({ id }) => id === "other-orientation")!
@@ -1521,18 +1493,7 @@ test("manual approvals recolour existing signups consistently without inventing 
     publicRoster.people.map(({ category }) => category).sort(),
     Object.values(expected).sort(),
   );
-  assert.equal(
-    await env.DB.prepare(
-      "SELECT count(*) AS n FROM orientation_completion WHERE user_id IN ('green','red')",
-    ).first("n"),
-    0,
-  );
 
-  await env.DB.prepare("DELETE FROM orientation_completion").run();
-  assert.deepEqual(
-    await listPublicRosters(env.DB, organizer, [target.id]),
-    publicRoster,
-  );
   const red = { ...volunteers[3], patrolApproved: true };
   assert.equal(
     (await listEvents(env.DB, red)).find(({ id }) => id === "other-orientation")
@@ -3011,7 +2972,7 @@ test("legacy patrol approval attribution retains its recorded organizer and epoc
   );
 });
 
-test("roster approval attribution belongs to the specific signup, independent of account approval and attendance", async () => {
+test("roster approval attribution belongs to the specific signup, independent of account approval", async () => {
   const { organizer, volunteer, input } = await patrolApprovalFixture();
   await env.DB.batch([
     env.DB.prepare(
@@ -3022,9 +2983,6 @@ test("roster approval attribution belongs to the specific signup, independent of
       "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('other-signup','other-orientation',?,0,0)",
     ).bind(volunteer.id),
     env.DB.prepare("UPDATE event SET starts_at=0"),
-    env.DB.prepare(
-      "INSERT INTO orientation_completion VALUES ('earlier-attendance',?,'other-orientation',?,0)",
-    ).bind(volunteer.id, organizer.id),
   ]);
   const rosters = () =>
     listRosters(env.DB, organizer, ["patrol-orientation", "other-orientation"]);
@@ -3034,7 +2992,7 @@ test("roster approval attribution belongs to the specific signup, independent of
     )
       .bind(volunteer.id)
       .first<number>("updated_at"))!;
-  // Profile approval, even with recorded attendance, does not attribute any roster entry.
+  // Profile approval, even with past orientation registrations, does not attribute any roster entry.
   await approveForPatrols(env.DB, organizer, input);
   for (const row of await rosters()) {
     assert.equal(row.patrolApproved, 1);
@@ -3064,7 +3022,6 @@ test("roster approval attribution belongs to the specific signup, independent of
   const other = (await rosters()).find(
     ({ eventId }) => eventId === "other-orientation",
   )!;
-  assert.equal(other.completed, 1);
   assert.equal(other.patrolApprovedAt, null);
   // Later profile approvals cannot rewrite the original entry's attribution.
   await env.DB.prepare(
@@ -3088,18 +3045,12 @@ test("roster approval attribution belongs to the specific signup, independent of
   );
 });
 
-test("roster patrol approval saves access, attribution and optional attendance history", async () => {
+test("roster patrol approval saves access and the signup's attribution", async () => {
   const { organizer, volunteer, input } = await patrolApprovalFixture();
-  const attendanceInput = { ...input, eventId: "patrol-orientation" };
+  const rosterInput = { ...input, eventId: "patrol-orientation" };
   assert.equal(
     (await findVolunteerOrientation(env.DB, organizer, volunteer.id))?.eventId,
     "patrol-orientation",
-  );
-  assert.equal(
-    await env.DB.prepare(
-      "SELECT count(*) AS n FROM orientation_completion",
-    ).first("n"),
-    0,
   );
   await env.DB.prepare(
     "UPDATE event SET starts_at=0 WHERE id='patrol-orientation'",
@@ -3109,10 +3060,7 @@ test("roster patrol approval saves access, attribution and optional attendance h
     .run();
   const attempts = await Promise.allSettled(
     Array.from({ length: 2 }, () =>
-      approveForPatrols(env.DB, organizer, {
-        ...attendanceInput,
-        notify: true,
-      }),
+      approveForPatrols(env.DB, organizer, { ...rosterInput, notify: true }),
     ),
   );
   const winner = attempts.find((attempt) => attempt.status === "fulfilled");
@@ -3122,40 +3070,35 @@ test("roster patrol approval saves access, attribution and optional attendance h
     1,
   );
   const result = winner.value;
-  assert.equal(
-    await env.DB.prepare("SELECT active FROM volunteer_status WHERE user_id=?")
-      .bind(volunteer.id)
-      .first("active"),
-    0,
-  );
   const approval = await env.DB.prepare(
-    "SELECT patrol_approved, approved_by, approved_at, updated_at FROM volunteer_status WHERE user_id=?",
+    "SELECT active, patrol_approved, approved_by, approved_at, updated_at FROM volunteer_status WHERE user_id=?",
   )
     .bind(volunteer.id)
     .first();
-  const completion = await env.DB.prepare(
-    "SELECT event_id, marked_by, marked_at FROM orientation_completion WHERE user_id=?",
-  )
-    .bind(volunteer.id)
-    .first();
+  assert.equal(approval?.active, 0);
   assert.equal(approval?.patrol_approved, 1);
   assert.equal(approval?.approved_by, organizer.id);
-  assert.equal(completion?.event_id, "patrol-orientation");
-  assert.equal(completion?.marked_by, organizer.id);
-  assert.equal(completion?.marked_at, approval?.approved_at);
   assert.deepEqual(
-    await findCompletedVolunteerOrientation(env.DB, organizer, volunteer.id),
+    await env.DB.prepare(
+      "SELECT patrol_approved_by, patrol_approved_at FROM signup WHERE user_id=? AND event_id='patrol-orientation'",
+    )
+      .bind(volunteer.id)
+      .first(),
     {
-      eventId: "patrol-orientation",
-      startsAt: 0,
-      meetingPoint: "Orientation meeting point",
+      patrol_approved_by: organizer.id,
+      patrol_approved_at: approval?.approved_at,
     },
   );
-  assert.equal(
-    await env.DB.prepare(
-      "SELECT count(*) AS n FROM audit_log WHERE action IN ('approval_changed','orientation_completed')",
-    ).first("n"),
-    2,
+  // Approval is the only record; nothing else marks the orientation.
+  assert.deepEqual(
+    (
+      await env.DB.prepare(
+        "SELECT action FROM audit_log WHERE subject_id=? AND action<>'profile_viewed'",
+      )
+        .bind(volunteer.id)
+        .all<{ action: string }>()
+    ).results.map(({ action }) => action),
+    ["approval_changed"],
   );
   assert.equal(
     await env.DB.prepare(
@@ -3169,45 +3112,9 @@ test("roster patrol approval saves access, attribution and optional attendance h
     approveForPatrols(env.DB, organizer, input),
     statusError(409),
   );
-  // Reapproval keeps recorded attendance, even if its original registration is gone.
-  await env.DB.batch([
-    env.DB.prepare(
-      "UPDATE volunteer_status SET patrol_approved=0, approved_by=NULL, approved_at=NULL WHERE user_id=?",
-    ).bind(volunteer.id),
-    env.DB.prepare("UPDATE signup SET status='cancelled' WHERE user_id=?").bind(
-      volunteer.id,
-    ),
-  ]);
-  assert.equal(
-    await findVolunteerOrientation(env.DB, organizer, volunteer.id),
-    null,
-  );
-  assert.equal(
-    (await findCompletedVolunteerOrientation(env.DB, organizer, volunteer.id))
-      ?.eventId,
-    "patrol-orientation",
-  );
-  await approveForPatrols(env.DB, organizer, {
-    ...input,
-    version: Number(approval!.updated_at),
-  });
-  assert.deepEqual(
-    await env.DB.prepare(
-      "SELECT event_id, marked_by, marked_at FROM orientation_completion WHERE user_id=?",
-    )
-      .bind(volunteer.id)
-      .first(),
-    completion,
-  );
-  assert.equal(
-    await env.DB.prepare("SELECT count(*) AS n FROM event_notification").first(
-      "n",
-    ),
-    1,
-  );
 });
 
-test("invalid attendance does not block approval; application and organizer permissions still apply", async () => {
+test("an invalid orientation does not block approval; application and organizer permissions still apply", async () => {
   const { organizer, volunteer, input } = await patrolApprovalFixture();
   for (const [invalidate, restore] of [
     [
@@ -3231,7 +3138,7 @@ test("invalid attendance does not block approval; application and organizer perm
     await env.DB.prepare(restore).run();
   }
   // A future/cancelled orientation, missing signup or unknown event cannot
-  // prevent the role change; only valid past attendance is recorded as history.
+  // prevent the role change; only a valid past signup records the approver.
   await env.DB.prepare("UPDATE event SET cancelled_at=1").run();
   await env.DB.prepare("UPDATE signup SET status='cancelled'").run();
   await approveForPatrols(env.DB, organizer, {
@@ -3258,44 +3165,14 @@ test("invalid attendance does not block approval; application and organizer perm
   );
   assert.equal(
     await env.DB.prepare(
-      "SELECT count(*) AS n FROM orientation_completion",
+      "SELECT count(*) AS n FROM signup WHERE patrol_approved_at IS NOT NULL",
     ).first("n"),
     0,
   );
 });
 
-test("failed attendance recording cannot roll back patrol access or its notification", async () => {
-  const { organizer, volunteer, input } = await patrolApprovalFixture();
-  await env.DB.prepare("UPDATE event SET starts_at=0").run();
-  await env.DB.prepare(
-    `CREATE TRIGGER reject_orientation BEFORE INSERT ON orientation_completion BEGIN SELECT RAISE(ABORT, 'test_orientation_failure'); END`,
-  ).run();
-  await approveForPatrols(env.DB, organizer, {
-    ...input,
-    eventId: "patrol-orientation",
-    notify: true,
-  });
-  assert.equal(
-    await env.DB.prepare(
-      "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
-    )
-      .bind(volunteer.id)
-      .first("patrol_approved"),
-    1,
-  );
-  for (const [table, expected] of [
-    ["orientation_completion", 0],
-    ["audit_log", 1],
-    ["event_notification", 1],
-  ] as const)
-    assert.equal(
-      await env.DB.prepare(`SELECT count(*) AS n FROM ${table}`).first("n"),
-      expected,
-    );
-});
-
 test.each(["unbooked", "booked", "started"] as const)(
-  "patrol approval supports the %s orientation state without inferring attendance",
+  "patrol approval supports the %s orientation state without attributing a roster entry",
   async (state) => {
     const { organizer, volunteer, input } = await patrolApprovalFixture();
     if (state === "unbooked")
@@ -3317,18 +3194,8 @@ test.each(["unbooked", "booked", "started"] as const)(
     assert.equal(saved?.patrol_approved, 1);
     assert.equal(saved?.approved_by, organizer.id);
     assert.equal(
-      await findCompletedVolunteerOrientation(env.DB, organizer, volunteer.id),
-      null,
-    );
-    assert.equal(
       await env.DB.prepare(
-        "SELECT count(*) AS n FROM orientation_completion",
-      ).first("n"),
-      0,
-    );
-    assert.equal(
-      await env.DB.prepare(
-        "SELECT count(*) AS n FROM audit_log WHERE action='orientation_completed'",
+        "SELECT count(*) AS n FROM signup WHERE patrol_approved_at IS NOT NULL",
       ).first("n"),
       0,
     );
@@ -3453,15 +3320,6 @@ test("new volunteers only see orientation events and rosters; patrol approval an
     changeSignup(env.DB, newVolunteer, "regular-patrol", "join"),
     statusError(403),
   );
-  await env.DB.prepare(
-    "INSERT INTO orientation_completion VALUES ('visibility-completion', ?, 'legacy-orientation', ?, 0)",
-  )
-    .bind(actor.id, organizer.id)
-    .run();
-  assert.deepEqual(
-    (await listEvents(env.DB, newVolunteer)).map((row) => row.id).sort(),
-    expected,
-  );
   await env.DB.batch([
     env.DB.prepare("UPDATE user SET role='organizer' WHERE id=?").bind(
       actor.id,
@@ -3483,44 +3341,6 @@ test("new volunteers only see orientation events and rosters; patrol approval an
   assert.equal(
     (await listPublicRosters(env.DB, manager, ids)).people.length,
     3,
-  );
-});
-
-test("first completed orientation uses the earliest attended event, not when attendance was recorded", async () => {
-  const actor = await draftActor();
-  const other = await draftActor("other-volunteer");
-  const starts = ["2025-01-01", "2025-02-01", "2025-03-01"].map((date) =>
-    Date.parse(`${date}T02:00:00Z`),
-  );
-  await env.DB.batch(
-    starts.map((startsAt, index) =>
-      env.DB.prepare(
-        `INSERT INTO event (id, type, starts_at, meeting_point, spots, created_by, created_at, updated_at)
-        VALUES (?, 'orientation', ?, 'Meeting point', 4, ?, 0, 0)`,
-      ).bind(`orientation-${index}`, startsAt, actor.id),
-    ),
-  );
-  assert.equal(await loadFirstCompletedOrientation(env.DB, actor.id), null);
-  await env.DB.batch(
-    [
-      [other.id, 0, 1000],
-      [actor.id, 2, 2000],
-      [actor.id, 1, 3000],
-    ].map(([userId, index, markedAt]) =>
-      env.DB.prepare(
-        "INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at) VALUES (?, ?, ?, ?, ?)",
-      ).bind(
-        crypto.randomUUID(),
-        userId,
-        `orientation-${index}`,
-        actor.id,
-        markedAt,
-      ),
-    ),
-  );
-  assert.equal(
-    (await loadFirstCompletedOrientation(env.DB, actor.id))?.getTime(),
-    starts[1],
   );
 });
 
@@ -3560,7 +3380,6 @@ test("new volunteers can concurrently book multiple orientations and rebook whil
   const events = await listEvents(env.DB, actor);
   assert.equal(events.filter((item) => item.signedUp).length, 2);
   const [booked, other] = events;
-  assert.equal(await loadFirstCompletedOrientation(env.DB, actor.id), null);
   await changeSignup(env.DB, actor, booked.id, "cancel");
   assert.equal(
     (await listEvents(env.DB, actor)).filter((item) => item.signedUp).length,
@@ -3990,7 +3809,7 @@ test("manual presets resolve real application completion, event access and roste
     false,
   );
   assert.equal(
-    users.find(({ id }) => id === localAccountUserId("orientation-completed"))!
+    users.find(({ id }) => id === localAccountUserId("orientation-attended"))!
       .state.patrolApproved,
     false,
   );
@@ -4143,27 +3962,28 @@ test("every reusable state resolves its declared milestones, permissions and att
     const row = await env.DB.prepare(
       `SELECT u.role,v.active,v.patrol_approved,
       EXISTS(SELECT 1 FROM application_draft WHERE user_id=u.id) AS hasDraft,
-      EXISTS(SELECT 1 FROM orientation_completion WHERE user_id=u.id) AS orientationCompleted,
+      EXISTS(SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id WHERE s.user_id=u.id
+        AND s.status='confirmed' AND e.starts_at<=?) AS orientationAttended,
       EXISTS(SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id WHERE s.user_id=u.id
         AND s.status='confirmed' AND e.starts_at>?) AS orientationBooked,
       EXISTS(SELECT 1 FROM json_each(p.teams) WHERE value='medic') AS medicSelected
       FROM user u LEFT JOIN volunteer_status v ON v.user_id=u.id LEFT JOIN profile p ON p.user_id=u.id WHERE u.id=?`,
     )
-      .bind(Date.now(), id)
+      .bind(Date.now(), Date.now(), id)
       .first<{
         role: string;
         active: number | null;
         patrol_approved: number | null;
         hasDraft: number;
-        orientationCompleted: number;
+        orientationAttended: number;
         orientationBooked: number;
         medicSelected: number;
       }>();
     assert.ok(row);
     assert.equal(row.role, preset.role, preset.key);
     assert.equal(
-      Boolean(row.orientationCompleted),
-      preset.orientation === "completed",
+      Boolean(row.orientationAttended),
+      preset.orientation === "attended",
       preset.key,
     );
     assert.equal(
@@ -4176,7 +3996,7 @@ test("every reusable state resolves its declared milestones, permissions and att
       hasDraft: Boolean(row.hasDraft),
       active: Boolean(row.active),
       patrolApproved: Boolean(row.patrol_approved),
-      orientationCompleted: Boolean(row.orientationCompleted),
+      orientationAttended: Boolean(row.orientationAttended),
       orientationBooked: Boolean(row.orientationBooked),
       medicSelected: Boolean(row.medicSelected),
       medicEligible: Boolean(

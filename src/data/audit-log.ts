@@ -126,13 +126,6 @@ export const auditActions: AuditAction[] = [
     "update",
     "changed account activity for",
   ),
-  entry(
-    "person",
-    "orientation_completed",
-    "Recorded orientation completion",
-    "create",
-    "recorded orientation completion for",
-  ),
   entry("event", "created", "Created event", "create", "created"),
   entry(
     "event",
@@ -286,7 +279,6 @@ const fieldLabels: Record<string, string> = {
   applicationApproved: "Application approval",
   registrationApproved: "Application approval",
   patrolApproved: "Patrol approval",
-  orientationCompletion: "Orientation completion",
   naloxoneCompletedAt: "Naloxone course completion",
   active: "Account active",
   role: "Account role",

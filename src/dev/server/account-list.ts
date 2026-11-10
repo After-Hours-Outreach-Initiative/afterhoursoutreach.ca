@@ -22,7 +22,7 @@ interface AccountRow {
   active: number | null;
   patrolApproved: number | null;
   hasDraft: number;
-  orientationCompleted: number;
+  orientationAttended: number;
   orientationBooked: number;
   medicSelected: number;
   medicEligible: number;
@@ -40,7 +40,9 @@ export async function listLocalAccounts(db: Env["DB"], after?: string) {
     v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.active, v.patrol_approved AS patrolApproved,
     u.two_factor_enabled AS twoFactorEnabled,
     EXISTS (SELECT 1 FROM application_draft WHERE user_id=u.id) AS hasDraft,
-    EXISTS (SELECT 1 FROM orientation_completion WHERE user_id=u.id) AS orientationCompleted,
+    EXISTS (SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id
+      WHERE s.user_id=u.id AND s.status='confirmed' AND e.cancelled_at IS NULL
+      AND e.starts_at<=${nowMsSql} AND ${includesOrientationSql()}) AS orientationAttended,
     EXISTS (SELECT 1 FROM signup s JOIN event e ON e.id=s.event_id
       WHERE s.user_id=u.id AND s.status='confirmed' AND e.cancelled_at IS NULL
       AND e.starts_at>${nowMsSql} AND ${includesOrientationSql()}) AS orientationBooked,
@@ -69,7 +71,7 @@ export async function listLocalAccounts(db: Env["DB"], after?: string) {
         active: Boolean(row.active),
         patrolApproved: Boolean(row.patrolApproved),
         hasDraft: Boolean(row.hasDraft),
-        orientationCompleted: Boolean(row.orientationCompleted),
+        orientationAttended: Boolean(row.orientationAttended),
         orientationBooked: Boolean(row.orientationBooked),
         medicSelected: Boolean(row.medicSelected),
         medicEligible: Boolean(row.active && row.medicEligible),

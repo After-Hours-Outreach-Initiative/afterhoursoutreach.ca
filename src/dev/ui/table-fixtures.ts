@@ -140,7 +140,7 @@ const volunteerProfiles = [
   "outreach-volunteer",
   "accepted",
   "medic-new-volunteer",
-  "orientation-completed",
+  "orientation-attended",
   "legacy-patrol",
   "inactive",
 ];
@@ -219,7 +219,6 @@ export function createTableFixture(
       ),
       updatedAt: Date.UTC(2026, 9, 1),
       twoFactorEnabled: Number(!applications && variant === 0),
-      orientations: Number(!applications && [0, 1, 2, 5, 7].includes(variant)),
     } satisfies Omit<Person, "searchName" | "status">;
     return {
       ...person,

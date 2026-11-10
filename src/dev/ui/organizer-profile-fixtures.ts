@@ -71,11 +71,11 @@ export const organizerProfileScenarios: ProfileScenario[] = import.meta.env.DEV
         booked: true,
       },
       {
-        id: "orientation-completed",
+        id: "orientation-attended",
         group: "Orientation",
-        label: "Orientation completed",
+        label: "Attended orientation",
         description:
-          "Recorded orientation attendance, awaiting patrol approval.",
+          "Registered for an orientation that has started, awaiting patrol approval.",
         approved: true,
         attended: true,
       },
@@ -163,7 +163,7 @@ export const organizerProfileScenarios: ProfileScenario[] = import.meta.env.DEV
         group: "Historical records",
         label: "Patrol access without attendance",
         description:
-          "A historical patrol approval without recorded orientation attendance.",
+          "A historical patrol approval without an orientation registration.",
         approved: true,
         patrol: true,
         medic: true,
@@ -433,7 +433,6 @@ export function createProfileFixture(
       patrolApproved: Number(patrol),
       updatedAt: timestamp,
       twoFactorEnabled: Number(Boolean(scenario.organizer)),
-      orientations: Number(Boolean(scenario.attended)),
     },
     profile: {
       answers,
@@ -485,7 +484,8 @@ export function createProfileFixture(
     },
     orientation: scenario.booked
       ? { ...orientation, startsAt: Date.UTC(2027, 0, 16, 21) }
-      : null,
-    completedOrientation: scenario.attended ? orientation : null,
+      : scenario.attended
+        ? orientation
+        : null,
   };
 }

@@ -69,7 +69,7 @@ test("organizer profile catalogue exposes every real profile state without accou
     "medic-applicant": "Application review",
     accepted: "Awaiting patrol approval",
     "orientation-booked": "Awaiting patrol approval",
-    "orientation-completed": "Awaiting patrol approval",
+    "orientation-attended": "Awaiting patrol approval",
     "medic-new-volunteer": "Awaiting patrol approval",
     "outreach-volunteer": "Revoke patrol approval",
     medic: "Revoke patrol approval",
@@ -111,14 +111,8 @@ test("organizer profile catalogue exposes every real profile state without accou
         0,
       );
       await expect(
-        patrolApproval.getByText("Orientation not completed", { exact: true }),
-      ).toHaveCount(0);
-      await expect(
         patrolApproval.getByText("Patrol access approved", { exact: true }),
       ).toHaveCount(0);
-      await expect(
-        patrolApproval.locator("[data-orientation-status]"),
-      ).toHaveCount(id === "legacy-patrol" ? 0 : 1);
     }
     await expect(
       preview.locator(

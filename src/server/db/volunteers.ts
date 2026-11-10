@@ -54,7 +54,6 @@ export interface VolunteerRow {
   patrolApproved: number;
   updatedAt: number;
   twoFactorEnabled: number;
-  orientations: number;
 }
 
 export async function listVolunteers(
@@ -125,8 +124,7 @@ async function listPeople(
         ${applicationReadyForReviewSql} AS applicationReadyForReview,
         ${applicationCompletedAtSql} AS applicationCompletedAt,
         ${attendeeCategorySql("u.id")} AS category,
-        ${directoryMedicMarkSql} AS medicMark,
-        (SELECT count(*) FROM orientation_completion o WHERE o.user_id = u.id) AS orientations
+        ${directoryMedicMarkSql} AS medicMark
        FROM user u JOIN profile p ON p.user_id = u.id
        JOIN volunteer_status v ON v.user_id = u.id
        WHERE u.deleted_at IS NULL
@@ -149,8 +147,7 @@ export function findVolunteer(db: Env["DB"], actor: Actor, userId: string) {
     .prepare(
       `SELECT u.id, ${profileDisplayNameSql} AS name, u.role, u.two_factor_enabled AS twoFactorEnabled,
         v.active, v.registration_approved AS applicationApproved, v.application_rejection_reason AS applicationRejectionReason, v.patrol_approved AS patrolApproved, v.updated_at AS updatedAt,
-        ${applicationReadyForReviewSql} AS applicationReadyForReview,
-        (SELECT count(*) FROM orientation_completion WHERE user_id=u.id) AS orientations
+        ${applicationReadyForReviewSql} AS applicationReadyForReview
       FROM user u JOIN profile p ON p.user_id=u.id
       JOIN volunteer_status v ON v.user_id=u.id WHERE u.id=? AND u.deleted_at IS NULL`,
     )
@@ -188,23 +185,6 @@ export function findVolunteerOrientation(
        ORDER BY e.starts_at > ${nowMsSql} DESC,
          CASE WHEN e.starts_at > ${nowMsSql} THEN e.starts_at ELSE -e.starts_at END, e.id
        LIMIT 1`,
-    )
-    .bind(userId)
-    .first<VolunteerOrientation>();
-}
-
-/** Recorded attendance remains visible even if its registration or event changed. */
-export function findCompletedVolunteerOrientation(
-  db: Env["DB"],
-  actor: Actor,
-  userId: string,
-) {
-  requireOrganizer(actor);
-  return db
-    .prepare(
-      `SELECT e.id AS eventId, e.starts_at AS startsAt, e.meeting_point AS meetingPoint
-     FROM orientation_completion o JOIN event e ON e.id=o.event_id
-     WHERE o.user_id=? ORDER BY e.starts_at, o.marked_at, o.id LIMIT 1`,
     )
     .bind(userId)
     .first<VolunteerOrientation>();
@@ -892,46 +872,6 @@ export async function approveForPatrols(
         409,
         "The application, volunteer status, or organizer access changed. Reload before approving patrols.",
       );
-    // Attendance is informational. Its absence or a failed history write must
-    // never prevent or roll back the role change already committed above.
-    if (eventId) {
-      try {
-        await db.batch([
-          db
-            .prepare(
-              `INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
-              SELECT ?, ?, e.id, ?, ? FROM event e JOIN signup s ON s.event_id=e.id
-              WHERE e.id=? AND s.user_id=? AND s.status='confirmed'
-                AND ${includesOrientationSql()} AND e.cancelled_at IS NULL
-                AND e.starts_at <= ${nowMsSql}
-                AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)
-                AND ${writePermission(true)}
-              ON CONFLICT(user_id, event_id) DO NOTHING`,
-            )
-            .bind(
-              crypto.randomUUID(),
-              userId,
-              actor.id,
-              now,
-              eventId,
-              userId,
-              operation,
-              ...permissionValues(actor),
-            ),
-          db
-            .prepare(
-              `INSERT INTO audit_log (id, actor_id, subject_id, action, changed_fields, created_at)
-              SELECT ?, ?, ?, 'orientation_completed', '["orientationCompletion"]', ?
-              WHERE changes()=1`,
-            )
-            .bind(crypto.randomUUID(), actor.id, userId, now),
-        ]);
-      } catch {
-        console.warn(
-          "Orientation history could not be recorded after patrol approval.",
-        );
-      }
-    }
     return { operation, message: "Volunteer access saved." };
   } catch (error) {
     return databaseWriteError(error);

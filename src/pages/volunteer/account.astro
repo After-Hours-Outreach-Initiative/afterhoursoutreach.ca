@@ -23,11 +23,7 @@ import {
   forwardCookies,
   readAccountSession,
 } from "@/server/auth";
-import {
-  loadProfile,
-  loadSubmittedApplication,
-  loadFirstCompletedOrientation,
-} from "@/server/db/profiles";
+import { loadProfile, loadSubmittedApplication } from "@/server/db/profiles";
 import { createDatabase } from "@/server/db";
 import { accountDeletionFreshAge } from "@/server/db/account-deletion";
 import { volunteerStatus } from "@/server/db/schema";
@@ -41,7 +37,7 @@ let values: ApplicationAnswers | null = null;
 let submission: Awaited<ReturnType<typeof loadSubmittedApplication>> = null;
 let applicationProgress: Awaited<ReturnType<typeof loadApplicationProgress>>;
 let accountCreatedAt: Date | null = null;
-let firstOrientationAt: Date | null = null;
+let patrolApprovedAt: Date | null = null;
 const accountDate = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Vancouver",
   dateStyle: "long",
@@ -74,10 +70,6 @@ try {
   submission = await loadSubmittedApplication(env.DB, current.user.id);
   applicationProgress = await loadApplicationProgress(env.DB, current.user.id);
   accountCreatedAt = current.user.createdAt;
-  firstOrientationAt = await loadFirstCompletedOrientation(
-    env.DB,
-    current.user.id,
-  );
   email = current.user.email;
   legacyName = current.user.name;
   userId = current.user.id;
@@ -96,6 +88,7 @@ try {
     where: eq(volunteerStatus.user_id, current.user.id),
   });
   active = status?.active ?? false;
+  patrolApprovedAt = status?.patrol_approved ? status.approved_at : null;
   try {
     const listed = await auth.api.listSessions({
       headers: Astro.request.headers,
@@ -165,12 +158,12 @@ const contents = [
   greetingName={accountGreeting(values, legacyName)}
   email={email}
 >
-  <h1 slot="heading" class="mb-6 text-2xl md:text-4xl">Account</h1>
-  {
-    /* Discord connection is temporarily disabled.
+  <h1 slot="heading" class="mb-6 text-2xl md:text-4xl">
+    Account
+  </h1>
+  {/* Discord connection is temporarily disabled.
   {applicationComplete && <DiscordConnectionNotice {userId} />}
-  */
-  }
+  */}
   <div data-account-contents-flow>
     <PageContents
       entries={contents}
@@ -178,120 +171,109 @@ const contents = [
       idleHeading="Sections"
     />
     <div data-account-contents-body>
-      {
-        values && !active && (
-          <p class="volunteer-notice" role="status">
-            Your volunteer account is inactive. Contact an organizer at{" "}
-            <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore
-            access.
-          </p>
-        )
-      }
+      {values && !active && (
+        <p class="volunteer-notice" role="status">
+          Your volunteer account is inactive. Contact an organizer at{" "}
+          <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore
+          access.
+        </p>
+      )}
       <section class="volunteer-panel">
-        <h2 id="account-profile-heading" data-contents-section>Your profile</h2>
+        <h2 id="account-profile-heading" data-contents-section>
+          Your profile
+        </h2>
         <div class="account-profile-summary mt-6 mb-8">
           <dl>
             <div>
               <dt>Account created</dt>
               <dd>
-                {
-                  accountCreatedAt ? (
-                    <time datetime={accountCreatedAt.toISOString()}>
-                      {accountDate.format(accountCreatedAt)}
-                    </time>
-                  ) : (
-                    "Unavailable"
-                  )
-                }
+                {accountCreatedAt ? (
+                  <time datetime={accountCreatedAt.toISOString()}>
+                    {accountDate.format(accountCreatedAt)}
+                  </time>
+                ) : (
+                  "Unavailable"
+                )}
               </dd>
             </div>
             <div>
-              <dt>First completed orientation</dt>
+              <dt>Approved to patrol</dt>
               <dd>
-                {
-                  firstOrientationAt ? (
-                    <time datetime={firstOrientationAt.toISOString()}>
-                      {accountDate.format(firstOrientationAt)}
-                    </time>
-                  ) : (
-                    "Not yet completed"
-                  )
-                }
+                {patrolApprovedAt ? (
+                  <time datetime={patrolApprovedAt.toISOString()}>
+                    {accountDate.format(patrolApprovedAt)}
+                  </time>
+                ) : (
+                  "Not yet approved"
+                )}
               </dd>
             </div>
           </dl>
         </div>
-        {
-          values ? (
-            <AccountProfileForm values={values} userId={userId} />
-          ) : (
-            <p>
-              You have not submitted a volunteer application.{" "}
-              <a href="/apply">Continue your application</a>.
-            </p>
-          )
-        }
+        {values ? (
+          <AccountProfileForm values={values} userId={userId} />
+        ) : (
+          <p>
+            You have not submitted a volunteer application.{" "}
+            <a href="/apply">Continue your application</a>.
+          </p>
+        )}
       </section>
-      {
-        (applicationComplete ||
-          applicationProgress.applicationRejectionReason) && (
-          <section
-            class="volunteer-panel"
-            aria-labelledby="submitted-application-heading"
+      {(applicationComplete ||
+        applicationProgress.applicationRejectionReason) && (
+        <section
+          class="volunteer-panel"
+          aria-labelledby="submitted-application-heading"
+        >
+          <h2 id="submitted-application-heading" data-contents-section>
+            Volunteer Application
+          </h2>
+          <ApplicationProgressMini
+            progress={applicationProgress}
+            idPrefix="account-application"
+            showTime
           >
-            <h2 id="submitted-application-heading" data-contents-section>
-              Volunteer Application
-            </h2>
-            <ApplicationProgressMini
-              progress={applicationProgress}
-              idPrefix="account-application"
-              showTime
+            <section
+              slot="application"
+              class="px-3 pb-3"
+              aria-label="Submitted answers"
             >
-              <section
-                slot="application"
-                class="px-3 pb-3"
-                aria-label="Submitted answers"
-              >
-                {submission ? (
-                  <ApplicationSummary
-                    {...submission}
-                    idPrefix="account-application"
-                  />
-                ) : (
-                  <p class="volunteer-help mt-4">
-                    Your application form was submitted. The original submitted
-                    answers were not captured for this account.
-                  </p>
-                )}
-              </section>
-              <Fragment slot="review">
-                {applicationProgress.applicationRejectionReason && (
-                  <p
-                    class="volunteer-help px-3 pb-3 whitespace-pre-wrap"
-                    data-application-rejection
-                  >
-                    Reason: {applicationProgress.applicationRejectionReason}
-                  </p>
-                )}
-              </Fragment>
-            </ApplicationProgressMini>
-            {
-              applicationProgress.applicationApproved && (
-                <a class="btn btn-outline mt-6" href="#account-profile-heading">
-                  View your profile
-                </a>
-              )
-            }
-          </section>
-        )
-      }
+              {submission ? (
+                <ApplicationSummary
+                  {...submission}
+                  idPrefix="account-application"
+                />
+              ) : (
+                <p class="volunteer-help mt-4">
+                  Your application form was submitted. The original submitted
+                  answers were not captured for this account.
+                </p>
+              )}
+            </section>
+            <Fragment slot="review">
+              {applicationProgress.applicationRejectionReason && (
+                <p
+                  class="volunteer-help px-3 pb-3 whitespace-pre-wrap"
+                  data-application-rejection
+                >
+                  Reason: {applicationProgress.applicationRejectionReason}
+                </p>
+              )}
+            </Fragment>
+          </ApplicationProgressMini>
+          {applicationProgress.applicationApproved && (
+            <a class="btn btn-outline mt-6" href="#account-profile-heading">
+              View your profile
+            </a>
+          )}
+        </section>
+      )}
       <section class="volunteer-panel">
         <h2 id="account-settings-heading" data-contents-section>
           Account settings
         </h2>
         <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />
-        {
-          /* Discord connection is temporarily disabled.
+        {/* Discord connection is temporarily disabled.
         <div class="volunteer-setting">
           <div class="w-full">
             <h3 id="account-discord-heading" data-contents-section>Discord</h3>
@@ -303,8 +285,7 @@ const contents = [
             />
           </div>
         </div>
-        */
-        }
+        */}
         <div
           class="volunteer-setting account-setting-unavailable"
           data-factor-settings
@@ -315,14 +296,12 @@ const contents = [
               Two-factor authentication
             </h3>
             <p>Coming soon.</p>
-            {
-              twoFactorEnabled && (
-                <p role="status">
-                  Your authenticator is enabled. It is required each time you
-                  sign in.
-                </p>
-              )
-            }
+            {twoFactorEnabled && (
+              <p role="status">
+                Your authenticator is enabled. It is required each time you sign
+                in.
+              </p>
+            )}
           </div>
         </div>
         <div class="volunteer-setting" data-account-sessions>
@@ -330,61 +309,55 @@ const contents = [
             <h3 id="account-sessions-heading" data-contents-section>
               Signed-in browsers
             </h3>
-            {
-              sessionsNeedSignIn && (
-                <form
-                  data-sign-out
-                  action="/api/v1/auth/sign-out"
-                  method="post"
-                  class="mt-6"
-                >
-                  <p>
-                    Sign in again to view and manage your signed-in browsers.
-                  </p>
-                  <button class="btn btn-outline mt-4" type="submit">
-                    Sign out to sign in again
-                  </button>
-                  <p data-form-message role="status" hidden />
-                </form>
-              )
-            }
+            {sessionsNeedSignIn && (
+              <form
+                data-sign-out
+                action="/api/v1/auth/sign-out"
+                method="post"
+                class="mt-6"
+              >
+                <p>Sign in again to view and manage your signed-in browsers.</p>
+                <button class="btn btn-outline mt-4" type="submit">
+                  Sign out to sign in again
+                </button>
+                <p data-form-message role="status" hidden />
+              </form>
+            )}
             <ul class="account-sessions mt-6">
-              {
-                sessions.map((entry) => (
-                  <li data-session-row>
-                    <div>
-                      <span>
-                        {entry.id === currentId
-                          ? "This browser"
-                          : entry.userAgent || "Another browser"}
-                      </span>
-                      <span class="volunteer-help">
-                        Last active:{" "}
-                        {entry.updatedAt.toLocaleString("en-CA", {
-                          timeZone: "America/Vancouver",
-                        })}
-                      </span>
-                    </div>
-                    {entry.id !== currentId && (
-                      <form
-                        data-end-session
-                        action="/api/v1/account/session"
-                        method="post"
+              {sessions.map((entry) => (
+                <li data-session-row>
+                  <div>
+                    <span>
+                      {entry.id === currentId
+                        ? "This browser"
+                        : entry.userAgent || "Another browser"}
+                    </span>
+                    <span class="volunteer-help">
+                      Last active:{" "}
+                      {entry.updatedAt.toLocaleString("en-CA", {
+                        timeZone: "America/Vancouver",
+                      })}
+                    </span>
+                  </div>
+                  {entry.id !== currentId && (
+                    <form
+                      data-end-session
+                      action="/api/v1/account/session"
+                      method="post"
+                    >
+                      <input type="hidden" name="id" value={entry.id} />
+                      <button
+                        class="btn btn-outline"
+                        type="submit"
+                        data-loading-label="Signing out…"
                       >
-                        <input type="hidden" name="id" value={entry.id} />
-                        <button
-                          class="btn btn-outline"
-                          type="submit"
-                          data-loading-label="Signing out…"
-                        >
-                          Sign out of session
-                        </button>
-                        <p data-form-message role="status" hidden />
-                      </form>
-                    )}
-                  </li>
-                ))
-              }
+                        Sign out of session
+                      </button>
+                      <p data-form-message role="status" hidden />
+                    </form>
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
         </div>

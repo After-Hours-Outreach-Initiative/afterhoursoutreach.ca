@@ -135,12 +135,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
           index === 1 ? " MJ " : "",
         ),
       ]);
-      if (index >= 3 && index < 6)
-        await DB.prepare(
-          "INSERT INTO orientation_completion VALUES (?,?, 'history',?,0)",
-        )
-          .bind(`completion-${index}`, id, organizer.id)
-          .run();
       await DB.prepare(
         "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES (?, 'crowded',?,0,0)",
       )

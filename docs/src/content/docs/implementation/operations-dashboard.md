@@ -88,7 +88,7 @@ Each account exposes reviewed controls for:
 New organizers need verified email and a submitted, active, approved application.
 This also allows first-organizer provisioning after those steps, without
 creating a fake app login. The last usable organizer cannot be demoted,
-deactivated or deleted. Patrol approvals and orientation completions reference
+deactivated or deleted. Patrol approvals reference
 an existing active organizer, while the dashboard's local activity log records
 the administrative operation under the local OS operator. This is a privileged
 out-of-band operation, not a claim that the referenced organizer signed in.
@@ -121,8 +121,7 @@ and privacy procedures. No provider API is called to erase external history.
 The dashboard lists up to 60 occurrences (upcoming first, then recent history)
 and up to 50 recurring series. Inspect rosters and category/capacity counts;
 change an upcoming occurrence's registration state, visibility or capacity;
-cancel an event; remove a registration; or mark a registered attendee's
-orientation completed after the event starts.
+cancel an event; or remove a registration.
 
 Capacity edits remain subject to the database's reservations for medics and new volunteers,
 total-capacity and existing-registration guards. Hiding/closing an event does

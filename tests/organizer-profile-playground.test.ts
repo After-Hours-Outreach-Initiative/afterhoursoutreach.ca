@@ -32,9 +32,6 @@ describe("organizer profile playground fixtures", () => {
       expect(fixture.profile.naloxoneCompletedAt).toBe(
         fixture.progress.naloxoneCompletedAt,
       );
-      expect(Boolean(fixture.completedOrientation)).toBe(
-        fixture.person.orientations > 0,
-      );
       if (fixture.person.patrolApproved)
         expect(fixture.person.applicationApproved).toBe(1);
       if (!fixture.person.applicationApproved)

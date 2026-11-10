@@ -294,26 +294,10 @@ BEGIN
       EXISTS (SELECT 1 FROM signup s
         WHERE s.event_id = OLD.id AND s.status = 'confirmed'
           AND (CASE WHEN s.user_id IS NULL THEN s.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1) END))
-      OR EXISTS (SELECT 1 FROM orientation_completion WHERE event_id = OLD.id)
     );
 END;
 --> statement-breakpoint
 
--- Completion is recorded separately from patrol approval.
-CREATE TRIGGER orientation_completion_insert
-BEFORE INSERT ON orientation_completion
-BEGIN
-  SELECT RAISE(ABORT, 'not_an_orientation')
-  WHERE NOT EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'));
-END;
---> statement-breakpoint
-CREATE TRIGGER orientation_completion_update
-BEFORE UPDATE OF event_id ON orientation_completion
-BEGIN
-  SELECT RAISE(ABORT, 'not_an_orientation')
-  WHERE NOT EXISTS (SELECT 1 FROM event e WHERE id = NEW.event_id AND coalesce(e.includes_orientation, e.type = 'orientation'));
-END;
---> statement-breakpoint
 CREATE TRIGGER approval_organizer_insert
 BEFORE INSERT ON volunteer_status WHEN NEW.patrol_approved = 1
 BEGIN

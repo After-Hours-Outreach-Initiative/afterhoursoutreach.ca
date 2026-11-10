@@ -89,15 +89,15 @@ separate attention.
 These periods are documented in the current public policy. They are administered
 by **manual reviews and deletion**, with no general automated retention cleanup.
 
-| Information                                                      | Documented rule                                                                                                                                                      |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unsubmitted draft answers                                        | Delete after 30 days without an answer edit; offline browser copies need separate handling.                                                                          |
-| Accounts without a submitted application                         | Delete after 90 days without sign-in; the shorter draft-answer period still applies.                                                                                 |
-| Volunteer profiles                                               | Keep for active participation. Review after 24 months without sign-in or event participation; give 30 days' notice before deleting an inactive profile.              |
-| Event, attendance, profile-view, edit, and access-change records | Normally retain identifiable records for 12 months after the event/action. Preserve minimum current orientation/eligibility records while needed for participation.  |
-| Information used for a decision directly affecting a person      | Retain the information actually used for at least one year after each use, with justified longer retention and legal holds where applicable.                         |
-| Authentication records                                           | Keep while needed for sign-in, security, abuse prevention, or an investigation. Expired verification records and abuse counters have bounded sign-in housekeeping.   |
-| Notification content and delivery history                        | Review for deletion when no longer needed for delivery, safe retries, investigations, or required decision records; minimal duplicate-prevention records may remain. |
+| Information                                                        | Documented rule                                                                                                                                                      |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unsubmitted draft answers                                          | Delete after 30 days without an answer edit; offline browser copies need separate handling.                                                                          |
+| Accounts without a submitted application                           | Delete after 90 days without sign-in; the shorter draft-answer period still applies.                                                                                 |
+| Volunteer profiles                                                 | Keep for active participation. Review after 24 months without sign-in or event participation; give 30 days' notice before deleting an inactive profile.              |
+| Event, registration, profile-view, edit, and access-change records | Normally retain identifiable records for 12 months after the event/action. Preserve minimum current orientation/eligibility records while needed for participation.  |
+| Information used for a decision directly affecting a person        | Retain the information actually used for at least one year after each use, with justified longer retention and legal holds where applicable.                         |
+| Authentication records                                             | Keep while needed for sign-in, security, abuse prevention, or an investigation. Expired verification records and abuse counters have bounded sign-in housekeeping.   |
+| Notification content and delivery history                          | Review for deletion when no longer needed for delivery, safe retries, investigations, or required decision records; minimal duplicate-prevention records may remain. |
 
 Provider windows are separate from application retention. A restore must account
 for prior deletions. Account deletion does not promise immediate or universal

@@ -33,120 +33,117 @@ const fullRegistrationDateFormat = new Intl.DateTimeFormat("en-CA", {
 <details class="volunteer-roster event-roster">
   <EventRosterSummary roster={roster} event={event} />
   <ul class="event-roster-list" role="list" aria-label="Registered volunteers">
-    {
-      roster.map((person) => (
-        <li class="event-roster-row">
-          <div class="event-roster-details">
-            <RosterPerson
-              name={person.name}
-              category={person.category}
-              medicMark={Boolean(person.medicMark)}
-              href={
-                person.userId
-                  ? `/volunteers/${encodeURIComponent(person.userId)}`
-                  : undefined
-              }
-            />
-            <span class="event-roster-status">
-              <span class="event-roster-registration-label">
-                {person.userId && !person.addedById ? (
-                  "Registered "
-                ) : (
-                  <>
-                    Added by{" "}
-                    {person.addedById ? (
-                      <a
-                        href={`/volunteers/${encodeURIComponent(person.addedById)}`}
-                        data-volunteer-profile-link
-                      >
-                        {person.addedByName}
-                      </a>
-                    ) : (
-                      "an organizer"
-                    )}{" "}
-                    on{" "}
-                  </>
-                )}
-              </span>
-              <time
-                datetime={new Date(person.registeredAt).toISOString()}
-                title={fullRegistrationDateFormat.format(person.registeredAt)}
-              >
-                {registrationDateFormat.format(person.registeredAt)}
-              </time>
-            </span>
-            {Boolean(person.completed) && !person.patrolApproved && (
-              <span class="event-roster-status">Orientation completed</span>
-            )}
-            {person.patrolApprovedAt !== null && !future && (
-              <span class="event-roster-status" data-patrol-approval-status>
-                {person.patrolApprovedAt !== null ? (
-                  <>
-                    Approved by{" "}
-                    {person.patrolApprovedById ? (
-                      <a
-                        href={`/volunteers/${encodeURIComponent(person.patrolApprovedById)}`}
-                        data-volunteer-profile-link
-                      >
-                        {person.patrolApprovedByName}
-                      </a>
-                    ) : (
-                      person.patrolApprovedByName || "an organizer"
-                    )}{" "}
-                    at{" "}
-                    <time
-                      datetime={new Date(person.patrolApprovedAt).toISOString()}
-                      title={fullRegistrationDateFormat.format(person.patrolApprovedAt)}
+    {roster.map((person) => (
+      <li class="event-roster-row">
+        <div class="event-roster-details">
+          <RosterPerson
+            name={person.name}
+            category={person.category}
+            medicMark={Boolean(person.medicMark)}
+            href={
+              person.userId
+                ? `/volunteers/${encodeURIComponent(person.userId)}`
+                : undefined
+            }
+          />
+          <span class="event-roster-status">
+            <span class="event-roster-registration-label">
+              {person.userId && !person.addedById ? (
+                "Registered "
+              ) : (
+                <>
+                  Added by{" "}
+                  {person.addedById ? (
+                    <a
+                      href={`/volunteers/${encodeURIComponent(person.addedById)}`}
+                      data-volunteer-profile-link
                     >
-                      {registrationDateFormat.format(person.patrolApprovedAt)}
-                    </time>
-                  </>
-                ) : (
-                  "Approved for patrols"
-                )}
-              </span>
-            )}
-            {person.userId &&
-              Boolean(event.includesOrientation) &&
-              !future &&
-              !event.cancelledAt &&
-              !person.patrolApproved && (
-                <form
-                  class="event-roster-orientation"
-                  data-organizer-patrol-approval
-                  data-email-prompt="access"
-                  action="/api/v1/organizer/action"
-                  method="post"
-                >
-                  <input name="userId" type="hidden" value={person.userId} />
-                  <input name="eventId" type="hidden" value={event.id} />
-                  <input
-                    name="version"
-                    type="hidden"
-                    value={person.statusVersion}
-                  />
-                  <button
-                    class="btn btn-outline"
-                    type="submit"
-                    data-loading-label="Saving…"
-                  >
-                    Approve for patrols
-                  </button>
-                  <p data-form-message role="status" hidden />
-                </form>
+                      {person.addedByName}
+                    </a>
+                  ) : (
+                    "an organizer"
+                  )}{" "}
+                  on{" "}
+                </>
               )}
-          </div>
-          <div class="event-roster-actions">
-            <SignupEditor
-              signup={person}
-              event={event}
-              destinations={destinations}
-              movable={future}
-            />
-          </div>
-        </li>
-      ))
-    }
+            </span>
+            <time
+              datetime={new Date(person.registeredAt).toISOString()}
+              title={fullRegistrationDateFormat.format(person.registeredAt)}
+            >
+              {registrationDateFormat.format(person.registeredAt)}
+            </time>
+          </span>
+          {person.patrolApprovedAt !== null && !future && (
+            <span class="event-roster-status" data-patrol-approval-status>
+              {person.patrolApprovedAt !== null ? (
+                <>
+                  Approved by{" "}
+                  {person.patrolApprovedById ? (
+                    <a
+                      href={`/volunteers/${encodeURIComponent(person.patrolApprovedById)}`}
+                      data-volunteer-profile-link
+                    >
+                      {person.patrolApprovedByName}
+                    </a>
+                  ) : (
+                    person.patrolApprovedByName || "an organizer"
+                  )}{" "}
+                  at{" "}
+                  <time
+                    datetime={new Date(person.patrolApprovedAt).toISOString()}
+                    title={fullRegistrationDateFormat.format(
+                      person.patrolApprovedAt,
+                    )}
+                  >
+                    {registrationDateFormat.format(person.patrolApprovedAt)}
+                  </time>
+                </>
+              ) : (
+                "Approved for patrols"
+              )}
+            </span>
+          )}
+          {person.userId &&
+            Boolean(event.includesOrientation) &&
+            !future &&
+            !event.cancelledAt &&
+            !person.patrolApproved && (
+              <form
+                class="event-roster-orientation"
+                data-organizer-patrol-approval
+                data-email-prompt="access"
+                action="/api/v1/organizer/action"
+                method="post"
+              >
+                <input name="userId" type="hidden" value={person.userId} />
+                <input name="eventId" type="hidden" value={event.id} />
+                <input
+                  name="version"
+                  type="hidden"
+                  value={person.statusVersion}
+                />
+                <button
+                  class="btn btn-outline"
+                  type="submit"
+                  data-loading-label="Saving…"
+                >
+                  Approve for patrols
+                </button>
+                <p data-form-message role="status" hidden />
+              </form>
+            )}
+        </div>
+        <div class="event-roster-actions">
+          <SignupEditor
+            signup={person}
+            event={event}
+            destinations={destinations}
+            movable={future}
+          />
+        </div>
+      </li>
+    ))}
   </ul>
 </details>
 

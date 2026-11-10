@@ -173,7 +173,6 @@ export function createEventCardFixture(
     newVolunteerConfirmed: scenario.newcomers,
     medicConfirmed: scenario.medics,
     medicEligible: 0,
-    orientationCompleted: Number(!scenario.newViewer),
     availableSpots: 0,
     futureConfirmed: publicRoster.length,
     futureEditableConfirmed: publicRoster.length,

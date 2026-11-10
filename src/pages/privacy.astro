@@ -31,68 +31,70 @@ const account = await loadAccountNavigation(
       <h2 class="mt-12">Information we collect and why</h2>
       <ul class="mt-6 list-disc space-y-4 pl-6">
         <li>
-          <strong>Accounts and contact details.</strong> Your email address identifies
-          your account, verifies sign-in and email changes, and receives service messages.
-          Account records include your name, role, verification status, and creation
-          and update times. Application names, optional pronouns, and phone numbers
-          support identification, communication, and volunteer coordination. Your
-          full date of birth is stored to check the application requirement that volunteers
-          be at least 19.
+          <strong>Accounts and contact details.</strong> Your email address
+          identifies your account, verifies sign-in and email changes, and
+          receives service messages. Account records include your name, role,
+          verification status, and creation and update times. Application names,
+          optional pronouns, and phone numbers support identification,
+          communication, and volunteer coordination. Your full date of birth is
+          stored to check the application requirement that volunteers be at
+          least 19.
         </li>
         <li>
-          <strong>Emergency and safety information.</strong> An emergency contact’s
-          name, phone number, and relationship to you help organizers contact someone
-          if you need help. Optional medical, allergy, or other safety information
-          helps organizers support you during events. Share only what is relevant
-          to that purpose. Please tell your emergency contact about this use and obtain
-          their agreement before providing their details.
+          <strong>Emergency and safety information.</strong> An emergency
+          contact’s name, phone number, and relationship to you help organizers
+          contact someone if you need help. Optional medical, allergy, or other
+          safety information helps organizers support you during events. Share
+          only what is relevant to that purpose. Please tell your emergency
+          contact about this use and obtain their agreement before providing
+          their details.
         </li>
         <li>
-          <strong>Application and qualifications.</strong> Team interests, motivation,
-          training, experience, and any required medic certification and expiry date
-          support application review, role suitability, and event safety. Referral
-          answers help us understand how applicants find us. Training choices include
-          potentially sensitive lived experience in the DTES, with substance use,
-          or in recovery; you do not have to select that choice or describe that personal
-          history. Organizers can see these answers after submission.
+          <strong>Application and qualifications.</strong> Team interests,
+          motivation, training, experience, and any required medic certification
+          and expiry date support application review, role suitability, and
+          event safety. Referral answers help us understand how applicants find
+          us. Training choices include potentially sensitive lived experience in
+          the DTES, with substance use, or in recovery; you do not have to
+          select that choice or describe that personal history. Organizers can
+          see these answers after submission.
         </li>
         <li>
-          <strong>Submission records.</strong> New applications keep an original copy
-          of the submitted answers and account email, the submission time, and the
-          Code of Conduct version and acknowledgement time. Later profile edits do
-          not replace that original copy. These records document the application and
-          acknowledgement; accepting the Code of Conduct is not consent to unrelated
-          uses of personal information.
+          <strong>Submission records.</strong> New applications keep an original
+          copy of the submitted answers and account email, the submission time,
+          and the Code of Conduct version and acknowledgement time. Later
+          profile edits do not replace that original copy. These records
+          document the application and acknowledgement; accepting the Code of
+          Conduct is not consent to unrelated uses of personal information.
         </li>
         <li>
-          <strong>Events and access.</strong> We record event signups, cancellations
-          and moves, orientation completion, application and patrol approvals, account
-          activity status, and role changes. Records of the person making a change
-          and its time support coordination, eligibility, and accountability. Notification
-          records can include recipients, subjects, message text, delivery attempts,
-          and status.
+          <strong>Events and access.</strong> We record event signups,
+          cancellations and moves, application and patrol approvals, account
+          activity status, and role changes. Records of the person making a
+          change and its time support coordination, eligibility, and
+          accountability. Notification records can include recipients, subjects,
+          message text, delivery attempts, and status.
         </li>
         <li>
-          <strong>Discord connection.</strong> With your explicit consent we link
-          one Discord ID and username to your volunteer account, join our server,
-          verify membership, and synchronize Volunteer, Organizer, and Medic roles
-          from website eligibility. We keep consent and completion times, membership
-          checks, and synchronization status/retry records.
-          {
-            /* Discord connection is temporarily disabled. Discord linking is required
+          <strong>Discord connection.</strong> With your explicit consent we
+          link one Discord ID and username to your volunteer account, join our
+          server, verify membership, and synchronize Volunteer, Organizer, and
+          Medic roles from website eligibility. We keep consent and completion
+          times, membership checks, and synchronization status/retry records.
+          {/* Discord connection is temporarily disabled. Discord linking is required
           after Naloxone 101 and before review for new applications; existing volunteers
-          keep website access without linking. */
-          }
+          keep website access without linking. */}
           Email sign-in is unchanged.
         </li>
         <li>
-          <strong>Technical and authentication records.</strong> Hosting receives
-          request information such as IP addresses and browser headers to serve the
-          site. Authentication records include session identifiers, IP addresses,
-          browser/device information, verification records, and hashed abuse-limiting
-          counters. If you set up an authenticator, we store its setup secret, backup-code
-          records, verification status, and failed-attempt information. These support
-          sign-in and abuse prevention. Operational logs and traces support troubleshooting.
+          <strong>Technical and authentication records.</strong> Hosting
+          receives request information such as IP addresses and browser headers
+          to serve the site. Authentication records include session identifiers,
+          IP addresses, browser/device information, verification records, and
+          hashed abuse-limiting counters. If you set up an authenticator, we
+          store its setup secret, backup-code records, verification status, and
+          failed-attempt information. These support sign-in and abuse
+          prevention. Operational logs and traces support troubleshooting.
         </li>
       </ul>
       <p class="mt-6">
@@ -163,12 +165,12 @@ const account = await loadAccountNavigation(
       </p>
       <p class="mt-6">
         Event rosters are organizer-only. They show volunteer display names
-        (preferred first name or first name, plus last initial) and
-        orientation-completion status, not medical or emergency-contact answers.
-        Other volunteers see available event details and signup counts, not
-        other volunteers’ roster names or full profiles. Two-factor
-        authentication is optional for both volunteers and organizers; once
-        enabled, it is required at sign-in.
+        (preferred first name or first name, plus last initial) and patrol
+        approval status, not medical or emergency-contact answers. Other
+        volunteers see available event details and signup counts, not other
+        volunteers’ roster names or full profiles. Two-factor authentication is
+        optional for both volunteers and organizers; once enabled, it is
+        required at sign-in.
       </p>
       <p class="mt-6">
         People administering our hosting, database, and email systems may have
@@ -216,10 +218,11 @@ const account = await loadAccountNavigation(
         already delivered to recipients’ inboxes.
       </p>
       <p class="mt-6">
-        When your application is ready for review, organizers receive an email with your
-        display name (preferred first name or first name, plus last initial),
-        submission time, and a link to review it after signing in. This email
-        uses Resend and does not include your other application answers.
+        When your application is ready for review, organizers receive an email
+        with your display name (preferred first name or first name, plus last
+        initial), submission time, and a link to review it after signing in.
+        This email uses Resend and does not include your other application
+        answers.
       </p>
       <p class="mt-6">
         Discord authorization requests only identity and permission to join our
@@ -231,8 +234,11 @@ const account = await loadAccountNavigation(
         processes this information under its own
         <a
           href="https://discord.com/privacy"
-          class="underline underline-offset-4">privacy policy</a
-        >, potentially outside Canada. We store the join access token encrypted
+          class="underline underline-offset-4"
+        >
+          privacy policy
+        </a>
+        , potentially outside Canada. We store the join access token encrypted
         only until joining/membership verification succeeds or the token
         expires; refresh tokens are not retained. Role sync uses the private bot
         credential, not a retained user access token. A ten-minute HttpOnly
@@ -291,47 +297,51 @@ const account = await loadAccountNavigation(
       </p>
       <ul class="mt-6 list-disc space-y-4 pl-6">
         <li>
-          <strong>Unsubmitted drafts:</strong> delete draft answers after 30 days
-          without an answer edit. Browser copies on offline devices cannot be remotely
-          erased and need separate handling when the site is next used.
+          <strong>Unsubmitted drafts:</strong> delete draft answers after 30
+          days without an answer edit. Browser copies on offline devices cannot
+          be remotely erased and need separate handling when the site is next
+          used.
         </li>
         <li>
-          <strong>Accounts without a submitted application:</strong> delete after
-          90 days without sign-in. The shorter draft-answer period still applies.
+          <strong>Accounts without a submitted application:</strong> delete
+          after 90 days without sign-in. The shorter draft-answer period still
+          applies.
         </li>
         <li>
-          <strong>Volunteer profiles:</strong> keep while needed for active participation.
-          Review after 24 months without sign-in or event participation and give 30
-          days’ notice before deleting an inactive profile. Keep only information
-          still required for a documented legal or operational purpose, with a further
-          review date.
+          <strong>Volunteer profiles:</strong> keep while needed for active
+          participation. Review after 24 months without sign-in or event
+          participation and give 30 days’ notice before deleting an inactive
+          profile. Keep only information still required for a documented legal
+          or operational purpose, with a further review date.
         </li>
         <li>
-          <strong>Event and audit records:</strong> normally keep identifiable event,
-          attendance, profile-view, edit, and access-change records for 12 months
-          after the event or action. Keep the minimum current orientation and eligibility
-          records while needed for active participation.
+          <strong>Event and audit records:</strong> normally keep identifiable
+          event, attendance, profile-view, edit, and access-change records for
+          12 months after the event or action. Keep the minimum current
+          orientation and eligibility records while needed for active
+          participation.
         </li>
         <li>
-          <strong>Decision records and legal holds:</strong> preserve information
-          actually used for a decision directly affecting a person for at least one
-          year after each use, as required by BC’s Personal Information Protection
-          Act. This minimum, and any documented legal hold, overrides routine deletion.
-          Review any need for longer retention. An original application snapshot or
-          field-name audit log does not by itself capture every later decision’s supporting
-          records.
+          <strong>Decision records and legal holds:</strong> preserve
+          information actually used for a decision directly affecting a person
+          for at least one year after each use, as required by BC’s Personal
+          Information Protection Act. This minimum, and any documented legal
+          hold, overrides routine deletion. Review any need for longer
+          retention. An original application snapshot or field-name audit log
+          does not by itself capture every later decision’s supporting records.
         </li>
         <li>
-          <strong>Technical and provider records:</strong> the provider windows above
-          are separate from our application’s retention. We retain authentication
-          records only while needed for sign-in, account security, abuse prevention,
-          or a documented investigation. Expired verification records and abuse counters
-          are cleaned up during sign-in housekeeping; expiring a code or session is
-          not proof that every related record has been erased. We review notification
-          content and delivery history for deletion once they are no longer needed
-          for delivery, safe retries, investigation, or required decision records.
-          Minimal records needed to prevent duplicate sends or restoration of discarded
-          drafts may need to remain after message content is removed.
+          <strong>Technical and provider records:</strong> the provider windows
+          above are separate from our application’s retention. We retain
+          authentication records only while needed for sign-in, account
+          security, abuse prevention, or a documented investigation. Expired
+          verification records and abuse counters are cleaned up during sign-in
+          housekeeping; expiring a code or session is not proof that every
+          related record has been erased. We review notification content and
+          delivery history for deletion once they are no longer needed for
+          delivery, safe retries, investigation, or required decision records.
+          Minimal records needed to prevent duplicate sends or restoration of
+          discarded drafts may need to remain after message content is removed.
         </li>
         <li>
           Copies in other browsers, provider systems, email inboxes, or backups
@@ -344,15 +354,20 @@ const account = await loadAccountNavigation(
 
       <h2 class="mt-12">Requests, corrections, and complaints</h2>
       <p class="mt-6">
-        Contact the Privacy officer at After Hours Outreach Society at <a
+        Contact the Privacy officer at After Hours Outreach Society at{" "}
+        <a
           href="mailto:info@afterhoursoutreach.ca"
-          class="underline underline-offset-4">info@afterhoursoutreach.ca</a
-        > with privacy questions or a written request for access, correction, deletion,
-        or withdrawal of consent where consent applies. You can also ask how your
-        information has been used or disclosed, or raise a privacy complaint. Identify
-        the request and the account email involved; do not send sign-in codes, authenticator
-        secrets, or unnecessary medical details. Identity may need to be verified
-        before information is released or changed.
+          class="underline underline-offset-4"
+        >
+          info@afterhoursoutreach.ca
+        </a>{" "}
+        with privacy questions or a written request for access, correction,
+        deletion, or withdrawal of consent where consent applies. You can also
+        ask how your information has been used or disclosed, or raise a privacy
+        complaint. Identify the request and the account email involved; do not
+        send sign-in codes, authenticator secrets, or unnecessary medical
+        details. Identity may need to be verified before information is released
+        or changed.
       </p>
       <p class="mt-6">
         Our Privacy officer monitors this inbox and handles requests manually,
@@ -365,20 +380,26 @@ const account = await loadAccountNavigation(
         charge for access to volunteer employee personal information.
       </p>
       <p class="mt-6">
-        You can edit ongoing profile details in <a
-          href="/volunteer/account"
-          class="underline underline-offset-4">Your account</a
-        > and change your email through verification. Legal names, birth date, and
-        the original submission cannot be changed through the profile editor; contact
-        us about corrections. Corrections to retained original submissions need separate
-        handling rather than only changing the current profile.
+        You can edit ongoing profile details in{" "}
+        <a href="/volunteer/account" class="underline underline-offset-4">
+          Your account
+        </a>{" "}
+        and change your email through verification. Legal names, birth date, and
+        the original submission cannot be changed through the profile editor;
+        contact us about corrections. Corrections to retained original
+        submissions need separate handling rather than only changing the current
+        profile.
       </p>
       <p class="mt-6">
         You can permanently delete your sign-in account under Account settings
-        in <a
+        in{" "}
+        <a
           href="/volunteer/account#account-delete-heading"
-          class="underline underline-offset-4">Your account</a
-        >. This requires a sign-in within ten minutes, your current email
+          class="underline underline-offset-4"
+        >
+          Your account
+        </a>
+        . This requires a sign-in within ten minutes, your current email
         address, and explicit confirmation. It removes all sessions, sign-in
         credentials, authenticator records, and account drafts, replaces the
         sign-in identity, cancels upcoming signups, and stops queued
@@ -401,13 +422,16 @@ const account = await loadAccountNavigation(
       </p>
       <p class="mt-6">
         Our Privacy officer investigates privacy complaints. You may also
-        contact the <a
+        contact the{" "}
+        <a
           href="https://www.oipc.bc.ca/for-the-public/"
           class="underline underline-offset-4"
-          >Office of the Information and Privacy Commissioner for British
-          Columbia</a
-        > about access or privacy concerns, including a complaint you cannot resolve
-        with us.
+        >
+          Office of the Information and Privacy Commissioner for British
+          Columbia
+        </a>{" "}
+        about access or privacy concerns, including a complaint you cannot
+        resolve with us.
       </p>
 
       <h2 class="mt-12">Policy updates</h2>

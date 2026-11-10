@@ -858,16 +858,6 @@ describe(
           ),
         );
         assert.equal(
-          (
-            await DB.prepare(
-              "SELECT count(*) AS n FROM orientation_completion WHERE user_id=?",
-            )
-              .bind(attendee!.userId)
-              .first()
-          )?.n,
-          1,
-        );
-        assert.equal(
           await DB.prepare(
             "SELECT patrol_approved FROM volunteer_status WHERE user_id=?",
           )
@@ -1924,11 +1914,6 @@ describe(
           await expect(
             approvedAttendee.locator("[data-patrol-approval-status] time"),
           ).toHaveAttribute("datetime", /.+/);
-          await expect(
-            approvedAttendee.getByText("Orientation completed", {
-              exact: true,
-            }),
-          ).toHaveCount(0);
           await expect(
             attendanceCard.locator(".volunteer-roster"),
           ).toHaveAttribute("open", "");

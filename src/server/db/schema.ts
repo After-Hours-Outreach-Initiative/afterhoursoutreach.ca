@@ -481,29 +481,6 @@ export const signup = sqliteTable(
   ],
 );
 
-export const orientationCompletion = sqliteTable(
-  "orientation_completion",
-  {
-    id: text().primaryKey(),
-    user_id: text()
-      .notNull()
-      .references(() => user.id),
-    event_id: text()
-      .notNull()
-      .references(() => event.id),
-    marked_by: text()
-      .notNull()
-      .references(() => user.id),
-    marked_at: timestamp().notNull(),
-  },
-  (table) => [
-    uniqueIndex("orientation_completion_user_event").on(
-      table.user_id,
-      table.event_id,
-    ),
-  ],
-);
-
 export const auditLog = sqliteTable(
   "audit_log",
   {
@@ -522,7 +499,6 @@ export const auditLog = sqliteTable(
         "application_rejected",
         "role_changed",
         "active_changed",
-        "orientation_completed",
       ],
     }).notNull(),
     // Log field names, not copies of sensitive profile answers.

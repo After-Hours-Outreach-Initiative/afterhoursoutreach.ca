@@ -117,11 +117,5 @@ export function localEventFixtures(now = Date.now()) {
   const past = quote(fixtureEventId("past-orientation"));
   statements.push(`UPDATE event SET starts_at = ${date(-7, "18:00")}
     WHERE id = ${past} AND created_at = ${now} AND updated_at = ${now}`);
-  statements.push(`INSERT INTO orientation_completion (id, user_id, event_id, marked_by, marked_at)
-    SELECT 'local-fixture-completion-alex', ${quote(fixtureUserId("alex"))}, ${past}, ${robin}, ${date(-7, "18:00")}
-    WHERE EXISTS (SELECT 1 FROM signup WHERE id = 'local-fixture-signup-alex' AND status = 'confirmed')
-    AND EXISTS (SELECT 1 FROM user WHERE id = ${quote(fixtureUserId("alex"))} AND email = 'alex.local@example.org')
-    AND EXISTS (SELECT 1 FROM user WHERE id = ${robin} AND email = 'robin.local@example.org')
-    ON CONFLICT(user_id, event_id) DO NOTHING`);
   return statements;
 }
