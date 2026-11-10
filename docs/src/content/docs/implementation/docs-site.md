@@ -69,13 +69,13 @@ the reader's three main sections:
 
 | Folder            | Purpose                                                        |
 | ----------------- | -------------------------------------------------------------- |
-| `planning/`       | Proposals, priorities, open decisions, and launch preparation. |
+| `planning/`       | TODO for ready work; TBD for ideas and open decisions. |
 | `specification/`  | Agreed workflows, permissions, and product behavior.           |
 | `implementation/` | Architecture, code, integrations, development, and operations. |
 
 Keep requirements in Specification and link to them from plans and implementation
-guides. Mark agreed but unbuilt behavior as **Planned**; ideas awaiting a decision
-stay in Planning.
+guides. Mark agreed but unbuilt behavior as **Planned**. Keep ideas awaiting a
+decision in [TBD](/planning/tbd/) and move them to [TODO](/planning/todo/) when ready.
 
 Edit the Markdown or MDX files in these folders directly. The local reader
 updates as you save changes.

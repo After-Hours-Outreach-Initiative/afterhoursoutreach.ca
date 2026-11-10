@@ -1,0 +1,87 @@
+---
+title: Roles and access
+description: Account roles, volunteer categories, badges, and avatars.
+---
+
+import RoleAppearance from "../../../../components/RoleAppearance.astro";
+import RoleTransition from "../../../../components/RoleTransition.astro";
+
+## Account roles
+
+| Role      | Avatar and badge                          | Access                                                  |
+| --------- | ----------------------------------------- | ------------------------------------------------------- |
+| Volunteer | <RoleAppearance />                        | Manages their own profile and books eligible events.    |
+| Organizer | <RoleAppearance badges={["organizer"]} /> | Reviews applications and manages volunteers and events. |
+
+Event access also depends on account status and approvals. Organizers keep the
+avatar for their volunteer category.
+
+## Volunteer categories
+
+| Category           | Avatar and badges                                                                         | Meaning                                           |
+| ------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| New volunteer      | <RoleAppearance category="new-volunteer" badges={["new-volunteer"]} />                    | Awaiting patrol approval.                         |
+| Outreach volunteer | <RoleAppearance />                                                                        | Patrol-approved volunteer outside the medic team. |
+| Medic              | <RoleAppearance category="medic" badges={["medic"]} />                                    | Patrol-approved volunteer on the medic team.      |
+| New medic          | <RoleAppearance category="new-volunteer" medicMark badges={["new-volunteer", "medic"]} /> | Medic-team volunteer awaiting patrol approval.    |
+
+## Role changes
+
+New accounts start as Volunteers with <RoleAppearance category="new-volunteer" badges={["new-volunteer"]} />.
+
+<RoleTransition
+  from={{
+    label: "New volunteer",
+    category: "new-volunteer",
+    badges: ["new-volunteer"],
+  }}
+  to={{
+    label: "New volunteer",
+    category: "new-volunteer",
+    badges: ["new-volunteer"],
+  }}
+  approval="application"
+  note="An organizer approves the application to open event access and orientation booking. The New category stays until patrol approval."
+/>
+
+<RoleTransition
+  from={{
+    label: "New volunteer",
+    category: "new-volunteer",
+    badges: ["new-volunteer"],
+  }}
+  to={{ label: "Outreach volunteer" }}
+  approval="patrol"
+  reversible
+  note="An organizer grants or revokes patrol approval. Orientation completion alone does not grant it."
+/>
+
+<RoleTransition
+  from={{
+    label: "New medic",
+    category: "new-volunteer",
+    medicMark: true,
+    badges: ["new-volunteer", "medic"],
+  }}
+  to={{ label: "Medic", category: "medic", badges: ["medic"] }}
+  approval="patrol"
+  reversible
+/>
+
+<RoleTransition
+  from={{ label: "Outreach volunteer" }}
+  to={{ label: "Medic", category: "medic", badges: ["medic"] }}
+  action="Add Medic team"
+  reverseAction="Remove Medic team"
+  reversible
+  note="Approved applicants update their team selection in their profile. Patrol approval stays unchanged."
+/>
+
+<RoleTransition
+  from={{ label: "Volunteer" }}
+  to={{ label: "Organizer", badges: ["organizer"] }}
+  action="Make organizer"
+  reverseAction="Make volunteer"
+  reversible
+  note="Organizers promote active volunteers with a verified email and approved application. At least one active organizer must remain."
+/>

@@ -1,0 +1,36 @@
+---
+import type { ComponentProps } from "astro/types";
+import AttendeeAvatar from "../../../src/components/volunteer/AttendeeAvatar.astro";
+import VolunteerRoleBadge from "../../../src/components/volunteer/VolunteerRoleBadge.astro";
+
+interface Props {
+  category?: ComponentProps<typeof AttendeeAvatar>["category"];
+  badges?: ComponentProps<typeof VolunteerRoleBadge>["role"][];
+  medicMark?: boolean;
+}
+
+const {
+  category = "outreach-volunteer",
+  badges = [],
+  medicMark = false,
+} = Astro.props;
+---
+
+<span class="role-appearance not-content">
+  <AttendeeAvatar category={category} medicMark={medicMark} decorative />
+  {badges.map((role) => (
+    <VolunteerRoleBadge role={role} />
+  ))}
+</span>
+
+<style>
+  .role-appearance {
+    --color-blue: #4169e1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+</style>

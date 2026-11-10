@@ -1,5 +1,5 @@
 ---
-title: Product specification
+title: Specification
 description: Users, volunteer progression, and the product rules behind the website.
 ---
 

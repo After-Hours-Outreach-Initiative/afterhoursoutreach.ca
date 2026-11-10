@@ -60,6 +60,10 @@ export default defineConfig({
     react(),
     starlight({
       title: "AHOI Docs",
+      components: {
+        Header: "./src/components/DocsHeader.astro",
+        PageTitle: "./src/components/DocsPageTitle.astro",
+      },
       customCss: ["./src/styles/layout.css", "./src/styles/diagrams.css"],
       // Pagefind needs a build; this reader only uses the development server.
       pagefind: false,
@@ -68,16 +72,34 @@ export default defineConfig({
         {
           label: "Planning",
           items: [
-            { label: "Plans and open decisions", slug: "planning" },
-            { label: "Privacy planning", slug: "planning/privacy" },
+            { label: "TODO", slug: "planning/todo" },
+            { label: "TBD", slug: "planning/tbd" },
           ],
         },
         {
           label: "Specification",
           items: [
-            { label: "Product overview", slug: "specification" },
+            { label: "Overview", slug: "specification" },
             { label: "Site map", slug: "specification/site-map" },
-            { label: "Accounts", slug: "specification/accounts" },
+            {
+              label: "Accounts",
+              items: [
+                { label: "Overview", slug: "specification/accounts" },
+                {
+                  label: "Sign-in and account settings",
+                  slug: "specification/accounts/sign-in-and-settings",
+                },
+                {
+                  label: "Applications",
+                  slug: "specification/accounts/applications",
+                },
+                { label: "Profiles", slug: "specification/accounts/profiles" },
+                {
+                  label: "Roles and access",
+                  slug: "specification/accounts/roles-and-access",
+                },
+              ],
+            },
             { label: "Events", slug: "specification/events" },
             { label: "Discord", slug: "specification/discord" },
             { label: "Notifications", slug: "specification/notifications" },

@@ -73,9 +73,11 @@ application secrets.
 
 The reader separates [Planning](docs/src/content/docs/planning/index.md),
 [Specification](docs/src/content/docs/specification/index.md), and
-[Implementation](docs/src/content/docs/implementation/index.md). Plans hold proposals
-and open decisions; specifications record agreed behavior; implementation guides
-explain the code and operations.
+[Implementation](docs/src/content/docs/implementation/index.md). Planning has
+[TODO](docs/src/content/docs/planning/todo.md) for ready work and
+[TBD](docs/src/content/docs/planning/tbd.md) for ideas and open decisions. Move items
+from TBD to TODO once ready. Specifications record agreed behavior; implementation
+guides explain the code and operations.
 
 Edit Markdown in [docs/src/content/docs/](docs/src/content/docs/); changes appear
 live in the browser. Each page has `title` and `description` frontmatter; Starlight

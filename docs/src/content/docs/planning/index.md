@@ -1,7 +1,12 @@
 ---
-title: Plans and open decisions
+title: Planning
 description: Deferred work, unresolved product questions, and launch preparation.
 ---
+
+- [TODO](/planning/todo/): stuff that is ready to work on.
+- [TBD](/planning/tbd/): stuff that still needs more thought.
+
+## Supporting planning notes
 
 These items come from the existing guides. They are proposals or unresolved
 decisions, with no new priority or delivery date assigned by this reorganization.

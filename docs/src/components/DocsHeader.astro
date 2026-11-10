@@ -1,0 +1,183 @@
+---
+import type { StarlightRouteData } from "@astrojs/starlight/route-data";
+import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
+import LanguageSelect from "@astrojs/starlight/components/LanguageSelect.astro";
+import ChevronDownIcon from "../../../src/components/icons/ChevronDownIcon.astro";
+
+type SidebarEntry = StarlightRouteData["sidebar"][number];
+
+function findTrail(entries: SidebarEntry[]): SidebarEntry[] {
+  for (const entry of entries) {
+    if (entry.type === "link" && entry.isCurrent) return [entry];
+    if (entry.type === "group") {
+      const trail = findTrail(entry.entries);
+      if (trail.length) return [entry, ...trail];
+    }
+  }
+  return [];
+}
+
+const { sidebar, entry, siteTitle, siteTitleHref } =
+  Astro.locals.starlightRoute;
+const isHome =
+  Astro.url.pathname.replace(/\/+$/, "") ===
+  new URL(siteTitleHref, Astro.url).pathname.replace(/\/+$/, "");
+const parents = findTrail(sidebar).flatMap((item) => {
+  if (item.type !== "group") return [];
+  const overview = item.entries.find((child) => child.type === "link");
+  // A section overview is already represented by the current page's title.
+  if (overview?.isCurrent) return [];
+  return [{ label: item.label, href: overview?.href }];
+});
+---
+
+<div class="docs-header">
+  <nav class="docs-breadcrumbs" aria-label="Breadcrumb">
+    <ol>
+      <li class="docs-breadcrumb-home">
+        <a href={siteTitleHref} aria-current={isHome ? "page" : undefined}>
+          {siteTitle}
+        </a>
+      </li>
+      {!isHome && (
+        <>
+          {parents.map((parent) => (
+            <li class="docs-breadcrumb-parent">
+              <ChevronDownIcon class="docs-breadcrumb-separator" />
+              {parent.href ? (
+                <a href={parent.href} title={parent.label}>
+                  {parent.label}
+                </a>
+              ) : (
+                <span title={parent.label}>{parent.label}</span>
+              )}
+            </li>
+          ))}
+          <li class="docs-breadcrumb-current">
+            <ChevronDownIcon class="docs-breadcrumb-separator" />
+            <span aria-current="page" title={entry.data.title}>
+              {entry.data.title}
+            </span>
+          </li>
+        </>
+      )}
+    </ol>
+  </nav>
+  <div class="docs-header-controls">
+    <ThemeSelect />
+    <LanguageSelect />
+  </div>
+</div>
+
+<style>
+  .docs-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    height: 100%;
+    min-width: 0;
+  }
+
+  .docs-breadcrumbs {
+    flex: 1;
+    min-width: 0;
+  }
+
+  ol,
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+  }
+
+  .docs-breadcrumb-home {
+    flex-shrink: 0;
+    font-weight: 600;
+  }
+
+  .docs-breadcrumb-home a {
+    color: var(--sl-color-text-accent);
+  }
+
+  .docs-breadcrumb-parent {
+    max-width: 12rem;
+  }
+
+  a,
+  span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  a:hover {
+    color: var(--sl-color-white);
+    text-decoration: underline;
+  }
+
+  a:focus-visible {
+    border-radius: 0.125rem;
+    outline: 2px solid var(--sl-color-text-accent);
+    outline-offset: 3px;
+  }
+
+  .docs-breadcrumb-current span {
+    color: var(--sl-color-white);
+    font-weight: 600;
+  }
+
+  .docs-breadcrumbs :global(.docs-breadcrumb-separator) {
+    flex: 0 0 0.75rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    color: var(--sl-color-gray-3);
+    transform: rotate(-90deg);
+  }
+
+  .docs-header-controls {
+    display: none;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  @media (max-width: 40rem) {
+    ol,
+    li {
+      gap: 0.375rem;
+    }
+
+    ol {
+      font-size: 0.875rem;
+    }
+
+    .docs-breadcrumb-parent {
+      display: none;
+    }
+  }
+
+  @media (min-width: 50rem) {
+    .docs-header-controls {
+      display: flex;
+    }
+  }
+
+  @media print {
+    .docs-header-controls {
+      display: none;
+    }
+  }
+</style>

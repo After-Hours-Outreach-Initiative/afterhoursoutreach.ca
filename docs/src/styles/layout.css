@@ -1,6 +1,12 @@
 :root {
   --sl-sidebar-width: 16rem;
   --docs-toc-width: 14rem;
+  --sl-text-h1: 1.5rem;
+  --sl-text-h2: 1.25rem;
+  --sl-text-h3: 1.125rem;
+  --sl-text-h4: 1rem;
+  --sl-text-h5: 1rem;
+  --sl-text-h6: 1rem;
 }
 
 /* Let pages and diagrams use all the space between the navigation panels. */
@@ -11,6 +17,17 @@
 .main-pane .sl-container {
   max-width: none;
   margin-inline: 0;
+}
+
+/* The page title is announced in the content and displayed in the header. */
+.main-pane .content-panel:has(> .sl-container > .docs-page-title:only-child) {
+  padding-block: 0;
+}
+
+.main-pane
+  .content-panel:has(> .sl-container > .docs-page-title:only-child)
+  + .content-panel {
+  border-top: 0;
 }
 
 /* Keep Starlight's mobile navigation below its desktop TOC breakpoint. */
