@@ -1,5 +1,6 @@
 ---
 import type { VolunteerRow } from "@/server/db/volunteers";
+import VolunteerAccessButton from "./VolunteerAccessButton.astro";
 
 interface Props {
   person: VolunteerRow;
@@ -22,11 +23,9 @@ const approved =
 >
   <input type="hidden" name="userId" value={person.id} />
   <input type="hidden" name="version" value={person.updatedAt} />
-  {
-    kind === "patrol" && !approved && (
-      <input type="hidden" name="approvePatrols" value="true" />
-    )
-  }
+  {kind === "patrol" && !approved && (
+    <input type="hidden" name="approvePatrols" value="true" />
+  )}
   <input
     type="checkbox"
     name="active"
@@ -36,9 +35,9 @@ const approved =
   <input
     type="checkbox"
     name="applicationApproved"
-    checked={kind === "application"
-      ? !approved
-      : Boolean(person.applicationApproved)}
+    checked={
+      kind === "application" ? !approved : Boolean(person.applicationApproved)
+    }
     hidden
   />
   <input
@@ -48,21 +47,11 @@ const approved =
     hidden
   />
   <p data-form-message role="status" hidden></p>
-  <button
-    class:list={["btn", approved ? "btn-red" : "btn-green"]}
-    type="submit"
+  <VolunteerAccessButton
+    {kind}
+    {approved}
     data-loading-label="Saving…"
     data-volunteer-control
     disabled
-  >
-    {
-      kind === "application"
-        ? approved
-          ? "Revoke application approval"
-          : "Approve application"
-        : approved
-          ? "Revoke patrol approval"
-          : "Approve for patrols"
-    }
-  </button>
+  />
 </form>
