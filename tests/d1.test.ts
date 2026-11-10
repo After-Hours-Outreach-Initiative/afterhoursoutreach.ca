@@ -326,19 +326,30 @@ test("organizer audit history combines all sources, paginates tied timestamps, a
   assert.equal(typeof first.entries[1].subjectApproved, "boolean");
   assert.equal(first.entries[0].subjectApproved, null);
   const stops = await listAuditLog(env.DB, organizer, undefined, {
-    action: "series:stopped",
+    users: [],
+    actions: ["series:stopped", "event:cancelled"],
   });
   assert.deepEqual(
     stops.entries.map(({ id }) => id),
-    ["audit-stop"],
+    ["audit-stop", "audit-cancel"],
   );
   assert.equal(
     (
       await listAuditLog(env.DB, organizer, undefined, {
-        user: volunteer.id,
+        users: [volunteer.id],
+        actions: [],
       })
     ).entries.length,
     0,
+  );
+  assert.equal(
+    (
+      await listAuditLog(env.DB, organizer, undefined, {
+        users: [volunteer.id, organizer.id],
+        actions: ["series:stopped"],
+      })
+    ).entries.length,
+    1,
   );
   assert.deepEqual(
     (await listAuditUsers(env.DB, organizer)).map(({ id }) => id),

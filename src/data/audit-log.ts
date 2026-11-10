@@ -27,25 +27,34 @@ export function auditCursor(value: string | null): AuditCursor | undefined {
 }
 
 export interface AuditFilters {
-  /** User id of the person who made the change. */
-  user?: string;
-  /** A `kind:action` key from {@link auditActions}. */
-  action?: string;
+  /** User ids of the people who made the change; empty matches everyone. */
+  users: string[];
+  /** `kind:action` keys from {@link auditActions}; empty matches every action. */
+  actions: string[];
 }
 
+const maxFilterValues = 100;
+
 export function auditFilters(params: URLSearchParams): AuditFilters {
-  const user = params.get("user");
-  const action = params.get("action");
+  const unique = (values: string[]) =>
+    [...new Set(values)].slice(0, maxFilterValues);
   return {
-    user: user && user.length <= 300 ? user : undefined,
-    action: action && auditActionsByKey.has(action) ? action : undefined,
+    users: unique(
+      params.getAll("user").filter((user) => user && user.length <= 300),
+    ),
+    actions: unique(
+      params.getAll("action").filter((action) => auditActionsByKey.has(action)),
+    ),
   };
 }
 
-export function auditLogUrl(filters: AuditFilters = {}, cursor?: AuditCursor) {
+export function auditLogUrl(
+  filters: AuditFilters = { users: [], actions: [] },
+  cursor?: AuditCursor,
+) {
   const params = new URLSearchParams();
-  if (filters.user) params.set("user", filters.user);
-  if (filters.action) params.set("action", filters.action);
+  for (const user of filters.users) params.append("user", user);
+  for (const action of filters.actions) params.append("action", action);
   if (cursor) params.set("before", JSON.stringify(cursor));
   const query = params.toString();
   return `/audit-log${query ? `?${query}` : ""}`;
@@ -265,7 +274,7 @@ const fieldLabels: Record<string, string> = {
     applicationFields.map(({ name, label }) => [name, label]),
   ),
   startsAt: "Start time",
-  includesOrientation: "Includes orientation",
+  includesOrientation: "Event type",
   meetingPoint: "Meeting point",
   meetingPointUrl: "Map link",
   spots: "Capacity",

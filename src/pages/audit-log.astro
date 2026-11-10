@@ -4,9 +4,8 @@ import AccountIcon from "@/components/icons/AccountIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import CalendarIcon from "@/components/icons/CalendarIcon.astro";
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
-import MinusIcon from "@/components/icons/MinusIcon.astro";
-import PlusIcon from "@/components/icons/PlusIcon.astro";
 import RecurringIcon from "@/components/icons/RecurringIcon.astro";
+import SearchIcon from "@/components/icons/SearchIcon.astro";
 import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/db/access";
 import { listAuditLog, listAuditUsers } from "@/server/db/audit-log";
@@ -16,6 +15,7 @@ import {
   auditAction,
   auditActionKey,
   auditActions,
+  type AuditKind,
   auditCursor,
   auditFilters,
   auditLogUrl,
@@ -70,17 +70,58 @@ try {
   });
 }
 const now = Date.now();
-const filtered = Boolean(filters.user || filters.action);
+const filtered = filters.users.length + filters.actions.length > 0;
 const kindIcons = {
   person: AccountIcon,
   event: CalendarIcon,
   series: RecurringIcon,
 };
-const kindLabels = {
+const kindLabels: Record<AuditKind, string> = {
   person: "Account",
   event: "Event",
   series: "Patrol series",
 };
+const actionGroups = (["person", "event", "series"] as const).map((kind) => ({
+  label: { person: "Accounts", event: "Events", series: "Patrol series" }[kind],
+  actions: auditActions.filter((item) => item.kind === kind),
+}));
+const filterMenus = [
+  {
+    name: "user",
+    label: "People",
+    selected: filters.users,
+    groups: [
+      {
+        label: "",
+        // Selected people lead the list so they stay easy to find.
+        options: users
+          .map((user) => ({
+            value: user.id,
+            label: user.name || "Unnamed account",
+          }))
+          .sort(
+            (a, b) =>
+              Number(filters.users.includes(b.value)) -
+              Number(filters.users.includes(a.value)),
+          ),
+      },
+    ],
+    search: users.length > 8,
+  },
+  {
+    name: "action",
+    label: "Actions",
+    selected: filters.actions,
+    groups: actionGroups.map((group) => ({
+      label: group.label,
+      options: group.actions.map((item) => ({
+        value: auditActionKey(item.kind, item.action),
+        label: item.label,
+      })),
+    })),
+    search: false,
+  },
+];
 ---
 
 <AccountLayout
@@ -92,125 +133,144 @@ const kindLabels = {
   greetingName={accountGreeting}
   email={accountEmail}
 >
-  <div slot="heading" class="audit-header">
-    <h1 class="text-2xl font-bold">Audit log</h1>
-    {!lock && (
+  <h1 slot="heading" class="mb-6 text-2xl md:text-4xl">
+    Audit log
+  </h1>
+  {lock ? (
+    <p class="volunteer-notice">
+      {lock} <a href="/volunteer/account">Your account</a>
+    </p>
+  ) : (
+    <>
       <form
         class="audit-filters"
         method="get"
         action="/audit-log"
         data-audit-filters
       >
-        <label>
-          <span>Filter by user</span>
-          <span class="audit-select">
-            <select name="user">
-              <option value="">All users</option>
-              {users.map((user) => (
-                <option value={user.id} selected={user.id === filters.user}>
-                  {user.name || "Unnamed account"}
-                </option>
-              ))}
-            </select>
-            <ChevronDownIcon class="audit-select-icon" />
-          </span>
-        </label>
-        <label>
-          <span>Filter by action</span>
-          <span class="audit-select">
-            <select name="action">
-              <option value="">All actions</option>
-              {auditActions.map((item) => {
-                const key = auditActionKey(item.kind, item.action);
-                return (
-                  <option value={key} selected={key === filters.action}>
-                    {item.label}
-                  </option>
-                );
-              })}
-            </select>
-            <ChevronDownIcon class="audit-select-icon" />
-          </span>
-        </label>
-        <noscript>
-          <button class="btn btn-outline" type="submit">
-            Apply
-          </button>
-        </noscript>
+        {filterMenus.map((menu) => (
+          <>
+            <button
+              class="volunteer-filter audit-filter-trigger"
+              type="button"
+              id={`audit-filter-${menu.name}-trigger`}
+              popovertarget={`audit-filter-${menu.name}`}
+              aria-expanded="false"
+              data-active={menu.selected.length ? "" : undefined}
+            >
+              {menu.label}
+              {menu.selected.length > 0 && (
+                <span class="volunteer-filter-count">
+                  {menu.selected.length}
+                  <span class="sr-only"> selected</span>
+                </span>
+              )}
+              <ChevronDownIcon class="audit-filter-chevron" />
+            </button>
+            <div
+              class="audit-filter-menu"
+              id={`audit-filter-${menu.name}`}
+              popover="auto"
+              role="group"
+              aria-labelledby={`audit-filter-${menu.name}-trigger`}
+              data-audit-filter-menu
+            >
+              {menu.search && (
+                <label class="volunteer-search-field audit-filter-search">
+                  <span class="sr-only">Search {menu.label.toLowerCase()}</span>
+                  <input
+                    type="search"
+                    placeholder="Search"
+                    autocomplete="off"
+                    data-audit-filter-search
+                  />
+                  <SearchIcon class="volunteer-search-icon" />
+                </label>
+              )}
+              <div class="audit-filter-options">
+                {menu.groups.map((group) => (
+                  <div class="audit-filter-group">
+                    {group.label && (
+                      <p class="audit-filter-group-label">{group.label}</p>
+                    )}
+                    {group.options.map((option) => (
+                      <label class="volunteer-check" data-audit-filter-option>
+                        <input
+                          type="checkbox"
+                          name={menu.name}
+                          value={option.value}
+                          checked={menu.selected.includes(option.value)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                ))}
+                <p class="audit-filter-empty" data-audit-filter-empty hidden>
+                  No matches.
+                </p>
+              </div>
+              <div class="audit-filter-actions">
+                <button
+                  class="btn btn-quiet"
+                  type="button"
+                  data-audit-filter-clear
+                >
+                  Clear
+                </button>
+                <button class="btn btn-primary" type="submit">
+                  Apply
+                </button>
+              </div>
+            </div>
+          </>
+        ))}
+        {filtered && (
+          <a class="audit-filters-reset" href="/audit-log">
+            Clear filters
+          </a>
+        )}
       </form>
-    )}
-  </div>
-  {lock ? (
-    <p class="volunteer-notice">
-      {lock} <a href="/volunteer/account">Your account</a>
-    </p>
-  ) : (
-    <section class="audit-history" aria-label="Audit history">
-      {history.entries.length ? (
-        <ol class="audit-entries">
-          {history.entries.map((entry) => {
-            const info = auditAction(entry.kind, entry.action);
-            const Icon = kindIcons[entry.kind];
-            const self =
-              entry.kind === "person" &&
-              entry.actorId === entry.subjectId &&
-              info.selfSentence;
-            const series =
-              entry.kind === "series" && entry.localTime && entry.firstDate
-                ? `Every ${entry.intervalWeeks === 1 ? "week" : `${entry.intervalWeeks} weeks`} at ${formatTimeInput(entry.localTime)} from ${entry.firstDate}`
-                : "";
-            const expandable =
-              entry.changedFields.length > 0 ||
-              entry.startsAt !== null ||
-              Boolean(series);
-            const detailsId = `audit-details-${entry.kind}-${entry.id}`;
-            const actorUrl = auditProfileUrl(
-              entry.actorId,
-              entry.actorApproved,
-              pageUrl,
-            );
-            return (
-              <li
-                class="audit-entry"
-                data-audit-entry={expandable ? "" : undefined}
-              >
-                <div class="audit-row">
+      <section class="audit-history" aria-label="Audit history">
+        {history.entries.length ? (
+          <ol class="audit-entries">
+            {history.entries.map((entry) => {
+              const info = auditAction(entry.kind, entry.action);
+              const Icon = kindIcons[entry.kind];
+              const self =
+                entry.kind === "person" &&
+                entry.actorId === entry.subjectId &&
+                info.selfSentence;
+              const series =
+                entry.kind === "series" && entry.localTime && entry.firstDate
+                  ? `Every ${entry.intervalWeeks === 1 ? "week" : `${entry.intervalWeeks} weeks`} at ${formatTimeInput(entry.localTime)} from ${entry.firstDate}`
+                  : "";
+              const expandable =
+                entry.changedFields.length > 0 ||
+                entry.startsAt !== null ||
+                Boolean(series);
+              const summary = (
+                <>
                   <span
                     class="audit-kind"
-                    data-tone={info.tone}
                     role="img"
-                    aria-label={`${kindLabels[entry.kind]}: ${info.label}`}
-                    title={`${kindLabels[entry.kind]}: ${info.label}`}
+                    aria-label={kindLabels[entry.kind]}
+                    title={kindLabels[entry.kind]}
                   >
                     <Icon class="audit-kind-icon" />
-                    {info.tone !== "view" && (
-                      <span class="audit-tone">
-                        {info.tone === "create" ? (
-                          <PlusIcon class="audit-tone-icon" />
-                        ) : info.tone === "remove" ? (
-                          <MinusIcon class="audit-tone-icon" />
-                        ) : null}
-                      </span>
-                    )}
                   </span>
-                  <span class="audit-avatar" aria-hidden="true">
-                    {(entry.actorName || "?")
-                      .split(/\s+/)
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((word) => word[0])
-                      .join("")
-                      .toUpperCase()}
-                  </span>
-                  <div class="audit-text">
-                    <p class="audit-sentence">
-                      {entry.actorName ? (
-                        <a class="audit-name" href={actorUrl}>
-                          {entry.actorName}
-                        </a>
-                      ) : (
-                        <strong class="audit-name">Deleted account</strong>
-                      )}{" "}
+                  <span class="audit-text">
+                    <span class="audit-sentence">
+                      <a
+                        class="audit-name"
+                        href={auditProfileUrl(
+                          entry.actorId,
+                          entry.actorApproved,
+                          pageUrl,
+                        )}
+                      >
+                        {entry.actorName}
+                      </a>{" "}
                       {self ? (
                         self
                       ) : (
@@ -238,192 +298,293 @@ const kindLabels = {
                           {info.sentence[1] && <> {info.sentence[1]}</>}
                         </>
                       )}
-                    </p>
+                    </span>
                     <time
                       datetime={new Date(entry.createdAt).toISOString()}
                       title={`${formatEventDate(entry.createdAt)} Vancouver time`}
                     >
                       {formatAuditTime(entry.createdAt, now)}
                     </time>
-                  </div>
-                  {expandable && (
-                    <button
-                      class="audit-toggle"
-                      type="button"
-                      aria-expanded="false"
-                      aria-controls={detailsId}
-                      aria-label="Show details"
-                      data-audit-toggle
-                    >
-                      <ChevronDownIcon class="audit-toggle-icon" />
-                    </button>
+                  </span>
+                </>
+              );
+              return (
+                <li class="audit-entry">
+                  {expandable ? (
+                    <details>
+                      <summary class="audit-row">
+                        {summary}
+                        <ChevronDownIcon class="audit-chevron" />
+                        <span class="sr-only">Details</span>
+                      </summary>
+                      <dl class="audit-details">
+                        {entry.startsAt !== null && (
+                          <div>
+                            <dt>Starts</dt>
+                            <dd>{formatEventDate(entry.startsAt)}</dd>
+                          </div>
+                        )}
+                        {series && (
+                          <div>
+                            <dt>Schedule</dt>
+                            <dd>{series}</dd>
+                          </div>
+                        )}
+                        {entry.changedFields.length > 0 && (
+                          <div>
+                            <dt>Changed</dt>
+                            <dd>{entry.changedFields.join(", ")}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </details>
+                  ) : (
+                    <div class="audit-row">{summary}</div>
                   )}
-                </div>
-                {expandable && (
-                  <div class="audit-details" id={detailsId} hidden>
-                    {entry.startsAt !== null && (
-                      <p>Starts {formatEventDate(entry.startsAt)}</p>
-                    )}
-                    {series && <p>{series}</p>}
-                    {entry.changedFields.length > 0 && (
-                      <ul class="audit-fields" aria-label="Fields">
-                        {entry.changedFields.map((field) => (
-                          <li>{field}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      ) : (
-        <p class="volunteer-notice">
-          {before
-            ? "No older audit entries."
-            : filtered
-              ? "No audit entries match these filters."
-              : "No audit activity yet."}
-        </p>
-      )}
-      {(before || history.next) && (
-        <nav class="audit-pagination" aria-label="Audit history pages">
-          {before && (
-            <a class="btn btn-outline" href={auditLogUrl(filters)}>
-              Newest entries
-            </a>
-          )}
-          {history.next && (
-            <a
-              class="btn btn-outline"
-              href={auditLogUrl(filters, history.next)}
-            >
-              Older entries <ArrowRightIcon class="btn-icon" />
-            </a>
-          )}
-        </nav>
-      )}
-    </section>
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          <p class="volunteer-notice">
+            {before
+              ? "No older audit entries."
+              : filtered
+                ? "No audit entries match these filters."
+                : "No audit activity yet."}
+          </p>
+        )}
+        {(before || history.next) && (
+          <nav class="audit-pagination" aria-label="Audit history pages">
+            {before && (
+              <a class="btn btn-outline" href={auditLogUrl(filters)}>
+                Newest entries
+              </a>
+            )}
+            {history.next && (
+              <a
+                class="btn btn-outline"
+                href={auditLogUrl(filters, history.next)}
+              >
+                Older entries <ArrowRightIcon class="btn-icon" />
+              </a>
+            )}
+          </nav>
+        )}
+      </section>
+    </>
   )}
 </AccountLayout>
 
 <script>
-  document
-    .querySelector<HTMLFormElement>("[data-audit-filters]")
-    ?.addEventListener("change", (event) => {
-      const form = event.currentTarget as HTMLFormElement;
-      // Omit unset filters so the address only names the active ones.
-      const params = new URLSearchParams();
-      for (const [name, value] of new FormData(form))
-        if (value) params.set(name, String(value));
-      const query = params.toString();
-      location.assign(`${form.action}${query ? `?${query}` : ""}`);
+  const form = document.querySelector<HTMLFormElement>("[data-audit-filters]");
+  const query = (target: HTMLFormElement) => {
+    const params = new URLSearchParams();
+    for (const [name, value] of new FormData(target))
+      params.append(name, String(value));
+    return params.toString();
+  };
+
+  if (form) {
+    const applied = query(form);
+    const apply = () => {
+      const next = query(form);
+      if (next !== applied)
+        // Filter inputs named "action" shadow the form's action property.
+        location.assign(`/audit-log${next ? `?${next}` : ""}`);
+    };
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      apply();
     });
 
-  function toggle(button: HTMLButtonElement) {
-    const expanded = button.getAttribute("aria-expanded") !== "true";
-    button.setAttribute("aria-expanded", String(expanded));
-    button.setAttribute(
-      "aria-label",
-      expanded ? "Hide details" : "Show details",
-    );
-    const details = document.getElementById(
-      button.getAttribute("aria-controls") ?? "",
-    );
-    if (details) details.hidden = !expanded;
-  }
+    const position = (menu: HTMLElement, trigger: HTMLElement) => {
+      const bounds = trigger.getBoundingClientRect();
+      const gap = 8;
+      menu.style.left = `${Math.max(gap, Math.min(bounds.left, innerWidth - menu.offsetWidth - gap))}px`;
+      menu.style.top = `${bounds.bottom + gap}px`;
+      menu.style.maxHeight = `${Math.max(12 * 16, innerHeight - bounds.bottom - gap * 2)}px`;
+    };
+    const triggerFor = (menu: HTMLElement) =>
+      document.getElementById(menu.getAttribute("aria-labelledby") ?? "");
 
-  document
-    .querySelector(".audit-entries")
-    ?.addEventListener("click", (event) => {
-      const target = event.target as Element;
-      if (target.closest("a")) return;
-      const button = target.closest<HTMLButtonElement>("[data-audit-toggle]");
-      if (button) return toggle(button);
-      // The whole summary row opens its details, as the chevron does.
-      const row = target.closest(".audit-row");
-      const rowButton = row?.querySelector<HTMLButtonElement>(
-        "[data-audit-toggle]",
+    for (const menu of form.querySelectorAll<HTMLElement>(
+      "[data-audit-filter-menu]",
+    )) {
+      menu.addEventListener("toggle", (event) => {
+        const open = (event as ToggleEvent).newState === "open";
+        const trigger = triggerFor(menu);
+        trigger?.setAttribute("aria-expanded", String(open));
+        if (open && trigger) {
+          position(menu, trigger);
+          // Skip focusing search on touch screens, where it opens the keyboard.
+          if (matchMedia("(pointer: fine)").matches)
+            menu
+              .querySelector<HTMLInputElement>("[data-audit-filter-search]")
+              ?.focus();
+        }
+        // Closing a menu applies its choices, as the Apply button does.
+        if (!open) apply();
+      });
+    }
+
+    form.addEventListener("click", (event) => {
+      const clear = (event.target as Element).closest(
+        "[data-audit-filter-clear]",
       );
-      if (rowButton && !getSelection()?.toString()) toggle(rowButton);
+      if (!clear) return;
+      for (const input of clear
+        .closest("[data-audit-filter-menu]")!
+        .querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
+        input.checked = false;
     });
+
+    form.addEventListener("input", (event) => {
+      const search = event.target as HTMLInputElement;
+      if (!search.matches("[data-audit-filter-search]")) return;
+      const menu = search.closest("[data-audit-filter-menu]")!;
+      const term = search.value.trim().toLocaleLowerCase();
+      let shown = 0;
+      for (const option of menu.querySelectorAll<HTMLElement>(
+        "[data-audit-filter-option]",
+      )) {
+        option.hidden = !option.textContent!.toLocaleLowerCase().includes(term);
+        if (!option.hidden) shown++;
+      }
+      menu.querySelector<HTMLElement>("[data-audit-filter-empty]")!.hidden =
+        shown > 0;
+    });
+
+    const reposition = () => {
+      for (const menu of form.querySelectorAll<HTMLElement>(
+        "[data-audit-filter-menu]:popover-open",
+      )) {
+        const trigger = triggerFor(menu);
+        if (trigger) position(menu, trigger);
+      }
+    };
+    addEventListener("resize", reposition);
+    document.addEventListener("scroll", reposition, true);
+  }
 </script>
 
 <style>
-  .audit-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem 2rem;
-    max-width: 52rem;
-    margin-bottom: 1.25rem;
-    padding-bottom: 1.25rem;
-    border-bottom: 1px solid #27272a;
-  }
   .audit-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
   }
-  .audit-filters label {
-    display: grid;
-    gap: 0.375rem;
-    width: 15rem;
-    max-width: 100%;
-    font-size: 0.875rem;
+  .audit-filter-trigger[data-active] {
+    border-color: #818cf8;
+    background: var(--color-blue-deep);
+    color: #e0e7ff;
   }
-  .audit-select {
-    position: relative;
-    display: block;
-  }
-  .audit-filters select {
-    appearance: none;
-    min-height: 2.5rem;
-    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
-    border-color: #3f3f46;
-    background: #18181b;
-    font-size: 0.9375rem;
-    cursor: pointer;
-  }
-  .audit-select :global(.audit-select-icon) {
-    position: absolute;
-    top: 50%;
-    right: 0.75rem;
+  .audit-filter-trigger :global(.audit-filter-chevron) {
     width: 1.25em;
     height: 1.25em;
-    translate: 0 -50%;
-    pointer-events: none;
+    transition: rotate 150ms ease;
+  }
+  .audit-filter-trigger[aria-expanded="true"] :global(.audit-filter-chevron) {
+    rotate: 180deg;
+  }
+  .audit-filters-reset {
+    margin-left: 0.25rem;
+    color: #d4d4d8;
+    text-decoration: underline;
+    text-underline-offset: 0.25rem;
+  }
+  .audit-filter-menu {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    width: min(22rem, calc(100vw - 1rem));
+    padding: 0;
+    border: var(--volunteer-border);
+    border-radius: 0.5rem;
+    background: #171a20;
+    color: #f4f4f5;
+    box-shadow: 0 0.5rem 1.5rem #0008;
+  }
+  .audit-filter-menu:popover-open {
+    display: flex;
+    flex-direction: column;
+  }
+  .audit-filter-search {
+    flex: none;
+    margin: 0.75rem 0.75rem 0;
+  }
+  .audit-filter-search input {
+    padding-left: 2.75rem;
+  }
+  .audit-filter-options {
+    display: grid;
+    gap: 1rem;
+    min-height: 0;
+    padding: 0.75rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .audit-filter-group {
+    display: grid;
+    gap: 0.25rem;
+  }
+  .audit-filter-group:not(:has([data-audit-filter-option]:not([hidden]))) {
+    display: none;
+  }
+  .audit-filter-group-label {
+    color: #a1a1aa;
+    font-size: 0.875rem;
+  }
+  .audit-filter-group .volunteer-check {
+    padding: 0.375rem 0;
+    cursor: pointer;
+  }
+  .audit-filter-empty {
+    color: #a1a1aa;
+  }
+  .audit-filter-actions {
+    display: flex;
+    flex: none;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-top: var(--volunteer-border);
   }
   .audit-entries {
-    display: grid;
-    gap: 0.5rem;
-    max-width: 52rem;
     padding: 0;
-    list-style: none;
-  }
-  .audit-entry {
-    border: 1px solid #27272a;
+    border: var(--volunteer-border);
     border-radius: 0.5rem;
-    background: #18181b;
+    background: #0c0d10;
+    list-style: none;
+    overflow: hidden;
     overflow-wrap: anywhere;
+  }
+  .audit-entry + .audit-entry {
+    border-top: var(--volunteer-border);
   }
   .audit-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.625rem 0.75rem;
+    gap: 0.875rem;
+    padding: 0.875rem 1rem;
   }
-  [data-audit-entry] .audit-row {
+  summary.audit-row {
+    list-style: none;
     cursor: pointer;
   }
-  [data-audit-entry]:hover {
-    --audit-entry-bg: #1f1f23;
-    background: var(--audit-entry-bg);
+  summary.audit-row::-webkit-details-marker {
+    display: none;
+  }
+  summary.audit-row:hover {
+    background: #171a20;
+  }
+  summary.audit-row:focus-visible {
+    outline: 3px solid #4169e1;
+    outline-offset: -3px;
   }
   .audit-kind {
-    position: relative;
     display: inline-flex;
     flex: none;
     color: #a1a1aa;
@@ -432,110 +593,61 @@ const kindLabels = {
     width: 1.25em;
     height: 1.25em;
   }
-  .audit-tone {
-    position: absolute;
-    right: -0.25em;
-    bottom: -0.25em;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 0.75em;
-    height: 0.75em;
-    border-radius: 999px;
-    background: #f59e0b;
-    box-shadow: 0 0 0 2px var(--audit-entry-bg, #18181b);
-    color: #18181b;
-  }
-  [data-tone="create"] .audit-tone {
-    background: #22c55e;
-  }
-  [data-tone="remove"] .audit-tone {
-    background: #ef4444;
-  }
-  .audit-tone :global(.audit-tone-icon) {
-    width: 0.75em;
-    height: 0.75em;
-    stroke-width: 4;
-  }
-  .audit-avatar {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 999px;
-    background: var(--color-blue-deep);
-    color: #c7d2fe;
-    font-size: 0.875rem;
-    font-weight: 700;
-  }
   .audit-text {
+    display: flex;
     flex: 1;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.125rem 1rem;
     min-width: 0;
   }
   .audit-sentence {
     color: #d4d4d8;
-    line-height: 1.35;
   }
   .audit-name {
     color: #fff;
     font-weight: 600;
   }
-  .audit-sentence a.audit-name {
-    text-decoration: none;
-  }
-  .audit-sentence a.audit-name:hover,
-  .audit-sentence a.audit-name:focus-visible {
+  a.audit-name {
     text-decoration: underline;
+    text-decoration-color: #71717a;
+    text-underline-offset: 0.25rem;
+  }
+  a.audit-name:hover {
+    text-decoration-color: currentColor;
   }
   .audit-text time {
-    display: block;
-    margin-top: 0.125rem;
-    color: #a1a1aa;
-    font-size: 0.8125rem;
-  }
-  .audit-toggle {
-    display: inline-flex;
     flex: none;
-    padding: 0.375rem;
-    border-radius: 0.375rem;
-    color: #d4d4d8;
-  }
-  .audit-toggle:hover {
-    background: #27272a;
-  }
-  .audit-toggle :global(.audit-toggle-icon) {
-    width: 1.25em;
-    height: 1.25em;
-    rotate: -90deg;
-    transition: rotate 150ms ease;
-  }
-  .audit-toggle[aria-expanded="true"] :global(.audit-toggle-icon) {
-    rotate: 0deg;
-  }
-  .audit-details {
-    display: grid;
-    gap: 0.375rem;
-    margin: 0 0.75rem 0.75rem;
-    padding: 0.625rem 0.75rem;
-    border-radius: 0.375rem;
-    background: #101013;
     color: #a1a1aa;
     font-size: 0.875rem;
   }
-  .audit-fields {
+  .audit-row :global(.audit-chevron) {
+    flex: none;
+    width: 1.25em;
+    height: 1.25em;
+    color: #a1a1aa;
+    transition: rotate 150ms ease;
+  }
+  details[open] > .audit-row :global(.audit-chevron) {
+    rotate: 180deg;
+  }
+  .audit-details {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0 1rem 1rem calc(1rem + 1.25em + 0.875rem);
+    font-size: 0.9375rem;
+  }
+  .audit-details div {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem;
-    padding: 0;
-    list-style: none;
+    gap: 0 0.5rem;
   }
-  .audit-fields li {
-    padding: 0.125rem 0.5rem;
-    border: 1px solid #3f3f46;
-    border-radius: 999px;
-    color: #d4d4d8;
+  .audit-details dt {
+    color: #a1a1aa;
+  }
+  .audit-details dd {
+    color: #e4e4e7;
   }
   .audit-pagination {
     display: flex;
@@ -544,18 +656,13 @@ const kindLabels = {
     margin-top: 1.5rem;
   }
   @media (max-width: 640px) {
-    .audit-filters,
-    .audit-filters label {
-      width: 100%;
-    }
-    .audit-avatar {
-      width: 2rem;
-      height: 2rem;
-      font-size: 0.75rem;
+    .audit-text {
+      display: grid;
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .audit-toggle :global(.audit-toggle-icon) {
+    .audit-filter-trigger :global(.audit-filter-chevron),
+    .audit-row :global(.audit-chevron) {
       transition: none;
     }
   }

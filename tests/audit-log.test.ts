@@ -26,13 +26,20 @@ test("audit times read relative to the Vancouver day", () => {
   );
 });
 
-test("audit filters accept only known actions", () => {
+test("audit filters accept several users and only known actions", () => {
   expect(
-    auditFilters(new URLSearchParams("user=u1&action=series%3Astopped")),
-  ).toEqual({ user: "u1", action: "series:stopped" });
+    auditFilters(
+      new URLSearchParams(
+        "user=u1&user=u2&user=u1&action=series%3Astopped&action=event%3Acreated",
+      ),
+    ),
+  ).toEqual({
+    users: ["u1", "u2"],
+    actions: ["series:stopped", "event:created"],
+  });
   expect(
-    auditFilters(new URLSearchParams("action=person%3Acreated")).action,
-  ).toBeUndefined();
+    auditFilters(new URLSearchParams("action=person%3Acreated")).actions,
+  ).toEqual([]);
   expect(auditAction("event", "created").sentence).toEqual(["created", ""]);
   expect(auditAction("person", "something_new").label).toBe("Something new");
 });

@@ -44,10 +44,10 @@ export async function listAuditLog(
   db: Env["DB"],
   actor: Actor,
   before?: AuditCursor,
-  filters: AuditFilters = {},
+  filters: AuditFilters = { users: [], actions: [] },
 ): Promise<{ entries: AuditEntry[]; next?: AuditCursor }> {
-  const [filterKind, filterAction] = filters.action?.split(":") ?? [];
   requireOrganizer(actor);
+  const placeholders = (values: string[]) => values.map(() => "?").join(", ");
   const { results } = await db
     .prepare(
       `
@@ -82,8 +82,8 @@ export async function listAuditLog(
     LEFT JOIN profile ap ON ap.user_id = actor.id
     LEFT JOIN volunteer_status av ON av.user_id = actor.id
     WHERE ${writePermission(true)}
-      ${filters.user ? "AND h.actorId = ?" : ""}
-      ${filterKind ? "AND h.kind = ? AND h.action = ?" : ""}
+      ${filters.users.length ? `AND h.actorId IN (${placeholders(filters.users)})` : ""}
+      ${filters.actions.length ? `AND h.kind || ':' || h.action IN (${placeholders(filters.actions)})` : ""}
       ${before ? "AND (h.createdAt, h.kind, h.id) < (?, ?, ?)" : ""}
     ORDER BY h.createdAt DESC, h.kind DESC, h.id DESC
     LIMIT 51
@@ -91,8 +91,8 @@ export async function listAuditLog(
     )
     .bind(
       ...permissionValues(actor),
-      ...(filters.user ? [filters.user] : []),
-      ...(filterKind ? [filterKind, filterAction] : []),
+      ...filters.users,
+      ...filters.actions,
       ...(before ? [before.createdAt, before.kind, before.id] : []),
     )
     .all<
