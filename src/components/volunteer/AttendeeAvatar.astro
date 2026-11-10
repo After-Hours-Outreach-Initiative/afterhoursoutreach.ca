@@ -6,6 +6,8 @@ interface Props {
   newVolunteerStyle?: "dot" | "outline" | "gradient" | "gradient-horizontal";
   medicMark?: boolean;
   gradientId?: string;
+  /** Unapproved applicants show a dashed outline instead of their category. */
+  applicant?: boolean;
 }
 const {
   category,
@@ -13,11 +15,14 @@ const {
   newVolunteerStyle = "gradient-horizontal",
   medicMark = false,
   gradientId: providedGradientId,
+  applicant = false,
 } = Astro.props;
 const hasMedicMark =
-  category === "medic" || (category === "new-volunteer" && medicMark);
-const label = `${category === "medic" ? "Approved medic" : category === "new-volunteer" ? (hasMedicMark ? "New medic" : "New volunteer") : "Outreach Volunteer"}: registered`;
+  !applicant &&
+  (category === "medic" || (category === "new-volunteer" && medicMark));
+const label = `${applicant ? "Applicant" : category === "medic" ? "Approved medic" : category === "new-volunteer" ? (hasMedicMark ? "New medic" : "New volunteer") : "Outreach Volunteer"}: registered`;
 const gradientId =
+  !applicant &&
   category === "new-volunteer" &&
   (newVolunteerStyle === "gradient" ||
     newVolunteerStyle === "gradient-horizontal")
@@ -35,39 +40,55 @@ const horizontalGradient = newVolunteerStyle === "gradient-horizontal";
   title={decorative ? undefined : label}
 >
   <svg viewBox="5 2.5 14 19.5" aria-hidden="true" focusable="false">
-    {
-      gradientId && (
-        <defs>
-          <linearGradient
-            id={gradientId}
-            x1={horizontalGradient ? "5" : "12"}
-            y1={horizontalGradient ? "12" : "2.5"}
-            x2={horizontalGradient ? "19" : "12"}
-            y2={horizontalGradient ? "12" : "22"}
-            gradientUnits="userSpaceOnUse"
-            data-avatar-decoration={`new-${newVolunteerStyle}`}
-          >
-            <stop offset="0" stop-color="currentColor" />
-            <stop offset="1" stop-color="#22c55e" />
-          </linearGradient>
-        </defs>
-      )
-    }
-    <circle cx="12" cy="6" r="3.5" fill={silhouetteFill} stroke="none"></circle>
-    <path d="M5 22v-5a7 7 0 0 1 14 0v5Z" fill={silhouetteFill} stroke="none"
-    ></path>
-    {
-      hasMedicMark && (
+    {gradientId && (
+      <defs>
+        <linearGradient
+          id={gradientId}
+          x1={horizontalGradient ? "5" : "12"}
+          y1={horizontalGradient ? "12" : "2.5"}
+          x2={horizontalGradient ? "19" : "12"}
+          y2={horizontalGradient ? "12" : "22"}
+          gradientUnits="userSpaceOnUse"
+          data-avatar-decoration={`new-${newVolunteerStyle}`}
+        >
+          <stop offset="0" stop-color="currentColor" />
+          <stop offset="1" stop-color="#22c55e" />
+        </linearGradient>
+      </defs>
+    )}
+    {applicant ? (
+      <g
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1"
+        stroke-dasharray="1.6 1.1"
+        data-avatar-decoration="applicant"
+      >
+        {/* Inset the strokes so the outline stays inside the original viewBox. */}
+        <circle cx="12" cy="6" r="3" />
+        <path d="M5.5 21.5V17a6.5 6.5 0 0 1 13 0v4.5Z" />
+      </g>
+    ) : (
+      <>
+        <circle cx="12" cy="6" r="3.5" fill={silhouetteFill} stroke="none" />
         <path
-          d="M10.75 12.25h2.5v2.5h2.5v2.5h-2.5v2.5h-2.5v-2.5h-2.5v-2.5h2.5Z"
-          fill="#fff"
+          d="M5 22v-5a7 7 0 0 1 14 0v5Z"
+          fill={silhouetteFill}
           stroke="none"
-          data-avatar-decoration="medic-cross"
         />
-      )
-    }
-    {
-      category === "new-volunteer" && newVolunteerStyle === "dot" && (
+      </>
+    )}
+    {hasMedicMark && (
+      <path
+        d="M10.75 12.25h2.5v2.5h2.5v2.5h-2.5v2.5h-2.5v-2.5h-2.5v-2.5h2.5Z"
+        fill="#fff"
+        stroke="none"
+        data-avatar-decoration="medic-cross"
+      />
+    )}
+    {!applicant &&
+      category === "new-volunteer" &&
+      newVolunteerStyle === "dot" && (
         <circle
           cx="15.25"
           cy="13.5"
@@ -76,10 +97,10 @@ const horizontalGradient = newVolunteerStyle === "gradient-horizontal";
           stroke="none"
           data-avatar-decoration="new-dot"
         />
-      )
-    }
-    {
-      category === "new-volunteer" && newVolunteerStyle === "outline" && (
+      )}
+    {!applicant &&
+      category === "new-volunteer" &&
+      newVolunteerStyle === "outline" && (
         <g
           fill="none"
           stroke="#22c55e"
@@ -90,8 +111,7 @@ const horizontalGradient = newVolunteerStyle === "gradient-horizontal";
           <circle cx="12" cy="6" r="3" />
           <path d="M5.5 21.5V17a6.5 6.5 0 0 1 13 0v4.5Z" />
         </g>
-      )
-    }
+      )}
   </svg>
 </span>
 

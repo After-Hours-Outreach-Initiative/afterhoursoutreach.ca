@@ -20,6 +20,7 @@ avatar for their volunteer category.
 
 | Category           | Avatar and badges                                                                         | Meaning                                           |
 | ------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Applicant          | <RoleAppearance applicant />                                                              | Application not yet approved.                     |
 | New volunteer      | <RoleAppearance category="new-volunteer" badges={["new-volunteer"]} />                    | Awaiting patrol approval.                         |
 | Outreach volunteer | <RoleAppearance />                                                                        | Patrol-approved volunteer outside the medic team. |
 | Medic              | <RoleAppearance category="medic" badges={["medic"]} />                                    | Patrol-approved volunteer on the medic team.      |
@@ -27,14 +28,10 @@ avatar for their volunteer category.
 
 ## Role changes
 
-New accounts start as Volunteers with <RoleAppearance category="new-volunteer" badges={["new-volunteer"]} />.
+New accounts start as applicants with <RoleAppearance applicant />.
 
 <RoleTransition
-  from={{
-    label: "New volunteer",
-    category: "new-volunteer",
-    badges: ["new-volunteer"],
-  }}
+  from={{ label: "Applicant", applicant: true }}
   to={{
     label: "New volunteer",
     category: "new-volunteer",

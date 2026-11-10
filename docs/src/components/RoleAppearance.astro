@@ -7,17 +7,24 @@ interface Props {
   category?: ComponentProps<typeof AttendeeAvatar>["category"];
   badges?: ComponentProps<typeof VolunteerRoleBadge>["role"][];
   medicMark?: boolean;
+  applicant?: boolean;
 }
 
 const {
   category = "outreach-volunteer",
   badges = [],
   medicMark = false,
+  applicant = false,
 } = Astro.props;
 ---
 
 <span class="role-appearance not-content">
-  <AttendeeAvatar category={category} medicMark={medicMark} decorative />
+  <AttendeeAvatar
+    category={category}
+    medicMark={medicMark}
+    applicant={applicant}
+    decorative
+  />
   {badges.map((role) => (
     <VolunteerRoleBadge role={role} />
   ))}

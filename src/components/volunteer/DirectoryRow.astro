@@ -45,6 +45,7 @@ const data: DirectoryPerson = {
       <AttendeeAvatar
         category={category}
         medicMark={Boolean(medicMark)}
+        applicant={applications && status !== "approved"}
         decorative
       />
       <div class="volunteer-table-name">
@@ -53,37 +54,33 @@ const data: DirectoryPerson = {
           href={href}
           data-volunteer-profile-link
         />
-        {
-          !applications && role === "organizer" && (
-            <VolunteerRoleBadge role="organizer" />
-          )
-        }
+        {!applications && role === "organizer" && (
+          <VolunteerRoleBadge role="organizer" />
+        )}
         {!applications && category === "new-volunteer" && <NewVolunteerBadge />}
         {Boolean(medicMark) && <VolunteerRoleBadge role="medic" />}
       </div>
     </div>
   </th>
-  {
-    applications && (
-      <>
-        <td>
-          <span
-            class="application-table-progress application-status-text"
-            data-state={applicationStatuses[status].state}
-          >
-            {applicationStatuses[status].label}
-          </span>
-        </td>
-        <td>
-          {applicationCompletedAt !== null && (
-            <time datetime={new Date(applicationCompletedAt).toISOString()}>
-              {formatApplicationCompletedTime(
-                new Date(applicationCompletedAt).toISOString(),
-              )}
-            </time>
-          )}
-        </td>
-      </>
-    )
-  }
+  {applications && (
+    <>
+      <td>
+        <span
+          class="application-table-progress application-status-text"
+          data-state={applicationStatuses[status].state}
+        >
+          {applicationStatuses[status].label}
+        </span>
+      </td>
+      <td>
+        {applicationCompletedAt !== null && (
+          <time datetime={new Date(applicationCompletedAt).toISOString()}>
+            {formatApplicationCompletedTime(
+              new Date(applicationCompletedAt).toISOString(),
+            )}
+          </time>
+        )}
+      </td>
+    </>
+  )}
 </tr>
