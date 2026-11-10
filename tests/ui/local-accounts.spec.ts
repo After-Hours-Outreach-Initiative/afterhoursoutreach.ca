@@ -338,8 +338,6 @@ test("DEV panel seeds presets in place without changing the current account or d
   await expect(
     profiles.locator('[data-switch-user="local-account-v2-user-organizer"]'),
   ).toContainText("Patrol approved");
-  const accountPage = await (await request.get("/volunteer/account")).text();
-  expect(accountPage.match(/data-session-row/g)).toHaveLength(1);
   // A fresh session must resolve full application completion and real medic
   // eligibility through the normal portal, not just the development listing.
   for (const [key, patrolAccess] of [

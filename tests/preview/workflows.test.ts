@@ -192,8 +192,11 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Save without email", exact: true })
+      .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
+    const feedback = page.locator("[data-action-email-feedback]");
+    await expect(feedback).toBeVisible();
+    await feedback.locator(".dialog-close").click();
     await expect(
       page.getByRole("button", {
         name: "Revoke application approval",
@@ -209,8 +212,10 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
     );
     assert.equal(new URL(page.url()).searchParams.get("approval"), "awaiting");
     assert.equal(
-      await DB.prepare("SELECT count(*) n FROM event_notification").first("n"),
-      0,
+      await DB.prepare(
+        "SELECT subject FROM event_notification WHERE subject != 'Your volunteer application is approved'",
+      ).first("subject"),
+      null,
     );
 
     // Conflict API against this same built Preview: independent edits merge;

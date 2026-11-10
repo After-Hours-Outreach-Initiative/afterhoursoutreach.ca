@@ -196,7 +196,9 @@ export function volunteerAccessEmail(
   { active, applicationApproved, patrolApproved }: VolunteerAccess,
   applicationApprovalChanged: boolean,
   approvingOrganizerName?: string,
+  revocationReason?: string,
 ): EmailContent {
+  const reason = revocationReason ? `Reason: ${revocationReason}\n\n` : "";
   const nextStep = !active
     ? `Your volunteer account is currently inactive. Please contact an organizer at ${contactEmail} to restore access.`
     : !applicationApproved
@@ -207,12 +209,12 @@ export function volunteerAccessEmail(
   if (!applicationApprovalChanged)
     return emailContent(
       "Your volunteer access changed",
-      `Account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}.\n\n${nextStep}`,
+      `Account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}.\n\n${reason}${nextStep}`,
     );
   if (!applicationApproved)
     return emailContent(
       "Your volunteer application approval was revoked",
-      `Your application is awaiting organizer approval again.\n\n${nextStep}\n\nCheck your account for registration changes.`,
+      `Your application is awaiting organizer approval again.\n\n${reason}${nextStep}\n\nCheck your account for registration changes.`,
     );
   return emailContent(
     "Your volunteer application is approved",

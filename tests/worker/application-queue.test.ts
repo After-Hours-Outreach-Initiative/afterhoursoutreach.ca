@@ -256,7 +256,7 @@ test("organizers review pending and approved applications with persistent list c
       );
       assert.doesNotMatch(
         directoryHtml,
-        /applicant-\d+|data-volunteer-filters|draft-only|account-only/,
+        /applicant-\d+|data-filter-menu="approval"|draft-only|account-only/,
       );
     }
     const auditCount = () =>
@@ -338,7 +338,8 @@ test("organizers review pending and approved applications with persistent list c
     );
     const names = page.locator("[data-volunteer-profile-link]");
     const nameSort = page.locator('[data-volunteer-sort="name"]');
-    await expect(names).toHaveText(["approved", "organizer"]);
+    // The default role order puts organizers first.
+    await expect(names).toHaveText(["organizer", "approved"]);
     await expect(
       page.locator('.volunteer-table-name > [data-volunteer-role="organizer"]'),
     ).toHaveText("Organizer");
@@ -379,8 +380,11 @@ test("organizers review pending and approved applications with persistent list c
         '[data-volunteer-results] tbody th .volunteer-table-name > [data-volunteer-role="new-volunteer"]',
       ),
     ).toHaveText("New");
-    await expect(page.locator('[name="sort"]')).toHaveValue("name");
-    await expect(page.locator('[name="direction"]')).toHaveValue("desc");
+    // The sort menu reflects the column sort.
+    await expect(page.locator('[name="sort"]:checked')).toHaveValue("name");
+    await expect(page.locator('[name="direction"]:checked')).toHaveValue(
+      "desc",
+    );
     const sortedReturn = "/volunteers?q=approved&sort=name&direction=desc";
     await expect(names).toHaveAttribute(
       "href",
@@ -430,13 +434,22 @@ test("organizers review pending and approved applications with persistent list c
     await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
       53,
     );
-    await page.getByRole("button", { name: /^Ready for review/ }).click();
+    // Filtering keeps the current sort.
+    await page.getByRole("button", { name: /^Status/ }).click();
+    await page
+      .locator('[data-filter-menu="approval"] input[value="awaiting"]')
+      .check();
+    await page
+      .locator('[data-filter-menu="approval"]')
+      .getByRole("button", { name: "Apply" })
+      .click();
+    await expect(page).toHaveURL(/approval=awaiting/);
     await expect(progressSort.locator("..")).toHaveAttribute(
       "aria-sort",
       "descending",
     );
     await expect(
-      page.locator('[data-volunteer-search-form] [name="sort"]'),
+      page.locator('[data-volunteer-search-form] [name="sort"]:checked'),
     ).toHaveValue("progress");
     await nameSort.click();
     await expect(nameSort.locator("..")).toHaveAttribute(
@@ -455,10 +468,29 @@ test("organizers review pending and approved applications with persistent list c
     );
     await page.goto(`${origin}${listPath}`);
     const count = page.locator("[data-awaiting-approval-count]");
-    const allCount = page.locator("[data-all-applicants-count]");
     const results = page.locator("[data-volunteer-results]");
+    // Status filters are a menu; its counts add up to every matching applicant.
+    const statusMenu = page.locator('[data-filter-menu="approval"]');
+    const statusTrigger = page.getByRole("button", { name: /^Status/ });
+    const readyInput = statusMenu.locator('input[value="awaiting"]');
+    const expectAllCount = (total: number) =>
+      expect
+        .poll(async () =>
+          (
+            await statusMenu.locator("[data-filter-count]").allTextContents()
+          ).reduce((sum, value) => sum + Number(value.trim()), 0),
+        )
+        .toBe(total);
+    const chooseStatuses = async (values: string[]) => {
+      await statusTrigger.click();
+      await statusMenu.getByRole("button", { name: "Clear" }).click();
+      for (const value of values)
+        await statusMenu.locator(`input[value="${value}"]`).check();
+      await statusMenu.getByRole("button", { name: "Apply" }).click();
+      await expect(statusMenu).toBeHidden();
+    };
     await expect(count).toHaveText("53");
-    await expect(allCount).toHaveText("53");
+    await expectAllCount(53);
     await expect(results.locator("tbody tr")).toHaveCount(53);
     await expect(results.getByRole("columnheader")).toHaveText([
       "Name",
@@ -492,14 +524,7 @@ test("organizers review pending and approved applications with persistent list c
       "color",
       "rgb(74, 222, 128)",
     );
-    const filters = page.getByRole("group", { name: "Application status" });
-    const allApplicants = filters.getByRole("button", {
-      name: /^All \d+$/,
-    });
-    const awaitingApproval = filters.getByRole("button", {
-      name: /^Ready for review/,
-    });
-    await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
+    await expect(readyInput).toBeChecked();
     await expect(
       page.getByRole("link", { name: /^(Next|Previous) applications$/ }),
     ).toHaveCount(0);
@@ -507,20 +532,20 @@ test("organizers review pending and approved applications with persistent list c
     page.on("request", (request) => {
       if (request.resourceType() === "document") documents.push(request.url());
     });
-    await allApplicants.click();
-    await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
-    await expect(allApplicants).toBeFocused();
-    await expect(results.locator("tbody tr")).toHaveCount(53);
+    await chooseStatuses([]);
     await expect(page).toHaveURL(`${origin}/applications?q=applicant`);
-    await awaitingApproval.click();
-    await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
+    await expect(readyInput).not.toBeChecked();
+    await expect(statusTrigger).toBeFocused();
+    await expect(results.locator("tbody tr")).toHaveCount(53);
+    await chooseStatuses(["awaiting"]);
     await expect(page).toHaveURL(
       `${origin}/applications?q=applicant&approval=awaiting`,
     );
+    await expect(readyInput).toBeChecked();
     await page.goBack();
-    await expect(allApplicants).toHaveAttribute("aria-pressed", "true");
+    await expect(readyInput).not.toBeChecked();
     await page.goBack();
-    await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
+    await expect(readyInput).toBeChecked();
     await expect(results.locator("tbody tr")).toHaveCount(53);
     assert.equal(page.url(), `${origin}${listPath}`);
     assert.deepEqual(documents, []);
@@ -590,9 +615,9 @@ test("organizers review pending and approved applications with persistent list c
     await expect(page.locator("[data-volunteer-profile-dialog]")).toHaveCount(
       0,
     );
-    await expect(page.locator("[data-volunteer-profile-overview]")).toHaveText(
-      "Alex Jordan Marie de la Cruz",
-    );
+    await expect(
+      page.locator("[data-volunteer-profile-overview] h2"),
+    ).toHaveText("Alex Jordan Marie de la Cruz");
     const profile = page.getByRole("region", {
       name: "Profile",
       exact: true,
@@ -687,7 +712,10 @@ test("organizers review pending and approved applications with persistent list c
     const inProgressHtml = await inProgressList.text();
     assert.match(inProgressHtml, /data-state="in-progress">In Progress</);
     assert.match(inProgressHtml, /data-awaiting-approval-count[^>]*>0</);
-    assert.match(inProgressHtml, /data-header-application-count[^>]*>52</);
+    assert.match(
+      inProgressHtml,
+      /data-header-application-count[^>]*>(?:<[^>]*>)*52</,
+    );
     const reviewQueue = await get(
       "/applications?q=applicant-50&approval=awaiting",
     );
@@ -721,18 +749,23 @@ test("organizers review pending and approved applications with persistent list c
     await page.goto(`${origin}${applicationHref}`);
     await page.locator('[data-application-mini-step="form"] summary').click();
     const documentsBeforeApproval = documents.length;
+    // Access decisions always email; tests have no email transport.
+    const closeEmailFeedback = async () => {
+      const feedback = page.locator("[data-action-email-feedback][open]");
+      await expect(feedback).toBeVisible();
+      await feedback.locator(".dialog-close").click();
+      await expect(feedback).toHaveCount(0);
+    };
     await page
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Save without email", exact: true })
+      .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
+    await closeEmailFeedback();
     await expect(
       page.getByRole("button", { name: "Revoke application approval" }),
     ).toBeEnabled();
-    await expect(
-      page.getByRole("button", { name: "Revoke application approval" }),
-    ).toBeFocused();
     await expect(page).toHaveURL(`${origin}${applicationHref}`);
     assert.equal(documents.length, documentsBeforeApproval);
     const approvedReview = page.locator(
@@ -756,7 +789,9 @@ test("organizers review pending and approved applications with persistent list c
     await expect(
       page.locator('[data-application-mini-step="form"] details'),
     ).toHaveAttribute("open");
-    await expect(page.locator("application-rejection")).toHaveCount(0);
+    await expect(
+      page.locator('access-decision[data-decision="reject"]'),
+    ).toHaveCount(0);
     // The dedicated application route renders the same approved review on reload.
     await page.reload();
     await expect(
@@ -795,8 +830,9 @@ test("organizers review pending and approved applications with persistent list c
     });
     await approvePatrols.click();
     await page
-      .getByRole("button", { name: "Save without email", exact: true })
+      .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
+    await closeEmailFeedback();
     await expect(patrolApproval.locator("[data-patrol-status]")).toHaveCount(0);
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
@@ -814,8 +850,12 @@ test("organizers review pending and approved applications with persistent list c
       .getByRole("button", { name: "Revoke patrol approval", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Save without email", exact: true })
+      .getByLabel("Reason for revoking patrol approval")
+      .fill("Missed the required orientation.");
+    await page
+      .getByRole("button", { name: "Revoke and send email", exact: true })
       .click();
+    await closeEmailFeedback();
     await expect(approvePatrols).toBeEnabled();
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
@@ -868,14 +908,15 @@ test("organizers review pending and approved applications with persistent list c
       ).toBe(width);
     }
     await approvePatrols.click();
-    await page
-      .getByRole("button", { name: "Cancel change", exact: true })
+    await patrolApproval
+      .getByRole("button", { name: "Cancel", exact: true })
       .click();
-    await expect(approvePatrols).toBeEnabled();
+    await expect(approvePatrols).toBeFocused();
     await approvePatrols.click();
     await page
-      .getByRole("button", { name: "Save without email", exact: true })
+      .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
+    await closeEmailFeedback();
     await expect(patrolApproval.locator("[data-patrol-status]")).toHaveCount(0);
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
@@ -904,15 +945,24 @@ test("organizers review pending and approved applications with persistent list c
     await expect(
       patrolApproval.locator("[data-orientation-event]"),
     ).toHaveCount(0);
-    assert.equal(
-      await DB.prepare(
-        "SELECT count(*) AS n FROM event_notification WHERE user_id='applicant-50'",
-      ).first("n"),
-      0,
+    assert.deepEqual(
+      (
+        await DB.prepare(
+          "SELECT subject FROM event_notification WHERE user_id='applicant-50'",
+        ).all<{ subject: string }>()
+      ).results
+        .map(({ subject }) => subject)
+        .sort(),
+      [
+        "Your volunteer access changed",
+        "Your volunteer access changed",
+        "Your volunteer access changed",
+        "Your volunteer application is approved",
+      ],
     );
     await page.getByRole("link", { name: "Back to applications" }).click();
     await expect(count).toHaveText("52");
-    await expect(allCount).toHaveText("53");
+    await expectAllCount(53);
     await expect(results.locator("tbody tr")).toHaveCount(52);
     // Normal full-page links retain exactly the same list context.
     await page.goto(`${origin}${applicationHref}`);
@@ -924,14 +974,23 @@ test("organizers review pending and approved applications with persistent list c
       .getByRole("button", { name: "Revoke application approval" })
       .click();
     await page
-      .getByRole("button", { name: "Save without email", exact: true })
+      .getByLabel("Reason for revoking approval")
+      .fill("Approved by mistake.");
+    await page
+      .getByRole("button", { name: "Revoke and send email", exact: true })
       .click();
+    await closeEmailFeedback();
     await expect(
       page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeEnabled();
-    await expect(
-      page.getByRole("button", { name: "Approve application", exact: true }),
-    ).toBeFocused();
+    assert.match(
+      String(
+        await DB.prepare(
+          "SELECT body FROM event_notification WHERE user_id='applicant-50' AND subject='Your volunteer application approval was revoked'",
+        ).first("body"),
+      ),
+      /Reason: Approved by mistake\./,
+    );
     await expect(page).toHaveURL(`${origin}${applicationHref}`);
     assert.equal(documents.length, documentsBeforeRevocation);
     await expect(page.locator("[data-application-approved-by]")).toHaveCount(0);
@@ -943,17 +1002,17 @@ test("organizers review pending and approved applications with persistent list c
     await search.fill("applicant-52");
     await expect(results.locator("tbody tr")).toHaveCount(1);
     await expect(count).toHaveText("1");
-    await expect(allCount).toHaveText("1");
+    await expectAllCount(1);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(page.url()).searchParams.has("offset")).toBe(false);
     await search.fill("approved");
     await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("1");
-    await allApplicants.click();
+    await expectAllCount(1);
+    await chooseStatuses([]);
     await expect(results.locator("tbody tr")).toHaveCount(1);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("1");
+    await expectAllCount(1);
     await expect(
       results.getByRole("link", { name: "approved", exact: true }),
     ).toBeVisible();
@@ -962,7 +1021,7 @@ test("organizers review pending and approved applications with persistent list c
     );
     await expect(page).toHaveURL(`${origin}/applications?q=approved`);
     await page.goBack();
-    await expect(awaitingApproval).toHaveAttribute("aria-pressed", "true");
+    await expect(readyInput).toBeChecked();
     await expect(results.locator("tbody tr")).toHaveCount(0);
     await expect(search).toHaveValue("approved");
     await search.fill("no match");
@@ -970,7 +1029,7 @@ test("organizers review pending and approved applications with persistent list c
       results.getByText("No applications ready for review match your search."),
     ).toBeVisible();
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("0");
+    await expectAllCount(0);
     await search.fill("applicant");
     await expect(results.locator("tbody tr")).toHaveCount(53);
     await expect(
@@ -1008,12 +1067,17 @@ test("organizers review pending and approved applications with persistent list c
     expect(new URL(plain.url()).searchParams.get("sort")).toBe("progress");
     expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
-    await plain.getByRole("button", { name: "All 1", exact: true }).click();
+    // Without scripts the menu is a native popover in a GET form.
+    const plainStatus = plain.locator('[data-filter-menu="approval"]');
+    await plain.getByRole("button", { name: /^Status/ }).click();
+    await plainStatus.locator('input[value="awaiting"]').uncheck();
+    await plainStatus.getByRole("button", { name: "Apply" }).click();
     expect(new URL(plain.url()).searchParams.get("q")).toBe("applicant-52");
-    await expect(
-      plain.getByRole("button", { name: "All 1", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await plain.getByRole("button", { name: "Ready for review 1" }).click();
+    expect(new URL(plain.url()).searchParams.has("approval")).toBe(false);
+    await plain.getByRole("button", { name: /^Status/ }).click();
+    await plainStatus.locator('input[value="awaiting"]').check();
+    await plainStatus.getByRole("button", { name: "Apply" }).click();
+    expect(new URL(plain.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(plain.url()).searchParams.get("sort")).toBe("progress");
     expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     await plain.locator("[data-volunteer-profile-link]").click();
@@ -1060,7 +1124,7 @@ test("organizers review pending and approved applications with persistent list c
       "50 ready for review",
       "50 ready for review",
     ]);
-    await expect(allCount).toHaveText("53");
+    await expectAllCount(53);
     await expect(results.locator("tbody tr")).toHaveCount(50);
     expect(page.url()).toBe(restoredListUrl);
     expect(new URL(page.url()).searchParams.get("approval")).toBe("awaiting");
@@ -1069,7 +1133,7 @@ test("organizers review pending and approved applications with persistent list c
     ).run();
     await page.goto(`${origin}/applications?approval=awaiting`);
     await expect(count).toHaveText("0");
-    await expect(allCount).toHaveText("55");
+    await expectAllCount(55);
     await expect(headerCount).toHaveCount(0);
     await expect(
       results.getByText("No applications are ready for review."),
@@ -1187,7 +1251,7 @@ test("organizers review pending and approved applications with persistent list c
     await page.goto(`${origin}/applications?approval=awaiting&q=applicant-50`);
     await expect(count).toHaveText("0");
     await expect(headerCount).toHaveCount(0);
-    await page.getByRole("button", { name: "All 1", exact: true }).click();
+    await page.getByRole("link", { name: "Clear filters" }).click();
     await expect(results).toContainText("Rejected");
     assert.notEqual(
       await (await get("/api/v1/events/version", applicantCookie)).text(),

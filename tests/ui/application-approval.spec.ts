@@ -63,59 +63,47 @@ test("application table opens a focused review with guarded decisions and list c
       "href",
       `${applicationPath}?returnTo=${encodeURIComponent(listPath)}`,
     );
-    const filters = page.getByRole("group", { name: "Application status" });
-    await expect(filters.getByRole("button")).toHaveText([
-      "All 1",
-      "Ready for review 0",
-      "In Progress 1",
-      "Rejected 0",
-      "Approved 0",
+    const status = page.locator('[data-filter-menu="approval"]');
+    const statusTrigger = page.getByRole("button", { name: /^Status/ });
+    const chooseStatus = async (label: string) => {
+      await statusTrigger.click();
+      await status.getByRole("button", { name: "Clear" }).click();
+      await status
+        .getByRole("checkbox", { name: new RegExp(`^${label}`) })
+        .check();
+      await status.getByRole("button", { name: "Apply" }).click();
+      await expect(status).toBeHidden();
+    };
+    await statusTrigger.click();
+    await expect(status.locator("[data-filter-option]")).toHaveText([
+      /Ready for review\s*0/,
+      /In Progress\s*1/,
+      /Rejected\s*0/,
+      /Approved\s*0/,
     ]);
-    for (const value of ["awaiting", "rejected", "approved"]) {
-      const filter = filters.locator(`[data-volunteer-filter="${value}"]`);
-      await filter.click();
-      await expect(filter).toHaveAttribute("aria-pressed", "true");
-      await expect(row).toHaveCount(0);
-      expect(new URL(page.url()).searchParams.get("approval")).toBe(value);
-      expect(new URL(page.url()).searchParams.get("sort")).toBe("completed");
-      expect(new URL(page.url()).searchParams.get("direction")).toBe("desc");
-    }
-    const inProgress = filters.getByRole("button", {
-      name: "In Progress 1",
-      exact: true,
-    });
-    await inProgress.focus();
-    await page.keyboard.press("Enter");
-    await expect(inProgress).toHaveAttribute("aria-pressed", "true");
-    await expect(inProgress).toBeFocused();
-    await expect(inProgress).toHaveCSS("outline-style", "solid");
-    for (const property of [
-      "color",
-      "font-size",
-      "font-weight",
-      "font-family",
-      "background-color",
-      "border-radius",
-      "padding",
-      "display",
-      "line-height",
+    await page.keyboard.press("Escape");
+    for (const [label, value] of [
+      ["Ready for review", "awaiting"],
+      ["Rejected", "rejected"],
+      ["Approved", "approved"],
     ]) {
-      const tableStyle = await row
-        .locator(".application-status-text")
-        .evaluate(
-          (element, property) =>
-            getComputedStyle(element).getPropertyValue(property),
-          property,
-        );
-      await expect(inProgress.locator(".application-status-text")).toHaveCSS(
-        property,
-        tableStyle,
-      );
+      await chooseStatus(label);
+      // Closing the menu applies it after the close event.
+      await expect(page).toHaveURL(new RegExp(`[?&]approval=${value}(&|$)`));
+      await expect(row).toHaveCount(0);
+      const params = new URL(page.url()).searchParams;
+      expect(params.getAll("approval")).toEqual([value]);
+      expect(params.get("sort")).toBe("completed");
+      expect(params.get("direction")).toBe("desc");
     }
+    await chooseStatus("In Progress");
+    await expect(page).toHaveURL(/approval=in-progress/);
+    await expect(row).toHaveCount(1);
+    await expect(statusTrigger).toBeFocused();
     expect(new URL(page.url()).searchParams.get("approval")).toBe(
       "in-progress",
     );
-    await filters.getByRole("button", { name: "All 1", exact: true }).click();
+    await page.getByRole("link", { name: "Clear filters" }).click();
     await expect(page).toHaveURL(new URL(listPath, baseURL!).href);
     await row.click({ position: { x: 2, y: 2 } });
     const review = page.locator("[data-application-review]");
@@ -134,8 +122,14 @@ test("application table opens a focused review with guarded decisions and list c
       name: "Reject application",
       exact: true,
     });
-    for (const button of [approve, reject]) {
-      await expect(button).toBeDisabled();
+    await expect(approve).toBeDisabled();
+    await expect(reject).toBeDisabled();
+    for (const button of [
+      review.locator(
+        'access-decision[data-decision="approve"] .decision-surface',
+      ),
+      reject,
+    ]) {
       await expect(button).toHaveCSS("background-color", "rgb(39, 39, 42)");
       await expect
         .poll(() =>
@@ -168,9 +162,11 @@ test("application table opens a focused review with guarded decisions and list c
     await page.reload();
     await expect(approve).toBeEnabled();
     await expect(steps.locator("time")).toHaveCount(2);
-    const rejectAction = review.locator("[data-rejection-open]");
-    await expect(rejectAction).toHaveClass(/\bbtn btn-red\b/);
-    for (const button of [approve, review.locator(".rejection-surface")]) {
+    const rejectAction = review.locator(
+      'access-decision[data-decision="reject"] [data-decision-open]',
+    );
+    await expect(rejectAction).toHaveClass(/\bbtn\b.*\bbtn-red\b/);
+    for (const button of await review.locator(".decision-surface").all()) {
       await expect
         .poll(() =>
           button.evaluate((button) =>
@@ -194,7 +190,7 @@ test("application table opens a focused review with guarded decisions and list c
       Number.parseFloat(String(morph[0].height)),
     );
     expect(morph[0].backgroundColor).toBe(morph[1].backgroundColor);
-    const rejection = review.locator("application-rejection");
+    const rejection = review.locator('access-decision[data-decision="reject"]');
     const rejectionForm = rejection.getByRole("form", {
       name: "Reject application",
       exact: true,
@@ -214,15 +210,15 @@ test("application table opens a focused review with guarded decisions and list c
     await expect(reason).not.toBeFocused();
     await expect(rejectAction).toHaveAttribute("aria-expanded", "true");
     await expect(rejectAction).toBeHidden();
-    await expect(rejection.locator(".rejection-surface")).toHaveCSS(
+    await expect(rejection.locator(".decision-surface")).toHaveCSS(
       "background-color",
       "rgb(0, 0, 0)",
     );
-    await expect(rejection.locator(".rejection-actions button")).toHaveText([
+    await expect(rejection.locator(".decision-actions button")).toHaveText([
       "Cancel",
       "Reject and send email",
     ]);
-    await expect(rejection.locator(".rejection-actions")).toHaveCSS(
+    await expect(rejection.locator(".decision-actions")).toHaveCSS(
       "justify-content",
       "flex-end",
     );
@@ -230,7 +226,7 @@ test("application table opens a focused review with guarded decisions and list c
       await page.setViewportSize({ width, height: 812 });
       const rejectionBounds = (await rejection.boundingBox())!;
       if (width === 1280) expect(rejectionBounds.width).toBeGreaterThan(576);
-      const surface = rejection.locator(".rejection-surface");
+      const surface = rejection.locator(".decision-surface");
       await expect
         .poll(async () =>
           Math.abs(
@@ -439,7 +435,10 @@ test("pending applications poll every minute, then approval restores five-second
       .getByRole("button", { name: "Approve application", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Save without email", exact: true })
+      .getByRole("button", { name: "Approve and send email", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Simulate successful delivery" })
       .click();
     await expect(
       page.getByRole("button", {
@@ -457,10 +456,9 @@ test("pending applications poll every minute, then approval restores five-second
     ).toHaveAttribute("href", `/volunteers/${account.id}`);
     const accountPage = await volunteerContext.newPage();
     await accountPage.goto(`${baseURL}/volunteer/account`);
-    await accountPage
-      .getByRole("link", { name: "View your profile", exact: true })
-      .click();
-    await expect(accountPage).toHaveURL(/#account-profile-heading$/);
+    await expect(
+      accountPage.getByRole("link", { name: "View your profile", exact: true }),
+    ).toHaveCount(0);
     await accountPage.close();
     expect(
       (await page.request.get("/volunteers/local-fixture-user-robin")).status(),
@@ -533,7 +531,13 @@ test("pending applications poll every minute, then approval restores five-second
       })
       .click();
     await page
-      .getByRole("button", { name: "Save without email", exact: true })
+      .getByRole("textbox", { name: "Reason for revoking approval" })
+      .fill("Approved by mistake.");
+    await page
+      .getByRole("button", { name: "Revoke and send email", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Simulate successful delivery" })
       .click();
     await expect(
       page.getByRole("button", { name: "Approve application", exact: true }),

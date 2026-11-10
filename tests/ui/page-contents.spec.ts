@@ -352,8 +352,9 @@ test("profile pages opened directly or from rosters keep section navigation", as
         profile.locator("#volunteer-application-panel"),
       ).toBeInViewport();
       await expect(
+        // Patrol approval belongs on profiles; application decisions do not.
         profile.locator(
-          '[data-access-kind="application"], application-rejection',
+          '[data-access-kind="application"], access-decision:not([data-decision$="-patrol"])',
         ),
       ).toHaveCount(0);
       const application = profile.locator(

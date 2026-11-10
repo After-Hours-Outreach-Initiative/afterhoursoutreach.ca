@@ -142,6 +142,8 @@
 [data-event-calendar] .event-calendar-header {
   display: grid;
   grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+  /* Reserve the month buttons' height before scripts reveal them. */
+  grid-auto-rows: minmax(2.25rem, auto);
   align-items: center;
   gap: 0.25rem;
   padding: 0.125rem 0.25rem 0.25rem;

@@ -28,6 +28,8 @@ interface Props {
   destinations: EventRow[];
   series?: PatrolSeriesRow;
   publicRoster?: PublicRosterRow[];
+  /** An organizer's preview of another viewer: show controls, never submit. */
+  preview?: boolean;
 }
 const {
   event,
@@ -37,6 +39,7 @@ const {
   destinations,
   series,
   publicRoster = [],
+  preview = false,
 } = Astro.props;
 const future = event.startsAt > Date.now();
 const unregisterOpen =
@@ -172,7 +175,17 @@ const blocked =
         blocked !== "This event is full." && <p>{blocked}</p>}
     </div>
     <div class="volunteer-actions">
-      {unregisterOpen ? (
+      {preview ? (
+        unregisterOpen ? (
+          <button class="btn btn-red" type="button" disabled>
+            Unregister
+          </button>
+        ) : future && !event.signedUp && !blocked ? (
+          <button class="btn btn-green" type="button" disabled>
+            Register
+          </button>
+        ) : null
+      ) : unregisterOpen ? (
         <form data-live-signup action="/api/v1/events/action" method="post">
           <input name="id" type="hidden" value={event.id} />
           <input name="action" type="hidden" value="cancel" />

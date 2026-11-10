@@ -53,13 +53,30 @@ test("application list state preserves approval, search and sorting, dropping ob
         direction: "desc",
       }),
     );
-    expect(filtered.approval).toBe(approval);
+    expect(filtered.approval).toEqual([approval]);
     expect(volunteerListReturnUrl(applicationListUrl(filtered))).toBe(
       `/applications?q=Alex+%26+Sam&approval=${approval}&sort=completed&direction=desc`,
     );
   }
+  // Several statuses and roles, and a custom role order, round-trip in order.
+  const multiple = applicationListState(
+    new URLSearchParams(
+      "approval=rejected&approval=awaiting&approval=all&role=medic&role=organizer&order=volunteer,medic",
+    ),
+  );
+  expect(multiple.approval).toEqual(["awaiting", "rejected"]);
+  expect(multiple.roles).toEqual(["medic"]);
+  expect(multiple.roleOrder).toEqual(["volunteer", "medic"]);
+  expect(applicationListUrl(multiple)).toBe(
+    "/applications?approval=awaiting&approval=rejected&role=medic&order=volunteer%2Cmedic",
+  );
   const volunteers = volunteerListState(new URLSearchParams("sort=role"));
   expect(volunteerListUrl(volunteers)).toBe("/volunteers");
+  // Partial or repeated orders fall back to the default order.
+  expect(
+    volunteerListState(new URLSearchParams("order=medic,medic,new,volunteer"))
+      .roleOrder,
+  ).toEqual(["organizer", "medic", "new", "volunteer"]);
   expect(
     volunteerListState(
       new URL(volunteerListUrl(volunteers), "https://example.org").searchParams,
@@ -95,7 +112,7 @@ test("list return destinations are restricted and untrusted filter inputs are no
   for (const approval of ["unknown", "__proto__", "constructor"])
     expect(
       applicationListState(new URLSearchParams({ approval })).approval,
-    ).toBe("all");
+    ).toEqual([]);
   expect(applicationListState(new URLSearchParams("sort=role")).sort).toBe(
     "role",
   );
@@ -120,7 +137,9 @@ test("list return destinations are restricted and untrusted filter inputs are no
     ),
   ).toEqual({
     search: "x".repeat(100),
-    approval: "all",
+    approval: [],
+    roles: [],
+    roleOrder: ["organizer", "medic", "new", "volunteer"],
     sort: "role",
     direction: "asc",
   });

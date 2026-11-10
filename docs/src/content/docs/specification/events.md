@@ -73,6 +73,11 @@ Fields shared by every selected event are prefilled; fields that differ are
 blank and stay unchanged unless filled in. Only edited fields are saved. A new
 start time applies to each event on its own date.
 
+**View as** shows the volunteer event list as a volunteer type (new volunteer,
+new medic, outreach volunteer, or medic) or as a specific active volunteer. The
+preview is read-only: registration buttons appear as that viewer would see them
+but are disabled.
+
 ### Edit view
 
 A popup for editing event details, public visibility, or cancelling the event.

@@ -1,5 +1,7 @@
 import { actionFragment, syncHeaderApplications } from "./action-page";
 import { initDirectoryTableHeader } from "./directory-table-header";
+import { initFilterMenus } from "./filter-menu";
+import { initRoleOrder } from "./role-order";
 import {
   directoryEmptyMessage,
   directoryListState,
@@ -40,7 +42,6 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     "[data-volunteer-search-form]",
   );
   const results = root?.querySelector<HTMLElement>("[data-volunteer-results]");
-  const filters = root?.querySelector<HTMLElement>("[data-volunteer-filters]");
   const error = root?.querySelector<HTMLElement>(
     "[data-volunteer-search-error]",
   );
@@ -71,12 +72,82 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   // dropping obsolete pagination from bookmarked and profile-return URLs.
   const urlFor = (state: DirectoryListState) => {
     const url = new URL(location.href);
-    for (const key of ["q", "approval", "sort", "direction", "offset"])
+    for (const key of [
+      "q",
+      "approval",
+      "role",
+      "order",
+      "sort",
+      "direction",
+      "offset",
+    ])
       url.searchParams.delete(key);
     new URL(directoryListUrl(kind, state), url).searchParams.forEach(
-      (value, key) => url.searchParams.set(key, value),
+      (value, key) => url.searchParams.append(key, value),
     );
     return url;
+  };
+  // The menus' controls are the pending state until they are applied.
+  const stateFromForm = () => {
+    const params = new URLSearchParams();
+    for (const [name, value] of new FormData(form))
+      params.append(name, String(value));
+    params.set("q", search.value.slice(0, 100));
+    return directoryListState(params, kind);
+  };
+  const sortMenu = form.querySelector<HTMLElement>('[data-filter-menu="sort"]');
+  const showRoleOrder = sortMenu ? initRoleOrder(sortMenu) : () => {};
+  const sortLabels = new Map(
+    [...form.querySelectorAll<HTMLInputElement>('input[name="sort"]')].map(
+      (input) => [input.value, input.closest("label")!.textContent!.trim()],
+    ),
+  );
+  const syncControls = (state: DirectoryListState) => {
+    const values: Record<string, readonly string[]> = {
+      approval: state.approval,
+      role: state.roles,
+    };
+    for (const menu of form.querySelectorAll<HTMLElement>(
+      "[data-filter-menu]",
+    )) {
+      // Never discard choices in a menu that is still open.
+      if (menu.matches(":popover-open")) continue;
+      const name = menu.dataset.filterMenu!;
+      if (name === "sort") {
+        for (const input of menu.querySelectorAll<HTMLInputElement>(
+          'input[type="radio"]',
+        ))
+          input.checked =
+            input.value ===
+            (input.name === "sort" ? state.sort : state.direction);
+        showRoleOrder(state.roleOrder, state.sort);
+        continue;
+      }
+      for (const input of menu.querySelectorAll<HTMLInputElement>(
+        'input[type="checkbox"]',
+      ))
+        input.checked = values[name]?.includes(input.value) ?? false;
+    }
+    for (const trigger of form.querySelectorAll<HTMLElement>(
+      "[data-filter-trigger]",
+    )) {
+      const selected = values[trigger.dataset.filterTrigger!]?.length ?? 0;
+      trigger.toggleAttribute("data-active", selected > 0);
+      const badge = trigger.querySelector<HTMLElement>(
+        "[data-filter-selected]",
+      )!;
+      badge.hidden = !selected;
+      badge.firstChild!.textContent = String(selected);
+    }
+    const label = form.querySelector<HTMLElement>("[data-sort-label]");
+    if (label) label.textContent = sortLabels.get(state.sort) ?? state.sort;
+    const reset = form.querySelector<HTMLAnchorElement>(
+      "[data-directory-reset]",
+    );
+    if (reset) {
+      reset.hidden = !state.approval.length && !state.roles.length;
+      reset.href = urlFor({ ...state, approval: [], roles: [] }).href;
+    }
   };
 
   const render = (
@@ -90,40 +161,24 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     );
     const url = urlFor(state);
     search.value = state.search;
-    for (const [name, value] of Object.entries({
-      q: state.search,
-      approval: state.approval,
-      sort: state.sort,
-      direction: state.direction,
-    })) {
-      root
-        .querySelectorAll<HTMLInputElement>(
-          `input[type="hidden"][name="${name}"]`,
-        )
-        .forEach((input) => {
-          input.value = value;
-        });
-    }
-    const counts: Record<string, number> = {
-      all: view.allApplicantsCount,
-      awaiting: view.awaitingApprovalCount,
-      "in-progress": view.inProgressCount,
-      rejected: view.rejectedCount,
-      approved: view.approvedCount,
+    const counts: Record<string, Record<string, number>> = {
+      approval: {
+        awaiting: view.awaitingApprovalCount,
+        "in-progress": view.inProgressCount,
+        rejected: view.rejectedCount,
+        approved: view.approvedCount,
+      },
+      role: view.roleCounts,
     };
-    filters
-      ?.querySelectorAll<HTMLElement>("[data-volunteer-count]")
+    form
+      .querySelectorAll<HTMLElement>("[data-filter-count]")
       .forEach((element) => {
-        element.textContent = String(counts[element.dataset.volunteerCount!]);
-      });
-    filters
-      ?.querySelectorAll<HTMLButtonElement>("[data-volunteer-filter]")
-      .forEach((button) => {
-        button.setAttribute(
-          "aria-pressed",
-          String(button.value === state.approval),
+        const menu = element.closest<HTMLElement>("[data-filter-menu]")!;
+        element.textContent = String(
+          counts[menu.dataset.filterMenu!]?.[element.dataset.filterCount!] ?? 0,
         );
       });
+    syncControls(state);
     results
       .querySelectorAll<HTMLElement>("[data-directory-column]")
       .forEach((column) => {
@@ -162,8 +217,9 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     empty.hidden = Boolean(view.rows.length);
     count.textContent = `${view.rows.length} ${kind === "applications" ? (view.rows.length === 1 ? "application" : "applications") : view.rows.length === 1 ? "volunteer" : "volunteers"}`;
     refreshTableHeader();
-    if (historyMode === "push") history.pushState(null, "", url);
-    else if (historyMode === "replace") history.replaceState(null, "", url);
+    if (historyMode === "push" && url.href !== location.href)
+      history.pushState(null, "", url);
+    else if (historyMode !== "none") history.replaceState(null, "", url);
   };
 
   // A refresh never owns the search state: typing, sorting and filtering remain
@@ -225,9 +281,15 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   search.addEventListener("input", () =>
     render({ ...stateFor(), search: search.value.slice(0, 100) }),
   );
+  // Closing a menu applies its choices, as its Apply button does.
+  initFilterMenus(form, () => render(stateFromForm(), "push"));
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    render({ ...stateFor(), search: search.value.slice(0, 100) });
+    const open = form.querySelector<HTMLElement>(
+      "[data-filter-menu]:popover-open",
+    );
+    if (open) open.hidePopover();
+    else render(stateFromForm(), "push");
   });
   const submit = form.querySelector<HTMLButtonElement>(
     "[data-volunteer-search-submit]",
@@ -251,16 +313,19 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     event.preventDefault();
     render(stateFor(new URL(link.href)), "push");
   });
-  filters?.addEventListener("click", (event) => {
-    if (!(event.target instanceof Element)) return;
-    const button = event.target.closest<HTMLButtonElement>(
-      "[data-volunteer-filter]",
-    );
-    if (!button) return;
+  form.addEventListener("click", (event) => {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      !(event.target instanceof Element) ||
+      !event.target.closest("[data-directory-reset]")
+    )
+      return;
     event.preventDefault();
-    const url = urlFor(stateFor());
-    url.searchParams.set("approval", button.value);
-    render(stateFor(url), "push");
+    render({ ...stateFor(), approval: [], roles: [] }, "push");
   });
   window.addEventListener("popstate", () => render(stateFor(), "none"));
   window.addEventListener("focus", () => void refresh());

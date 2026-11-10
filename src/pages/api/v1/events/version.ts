@@ -13,6 +13,7 @@ import {
   listPatrolSeries,
 } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
+import { listViewerEvents, resolveEventViewer } from "@/server/events/view-as";
 import { errorResponse } from "@/server/http";
 
 export const prerender = false;
@@ -20,20 +21,31 @@ export const GET: APIRoute = async ({ request }) => {
   try {
     const { actor, headers } = await accountContext(env, request);
     const params = new URL(request.url).searchParams;
-    const manage = params.get("view") === "manage";
+    // Match an organizer's preview, which lists events for another viewer.
+    const viewer = await resolveEventViewer(
+      env.DB,
+      actor,
+      params.get("viewAs"),
+    );
+    const manage = !viewer && params.get("view") === "manage";
     if (manage) requireOrganizer(actor);
-    const events = await listEvents(
-      env.DB,
-      actor,
-      params.get("occurrence") ?? undefined,
-      manage ? "manage-upcoming" : "volunteer",
-    );
-    const pastEvents = await listEvents(
-      env.DB,
-      actor,
-      manage ? (params.get("occurrence") ?? undefined) : undefined,
-      manage ? "manage-past" : "past",
-    );
+    const subject = viewer?.actor ?? actor;
+    const events = viewer
+      ? await listViewerEvents(env.DB, viewer, "volunteer")
+      : await listEvents(
+          env.DB,
+          actor,
+          params.get("occurrence") ?? undefined,
+          manage ? "manage-upcoming" : "volunteer",
+        );
+    const pastEvents = viewer
+      ? await listViewerEvents(env.DB, viewer, "past")
+      : await listEvents(
+          env.DB,
+          actor,
+          manage ? (params.get("occurrence") ?? undefined) : undefined,
+          manage ? "manage-past" : "past",
+        );
     const series = manage && actor ? await listPatrolSeries(env.DB, actor) : [];
     const rosters =
       manage && actor
@@ -45,14 +57,14 @@ export const GET: APIRoute = async ({ request }) => {
         : [];
     const version = await eventViewVersion(
       [...events, ...pastEvents],
-      actor,
+      subject,
       rosters,
       Date.now(),
       series,
-      !manage && canViewEvents(actor) && actor
+      !manage && canViewEvents(subject) && subject
         ? await listPublicRosters(
             env.DB,
-            actor,
+            subject,
             events.map((event) => event.id),
           )
         : undefined,

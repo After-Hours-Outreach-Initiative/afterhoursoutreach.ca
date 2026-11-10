@@ -49,20 +49,20 @@ for (const kind of ["applications", "volunteers"]) {
     await expect(rows).toHaveCount(500);
 
     if (kind === "applications") {
-      const ready = page.getByRole("button", {
-        name: "Ready for review 250",
-        exact: true,
-      });
-      await ready.click();
-      await expect(ready).toBeFocused();
+      const status = page.locator('[data-filter-menu="approval"]');
+      await page.getByRole("button", { name: /^Status/ }).click();
+      await expect(status.locator('[data-filter-count="awaiting"]')).toHaveText(
+        "250",
+      );
+      await status.getByRole("checkbox", { name: /^Ready for review/ }).check();
+      await status.getByRole("button", { name: "Apply" }).click();
       await expect(rows).toHaveCount(250);
       await search.fill("sample 001");
       await expect(rows).toHaveCount(0);
-      await expect(page.locator("[data-all-applicants-count]")).toHaveText("1");
-      await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
+      await expect(status.locator('[data-filter-count="awaiting"]')).toHaveText(
         "0",
       );
-      await page.getByRole("button", { name: "All 1", exact: true }).click();
+      await page.getByRole("link", { name: "Clear filters" }).click();
       await expect(rows).toHaveCount(1);
       await search.fill("");
     }

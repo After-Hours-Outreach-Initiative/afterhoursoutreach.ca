@@ -8,6 +8,7 @@ import {
 } from "@/server/db/access";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
+import { resolveEventViewer } from "@/server/events/view-as";
 export const prerender = false;
 const account = await accountContext(env, Astro.request);
 forwardCookies(account.headers, Astro.response.headers);
@@ -20,9 +21,16 @@ if (!canViewEvents(account.actor))
 const view = Astro.url.searchParams.get("view");
 // Legacy view links no longer change the layout or the actor's capabilities.
 const manage = account.actor.role === "organizer";
+let viewer = null;
 if (manage || view === "organizer") {
   try {
     requireOrganizer(account.actor);
+    // Organizers can preview the volunteer list as a type or a volunteer.
+    viewer = await resolveEventViewer(
+      env.DB,
+      account.actor,
+      Astro.url.searchParams.get("viewAs"),
+    );
   } catch (error) {
     if (error instanceof RequestError)
       return new Response(error.message, { status: error.status });
@@ -31,4 +39,4 @@ if (manage || view === "organizer") {
 }
 ---
 
-<VolunteerPortal {account} {manage} />
+<VolunteerPortal {account} {manage} {viewer} />

@@ -163,7 +163,8 @@ export const emailPreviews: EmailPreview[] = [
     name: "Application approved",
     group: "Applications and access",
     trigger: "An organizer approves a previously unapproved application.",
-    delivery: optionalDelivery,
+    delivery:
+      "Always sent when an organizer confirms the decision on the application review page.",
     source: source.volunteers,
     examples: [
       {
@@ -195,7 +196,8 @@ export const emailPreviews: EmailPreview[] = [
     name: "Application approval revoked",
     group: "Applications and access",
     trigger: "An organizer revokes application approval.",
-    delivery: optionalDelivery,
+    delivery:
+      "Always sent when an organizer confirms the decision on the application review page.",
     source: source.volunteers,
     examples: [true, false].map((active) =>
       notification(
@@ -203,6 +205,8 @@ export const emailPreviews: EmailPreview[] = [
         volunteerAccessEmail(
           { active, applicationApproved: false, patrolApproved: false },
           true,
+          undefined,
+          "We need to confirm your emergency contact before you patrol.",
         ),
       ),
     ),
@@ -213,21 +217,32 @@ export const emailPreviews: EmailPreview[] = [
     group: "Applications and access",
     trigger:
       "An organizer changes active status or patrol approval without changing application approval.",
-    delivery: optionalDelivery,
+    delivery: `${optionalDelivery} Approving or revoking patrol approval from a volunteer profile always sends this email; revocation includes the organizer's reason.`,
     source: source.volunteers,
-    examples: [true, false].flatMap((active) =>
-      [true, false].flatMap((applicationApproved) =>
-        [true, false].map((patrolApproved) =>
-          notification(
-            `${active ? "Active" : "Inactive"}, application ${applicationApproved ? "approved" : "pending"}, patrol ${patrolApproved ? "approved" : "not approved"}`,
-            volunteerAccessEmail(
-              { active, applicationApproved, patrolApproved },
-              false,
+    examples: [
+      ...[true, false].flatMap((active) =>
+        [true, false].flatMap((applicationApproved) =>
+          [true, false].map((patrolApproved) =>
+            notification(
+              `${active ? "Active" : "Inactive"}, application ${applicationApproved ? "approved" : "pending"}, patrol ${patrolApproved ? "approved" : "not approved"}`,
+              volunteerAccessEmail(
+                { active, applicationApproved, patrolApproved },
+                false,
+              ),
             ),
           ),
         ),
       ),
-    ),
+      notification(
+        "Patrol approval revoked",
+        volunteerAccessEmail(
+          { active: true, applicationApproved: true, patrolApproved: false },
+          false,
+          undefined,
+          "Please attend another orientation before your next patrol.",
+        ),
+      ),
+    ],
   },
   {
     id: "account-role",

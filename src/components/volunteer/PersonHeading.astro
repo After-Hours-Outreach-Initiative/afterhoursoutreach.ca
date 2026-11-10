@@ -1,0 +1,79 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import type { VolunteerRow } from "@/server/db/volunteers";
+import AttendeeAvatar from "./AttendeeAvatar.astro";
+import NewVolunteerBadge from "./NewVolunteerBadge.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
+
+interface Props extends HTMLAttributes<"h1"> {
+  level: "h1" | "h2";
+  name: string;
+  person: VolunteerRow;
+  teams: readonly string[];
+  /** Match the applications list: applicant outline and medic-team interest. */
+  applications: boolean;
+}
+const {
+  level: Heading,
+  name,
+  person,
+  teams,
+  applications,
+  class: className,
+  ...attributes
+} = Astro.props;
+// Mirror the directory rows, which derive these marks in SQL.
+const approved = Boolean(person.applicationApproved);
+const medicTeam = teams.includes("medic");
+const category = !person.patrolApproved
+  ? "new-volunteer"
+  : approved && medicTeam
+    ? "medic"
+    : "outreach-volunteer";
+const medicMark = applications ? medicTeam : approved && medicTeam;
+const organizer = !applications && person.role === "organizer";
+const newVolunteer = !applications && category === "new-volunteer";
+---
+
+<div class:list={["person-heading", className]}>
+  <Heading {...attributes}>
+    <AttendeeAvatar
+      {category}
+      {medicMark}
+      applicant={applications && !approved}
+      decorative
+    />
+    <span>{name}</span>
+  </Heading>
+  {(organizer || newVolunteer || medicMark) && (
+    <div class="person-heading-badges">
+      {organizer && <VolunteerRoleBadge role="organizer" />}
+      {newVolunteer && <NewVolunteerBadge />}
+      {medicMark && <VolunteerRoleBadge role="medic" />}
+    </div>
+  )}
+</div>
+
+<style>
+  .person-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    min-width: 0;
+  }
+  .person-heading > :is(h1, h2) {
+    --attendee-avatar-height: 1em;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .person-heading-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 0.5rem;
+  }
+</style>

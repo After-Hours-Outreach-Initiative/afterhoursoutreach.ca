@@ -102,28 +102,10 @@
 .account-setting-unavailable h3 {
   color: #a1a1aa;
 }
-.account-sessions {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
-}
-.account-sessions li {
+.account-session-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
   gap: 1rem;
-  padding: 1.25rem;
-  border: var(--volunteer-border);
-  border-radius: 0.5rem;
-}
-.account-sessions span {
-  display: block;
-}
-.account-sessions li > div {
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 .volunteer-portal code {
   overflow-wrap: anywhere;

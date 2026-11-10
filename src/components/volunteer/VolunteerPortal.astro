@@ -12,7 +12,9 @@ import {
   listPatrolSeries,
 } from "@/server/db/events";
 import { eventViewVersion } from "@/server/events/version";
-import { countReadyApplications } from "@/server/db/volunteers";
+import { countReadyApplications, listVolunteers } from "@/server/db/volunteers";
+import { listViewerEvents, type EventViewer } from "@/server/events/view-as";
+import ViewAsMenu from "./ViewAsMenu.astro";
 import AccountLayout from "./AccountLayout.astro";
 import EventCard from "./EventCard.astro";
 import EventCalendar from "./EventCalendar.astro";
@@ -37,32 +39,49 @@ import "@/styles/volunteer.css";
 interface Props {
   account: Awaited<ReturnType<typeof accountContext>>;
   manage?: boolean;
+  /** An organizer's read-only preview of another viewer's event list. */
+  viewer?: EventViewer | null;
 }
-const { manage = false } = Astro.props;
+const { viewer = null } = Astro.props;
+const manage = !viewer && (Astro.props.manage ?? false);
 const { actor, email, greetingName } = Astro.props.account;
 // Callers authenticate first. Organizer controls always require authorization.
 if (!actor) throw new Error("VolunteerPortal requires a signed-in account.");
-if (manage) requireOrganizer(actor);
-const events = await listEvents(
-  env.DB,
-  actor,
-  Astro.url.searchParams.get("occurrence") ?? undefined,
-  manage ? "manage-upcoming" : "volunteer",
-);
-const pastEvents = await listEvents(
-  env.DB,
-  actor,
-  manage ? (Astro.url.searchParams.get("occurrence") ?? undefined) : undefined,
-  manage ? "manage-past" : "past",
-);
+if (manage || viewer) requireOrganizer(actor);
+// Events are listed for the previewed viewer; the account itself stays the organizer.
+const subject = viewer?.actor ?? actor;
+const events = viewer
+  ? await listViewerEvents(env.DB, viewer, "volunteer")
+  : await listEvents(
+      env.DB,
+      actor,
+      Astro.url.searchParams.get("occurrence") ?? undefined,
+      manage ? "manage-upcoming" : "volunteer",
+    );
+const pastEvents = viewer
+  ? await listViewerEvents(env.DB, viewer, "past")
+  : await listEvents(
+      env.DB,
+      actor,
+      manage
+        ? (Astro.url.searchParams.get("occurrence") ?? undefined)
+        : undefined,
+      manage ? "manage-past" : "past",
+    );
 const series = manage ? await listPatrolSeries(env.DB, actor) : [];
-const eventAccess = canViewEvents(actor);
+const eventAccess = canViewEvents(subject);
+const viewAsPeople =
+  manage || viewer
+    ? (await listVolunteers(env.DB, actor, "", "name")).allRows
+        .filter((person) => person.active && person.applicationApproved)
+        .map(({ id, name }) => ({ id, name }))
+    : [];
 const readyApplicationCount =
   actor.role === "organizer" && eventAccess
     ? await countReadyApplications(env.DB, actor)
     : 0;
 const showApplicationProgress =
-  !manage && (!actor.twoFactorEnabled || actor.twoFactorVerified);
+  !manage && !viewer && (!actor.twoFactorEnabled || actor.twoFactorVerified);
 const applicationProgress = showApplicationProgress
   ? await loadApplicationProgress(env.DB, actor.id)
   : null;
@@ -87,13 +106,13 @@ const publicRoster =
   !manage && eventAccess
     ? await listPublicRosters(
         env.DB,
-        actor,
+        subject,
         events.map((event) => event.id),
       )
     : undefined;
 const eventVersion = await eventViewVersion(
   [...events, ...pastEvents],
-  actor,
+  subject,
   rosters,
   Date.now(),
   series,
@@ -126,7 +145,7 @@ const seriesItems = manage
   email={email}
 >
   <Fragment slot="heading">
-    {!manage && (
+    {!manage && !viewer && (
       <h1
         data-portal-heading
         class:list={[
@@ -143,6 +162,7 @@ const seriesItems = manage
   <div
     data-event-browser
     data-event-view={manage ? "manage" : "volunteer"}
+    data-event-view-as={viewer?.value}
     data-event-version={eventVersion}
     data-event-access={String(eventAccess)}
     data-event-path={eventAccess ? Astro.url.pathname : "/volunteer"}
@@ -217,14 +237,20 @@ const seriesItems = manage
       <section class="volunteer-events" aria-labelledby="events-heading">
         <div class="volunteer-section-heading">
           <div>
-            {manage ? (
+            {manage || viewer ? (
               <h1 id="events-heading">Events</h1>
             ) : (
               <h2 id="events-heading">Events</h2>
             )}
           </div>
+          {viewer && (
+            <div class="volunteer-event-tools">
+              <ViewAsMenu people={viewAsPeople} current={viewer} />
+            </div>
+          )}
           {manage && (
             <div class="volunteer-event-tools">
+              <ViewAsMenu people={viewAsPeople} current={null} />
               <button
                 class="btn btn-quiet"
                 type="button"
@@ -244,6 +270,15 @@ const seriesItems = manage
             </div>
           )}
         </div>
+        {viewer && (
+          <p class="volunteer-notice view-as-notice" data-view-as-notice>
+            <span>
+              Viewing events as <strong>{viewer.label}</strong>. Buttons are
+              disabled in this view.
+            </span>
+            <a href="/events">Back to managing events</a>
+          </p>
+        )}
         <div class="volunteer-event-schedule">
           <EventCalendar
             events={events.map((event) => ({
@@ -258,8 +293,9 @@ const seriesItems = manage
               {events.map((event) => (
                 <EventCard
                   event={event}
-                  actor={actor}
+                  actor={subject}
                   organizer={manage}
+                  preview={Boolean(viewer)}
                   publicRoster={publicRoster?.people.filter(
                     (person) => person.eventId === event.id,
                   )}
@@ -318,8 +354,9 @@ const seriesItems = manage
           {pastEvents.map((event) => (
             <EventCard
               event={event}
-              actor={actor}
+              actor={subject}
               organizer={manage}
+              preview={Boolean(viewer)}
               roster={rosters.filter((person) => person.eventId === event.id)}
               destinations={[]}
             />
@@ -379,6 +416,13 @@ const seriesItems = manage
   }
   .volunteer-event-results {
     min-width: 0;
+  }
+  .view-as-notice {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1.5rem;
   }
   .volunteer-event-tools {
     display: flex;

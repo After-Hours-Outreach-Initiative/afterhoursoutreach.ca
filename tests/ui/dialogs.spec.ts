@@ -287,13 +287,7 @@ test("event dialogs offer only cancellation for future events and keep ended his
       cancelForm.getByRole("heading", { name: "Cancel event?", exact: true }),
     ).toBeVisible();
     if (recurring) {
-      await expect(cancelForm.locator("[data-event-cancel-policy]")).toHaveText(
-        "The rest of the series will continue.",
-      );
       await cancelForm.locator('[name="scope"]').selectOption("future");
-      await expect(
-        cancelForm.locator("[data-event-cancel-policy]"),
-      ).toBeHidden();
       await expect(
         cancelForm.locator("[data-event-cancel-reason]"),
       ).toBeHidden();

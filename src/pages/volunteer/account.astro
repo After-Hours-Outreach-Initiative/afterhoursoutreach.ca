@@ -1,6 +1,5 @@
 ---
 import { env } from "cloudflare:workers";
-import { APIError } from "better-auth/api";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
@@ -45,12 +44,9 @@ const accountDate = new Intl.DateTimeFormat("en-CA", {
 let email = "";
 let legacyName = "";
 let userId = "";
-let currentId = "";
 let twoFactorEnabled = false;
 let organizer = false;
 let active = false;
-let sessions: { id: string; userAgent?: string | null; updatedAt: Date }[] = [];
-let sessionsNeedSignIn = false;
 let emailNeedsSignIn = false;
 let deletionNeedsSignIn = false;
 if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");
@@ -78,7 +74,6 @@ try {
     sessionConfig.freshAge !== 0 &&
     Date.now() - current.session.createdAt.getTime() >=
       sessionConfig.freshAge * 1000;
-  currentId = current.session.id;
   deletionNeedsSignIn =
     Date.now() - current.session.createdAt.getTime() >=
     accountDeletionFreshAge * 1000;
@@ -89,28 +84,6 @@ try {
   });
   active = status?.active ?? false;
   patrolApprovedAt = status?.patrol_approved ? status.approved_at : null;
-  try {
-    const listed = await auth.api.listSessions({
-      headers: Astro.request.headers,
-      returnHeaders: true,
-    });
-    forwardCookies(listed.headers, Astro.response.headers);
-    // Only display IDs and metadata, never session tokens.
-    sessions = listed.response
-      .slice(0, 100)
-      .map(({ id, userAgent, updatedAt }) => ({
-        id,
-        userAgent,
-        updatedAt,
-      }));
-  } catch (error) {
-    if (
-      !(error instanceof APIError) ||
-      error.body?.code !== "SESSION_NOT_FRESH"
-    )
-      throw error;
-    sessionsNeedSignIn = true;
-  }
 } catch {
   return new Response("Your account is temporarily unavailable.", {
     status: 503,
@@ -142,7 +115,7 @@ const contents = [
   },
   {
     id: "account-sessions-heading",
-    heading: "Signed-in browsers",
+    heading: "Sign out",
     nested: true,
   },
   { id: "account-delete-heading", heading: "Delete account", nested: true },
@@ -151,7 +124,7 @@ const contents = [
 
 <AccountLayout
   title="Your account"
-  description="Edit your volunteer profile and manage your signed-in browsers."
+  description="Edit your volunteer profile and manage your account settings."
   signedIn
   organizer={organizer}
   name={accountGreeting(values, legacyName)}
@@ -261,11 +234,6 @@ const contents = [
               )}
             </Fragment>
           </ApplicationProgressMini>
-          {applicationProgress.applicationApproved && (
-            <a class="btn btn-outline mt-6" href="#account-profile-heading">
-              View your profile
-            </a>
-          )}
         </section>
       )}
       <section class="volunteer-panel">
@@ -307,58 +275,34 @@ const contents = [
         <div class="volunteer-setting" data-account-sessions>
           <div class="w-full">
             <h3 id="account-sessions-heading" data-contents-section>
-              Signed-in browsers
+              Sign out
             </h3>
-            {sessionsNeedSignIn && (
-              <form
-                data-sign-out
-                action="/api/v1/auth/sign-out"
-                method="post"
-                class="mt-6"
-              >
-                <p>Sign in again to view and manage your signed-in browsers.</p>
-                <button class="btn btn-outline mt-4" type="submit">
-                  Sign out to sign in again
+            <div class="account-session-actions mt-6">
+              <form data-sign-out action="/api/v1/auth/sign-out" method="post">
+                <button
+                  class="btn btn-outline"
+                  type="submit"
+                  data-loading-label="Signing out…"
+                >
+                  Sign out
                 </button>
                 <p data-form-message role="status" hidden />
               </form>
-            )}
-            <ul class="account-sessions mt-6">
-              {sessions.map((entry) => (
-                <li data-session-row>
-                  <div>
-                    <span>
-                      {entry.id === currentId
-                        ? "This browser"
-                        : entry.userAgent || "Another browser"}
-                    </span>
-                    <span class="volunteer-help">
-                      Last active:{" "}
-                      {entry.updatedAt.toLocaleString("en-CA", {
-                        timeZone: "America/Vancouver",
-                      })}
-                    </span>
-                  </div>
-                  {entry.id !== currentId && (
-                    <form
-                      data-end-session
-                      action="/api/v1/account/session"
-                      method="post"
-                    >
-                      <input type="hidden" name="id" value={entry.id} />
-                      <button
-                        class="btn btn-outline"
-                        type="submit"
-                        data-loading-label="Signing out…"
-                      >
-                        Sign out of session
-                      </button>
-                      <p data-form-message role="status" hidden />
-                    </form>
-                  )}
-                </li>
-              ))}
-            </ul>
+              <form
+                data-sign-out-everywhere
+                action="/api/v1/account/session"
+                method="post"
+              >
+                <button
+                  class="btn btn-outline"
+                  type="submit"
+                  data-loading-label="Signing out…"
+                >
+                  Sign out of all devices
+                </button>
+                <p data-form-message role="status" hidden />
+              </form>
+            </div>
           </div>
         </div>
         <AccountDeleteSettings {userId} needsSignIn={deletionNeedsSignIn} />

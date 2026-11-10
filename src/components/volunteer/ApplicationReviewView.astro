@@ -10,9 +10,9 @@ import {
 import { personFullName } from "@/data/person-name";
 import { submittedApplicationSections } from "@/data/application";
 import OrganizerApplicationSteps from "./OrganizerApplicationSteps.astro";
-import VolunteerAccessAction from "./VolunteerAccessAction.astro";
-import ApplicationRejection from "./ApplicationRejection.astro";
+import AccessDecision from "./AccessDecision.astro";
 import PageContents from "./PageContents.astro";
+import PersonHeading from "./PersonHeading.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 
 interface Props {
@@ -35,13 +35,17 @@ const contents = [
 ---
 
 <article class="application-review" data-application-review>
-  <h1
+  <PersonHeading
+    class="application-review-heading"
+    level="h1"
     id="application-review-overview"
     data-application-review-heading
     tabindex="-1"
-  >
-    {personFullName((profile.submission ?? profile).answers, person.name)}
-  </h1>
+    name={personFullName((profile.submission ?? profile).answers, person.name)}
+    {person}
+    teams={profile.answers.teams}
+    applications
+  />
   <PageContents entries={contents} heading="Sections" idleHeading="Sections" />
   <section
     class="application-review-body"
@@ -54,67 +58,59 @@ const contents = [
       idPrefix="application-review"
       showReview={Boolean(person.applicationApproved)}
     >
-      {
-        Boolean(person.applicationApproved) && (
-          <div
-            slot="review"
-            class="application-decision-actions"
-            data-volunteer-controls
-          >
-            <div class="organizer-application-review-actions">
-              <VolunteerAccessAction {person} kind="application" />
-            </div>
-          </div>
-        )
-      }
-    </OrganizerApplicationSteps>
-    {
-      Boolean(person.applicationApproved) && (
-        <a
-          class="btn btn-outline mt-6"
-          href={`/volunteers/${encodeURIComponent(person.id)}`}
-        >
-          View volunteer profile
-          <ArrowRightIcon class="btn-icon" />
-        </a>
-      )
-    }
-    {
-      person.applicationRejectionReason && (
-        <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
-          Reason: {person.applicationRejectionReason}
-        </p>
-      )
-    }
-    {
-      !person.applicationApproved && (
+      {Boolean(person.applicationApproved) && (
         <div
-          class="review-actions application-decision-actions mt-6"
-          data-volunteer-controls={ready ? "" : undefined}
+          slot="review"
+          class="application-decision-actions"
+          data-volunteer-controls
         >
-          <VolunteerAccessAction {person} kind="application" />
-          {!person.applicationRejectionReason &&
-            (ready ? (
-              <ApplicationRejection {person} />
-            ) : (
-              <button class="btn btn-red" type="button" disabled>
-                Reject application
-              </button>
-            ))}
+          <div class="organizer-application-review-actions">
+            <AccessDecision {person} decision="revoke" />
+          </div>
         </div>
-      )
-    }
+      )}
+    </OrganizerApplicationSteps>
+    {Boolean(person.applicationApproved) && (
+      <a
+        class="btn btn-outline mt-6"
+        href={`/volunteers/${encodeURIComponent(person.id)}`}
+      >
+        View volunteer profile
+        <ArrowRightIcon class="btn-icon" />
+      </a>
+    )}
+    {person.applicationRejectionReason && (
+      <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
+        Reason: {person.applicationRejectionReason}
+      </p>
+    )}
+    {!person.applicationApproved && (
+      <div
+        class="review-actions application-decision-actions mt-6"
+        data-volunteer-controls={ready ? "" : undefined}
+      >
+        <AccessDecision {person} decision="approve" />
+        {!person.applicationRejectionReason &&
+          (ready ? (
+            <AccessDecision {person} decision="reject" />
+          ) : (
+            <button class="btn btn-red" type="button" disabled>
+              Reject application
+            </button>
+          ))}
+      </div>
+    )}
   </section>
 </article>
 
 <style>
-  .application-review h1 {
+  .application-review :global(.application-review-heading) {
     grid-column: 1;
     grid-row: 1;
-    min-width: 0;
     margin-bottom: 2rem;
+  }
+  .application-review h1 {
     font-size: var(--text-3xl);
-    overflow-wrap: anywhere;
   }
   .application-review {
     display: grid;

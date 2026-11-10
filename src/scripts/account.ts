@@ -15,12 +15,12 @@ import {
 } from "./application-review";
 import { initApplicationSections } from "./application-sections";
 import { initPageContents } from "./page-contents";
-import { focusAfterUpdate } from "./focus";
 import { syncApplicationProgress } from "./application-progress";
 import { initPhoneInputs } from "./phone-input";
 import { initDateInputs } from "./date-input";
 import {
   clearApplicationDraft,
+  clearSyncedApplicationDrafts,
   initApplicationDraft,
 } from "./application-draft";
 import type { SignInEmail } from "../server/auth/services";
@@ -429,36 +429,30 @@ form("[data-email-change-confirm]", async (element, values) => {
   );
 });
 
-form("[data-sign-out]", async () => {
+async function signOutWith(action: () => Promise<unknown>) {
   const application = document.querySelector<HTMLFormElement>(
     "[data-account-profile][data-application]",
   );
   const draft = application ? applicationDrafts.get(application) : undefined;
   if (draft && !(await draft.beforeSignOut())) return;
   try {
-    await signOut();
+    await action();
   } catch (error) {
     draft?.resume();
     throw error;
   }
   draft?.signedOut();
   location.assign("/volunteer/sign-in");
-});
+}
 
-form("[data-end-session]", async (element, values) => {
-  await post("/api/v1/account/session", { id: String(values.get("id")) });
-  const row = element.closest<HTMLElement>("[data-session-row]")!;
-  const sessions = row.closest<HTMLElement>("[data-account-sessions]")!;
-  const restoreFocus =
-    element.contains(document.activeElement) ||
-    document.activeElement === document.body;
-  row.remove();
-  if (restoreFocus)
-    focusAfterUpdate(
-      sessions.querySelector<HTMLElement>("[data-end-session] button") ??
-        sessions.querySelector<HTMLElement>("h3"),
-    );
-});
+form("[data-sign-out]", () => signOutWith(signOut));
+
+form("[data-sign-out-everywhere]", () =>
+  signOutWith(async () => {
+    await post("/api/v1/account/session", {});
+    clearSyncedApplicationDrafts();
+  }),
+);
 
 form("[data-delete-account]", async (element, values) => {
   const userId = element.dataset.deleteUserId!;

@@ -2,7 +2,32 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const unexpectedRequests = new WeakMap<Page, string[]>();
 const currentProfileState =
-  '[data-patrol-status], [data-patrol-approval] .btn-red, [data-application-mini-step][aria-current="step"] .application-progress-mini-title';
+  '[data-patrol-status], [data-decision="revoke-patrol"] [data-decision-open], [data-application-mini-step][aria-current="step"] .application-progress-mini-title';
+type Frame = ReturnType<Page["frameLocator"]>;
+
+// Patrol decisions confirm in place and always email the volunteer.
+async function approvePatrols(preview: Frame) {
+  await preview
+    .getByRole("button", { name: "Approve for patrols", exact: true })
+    .click();
+  await preview
+    .getByRole("button", { name: "Approve and send email", exact: true })
+    .click();
+}
+async function revokePatrols(preview: Frame) {
+  const trigger = preview.getByRole("button", {
+    name: "Revoke patrol approval",
+    exact: true,
+  });
+  // A failed save leaves the confirmation open with its reason.
+  if (await trigger.isVisible()) await trigger.click();
+  await preview
+    .getByRole("textbox", { name: "Reason for revoking patrol approval" })
+    .fill("Missed the required orientation.");
+  await preview
+    .getByRole("button", { name: "Revoke and send email", exact: true })
+    .click();
+}
 
 async function expectOrganizerField(field: Locator, label: string) {
   const term = field.locator("dt");
@@ -88,7 +113,7 @@ test("organizer profile catalogue exposes every real profile state without accou
     ).toHaveAttribute("data-ui-scenario", id);
     await expect(preview.locator(currentProfileState)).toHaveText(step);
     await expect(
-      preview.locator("[data-volunteer-profile-overview]"),
+      preview.locator("[data-volunteer-profile-overview] h2"),
     ).toHaveText("Alex Jordan Rivera");
     const patrolApproval = preview.getByRole("region", {
       name: "Patrol Approval",
@@ -349,19 +374,12 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
   await expect(approval).toBeEnabled();
   await showPreview(page);
   await approval.click();
-  await preview
-    .getByRole("button", { name: "Cancel change", exact: true })
-    .click();
+  await preview.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(approval).toBeFocused();
   await expect(preview.locator(currentProfileState)).toHaveText(
     "Awaiting patrol approval",
   );
-  await expect(page.locator("[data-ui-profile-status]")).toContainText(
-    "cancelled",
-  );
-  await approval.click();
-  await preview
-    .getByRole("button", { name: "Save without email", exact: true })
-    .click();
+  await approvePatrols(preview);
   await expect(preview.locator(currentProfileState)).toHaveText(
     "Revoke patrol approval",
   );
@@ -373,12 +391,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
       .getByRole("combobox", { name: "Action result" })
       .selectOption(outcome);
     await showPreview(page);
-    await preview
-      .getByRole("button", { name: "Revoke patrol approval", exact: true })
-      .click();
-    await preview
-      .getByRole("button", { name: "Save without email", exact: true })
-      .click();
+    await revokePatrols(preview);
     await expect(preview.getByRole("alert")).toContainText(error);
     await expect(preview.locator(currentProfileState)).toHaveText(
       "Revoke patrol approval",
@@ -388,12 +401,7 @@ test("real organizer controls simulate confirmation, cancellation, success, erro
     .getByRole("combobox", { name: "Action result" })
     .selectOption("pending");
   await showPreview(page);
-  await preview
-    .getByRole("button", { name: "Revoke patrol approval", exact: true })
-    .click();
-  await preview
-    .getByRole("button", { name: "Save without email", exact: true })
-    .click();
+  await revokePatrols(preview);
   await expect(
     preview.locator('[data-organizer-status][data-access-kind="patrol"]'),
   ).toHaveAttribute("aria-busy", "true");
@@ -418,15 +426,7 @@ test("patrol approval email failures update only fictional state", async ({
   );
   const preview = page.frameLocator("[data-ui-profile-frame]");
   await showPreview(page);
-  await preview
-    .getByRole("button", { name: "Approve for patrols", exact: true })
-    .click();
-  await preview
-    .getByRole("button", {
-      name: "Save and send email",
-      exact: true,
-    })
-    .click();
+  await approvePatrols(preview);
   await expect(
     preview.getByRole("dialog", {
       name: "Volunteer access saved",
@@ -481,10 +481,10 @@ test("active status, account roles and patrol access can be changed through the 
   await expect(page.locator("[data-ui-profile-state]")).toContainText(
     '"role": "organizer"',
   );
-  await preview
-    .getByRole("button", { name: "Revoke patrol approval", exact: true })
-    .click();
-  await save();
+  await revokePatrols(preview);
+  await expect(page.locator("[data-ui-profile-status]")).toContainText(
+    "Simulation: saved",
+  );
   await expect(preview.locator(currentProfileState)).toHaveText(
     "Awaiting patrol approval",
   );
@@ -502,10 +502,10 @@ test("active status, account roles and patrol access can be changed through the 
     "datetime",
     /T.*Z$/,
   );
-  await preview
-    .getByRole("button", { name: "Approve for patrols", exact: true })
-    .click();
-  await save();
+  await approvePatrols(preview);
+  await expect(page.locator("[data-ui-profile-status]")).toContainText(
+    "Simulation: saved",
+  );
   await expect(preview.locator(currentProfileState)).toHaveText(
     "Revoke patrol approval",
   );

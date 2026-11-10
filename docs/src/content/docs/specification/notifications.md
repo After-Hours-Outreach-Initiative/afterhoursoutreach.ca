@@ -17,8 +17,13 @@ expiry, and retry limits belong in [Account implementation](/implementation/acco
 
 ## Organizer choices
 
-Organizers choose whether to send email when they change application approval,
-active status, patrol approval, roles, event details, or event cancellation, or
+Approving, rejecting, or revoking an application, and approving or revoking
+patrol approval from a volunteer profile, always email the volunteer once the
+organizer confirms. Rejection and revocation require a reason, which the email
+includes.
+
+Organizers choose whether to send email when they change active status, roles,
+event details, or event cancellation, approve patrols from an event roster, or
 move or remove a volunteer's sign-up. A reason may accompany relevant changes.
 
 - **Save without email** applies the change without queuing a notification.

@@ -42,11 +42,6 @@ const id = `${dialogId}-cancel`;
       </h3>
       <input type="hidden" name="id" value={event.id} />
       <input type="hidden" name="version" value={event.updatedAt} />
-      {event.seriesId && (
-        <p class="volunteer-help" data-event-cancel-policy>
-          The rest of the series will continue.
-        </p>
-      )}
       {series && (
         <>
           <input type="hidden" name="seriesId" value={series.id} />
@@ -65,11 +60,6 @@ const id = `${dialogId}-cancel`;
               </option>
             </select>
           </label>
-          <p class="volunteer-help">
-            Cancelling future occurrences also cancels their bookings, including
-            individual exceptions. Past attendance and cancellation history are
-            kept.
-          </p>
         </>
       )}
       <div
@@ -155,8 +145,13 @@ const id = `${dialogId}-cancel`;
       const trigger = this.querySelector<HTMLButtonElement>(
         "[data-event-cancel-open]",
       )!;
-      void this.morph
-        .run(surface, trigger, form, expanded, () => {
+      // Reveal the confirmation while it expands, not after the morph ends.
+      this.morph.run(
+        surface,
+        trigger,
+        form,
+        expanded,
+        () => {
           this.toggleAttribute("data-expanded", expanded);
           trigger.setAttribute("aria-expanded", String(expanded));
           form.inert = !expanded;
@@ -164,24 +159,9 @@ const id = `${dialogId}-cancel`;
           trigger.inert = expanded;
           // Focus the section without opening the keyboard or choosing an action.
           (expanded ? form : trigger).focus({ preventScroll: true });
-        })
-        .then((completed) => {
-          if (
-            !completed ||
-            !expanded ||
-            !this.isConnected ||
-            !this.hasAttribute("data-expanded")
-          )
-            return;
-          surface.scrollIntoView({
-            block: "nearest",
-            inline: "nearest",
-            behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
-              .matches
-              ? "instant"
-              : "smooth",
-          });
-        });
+        },
+        { reveal: true },
+      );
     }
   }
 

@@ -268,7 +268,7 @@ function initializeProfileSimulator() {
     }
     let paused = false;
     try {
-      let notify = form.hasAttribute("data-organizer-rejection");
+      let notify = form.matches("[data-organizer-rejection], [data-notify]");
       if (form.dataset.emailPrompt) {
         phase = "choosing-notification";
         report();
@@ -313,8 +313,8 @@ function initializeProfileSimulator() {
           "This volunteer's status changed. Reload before saving.",
         );
       const next = { ...current };
-      let selector =
-        '[data-organizer-status][data-access-kind="application"] button';
+      const patrolControl = "[data-patrol-approval] [data-decision-open]";
+      let selector = "[data-decision-open]";
       if (form.hasAttribute("data-organizer-role")) {
         next.role =
           values.get("role") === "organizer" ? "organizer" : "volunteer";
@@ -323,7 +323,7 @@ function initializeProfileSimulator() {
         next.rejection = String(values.get("reason") ?? "").trim();
       } else if (values.has("approvePatrols")) {
         next.patrol = true;
-        selector = '[data-organizer-status][data-access-kind="patrol"] button';
+        selector = patrolControl;
       } else {
         next.approved = values.has("applicationApproved");
         next.patrol = next.approved && values.has("patrolApproved");
@@ -332,9 +332,7 @@ function initializeProfileSimulator() {
         if (form.dataset.accessKind === "active")
           selector =
             '[data-organizer-status][data-access-kind="active"] input[name="active"]';
-        else if (form.dataset.accessKind === "patrol")
-          selector =
-            '[data-organizer-status][data-access-kind="patrol"] button';
+        else if (form.dataset.accessKind === "patrol") selector = patrolControl;
       }
       if (
         next.approved &&

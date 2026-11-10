@@ -1207,13 +1207,20 @@ describe(
               '[data-organizer-status][data-access-kind="patrol"]',
             ),
             notify: true,
-            trigger: () =>
-              profileView
+            trigger: async () => {
+              await profileView
                 .getByRole("button", {
                   name: "Approve for patrols",
                   exact: true,
                 })
-                .click(),
+                .click();
+              await profileView
+                .getByRole("button", {
+                  name: "Approve and send email",
+                  exact: true,
+                })
+                .click();
+            },
             updated: () =>
               profileView
                 .getByRole("button", {

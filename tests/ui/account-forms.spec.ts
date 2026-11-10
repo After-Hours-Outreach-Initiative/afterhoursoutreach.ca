@@ -718,7 +718,7 @@ test("account contents navigate profile and settings sections on desktop and mob
     ).toHaveCount(0);
     for (const [id, heading] of [
       ["account-profile-emergency-contact", "Emergency contact"],
-      ["account-sessions-heading", "Signed-in browsers"],
+      ["account-sessions-heading", "Sign out"],
     ]) {
       if (width < 1024) await summary.click();
       const link = contents.getByRole("link", { name: heading, exact: true });
@@ -3673,72 +3673,39 @@ test("edits made during a profile save remain unsaved", async ({
   }
 });
 
-test("signed-in browser cards stay framed after reload and removal", async ({
+test("signing out of all devices ends every session", async ({
   page,
   browser,
   baseURL,
 }) => {
   const account = await createLocalAccount(page.request, baseURL!);
-  await page.goto("/volunteer/account");
-  const sessions = page.locator("[data-account-sessions]");
-  const rows = sessions.locator("[data-session-row]");
-  const expectCards = async (count: number) => {
-    await expect(rows).toHaveCount(count);
-    await expect(sessions).toHaveCSS("border-bottom-width", "0px");
-    for (let index = 0; index < count; index++) {
-      await expect(rows.nth(index)).toHaveCSS("border-width", "1px");
-      await expect(rows.nth(index)).toHaveCSS("border-radius", "8px");
-      await expect(rows.nth(index)).toHaveCSS("padding", "20px");
-    }
-    await expect(sessions).toHaveCSS("border-top-width", "1px");
-  };
-  await expectCards(1);
-
-  // Separate devices keep their sessions when the local browser clears cookies.
+  // A separate device keeps its own session until every session is revoked.
   const otherDevice = await browser.newContext({ baseURL });
   try {
-    for (let index = 0; index < 2; index++) {
-      await otherDevice.clearCookies();
-      const response = await otherDevice.request.post(
-        "/api/v1/auth/dev/switch-user",
-        {
-          headers: { origin: baseURL! },
-          data: { userId: account.id },
-        },
-      );
-      expect(response.status(), await response.text()).toBe(200);
-    }
+    const response = await otherDevice.request.post(
+      "/api/v1/auth/dev/switch-user",
+      {
+        headers: { origin: baseURL! },
+        data: { userId: account.id },
+      },
+    );
+    expect(response.status(), await response.text()).toBe(200);
+    await page.goto("/volunteer/account");
+    const sessions = page.locator("[data-account-sessions]");
+    await expect(sessions.locator("[data-session-row]")).toHaveCount(0);
+    await expect(
+      sessions.getByRole("button", { name: "Sign out", exact: true }),
+    ).toBeVisible();
+    await sessions
+      .getByRole("button", { name: "Sign out of all devices", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
+    const other = await otherDevice.newPage();
+    await other.goto("/volunteer/account");
+    await expect(other).toHaveURL(/\/volunteer\/sign-in/);
   } finally {
     await otherDevice.close();
   }
-  await page.reload();
-  for (const width of [1280, 375]) {
-    await page.setViewportSize({ width, height: 812 });
-    await expectCards(3);
-  }
-  for (const remaining of [2, 1]) {
-    const form = sessions.locator("[data-end-session]").last();
-    await inPlaceAction(page, {
-      endpoint: "/api/v1/account/session",
-      form,
-      trigger: () =>
-        form
-          .getByRole("button", { name: "Sign out of session", exact: true })
-          .click(),
-      updated: () => expectCards(remaining),
-      loadingLabel: "Signing out…",
-    });
-  }
-  await expect(
-    sessions.getByRole("heading", {
-      name: "Signed-in browsers",
-      exact: true,
-    }),
-  ).toBeFocused();
-  await expect(page.locator("#account-sessions-heading")).toHaveAttribute(
-    "tabindex",
-    "-1",
-  );
 });
 
 test("authenticator sign-in shows native inline code errors", async ({
@@ -3769,11 +3736,10 @@ test("authenticator sign-in shows native inline code errors", async ({
       'a[href="#account-factor-heading"][aria-current="location"]',
     ),
   ).toHaveCount(2);
-  await expect(page.locator("[data-account-sessions]")).toContainText(
-    "This browser",
-  );
-  await page.locator("[data-account-menu] summary").click();
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page
+    .locator("[data-account-sessions]")
+    .getByRole("button", { name: "Sign out", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/volunteer\/sign-in$/);
   await page.goto("/volunteer/sign-in?second-factor=1");
   const challenge = page.locator("[data-second-factor]");

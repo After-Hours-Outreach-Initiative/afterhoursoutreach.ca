@@ -449,11 +449,15 @@ async function refreshVolunteer(element: HTMLFormElement) {
   const restoreFocus = element.contains(active) || active === document.body;
   const selector = element.matches("[data-organizer-role]")
     ? '[data-organizer-role] select[name="role"]'
-    : element.matches("[data-organizer-rejection]")
-      ? '[data-organizer-status][data-access-kind="application"] button[type="submit"]'
+    : element.matches(
+          '[data-organizer-rejection], [data-organizer-status][data-access-kind="application"]',
+        )
+      ? "[data-decision-open]"
       : element.hasAttribute("data-submit-on-change")
         ? '[data-organizer-status][data-submit-on-change] input[name="active"]'
-        : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
+        : element.dataset.accessKind === "patrol"
+          ? "[data-patrol-approval] [data-decision-open]"
+          : `[data-organizer-status][data-access-kind="${element.dataset.accessKind}"] button[type="submit"]`;
   if (profile.isConnected) {
     disposeVolunteerProfileContents(profile);
     profile.replaceWith(replacement);
@@ -508,6 +512,11 @@ if (eventBrowser) {
         const versionUrl = new URL("/api/v1/events/version", location.origin);
         if (eventBrowser.dataset.eventView === "manage")
           versionUrl.searchParams.set("view", "manage");
+        if (eventBrowser.dataset.eventViewAs)
+          versionUrl.searchParams.set(
+            "viewAs",
+            eventBrowser.dataset.eventViewAs,
+          );
         const selectedOccurrence = new URL(location.href).searchParams.get(
           "occurrence",
         );
@@ -719,7 +728,7 @@ function form(
       )
         return;
       let notify: boolean | undefined = element.matches(
-        "[data-organizer-rejection]",
+        "[data-organizer-rejection], [data-notify]",
       )
         ? true
         : undefined;
@@ -952,6 +961,7 @@ form(
           active: v.has("active"),
           applicationApproved: v.has("applicationApproved"),
           patrolApproved: v.has("patrolApproved"),
+          ...(v.has("reason") ? { reason: str(v, "reason") } : {}),
         },
   refreshVolunteer,
 );

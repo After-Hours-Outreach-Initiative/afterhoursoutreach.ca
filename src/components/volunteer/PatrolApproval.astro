@@ -4,7 +4,7 @@ import type {
   VolunteerPatrolAccessChange,
   VolunteerRow,
 } from "@/server/db/volunteers";
-import VolunteerAccessAction from "./VolunteerAccessAction.astro";
+import AccessDecision from "./AccessDecision.astro";
 import { formatEventDate } from "@/data/event-time";
 import { formatApplicationSubmittedTime } from "@/data/application";
 
@@ -72,7 +72,10 @@ const { person, orientation, accessChangedBy } = Astro.props;
   {!person.active && <p>Volunteer account inactive</p>}
   {Boolean(person.applicationApproved) && (
     <div class="patrol-approval-actions">
-      <VolunteerAccessAction {person} kind="patrol" />
+      <AccessDecision
+        {person}
+        decision={person.patrolApproved ? "revoke-patrol" : "approve-patrol"}
+      />
     </div>
   )}
 </section>

@@ -80,6 +80,7 @@ export const POST: APIRoute = async ({ request }) => {
               registrationApproved: input.registrationApproved,
               patrolApproved: input.patrolApproved,
               notify: input.notify,
+              reason: input.reason,
             })
           : input.action === "approve-patrols"
             ? await approveForPatrols(env.DB, actor, {

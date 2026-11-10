@@ -1,0 +1,338 @@
+---
+import type { VolunteerRow } from "@/server/db/volunteers";
+
+interface Props {
+  person: VolunteerRow;
+  decision:
+    "approve" | "reject" | "revoke" | "approve-patrol" | "revoke-patrol";
+}
+const { person, decision } = Astro.props;
+const id = `access-${decision}-${person.id}`;
+const copy = {
+  approve: {
+    trigger: "Approve application",
+    heading: "Approve application?",
+    reason: undefined,
+    submit: "Approve and send email",
+  },
+  reject: {
+    trigger: "Reject application",
+    heading: "Reject application",
+    reason: "Reason for rejection",
+    submit: "Reject and send email",
+  },
+  revoke: {
+    trigger: "Revoke application approval",
+    heading: "Revoke application approval",
+    reason: "Reason for revoking approval",
+    submit: "Revoke and send email",
+  },
+  "approve-patrol": {
+    trigger: "Approve for patrols",
+    heading: "Approve for patrols?",
+    reason: undefined,
+    submit: "Approve and send email",
+  },
+  "revoke-patrol": {
+    trigger: "Revoke patrol approval",
+    heading: "Revoke patrol approval",
+    reason: "Reason for revoking patrol approval",
+    submit: "Revoke and send email",
+  },
+}[decision];
+const statusForm = decision !== "reject";
+const patrol = decision.endsWith("-patrol");
+const approval = decision.startsWith("approve");
+---
+
+<access-decision data-decision={decision}>
+  <div class="decision-surface">
+    <button
+      class:list={["btn decision-trigger", approval ? "btn-green" : "btn-red"]}
+      type="button"
+      aria-expanded="false"
+      aria-controls={id}
+      data-decision-open
+      data-volunteer-control
+      disabled
+    >
+      {copy.trigger}
+    </button>
+    <form
+      id={id}
+      class="volunteer-form decision-form"
+      data-organizer-rejection={decision === "reject" ? "" : undefined}
+      data-organizer-status={statusForm ? "" : undefined}
+      data-access-kind={
+        statusForm ? (patrol ? "patrol" : "application") : undefined
+      }
+      data-notify={statusForm ? "" : undefined}
+      action="/api/v1/organizer/action"
+      method="post"
+      aria-labelledby={`${id}-heading`}
+      aria-hidden="true"
+      tabindex="-1"
+      inert
+    >
+      <h3 id={`${id}-heading`} class="text-lg">
+        {copy.heading}
+      </h3>
+      <input type="hidden" name="userId" value={person.id} />
+      <input type="hidden" name="version" value={person.updatedAt} />
+      {statusForm && (
+        <>
+          <input
+            type="checkbox"
+            name="active"
+            checked={Boolean(person.active)}
+            hidden
+          />
+          <input
+            type="checkbox"
+            name="applicationApproved"
+            checked={
+              patrol
+                ? Boolean(person.applicationApproved)
+                : decision === "approve"
+            }
+            hidden
+          />
+          <input
+            type="checkbox"
+            name="patrolApproved"
+            checked={
+              patrol
+                ? decision === "approve-patrol"
+                : Boolean(person.patrolApproved)
+            }
+            hidden
+          />
+        </>
+      )}
+      {decision === "approve-patrol" && (
+        <input type="hidden" name="approvePatrols" value="true" />
+      )}
+      {copy.reason && (
+        <label class="volunteer-field">
+          {copy.reason}
+          <textarea
+            name="reason"
+            required
+            maxlength="2000"
+            rows="4"
+            data-volunteer-control
+            disabled
+          />
+        </label>
+      )}
+      <p data-form-message role="status" hidden></p>
+      <div class="decision-actions">
+        <button
+          class="btn btn-quiet"
+          type="button"
+          data-decision-cancel
+          data-volunteer-control
+          disabled
+        >
+          Cancel
+        </button>
+        <button
+          class:list={["btn", approval ? "btn-green" : "btn-red"]}
+          type="submit"
+          data-loading-label="Sending…"
+          data-volunteer-control
+          disabled
+        >
+          {copy.submit}
+        </button>
+      </div>
+    </form>
+  </div>
+</access-decision>
+
+<script>
+  import { InlineMorph } from "@/scripts/inline-morph";
+
+  class AccessDecision extends HTMLElement {
+    private controller?: AbortController;
+    private morph = new InlineMorph();
+
+    connectedCallback() {
+      this.controller?.abort();
+      this.controller = new AbortController();
+      const { signal } = this.controller;
+      this.addEventListener(
+        "click",
+        (event) => {
+          if (!(event.target instanceof Element)) return;
+          const button = event.target.closest<HTMLButtonElement>(
+            "[data-decision-open], [data-decision-cancel]",
+          );
+          if (button && !button.disabled)
+            this.expand(button.hasAttribute("data-decision-open"));
+          // The surface's border belongs to the collapsed button too.
+          else if (
+            event.target.matches(".decision-surface") &&
+            !this.hasAttribute("data-expanded")
+          ) {
+            const trigger = this.querySelector<HTMLButtonElement>(
+              "[data-decision-open]",
+            )!;
+            if (!trigger.disabled) this.expand(true);
+          }
+        },
+        { signal },
+      );
+      this.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape" && this.hasAttribute("data-expanded")) {
+            event.preventDefault();
+            this.expand(false);
+          }
+        },
+        { signal },
+      );
+    }
+
+    disconnectedCallback() {
+      this.controller?.abort();
+      this.morph.cancel();
+    }
+
+    expand(expanded: boolean, focus = true) {
+      if (this.closest("[data-submitting]")) return;
+      if (expanded === this.hasAttribute("data-expanded")) return;
+      // Only one decision can be in progress for an application.
+      if (expanded)
+        for (const other of this.parentElement?.querySelectorAll<AccessDecision>(
+          "access-decision[data-expanded]",
+        ) ?? [])
+          if (other !== this) other.expand(false, false);
+      const surface = this.querySelector<HTMLElement>(".decision-surface")!;
+      const trigger = this.querySelector<HTMLButtonElement>(
+        "[data-decision-open]",
+      )!;
+      const form = this.querySelector<HTMLFormElement>("form")!;
+      this.morph.run(surface, trigger, form, expanded, () => {
+        this.toggleAttribute("data-expanded", expanded);
+        trigger.setAttribute("aria-expanded", String(expanded));
+        form.inert = !expanded;
+        form.setAttribute("aria-hidden", String(!expanded));
+        trigger.inert = expanded;
+        // Focus the form itself, not the textarea or the hidden trigger.
+        if (focus) (expanded ? form : trigger).focus({ preventScroll: true });
+      });
+    }
+  }
+
+  if (!customElements.get("access-decision"))
+    customElements.define("access-decision", AccessDecision);
+</script>
+
+<style>
+  access-decision {
+    --decision-color: var(--color-red-700);
+    --decision-hover: var(--color-red-800);
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  access-decision[data-decision^="approve"] {
+    --decision-color: var(--color-green-700);
+    --decision-hover: var(--color-green-800);
+  }
+  .decision-surface {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    overflow: clip;
+    border: 2px solid var(--decision-color);
+    border-radius: 0.5rem;
+    background: var(--decision-color);
+  }
+  .decision-trigger.btn {
+    min-height: 2.5rem;
+    padding-inline: calc(1.25rem - 2px);
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+  }
+  access-decision:not([data-expanded])
+    .decision-surface:has(.decision-trigger:hover:not(:disabled)) {
+    border-color: var(--decision-hover);
+    background: var(--decision-hover);
+  }
+  access-decision:not([data-expanded])
+    .decision-surface:has(.decision-trigger:enabled) {
+    cursor: pointer;
+  }
+  access-decision:not([data-expanded])
+    .decision-surface:has(.decision-trigger:disabled) {
+    border-color: #3f3f46;
+    background: #27272a;
+  }
+  .decision-trigger,
+  .decision-form {
+    transition:
+      opacity 160ms ease,
+      visibility 0s linear 160ms;
+  }
+  .decision-form {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 1rem;
+    visibility: hidden;
+    opacity: 0;
+  }
+  [data-expanded] .decision-surface {
+    width: min(100%, 36rem);
+    background: #000;
+  }
+  [data-expanded] .decision-trigger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    opacity: 0;
+  }
+  [data-expanded] .decision-form {
+    position: relative;
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  access-decision:not([data-expanded]) .decision-trigger {
+    transition-delay: 0s;
+  }
+  .decision-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+  .decision-surface:has(.decision-trigger:focus-visible) {
+    outline: 2px solid white;
+    outline-offset: 3px;
+  }
+  @media (width < 40rem) {
+    .decision-surface {
+      width: 100%;
+    }
+    /* Fill the full-width surface so the label centers and all of it is clickable. */
+    .decision-trigger.btn {
+      width: 100%;
+      justify-content: center;
+      text-align: center;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .decision-trigger,
+    .decision-form {
+      transition: none;
+    }
+  }
+</style>

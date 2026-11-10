@@ -17,13 +17,14 @@ let team: Awaited<ReturnType<typeof listVolunteers>> = {
   inProgressCount: 0,
   rejectedCount: 0,
   approvedCount: 0,
+  roleCounts: {},
 };
 let lock = "";
 let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
 const state = volunteerListState(Astro.url.searchParams);
-const { search, sort, direction } = state;
+const { search, sort, direction, roles, roleOrder } = state;
 const listUrl = volunteerListUrl(state);
 try {
   const { actor, headers, email, greetingName } = await accountContext(
@@ -47,7 +48,10 @@ try {
     else throw error;
   }
   if (!lock)
-    team = await listVolunteers(env.DB, actor, search, sort, direction);
+    team = await listVolunteers(env.DB, actor, search, sort, direction, {
+      roles,
+      roleOrder,
+    });
 } catch {
   return new Response("Volunteer management is temporarily unavailable.", {
     status: 503,

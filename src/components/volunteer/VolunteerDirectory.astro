@@ -3,10 +3,15 @@ import DirectoryRow from "./DirectoryRow.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
 import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
+import FilterMenu from "./FilterMenu.astro";
+import DirectorySortMenu from "./DirectorySortMenu.astro";
 import {
   directoryListUrl,
   applicationStatuses,
   directoryEmptyMessage,
+  directoryRoleKeys,
+  directoryRoles,
+  type ApplicationStatus,
   type DirectoryListState,
   type DirectorySort,
 } from "../../data/volunteer-list";
@@ -31,10 +36,10 @@ const profileHref =
   Astro.props.profileHref ??
   ((id: string) =>
     `/${kind}/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(listUrl)}`);
-const { search, approval, sort, direction } = state;
+const { search, approval, roles, sort, direction } = state;
 const visibleIds = new Set(people.rows.map(({ id }) => id));
 const cachedRows = people.allRows.filter(({ id }) => !visibleIds.has(id));
-const statusCounts = {
+const statusCounts: Record<ApplicationStatus, number> = {
   awaiting: people.awaitingApprovalCount,
   "in-progress": people.inProgressCount,
   rejected: people.rejectedCount,
@@ -49,6 +54,17 @@ const columns = (
       ]
     : [{ key: "name", label: "Name" }]
 ) satisfies { key: DirectorySort; label: string }[];
+const sortOptions = applications
+  ? [
+      { value: "progress", label: "Status" },
+      { value: "completed", label: "Completed" },
+      { value: "name", label: "Name" },
+      { value: "role", label: "Role" },
+    ]
+  : [
+      { value: "role", label: "Role" },
+      { value: "name", label: "Name" },
+    ];
 ---
 
 <section
@@ -60,96 +76,91 @@ const columns = (
   <div class="volunteer-section-heading">
     <h2 id={`${kind}-heading`}>{title}</h2>
   </div>
-  <form class="volunteer-search" method="get" data-volunteer-search-form>
-    {
-      Object.entries(formFields).map(([name, value]) => (
-        <input type="hidden" name={name} value={value} />
-      ))
-    }
-    {applications && <input type="hidden" name="approval" value={approval} />}
-    <input type="hidden" name="sort" value={sort} />
-    <input type="hidden" name="direction" value={direction} />
-    <label class="volunteer-search-field">
-      <span class="sr-only">
-        {applications ? "Find an applicant" : "Find a volunteer"}
-      </span>
-      <SearchIcon class="volunteer-search-icon" />
-      <input
-        type="search"
-        name="q"
-        data-volunteer-search
-        value={search}
-        maxlength="100"
-        placeholder="Search by name"
-      />
-    </label>
-    <button class="btn btn-outline" type="submit" data-volunteer-search-submit
-      >Search</button
-    >
-  </form>
-  {
-    applications && (
-      <form
-        class="volunteer-filters"
-        method="get"
-        role="group"
-        aria-label="Application status"
-        data-volunteer-filters
+  <form
+    class="directory-controls"
+    method="get"
+    data-volunteer-search-form
+    data-directory-controls
+  >
+    {Object.entries(formFields).map(([name, value]) => (
+      <input type="hidden" name={name} value={value} />
+    ))}
+    <div class="volunteer-search">
+      <label class="volunteer-search-field">
+        <span class="sr-only">
+          {applications ? "Find an applicant" : "Find a volunteer"}
+        </span>
+        <SearchIcon class="volunteer-search-icon" />
+        <input
+          type="search"
+          name="q"
+          data-volunteer-search
+          value={search}
+          maxlength="100"
+          placeholder="Search by name"
+        />
+      </label>
+      <button
+        class="btn btn-outline"
+        type="submit"
+        data-volunteer-search-submit
       >
-        {Object.entries(formFields).map(([name, value]) => (
-          <input type="hidden" name={name} value={value} />
-        ))}
-        <input type="hidden" name="q" value={search} />
-        <input type="hidden" name="sort" value={sort} />
-        <input type="hidden" name="direction" value={direction} />
-        <button
-          class="volunteer-filter"
-          type="submit"
-          name="approval"
-          value="all"
-          data-volunteer-filter="all"
-          aria-controls={`${kind}-table`}
-          aria-pressed={approval === "all" ? "true" : "false"}
-        >
-          <span>All</span>{" "}
-          <span
-            class="volunteer-filter-count"
-            data-all-applicants-count
-            data-volunteer-count="all"
-          >
-            {people.allApplicantsCount}
-          </span>
-        </button>
-        {Object.entries(applicationStatuses).map(([value, status]) => (
-          <button
-            class="volunteer-filter"
-            type="submit"
+        Search
+      </button>
+    </div>
+    <div class="directory-control-row">
+      <div class="directory-filters" role="group" aria-label="Filters">
+        {applications && (
+          <FilterMenu
             name="approval"
-            value={value}
-            data-volunteer-filter={value}
-            data-state={status.state}
-            aria-controls={`${kind}-table`}
-            aria-pressed={approval === value ? "true" : "false"}
-          >
-            <span>{status.label}</span>{" "}
-            {value === "awaiting" ? (
-              <span
-                class="volunteer-filter-count"
-                data-awaiting-approval-count
-                data-volunteer-count={value}
-              >
-                {people.awaitingApprovalCount}
-              </span>
-            ) : (
-              <span class="volunteer-filter-count" data-volunteer-count={value}>
-                {statusCounts[value as keyof typeof statusCounts]}
-              </span>
-            )}
-          </button>
-        ))}
-      </form>
-    )
-  }
+            label="Status"
+            idPrefix={kind}
+            selected={approval}
+            groups={[
+              {
+                options: Object.entries(applicationStatuses).map(
+                  ([value, status]) => ({
+                    value,
+                    label: status.label,
+                    count: statusCounts[value as ApplicationStatus],
+                    // The review queue's count is a stable page hook.
+                    countAttributes:
+                      value === "awaiting"
+                        ? { "data-awaiting-approval-count": "" }
+                        : undefined,
+                  }),
+                ),
+              },
+            ]}
+          />
+        )}
+        <FilterMenu
+          name="role"
+          label="Role"
+          idPrefix={kind}
+          selected={roles}
+          groups={[
+            {
+              options: directoryRoleKeys(kind).map((role) => ({
+                value: role,
+                label: directoryRoles[role],
+                count: people.roleCounts[role] ?? 0,
+              })),
+            },
+          ]}
+        />
+        <a
+          class="directory-filters-reset"
+          href={urlForState({ ...state, approval: [], roles: [] })}
+          data-directory-reset
+          hidden={!approval.length && !roles.length}
+        >
+          Clear filters
+        </a>
+      </div>
+      <DirectorySortMenu {kind} {state} options={sortOptions} />
+    </div>
+  </form>
   <div data-volunteer-results>
     <div class="volunteer-table-shell">
       <TableScrollFrame
@@ -158,61 +169,55 @@ const columns = (
       >
         <table class="volunteer-table" id={`${kind}-table`}>
           <caption class="sr-only">
-            {
-              applications
-                ? "Applicants, roles, status, and completion dates"
-                : "Approved volunteers and roles"
-            }
+            {applications
+              ? "Applicants, roles, status, and completion dates"
+              : "Approved volunteers and roles"}
           </caption>
           <thead>
             <tr>
-              {
-                columns.map(({ key, label }) => {
-                  const active = sort === key;
-                  const nextDirection =
-                    active && direction === "asc" ? "desc" : "asc";
-                  return (
-                    <th
-                      scope="col"
-                      data-directory-column={key}
-                      aria-sort={
-                        active
-                          ? direction === "asc"
-                            ? "ascending"
-                            : "descending"
-                          : undefined
-                      }
+              {columns.map(({ key, label }) => {
+                const active = sort === key;
+                const nextDirection =
+                  active && direction === "asc" ? "desc" : "asc";
+                return (
+                  <th
+                    scope="col"
+                    data-directory-column={key}
+                    aria-sort={
+                      active
+                        ? direction === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : undefined
+                    }
+                  >
+                    <a
+                      class="volunteer-table-sort"
+                      href={urlForState({
+                        ...state,
+                        sort: key,
+                        direction: nextDirection,
+                      })}
+                      data-volunteer-sort={key}
+                      aria-controls={`${kind}-table`}
+                      aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
                     >
-                      <a
-                        class="volunteer-table-sort"
-                        href={urlForState({
-                          ...state,
-                          sort: key,
-                          direction: nextDirection,
-                        })}
-                        data-volunteer-sort={key}
-                        aria-controls={`${kind}-table`}
-                        aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
-                      >
-                        <span>{label}</span>
-                        <ArrowRightIcon class="volunteer-table-sort-icon" />
-                      </a>
-                    </th>
-                  );
-                })
-              }
+                      <span>{label}</span>
+                      <ArrowRightIcon class="volunteer-table-sort-icon" />
+                    </a>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {
-              people.rows.map((person) => (
-                <DirectoryRow
-                  person={person}
-                  applications={applications}
-                  href={profileHref(person.id)}
-                />
-              ))
-            }
+            {people.rows.map((person) => (
+              <DirectoryRow
+                person={person}
+                applications={applications}
+                href={profileHref(person.id)}
+              />
+            ))}
           </tbody>
         </table>
       </TableScrollFrame>
@@ -227,20 +232,52 @@ const columns = (
     <template data-volunteer-cached-rows>
       <table>
         <tbody>
-          {
-            cachedRows.map((person) => (
-              <DirectoryRow
-                person={person}
-                applications={applications}
-                href={profileHref(person.id)}
-              />
-            ))
-          }
+          {cachedRows.map((person) => (
+            <DirectoryRow
+              person={person}
+              applications={applications}
+              href={profileHref(person.id)}
+            />
+          ))}
         </tbody>
       </table>
     </template>
   </div>
   <p class="sr-only" role="status" data-volunteer-result-count></p>
-  <p data-volunteer-search-error class="volunteer-notice" role="status" hidden>
-  </p>
+  <p
+    data-volunteer-search-error
+    class="volunteer-notice"
+    role="status"
+    hidden
+  ></p>
 </section>
+
+<style>
+  .directory-controls {
+    margin-bottom: 1rem;
+  }
+  .directory-controls .volunteer-search {
+    margin-bottom: 1rem;
+  }
+  .directory-control-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .directory-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .directory-filters-reset {
+    margin-left: 0.25rem;
+    color: #d4d4d8;
+    text-decoration: underline;
+    text-underline-offset: 0.25rem;
+  }
+  .directory-filters-reset[hidden] {
+    display: none;
+  }
+</style>

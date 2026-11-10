@@ -34,14 +34,23 @@ import {
 import type {
   ApplicationSort,
   ApplicationApprovalFilter,
+  ApplicationStatus,
+  DirectoryRole,
   VolunteerSort,
   VolunteerSortDirection,
 } from "../../data/volunteer-list";
 import {
+  directoryRoleKeys,
   directoryView,
   type DirectoryPerson,
   type DirectoryListState,
 } from "../../data/volunteer-list";
+
+/** Role filters and the custom role sort order shared by both directories. */
+interface DirectoryRoleOptions {
+  roles?: DirectoryRole[];
+  roleOrder?: DirectoryRole[];
+}
 
 export interface VolunteerRow {
   id: string;
@@ -62,10 +71,16 @@ export async function listVolunteers(
   search = "",
   sort: VolunteerSort = "role",
   direction: VolunteerSortDirection = "asc",
+  {
+    roles = [],
+    roleOrder = directoryRoleKeys("volunteers"),
+  }: DirectoryRoleOptions = {},
 ) {
   return listPeople(db, actor, false, {
     search,
-    approval: "all",
+    approval: [],
+    roles,
+    roleOrder,
     sort,
     direction,
   });
@@ -75,11 +90,27 @@ export async function listApplications(
   db: Env["DB"],
   actor: Actor,
   search = "",
-  approval: ApplicationApprovalFilter = "all",
+  approval: ApplicationApprovalFilter | readonly ApplicationStatus[] = "all",
   sort: ApplicationSort = "progress",
   direction: VolunteerSortDirection = "asc",
+  {
+    roles = [],
+    roleOrder = directoryRoleKeys("applications"),
+  }: DirectoryRoleOptions = {},
 ) {
-  return listPeople(db, actor, true, { search, approval, sort, direction });
+  return listPeople(db, actor, true, {
+    search,
+    approval:
+      approval === "all"
+        ? []
+        : typeof approval === "string"
+          ? [approval]
+          : [...approval],
+    roles,
+    roleOrder,
+    sort,
+    direction,
+  });
 }
 
 /** Count the full review queue without loading directory rows or private answers. */
@@ -391,6 +422,8 @@ export const statusSchema = z.strictObject({
   registrationApproved: z.boolean().optional(),
   patrolApproved: z.boolean(),
   notify: z.boolean().default(false),
+  /** Sent to the volunteer when an organizer revokes an approval. */
+  reason: z.string().trim().min(1).max(2000).optional(),
 });
 export async function setVolunteerStatus(
   db: Env["DB"],
@@ -401,7 +434,8 @@ export async function setVolunteerStatus(
   const parsed = statusSchema.safeParse(input);
   if (!parsed.success)
     throw new RequestError(400, "Choose a volunteer and their access status.");
-  const { userId, version, active, patrolApproved, notify } = parsed.data;
+  const { userId, version, active, patrolApproved, notify, reason } =
+    parsed.data;
   const old = await db
     .prepare(
       `SELECT active, registration_approved AS applicationApproved, patrol_approved AS patrolApproved
@@ -452,12 +486,22 @@ export async function setVolunteerStatus(
       : "",
     old.patrolApproved !== Number(patrolApproved) ? "patrolApproved" : "",
   ].filter(Boolean);
+  if (
+    reason !== undefined &&
+    !(old.applicationApproved && !applicationApproved) &&
+    !(old.patrolApproved && !patrolApproved)
+  )
+    throw new RequestError(
+      400,
+      "A reason can only be given when revoking an approval.",
+    );
   if (!fields.length)
     return { operation: crypto.randomUUID(), message: "No access changes." };
   const email = volunteerAccessEmail(
     { active, applicationApproved, patrolApproved },
     fields.includes("applicationApproved"),
     actor.name,
+    reason,
   );
   const operation = crypto.randomUUID();
   const now = Math.max(Date.now(), version + 1);

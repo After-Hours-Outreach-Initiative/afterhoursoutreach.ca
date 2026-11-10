@@ -1,0 +1,138 @@
+---
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+import SearchIcon from "@/components/icons/SearchIcon.astro";
+import { viewAsTypes, type EventViewer } from "@/server/events/view-as";
+import "@/styles/filter-menu.css";
+
+interface Props {
+  people: { id: string; name: string }[];
+  current: EventViewer | null;
+}
+const { people, current } = Astro.props;
+const href = (value: string) => `/events?viewAs=${encodeURIComponent(value)}`;
+---
+
+<view-as-menu>
+  <button
+    class="volunteer-filter filter-menu-trigger"
+    type="button"
+    id="view-as-trigger"
+    popovertarget="view-as-menu"
+    aria-expanded="false"
+    data-active={current ? "" : undefined}
+  >
+    {current ? `View as: ${current.label}` : "View as"}
+    <ChevronDownIcon class="filter-menu-chevron" />
+  </button>
+  <div
+    class="filter-menu view-as-menu"
+    id="view-as-menu"
+    popover="auto"
+    role="group"
+    aria-labelledby="view-as-trigger"
+    data-filter-menu="view-as"
+    data-filter-menu-align="end"
+  >
+    <div class="filter-menu-options">
+      <nav class="filter-menu-group" aria-labelledby="view-as-types">
+        <p class="filter-menu-group-label" id="view-as-types">
+          Volunteer type
+        </p>
+        {Object.entries(viewAsTypes).map(([value, type]) => (
+          <a
+            class="view-as-option"
+            href={href(value)}
+            aria-current={current?.value === value ? "page" : undefined}
+          >
+            {type.label}
+          </a>
+        ))}
+      </nav>
+      <nav class="filter-menu-group" aria-labelledby="view-as-people">
+        <p class="filter-menu-group-label" id="view-as-people">
+          Volunteer
+        </p>
+        <label class="volunteer-search-field filter-menu-search view-as-search">
+          <span class="sr-only">Search volunteers</span>
+          <input
+            type="search"
+            placeholder="Search"
+            autocomplete="off"
+            data-filter-search
+          />
+          <SearchIcon class="volunteer-search-icon" />
+        </label>
+        <div class="view-as-people">
+          {people.map((person) => (
+            <a
+              class="view-as-option"
+              href={href(`person:${person.id}`)}
+              aria-current={
+                current?.value === `person:${person.id}` ? "page" : undefined
+              }
+              data-filter-option
+            >
+              {person.name}
+            </a>
+          ))}
+          <p class="filter-menu-empty" data-filter-empty hidden>
+            No matches.
+          </p>
+        </div>
+      </nav>
+    </div>
+  </div>
+</view-as-menu>
+
+<script>
+  import { initFilterMenus } from "@/scripts/filter-menu";
+
+  class ViewAsMenu extends HTMLElement {
+    connectedCallback() {
+      if (this.dataset.ready) return;
+      this.dataset.ready = "";
+      initFilterMenus(this, () => {});
+    }
+  }
+
+  if (!customElements.get("view-as-menu"))
+    customElements.define("view-as-menu", ViewAsMenu);
+</script>
+
+<style>
+  view-as-menu {
+    display: contents;
+  }
+  .view-as-search {
+    margin: 0 0 0.25rem;
+  }
+  .view-as-people {
+    display: grid;
+    gap: 0.125rem;
+    max-height: 16rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .view-as-option {
+    display: block;
+    padding: 0.375rem 0.5rem;
+    border-radius: 0.375rem;
+    color: #e4e4e7;
+    text-decoration: none;
+  }
+  .view-as-option[hidden] {
+    display: none;
+  }
+  .view-as-option:hover {
+    background: #27272a;
+    color: white;
+  }
+  .view-as-option[aria-current="page"] {
+    background: var(--color-blue-deep);
+    color: #e0e7ff;
+  }
+  .view-as-option:focus-visible {
+    outline: 3px solid #a5b4fc;
+    outline-offset: -3px;
+  }
+</style>

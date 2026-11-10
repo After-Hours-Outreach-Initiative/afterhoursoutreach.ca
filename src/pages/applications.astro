@@ -20,13 +20,14 @@ let applications: Awaited<ReturnType<typeof listApplications>> = {
   inProgressCount: 0,
   rejectedCount: 0,
   approvedCount: 0,
+  roleCounts: {},
 };
 let lock = "";
 let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
 const state = applicationListState(Astro.url.searchParams);
-const { search, approval, sort, direction } = state;
+const { search, approval, sort, direction, roles, roleOrder } = state;
 const listUrl = applicationListUrl(state);
 try {
   const { actor, headers, email, greetingName } = await accountContext(
@@ -57,6 +58,7 @@ try {
       approval,
       sort,
       direction,
+      { roles, roleOrder },
     );
 } catch {
   return new Response("Application management is temporarily unavailable.", {

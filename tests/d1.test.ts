@@ -1750,8 +1750,9 @@ test("volunteer directory defaults to displayed roles and sorts the entire direc
   for (const [sort, direction, expected] of [
     ["name", "asc", ["outreach", "tie", "organizer", "medic", "new"]],
     ["name", "desc", ["new", "medic", "organizer", "outreach", "tie"]],
-    ["role", "asc", ["outreach", "medic", "tie", "new", "organizer"]],
-    ["role", "desc", ["organizer", "tie", "new", "medic", "outreach"]],
+    // Default role order: organizer, medic, new volunteer, outreach volunteer.
+    ["role", "asc", ["organizer", "medic", "tie", "new", "outreach"]],
+    ["role", "desc", ["outreach", "tie", "new", "medic", "organizer"]],
   ] as const) {
     const page = await listVolunteers(env.DB, actor, "", sort, direction);
     assert.deepEqual(
@@ -1762,11 +1763,28 @@ test("volunteer directory defaults to displayed roles and sorts the entire direc
   }
   assert.deepEqual(
     (await listVolunteers(env.DB, actor)).rows.map(({ id }) => id),
-    ["outreach", "medic", "tie", "new", "organizer"],
+    ["organizer", "medic", "tie", "new", "outreach"],
   );
+  // A custom role order and role filter apply to the whole directory.
+  assert.deepEqual(
+    (
+      await listVolunteers(env.DB, actor, "", "role", "asc", {
+        roleOrder: ["new", "volunteer", "medic", "organizer"],
+      })
+    ).rows.map(({ id }) => id),
+    ["tie", "new", "outreach", "medic", "organizer"],
+  );
+  const medics = await listVolunteers(env.DB, actor, "", "role", "asc", {
+    roles: ["medic"],
+  });
+  assert.deepEqual(
+    medics.rows.map(({ id }) => id),
+    ["medic"],
+  );
+  assert.equal(medics.roleCounts.organizer, 1);
   assert.deepEqual(
     (await listVolunteers(env.DB, actor, "AL")).rows.map(({ id }) => id),
-    ["outreach", "tie"],
+    ["tie", "outreach"],
   );
 });
 
@@ -1984,8 +2002,9 @@ test("review queue loads every submitted entry and counts search matches indepen
       "desc",
       [...approved, "pending-01", "pending-52", ...reviewByCompletion],
     ],
-    ["role", "asc", [...reviewAndApprovedNames, "pending-01", "pending-52"]],
-    ["role", "desc", ["pending-01", "pending-52", ...reviewAndApprovedNames]],
+    // Medic interest leads the default role order.
+    ["role", "asc", ["pending-01", "pending-52", ...reviewAndApprovedNames]],
+    ["role", "desc", [...reviewAndApprovedNames, "pending-01", "pending-52"]],
     [
       "completed",
       "asc",
@@ -2216,6 +2235,7 @@ test("review queue loads every submitted entry and counts search matches indepen
     applicationApproved: false,
     patrolApproved: false,
     notify: true,
+    reason: "Approved by mistake.",
   });
   const revokedEmail = await env.DB.prepare(
     "SELECT subject, body FROM event_notification WHERE operation_id=?",
@@ -2227,6 +2247,7 @@ test("review queue loads every submitted entry and counts search matches indepen
     "Your volunteer application approval was revoked",
   );
   assert.match(revokedEmail!.body, /awaiting organizer approval again/);
+  assert.match(revokedEmail!.body, /Reason: Approved by mistake\./);
   assert.match(revokedEmail!.body, /application steps on the Volunteer page/);
   assert.match(
     revokedEmail!.body,
@@ -2244,6 +2265,19 @@ test("review queue loads every submitted entry and counts search matches indepen
   assert.deepEqual(
     (await listVolunteers(env.DB, actor, "pending-02")).rows,
     [],
+  );
+  // A reason only accompanies revoking an approved application.
+  await assert.rejects(
+    setVolunteerStatus(env.DB, actor, {
+      userId: "pending-02",
+      version: (await listApplications(env.DB, actor, "pending-02")).rows[0]
+        .updatedAt,
+      active: false,
+      applicationApproved: false,
+      patrolApproved: false,
+      reason: "Not a revocation.",
+    }),
+    statusError(400),
   );
   for (const denied of [
     { ...actor, role: "volunteer" as const },

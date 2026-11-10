@@ -318,21 +318,20 @@ for (const kind of ["applications", "volunteers"]) {
       shell.locator(".volunteer-table-name > [data-volunteer-role]"),
     ).toHaveCount(await badges.count());
     if (kind === "applications") {
-      const search = page.locator("[data-volunteer-search-form]");
-      const filters = page.locator("[data-volunteer-filters]");
+      // Filters sit below the search field, with sorting at the row's end.
+      const search = page.locator(".directory-controls .volunteer-search");
+      const filters = page.getByRole("group", { name: "Filters" });
       const searchBox = (await search.boundingBox())!;
       expect((await filters.boundingBox())!.y).toBeGreaterThan(
         searchBox.y + searchBox.height,
       );
-      await expect(
-        filters.locator('[data-state="approved"] .volunteer-filter-count'),
-      ).toHaveCSS("color", "rgb(147, 197, 253)");
-      await expect(
-        filters.locator('[data-state="approved"] .volunteer-filter-count'),
-      ).toHaveCSS("background-color", "rgb(23, 37, 84)");
-      await expect(
-        filters.locator('[data-state="ready"] .volunteer-filter-count'),
-      ).toHaveCSS("color", "rgb(74, 222, 128)");
+      const sortBox = (await page
+        .getByRole("button", { name: /^Sort:/ })
+        .boundingBox())!;
+      expect(sortBox.x + sortBox.width).toBeCloseTo(
+        searchBox.x + searchBox.width,
+        0,
+      );
     }
     await expect(shell.locator(".volunteer-table-frame thead a")).toHaveCount(
       0,

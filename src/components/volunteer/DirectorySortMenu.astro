@@ -1,0 +1,201 @@
+---
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+import GripIcon from "@/components/icons/GripIcon.astro";
+import {
+  directoryRoles,
+  type DirectoryKind,
+  type DirectoryListState,
+} from "@/data/volunteer-list";
+import "@/styles/filter-menu.css";
+
+interface Props {
+  kind: DirectoryKind;
+  state: DirectoryListState;
+  options: { value: string; label: string }[];
+}
+const { kind, state, options } = Astro.props;
+const id = `${kind}-sort`;
+const current =
+  options.find((option) => option.value === state.sort) ?? options[0];
+---
+
+<button
+  class="volunteer-filter filter-menu-trigger directory-sort-trigger"
+  type="button"
+  id={`${id}-trigger`}
+  popovertarget={id}
+  aria-expanded="false"
+>
+  <span>
+    Sort: <span data-sort-label>{current.label}</span>
+  </span>
+  <ChevronDownIcon class="filter-menu-chevron" />
+</button>
+<div
+  class="filter-menu directory-sort-menu"
+  id={id}
+  popover="auto"
+  role="group"
+  aria-labelledby={`${id}-trigger`}
+  data-filter-menu="sort"
+  data-filter-menu-align="end"
+>
+  <div class="filter-menu-options">
+    <fieldset class="filter-menu-group">
+      <legend class="filter-menu-group-label">Sort by</legend>
+      {options.map((option) => (
+        <label class="volunteer-check" data-filter-option>
+          <input
+            type="radio"
+            name="sort"
+            value={option.value}
+            checked={option.value === current.value}
+          />
+          <span class="filter-menu-option-label">{option.label}</span>
+        </label>
+      ))}
+    </fieldset>
+    <fieldset class="filter-menu-group">
+      <legend class="filter-menu-group-label">Direction</legend>
+      <label class="volunteer-check" data-filter-option>
+        <input
+          type="radio"
+          name="direction"
+          value="asc"
+          checked={state.direction === "asc"}
+        />
+        <span class="filter-menu-option-label">Ascending</span>
+      </label>
+      <label class="volunteer-check" data-filter-option>
+        <input
+          type="radio"
+          name="direction"
+          value="desc"
+          checked={state.direction === "desc"}
+        />
+        <span class="filter-menu-option-label">Descending</span>
+      </label>
+    </fieldset>
+    <div
+      class="filter-menu-group directory-role-order"
+      data-role-order
+      hidden={state.sort !== "role"}
+    >
+      <p class="filter-menu-group-label" id={`${id}-order-label`}>
+        Role order
+      </p>
+      <input type="hidden" name="order" value={state.roleOrder.join(",")} />
+      <ol aria-labelledby={`${id}-order-label`} data-role-order-list>
+        {state.roleOrder.map((role) => (
+          <li class="directory-role-order-item" data-role-order-item={role}>
+            <span class="directory-role-order-handle" data-role-order-handle>
+              <GripIcon class="directory-role-order-grip" />
+            </span>
+            <span class="directory-role-order-label">
+              {directoryRoles[role]}
+            </span>
+            <button
+              class="directory-role-order-move"
+              type="button"
+              data-role-order-move="up"
+              aria-label={`Move ${directoryRoles[role]} up`}
+            >
+              <ChevronDownIcon class="directory-role-order-icon rotate-180" />
+            </button>
+            <button
+              class="directory-role-order-move"
+              type="button"
+              data-role-order-move="down"
+              aria-label={`Move ${directoryRoles[role]} down`}
+            >
+              <ChevronDownIcon class="directory-role-order-icon" />
+            </button>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
+  <div class="filter-menu-actions">
+    <button class="btn btn-primary" type="submit" data-filter-apply>
+      Apply
+    </button>
+  </div>
+</div>
+
+<style>
+  .directory-sort-trigger {
+    margin-left: auto;
+  }
+  fieldset.filter-menu-group {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  fieldset.filter-menu-group legend {
+    margin-bottom: 0.25rem;
+    padding: 0;
+  }
+  .directory-role-order[hidden] {
+    display: none;
+  }
+  [data-role-order-list] {
+    display: grid;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .directory-role-order-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.25rem 0.25rem 0;
+    border: 1px solid #3f3f46;
+    border-radius: 0.375rem;
+    background: #0c0d10;
+    touch-action: none;
+  }
+  .directory-role-order-item[data-dragging] {
+    border-color: #818cf8;
+    background: #16214a;
+  }
+  .directory-role-order-handle {
+    display: inline-flex;
+    align-self: stretch;
+    align-items: center;
+    padding-inline: 0.375rem;
+    color: #a1a1aa;
+    cursor: grab;
+  }
+  [data-dragging] .directory-role-order-handle {
+    cursor: grabbing;
+  }
+  .directory-role-order-handle :global(.directory-role-order-grip) {
+    width: 1.25em;
+    height: 1.25em;
+  }
+  .directory-role-order-label {
+    flex: 1;
+  }
+  .directory-role-order-move {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.375rem;
+    color: #d4d4d8;
+  }
+  .directory-role-order-move:hover:enabled {
+    background: #27272a;
+    color: white;
+  }
+  .directory-role-order-move:disabled {
+    color: #52525b;
+  }
+  .directory-role-order-move :global(.directory-role-order-icon) {
+    width: 1.25em;
+    height: 1.25em;
+  }
+</style>

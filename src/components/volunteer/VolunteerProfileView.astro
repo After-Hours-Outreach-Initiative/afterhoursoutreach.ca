@@ -11,6 +11,7 @@ import AccountProfileAnswers from "@/components/volunteer/AccountProfileAnswers.
 import VolunteerControls from "@/components/volunteer/VolunteerControls.astro";
 import PatrolApproval from "@/components/volunteer/PatrolApproval.astro";
 import PageContents from "@/components/volunteer/PageContents.astro";
+import PersonHeading from "@/components/volunteer/PersonHeading.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import type { ApplicationProgress } from "@/server/db/application-progress";
 interface Props {
@@ -47,7 +48,13 @@ const contents = [
 
 <div data-volunteer-profile>
   <div data-volunteer-profile-overview>
-    <h2>{personFullName(profile.answers, person.name)}</h2>
+    <PersonHeading
+      level="h2"
+      name={personFullName(profile.answers, person.name)}
+      {person}
+      teams={profile.answers.teams}
+      applications={!person.applicationApproved}
+    />
   </div>
   <PageContents entries={contents} heading="Sections" idleHeading="Sections" />
   <div data-volunteer-profile-body>
