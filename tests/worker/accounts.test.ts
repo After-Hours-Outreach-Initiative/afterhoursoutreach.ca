@@ -957,72 +957,44 @@ describe(
       }
     });
 
-    test("session management lists only active owned sessions and revokes by ID without exposing tokens", async () => {
-      const siblingCookie = await signIn("worker-volunteer@example.org");
-      const expiredCookie = await signIn("worker-volunteer@example.org");
-      const sibling = (await (
-        await send("/api/v1/auth/get-session", undefined, siblingCookie)
-      ).json()) as { session: { id: string; token: string } };
-      const expired = (await (
-        await send("/api/v1/auth/get-session", undefined, expiredCookie)
-      ).json()) as { session: { id: string; token: string } };
-      await DB.prepare("UPDATE session SET expires_at=? WHERE id=?")
-        .bind(Date.now() - 1000, expired.session.id)
-        .run();
-      const page = await send("/volunteer/account", undefined, cookie);
-      assert.equal(page.status, 200);
-      const html = await page.text();
-      assert.ok(html.includes(sibling.session.id));
-      assert.ok(!html.includes(expired.session.id));
-      assert.ok(!html.includes(sibling.session.token));
-      assert.ok(!html.includes(expired.session.token));
-
-      const revoked = await send(
-        "/api/v1/account/session",
-        { id: sibling.session.id },
-        cookie,
-      );
-      assert.equal(revoked.status, 200, await revoked.clone().text());
-      assert.equal(
-        await (
-          await send("/api/v1/auth/get-session", undefined, siblingCookie)
-        ).json(),
-        null,
-      );
-      assert.ok(
-        await (
-          await send("/api/v1/auth/get-session", undefined, cookie)
-        ).json(),
-      );
+    test("signing out of all devices ends only this account's sessions", async () => {
+      // A separate account, so the shared test session stays signed in.
+      const email = "sessions-worker-volunteer@example.org";
+      const firstCookie = await signIn(email);
+      const secondCookie = await signIn(email);
+      const otherCookie = await signIn("other-worker-volunteer@example.org");
+      const signedIn = async (sessionCookie: string) =>
+        Boolean(
+          await (
+            await send("/api/v1/auth/get-session", undefined, sessionCookie)
+          ).json(),
+        );
+      assert.equal((await send("/api/v1/account/session", {})).status, 401);
       assert.equal(
         (
           await send(
             "/api/v1/account/session",
-            { id: "unknown-session" },
-            cookie,
-          )
-        ).status,
-        200,
-      );
-      assert.equal(
-        (await send("/api/v1/account/session", { id: current.session.id }))
-          .status,
-        401,
-      );
-      assert.equal(
-        (
-          await send(
-            "/api/v1/account/session",
-            { id: current.session.id },
-            cookie,
+            {},
+            firstCookie,
             "https://evil.example",
           )
         ).status,
         403,
       );
+      assert.ok(await signedIn(firstCookie));
+      const ended = await send("/api/v1/account/session", {}, firstCookie);
+      assert.equal(ended.status, 200, await ended.clone().text());
+      assert.equal(await signedIn(firstCookie), false);
+      assert.equal(await signedIn(secondCookie), false);
+      assert.ok(await signedIn(otherCookie));
+      assert.ok(await signedIn(cookie));
+      const page = await send("/volunteer/account", undefined, cookie);
+      const html = await page.text();
+      assert.match(html, /data-sign-out-everywhere/);
+      assert.doesNotMatch(html, new RegExp(current.session.id));
     });
 
-    test("older sessions can edit their profile but must sign in again to list sessions", async () => {
+    test("older sessions can edit their profile but must sign in again to delete the account", async () => {
       const original = await DB.prepare(
         "SELECT created_at AS createdAt FROM session WHERE id=?",
       )
@@ -1035,40 +1007,14 @@ describe(
         const page = await send("/volunteer/account", undefined, cookie);
         assert.equal(page.status, 200, await page.clone().text());
         const html = await page.text();
-        assert.match(html, /Sign in again to view and manage/);
+        assert.match(html, /Sign in again before deleting your account/);
         assert.match(html, /data-account-profile/);
-        assert.doesNotMatch(html, /data-end-session|This browser/);
+        assert.doesNotMatch(html, /data-delete-account/);
       } finally {
         await DB.prepare("UPDATE session SET created_at=? WHERE id=?")
           .bind(original!.createdAt, current.session.id)
           .run();
       }
-    });
-
-    test("ending another person's session cannot revoke it", async () => {
-      const otherCookie = await signIn("other-worker-volunteer@example.org");
-      const other = (await (
-        await send("/api/v1/auth/get-session", undefined, otherCookie)
-      ).json()) as { session: { id: string } };
-      assert.equal(
-        (
-          await send(
-            "/api/v1/account/session",
-            { id: other.session.id },
-            cookie,
-          )
-        ).status,
-        200,
-      );
-      assert.equal(
-        (await send("/api/v1/auth/get-session", undefined, otherCookie)).status,
-        200,
-      );
-      assert.ok(
-        await (
-          await send("/api/v1/auth/get-session", undefined, otherCookie)
-        ).json(),
-      );
     });
 
     test("GET link pages do not consume codes or set session cookies", async () => {
@@ -1365,14 +1311,6 @@ describe(
             body: Buffer.from(await response.arrayBuffer()),
           });
         });
-        const siblings: string[] = [];
-        for (let i = 0; i < 2; i++) {
-          const siblingCookie = await signIn("worker-volunteer@example.org");
-          const sibling = (await (
-            await send("/api/v1/auth/get-session", undefined, siblingCookie)
-          ).json()) as { session: { id: string } };
-          siblings.push(sibling.session.id);
-        }
         await page.goto(`${origin}/volunteer/account`);
         await page
           .getByRole("heading", { name: "Account", exact: true })
@@ -1423,39 +1361,6 @@ describe(
           )
           .fill("Changed browser sample");
         await expect(saveProfile).toBeEnabled();
-        for (const id of siblings) {
-          const sessionForm = page
-            .locator("[data-end-session]")
-            .filter({ has: page.locator(`input[value="${id}"]`) });
-          await inPlaceAction(page, {
-            endpoint: "/api/v1/account/session",
-            form: sessionForm,
-            trigger: () =>
-              sessionForm
-                .getByRole("button", {
-                  name: "Sign out of session",
-                  exact: true,
-                })
-                .click(),
-            updated: () => expect(sessionForm).toHaveCount(0),
-            loadingLabel: "Signing out…",
-          });
-          await expect(page.getByLabel("Preferred first name")).toHaveValue(
-            changedName,
-          );
-          await expect(
-            page.getByLabel(
-              "Medical conditions/allergies/anything else we should know",
-              { exact: false },
-            ),
-          ).toHaveValue("Changed browser sample");
-          assert.equal(
-            await DB.prepare("SELECT id FROM session WHERE id=?")
-              .bind(id)
-              .first(),
-            null,
-          );
-        }
         await saveProfile.click();
         try {
           const saved = page.locator(
@@ -1720,6 +1625,7 @@ describe(
         assert.equal(consumed, null);
         await newPage.locator("[data-account-menu] > summary").click();
         await newPage
+          .locator("[data-account-menu]")
           .getByRole("button", { name: "Sign out", exact: true })
           .click();
         await newPage

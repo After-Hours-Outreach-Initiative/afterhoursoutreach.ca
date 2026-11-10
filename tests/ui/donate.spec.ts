@@ -11,7 +11,7 @@ for (const width of [320, 375, 639, 640, 1024, 1280]) {
       name: "e-Transfer email address",
       exact: true,
     });
-    const email = block.locator("code");
+    const email = block.locator("[data-etransfer-email]");
     const copyButton = page.getByRole("button", {
       name: "Copy e-Transfer email address",
     });

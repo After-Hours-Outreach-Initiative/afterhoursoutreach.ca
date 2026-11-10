@@ -35,6 +35,18 @@ export async function openLocalAccountSwitcher(page: Page) {
   return profiles;
 }
 
+/** The DEV panel lists accounts only once opened, so reopen it to check the
+ * selected account after a switch reloads the page. */
+export async function expectSelectedLocalAccount(page: Page, userId: string) {
+  const profiles = await openLocalAccountSwitcher(page);
+  await expect(
+    profiles.locator(`[data-switch-user="${userId}"]`),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .getByRole("button", { name: "Close DEV panel", exact: true })
+    .click();
+}
+
 export const sampleAnswers = {
   firstName: "Database",
   middleNames: "Test",

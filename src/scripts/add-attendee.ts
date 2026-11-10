@@ -1,5 +1,6 @@
 import type { SignupCandidate } from "../server/db/events";
 import { InlineMorph } from "./inline-morph";
+import { syncUnsavedChanges, trackUnsavedChanges } from "./unsaved-changes";
 import { setCompactPersonName } from "./compact-person-name";
 import { manualAttendeeCategory } from "../data/event-roster";
 
@@ -28,6 +29,8 @@ class AddAttendee extends HTMLElement {
     this.controller?.abort();
     this.controller = new AbortController();
     const { signal } = this.controller;
+    // Add stays disabled until someone is in the list.
+    trackUnsavedChanges(this.form);
     this.addEventListener(
       "click",
       (event) => {
@@ -51,6 +54,7 @@ class AddAttendee extends HTMLElement {
             this.querySelector<HTMLButtonElement>("[data-attendee-manual]")!;
           row.remove();
           this.staged.hidden = !this.staged.children.length;
+          syncUnsavedChanges(this.form);
           this.announce("Removed from the list.");
           this.closeSuggestions();
           nextFocus.focus({ preventScroll: true });
@@ -337,6 +341,7 @@ class AddAttendee extends HTMLElement {
     this.search.value = "";
     this.closeSuggestions();
     this.announce(`${person.name} added to the list.`);
+    syncUnsavedChanges(this.form);
   }
 
   private addManual() {
@@ -354,6 +359,7 @@ class AddAttendee extends HTMLElement {
       checkbox.closest("label")!.htmlFor = checkbox.id;
     }
     this.syncManual(row);
+    syncUnsavedChanges(this.form);
     name.focus();
   }
 

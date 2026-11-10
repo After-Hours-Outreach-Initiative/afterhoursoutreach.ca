@@ -23,7 +23,7 @@ test("status and role filters open in place, apply on close, and scroll with the
 }) => {
   await page.setViewportSize({ width: 1280, height: 600 });
   await page.goto("/dev/ui/applications/preview?scenario=mixed&latency=0");
-  const rows = page.locator("[data-volunteer-results] tbody tr");
+  const rows = page.locator("[data-volunteer-results] [data-volunteer-row]");
   const total = await rows.count();
   const trigger = page.getByRole("button", { name: /^Status/ });
   const menu = page.locator('[data-filter-menu="approval"]');
@@ -72,42 +72,44 @@ test("status and role filters open in place, apply on close, and scroll with the
   await expect(page.getByRole("link", { name: "Clear filters" })).toBeHidden();
 });
 
-test("the role sort order can be rearranged by buttons and by dragging", async ({
+test("the role sort order can be rearranged by keyboard and by dragging", async ({
   page,
 }) => {
-  // Keep the whole menu in view so the drag starts on the visible handle.
+  // Keep the whole menu in view so the drag starts on the visible item.
   await page.setViewportSize({ width: 1280, height: 1000 });
   await page.goto("/dev/ui/volunteers/preview?scenario=mixed&latency=0");
   const firstPerson = () =>
     page
-      .locator("[data-volunteer-results] tbody tr")
+      .locator("[data-volunteer-results] [data-volunteer-row]")
       .first()
       .evaluate((row: HTMLElement) => {
         const person = JSON.parse(row.dataset.directoryPerson!);
         return person.role === "organizer" ? "organizer" : person.category;
       });
-  expect(await firstPerson()).toBe("organizer");
+  // The default role order puts new volunteers first and organizers last.
+  expect(await firstPerson()).toBe("new-volunteer");
   await page.getByRole("button", { name: "Sort: Role" }).click();
   const menu = page.locator('[data-filter-menu="sort"]');
   const items = menu.locator("[data-role-order-item]");
   await expect(items).toHaveText([
-    "Organizer",
-    "Medic",
     "New volunteer",
     "Outreach Volunteer",
+    "Medic",
+    "Organizer",
   ]);
-  await expect(
-    menu.getByRole("button", { name: "Move Organizer up" }),
-  ).toBeDisabled();
-  const down = menu.getByRole("button", { name: "Move Organizer down" });
-  await down.click();
-  await expect(down).toBeFocused();
-  await expect(items.first()).toHaveText("Medic");
+  const organizer = menu.locator('[data-role-order-item="organizer"]');
+  await organizer.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(organizer).toBeFocused();
+  await expect(items).toHaveText([
+    "New volunteer",
+    "Outreach Volunteer",
+    "Organizer",
+    "Medic",
+  ]);
 
-  const handle = menu.locator(
-    '[data-role-order-item="volunteer"] [data-role-order-handle]',
-  );
-  const from = (await handle.boundingBox())!;
+  const outreach = menu.locator('[data-role-order-item="volunteer"]');
+  const from = (await outreach.boundingBox())!;
   const to = (await items.first().boundingBox())!;
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
@@ -115,13 +117,13 @@ test("the role sort order can be rearranged by buttons and by dragging", async (
   await page.mouse.up();
   await expect(items).toHaveText([
     "Outreach Volunteer",
-    "Medic",
-    "Organizer",
     "New volunteer",
+    "Organizer",
+    "Medic",
   ]);
   await menu.getByRole("button", { name: "Apply" }).click();
   await expect(menu).toBeHidden();
-  await expect(page).toHaveURL(/order=volunteer%2Cmedic%2Corganizer%2Cnew/);
+  await expect(page).toHaveURL(/order=volunteer%2Cnew%2Corganizer%2Cmedic/);
   expect(await firstPerson()).toBe("outreach-volunteer");
 
   // Sorting by name hides the role order until Role is chosen again.

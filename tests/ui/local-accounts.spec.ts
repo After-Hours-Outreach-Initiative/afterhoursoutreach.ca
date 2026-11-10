@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { profileWriteBody } from "../helpers/profile-write";
 import { social } from "../../src/data/site";
+import { applicationDisplayName } from "../../src/data/application";
 import {
   accountStatePersona,
   manualAccountPresets,
@@ -526,7 +527,8 @@ test("saved accounts keep their drafts and submitted answers and can be deleted"
   await expect(page).toHaveURL(/\/volunteer$/);
   expect(await current()).toMatchObject({
     id: second.id,
-    name: sampleAnswers.preferredName,
+    // Account names include the last-name initial.
+    name: applicationDisplayName(sampleAnswers),
   });
   await page.reload();
   expect(await draft()).toMatchObject({ submitted: true, draft: null });
@@ -708,8 +710,10 @@ test("Discord linking stays hidden while applications advance to review and appr
   expect(approved.ok(), await approved.text()).toBe(true);
   await page.reload();
   await expect(
-    page.getByText("Application approved", { exact: true }),
-  ).toBeVisible();
+    page.locator(
+      '[data-application-mini-step="review"] .application-progress-mini-status',
+    ),
+  ).toContainText("Approved");
   await expectNoDiscord();
   await page.goto("/volunteer");
   await expect(page.locator("[data-event-list]")).toBeVisible();

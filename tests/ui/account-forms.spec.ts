@@ -123,7 +123,7 @@ async function expectTeamCardRows(form: Locator) {
         return { x, y, width, height };
       }),
     );
-  expect(boxes).toHaveLength(3);
+  expect(boxes).toHaveLength(2);
   for (const [index, box] of boxes.entries()) {
     expect(box.x).toBeCloseTo(bounds!.x, 1);
     expect(box.width).toBeCloseTo(bounds!.width, 1);
@@ -2444,7 +2444,8 @@ test("account headings scale consistently and profile titles wrap beside their e
   const headings = page.locator(
     "[data-account-contents-body] > .volunteer-panel > h2",
   );
-  await expect(headings).toHaveCount(3);
+  // Profile and Settings; the application panel waits for a complete application.
+  await expect(headings).toHaveCount(2);
   const form = page.locator("[data-account-profile]");
   const rows = form.locator(".volunteer-profile-section-heading");
   await expect(rows).toHaveCount(4);

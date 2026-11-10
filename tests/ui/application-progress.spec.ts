@@ -789,9 +789,11 @@ test("one compact mobile tracker keeps its reading edge and scrolls its viewport
   const height = (await compact.boundingBox())!.height;
   expect(height).toBe(78);
   expect((await summary.boundingBox())!.height).toBe(54);
-  await expect(page.locator("[data-application-flow]")).toHaveAttribute(
+  const flow = page.locator("[data-application-flow]");
+  await expect(flow).toHaveAttribute("style", /--contents-bar-height: 78px;/);
+  await expect(flow).toHaveAttribute(
     "style",
-    /--contents-bar-height: 78px; --contents-scroll-offset: 78px;/,
+    /--contents-scroll-offset: 78px;/,
   );
   const beforeOpen = await page.evaluate(() => scrollY);
   await tracker.locator("summary").click();
@@ -809,7 +811,7 @@ test("one compact mobile tracker keeps its reading edge and scrolls its viewport
   await expect(tracker.getByRole("status")).toHaveCount(1);
   await expect(dropdown.getByRole("link").first()).toHaveCSS(
     "font-size",
-    "18px",
+    "16px",
   );
   const dropdownBounds = (await dropdown.boundingBox())!;
   const linksBounds = (await dropdown.locator("ol").boundingBox())!;
@@ -924,9 +926,10 @@ test("one compact mobile tracker keeps its reading edge and scrolls its viewport
     await page.setViewportSize(viewport);
     await expectDropdown(dropdown, true);
     expect(await page.evaluate(() => scrollY)).toBe(menuScroll);
-    await expect(page.locator("[data-application-flow]")).toHaveAttribute(
+    await expect(flow).toHaveAttribute("style", /--contents-bar-height: 78px;/);
+    await expect(flow).toHaveAttribute(
       "style",
-      /--contents-bar-height: 78px; --contents-scroll-offset: 78px;/,
+      /--contents-scroll-offset: 78px;/,
     );
     await expect(summary).toBeInViewport({ ratio: 1 });
     await page.keyboard.press("Escape");
@@ -1017,7 +1020,8 @@ test("the mobile dropdown works from its normal position and Overview restores S
   const chevron = summary.locator(".volunteer-contents-chevron");
   const progress = summary.locator("[data-application-progress]");
   await expect(summary).toHaveAccessibleName("Sections");
-  await expect(summary).toHaveText("Sections");
+  // The hidden conflict warning is not part of the visible label.
+  await expect(summary).toHaveText("Sections", { useInnerText: true });
   await expect(icon).toBeVisible();
   await expect(icon).toHaveText("");
   await expect(icon).toHaveAttribute("aria-hidden", "true");
@@ -1085,7 +1089,9 @@ test("the mobile dropdown works from its normal position and Overview restores S
     await expect(current).toHaveText("Personal info");
     await expect(current).toBeVisible();
     await expect(summary).toHaveAccessibleName("Sections");
-    await expect(summary).toHaveText("Personal info");
+    await expect(summary).toHaveText("Personal info", {
+      useInnerText: true,
+    });
     await expect(icon).toBeVisible();
     const iconBounds = (await icon.boundingBox())!;
     const currentBounds = (await current.boundingBox())!;

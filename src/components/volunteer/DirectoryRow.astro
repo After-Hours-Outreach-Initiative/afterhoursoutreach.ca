@@ -39,40 +39,39 @@ const data: DirectoryPerson = {
 };
 ---
 
-<tr data-volunteer-row data-directory-person={JSON.stringify(data)}>
-  <th scope="row">
-    <div class="volunteer-table-person">
-      <AttendeeAvatar
-        category={category}
-        medicMark={Boolean(medicMark)}
-        applicant={applications && status !== "approved"}
-        decorative
+<li
+  class="directory-item"
+  data-volunteer-row
+  data-directory-person={JSON.stringify(data)}
+>
+  <AttendeeAvatar
+    category={category}
+    medicMark={Boolean(medicMark)}
+    applicant={applications && status !== "approved"}
+    decorative
+  />
+  <div class="directory-item-body">
+    <div class="directory-item-name">
+      <CompactPersonName
+        class="directory-item-link"
+        name={name}
+        href={href}
+        data-volunteer-profile-link
       />
-      <div class="volunteer-table-name">
-        <CompactPersonName
-          name={name}
-          href={href}
-          data-volunteer-profile-link
-        />
-        {!applications && role === "organizer" && (
-          <VolunteerRoleBadge role="organizer" />
-        )}
-        {!applications && category === "new-volunteer" && <NewVolunteerBadge />}
-        {Boolean(medicMark) && <VolunteerRoleBadge role="medic" />}
-      </div>
+      {!applications && role === "organizer" && (
+        <VolunteerRoleBadge role="organizer" />
+      )}
+      {!applications && category === "new-volunteer" && <NewVolunteerBadge />}
+      {Boolean(medicMark) && <VolunteerRoleBadge role="medic" />}
     </div>
-  </th>
-  {applications && (
-    <>
-      <td>
+    {applications && (
+      <div class="directory-item-meta">
         <span
           class="application-table-progress application-status-text"
           data-state={applicationStatuses[status].state}
         >
           {applicationStatuses[status].label}
         </span>
-      </td>
-      <td>
         {applicationCompletedAt !== null && (
           <time datetime={new Date(applicationCompletedAt).toISOString()}>
             {formatApplicationCompletedTime(
@@ -80,7 +79,7 @@ const data: DirectoryPerson = {
             )}
           </time>
         )}
-      </td>
-    </>
-  )}
-</tr>
+      </div>
+    )}
+  </div>
+</li>

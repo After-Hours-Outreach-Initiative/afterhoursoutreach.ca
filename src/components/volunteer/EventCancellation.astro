@@ -221,6 +221,11 @@ const id = `${dialogId}-cancel`;
     opacity: 0;
     outline: none;
   }
+  /* Match the other inline confirmations, not the enclosing event card's h3. */
+  .cancellation-form h3 {
+    font-size: var(--text-lg);
+    line-height: var(--text-lg--line-height);
+  }
   [data-expanded] .cancellation-surface {
     width: 100%;
     background: #000;
@@ -255,9 +260,18 @@ const id = `${dialogId}-cancel`;
     .cancellation-surface {
       width: 100%;
     }
-    .cancellation-trigger {
+    /* Fill the full-width surface so the label centers and all of it is clickable. */
+    .cancellation-trigger.btn {
       width: 100%;
+      justify-content: center;
       text-align: center;
+    }
+    .cancellation-actions {
+      flex-direction: column;
+    }
+    .cancellation-actions > .btn {
+      width: 100%;
+      justify-content: center;
     }
   }
   @media (prefers-reduced-motion: reduce) {

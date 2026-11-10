@@ -27,6 +27,7 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
         id={`${dialogId}-save`}
         class="volunteer-form"
         data-event-save
+        data-track-changes={event ? "" : undefined}
         data-email-prompt={event && event.confirmed > 0 ? "event" : undefined}
         data-future-email-prompt={
           event && event.futureEditableConfirmed > 0 ? "series" : undefined

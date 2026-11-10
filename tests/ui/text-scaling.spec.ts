@@ -15,10 +15,10 @@ test.beforeAll(async ({ browser, baseURL }) => {
   try {
     const page = await context.newPage();
     await page.goto("/volunteer");
-    await expect(page.locator("[data-view-as]")).toHaveAttribute(
-      "aria-busy",
-      "false",
-    );
+    // The account switcher script reveals the DEV panel button once it runs.
+    await expect(
+      page.getByRole("button", { name: "DEV panel", exact: true }),
+    ).toBeVisible();
   } finally {
     await context.close();
   }
@@ -272,10 +272,9 @@ for (const root of [16, 20, 24]) {
         name: "DEV panel",
         exact: true,
       });
-      await expect(dialog.getByRole("heading")).toHaveCSS(
-        "font-size",
-        `${1.5 * root}px`,
-      );
+      await expect(
+        dialog.getByRole("heading", { name: "DEV panel", exact: true }),
+      ).toHaveCSS("font-size", `${1.5 * root}px`);
       await expect(dialog.locator(".dialog-body")).toHaveCSS(
         "padding",
         `${(28 / 16) * root}px`,

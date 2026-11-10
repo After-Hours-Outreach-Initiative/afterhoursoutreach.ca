@@ -181,6 +181,10 @@ describe("database readiness in the built Worker", () => {
     );
     await applySelected(migrations.filter((entry) => entry !== triggerOnly));
     await health(503);
+    // Later migrations drop tables that old trigger migrations reference, so
+    // recover by migrating a fresh database in order, as a deployment would.
+    await server.reset();
+    worker = server.getWorker<Env>();
     await worker.applyD1Migrations("DB");
     await health(200);
   });

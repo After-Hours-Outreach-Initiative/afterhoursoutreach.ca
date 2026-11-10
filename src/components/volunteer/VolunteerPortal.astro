@@ -249,7 +249,7 @@ const seriesItems = manage
             </div>
           )}
           {manage && (
-            <div class="volunteer-event-tools">
+            <div class="volunteer-event-tools volunteer-event-manage-tools">
               <ViewAsMenu people={viewAsPeople} current={null} />
               <button
                 class="btn btn-quiet"
@@ -259,15 +259,17 @@ const seriesItems = manage
               >
                 Select
               </button>
-              <button
-                class="btn btn-primary"
-                data-show-dialog="event-editor-new"
-                type="button"
-              >
-                <PlusIcon class="btn-icon" />
-                Create
-              </button>
             </div>
+          )}
+          {manage && (
+            <button
+              class="btn btn-primary volunteer-event-create"
+              data-show-dialog="event-editor-new"
+              type="button"
+            >
+              <PlusIcon class="btn-icon" />
+              Create
+            </button>
           )}
         </div>
         {viewer && (
@@ -428,6 +430,23 @@ const seriesItems = manage
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
+  }
+  /* Create sits beside the tools, after a flexible gap after the title. */
+  .volunteer-section-heading:has(> .volunteer-event-create) {
+    column-gap: 0.75rem;
+  }
+  .volunteer-section-heading:has(> .volunteer-event-create) > :first-child {
+    margin-right: auto;
+  }
+  /* On narrow screens Create stays beside the title; the other tools wrap. */
+  @media (width < 48rem) {
+    .volunteer-event-create {
+      order: 1;
+    }
+    .volunteer-event-manage-tools {
+      order: 2;
+      flex-basis: 100%;
+    }
   }
   [data-bulk-select-mode][aria-pressed="true"] {
     border-color: #818cf8;

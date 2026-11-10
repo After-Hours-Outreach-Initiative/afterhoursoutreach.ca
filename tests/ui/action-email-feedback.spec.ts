@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { createLocalAccount } from "../helpers/local-account";
 
 test("email feedback preserves errors, retries only its operation, and closes silently on success", async ({
   page,
+  baseURL,
 }) => {
   const operation = "56800536-96d1-4b07-a570-88dde73fc0f7";
   const submissions: object[] = [];
@@ -48,6 +50,8 @@ test("email feedback preserves errors, retries only its operation, and closes si
       });
     }
   });
+  // Signed-out visitors get the sign-in page, which has no portal actions.
+  await createLocalAccount(page.request, baseURL!);
   await page.goto("/volunteer");
   await expect(page.locator("[data-event-notifications]")).toHaveCount(0);
   await page.evaluate(() => {

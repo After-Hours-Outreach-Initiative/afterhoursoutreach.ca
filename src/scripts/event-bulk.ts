@@ -162,7 +162,9 @@ export function syncBulkEventSelection(root: HTMLElement) {
   root.querySelector<HTMLButtonElement>("[data-bulk-clear]")!.disabled =
     selected.size === 0;
   root.querySelector<HTMLButtonElement>("[data-bulk-select-all]")!.disabled =
-    !inputs.some(shown);
+    !inputs.some(
+      (input) => shown(input) && !selected.has(input.dataset.bulkEvent!),
+    );
   const form = root.querySelector<HTMLFormElement>("[data-bulk-event-save]")!;
   if (form.closest<HTMLDialogElement>("dialog")!.open) {
     const snapshot =

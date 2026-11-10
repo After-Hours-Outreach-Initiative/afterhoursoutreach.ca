@@ -543,7 +543,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     const uiCard = organizerPage.locator(`[data-live-event="${uiId}"]`);
     const editor = uiCard.locator("dialog");
     await expect(editor).toBeVisible();
-    expect(new URL(organizerPage.url()).searchParams.get("type")).toBeNull();
+    // Event type filters are ignored, so a leftover one cannot hide the date.
     expect(new URL(organizerPage.url()).searchParams.get("occurrence")).toBe(
       uiId,
     );

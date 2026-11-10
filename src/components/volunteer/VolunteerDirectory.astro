@@ -1,8 +1,6 @@
 ---
 import DirectoryRow from "./DirectoryRow.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
-import ArrowRightIcon from "../icons/ArrowRightIcon.astro";
-import TableScrollFrame from "../TableScrollFrame.astro";
 import FilterMenu from "./FilterMenu.astro";
 import DirectorySortMenu from "./DirectorySortMenu.astro";
 import {
@@ -13,7 +11,6 @@ import {
   directoryRoles,
   type ApplicationStatus,
   type DirectoryListState,
-  type DirectorySort,
 } from "../../data/volunteer-list";
 import type { listVolunteers } from "../../server/db/volunteers";
 
@@ -45,15 +42,6 @@ const statusCounts: Record<ApplicationStatus, number> = {
   rejected: people.rejectedCount,
   approved: people.approvedCount,
 };
-const columns = (
-  applications
-    ? [
-        { key: "name", label: "Name" },
-        { key: "progress", label: "Status" },
-        { key: "completed", label: "Completed" },
-      ]
-    : [{ key: "name", label: "Name" }]
-) satisfies { key: DirectorySort; label: string }[];
 const sortOptions = applications
   ? [
       { value: "progress", label: "Status" },
@@ -100,13 +88,6 @@ const sortOptions = applications
           placeholder="Search by name"
         />
       </label>
-      <button
-        class="btn btn-outline"
-        type="submit"
-        data-volunteer-search-submit
-      >
-        Search
-      </button>
     </div>
     <div class="directory-control-row">
       <div class="directory-filters" role="group" aria-label="Filters">
@@ -164,66 +145,21 @@ const sortOptions = applications
     </div>
   </form>
   <div data-volunteer-results>
-    <div class="volunteer-table-shell">
-      <TableScrollFrame
-        class="volunteer-table-frame"
-        label={applications ? "Application table" : "Volunteer table"}
-      >
-        <table class="volunteer-table" id={`${kind}-table`}>
-          <caption class="sr-only">
-            {applications
-              ? "Applicants, roles, status, and completion dates"
-              : "Approved volunteers and roles"}
-          </caption>
-          <thead>
-            <tr>
-              {columns.map(({ key, label }) => {
-                const active = sort === key;
-                const nextDirection =
-                  active && direction === "asc" ? "desc" : "asc";
-                return (
-                  <th
-                    scope="col"
-                    data-directory-column={key}
-                    aria-sort={
-                      active
-                        ? direction === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : undefined
-                    }
-                  >
-                    <a
-                      class="volunteer-table-sort"
-                      href={urlForState({
-                        ...state,
-                        sort: key,
-                        direction: nextDirection,
-                      })}
-                      data-volunteer-sort={key}
-                      aria-controls={`${kind}-table`}
-                      aria-label={`${label}: sort ${nextDirection === "asc" ? "ascending" : "descending"}`}
-                    >
-                      <span>{label}</span>
-                      <ArrowRightIcon class="volunteer-table-sort-icon" />
-                    </a>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {people.rows.map((person) => (
-              <DirectoryRow
-                person={person}
-                applications={applications}
-                href={profileHref(person.id)}
-              />
-            ))}
-          </tbody>
-        </table>
-      </TableScrollFrame>
-    </div>
+    <ul
+      class="directory-list"
+      id={`${kind}-list`}
+      aria-label={applications ? "Applications" : "Volunteers"}
+      data-volunteer-list
+      hidden={!people.rows.length}
+    >
+      {people.rows.map((person) => (
+        <DirectoryRow
+          person={person}
+          applications={applications}
+          href={profileHref(person.id)}
+        />
+      ))}
+    </ul>
     <p
       class="volunteer-notice"
       data-volunteer-empty
@@ -232,17 +168,15 @@ const sortOptions = applications
       {directoryEmptyMessage(kind, state)}
     </p>
     <template data-volunteer-cached-rows>
-      <table>
-        <tbody>
-          {cachedRows.map((person) => (
-            <DirectoryRow
-              person={person}
-              applications={applications}
-              href={profileHref(person.id)}
-            />
-          ))}
-        </tbody>
-      </table>
+      <ul>
+        {cachedRows.map((person) => (
+          <DirectoryRow
+            person={person}
+            applications={applications}
+            href={profileHref(person.id)}
+          />
+        ))}
+      </ul>
     </template>
   </div>
   <p class="sr-only" role="status" data-volunteer-result-count></p>

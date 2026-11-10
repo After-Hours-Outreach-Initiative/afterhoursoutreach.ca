@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { contactEmail, contactPhone, social } from "../../src/data/site";
 
-test("home page offers volunteering without an upcoming events section", async ({
+test("home page lists upcoming events and offers volunteering", async ({
   page,
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Upcoming events" }),
-  ).toHaveCount(0);
+    page.getByRole("heading", { name: "Upcoming events", exact: true }),
+  ).toBeVisible();
   await expect(
     page.locator('#events, [href="#events"], [data-event-teaser]'),
   ).toHaveCount(0);
@@ -91,7 +91,14 @@ for (const width of [1280, 375]) {
     await expect(contact.getByRole("link")).toHaveText([
       contactEmail,
       contactPhone,
+      "312 Main St",
     ]);
+    await expect(
+      contact.getByRole("link", { name: "312 Main St" }),
+    ).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=312+Main+St+Vancouver",
+    );
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,

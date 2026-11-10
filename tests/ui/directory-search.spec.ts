@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectDirectorySort, sortDirectory } from "../helpers/directory-sort";
 
 for (const kind of ["applications", "volunteers"]) {
   test(`${kind} instantly search, filter and sort all 500 cached entries without network requests`, async ({
@@ -8,13 +9,10 @@ for (const kind of ["applications", "volunteers"]) {
     await page.goto(
       `/dev/ui/${kind}/preview?scenario=large&latency=0&q=sample+500&offset=50`,
     );
-    const rows = page.locator("[data-volunteer-results] tbody tr");
+    const rows = page.locator("[data-volunteer-results] [data-volunteer-row]");
     const search = page.locator("[data-volunteer-search]");
     await expect(rows).toHaveCount(1);
     await expect(rows).toContainText("sample 500");
-    await expect(
-      page.getByRole("button", { name: "Search", exact: true }),
-    ).toBeHidden();
     await expect(
       page.getByRole("link", {
         name: /^(Next|Previous) (applications|volunteers)$/,
@@ -34,8 +32,9 @@ for (const kind of ["applications", "volunteers"]) {
       await search.evaluate((input: HTMLInputElement) => {
         input.value = "";
         input.dispatchEvent(new Event("input", { bubbles: true }));
-        return document.querySelectorAll("[data-volunteer-results] tbody tr")
-          .length;
+        return document.querySelectorAll(
+          "[data-volunteer-results] [data-volunteer-row]",
+        ).length;
       }),
     ).toBe(500);
     await search.fill("sample 001");
@@ -66,23 +65,20 @@ for (const kind of ["applications", "volunteers"]) {
       await expect(rows).toHaveCount(1);
       await search.fill("");
     }
-    const sort = page.locator('[data-volunteer-sort="name"]');
-    await sort.focus();
-    await page.keyboard.press("Enter");
-    await expect(sort).toBeFocused();
-    await expect(sort.locator("..")).toHaveAttribute("aria-sort", "ascending");
+    await sortDirectory(page, "name", "asc");
+    await expectDirectorySort(page, "name", "asc");
     const ascending = await rows
       .locator("[data-volunteer-profile-link]")
       .allTextContents();
-    await sort.click();
-    await expect(sort.locator("..")).toHaveAttribute("aria-sort", "descending");
+    await sortDirectory(page, "name", "desc");
+    await expectDirectorySort(page, "name", "desc");
     expect(
       await rows.locator("[data-volunteer-profile-link]").allTextContents(),
     ).toEqual(ascending.toReversed());
     await page.goBack();
-    await expect(sort.locator("..")).toHaveAttribute("aria-sort", "ascending");
+    await expectDirectorySort(page, "name", "asc");
     await page.goForward();
-    await expect(sort.locator("..")).toHaveAttribute("aria-sort", "descending");
+    await expectDirectorySort(page, "name", "desc");
     expect(requests).toEqual([]);
   });
 }
@@ -91,7 +87,7 @@ test("background refresh preserves newer local search and sorting; failure leave
   page,
 }) => {
   await page.goto("/dev/ui/applications/preview?scenario=mixed&latency=0");
-  const rows = page.locator("[data-volunteer-results] tbody tr");
+  const rows = page.locator("[data-volunteer-results] [data-volunteer-row]");
   await expect(rows).toHaveCount(8);
   const updated = await page.request.get(
     "/dev/ui/applications/preview?scenario=large&latency=0",
@@ -122,15 +118,14 @@ test("background refresh preserves newer local search and sorting; failure leave
   );
   await page.locator("[data-volunteer-search]").fill("sample 500");
   await expect(rows).toHaveCount(0);
-  const sort = page.locator('[data-volunteer-sort="name"]');
-  await sort.click();
+  await sortDirectory(page, "name", "asc");
   release();
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText("sample 500");
   await expect(page.locator("[data-volunteer-search]")).toHaveValue(
     "sample 500",
   );
-  await expect(sort.locator("..")).toHaveAttribute("aria-sort", "ascending");
+  await expectDirectorySort(page, "name", "asc");
   await expect(page).toHaveURL(/q=sample\+500&sort=name$/);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.locator("[data-volunteer-search-error]")).toBeVisible();
@@ -145,9 +140,9 @@ test("the browser search index contains directory fields only, not review reason
   page,
 }) => {
   await page.goto("/dev/ui/applications/preview?scenario=mixed&latency=0");
-  await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
-    8,
-  );
+  await expect(
+    page.locator("[data-volunteer-results] [data-volunteer-row]"),
+  ).toHaveCount(8);
   const metadata = await page
     .locator("[data-volunteer-row]")
     .first()

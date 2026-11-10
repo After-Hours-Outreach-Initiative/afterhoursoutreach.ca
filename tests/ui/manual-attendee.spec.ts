@@ -95,12 +95,10 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
   await expect(form.getByText("Preview", { exact: true })).toHaveCount(0);
   await expect(formErrorIcon).toBeHidden();
   await expect(searchErrorIcon).toBeHidden();
-  await form.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(form.getByRole("alert")).toHaveText(
-    "Choose a volunteer or enter a name.",
-  );
-  await expect(formErrorIcon).toBeVisible();
-  await expect(formErrorIcon).toHaveAttribute("aria-hidden", "true");
+  // Nothing is staged yet, so there is nothing to add.
+  await expect(
+    form.getByRole("button", { name: "Add", exact: true }),
+  ).toBeDisabled();
 
   const failSearch = (route: Route) =>
     route.fulfill({

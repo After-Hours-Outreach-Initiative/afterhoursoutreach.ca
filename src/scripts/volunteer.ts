@@ -1,4 +1,5 @@
 import { vancouverInstant } from "../data/event-time";
+import { trackUnsavedChanges } from "./unsaved-changes";
 import { handleEventCalendarClick, syncEventCalendar } from "./event-calendar";
 import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
@@ -52,8 +53,11 @@ function initEventDates(root: Document | HTMLElement) {
   for (const form of root.querySelectorAll<HTMLFormElement>(
     "[data-event-save]:not([data-submitting]), [data-series-save]:not([data-submitting])",
   )) {
-    const button = submitButton(form);
-    if (button) button.disabled = false;
+    if (form.matches("[data-track-changes]")) trackUnsavedChanges(form);
+    else {
+      const button = submitButton(form);
+      if (button) button.disabled = false;
+    }
     for (const step of form.querySelectorAll<HTMLButtonElement>(
       "[data-stepper-step]",
     ))
@@ -832,6 +836,9 @@ function form(
       }
       delete element.dataset.submitting;
       delete scope.dataset.submitting;
+      // A saved form's current values are its new baseline.
+      if (element.matches("[data-track-changes]"))
+        trackUnsavedChanges(element, saved);
       const browser = element.closest<HTMLElement>("[data-event-browser]");
       if (browser) syncBulkEventSelection(browser);
       initRecurrenceControls(

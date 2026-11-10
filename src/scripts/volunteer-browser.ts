@@ -1,5 +1,4 @@
 import { actionFragment, syncHeaderApplications } from "./action-page";
-import { initDirectoryTableHeader } from "./directory-table-header";
 import { initFilterMenus } from "./filter-menu";
 import { initRoleOrder } from "./role-order";
 import {
@@ -18,8 +17,8 @@ function readRows(root: HTMLElement) {
     "[data-volunteer-cached-rows]",
   );
   const nodes = [
-    ...root.querySelectorAll<HTMLTableRowElement>("[data-volunteer-row]"),
-    ...(template?.content.querySelectorAll<HTMLTableRowElement>(
+    ...root.querySelectorAll<HTMLElement>("[data-volunteer-row]"),
+    ...(template?.content.querySelectorAll<HTMLElement>(
       "[data-volunteer-row]",
     ) ?? []),
   ];
@@ -46,7 +45,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     "[data-volunteer-search-error]",
   );
   const empty = root?.querySelector<HTMLElement>("[data-volunteer-empty]");
-  const tbody = results?.querySelector("tbody");
+  const list = results?.querySelector<HTMLElement>("[data-volunteer-list]");
   const count = root?.querySelector<HTMLElement>(
     "[data-volunteer-result-count]",
   );
@@ -57,12 +56,11 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     !results ||
     !error ||
     !empty ||
-    !tbody ||
+    !list ||
     !count
   )
     return;
   const kind = root.dataset.directoryKind as DirectoryKind;
-  const refreshTableHeader = initDirectoryTableHeader(results);
   let rows = readRows(root);
   let pending: AbortController | undefined;
   const stateFor = (url = new URL(location.href)) =>
@@ -179,28 +177,6 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
         );
       });
     syncControls(state);
-    results
-      .querySelectorAll<HTMLElement>("[data-directory-column]")
-      .forEach((column) => {
-        if (column.dataset.directoryColumn === state.sort)
-          column.setAttribute(
-            "aria-sort",
-            state.direction === "asc" ? "ascending" : "descending",
-          );
-        else column.removeAttribute("aria-sort");
-      });
-    results
-      .querySelectorAll<HTMLAnchorElement>("[data-volunteer-sort]")
-      .forEach((link) => {
-        const sort = link.dataset.volunteerSort as DirectoryListState["sort"];
-        const direction =
-          state.sort === sort && state.direction === "asc" ? "desc" : "asc";
-        link.href = urlFor({ ...state, sort, direction }).href;
-        link.setAttribute(
-          "aria-label",
-          `${link.textContent!.trim()}: sort ${direction === "asc" ? "ascending" : "descending"}`,
-        );
-      });
     for (const { node } of rows.values()) {
       const link = node.querySelector<HTMLAnchorElement>(
         "[data-volunteer-profile-link]",
@@ -212,11 +188,11 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
         link.setAttribute("href", profileUrl.pathname + profileUrl.search);
       }
     }
-    tbody.replaceChildren(...view.rows.map(({ id }) => rows.get(id)!.node));
+    list.replaceChildren(...view.rows.map(({ id }) => rows.get(id)!.node));
     empty.textContent = directoryEmptyMessage(kind, state);
     empty.hidden = Boolean(view.rows.length);
+    list.hidden = !view.rows.length;
     count.textContent = `${view.rows.length} ${kind === "applications" ? (view.rows.length === 1 ? "application" : "applications") : view.rows.length === 1 ? "volunteer" : "volunteers"}`;
-    refreshTableHeader();
     if (historyMode === "push" && url.href !== location.href)
       history.pushState(null, "", url);
     else if (historyMode !== "none") history.replaceState(null, "", url);
@@ -250,8 +226,8 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
       const focused = document.activeElement;
       const focusedId =
         focused instanceof Element
-          ? focused.closest<HTMLTableRowElement>("[data-volunteer-row]")
-              ?.dataset.directoryPerson
+          ? focused.closest<HTMLElement>("[data-volunteer-row]")?.dataset
+              .directoryPerson
           : undefined;
       rows = readRows(nextRoot);
       render(stateFor(), "none");
@@ -290,28 +266,6 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     );
     if (open) open.hidePopover();
     else render(stateFromForm(), "push");
-  });
-  const submit = form.querySelector<HTMLButtonElement>(
-    "[data-volunteer-search-submit]",
-  );
-  if (submit) submit.hidden = true;
-  results.addEventListener("click", (event) => {
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey ||
-      !(event.target instanceof Element)
-    )
-      return;
-    const link = event.target.closest<HTMLAnchorElement>(
-      "[data-volunteer-sort]",
-    );
-    if (!link) return;
-    event.preventDefault();
-    render(stateFor(new URL(link.href)), "push");
   });
   form.addEventListener("click", (event) => {
     if (

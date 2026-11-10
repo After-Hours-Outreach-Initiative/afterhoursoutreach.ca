@@ -432,6 +432,7 @@ test("other viewers see signups and cancellations through polling without losing
 
 test("events retain recurring dates, polling, actions and past events without filters", async ({
   page,
+  playwright,
   baseURL,
 }) => {
   test.setTimeout(60_000);
@@ -502,9 +503,23 @@ test("events retain recurring dates, polling, actions and past events without fi
   // without losing series tools or attendance actions.
   const occurrence = occurrences.first();
   const occurrenceId = (await occurrence.getAttribute("data-live-event"))!;
+  // Robin is already patrol approved, so add a volunteer who still needs it.
+  const volunteerRequest = await playwright.request.newContext({ baseURL });
+  const volunteer = await createLocalAccount(volunteerRequest, baseURL!);
+  const completed = await volunteerRequest.post("/api/v1/account/naloxone", {
+    headers: { origin: baseURL! },
+    data: { userId: volunteer.id, completed: true },
+  });
+  expect(completed.status(), await completed.text()).toBe(200);
+  await volunteerRequest.dispose();
+  await approveLocalApplication(page.request, baseURL!, volunteer.id);
   const joined = await page.request.post("/api/v1/events/action", {
     headers: { origin: baseURL! },
-    data: { action: "join", id: occurrenceId },
+    data: {
+      action: "add-volunteers",
+      id: occurrenceId,
+      volunteers: [{ userId: volunteer.id }],
+    },
   });
   expect(joined.status(), await joined.text()).toBe(200);
   await occurrence.locator(".volunteer-roster > summary").click();

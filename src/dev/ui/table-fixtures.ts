@@ -44,7 +44,7 @@ export function tableScenarios(kind: TableKind) {
       id: "long-names",
       label: "Long names",
       description:
-        "Long, hyphenated, and unbroken names for checking horizontal table scrolling without wrapping or page overflow.",
+        "Long, hyphenated, and unbroken names for checking that list rows wrap without page overflow.",
     },
     {
       id: "large",

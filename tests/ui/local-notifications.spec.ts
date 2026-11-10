@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createLocalAccount } from "../helpers/local-account";
 
 test("local approval notifications work without crypto.randomUUID", async ({
   page,
@@ -60,6 +61,8 @@ test("local approval notifications work without crypto.randomUUID", async ({
       body: profile(),
     }),
   );
+  // Signed-out visitors get the sign-in page, which has no portal actions.
+  await createLocalAccount(page.request, baseURL!);
   await page.goto("/volunteer");
   await page.evaluate((html) => {
     const dialog = document.createElement("dialog");
@@ -68,6 +71,8 @@ test("local approval notifications work without crypto.randomUUID", async ({
     dialog.innerHTML = html;
     document.querySelector(".volunteer-wrap")!.appendChild(dialog);
     dialog.showModal();
+    // Saves refresh the profile from the current page URL.
+    history.replaceState(null, "", "/volunteers/test-patrol");
     document.documentElement.dataset.testDocument = "approval-regression";
   }, profile());
   const profileDialog = page.getByRole("dialog", {

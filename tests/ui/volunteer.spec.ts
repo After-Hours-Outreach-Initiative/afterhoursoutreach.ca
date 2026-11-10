@@ -9,6 +9,7 @@ import {
 import { social } from "../../src/data/site";
 import {
   createLocalAccount,
+  expectSelectedLocalAccount,
   openLocalAccountSwitcher,
   sampleAnswers,
   signInLocalAuthenticatorAccount,
@@ -125,7 +126,7 @@ test("events show all permitted event types and ignore legacy filters while pres
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(
       formatEventDate(event.startsAt),
     );
-    await expect(card.locator("h3 + p")).toHaveText(
+    await expect(card.locator(".volunteer-event-heading + p")).toHaveText(
       event.includesOrientation ? "Orientation + Patrol" : "Patrol",
     );
   }
@@ -486,7 +487,8 @@ test("View as has a button for every seeded profile and supports keyboard switch
       .getByRole("navigation", { name: "Mobile navigation" })
       .getByRole("link", { name: "Volunteers", exact: true }),
   ).toBeVisible();
-  await expect(robin).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expectSelectedLocalAccount(page, "local-fixture-user-robin");
 });
 
 test("profile buttons disable during switching and recover without changing selection on failure", async ({
@@ -543,7 +545,7 @@ test("View as lists actual D1 users and switching to Visitor ends only the curre
   await expect(page.locator("[data-account-menu]")).toHaveCount(0);
   await profile.click();
   await expect(page.locator("[data-account-menu]")).toBeVisible();
-  await expect(profile).toHaveAttribute("aria-pressed", "true");
+  await expectSelectedLocalAccount(page, user.id);
   const selected = await page.request.get("/api/v1/auth/get-session");
   const selectedSession: { user: { id: string }; session: { id: string } } =
     await selected.json();
@@ -585,8 +587,8 @@ test("View as can choose a D1 account without an application without changing it
   await expect(page.locator("[data-account-email]").first()).toHaveText(
     user.email,
   );
-  await expect(page.getByLabel("First name")).toHaveValue("");
-  await expect(profile).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('input[name="firstName"]')).toHaveValue("");
+  await expectSelectedLocalAccount(page, user.id);
 
   await page.goto("/volunteer");
   const portal = page.locator("[data-event-browser]");
@@ -688,11 +690,15 @@ test("account navigation and profile controls are usable on desktop and mobile",
         width < 768 ? "18px" : "20px",
       );
       await expect(heading).toHaveCSS("font-weight", "700");
+      // Dividers separate whole sections, not a heading from its answers.
       await expect(heading.locator("..")).toHaveCSS(
         "border-bottom-width",
-        "1px",
+        "0px",
       );
     }
+    const sections = await form.locator(".volunteer-profile-section").all();
+    for (const section of sections.slice(1))
+      await expect(section).toHaveCSS("border-top-width", "1px");
     await form.getByRole("button", { name: "Cancel", exact: true }).click();
     await page.getByRole("button", { name: "Edit emergency contact" }).click();
     const emergencyContact = page.getByRole("group", {
@@ -709,8 +715,9 @@ test("account navigation and profile controls are usable on desktop and mobile",
       await expect(
         emergencyContact.locator(`input[name="${field}"]`),
       ).toHaveValue(sampleAnswers[field]);
-    await expect(emergencyContact).toHaveCSS("border-top-width", "0px");
-    await expect(emergencyContact).toHaveCSS("padding", "0px");
+    // A later profile section starts with the divider above it.
+    await expect(emergencyContact).toHaveCSS("border-top-width", "1px");
+    await expect(emergencyContact).toHaveCSS("padding", "32px 0px 0px");
     const emergencyGrid = emergencyContact.locator(".volunteer-fields");
     await expect(emergencyGrid).toBeVisible();
     expect(
@@ -746,11 +753,12 @@ test("account navigation and profile controls are usable on desktop and mobile",
     );
     await expect(certificationOptions).toHaveCount(6);
     for (const option of await certificationOptions.all()) {
+      // Choices are selectable cards.
       await expect(option).toHaveCSS("align-items", "flex-start");
-      await expect(option).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      await expect(option).toHaveCSS("padding-inline-start", "0px");
-      await expect(option).toHaveCSS("padding-inline-end", "0px");
-      await expect(option).toHaveCSS("border-top-width", "0px");
+      await expect(option).toHaveCSS("background-color", "rgb(12, 13, 16)");
+      await expect(option).toHaveCSS("padding-inline-start", "10px");
+      await expect(option).toHaveCSS("padding-inline-end", "10px");
+      await expect(option).toHaveCSS("border-top-width", "1px");
     }
     await certifications
       .getByText(
@@ -909,6 +917,12 @@ test("local account selection rejects cross-origin writes, unknown users and del
   await page.route("**/api/v1/auth/dev/users", async (route) => {
     const response = await route.fetch();
     const listing = await response.json();
+    // Each listed account carries its state for the status line.
+    const state = {
+      ...listing.users[0].state,
+      submittedAt: null,
+      hasDraft: false,
+    };
     await route.fulfill({
       json: {
         ...listing,
@@ -919,12 +933,14 @@ test("local account selection rejects cross-origin writes, unknown users and del
             name: "Renamed preset",
             email: `${id}@example.invalid`,
             role: "volunteer",
+            state,
           })),
           {
             id: "local-account-user-not-applied",
             name: "Not applied",
             email: "not-applied.local@example.org",
             role: "volunteer",
+            state,
           },
         ],
       },
@@ -949,7 +965,9 @@ test("local account selection rejects cross-origin writes, unknown users and del
   ).toHaveCount(0);
   const remove = profiles.locator(`[data-delete-user="${user.id}"]`);
   await expect(remove).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
+  // Deletion asks for a second click on the same button.
+  await remove.click();
+  await expect(remove).toHaveAttribute("data-delete-confirming", "");
   await remove.click();
   await expect(page).toHaveURL(/\/volunteer$/);
   expect(
@@ -968,7 +986,7 @@ test("View as simulates a verified factor without changing the user's real role 
   const profile = profiles.locator(`[data-switch-user="${user.id}"]`);
   await profile.click();
   await expect(page.locator("[data-account-menu]")).toBeVisible();
-  await expect(profile).toHaveAttribute("aria-pressed", "true");
+  await expectSelectedLocalAccount(page, user.id);
   const current = await page.request.get("/api/v1/auth/get-session");
   const session = await current.json();
   expect(session.user.id).toBe(user.id);

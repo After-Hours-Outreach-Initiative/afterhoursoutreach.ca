@@ -82,38 +82,6 @@ const blocked =
   data-event-type="patrol"
   data-includes-orientation={String(Boolean(event.includesOrientation))}
 >
-  {organizer && future && !event.cancelledAt && (
-    <label class="volunteer-event-select">
-      <input
-        type="checkbox"
-        data-bulk-event={event.id}
-        data-bulk-version={event.updatedAt}
-        data-bulk-day={formatEventDay(event.startsAt)}
-        data-bulk-time={formatEventTime(event.startsAt)}
-        data-bulk-place={event.meetingPoint}
-        data-bulk-recurring={event.seriesId ? "" : undefined}
-        data-bulk-values={JSON.stringify({
-          startTime: vancouverInput(event.startsAt).slice(11),
-          meetingPoint: event.meetingPoint,
-          meetingPointUrl: event.meetingPointUrl ?? "",
-          spots: String(event.spots),
-          minMedicSpots: String(event.minMedicSpots),
-          minNewVolunteerSpots: String(event.minNewVolunteerSpots),
-          maxNewVolunteers: String(event.maxNewVolunteers),
-          unregisterMinutes: String(event.unregisterMinutes),
-          includesOrientation: String(Boolean(event.includesOrientation)),
-          publicVisibility: String(Boolean(event.open && !event.hidden)),
-        })}
-      />
-      <span>
-        Select
-        <span class="sr-only">
-          {" "}
-          {formatEventDate(event.startsAt)} at {event.meetingPoint}
-        </span>
-      </span>
-    </label>
-  )}
   <div class="volunteer-event-layout">
     <div class="volunteer-event-info">
       {event.cancelledAt ? (
@@ -123,7 +91,37 @@ const blocked =
       ) : !event.open ? (
         <p class="volunteer-hidden">Registration closed</p>
       ) : null}
-      <h3>{formatEventDate(event.startsAt)}</h3>
+      <div class="volunteer-event-heading">
+        {organizer && future && !event.cancelledAt && (
+          <label class="volunteer-event-select">
+            <input
+              type="checkbox"
+              data-bulk-event={event.id}
+              data-bulk-version={event.updatedAt}
+              data-bulk-day={formatEventDay(event.startsAt)}
+              data-bulk-time={formatEventTime(event.startsAt)}
+              data-bulk-place={event.meetingPoint}
+              data-bulk-recurring={event.seriesId ? "" : undefined}
+              data-bulk-values={JSON.stringify({
+                startTime: vancouverInput(event.startsAt).slice(11),
+                meetingPoint: event.meetingPoint,
+                meetingPointUrl: event.meetingPointUrl ?? "",
+                spots: String(event.spots),
+                minMedicSpots: String(event.minMedicSpots),
+                minNewVolunteerSpots: String(event.minNewVolunteerSpots),
+                maxNewVolunteers: String(event.maxNewVolunteers),
+                unregisterMinutes: String(event.unregisterMinutes),
+                includesOrientation: String(Boolean(event.includesOrientation)),
+                publicVisibility: String(Boolean(event.open && !event.hidden)),
+              })}
+            />
+            <span class="sr-only">
+              Select {formatEventDate(event.startsAt)} at {event.meetingPoint}
+            </span>
+          </label>
+        )}
+        <h3>{formatEventDate(event.startsAt)}</h3>
+      </div>
       <p>
         {!future && "Past event · "}
         {event.includesOrientation ? "Orientation + Patrol" : "Patrol"}
@@ -248,7 +246,6 @@ const blocked =
 <style>
   .volunteer-event-card {
     --event-card-gap: 1rem;
-    --event-select-height: 2.25rem;
     container: event-card / inline-size;
     padding: 1rem;
     scroll-margin-top: calc(
@@ -285,44 +282,37 @@ const blocked =
     min-width: 0;
     overflow-wrap: anywhere;
   }
+  .volunteer-event-heading {
+    display: flex;
+    /* Line the checkbox up with the date's first line when it wraps. */
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
   .volunteer-event-select {
     display: none;
   }
-  /* In selection mode the checkbox is a tab joined to the card's top edge. */
-  :global([data-bulk-selecting])
-    .volunteer-event-card:has(> .volunteer-event-select) {
+  /* In selection mode the checkbox sits just before the date. */
+  :global([data-bulk-selecting]) .volunteer-event-heading {
     position: relative;
-    margin-top: var(--event-select-height);
-  }
-  :global([data-bulk-selecting]) .volunteer-event-select {
-    position: absolute;
-    bottom: 100%;
-    left: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    height: var(--event-select-height);
-    padding: 0 0.875rem 0 0.75rem;
-    border: 1px solid #3f3f46;
-    border-bottom: 0;
-    border-radius: 0.5rem 0.5rem 0 0;
-    background: var(--color-black);
-    color: #d4d4d8;
-    font-size: 0.875rem;
-    font-weight: 500;
     cursor: pointer;
   }
-  .volunteer-event-select:hover {
-    color: white;
+  :global([data-bulk-selecting]) .volunteer-event-select {
+    display: flex;
+    flex-shrink: 0;
+    margin-top: calc((1.75rem - var(--volunteer-check-size)) / 2);
   }
-  .volunteer-event-card:has(> .volunteer-event-select > input:checked),
-  .volunteer-event-card:has(> .volunteer-event-select > input:checked)
-    > .volunteer-event-select {
+  :global([data-bulk-selecting]) .volunteer-event-select > input {
+    position: relative;
+    z-index: 1;
+  }
+  /* The whole checkbox and date row toggles the selection. */
+  :global([data-bulk-selecting]) .volunteer-event-select::after {
+    content: "";
+    position: absolute;
+    inset: -0.375rem 0;
+  }
+  .volunteer-event-card:has(.volunteer-event-select > input:checked) {
     border-color: #818cf8;
-  }
-  .volunteer-event-select:has(> input:checked) {
-    background: var(--color-blue-deep);
-    color: #e0e7ff;
   }
   .volunteer-event-info h3 {
     font-size: 1.25rem;

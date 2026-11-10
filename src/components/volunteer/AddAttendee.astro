@@ -37,6 +37,7 @@ const roles = [
       id={`${id}-form`}
       class="volunteer-form attendee-form"
       data-add-attendee
+      data-track-changes
       action="/api/v1/events/action"
       method="post"
       aria-labelledby={`${id}-heading`}
@@ -170,8 +171,11 @@ const roles = [
         <button class="btn btn-quiet" type="button" data-attendee-cancel
           >Cancel</button
         >
-        <button class="btn btn-green" type="submit" data-loading-label="Adding…"
-          >Add</button
+        <button
+          class="btn btn-green"
+          type="submit"
+          data-loading-label="Adding…"
+          disabled>Add</button
         >
       </div>
     </form>
@@ -317,6 +321,20 @@ const roles = [
     gap: 0.375rem;
     padding: 0.25rem 0.5rem;
     cursor: pointer;
+  }
+  @media (width < 40rem) {
+    .attendee-form > .attendee-manual.btn {
+      align-self: stretch;
+      justify-content: center;
+      text-align: center;
+    }
+    .attendee-actions {
+      flex-direction: column;
+    }
+    .attendee-actions > .btn {
+      width: 100%;
+      justify-content: center;
+    }
   }
   @media (min-width: 64rem) {
     @container event-card (min-width: 32rem) {
