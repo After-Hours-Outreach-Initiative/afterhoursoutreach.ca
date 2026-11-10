@@ -14,7 +14,7 @@ const numberFields = [
   "maxNewVolunteers",
   "unregisterMinutes",
 ];
-const booleanFields = ["includesOrientation", "open", "hidden"];
+const booleanFields = ["includesOrientation", "publicVisibility"];
 const fields = [
   "startTime",
   "meetingPoint",
@@ -57,6 +57,12 @@ export function bulkEventAction(values: FormData) {
     const value = String(values.get(name) ?? "");
     const shared = initial[name] ?? null;
     if (shared === null ? value === "" : value === shared) continue;
+    // Visibility also controls registration, matching the single event editor.
+    if (name === "publicVisibility") {
+      changes.open = value === "true";
+      changes.hidden = value !== "true";
+      continue;
+    }
     changes[name] = numberFields.includes(name)
       ? Number(value)
       : booleanFields.includes(name)
@@ -81,21 +87,17 @@ function fillBulkForm(dialog: HTMLDialogElement, selected: SelectedEvent[]) {
     const values = new Set(selected.map((row) => row.values[name]));
     const shared = values.size === 1 ? [...values][0] : null;
     initial[name] = shared;
-    const control = form.elements.namedItem(name) as
-      HTMLInputElement | HTMLSelectElement;
-    if (control instanceof HTMLSelectElement) {
-      const mixed =
-        control.querySelector<HTMLOptionElement>("[data-bulk-mixed]")!;
-      mixed.hidden = mixed.disabled = shared !== null;
-    } else {
-      control.placeholder =
-        shared === null
-          ? "Varies"
-          : name === "meetingPointUrl"
-            ? "https://"
-            : "";
-      control.required = shared !== null && name !== "meetingPointUrl";
+    if (booleanFields.includes(name)) {
+      for (const radio of form.querySelectorAll<HTMLInputElement>(
+        `[name="${name}"]`,
+      ))
+        radio.checked = radio.value === shared;
+      continue;
     }
+    const control = form.elements.namedItem(name) as HTMLInputElement;
+    control.placeholder =
+      shared === null ? "Varies" : name === "meetingPointUrl" ? "https://" : "";
+    control.required = shared !== null && name !== "meetingPointUrl";
     control.value = shared ?? "";
   }
   form.querySelector<HTMLInputElement>('[name="initial"]')!.value =
@@ -130,8 +132,10 @@ export function syncBulkEventSelection(root: HTMLElement) {
   // Selection mode lives on the root so it survives refreshed cards and toolbars.
   const selecting = "bulkSelecting" in root.dataset;
   root.querySelector<HTMLElement>("[data-bulk-actions]")!.hidden = !selecting;
-  for (const toggle of root.querySelectorAll("[data-bulk-select-mode]"))
+  for (const toggle of root.querySelectorAll("[data-bulk-select-mode]")) {
     toggle.setAttribute("aria-pressed", String(selecting));
+    toggle.textContent = selecting ? "Cancel" : "Select";
+  }
   const selected = selectedFor(root);
   const inputs = checkboxes(root);
   let removed = false;
@@ -193,6 +197,12 @@ export function initBulkEvents(root: HTMLElement) {
     if (!(event.target instanceof Element)) return;
     if (event.target.closest("[data-bulk-select-mode]"))
       setBulkEventSelecting(root, !("bulkSelecting" in root.dataset));
+    if (event.target.closest("[data-bulk-exit]")) {
+      setBulkEventSelecting(root, false);
+      root
+        .querySelector<HTMLButtonElement>("[data-bulk-select-mode]")
+        ?.focus({ preventScroll: true });
+    }
     if (event.target.closest("[data-bulk-clear]"))
       clearBulkEventSelection(root);
     if (event.target.closest("[data-bulk-select-all]")) {
@@ -215,14 +225,8 @@ export function initBulkEvents(root: HTMLElement) {
   });
   root.addEventListener("change", (event) => {
     const input = event.target;
-    if (!(
-      input instanceof HTMLInputElement || input instanceof HTMLSelectElement
-    ))
-      return;
-    if (
-      input instanceof HTMLInputElement &&
-      input.matches("[data-bulk-event]")
-    ) {
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.matches("[data-bulk-event]")) {
       if (input.checked && shown(input))
         selectedFor(root).set(input.dataset.bulkEvent!, target(input));
       else selectedFor(root).delete(input.dataset.bulkEvent!);

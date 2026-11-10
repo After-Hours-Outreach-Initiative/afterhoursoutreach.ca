@@ -1,5 +1,4 @@
 import { eventCalendar, type CalendarEvent } from "../data/event-calendar";
-import { addCalendarDays } from "../data/event-time";
 
 const selections = new WeakMap<
   HTMLElement,
@@ -67,7 +66,7 @@ function highlightEvent(root: HTMLElement, card: HTMLElement) {
   frame = requestAnimationFrame(waitForEvent);
 }
 
-/** Read the actual cards after filtering/reconciliation, not a second event feed. */
+/** Read the actual cards after reconciliation, not a second event feed. */
 export function syncEventCalendar(root: HTMLElement, start?: string) {
   const calendar = root.querySelector<HTMLElement>("[data-event-calendar]");
   if (!calendar) return;
@@ -92,15 +91,19 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
   }
   const model = eventCalendar(events, start ?? calendar.dataset.calendarStart);
   calendar.dataset.calendarStart = model.start;
-  calendar.querySelector<HTMLElement>("[data-calendar-controls]")!.hidden =
-    false;
+  for (const control of calendar.querySelectorAll<HTMLElement>(
+    "[data-calendar-controls]",
+  ))
+    control.hidden = !model.previous && !model.next;
   const range = calendar.querySelector<HTMLElement>("[data-calendar-range]")!;
   if (range.textContent?.trim() !== model.range)
     range.textContent = model.range;
   for (const step of ["previous", "next"] as const) {
-    calendar.querySelector<HTMLButtonElement>(
+    const button = calendar.querySelector<HTMLButtonElement>(
       `[data-calendar-step="${step}"]`,
-    )!.disabled = !model[step];
+    )!;
+    button.disabled = !model[step];
+    button.dataset.calendarTarget = model[step] ?? "";
   }
   const days = calendar.querySelector<HTMLElement>("[data-calendar-days]")!;
   const signature = JSON.stringify(model.weeks);
@@ -117,6 +120,11 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
       for (const day of week) {
         const cell = document.createElement("td");
         cell.dataset.calendarDate = day.date;
+        row.appendChild(cell);
+        if (!day.inMonth) {
+          if (day.date < model.start) continue;
+          cell.dataset.calendarOverflow = "";
+        }
         if (day.today) cell.setAttribute("aria-current", "date");
         const date = document.createElement("span");
         date.className = "event-calendar-day";
@@ -132,7 +140,6 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
           link.appendChild(date);
           cell.appendChild(link);
         } else cell.appendChild(date);
-        row.appendChild(cell);
       }
       return row;
     }),
@@ -143,26 +150,21 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
     ].find((link) => link.dataset.calendarEvent === focusedId);
     (
       replacement ??
-      calendar.querySelector<HTMLElement>('[data-calendar-step="today"]')
+      calendar.querySelector<HTMLElement>(
+        "[data-calendar-step]:not(:disabled):not([hidden])",
+      ) ??
+      range
     )?.focus({ preventScroll: true });
   }
 }
 
 export function handleEventCalendarClick(root: HTMLElement, event: MouseEvent) {
   if (!(event.target instanceof Element)) return;
-  if (event.target.closest("[data-event-filter]")) clearSelection(root);
   const step = event.target.closest<HTMLButtonElement>("[data-calendar-step]");
   if (step) {
     if (step.disabled) return;
     clearSelection(root);
-    const calendar = root.querySelector<HTMLElement>("[data-event-calendar]")!;
-    const offset = step.dataset.calendarStep === "previous" ? -35 : 35;
-    const start =
-      step.dataset.calendarStep === "today"
-        ? undefined
-        : addCalendarDays(calendar.dataset.calendarStart!, offset);
-    // An empty start resets to the current Vancouver week.
-    syncEventCalendar(root, start ?? "");
+    syncEventCalendar(root, step.dataset.calendarTarget);
     return;
   }
   const link = event.target.closest<HTMLAnchorElement>("[data-calendar-event]");
@@ -180,13 +182,15 @@ export function handleEventCalendarClick(root: HTMLElement, event: MouseEvent) {
   ].find((card) => card.dataset.liveEvent === link.dataset.calendarEvent);
   if (!card || card.hidden) return;
   event.preventDefault();
-  // Keep filter/occurrence query parameters and native back/forward navigation.
+  // Keep occurrence query parameters and native back/forward navigation.
   if (location.hash !== link.hash) history.pushState(null, "", link.hash);
   card.focus({ preventScroll: true });
   highlightEvent(root, card);
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   card.scrollIntoView({
-    behavior: reduced ? "instant" : "smooth",
-    block: "start",
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "instant"
+      : "smooth",
+    block: "center",
+    inline: "nearest",
   });
 }

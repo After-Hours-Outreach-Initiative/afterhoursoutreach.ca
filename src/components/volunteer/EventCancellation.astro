@@ -27,9 +27,9 @@ const id = `${dialogId}-cancel`;
       class="volunteer-form cancellation-form"
       data-event-cancel
       data-email-prompt={event.confirmed > 0 ? "event-cancel" : undefined}
-      data-future-email-prompt={event.futureConfirmed > 0
-        ? "series-cancel"
-        : undefined}
+      data-future-email-prompt={
+        event.futureConfirmed > 0 ? "series-cancel" : undefined
+      }
       action="/api/v1/events/action"
       method="post"
       aria-labelledby={`${id}-heading`}
@@ -37,47 +37,41 @@ const id = `${dialogId}-cancel`;
       tabindex="-1"
       inert
     >
-      <h3 id={`${id}-heading`} class="text-lg">Cancel event?</h3>
+      <h3 id={`${id}-heading`} class="text-lg">
+        Cancel event?
+      </h3>
       <input type="hidden" name="id" value={event.id} />
       <input type="hidden" name="version" value={event.updatedAt} />
-      {
-        event.seriesId && (
-          <p class="volunteer-help" data-event-cancel-policy>
-            The rest of the series will continue.
+      {event.seriesId && (
+        <p class="volunteer-help" data-event-cancel-policy>
+          The rest of the series will continue.
+        </p>
+      )}
+      {series && (
+        <>
+          <input type="hidden" name="seriesId" value={series.id} />
+          <input type="hidden" name="seriesVersion" value={series.updatedAt} />
+          <input
+            type="hidden"
+            name="occurrenceDate"
+            value={event.occurrenceDate!}
+          />
+          <label class="volunteer-field">
+            Cancel
+            <select name="scope">
+              <option value="occurrence">Only this occurrence</option>
+              <option value="future">
+                This and future occurrences (stop recurrence)
+              </option>
+            </select>
+          </label>
+          <p class="volunteer-help">
+            Cancelling future occurrences also cancels their bookings, including
+            individual exceptions. Past attendance and cancellation history are
+            kept.
           </p>
-        )
-      }
-      {
-        series && (
-          <>
-            <input type="hidden" name="seriesId" value={series.id} />
-            <input
-              type="hidden"
-              name="seriesVersion"
-              value={series.updatedAt}
-            />
-            <input
-              type="hidden"
-              name="occurrenceDate"
-              value={event.occurrenceDate!}
-            />
-            <label class="volunteer-field">
-              Cancel
-              <select name="scope">
-                <option value="occurrence">Only this occurrence</option>
-                <option value="future">
-                  This and future occurrences (stop recurrence)
-                </option>
-              </select>
-            </label>
-            <p class="volunteer-help">
-              Cancelling future occurrences also cancels their bookings,
-              including individual exceptions. Past attendance and cancellation
-              history are kept.
-            </p>
-          </>
-        )
-      }
+        </>
+      )}
       <div
         class="volunteer-field"
         data-event-cancel-reason
@@ -90,7 +84,8 @@ const id = `${dialogId}-cancel`;
           aria-describedby={`error-${dialogId}-reason`}
           maxlength="1000"
           rows="3"
-          disabled={event.confirmed === 0}></textarea>
+          disabled={event.confirmed === 0}
+        ></textarea>
         <FieldError
           field={`${dialogId}-reason`}
           message="Keep the reason to 1000 characters or fewer."
@@ -160,15 +155,33 @@ const id = `${dialogId}-cancel`;
       const trigger = this.querySelector<HTMLButtonElement>(
         "[data-event-cancel-open]",
       )!;
-      this.morph.run(surface, trigger, form, expanded, () => {
-        this.toggleAttribute("data-expanded", expanded);
-        trigger.setAttribute("aria-expanded", String(expanded));
-        form.inert = !expanded;
-        form.setAttribute("aria-hidden", String(!expanded));
-        trigger.inert = expanded;
-        // Focus the section without opening the keyboard or choosing an action.
-        (expanded ? form : trigger).focus({ preventScroll: true });
-      });
+      void this.morph
+        .run(surface, trigger, form, expanded, () => {
+          this.toggleAttribute("data-expanded", expanded);
+          trigger.setAttribute("aria-expanded", String(expanded));
+          form.inert = !expanded;
+          form.setAttribute("aria-hidden", String(!expanded));
+          trigger.inert = expanded;
+          // Focus the section without opening the keyboard or choosing an action.
+          (expanded ? form : trigger).focus({ preventScroll: true });
+        })
+        .then((completed) => {
+          if (
+            !completed ||
+            !expanded ||
+            !this.isConnected ||
+            !this.hasAttribute("data-expanded")
+          )
+            return;
+          surface.scrollIntoView({
+            block: "nearest",
+            inline: "nearest",
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+              .matches
+              ? "instant"
+              : "smooth",
+          });
+        });
     }
   }
 
@@ -261,6 +274,10 @@ const id = `${dialogId}-cancel`;
   @media (width < 40rem) {
     .cancellation-surface {
       width: 100%;
+    }
+    .cancellation-trigger {
+      width: 100%;
+      text-align: center;
     }
   }
   @media (prefers-reduced-motion: reduce) {

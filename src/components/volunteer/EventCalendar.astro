@@ -1,5 +1,5 @@
 ---
-import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
 import TableScrollFrame from "../TableScrollFrame.astro";
 import { eventCalendar, type CalendarEvent } from "@/data/event-calendar";
 import "@/styles/event-calendar.css";
@@ -24,37 +24,61 @@ const weekdays = [
   data-event-calendar
   data-calendar-start={calendar.start}
 >
-  <p id="calendar-help" class="sr-only">
-    Circled dates link to the first event that day.
-  </p>
+  <div class="event-calendar-header">
+    <button
+      type="button"
+      data-calendar-controls
+      data-calendar-step="previous"
+      aria-label="Previous month"
+      disabled={!calendar.previous}
+      hidden
+    >
+      <ChevronDownIcon class="size-5 rotate-90" />
+    </button>
+    <p
+      id="calendar-range"
+      class="event-calendar-range"
+      data-calendar-range
+      aria-live="polite"
+      tabindex="-1"
+    >
+      {calendar.range}
+    </p>
+    <button
+      type="button"
+      data-calendar-controls
+      data-calendar-step="next"
+      aria-label="Next month"
+      disabled={!calendar.next}
+      hidden
+    >
+      <ChevronDownIcon class="size-5 -rotate-90" />
+    </button>
+  </div>
   <TableScrollFrame label="Event calendar">
-    <table aria-describedby="calendar-help">
-      <caption class="sr-only" data-calendar-range aria-live="polite">
-        {calendar.range}
-      </caption>
+    <table aria-labelledby="calendar-range" aria-describedby="calendar-help">
       <thead>
-        <tr
-          >{
-            weekdays.map((day) => (
-              <th scope="col" aria-label={day}>
-                <abbr class="font-bold text-white" title={day}>
-                  {day.slice(0, 1)}
-                </abbr>
-              </th>
-            ))
-          }</tr
-        >
+        <tr>
+          {weekdays.map((day) => (
+            <th scope="col" aria-label={day}>
+              <abbr title={day}>{day.slice(0, 3)}</abbr>
+            </th>
+          ))}
+        </tr>
       </thead>
       <tbody data-calendar-days>
-        {
-          calendar.weeks.map((week) => (
-            <tr>
-              {week.map((day) => (
-                <td
-                  data-calendar-date={day.date}
-                  aria-current={day.today ? "date" : undefined}
-                >
-                  {day.events.length ? (
+        {calendar.weeks.map((week) => (
+          <tr>
+            {week.map((day) => (
+              <td
+                data-calendar-date={day.date}
+                data-calendar-overflow={
+                  !day.inMonth && day.date > calendar.start ? "" : undefined
+                }
+                aria-current={day.today ? "date" : undefined}
+              >
+                {(day.inMonth || day.date > calendar.start) &&
+                  (day.events.length ? (
                     <a
                       href={`#event-${day.events[0].id}`}
                       data-calendar-event={day.events[0].id}
@@ -67,32 +91,15 @@ const weekdays = [
                     </a>
                   ) : (
                     <span class="event-calendar-day">{day.day}</span>
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))
-        }
+                  ))}
+              </td>
+            ))}
+          </tr>
+        ))}
       </tbody>
     </table>
   </TableScrollFrame>
-  <div class="event-calendar-controls" data-calendar-controls hidden>
-    <button
-      type="button"
-      data-calendar-step="previous"
-      aria-label="Previous five weeks"
-      disabled={!calendar.previous}
-    >
-      <ArrowRightIcon class="size-5 rotate-180" />
-    </button>
-    <button type="button" data-calendar-step="today">Today</button>
-    <button
-      type="button"
-      data-calendar-step="next"
-      aria-label="Next five weeks"
-      disabled={!calendar.next}
-    >
-      <ArrowRightIcon class="size-5" />
-    </button>
-  </div>
+  <p id="calendar-help" class="sr-only">
+    Select an event date to jump to its first event.
+  </p>
 </div>

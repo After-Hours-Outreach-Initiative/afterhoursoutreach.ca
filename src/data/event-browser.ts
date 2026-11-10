@@ -1,26 +1,5 @@
 import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 
-export function eventFilter(value: string | null, management: boolean) {
-  return value === "orientation" ||
-    (management && (value === "one-off" || value === "recurring"))
-    ? value
-    : "all";
-}
-
-export function matchesEventFilter(
-  filter: string,
-  recurring: boolean,
-  includesOrientation: boolean,
-) {
-  return filter === "orientation"
-    ? includesOrientation
-    : filter === "recurring"
-      ? recurring
-      : filter === "one-off"
-        ? !recurring
-        : true;
-}
-
 type ManagementItem =
   | { kind: "event"; event: EventRow }
   | { kind: "series"; series: PatrolSeriesRow; events: EventRow[] };

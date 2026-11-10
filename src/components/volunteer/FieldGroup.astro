@@ -1,0 +1,27 @@
+---
+interface Props {
+  id: string;
+  heading: string;
+  /** Help for every field in the group; fields reference it by this id. */
+  descriptionId?: string;
+  description?: string;
+}
+const { id, heading, descriptionId, description } = Astro.props;
+---
+
+<section class="volunteer-field-group volunteer-wide" aria-labelledby={id}>
+  <h3 id={id} class="volunteer-field-group-heading">
+    {heading}
+  </h3>
+  {description && (
+    <p
+      id={descriptionId}
+      class="volunteer-help volunteer-field-group-description"
+    >
+      {description}
+    </p>
+  )}
+  <div class="volunteer-fields">
+    <slot />
+  </div>
+</section>

@@ -1374,10 +1374,9 @@ describe(
             exact: true,
           });
           await expect(dialog.locator('[name="type"]')).toHaveCount(0);
-          const includesOrientation = dialog.getByRole("checkbox", {
-            name: "Includes orientation",
-            exact: true,
-          });
+          const includesOrientation = dialog
+            .getByRole("group", { name: "Event type" })
+            .getByRole("radio", { name: "Orientation + Patrol", exact: true });
           await expect(includesOrientation).not.toBeChecked();
           await expect(includesOrientation).toBeEnabled();
           const visibilityChoices = dialog.getByRole("group", {
@@ -1447,13 +1446,18 @@ describe(
               editor.locator('input[type="radio"][name="type"]'),
             ).toHaveCount(0);
             await expect(editor.locator('[name="type"]')).toHaveCount(0);
-            const orientationToggle = editor.getByRole("checkbox", {
-              name: "Includes orientation",
+            const eventType = editor.getByRole("group", { name: "Event type" });
+            const orientationToggle = eventType.getByRole("radio", {
+              name: "Orientation + Patrol",
               exact: true,
             });
             if (spots === 9) await expect(orientationToggle).not.toBeChecked();
             else await expect(orientationToggle).toBeChecked();
-            await orientationToggle.setChecked(spots === 9);
+            await eventType
+              .getByText(spots === 9 ? "Orientation + Patrol" : "Patrol", {
+                exact: true,
+              })
+              .click();
             const visibility = editor.getByRole("group", {
               name: "Public visibility",
               exact: true,
@@ -1536,27 +1540,13 @@ describe(
             updated: () => destinationCard.waitFor(),
             loadingLabel: "Creating…",
           });
-          const filters = page.getByRole("group", {
-            name: "Filter events",
-            exact: true,
-          });
-          await filters
-            .getByRole("button", { name: /^Orientations \d+$/ })
-            .click();
-          assert.equal(
-            await page
-              .locator(
-                '[data-live-event][data-includes-orientation="false"]:visible',
-              )
-              .count(),
-            0,
-          );
-          await filters.getByRole("button", { name: /^All \d+$/ }).click();
+          await expect(
+            page.getByRole("group", { name: "Filter events", exact: true }),
+          ).toHaveCount(0);
           assert.equal(
             await page.locator("[data-live-event][hidden]").count(),
             0,
           );
-          await filters.getByRole("button", { name: /^All \d+$/ }).click();
           assert.equal(
             await page.evaluate(
               () => document.documentElement.scrollWidth <= innerWidth,
@@ -1618,13 +1608,6 @@ describe(
                   target.locator("[data-live-signup] button"),
                 ).toBeDisabled(),
             });
-          const volunteerFilters = page.getByRole("group", {
-            name: "Filter events",
-            exact: true,
-          });
-          await volunteerFilters
-            .getByRole("button", { name: /^All \d+$/ })
-            .click();
           await changeSpot("join", () =>
             card.getByText("Registered", { exact: true }).waitFor(),
           );
@@ -1635,13 +1618,6 @@ describe(
             card.getByRole("button", { name: "Unregister", exact: true }),
           ).toBeFocused();
           await expect(page).toHaveURL(/\/events$/);
-          await volunteerFilters
-            .getByRole("button", { name: /^Orientations \d+$/ })
-            .click();
-          await expect(card).toBeHidden();
-          await volunteerFilters
-            .getByRole("button", { name: /^All \d+$/ })
-            .click();
           await expect(card).toBeVisible();
           assert.equal(await page.locator("[data-action-notice]").count(), 0);
           assert.equal(
@@ -1829,11 +1805,7 @@ describe(
             card.getByText("Public visibility off", { exact: true }),
           ).toBeVisible();
           await changeSpot("cancel", () => card.waitFor({ state: "detached" }));
-          await expect(
-            volunteerFilters.getByRole("button", {
-              name: /^All \d+$/,
-            }),
-          ).toBeFocused();
+          await expect(page.locator("#events-heading")).toBeFocused();
           await account.click();
           await nav.getByRole("link", { name: "Account", exact: true }).click();
           await page

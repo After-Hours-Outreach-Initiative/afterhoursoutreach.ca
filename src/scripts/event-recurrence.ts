@@ -21,7 +21,7 @@ export function eventFields(values: FormData) {
     unregisterMinutes: Number(
       values.get("unregisterMinutes") ?? defaultUnregisterMinutes,
     ),
-    includesOrientation: values.has("includesOrientation"),
+    includesOrientation: str(values, "includesOrientation") === "true",
     open: str(values, "publicVisibility") === "true",
     hidden: str(values, "publicVisibility") !== "true",
   };
@@ -132,7 +132,7 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
   )) {
     if (form.dataset.submitting) continue;
     const orientation = form.querySelector<HTMLInputElement>(
-      '[name="includesOrientation"]',
+      '[name="includesOrientation"][value="true"]',
     );
     const spots = form.querySelector<HTMLInputElement>('[name="spots"]');
     const capacityFeedback = form.querySelector<HTMLElement>(
@@ -169,7 +169,10 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
       };
       if (!form.dataset.capacityReady) {
         form.dataset.capacityReady = "true";
-        orientation.addEventListener("change", updateCapacity);
+        for (const input of form.querySelectorAll(
+          '[name="includesOrientation"]',
+        ))
+          input.addEventListener("change", updateCapacity);
         for (const input of [minMedicSpots, minNewVolunteerSpots])
           input?.addEventListener("input", updateCapacity);
         form.addEventListener("reset", () => queueMicrotask(updateCapacity));

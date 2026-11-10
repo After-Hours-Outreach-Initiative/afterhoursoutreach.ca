@@ -11,7 +11,14 @@ export function calendarWeekStart(date: string) {
   return addCalendarDays(date, -weekday);
 }
 
-/** Date-only arithmetic keeps all 35 days intact across Vancouver DST changes. */
+/** Normalize to the first of a month before shifting, so month lengths cannot overflow. */
+export function calendarMonthStart(date: string, offset = 0) {
+  const first = new Date(`${date.slice(0, 7)}-01T00:00:00Z`);
+  first.setUTCMonth(first.getUTCMonth() + offset);
+  return first.toISOString().slice(0, 10);
+}
+
+/** Date-only arithmetic keeps month boundaries intact across Vancouver DST changes. */
 export function eventCalendar(
   events: CalendarEvent[],
   start?: string,
@@ -27,36 +34,37 @@ export function eventCalendar(
     }));
   const firstDate = dated[0]?.date ?? today;
   const lastDate = dated.at(-1)?.date ?? today;
-  const first = calendarWeekStart(firstDate < today ? firstDate : today);
-  const last = calendarWeekStart(lastDate > today ? lastDate : today);
-  const requested = start ? calendarWeekStart(start) : calendarWeekStart(today);
+  const first = calendarMonthStart(firstDate < today ? firstDate : today);
+  const last = calendarMonthStart(lastDate > today ? lastDate : today);
+  const requested = calendarMonthStart(start || today);
   start = requested < first ? first : requested > last ? last : requested;
-  const end = addCalendarDays(start, 34);
-  const rangeFormat = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-  const days = Array.from({ length: 35 }, (_, index) => {
-    const date = addCalendarDays(start, index);
+  const month = start.slice(0, 7);
+  const gridStart = calendarWeekStart(start);
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const date = addCalendarDays(gridStart, index);
+    const inMonth = date.slice(0, 7) === month;
     return {
       date,
       day: Number(date.slice(-2)),
-      today: date === today,
-      events: dated.filter((event) => event.date === date),
+      inMonth,
+      today: inMonth && date === today,
+      events:
+        date.slice(0, 7) >= month
+          ? dated.filter((event) => event.date === date)
+          : [],
     };
   });
   return {
     start,
-    range: rangeFormat.formatRange(
-      new Date(`${start}T00:00:00Z`),
-      new Date(`${end}T00:00:00Z`),
-    ),
-    previous: start > first ? addCalendarDays(start, -35) : null,
-    next: end < last ? addCalendarDays(start, 35) : null,
-    weeks: Array.from({ length: 5 }, (_, index) =>
+    range: new Intl.DateTimeFormat("en-CA", {
+      timeZone: "UTC",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(`${start}T00:00:00Z`)),
+    previous: start > first ? calendarMonthStart(start, -1) : null,
+    next: start < last ? calendarMonthStart(start, 1) : null,
+    weeks: Array.from({ length: 6 }, (_, index) =>
       days.slice(index * 7, index * 7 + 7),
-    ),
+    ).filter((week) => week.some((day) => day.inMonth)),
   };
 }

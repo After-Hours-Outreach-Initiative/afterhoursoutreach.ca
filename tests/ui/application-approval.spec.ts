@@ -503,7 +503,6 @@ test("pending applications poll every minute, then approval restores five-second
     expect(checks).toBe(2);
     await volunteer.clock.runFor(1);
     await expect.poll(() => checks).toBe(3);
-    await volunteer.getByRole("button", { name: /^Orientations \d+$/ }).click();
     await expect(volunteer).toHaveURL(/\?type=orientation$/);
     const orientation = volunteer
       .locator('[data-live-event][data-includes-orientation="true"]')

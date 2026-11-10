@@ -9,62 +9,88 @@ const event = (id: string, instant: string): CalendarEvent => ({
   label: `Patrol at ${id}`,
 });
 
-test("calendar uses Vancouver dates and orders same-day events chronologically with stable ties", () => {
+test("calendar uses Vancouver dates, stable chronological ordering and month boundaries", () => {
   const events = [
     event("later", "2027-01-01T06:30:00Z"),
-    event("next-day", "2027-01-01T07:30:00Z"),
+    event("next-day", "2027-01-01T09:30:00Z"),
     event("earlier", "2027-01-01T02:30:00Z"),
     event("earlier-tie", "2027-01-01T02:30:00Z"),
     event("a-earlier-tie", "2027-01-01T02:30:00Z"),
   ];
-  const calendar = eventCalendar(
-    events,
-    undefined,
-    Date.parse("2027-01-01T06:00:00Z"),
-  );
+  const now = Date.parse("2027-01-01T06:00:00Z");
+  const calendar = eventCalendar(events, undefined, now);
+  assert.equal(calendar.start, "2026-12-01");
+  assert.equal(calendar.range, "Dec 2026");
   const days = calendar.weeks.flat();
-  assert.equal(calendar.start, "2026-12-27");
   const today = days.find((day) => day.today)!;
   assert.equal(today.date, "2026-12-31");
   assert.deepEqual(
     today.events.map((item) => item.id),
     ["earlier", "earlier-tie", "a-earlier-tie", "later"],
   );
+  assert.match(today.events[0].description, /Patrol at earlier/);
+  assert.ok(
+    days
+      .filter((day) => day.date < calendar.start)
+      .every((day) => !day.events.length),
+  );
   assert.equal(
     days.find((day) => day.date === "2027-01-01")!.events[0].id,
     "next-day",
   );
-  assert.match(today.events[0].description, /Patrol at earlier/);
+  assert.equal(calendar.next, "2027-01-01");
+  const january = eventCalendar(events, calendar.next!, now);
+  assert.equal(january.range, "Jan 2027");
+  assert.equal(january.previous, "2026-12-01");
+  assert.equal(
+    january.weeks.flat().find((day) => day.date === "2027-01-01")!.events[0].id,
+    "next-day",
+  );
 });
 
-test.each(["2025-03-09T08:00:00Z", "2025-11-02T07:00:00Z"])(
-  "calendar has exactly five complete weeks across DST at %s",
-  (instant) => {
-    const calendar = eventCalendar([], undefined, Date.parse(instant));
+for (const [month, count, weeks] of [
+  ["2026-02", 28, 4],
+  ["2024-02", 29, 5],
+  ["2026-08", 31, 6],
+  ["2025-03", 31, 6],
+  ["2025-11", 30, 6],
+] as const) {
+  test(`calendar covers every day of ${month} in complete weeks`, () => {
+    const calendar = eventCalendar(
+      [],
+      undefined,
+      Date.parse(`${month}-15T12:00:00Z`),
+    );
     const days = calendar.weeks.flat();
-    assert.equal(calendar.weeks.length, 5);
+    const dates = days.filter((day) => day.inMonth);
+    assert.equal(calendar.weeks.length, weeks);
     assert.ok(calendar.weeks.every((week) => week.length === 7));
-    assert.equal(new Set(days.map((day) => day.date)).size, 35);
+    assert.equal(dates.length, count);
+    assert.equal(dates[0].date, `${month}-01`);
+    assert.equal(dates.at(-1)!.day, count);
     days.forEach((day, index) =>
-      assert.equal(day.date, addCalendarDays(calendar.start, index)),
+      assert.equal(day.date, addCalendarDays(days[0].date, index)),
     );
     assert.equal(calendar.previous, null);
     assert.equal(calendar.next, null);
-  },
-);
+  });
+}
 
-test("calendar navigation reaches distant loaded events and clamps after filtering", () => {
+test("navigation advances one month, crosses empty months, and clamps after events disappear", () => {
   const now = Date.parse("2026-10-22T19:00:00Z");
   const events = [event("distant", "2026-12-20T04:00:00Z")];
-  let calendar = eventCalendar(events, undefined, now);
-  assert.equal(calendar.previous, null);
-  assert.ok(calendar.next);
-  calendar = eventCalendar(events, calendar.next!, now);
-  assert.ok(calendar.weeks.flat().some((day) => day.events.length === 1));
-  assert.ok(calendar.previous);
-  assert.equal(calendar.next, null);
-  calendar = eventCalendar([], calendar.start, now);
-  assert.equal(calendar.start, "2026-10-18");
-  assert.equal(calendar.previous, null);
-  assert.equal(calendar.next, null);
+  const october = eventCalendar(events, undefined, now);
+  assert.equal(october.previous, null);
+  assert.equal(october.next, "2026-11-01");
+  const november = eventCalendar(events, october.next!, now);
+  assert.equal(november.previous, "2026-10-01");
+  assert.equal(november.next, "2026-12-01");
+  const december = eventCalendar(events, november.next!, now);
+  assert.ok(december.weeks.flat().some((day) => day.events.length === 1));
+  assert.equal(december.next, null);
+  assert.equal(eventCalendar(events, "2027-06-01", now).start, december.start);
+  const empty = eventCalendar([], december.start, now);
+  assert.equal(empty.start, "2026-10-01");
+  assert.equal(empty.previous, null);
+  assert.equal(empty.next, null);
 });

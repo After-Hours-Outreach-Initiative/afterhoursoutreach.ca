@@ -1,7 +1,10 @@
 ---
 import DialogHeader from "@/components/DialogHeader.astro";
 import FieldError from "@/components/FieldError.astro";
+import FieldGroup from "./FieldGroup.astro";
+import StepperField from "./StepperField.astro";
 import RecurringIcon from "@/components/icons/RecurringIcon.astro";
+import CloseIcon from "@/components/icons/CloseIcon.svg";
 import { maxUnregisterMinutes } from "@/data/event-unregistration";
 ---
 
@@ -12,9 +15,19 @@ import { maxUnregisterMinutes } from "@/data/event-unregistration";
   aria-label="Selected events"
   hidden
 >
-  <p data-bulk-count role="status" aria-live="polite" aria-atomic="true">
-    0 selected
-  </p>
+  <div class="volunteer-bulk-heading">
+    <p data-bulk-count role="status" aria-live="polite" aria-atomic="true">
+      0 selected
+    </p>
+    <button
+      class="btn btn-quiet volunteer-bulk-close"
+      type="button"
+      data-bulk-exit
+      aria-label="Exit selection mode"
+    >
+      <CloseIcon />
+    </button>
+  </div>
   <div class="volunteer-bulk-buttons">
     <button class="btn btn-quiet" type="button" data-bulk-select-all>
       Select all
@@ -67,143 +80,184 @@ import { maxUnregisterMinutes } from "@/data/event-unregistration";
       <input type="hidden" name="selection" />
       <input type="hidden" name="initial" />
       <div class="volunteer-fields">
-        <div class="volunteer-field">
-          <label for="bulk-startTime">Start time</label>
-          <input
-            id="bulk-startTime"
-            name="startTime"
-            type="time"
-            step="60"
-            aria-describedby="bulk-startTime-help error-bulk-startTime"
-          />
-          <p
-            id="bulk-startTime-help"
-            class="volunteer-help"
-            data-bulk-time-help
-          >
-            Each event keeps its date.
-          </p>
-          <FieldError field="bulk-startTime" message="Enter a valid time." />
-        </div>
-        <div class="volunteer-field">
-          <label for="bulk-spots">Volunteer spots</label>
-          <input
-            id="bulk-spots"
-            name="spots"
-            type="number"
-            min="1"
-            max="100"
-            step="1"
-            aria-describedby="bulk-capacity-help error-bulk-spots"
-          />
-          <FieldError
-            field="bulk-spots"
-            message="Enter a whole number from 1 to 100, covering the event's reserved places."
-          />
-        </div>
-        <div class="volunteer-field">
-          <label for="bulk-meetingPoint">Meeting point</label>
-          <input
-            id="bulk-meetingPoint"
-            name="meetingPoint"
-            maxlength="500"
-            pattern={String.raw`.*\S.*`}
-            aria-describedby="error-bulk-meetingPoint"
-          />
-          <FieldError
-            field="bulk-meetingPoint"
-            message="Enter a meeting point (up to 500 characters)."
-          />
-        </div>
-        <div class="volunteer-field">
-          <label for="bulk-meetingPointUrl">Map link (optional)</label>
-          <input
-            id="bulk-meetingPointUrl"
-            name="meetingPointUrl"
-            type="url"
-            maxlength="2048"
-            pattern="https://.*"
-            aria-describedby="error-bulk-meetingPointUrl"
-          />
-          <FieldError
-            field="bulk-meetingPointUrl"
-            message="Enter a valid HTTPS map link."
-          />
-        </div>
-        {(
-          [
-            ["minMedicSpots", "Minimum medic spots", 100],
-            ["minNewVolunteerSpots", "Minimum new volunteer spots", 100],
-            ["maxNewVolunteers", "Maximum new volunteers", 100],
-            [
-              "unregisterMinutes",
-              "Unregister until (minutes after start)",
-              maxUnregisterMinutes,
-            ],
-          ] as const
-        ).map(([name, label, max]) => (
+        <FieldGroup id="bulk-type-time-group" heading="Type and time">
+          <fieldset class="volunteer-radio-field volunteer-wide">
+            <legend>Event type</legend>
+            <div class="volunteer-radio-group">
+              {(
+                [
+                  ["false", "Patrol"],
+                  ["true", "Orientation + Patrol"],
+                ] as const
+              ).map(([value, text]) => (
+                <label class="volunteer-check">
+                  <input
+                    type="radio"
+                    name="includesOrientation"
+                    value={value}
+                  />
+                  <span>{text}</span>
+                </label>
+              ))}
+            </div>
+            <p class="volunteer-help volunteer-bulk-mixed">
+              Varies across the selected events.
+            </p>
+          </fieldset>
           <div class="volunteer-field">
-            <label for={`bulk-${name}`}>{label}</label>
+            <label for="bulk-startTime">Start time</label>
             <input
-              id={`bulk-${name}`}
-              name={name}
-              type="number"
-              min="0"
-              max={max}
-              step="1"
-              aria-describedby={`error-bulk-${name}`}
+              id="bulk-startTime"
+              name="startTime"
+              type="time"
+              step="60"
+              aria-describedby="bulk-startTime-help error-bulk-startTime"
+            />
+            <p
+              id="bulk-startTime-help"
+              class="volunteer-help"
+              data-bulk-time-help
+            >
+              Each event keeps its date.
+            </p>
+            <FieldError field="bulk-startTime" message="Enter a valid time." />
+          </div>
+        </FieldGroup>
+        <FieldGroup id="bulk-location-group" heading="Location">
+          <div class="volunteer-field">
+            <label for="bulk-meetingPoint">Meeting point</label>
+            <input
+              id="bulk-meetingPoint"
+              name="meetingPoint"
+              maxlength="500"
+              pattern={String.raw`.*\S.*`}
+              aria-describedby="error-bulk-meetingPoint"
             />
             <FieldError
-              field={`bulk-${name}`}
-              message={`Enter a whole number from 0 to ${max}.`}
+              field="bulk-meetingPoint"
+              message="Enter a meeting point (up to 500 characters)."
             />
           </div>
-        ))}
-        {(
-          [
-            [
-              "includesOrientation",
-              "Includes orientation",
+          <div class="volunteer-field">
+            <label for="bulk-meetingPointUrl">Map link (optional)</label>
+            <input
+              id="bulk-meetingPointUrl"
+              name="meetingPointUrl"
+              type="url"
+              maxlength="2048"
+              pattern="https://.*"
+              aria-describedby="error-bulk-meetingPointUrl"
+            />
+            <FieldError
+              field="bulk-meetingPointUrl"
+              message="Enter a valid HTTPS map link."
+            />
+          </div>
+        </FieldGroup>
+        <FieldGroup
+          id="bulk-spots-group"
+          heading="Spots"
+          descriptionId="bulk-capacity-help"
+          description="Capacity and limits must fit each event's registrations. If any event conflicts, nothing is saved."
+        >
+          <StepperField
+            id="bulk-spots"
+            name="spots"
+            label="Volunteer spots"
+            help="Total places, including the reserved ones below."
+            describedBy="bulk-capacity-help"
+            min="1"
+            max="100"
+            error="Enter a whole number from 1 to 100, covering the event's reserved places."
+            waitForScript={false}
+            primary
+          />
+          <div
+            class="volunteer-spot-limits volunteer-wide"
+            role="group"
+            aria-labelledby="bulk-spot-limits"
+          >
+            <p id="bulk-spot-limits" class="volunteer-spot-limits-label">
+              Reserved places and limits
+            </p>
+            {(
               [
-                ["true", "Includes orientation"],
-                ["false", "Patrol only"],
-              ],
-            ],
-            [
-              "open",
-              "Registration",
-              [
-                ["true", "Open"],
-                ["false", "Closed"],
-              ],
-            ],
-            [
-              "hidden",
-              "Public visibility",
-              [
-                ["false", "Visible"],
-                ["true", "Hidden"],
-              ],
-            ],
-          ] as const
-        ).map(([name, label, options]) => (
-          <label class="volunteer-field">
-            {label}
-            <select name={name}>
-              <option value="" data-bulk-mixed>
-                Varies
-              </option>
-              {options.map(([value, text]) => (
-                <option value={value}>{text}</option>
+                [
+                  "minMedicSpots",
+                  "Minimum medic spots",
+                  "Held for approved medics.",
+                ],
+                [
+                  "minNewVolunteerSpots",
+                  "Minimum new volunteer spots",
+                  "Held for new volunteers when orientation is included.",
+                ],
+                [
+                  "maxNewVolunteers",
+                  "Maximum new volunteers",
+                  "Cap on new volunteers when orientation is included.",
+                ],
+              ] as const
+            ).map(([name, label, help]) => (
+              <StepperField
+                id={`bulk-${name}`}
+                name={name}
+                label={label}
+                help={help}
+                describedBy="bulk-capacity-help"
+                min="0"
+                max="100"
+                error="Enter a whole number from 0 to 100."
+                waitForScript={false}
+              />
+            ))}
+          </div>
+        </FieldGroup>
+        <FieldGroup id="bulk-registration-group" heading="Registration">
+          <div class="volunteer-field">
+            <label for="bulk-unregisterMinutes">
+              Unregister until (minutes after start)
+            </label>
+            <input
+              id="bulk-unregisterMinutes"
+              name="unregisterMinutes"
+              type="number"
+              min="0"
+              max={maxUnregisterMinutes}
+              step="1"
+              aria-describedby="error-bulk-unregisterMinutes"
+            />
+            <FieldError
+              field="bulk-unregisterMinutes"
+              message={`Enter a whole number from 0 to ${maxUnregisterMinutes}.`}
+            />
+          </div>
+          <fieldset class="volunteer-state-field volunteer-wide">
+            <legend>Public visibility</legend>
+            <div class="volunteer-state-selector">
+              {(
+                [
+                  ["true", "Visible", "positive"],
+                  ["false", "Hidden", "negative"],
+                ] as const
+              ).map(([value, text, tone]) => (
+                <label class={`volunteer-state-option volunteer-state-${tone}`}>
+                  <input
+                    class="sr-only"
+                    type="radio"
+                    name="publicVisibility"
+                    value={value}
+                  />
+                  <span>{text}</span>
+                </label>
               ))}
-            </select>
-          </label>
-        ))}
+            </div>
+            <p class="volunteer-help volunteer-bulk-mixed">
+              Varies across the selected events.
+            </p>
+          </fieldset>
+        </FieldGroup>
       </div>
-      <p id="bulk-capacity-help" class="volunteer-help">
-        Capacity and limits must fit each event's registrations. If any event
-        conflicts, nothing is saved.
-      </p>
       <p data-bulk-stale role="alert" hidden>
         The selection changed while this dialog was open. Close it, review the
         events and select again before saving.
@@ -228,6 +282,10 @@ import { maxUnregisterMinutes } from "@/data/event-unregistration";
 </dialog>
 
 <style>
+  fieldset:has(input:checked) > .volunteer-bulk-mixed {
+    display: none;
+  }
+
   .volunteer-bulk-bar {
     position: fixed;
     z-index: 40;
@@ -250,8 +308,27 @@ import { maxUnregisterMinutes } from "@/data/event-unregistration";
     color: #e4e4e7;
     font-variant-numeric: tabular-nums;
   }
+  .volunteer-bulk-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+  }
+  .volunteer-bulk-close {
+    width: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .volunteer-bulk-close :global(svg) {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
   .volunteer-bulk-buttons {
     display: flex;
+    justify-content: flex-end;
+    width: 100%;
     gap: 0.5rem;
   }
   @media (max-width: 40rem) {
@@ -313,8 +390,5 @@ import { maxUnregisterMinutes } from "@/data/event-unregistration";
     color: #a1a1aa;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  #bulk-capacity-help {
-    margin-top: 1.5rem;
   }
 </style>

@@ -1,3 +1,4 @@
+import { calendarMonthStart } from "../../src/data/event-calendar";
 import { expect, test } from "@playwright/test";
 import {
   addCalendarDays,
@@ -86,45 +87,36 @@ test("volunteer-page sign-in is usable on mobile and opens the shared code form"
   ).toBe(false);
 });
 
-test("event filters include orientation without excluding other patrols, preserve deep links, and never submit a confirmation form", async ({
+test("events show all permitted event types and ignore legacy filters while preserving deep links", async ({
   page,
 }) => {
   await (
     await openLocalAccountSwitcher(page)
   )
-    .locator('[data-switch-user="local-fixture-user-casey"]')
+    .locator('[data-switch-user="local-fixture-user-dana"]')
     .click();
   await expect(page.locator("[data-event-list]")).toBeVisible();
-  const documents: string[] = [];
-  page.on("request", (request) => {
-    if (request.resourceType() === "document") documents.push(request.url());
-  });
-  const cards = page.locator("[data-live-event]");
-  const types = await cards.evaluateAll((nodes) =>
-    nodes.map((node) => (node as HTMLElement).dataset.includesOrientation),
-  );
-  // Polling may add events from another test/viewer while this filter is active.
-  // Verify every current card's visibility, not a stale initial list length.
-  const expectFilter = (type: string) =>
-    expect
-      .poll(() =>
-        cards.evaluateAll(
-          (nodes, selected) =>
-            nodes.every((node) => {
-              const card = node as HTMLElement;
-              return (
-                card.hidden ===
-                (selected === "orientation" &&
-                  card.dataset.includesOrientation !== "true")
-              );
-            }),
-          type,
-        ),
-      )
-      .toBe(true);
-  const filters = page.getByRole("group", { name: "Filter events" });
-  expect(types).toContain("true");
-  expect(types).toContain("false");
+  for (const type of ["all", "orientation", "one-off", "recurring"]) {
+    await page.goto(
+      `/events?type=${type}&occurrence=local-fixture-event-orientation`,
+    );
+    await expect(
+      page.getByRole("group", { name: "Filter events" }),
+    ).toHaveCount(0);
+    const cards = page.locator("[data-live-event]");
+    const types = await cards.evaluateAll((nodes) =>
+      nodes.map((node) => (node as HTMLElement).dataset.includesOrientation),
+    );
+    expect(types).toContain("true");
+    expect(types).toContain("false");
+    await expect(page.locator("[data-live-event][hidden]")).toHaveCount(0);
+    await expect(
+      page.locator('[data-live-event="local-fixture-event-orientation"]'),
+    ).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("occurrence")).toBe(
+      "local-fixture-event-orientation",
+    );
+  }
   const response = await page.request.get("/api/v1/events");
   expect(response.ok()).toBe(true);
   const { events } = await response.json();
@@ -137,27 +129,9 @@ test("event filters include orientation without excluding other patrols, preserv
       event.includesOrientation ? "Orientation + Patrol" : "Patrol",
     );
   }
-  await filters.getByRole("button", { name: /^Orientations \d+$/ }).click();
-  await expect(
-    filters.getByRole("button", { name: /^Orientations \d+$/ }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expectFilter("orientation");
-  await expect(page).toHaveURL(/\?type=orientation$/);
-  await filters.getByRole("button", { name: /^All \d+$/ }).click();
-  await expectFilter("all");
-  await page.goBack();
-  await expect(
-    filters.getByRole("button", { name: /^Orientations \d+$/ }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expectFilter("orientation");
-  expect(documents).toEqual([]);
-  await page.reload();
-  await expectFilter("orientation");
-  await filters.getByRole("button", { name: /^All \d+$/ }).click();
-  await expectFilter("all");
 });
 
-test("event calendar links visible cards, reaches later weeks, and survives live event changes", async ({
+test("event calendar links visible cards, reaches later months, and survives live event changes", async ({
   page,
   baseURL,
 }) => {
@@ -172,7 +146,18 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   ).toBeVisible();
   await expect(page.locator("[data-event-calendar]")).toBeVisible();
   const today = vancouverInput(Date.now()).slice(0, 10);
-  const date = addCalendarDays(today, 2);
+  const date = await page
+    .locator(
+      "[data-event-calendar] td:not([data-calendar-overflow]):not(:has(a)):has(.event-calendar-day)",
+    )
+    .evaluateAll(
+      (cells, earliest) =>
+        cells
+          .map((cell) => cell.getAttribute("data-calendar-date")!)
+          .find((date) => date >= earliest)!,
+      addCalendarDays(today, 2),
+    );
+  expect(date).toBeTruthy();
   const makeEvent = async (
     day: string,
     time: string,
@@ -203,9 +188,13 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   };
   const patrol = await makeEvent(date, "18:00", false);
   const orientation = await makeEvent(date, "19:00", true);
-  const distant = await makeEvent(addCalendarDays(today, 49), "20:00", true);
+  const distant = await makeEvent(
+    addCalendarDays(calendarMonthStart(today, 1), 9),
+    "20:00",
+    true,
+  );
   const laterDistant = await makeEvent(
-    addCalendarDays(today, 50),
+    addCalendarDays(calendarMonthStart(today, 1), 10),
     "21:00",
     true,
   );
@@ -230,16 +219,28 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   const link = (id: string) =>
     calendar.locator(`[data-calendar-event="${id}"]`);
   const card = (id: string) => page.locator(`[data-live-event="${id}"]`);
-  await expect(calendar.locator("tbody tr")).toHaveCount(5);
-  await expect(calendar.locator("td")).toHaveCount(35);
+  const monthStart = (await calendar.getAttribute("data-calendar-start"))!;
+  const first = new Date(`${monthStart}T00:00:00Z`);
+  const monthEnd = new Date(first);
+  monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1, 0);
+  const rows = Math.ceil((first.getUTCDay() + monthEnd.getUTCDate()) / 7);
+  await expect(calendar.locator("tbody tr")).toHaveCount(rows);
+  await expect(calendar.locator("td")).toHaveCount(rows * 7);
+  await expect(calendar.locator("[data-calendar-range]")).toHaveText(
+    new Intl.DateTimeFormat("en-CA", {
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(first),
+  );
   await expect(calendar.locator("th")).toHaveText([
-    "S",
-    "M",
-    "T",
-    "W",
-    "T",
-    "F",
-    "S",
+    "Sun",
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
   ]);
   await expect(
     calendar.getByRole("columnheader", { name: "Thursday", exact: true }),
@@ -251,8 +252,8 @@ test("event calendar links visible cards, reaches later weeks, and survives live
       (element) =>
         element
           .querySelector("[data-calendar-controls]")!
-          .getBoundingClientRect().top >=
-        element.querySelector("table")!.getBoundingClientRect().bottom,
+          .getBoundingClientRect().bottom <=
+        element.querySelector("table")!.getBoundingClientRect().top,
     ),
   ).toBe(true);
   await expect(
@@ -311,18 +312,9 @@ test("event calendar links visible cards, reaches later weeks, and survives live
     "",
   );
 
-  await page.getByRole("button", { name: /^Orientations \d+$/ }).click();
-  await expect(link(patrol.id)).toHaveCount(0);
-  await expect(link(orientation.id)).toBeVisible();
-  await expect(link(orientation.id)).toHaveAccessibleName(
-    new RegExp(
-      ` · Orientation \\+ Patrol at ${orientation.event.meetingPoint}$`,
-    ),
-  );
-  await expect(
-    calendar.locator(`[data-calendar-date="${date}"] a`),
-  ).toHaveCount(1);
-  // Every date/event link must still target a real, visible card after filtering.
+  await expect(link(patrol.id)).toBeVisible();
+  await expect(card(orientation.id)).toBeVisible();
+  // Every date/event link must still target a real, visible card after navigation.
   expect(
     await calendar.locator("a").evaluateAll((links) =>
       links.every((link) => {
@@ -336,7 +328,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
   await page.goBack();
   await expect(link(patrol.id)).toBeVisible();
   await page.goForward();
-  await expect(link(patrol.id)).toHaveCount(0);
+  await expect(link(patrol.id)).toBeVisible();
 
   for (const width of [768, 375, 320]) {
     await page.setViewportSize({ width, height: 812 });
@@ -346,10 +338,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
       calendar.boundingBox(),
       page.locator(".volunteer-event-results").boundingBox(),
     ]);
-    expect(calendarBounds!.width).toBeCloseTo(
-      Math.min(352, resultsBounds!.width),
-      0,
-    );
+    expect(calendarBounds!.width).toBeCloseTo(resultsBounds!.width, 0);
     expect(calendarBounds!.x + calendarBounds!.width / 2).toBeCloseTo(
       resultsBounds!.x + resultsBounds!.width / 2,
       0,
@@ -362,28 +351,24 @@ test("event calendar links visible cards, reaches later weeks, and survives live
         () => document.documentElement.scrollWidth > innerWidth,
       ),
     ).toBe(false);
-    await link(orientation.id).click();
-    await expect(card(orientation.id)).toBeFocused();
-    await expect(card(orientation.id)).toBeInViewport();
+    await link(patrol.id).click();
+    await expect(card(patrol.id)).toBeFocused();
+    await expect(card(patrol.id)).toBeInViewport();
     expect(
-      await card(orientation.id).evaluate(
+      await card(patrol.id).evaluate(
         (element) => getComputedStyle(element).animationName,
       ),
     ).toBe("none");
-    await expect(card(orientation.id)).toHaveCSS("outline-style", "solid");
+    await expect(card(patrol.id)).toHaveCSS("outline-style", "solid");
   }
 
-  // Paging changes only the calendar, even when it is above the viewport.
-  expect(
-    await calendar.evaluate((element) => {
-      const before = scrollY;
-      element
-        .querySelector<HTMLButtonElement>('[data-calendar-step="next"]')!
-        .click();
-      return scrollY - before;
-    }),
-  ).toBe(0);
-  await expect(card(orientation.id)).not.toHaveAttribute(
+  // Paging changes the displayed month without selecting another event.
+  const beforePaging = page.url();
+  await calendar
+    .getByRole("button", { name: "Next month", exact: true })
+    .click();
+  await expect(page).toHaveURL(beforePaging);
+  await expect(card(patrol.id)).not.toHaveAttribute(
     "data-calendar-highlight",
     "",
   );
@@ -401,7 +386,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
     expect(value).toBeDefined();
     return Number(value);
   };
-  const movedDate = addCalendarDays(today, 50);
+  const movedDate = addCalendarDays(calendarMonthStart(today, 1), 10);
   const moved = {
     ...distant.event,
     startsAt: vancouverInstant(`${movedDate}T20:00`),
@@ -442,9 +427,7 @@ test("event calendar links visible cards, reaches later weeks, and survives live
     ),
   );
   await expect(page).toHaveURL(
-    new RegExp(
-      `occurrence=${orientation.id}&type=orientation#event-${orientation.id}$`,
-    ),
+    new RegExp(`occurrence=${orientation.id}#event-${patrol.id}$`),
   );
   expect(documents).toEqual([]);
 });

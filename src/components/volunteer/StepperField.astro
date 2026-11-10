@@ -1,0 +1,90 @@
+---
+import FieldError from "@/components/FieldError.astro";
+import MinusIcon from "@/components/icons/MinusIcon.astro";
+import PlusIcon from "@/components/icons/PlusIcon.astro";
+
+interface Props {
+  id: string;
+  name: string;
+  label: string;
+  help?: string;
+  /** Extra description ids, such as help shared by a whole field group. */
+  describedBy?: string;
+  min: number | string;
+  max: number | string;
+  value?: number | string;
+  required?: boolean;
+  error: string;
+  /** Forms that render before scripts load keep the buttons off until then. */
+  waitForScript?: boolean;
+  /** The main number of a group, drawn larger than the settings within it. */
+  primary?: boolean;
+}
+const {
+  id,
+  name,
+  label,
+  help,
+  describedBy,
+  min,
+  max,
+  value,
+  required = false,
+  error,
+  waitForScript = true,
+  primary = false,
+} = Astro.props;
+const helpId = help ? `${id}-help` : undefined;
+const description = [helpId, describedBy, `error-${id}`]
+  .filter(Boolean)
+  .join(" ");
+---
+
+<div
+  class:list={[
+    "volunteer-stepper-field volunteer-wide",
+    { "volunteer-stepper-field-primary": primary },
+  ]}
+>
+  <label for={id}>{label}</label>
+  <div class="volunteer-stepper">
+    <button
+      class="btn btn-quiet"
+      type="button"
+      data-stepper-step="-1"
+      aria-label={`Decrease ${label.toLowerCase()}`}
+      aria-controls={id}
+      disabled={waitForScript}
+    >
+      <MinusIcon />
+    </button>
+    <input
+      id={id}
+      name={name}
+      type="number"
+      inputmode="numeric"
+      min={min}
+      max={max}
+      step="1"
+      value={value}
+      required={required}
+      aria-describedby={description}
+    />
+    <button
+      class="btn btn-quiet"
+      type="button"
+      data-stepper-step="1"
+      aria-label={`Increase ${label.toLowerCase()}`}
+      aria-controls={id}
+      disabled={waitForScript}
+    >
+      <PlusIcon />
+    </button>
+  </div>
+  {help && (
+    <p class="volunteer-help" id={helpId}>
+      {help}
+    </p>
+  )}
+  <FieldError field={id} message={error} />
+</div>

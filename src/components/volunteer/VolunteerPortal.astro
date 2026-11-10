@@ -19,11 +19,7 @@ import EventCalendar from "./EventCalendar.astro";
 import EventEditor from "./EventEditor.astro";
 import BulkEventEditor from "./BulkEventEditor.astro";
 import PatrolSeriesCard from "./PatrolSeriesCard.astro";
-import {
-  eventFilter,
-  matchesEventFilter,
-  groupManagementEvents,
-} from "@/data/event-browser";
+import { groupManagementEvents } from "@/data/event-browser";
 import ApplicationProgress from "./ApplicationProgress.astro";
 // Discord connection is temporarily disabled.
 // import DiscordConnectionNotice from "./DiscordConnectionNotice.astro";
@@ -34,7 +30,6 @@ import {
   loadApplicationProgress,
 } from "@/server/db/application-progress";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
-import CheckIcon from "@/components/icons/CheckIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import { contactEmail, social } from "@/data/site";
 import "@/styles/volunteer.css";
@@ -112,27 +107,11 @@ const destinations = events.filter(
     event.inSignupWindow &&
     !event.cancelledAt,
 );
-// Legacy ?type=patrol now means all patrols, including those with orientation.
-const filter = eventFilter(Astro.url.searchParams.get("type"), manage);
 const seriesItems = manage
   ? groupManagementEvents(events, series).filter(
       (item) => item.kind === "series",
     )
   : [];
-const selectedOccurrence = Astro.url.searchParams.get("occurrence");
-const countEvents = (items: typeof events, type: string) =>
-  items.filter((event) =>
-    matchesEventFilter(
-      type,
-      Boolean(event.seriesId),
-      Boolean(event.includesOrientation),
-    ),
-  ).length;
-// Count dates consistently in the calendar, upcoming list and history.
-const filterCount = (type: string) =>
-  countEvents(events, type) + countEvents(pastEvents, type);
-const hasVisibleEvents = countEvents(events, filter) > 0;
-const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
 ---
 
 <AccountLayout
@@ -147,21 +126,19 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
   email={email}
 >
   <Fragment slot="heading">
-    {
-      !manage && (
-        <h1
-          data-portal-heading
-          class:list={[
-            "max-w-4xl text-2xl md:text-4xl",
-            {
-              "sr-only": eventAccess,
-            },
-          ]}
-        >
-          {title}
-        </h1>
-      )
-    }
+    {!manage && (
+      <h1
+        data-portal-heading
+        class:list={[
+          "max-w-4xl text-2xl md:text-4xl",
+          {
+            "sr-only": eventAccess,
+          },
+        ]}
+      >
+        {title}
+      </h1>
+    )}
   </Fragment>
   <div
     data-event-browser
@@ -178,269 +155,194 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
       ),
     )}
   >
-    {
-      /* Discord connection is temporarily disabled.
+    {/* Discord connection is temporarily disabled.
     {
       !manage && actor.applicationComplete && (
         <DiscordConnectionNotice userId={actor.id} />
       )
     }
-    */
-    }
-    {
-      actor.applicationSubmitted && !actor.active && (
-        <p class="volunteer-notice" role="status">
-          Your volunteer account is inactive. Contact an organizer at{" "}
-          <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore
-          access.
-        </p>
-      )
-    }
-    {
-      applicationProgress && incompleteApplication && (
-        <>
-          {title === "Welcome" && (
-            <p class="mt-6 max-w-3xl text-zinc-300">
-              Thanks for your interest in volunteering. Please complete the
-              steps below to complete your application.
-            </p>
-          )}
-          <ApplicationProgress
-            progress={applicationProgress}
-            userId={actor.id}
-            idPrefix="events"
-            {email}
-          >
-            <Fragment slot="application">
-              {submission ? (
-                <SubmittedApplication submission={submission} embedded />
-              ) : (
-                <p class="text-base">
-                  Your application form was submitted. The original submitted
-                  answers were not captured for this account.
-                </p>
-              )}
-            </Fragment>
-          </ApplicationProgress>
-        </>
-      )
-    }
-    {
-      !eventAccess && (
-        <>
-          <p class="mt-12 max-w-3xl text-zinc-300">
-            Join our Discord for the most up-to-date information.
+    */}
+    {actor.applicationSubmitted && !actor.active && (
+      <p class="volunteer-notice" role="status">
+        Your volunteer account is inactive. Contact an organizer at{" "}
+        <a href={`mailto:${contactEmail}`}>{contactEmail}</a> to restore access.
+      </p>
+    )}
+    {applicationProgress && incompleteApplication && (
+      <>
+        {title === "Welcome" && (
+          <p class="mt-6 max-w-3xl text-zinc-300">
+            Thanks for your interest in volunteering. Please complete the steps
+            below to complete your application.
           </p>
-          <div class="mt-6 flex flex-wrap gap-3.5 max-sm:flex-col">
-            <a
-              class="btn btn-primary"
-              href={social.discord}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <DiscordIcon class="btn-icon fill-current" />
-              Join Discord
-            </a>
-          </div>
-        </>
-      )
-    }
-    {
-      eventAccess && (
-        <section class="volunteer-events" aria-labelledby="events-heading">
-          <div class="volunteer-section-heading">
-            <div>
-              {manage ? (
-                <h1 id="events-heading">Events</h1>
-              ) : (
-                <h2 id="events-heading">Events</h2>
-              )}
-            </div>
-            {manage && (
-              <div class="volunteer-event-tools">
-                <button
-                  class="btn btn-quiet"
-                  type="button"
-                  data-bulk-select-mode
-                  aria-pressed="false"
-                >
-                  <CheckIcon class="btn-icon" />
-                  Select
-                </button>
-                <button
-                  class="btn btn-primary"
-                  data-show-dialog="event-editor-new"
-                  type="button"
-                >
-                  <PlusIcon class="btn-icon" />
-                  Create
-                </button>
-              </div>
+        )}
+        <ApplicationProgress
+          progress={applicationProgress}
+          userId={actor.id}
+          idPrefix="events"
+          {email}
+        >
+          <Fragment slot="application">
+            {submission ? (
+              <SubmittedApplication submission={submission} embedded />
+            ) : (
+              <p class="text-base">
+                Your application form was submitted. The original submitted
+                answers were not captured for this account.
+              </p>
             )}
-          </div>
-          <form
-            class="volunteer-filters"
-            method="get"
-            role="group"
-            aria-label="Filter events"
+          </Fragment>
+        </ApplicationProgress>
+      </>
+    )}
+    {!eventAccess && (
+      <>
+        <p class="mt-12 max-w-3xl text-zinc-300">
+          Join our Discord for the most up-to-date information.
+        </p>
+        <div class="mt-6 flex flex-wrap gap-3.5 max-sm:flex-col">
+          <a
+            class="btn btn-primary"
+            href={social.discord}
+            target="_blank"
+            rel="noreferrer"
           >
-            {selectedOccurrence && (
-              <input
-                type="hidden"
-                name="occurrence"
-                value={selectedOccurrence}
-              />
+            <DiscordIcon class="btn-icon fill-current" />
+            Join Discord
+          </a>
+        </div>
+      </>
+    )}
+    {eventAccess && (
+      <section class="volunteer-events" aria-labelledby="events-heading">
+        <div class="volunteer-section-heading">
+          <div>
+            {manage ? (
+              <h1 id="events-heading">Events</h1>
+            ) : (
+              <h2 id="events-heading">Events</h2>
             )}
-            {[
-              ["all", "All"],
-              ...(manage
-                ? [
-                    ["one-off", "One-off events"],
-                    ["recurring", "Recurring events"],
-                  ]
-                : []),
-              ["orientation", "Orientations"],
-            ].map(([type, label]) => (
-              <button
-                class="volunteer-filter"
-                type="submit"
-                name="type"
-                value={type}
-                data-event-filter={type}
-                aria-pressed={filter === type ? "true" : "false"}
-              >
-                <span>{label}</span>{" "}
-                <span
-                  class="volunteer-filter-count"
-                  data-event-filter-count={type}
-                >
-                  {filterCount(type)}
-                </span>
-              </button>
-            ))}
-          </form>
-          <div class="volunteer-event-schedule">
-            <EventCalendar
-              events={events
-                .filter((event) =>
-                  matchesEventFilter(
-                    filter,
-                    Boolean(event.seriesId),
-                    Boolean(event.includesOrientation),
-                  ),
-                )
-                .map((event) => ({
-                  id: event.id,
-                  startsAt: event.startsAt,
-                  label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
-                }))}
-            />
-            <div class="volunteer-event-results">
-              {manage && <BulkEventEditor />}
-              <ul class="volunteer-event-list" data-event-list>
-                {events.map((event) => (
-                  <EventCard
-                    event={event}
-                    actor={actor}
-                    organizer={manage}
-                    publicRoster={publicRoster?.people.filter(
-                      (person) => person.eventId === event.id,
-                    )}
-                    roster={rosters.filter(
-                      (person) => person.eventId === event.id,
-                    )}
-                    destinations={destinations}
-                    filter={filter}
-                    series={series.find((item) => item.id === event.seriesId)}
-                  />
-                ))}
-              </ul>
-              <p
-                class="volunteer-notice"
-                data-empty-events
-                role="status"
-                hidden={hasVisibleEvents}
-              >
-                {events.length
-                  ? "No upcoming events match this filter. Check back soon."
-                  : "No upcoming events are scheduled. Check back soon."}
-              </p>
-              <p
-                class="volunteer-help"
-                data-event-limit
-                hidden={events.length !== 100}
-              >
-                {manage
-                  ? "Showing up to 100 events. Open another date under Manage recurring series."
-                  : "Showing up to 100 events."}
-              </p>
-            </div>
           </div>
           {manage && (
-            <details class="volunteer-series-management" data-series-management>
-              <summary>Manage recurring series</summary>
-              <ul class="volunteer-event-list" data-series-list>
-                {seriesItems.map((item) => (
-                  <PatrolSeriesCard series={item.series} events={item.events} />
-                ))}
-              </ul>
-              <p
-                class="volunteer-help"
-                data-empty-series
-                hidden={seriesItems.length > 0}
+            <div class="volunteer-event-tools">
+              <button
+                class="btn btn-quiet"
+                type="button"
+                data-bulk-select-mode
+                aria-pressed="false"
               >
-                No recurring series have been created.
-              </p>
-            </details>
+                Select
+              </button>
+              <button
+                class="btn btn-primary"
+                data-show-dialog="event-editor-new"
+                type="button"
+              >
+                <PlusIcon class="btn-icon" />
+                Create
+              </button>
+            </div>
           )}
-        </section>
-      )
-    }
-    {
-      eventAccess && pastEvents.length > 0 && (
-        <section class="volunteer-events" aria-labelledby="past-events-heading">
-          <div class="volunteer-section-heading">
-            <h2 id="past-events-heading">Past events</h2>
+        </div>
+        <div class="volunteer-event-schedule">
+          <EventCalendar
+            events={events.map((event) => ({
+              id: event.id,
+              startsAt: event.startsAt,
+              label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
+            }))}
+          />
+          <div class="volunteer-event-results">
+            {manage && <BulkEventEditor />}
+            <ul class="volunteer-event-list" data-event-list>
+              {events.map((event) => (
+                <EventCard
+                  event={event}
+                  actor={actor}
+                  organizer={manage}
+                  publicRoster={publicRoster?.people.filter(
+                    (person) => person.eventId === event.id,
+                  )}
+                  roster={rosters.filter(
+                    (person) => person.eventId === event.id,
+                  )}
+                  destinations={destinations}
+                  series={series.find((item) => item.id === event.seriesId)}
+                />
+              ))}
+            </ul>
+            <p
+              class="volunteer-notice"
+              data-empty-events
+              role="status"
+              hidden={events.length > 0}
+            >
+              No upcoming events are scheduled. Check back soon.
+            </p>
+            <p
+              class="volunteer-help"
+              data-event-limit
+              hidden={events.length !== 100}
+            >
+              {manage
+                ? "Showing up to 100 events. Open another date under Manage recurring series."
+                : "Showing up to 100 events."}
+            </p>
           </div>
-          <ul class="volunteer-event-list" data-past-event-list>
-            {pastEvents.map((event) => (
-              <EventCard
-                event={event}
-                actor={actor}
-                organizer={manage}
-                roster={rosters.filter((person) => person.eventId === event.id)}
-                destinations={[]}
-                filter={filter}
-              />
-            ))}
-          </ul>
-          <p
-            class="volunteer-notice"
-            data-empty-past-events
-            role="status"
-            hidden={hasVisiblePastEvents}
-          >
-            No past events match this filter.
-          </p>
-          <p
-            class="volunteer-help"
-            data-past-event-limit
-            hidden={pastEvents.length !== 100}
-          >
-            {manage
-              ? "Showing up to 100 past events. Open another date under Manage recurring series."
-              : "Showing the 100 most recent past events."}
-          </p>
-        </section>
-      )
-    }
+        </div>
+        {manage && (
+          <details class="volunteer-series-management" data-series-management>
+            <summary>Manage recurring series</summary>
+            <ul class="volunteer-event-list" data-series-list>
+              {seriesItems.map((item) => (
+                <PatrolSeriesCard series={item.series} events={item.events} />
+              ))}
+            </ul>
+            <p
+              class="volunteer-help"
+              data-empty-series
+              hidden={seriesItems.length > 0}
+            >
+              No recurring series have been created.
+            </p>
+          </details>
+        )}
+      </section>
+    )}
+    {eventAccess && pastEvents.length > 0 && (
+      <section class="volunteer-events" aria-labelledby="past-events-heading">
+        <div class="volunteer-section-heading">
+          <h2 id="past-events-heading">Past events</h2>
+        </div>
+        <ul class="volunteer-event-list" data-past-event-list>
+          {pastEvents.map((event) => (
+            <EventCard
+              event={event}
+              actor={actor}
+              organizer={manage}
+              roster={rosters.filter((person) => person.eventId === event.id)}
+              destinations={[]}
+            />
+          ))}
+        </ul>
+        <p
+          class="volunteer-help"
+          data-past-event-limit
+          hidden={pastEvents.length !== 100}
+        >
+          {manage
+            ? "Showing up to 100 past events. Open another date under Manage recurring series."
+            : "Showing the 100 most recent past events."}
+        </p>
+      </section>
+    )}
     {manage && <EventEditor />}
   </div>
-  <noscript
-    ><p class="volunteer-notice">
+  <noscript>
+    <p class="volunteer-notice">
       JavaScript is required to save changes and register for events.
-    </p></noscript
-  >
+    </p>
+  </noscript>
 </AccountLayout>
 <script>
   import "@/scripts/volunteer";
@@ -473,7 +375,7 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    gap: 1.5rem;
+    gap: 1.125rem;
   }
   .volunteer-event-results {
     min-width: 0;

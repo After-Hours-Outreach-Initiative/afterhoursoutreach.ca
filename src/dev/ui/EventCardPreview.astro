@@ -17,13 +17,7 @@ const { scenario, ...fixture } = createEventCardFixture(
 <LocalLayout title={`${scenario.label} · Event card`}>
   <main class="volunteer-portal ui-event-preview" data-ui-event-preview>
     <ul class="volunteer-event-list" data-event-list>
-      <EventCard
-        {...fixture}
-        organizer={false}
-        roster={[]}
-        destinations={[]}
-        filter="all"
-      />
+      <EventCard {...fixture} organizer={false} roster={[]} destinations={[]} />
     </ul>
   </main>
 </LocalLayout>

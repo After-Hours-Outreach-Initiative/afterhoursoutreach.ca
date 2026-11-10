@@ -264,6 +264,22 @@ body:has(
 .volunteer-wide {
   grid-column: 1 / -1;
 }
+/* Related form fields under one heading, divided from the previous group. */
+.volunteer-field-group {
+  min-width: 0;
+}
+.volunteer-field-group:not(:first-child) {
+  padding-top: 1.5rem;
+  border-top: var(--volunteer-border);
+}
+/* Outranks card heading sizes, since event dialogs render inside their cards. */
+.volunteer-field-group > .volunteer-field-group-heading {
+  margin-bottom: 1rem;
+  @apply text-lg font-semibold;
+}
+.volunteer-field-group-description {
+  margin: -0.5rem 0 1rem;
+}
 .volunteer-profile-form {
   gap: 2rem;
 }
@@ -789,33 +805,145 @@ body:has(
   width: 100%;
   color-scheme: dark;
 }
-.volunteer-spots-stepper {
-  display: grid;
-  grid-template-columns: 3.25rem minmax(0, 1fr) 3.25rem;
-  gap: 0.5rem;
-  width: 13.5rem;
-  max-width: 100%;
+/* A number setting as one row: the label and hint beside a compact stepper.
+   Narrow forms give the hint the full width below instead. */
+.volunteer-field-group {
+  container-type: inline-size;
 }
-.volunteer-spots-stepper > button {
-  min-height: 3.25rem;
+.volunteer-stepper-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label stepper"
+    "help help"
+    "error error";
+  align-items: center;
+  gap: 0.25rem 1rem;
+  min-width: 0;
+}
+.volunteer-stepper-field > label {
+  grid-area: label;
+}
+.volunteer-stepper-field > .volunteer-stepper {
+  grid-area: stepper;
+}
+.volunteer-stepper-field > .volunteer-help {
+  grid-area: help;
+  margin: 0;
+}
+.volunteer-stepper-field > [data-error] {
+  grid-area: error;
+}
+@container (min-width: 32rem) {
+  .volunteer-stepper-field {
+    grid-template-areas:
+      "label stepper"
+      "help stepper"
+      "error error";
+    row-gap: 0.125rem;
+  }
+  .volunteer-stepper-field:has(> .volunteer-help) > label {
+    align-self: end;
+  }
+  .volunteer-stepper-field > .volunteer-help {
+    align-self: start;
+  }
+}
+.volunteer-stepper {
+  display: grid;
+  grid-template-columns: 2.75rem 4rem 2.75rem;
+  gap: 0.375rem;
+}
+.volunteer-stepper > button {
   padding: 0;
 }
-.volunteer-spots-stepper svg {
-  width: 1.25rem;
-  height: 1.25rem;
+.volunteer-stepper svg {
+  width: 1.125rem;
+  height: 1.125rem;
 }
-.volunteer-portal .volunteer-spots-stepper input[type="number"] {
+.volunteer-portal .volunteer-stepper input[type="number"] {
   min-width: 0;
-  min-height: 3.25rem;
+  padding-inline: 0.25rem;
   text-align: center;
-  @apply text-xl;
+  @apply text-lg;
   -moz-appearance: textfield;
   appearance: textfield;
 }
-.volunteer-spots-stepper input::-webkit-inner-spin-button,
-.volunteer-spots-stepper input::-webkit-outer-spin-button {
+.volunteer-stepper input::placeholder {
+  @apply text-sm;
+}
+.volunteer-stepper input::-webkit-inner-spin-button,
+.volunteer-stepper input::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+/* Total capacity leads; reservations and limits sit together underneath. */
+.volunteer-stepper-field-primary > label {
+  @apply text-lg font-semibold;
+}
+.volunteer-stepper-field-primary .volunteer-stepper {
+  grid-template-columns: 3.25rem 5rem 3.25rem;
+}
+.volunteer-stepper-field-primary .volunteer-stepper > button {
+  min-height: 3.25rem;
+}
+.volunteer-portal .volunteer-stepper-field-primary input[type="number"] {
+  @apply text-2xl font-semibold;
+}
+.volunteer-spot-limits {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  container-type: inline-size;
+  min-width: 0;
+  padding: 0.25rem 1rem;
+  border: var(--volunteer-border);
+  border-radius: 0.5rem;
+  background: #050608;
+}
+.volunteer-spot-limits-label {
+  padding-block: 0.75rem 0.25rem;
+  color: #a1a1aa;
+  @apply text-sm;
+}
+.volunteer-spot-limits > .volunteer-stepper-field {
+  padding-block: 0.875rem;
+}
+.volunteer-spot-limits > .volunteer-stepper-field + .volunteer-stepper-field {
+  border-top: var(--volunteer-border);
+}
+.volunteer-form:not(:has([name="includesOrientation"][value="true"]:checked))
+  .volunteer-stepper-field:has(
+    input:is([name="minNewVolunteerSpots"], [name="maxNewVolunteers"])
+  ) {
+  display: none;
+}
+@container (width < 24rem) {
+  .volunteer-stepper-field-primary {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "label"
+      "help"
+      "stepper"
+      "error";
+  }
+  .volunteer-stepper-field-primary > .volunteer-stepper {
+    justify-self: start;
+    margin-top: 0.5rem;
+  }
+}
+@container (width < 20rem) {
+  .volunteer-spot-limits > .volunteer-stepper-field {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "label"
+      "help"
+      "stepper"
+      "error";
+  }
+  .volunteer-spot-limits > .volunteer-stepper-field > .volunteer-stepper {
+    justify-self: start;
+    margin-top: 0.5rem;
+  }
 }
 .volunteer-date-input {
   width: 100%;
@@ -910,13 +1038,19 @@ body:has(
   color: #a1a1aa;
   background: #171a20;
 }
-.volunteer-state-field {
+.volunteer-state-field,
+.volunteer-radio-field {
   min-width: 0;
 }
-.volunteer-state-field legend {
+.volunteer-state-field legend,
+.volunteer-radio-field legend {
   margin-bottom: 0.5rem;
   @apply text-base/[inherit];
   font-weight: normal;
+}
+.volunteer-radio-group {
+  display: grid;
+  gap: 0.75rem;
 }
 .volunteer-state-selector {
   position: relative;
@@ -952,6 +1086,9 @@ body:has(
   border-color: #b91c1c;
   background: #450a0a;
 }
+.volunteer-state-selector:not(:has(input:checked))::before {
+  opacity: 0;
+}
 .volunteer-state-selector:has(input:disabled)::before {
   opacity: 0.6;
 }
@@ -974,6 +1111,7 @@ body:has(
   border: 1px solid transparent;
   border-radius: 0.25rem;
   color: #a1a1aa;
+  text-align: center;
   cursor: pointer;
   transition: color 150ms;
 }
@@ -2171,6 +2309,8 @@ body:has(
   color: #facc15;
 }
 .volunteer-field:has(:user-invalid:not([data-validation-untouched]))
+  > [data-error],
+.volunteer-stepper-field:has(:user-invalid:not([data-validation-untouched]))
   > [data-error],
 .volunteer-date-input:has([aria-invalid="true"]) > [data-error],
 .volunteer-team-options:has(input[name="teams"]:user-invalid) + [data-error],

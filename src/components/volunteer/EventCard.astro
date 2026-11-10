@@ -14,7 +14,6 @@ import {
   vancouverInput,
 } from "@/data/event-time";
 import { eventUnregisterDeadline } from "@/data/event-unregistration";
-import { matchesEventFilter } from "@/data/event-browser";
 import EventEditor from "./EventEditor.astro";
 import EventRoster from "./EventRoster.astro";
 import PublicEventRoster from "./PublicEventRoster.astro";
@@ -27,7 +26,6 @@ interface Props {
   organizer: boolean;
   roster: RosterRow[];
   destinations: EventRow[];
-  filter: string;
   series?: PatrolSeriesRow;
   publicRoster?: PublicRosterRow[];
 }
@@ -37,7 +35,6 @@ const {
   organizer,
   roster,
   destinations,
-  filter,
   series,
   publicRoster = [],
 } = Astro.props;
@@ -81,13 +78,6 @@ const blocked =
   data-event-label={`${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`}
   data-event-type="patrol"
   data-includes-orientation={String(Boolean(event.includesOrientation))}
-  hidden={
-    !matchesEventFilter(
-      filter,
-      Boolean(event.seriesId),
-      Boolean(event.includesOrientation),
-    )
-  }
 >
   {organizer && future && !event.cancelledAt && (
     <label class="volunteer-event-select">
@@ -109,8 +99,7 @@ const blocked =
           maxNewVolunteers: String(event.maxNewVolunteers),
           unregisterMinutes: String(event.unregisterMinutes),
           includesOrientation: String(Boolean(event.includesOrientation)),
-          open: String(Boolean(event.open)),
-          hidden: String(Boolean(event.hidden)),
+          publicVisibility: String(Boolean(event.open && !event.hidden)),
         })}
       />
       <span>

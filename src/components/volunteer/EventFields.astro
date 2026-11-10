@@ -7,9 +7,9 @@ import {
   maxUnregisterMinutes,
 } from "@/data/event-unregistration";
 import FieldError from "@/components/FieldError.astro";
+import FieldGroup from "./FieldGroup.astro";
+import StepperField from "./StepperField.astro";
 import RecurringIcon from "@/components/icons/RecurringIcon.astro";
-import MinusIcon from "@/components/icons/MinusIcon.astro";
-import PlusIcon from "@/components/icons/PlusIcon.astro";
 import DateInput from "./DateInput.astro";
 import NativePickerInput from "./NativePickerInput.astro";
 
@@ -26,35 +26,50 @@ const publicVisibility = settings
   : true;
 ---
 
-<div class="volunteer-field volunteer-wide">
-  <label class="volunteer-check">
-    <input
-      type="checkbox"
-      name="includesOrientation"
-      checked={Boolean(settings?.includesOrientation)}
+<FieldGroup id={`${id}-type-time-group`} heading="Type and time">
+  <fieldset class="volunteer-radio-field volunteer-wide">
+    <legend>Event type</legend>
+    <div class="volunteer-radio-group">
+      <label class="volunteer-check">
+        <input
+          type="radio"
+          name="includesOrientation"
+          value="false"
+          checked={!settings?.includesOrientation}
+        />
+        <span>Patrol</span>
+      </label>
+      <label class="volunteer-check">
+        <input
+          type="radio"
+          name="includesOrientation"
+          value="true"
+          checked={Boolean(settings?.includesOrientation)}
+        />
+        <span>Orientation + Patrol</span>
+      </label>
+    </div>
+  </fieldset>
+  <div class="volunteer-event-start volunteer-wide">
+    <DateInput
+      name="startsAt"
+      id={`${id}-startsAt`}
+      errorField={`${id}-startsAt`}
+      label={series ? "Start date (fixed)" : "Start date"}
+      value={
+        event
+          ? vancouverInput(event.startsAt)
+          : series
+            ? `${series.firstDate}T${series.localTime}`
+            : ""
+      }
+      withTime
+      defaultTime="21:00"
+      readonlyDate={Boolean(series)}
+      warnPast={!series}
     />
-    <span>Includes orientation</span>
-  </label>
-</div>
-<div class="volunteer-event-start volunteer-wide">
-  <DateInput
-    name="startsAt"
-    id={`${id}-startsAt`}
-    errorField={`${id}-startsAt`}
-    label={series ? "Start date (fixed)" : "Start date"}
-    value={event
-      ? vancouverInput(event.startsAt)
-      : series
-        ? `${series.firstDate}T${series.localTime}`
-        : ""}
-    withTime
-    defaultTime="21:00"
-    readonlyDate={Boolean(series)}
-    warnPast={!series}
-  />
-</div>
-{
-  !event && (
+  </div>
+  {!event && (
     <div class="volunteer-field volunteer-wide" data-recurrence-controls>
       {!series && (
         <label class="volunteer-check volunteer-recurrence-toggle">
@@ -106,173 +121,156 @@ const publicVisibility = settings
         </p>
       )}
     </div>
-  )
-}
-<div class="volunteer-field">
-  <label for={`${id}-spots`}>Volunteer spots</label>
-  <div class="volunteer-spots-stepper">
-    <button
-      class="btn btn-quiet"
-      type="button"
-      data-spots-step="-1"
-      aria-label="Decrease volunteer spots"
-      aria-controls={`${id}-spots`}
-      disabled><MinusIcon /></button
-    >
+  )}
+</FieldGroup>
+<FieldGroup id={`${id}-location-group`} heading="Location">
+  <div class="volunteer-field">
+    <label for={`${id}-meetingPoint`}>Meeting point</label>
     <input
-      id={`${id}-spots`}
-      name="spots"
-      type="number"
-      min={minimumEventSpots(limits)}
-      max="100"
-      step="1"
-      aria-describedby={`error-${id}-spots`}
+      id={`${id}-meetingPoint`}
+      name="meetingPoint"
+      aria-describedby={`error-${id}-meetingPoint`}
       required
-      value={settings?.spots ?? 8}
+      pattern={String.raw`.*\S.*`}
+      maxlength="500"
+      value={settings?.meetingPoint ?? "Lord Strathcona Elementary"}
     />
-    <button
-      class="btn btn-quiet"
-      type="button"
-      data-spots-step="1"
-      aria-label="Increase volunteer spots"
-      aria-controls={`${id}-spots`}
-      disabled><PlusIcon /></button
-    >
+    <FieldError
+      field={`${id}-meetingPoint`}
+      message="Enter a meeting point (up to 500 characters)."
+    />
   </div>
-  <FieldError
-    field={`${id}-spots`}
-    message={minimumEventSpots(limits) > 100
-      ? "Reduce reserved places to a combined maximum of 100."
-      : `Enter a whole number from ${minimumEventSpots(limits)} to 100, covering all reserved places.`}
+  <div class="volunteer-field">
+    <label for={`${id}-meetingPointUrl`}>Map link (optional)</label>
+    <input
+      id={`${id}-meetingPointUrl`}
+      type="url"
+      name="meetingPointUrl"
+      aria-describedby={`error-${id}-meetingPointUrl`}
+      maxlength="2048"
+      value={
+        settings
+          ? (settings.meetingPointUrl ?? "")
+          : "https://maps.app.goo.gl/4ommJyZFCRJRGf9F9"
+      }
+      placeholder="https://"
+    />
+    <FieldError
+      field={`${id}-meetingPointUrl`}
+      message="Enter a valid map URL (up to 2048 characters)."
+    />
+  </div>
+</FieldGroup>
+<FieldGroup id={`${id}-spots-group`} heading="Spots">
+  <StepperField
+    id={`${id}-spots`}
+    name="spots"
+    label="Volunteer spots"
+    help="Total places, including the reserved ones below."
+    min={minimumEventSpots(limits)}
+    max="100"
+    value={settings?.spots ?? 8}
+    required
+    primary
+    error={
+      minimumEventSpots(limits) > 100
+        ? "Reduce reserved places to a combined maximum of 100."
+        : `Enter a whole number from ${minimumEventSpots(limits)} to 100, covering all reserved places.`
+    }
   />
-</div>
-{
-  [
-    {
-      name: "minMedicSpots",
-      label: "Minimum medic spots",
-      help: "Places reserved for approved medics on every patrol.",
-    },
-    {
-      name: "minNewVolunteerSpots",
-      label: "Minimum new volunteer spots",
-      help: "Places reserved for volunteers awaiting patrol approval when orientation is included.",
-    },
-    {
-      name: "maxNewVolunteers",
-      label: "Maximum new volunteers",
-      help: "Limit for volunteers awaiting patrol approval when orientation is included.",
-    },
-  ].map(({ name, label, help }) => (
-    <div class="volunteer-field">
-      <label for={`${id}-${name}`}>{label}</label>
-      <input
+  <div
+    class="volunteer-spot-limits volunteer-wide"
+    role="group"
+    aria-labelledby={`${id}-spot-limits`}
+  >
+    <p id={`${id}-spot-limits`} class="volunteer-spot-limits-label">
+      Reserved places and limits
+    </p>
+    {[
+      {
+        name: "minMedicSpots",
+        label: "Minimum medic spots",
+        help: "Held for approved medics.",
+        error: "Enter a whole number from 0 to 100.",
+      },
+      {
+        name: "minNewVolunteerSpots",
+        label: "Minimum new volunteer spots",
+        help: "Held for new volunteers when orientation is included.",
+        error: "Enter a whole number from 0 to 100.",
+      },
+      {
+        name: "maxNewVolunteers",
+        label: "Maximum new volunteers",
+        help: "Cap on new volunteers when orientation is included.",
+        error:
+          "Enter a whole number from 0 to 100, at least the minimum new volunteer spots.",
+      },
+    ].map(({ name, label, help, error }) => (
+      <StepperField
         id={`${id}-${name}`}
         name={name}
-        type="number"
+        label={label}
+        help={help}
         min="0"
         max="100"
-        step="1"
-        required
         value={limits[name as keyof typeof defaultEventLimits]}
-        aria-describedby={`${id}-${name}-help error-${id}-${name}`}
+        required
+        error={error}
       />
-      <p class="volunteer-help" id={`${id}-${name}-help`}>
-        {help}
-      </p>
-      <FieldError
-        field={`${id}-${name}`}
-        message={
-          name === "maxNewVolunteers"
-            ? "Enter a whole number from 0 to 100, at least the minimum new volunteer spots."
-            : "Enter a whole number from 0 to 100."
-        }
-      />
-    </div>
-  ))
-}
-<div class="volunteer-field">
-  <label for={`${id}-unregisterMinutes`}
-    >Unregister until (minutes after start)</label
-  >
-  <input
-    id={`${id}-unregisterMinutes`}
-    name="unregisterMinutes"
-    type="number"
-    min="0"
-    max={maxUnregisterMinutes}
-    step="1"
-    required
-    value={settings?.unregisterMinutes ?? defaultUnregisterMinutes}
-    aria-describedby={`${id}-unregisterMinutes-help error-${id}-unregisterMinutes`}
-  />
-  <p class="volunteer-help" id={`${id}-unregisterMinutes-help`}>
-    Volunteers can unregister until this many minutes after the event starts.
-  </p>
-  <FieldError
-    field={`${id}-unregisterMinutes`}
-    message={`Enter a whole number from 0 to ${maxUnregisterMinutes}.`}
-  />
-</div>
-<div class="volunteer-field">
-  <label for={`${id}-meetingPoint`}>Meeting point</label>
-  <input
-    id={`${id}-meetingPoint`}
-    name="meetingPoint"
-    aria-describedby={`error-${id}-meetingPoint`}
-    required
-    pattern={String.raw`.*\S.*`}
-    maxlength="500"
-    value={settings?.meetingPoint ?? "Lord Strathcona Elementary"}
-  />
-  <FieldError
-    field={`${id}-meetingPoint`}
-    message="Enter a meeting point (up to 500 characters)."
-  />
-</div>
-<div class="volunteer-field">
-  <label for={`${id}-meetingPointUrl`}>Map link (optional)</label>
-  <input
-    id={`${id}-meetingPointUrl`}
-    type="url"
-    name="meetingPointUrl"
-    aria-describedby={`error-${id}-meetingPointUrl`}
-    maxlength="2048"
-    value={settings
-      ? (settings.meetingPointUrl ?? "")
-      : "https://maps.app.goo.gl/4ommJyZFCRJRGf9F9"}
-    placeholder="https://"
-  />
-  <FieldError
-    field={`${id}-meetingPointUrl`}
-    message="Enter a valid map URL (up to 2048 characters)."
-  />
-</div>
-<fieldset class="volunteer-state-field volunteer-wide">
-  <legend>Public visibility</legend>
-  <div class="volunteer-state-selector">
-    <label class="volunteer-state-option volunteer-state-positive">
-      <input
-        class="sr-only"
-        type="radio"
-        name="publicVisibility"
-        value="true"
-        checked={publicVisibility}
-      />
-      <span>Visible</span>
-    </label>
-    <label class="volunteer-state-option volunteer-state-negative">
-      <input
-        class="sr-only"
-        type="radio"
-        name="publicVisibility"
-        value="false"
-        checked={!publicVisibility}
-      />
-      <span>Hidden</span>
-    </label>
+    ))}
   </div>
-</fieldset>
+</FieldGroup>
+<FieldGroup id={`${id}-registration-group`} heading="Registration">
+  <div class="volunteer-field">
+    <label for={`${id}-unregisterMinutes`}>
+      Unregister until (minutes after start)
+    </label>
+    <input
+      id={`${id}-unregisterMinutes`}
+      name="unregisterMinutes"
+      type="number"
+      min="0"
+      max={maxUnregisterMinutes}
+      step="1"
+      required
+      value={settings?.unregisterMinutes ?? defaultUnregisterMinutes}
+      aria-describedby={`${id}-unregisterMinutes-help error-${id}-unregisterMinutes`}
+    />
+    <p class="volunteer-help" id={`${id}-unregisterMinutes-help`}>
+      Volunteers can unregister until this many minutes after the event starts.
+    </p>
+    <FieldError
+      field={`${id}-unregisterMinutes`}
+      message={`Enter a whole number from 0 to ${maxUnregisterMinutes}.`}
+    />
+  </div>
+  <fieldset class="volunteer-state-field volunteer-wide">
+    <legend>Public visibility</legend>
+    <div class="volunteer-state-selector">
+      <label class="volunteer-state-option volunteer-state-positive">
+        <input
+          class="sr-only"
+          type="radio"
+          name="publicVisibility"
+          value="true"
+          checked={publicVisibility}
+        />
+        <span>Visible</span>
+      </label>
+      <label class="volunteer-state-option volunteer-state-negative">
+        <input
+          class="sr-only"
+          type="radio"
+          name="publicVisibility"
+          value="false"
+          checked={!publicVisibility}
+        />
+        <span>Hidden</span>
+      </label>
+    </div>
+  </fieldset>
+</FieldGroup>
 
 <style>
   .volunteer-event-start {

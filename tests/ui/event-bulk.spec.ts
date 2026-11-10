@@ -34,7 +34,7 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     });
     expect(response.status(), await response.text()).toBe(200);
   }
-  await page.goto("/events?type=one-off");
+  await page.goto("/events");
   const cards = page.locator("[data-live-event]").filter({ hasText: label });
   const dates = await cards.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-event-start")),
@@ -42,18 +42,23 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   const ids = await cards.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-live-event")),
   );
-  const selectMode = page.getByRole("button", { name: "Select", exact: true });
+  const selectMode = page.locator("[data-bulk-select-mode]");
   await expect(page.locator("[data-bulk-event]:visible")).toHaveCount(0);
   await selectMode.click();
   await expect(selectMode).toHaveAttribute("aria-pressed", "true");
+  await expect(selectMode).toHaveText("Cancel");
   await cards.first().locator("[data-bulk-event]").check();
   await expect(page.locator("[data-bulk-count]")).toHaveText("1 selected");
-  await page.getByRole("button", { name: /^Recurring events \d+$/ }).click();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(page.locator("[data-bulk-count]")).toContainText("0 selected");
-  await expect(
-    page.getByRole("button", { name: "Bulk edit", exact: true }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: /^One-off events \d+$/ }).click();
+  const bulkEdit = page.getByRole("button", { name: "Bulk edit", exact: true });
+  await expect(bulkEdit).toBeDisabled();
+  // Disabled actions must also look unavailable, not only ignore clicks.
+  await expect(bulkEdit).toHaveCSS("cursor", "not-allowed");
+  await expect(bulkEdit).toHaveCSS(
+    "background-color",
+    "oklch(0.274 0.006 286.033)",
+  );
   await page.getByRole("button", { name: "Select all", exact: true }).click();
   expect(await page.locator("[data-bulk-event]:checked").count()).toBe(
     await page.locator("[data-bulk-event]:visible").count(),
@@ -77,9 +82,9 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   await expect(dialog.locator("[data-bulk-targets] li")).toHaveCount(2);
   await expect(dialog.locator('[type="checkbox"]')).toHaveCount(0);
   await expect(dialog.locator('[name="startsAt"]')).toHaveCount(0);
-  await expect(
-    dialog.getByRole("button", { name: "Save selected events" }),
-  ).toBeDisabled();
+  const save = dialog.getByRole("button", { name: "Save selected events" });
+  await expect(save).toBeDisabled();
+  await expect(save).toHaveCSS("cursor", "not-allowed");
   const meetingPoint = dialog.getByLabel("Meeting point", { exact: true });
   await expect(meetingPoint).toHaveValue("");
   await expect(meetingPoint).toHaveAttribute("placeholder", "Varies");
@@ -112,8 +117,9 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   await cards.first().locator("[data-bulk-event]").check();
   await page.getByRole("button", { name: "Bulk edit", exact: true }).click();
   await dialog
-    .getByRole("combobox", { name: "Includes orientation", exact: true })
-    .selectOption("true");
+    .getByRole("group", { name: "Event type" })
+    .getByText("Orientation + Patrol", { exact: true })
+    .click();
   const selection = JSON.parse(
     await dialog.locator('[name="selection"]').inputValue(),
   );
@@ -129,11 +135,20 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     dialog.getByRole("button", { name: "Save selected events" }),
   ).toBeDisabled();
   await expect(
-    dialog.getByRole("combobox", { name: "Includes orientation", exact: true }),
-  ).toHaveValue("true");
+    dialog
+      .getByRole("group", { name: "Event type" })
+      .getByRole("radio", { name: "Orientation + Patrol", exact: true }),
+  ).toBeChecked();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.locator("[data-bulk-count]")).toContainText("0 selected");
-  await selectMode.click();
+  await cards.first().locator("[data-bulk-event]").check();
+  await page
+    .getByRole("button", { name: "Exit selection mode", exact: true })
+    .click();
   await expect(page.locator("[data-bulk-actions]")).toBeHidden();
   await expect(page.locator("[data-bulk-event]:visible")).toHaveCount(0);
+  await expect(page.locator("[data-bulk-event]:checked")).toHaveCount(0);
+  await expect(selectMode).toHaveAttribute("aria-pressed", "false");
+  await expect(selectMode).toHaveText("Select");
+  await expect(selectMode).toBeFocused();
 });

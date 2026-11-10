@@ -362,26 +362,14 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
         exact: true,
       }),
     ).toHaveCount(0);
-    await organizerPage
-      .getByRole("button", { name: /^One-off events \d+$/ })
-      .click();
     await expect(
-      organizerPage.locator("[data-event-list] > li:visible"),
-    ).toHaveCount(1);
-    await expect(occurrences.first()).toBeHidden();
-    await organizerPage.reload();
-    await expect(occurrences.first()).toBeHidden();
+      organizerPage.getByRole("group", { name: "Filter events" }),
+    ).toHaveCount(0);
+    await organizerPage.goto(`${origin}/events?type=one-off`);
+    await expect(topLevel).toHaveCount(initialOccurrenceCount + 1);
+    await expect(occurrences.first()).toBeVisible();
     await organizerPage.locator("[data-series-management] > summary").click();
-    await organizerPage
-      .getByRole("button", { name: /^Recurring events \d+$/ })
-      .click();
-    await expect(
-      organizerPage.locator("[data-event-list] > li:visible"),
-    ).toHaveCount(initialOccurrenceCount);
     await expect(emptyGroup).toBeVisible();
-    await organizerPage.goBack();
-    await expect(occurrences.first()).toBeHidden();
-    await organizerPage.getByRole("button", { name: /^All \d+$/ }).click();
 
     // Polling updates occurrences without discarding the open series draft or
     // collapsing the date controls behind the modal.
@@ -460,15 +448,13 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     ).toBeFocused();
     await expect(initialGroup).toHaveCount(1);
     await organizerPage
-      .getByRole("button", { name: /^Recurring events \d+$/ })
-      .click();
-    await organizerPage
       .getByRole("button", { name: "Create", exact: true })
       .click();
     const creator = organizerPage.locator("#event-editor-new");
     await creator
-      .getByRole("checkbox", { name: "Includes orientation", exact: true })
-      .check();
+      .getByRole("group", { name: "Event type" })
+      .getByText("Orientation + Patrol", { exact: true })
+      .click();
     await expect(creator.locator("[data-recurrence-controls]")).toBeVisible();
     await creator.locator('[name="recurring"]').check();
     await expect(creator.locator('[name="intervalWeeks"]')).toBeEnabled();
@@ -503,15 +489,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await expect(uiGroup).toBeVisible();
     await expect(
       organizerPage.locator(`[data-live-event="${oneOffId}"]`),
-    ).toBeHidden();
-    await organizerPage
-      .getByRole("button", { name: /^Orientations \d+$/ })
-      .click();
+    ).toBeVisible();
     await expect(uiGroup).toBeVisible();
-    await expect(occurrences.first()).toBeHidden();
-    await organizerPage
-      .getByRole("button", { name: /^Recurring events \d+$/ })
-      .click();
+    await expect(occurrences.first()).toBeVisible();
     await uiGroup
       .getByRole("button", { name: "Edit series", exact: true })
       .click();
@@ -572,21 +552,23 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     ).toHaveCount(1);
     await expect(uiGroup).toHaveCount(1);
     await expect(
-      editor.getByRole("checkbox", {
-        name: "Includes orientation",
-        exact: true,
-      }),
+      editor
+        .getByRole("group", { name: "Event type" })
+        .getByRole("radio", { name: "Orientation + Patrol", exact: true }),
     ).toBeChecked();
     await expect(uiCard).not.toContainText("nominal date");
     await expect(
       uiCard.getByRole("button", { name: "Register", exact: true }),
     ).toHaveCount(0);
     await editor
-      .locator('[data-event-save] [name="scope"]')
-      .selectOption("future");
+      .locator("[data-event-save]")
+      .getByRole("group", { name: "Apply changes to" })
+      .getByText("This and future occurrences", { exact: true })
+      .click();
     await editor
-      .getByRole("checkbox", { name: "Includes orientation", exact: true })
-      .uncheck();
+      .getByRole("group", { name: "Event type" })
+      .getByText("Patrol", { exact: true })
+      .click();
     await editor
       .getByLabel("Meeting point", { exact: true })
       .fill("UI future meeting point");
@@ -608,8 +590,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await uiCard.getByRole("button", { name: "Edit", exact: true }).click();
     await uiCard
       .locator("dialog")
-      .getByRole("checkbox", { name: "Includes orientation", exact: true })
-      .check();
+      .getByRole("group", { name: "Event type" })
+      .getByText("Orientation + Patrol", { exact: true })
+      .click();
     await uiCard
       .locator("dialog")
       .getByRole("button", { name: "Save", exact: true })
@@ -779,9 +762,9 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await expect(pastCard.locator("[data-live-signup] button")).toHaveText(
       "Unregister",
     );
-    await page.locator('[data-event-filter="orientation"]').click();
-    await expect(pastCard).toBeHidden();
-    await page.locator('[data-event-filter="all"]').click();
+    await expect(
+      page.getByRole("group", { name: "Filter events" }),
+    ).toHaveCount(0);
     await expect(pastCard).toBeVisible();
     expect(
       await DB.prepare(

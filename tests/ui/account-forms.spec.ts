@@ -3120,8 +3120,9 @@ test("event editor shows native number and URL errors without submitting invalid
     exact: true,
   });
   const form = dialog.locator("[data-event-save]");
-  const orientation = form.getByRole("checkbox", {
-    name: "Includes orientation",
+  const eventType = form.getByRole("group", { name: "Event type" });
+  const orientation = eventType.getByRole("radio", {
+    name: "Orientation + Patrol",
     exact: true,
   });
   const recurrence = form.locator("[data-recurrence-controls]");
@@ -3138,7 +3139,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await recurring.check();
   await interval.fill("3");
   await endDate.fill("2030-02-01");
-  await orientation.check();
+  await eventType.getByText("Orientation + Patrol", { exact: true }).click();
   await expect(orientation).toBeChecked();
   await expect(recurrence).toBeVisible();
   await expect(recurring).toBeChecked();
@@ -3154,12 +3155,12 @@ test("event editor shows native number and URL errors without submitting invalid
         "endDate",
       ].map((key) => values.get(key));
     }),
-  ).toEqual(["on", "on", "3", "2030-02-01"]);
+  ).toEqual(["true", "on", "3", "2030-02-01"]);
   await recurring.uncheck();
   await expect(recurrence).toBeVisible();
   await expect(recurring).not.toBeChecked();
   await expect(form.locator("[data-recurrence-fields]")).toBeHidden();
-  await orientation.check();
+  await eventType.getByText("Orientation + Patrol", { exact: true }).click();
   const requests: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/v1/events/action")
@@ -3392,7 +3393,7 @@ test("event editor shows native number and URL errors without submitting invalid
     expect(minus!.x + minus!.width).toBeLessThan(number!.x);
     expect(number!.x + number!.width).toBeLessThan(plus!.x);
     for (const box of [minus!, number!, plus!]) {
-      expect(box.height).toBeGreaterThanOrEqual(52);
+      expect(box.height).toBeGreaterThanOrEqual(44);
       expect(box.y).toBe(number!.y);
     }
     expect(
@@ -3408,7 +3409,8 @@ test("event editor shows native number and URL errors without submitting invalid
   await dialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(form.locator("[data-error$='-spots']")).toBeVisible();
   await expect(form.locator("[data-error$='-meetingPointUrl']")).toBeVisible();
-  await expect(spots).toBeFocused();
+  // Location precedes spots, so its invalid map link is focused first.
+  await expect(map).toBeFocused();
   await expect(spots).toHaveCSS("border-top-color", "rgb(248, 113, 113)");
   expect(requests).toEqual([]);
   await increase.click();
@@ -3447,7 +3449,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await map.fill("https://example.org/map");
   // Changing orientation changes the native minimum, not the organizer's draft.
   await spots.fill("1");
-  await orientation.check();
+  await eventType.getByText("Orientation + Patrol", { exact: true }).click();
   await expect(spots).toHaveAttribute("min", "4");
   await expect(spots).toHaveValue("1");
   await dialog.getByRole("button", { name: "Create", exact: true }).click();
@@ -3460,7 +3462,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await expect(spots).toHaveValue("4");
   await decrease.click();
   await expect(spots).toHaveValue("4");
-  await orientation.uncheck();
+  await eventType.getByText("Patrol", { exact: true }).click();
   await expect(spots).toHaveAttribute("min", "2");
   await decrease.click();
   await expect(spots).toHaveValue("3");
@@ -3502,13 +3504,14 @@ test("event editor shows native number and URL errors without submitting invalid
     editForm.locator('input[type="radio"][name="type"]'),
   ).toHaveCount(0);
   await expect(editForm.locator('[name="type"]')).toHaveCount(0);
-  const editOrientation = editForm.getByRole("checkbox", {
-    name: "Includes orientation",
+  const editEventType = editForm.getByRole("group", { name: "Event type" });
+  const editOrientation = editEventType.getByRole("radio", {
+    name: "Orientation + Patrol",
     exact: true,
   });
   await expect(editOrientation).toBeChecked();
   await expect(editSpots).toHaveAttribute("min", "4");
-  await editOrientation.uncheck();
+  await editEventType.getByText("Patrol", { exact: true }).click();
   await expect(editOrientation).not.toBeChecked();
   await expect(editSpots).toHaveAttribute("min", "2");
   await editForm.evaluate((element: HTMLFormElement) => element.reset());

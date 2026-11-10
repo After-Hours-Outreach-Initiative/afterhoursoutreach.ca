@@ -5,11 +5,7 @@ import {
   seriesSaveAction,
   eventEmailPrompt,
 } from "../src/scripts/event-recurrence";
-import {
-  eventFilter,
-  matchesEventFilter,
-  groupManagementEvents,
-} from "../src/data/event-browser";
+import { groupManagementEvents } from "../src/data/event-browser";
 import type { EventRow, PatrolSeriesRow } from "../src/server/db/events";
 
 test("management groups selected occurrences once per series, retaining one-offs and series without loaded occurrences", () => {
@@ -31,19 +27,6 @@ test("management groups selected occurrences once per series, retaining one-offs
     { kind: "series", series: series[0], events: [events[2]] },
     { kind: "series", series: series[2], events: [] },
   ]);
-  for (const filter of ["all", "orientation", "one-off", "recurring"]) {
-    expect(eventFilter(filter, true)).toBe(filter);
-    expect(eventFilter(filter, false)).toBe(
-      filter === "orientation" ? filter : "all",
-    );
-  }
-  expect(eventFilter("patrol", true)).toBe("all");
-  expect(matchesEventFilter("one-off", false, true)).toBe(true);
-  expect(matchesEventFilter("one-off", true, false)).toBe(false);
-  expect(matchesEventFilter("recurring", true, false)).toBe(true);
-  expect(matchesEventFilter("recurring", false, true)).toBe(false);
-  expect(matchesEventFilter("orientation", true, false)).toBe(false);
-  expect(matchesEventFilter("orientation", true, true)).toBe(true);
 });
 
 const values = (extra: Record<string, string> = {}) => {
@@ -89,7 +72,9 @@ test("creation keeps Vancouver wall time and inclusive end date with optional or
     },
   });
   expect(
-    recurringSaveAction(values({ includesOrientation: "on", recurring: "on" })),
+    recurringSaveAction(
+      values({ includesOrientation: "true", recurring: "on" }),
+    ),
   ).toMatchObject({
     action: "save-series",
     series: { includesOrientation: true },
@@ -104,7 +89,7 @@ test("this-and-future edits use nominal identities and series versions, not occu
     occurrenceDate: "2026-11-01",
     scope: "future",
     publicVisibility: "false",
-    includesOrientation: "on",
+    includesOrientation: "true",
     minMedicSpots: "3",
     minNewVolunteerSpots: "1",
     maxNewVolunteers: "2",
@@ -155,7 +140,7 @@ test("series settings send the create-event fields without a recurring checkbox"
     version: "9",
     endDate: "",
     intervalWeeks: "2",
-    includesOrientation: "on",
+    includesOrientation: "true",
     publicVisibility: "false",
   });
   expect(seriesSaveAction(data)).toEqual({

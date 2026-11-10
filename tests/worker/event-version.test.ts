@@ -278,11 +278,16 @@ test("built Worker returns scoped versions for signups, cancellations and revoke
       expect.stringMatching(/<h1\b[^>]*id="events-heading"[^>]*>Events<\/h1>/),
     ]);
     expect(managementHtml).not.toMatch(/<h2\b[^>]*>\s*Events\s*<\/h2>/);
-    const filteredHistory = await (
+    const legacyFilterHistory = await (
       await send("/events?type=recurring", undefined, organizerCookie)
     ).text();
-    expect(filteredHistory).toContain('id="past-events-heading"');
-    expect(filteredHistory).toContain("No past events match this filter.");
+    expect(legacyFilterHistory).toContain('id="past-events-heading"');
+    expect(legacyFilterHistory).not.toContain("data-event-filter");
+    for (const id of ["past", "past-orientation", "hidden"])
+      expect(legacyFilterHistory).toContain(`data-live-event="${id}"`);
+    expect(legacyFilterHistory).not.toContain(
+      "No past events match this filter.",
+    );
     expect(managementHtml).toMatch(
       /<button[^>]*data-show-dialog="event-editor-new"[^>]*>[\s\S]*?\bCreate\s*<\/button>/,
     );

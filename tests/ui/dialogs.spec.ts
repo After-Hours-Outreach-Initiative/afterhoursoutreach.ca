@@ -254,9 +254,11 @@ test("event dialogs offer only cancellation for future events and keep ended his
       dialog.locator("[data-event-save], [data-event-cancel]"),
     ).toHaveCount(editable ? 2 : 0);
     if (editable && recurring) {
-      await expect(dialog.getByLabel("Apply changes to")).toHaveValue(
-        "occurrence",
-      );
+      await expect(
+        dialog
+          .getByRole("group", { name: "Apply changes to" })
+          .getByLabel("Only this occurrence"),
+      ).toBeChecked();
       await expect(
         dialog.locator('[data-event-cancel] [name="scope"]'),
       ).toHaveValue("occurrence");
@@ -378,15 +380,43 @@ test("event cancellation morphs in place and preserves its draft after notificat
     await card.getByRole("button", { name: "Edit", exact: true }).click();
     const form = dialog.locator("[data-event-cancel]");
     const morph = dialog.locator("event-cancellation");
+    if (width === 320) {
+      await expect(morph.locator(".cancellation-trigger")).toHaveCSS(
+        "text-align",
+        "center",
+      );
+      expect(
+        await morph
+          .locator(".cancellation-trigger")
+          .evaluate((trigger) =>
+            Math.abs(
+              trigger.getBoundingClientRect().width -
+                trigger.parentElement!.clientWidth,
+            ),
+          ),
+      ).toBeLessThan(1);
+    }
     await dialog
       .getByRole("button", { name: "Cancel event", exact: true })
       .click();
-    await form.getByLabel("Reason (optional)").fill("Unsafe conditions");
     await morph.locator(".cancellation-surface").evaluate(async (surface) => {
       await Promise.allSettled(
         surface.getAnimations().map((animation) => animation.finished),
       );
     });
+    await expect
+      .poll(() =>
+        morph.locator(".cancellation-surface").evaluate((surface) => {
+          const bounds = surface.getBoundingClientRect();
+          const body = surface.closest(".dialog-body")!.getBoundingClientRect();
+          return (
+            bounds.top >= body.top - 1 &&
+            (bounds.height > body.height || bounds.bottom <= body.bottom + 1)
+          );
+        }),
+      )
+      .toBe(true);
+    await form.getByLabel("Reason (optional)").fill("Unsafe conditions");
     await expectPinnedChrome(dialog);
     expect(
       await dialog.evaluate(

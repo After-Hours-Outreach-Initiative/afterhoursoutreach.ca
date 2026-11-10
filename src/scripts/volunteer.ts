@@ -1,5 +1,4 @@
 import { vancouverInstant } from "../data/event-time";
-import { eventFilter, matchesEventFilter } from "../data/event-browser";
 import { handleEventCalendarClick, syncEventCalendar } from "./event-calendar";
 import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
@@ -56,7 +55,7 @@ function initEventDates(root: Document | HTMLElement) {
     const button = submitButton(form);
     if (button) button.disabled = false;
     for (const step of form.querySelectorAll<HTMLButtonElement>(
-      "[data-spots-step]",
+      "[data-stepper-step]",
     ))
       step.disabled = false;
   }
@@ -71,7 +70,7 @@ function initVolunteerControls(root: Document | HTMLElement) {
     >("[data-volunteer-control]"))
       control.disabled = false;
 }
-// Compare against the server HTML, not transient loading/filter/expanded state.
+// Compare against the server HTML, not transient loading/expanded state.
 const renderedCards = new WeakMap<HTMLElement, string>();
 let deferredEventRefresh = false;
 let refreshDeferredEvents = () => {};
@@ -82,33 +81,11 @@ initVolunteerProfileContents();
 initSignupMenus();
 initSignupMoveCalendars();
 
-function applyEventFilter(root: HTMLElement, type: string) {
-  const selected = eventFilter(type, root.dataset.eventView === "manage");
-  for (const [listSelector, emptySelector] of [
-    ["[data-event-list]", "[data-empty-events]"],
-    ["[data-past-event-list]", "[data-empty-past-events]"],
-  ]) {
-    let visible = 0;
-    const list = root.querySelector(listSelector);
-    for (const card of list?.querySelectorAll<HTMLElement>(
-      ":scope > [data-live-event]",
-    ) ?? []) {
-      card.hidden = !matchesEventFilter(
-        selected,
-        Boolean(card.dataset.eventSeries),
-        card.dataset.includesOrientation === "true",
-      );
-      if (!card.hidden) visible++;
-    }
-    const empty = root.querySelector<HTMLElement>(emptySelector);
-    if (empty) empty.hidden = visible !== 0;
-  }
-  for (const button of root.querySelectorAll<HTMLButtonElement>(
-    "[data-event-filter]",
-  ))
-    button.setAttribute(
-      "aria-pressed",
-      String(button.dataset.eventFilter === selected),
+function syncEventBrowser(root: HTMLElement) {
+  const empty = root.querySelector<HTMLElement>("[data-empty-events]");
+  if (empty)
+    empty.hidden = Boolean(
+      root.querySelector("[data-event-list] > [data-live-event]"),
     );
   syncEventCalendar(root);
   syncBulkEventSelection(root);
@@ -117,27 +94,12 @@ function applyEventFilter(root: HTMLElement, type: string) {
 document
   .querySelectorAll<HTMLElement>("[data-event-browser]")
   .forEach((root) => {
-    const applyFilter = (type: string) => applyEventFilter(root, type);
     syncEventCalendar(root);
     initBulkEvents(root);
-    root.addEventListener("click", (event) => {
-      handleEventCalendarClick(root, event);
-      if (!(event.target instanceof Element)) return;
-      const button = event.target.closest<HTMLButtonElement>(
-        "[data-event-filter]",
-      );
-      if (!button) return;
-      event.preventDefault();
-      const type = button.dataset.eventFilter ?? "all";
-      applyFilter(type);
-      const url = new URL(location.href);
-      if (type === "all") url.searchParams.delete("type");
-      else url.searchParams.set("type", type);
-      history.pushState(null, "", url);
-    });
-    window.addEventListener("popstate", () =>
-      applyFilter(new URL(location.href).searchParams.get("type") ?? "all"),
+    root.addEventListener("click", (event) =>
+      handleEventCalendarClick(root, event),
     );
+    window.addEventListener("popstate", () => syncEventCalendar(root));
   });
 
 function syncEvents(page: Document, element?: HTMLFormElement) {
@@ -184,10 +146,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     root.dataset.eventVersion = refreshed.dataset.eventVersion;
     for (const card of root.querySelectorAll<HTMLElement>("[data-live-event]"))
       renderedCards.set(card, card.outerHTML);
-    applyEventFilter(
-      root,
-      new URL(location.href).searchParams.get("type") ?? "all",
-    );
+    syncEventBrowser(root);
     initEventDates(root);
     if (restoreFocus)
       focusAfterUpdate(
@@ -403,30 +362,16 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     pastList.closest("section")!.remove();
   }
   if (pastList && nextPastList) syncList(pastList, nextPastList);
-  // Adopt authoritative counts after polling/actions without replacing a
-  // focused filter button. Recurring events count once per date, just like cards.
-  for (const count of root.querySelectorAll<HTMLElement>(
-    "[data-event-filter-count]",
-  )) {
-    const updated = refreshed.querySelector(
-      `[data-event-filter-count="${count.dataset.eventFilterCount}"]`,
-    );
-    if (updated) count.textContent = updated.textContent;
-  }
   for (const selector of [
     "[data-empty-events]",
     "[data-event-limit]",
-    "[data-empty-past-events]",
     "[data-past-event-limit]",
     "[data-empty-series]",
   ]) {
     const target = root.querySelector(selector);
     if (target) target.replaceWith(actionFragment(page, selector));
   }
-  applyEventFilter(
-    root,
-    new URL(location.href).searchParams.get("type") ?? "all",
-  );
+  syncEventBrowser(root);
   root.dataset.eventVersion = refreshed.dataset.eventVersion;
   initEventDates(root);
   if (element?.matches("[data-event-save]") && !eventId) element.reset();
@@ -473,9 +418,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       : null
     )?.focus({ preventScroll: true });
     if (document.activeElement === document.body)
-      root
-        .querySelector<HTMLElement>('[data-event-filter][aria-pressed="true"]')
-        ?.focus({ preventScroll: true });
+      focusAfterUpdate(root.querySelector("#events-heading"));
   }
 }
 
@@ -972,8 +915,6 @@ form(
     const id = `patrol:${value("seriesId")}:${value("occurrenceDate")}`;
     const url = new URL(location.href);
     url.searchParams.set("occurrence", id);
-    // An explicitly requested date must not stay hidden by an unrelated filter.
-    url.searchParams.delete("type");
     const page = await loadActionPage(url.href);
     history.replaceState(null, "", url);
     syncEvents(page, element);
@@ -1049,12 +990,13 @@ document.addEventListener("change", (event) => {
 });
 document.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
-  const step = event.target.closest<HTMLButtonElement>("[data-spots-step]");
+  const step = event.target.closest<HTMLButtonElement>("[data-stepper-step]");
   if (!step || step.disabled || step.closest("[data-submitting]")) return;
-  const input = step.form?.querySelector<HTMLInputElement>(
-    'input[name="spots"]',
+  const input = document.getElementById(
+    step.getAttribute("aria-controls") ?? "",
   );
-  if (!input || input.disabled || input.readOnly) return;
+  if (!(input instanceof HTMLInputElement) || input.disabled || input.readOnly)
+    return;
   const before = input.value;
   const value = input.valueAsNumber;
   // Recover empty/out-of-range drafts at the nearest limit; otherwise retain
@@ -1062,7 +1004,7 @@ document.addEventListener("click", (event) => {
   if (!Number.isFinite(value) || value < Number(input.min))
     input.value = input.min;
   else if (value > Number(input.max)) input.value = input.max;
-  else input.stepUp(Number(step.dataset.spotsStep));
+  else input.stepUp(Number(step.dataset.stepperStep));
   if (input.value !== before) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));

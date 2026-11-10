@@ -613,7 +613,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
             style: "header, [data-skip-to-main] { visibility: hidden; }",
           });
         if (manage) {
-          await page.locator('[data-event-filter="recurring"]').click();
           expect(await list.evaluate(columns)).toBe(1);
           const occurrence = list
             .locator(`[data-event-series="${seriesId}"]`)

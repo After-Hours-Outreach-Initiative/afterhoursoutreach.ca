@@ -29,7 +29,6 @@ test("organizers share the event calendar and cards with role-gated controls", a
       .locator('[data-live-event="local-fixture-event-orientation"]')
       .getByRole("button", { name: "Register", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /^Orientations \d+$/ }).click();
   expect(new URL(page.url()).searchParams.get("occurrence")).toBe(
     "local-fixture-event-orientation",
   );
@@ -38,9 +37,10 @@ test("organizers share the event calendar and cards with role-gated controls", a
   await expect(
     page.locator('[data-show-dialog="event-editor-new"]'),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /^Orientations \d+$/ }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "Filter events" })).toHaveCount(
+    0,
+  );
+  await expect(page.locator("[data-live-event][hidden]")).toHaveCount(0);
   await (
     await openLocalAccountSwitcher(page)
   )
@@ -118,11 +118,20 @@ test("meeting and volunteer-limit defaults are submitted without replacing draft
   await meeting.fill("Custom meeting point");
   await map.fill("");
   await form.getByLabel("Minimum medic spots", { exact: true }).fill("3");
+  await expect(
+    form.getByLabel("Minimum new volunteer spots", { exact: true }),
+  ).toBeHidden();
+  await expect(
+    form.getByLabel("Maximum new volunteers", { exact: true }),
+  ).toBeHidden();
+  await form
+    .getByRole("group", { name: "Event type" })
+    .getByText("Orientation + Patrol", { exact: true })
+    .click();
   await form
     .getByLabel("Minimum new volunteer spots", { exact: true })
     .fill("1");
   await form.getByLabel("Maximum new volunteers", { exact: true }).fill("2");
-  await form.getByLabel("Includes orientation", { exact: true }).check();
   await expect(
     form.getByLabel("Volunteer spots", { exact: true }),
   ).toHaveAttribute("min", "4");
@@ -162,7 +171,10 @@ test("meeting and volunteer-limit defaults are submitted without replacing draft
     await expect(editMap).toHaveValue(url);
     await editMeeting.fill("");
     await editMap.fill("");
-    await edit.getByLabel("Includes orientation", { exact: true }).check();
+    await edit
+      .getByRole("group", { name: "Event type" })
+      .getByText("Orientation + Patrol", { exact: true })
+      .click();
     await expect(editMeeting).toHaveValue("");
     await expect(editMap).toHaveValue("");
     await edit
