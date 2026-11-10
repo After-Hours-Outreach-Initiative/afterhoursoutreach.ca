@@ -1,0 +1,4 @@
+- Keep documentation minimal. Include only what the reader needs.
+- Omit filler, repetition, obvious statements, and unnecessary implementation details.
+- Expand explanations or add sections only when explicitly asked.
+- Preserve user-written wording unless explicitly asked to rewrite it.

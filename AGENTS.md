@@ -59,6 +59,8 @@ Use icon components for arrows in UI, never Unicode or text arrow glyphs.
 
 ## Documentation
 
+For any work under docs/, read and follow docs/AGENTS.md.
+
 Full documentation: https://docs.astro.build
 
 Consult these guides before working on related tasks:
