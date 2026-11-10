@@ -26,37 +26,245 @@ export function auditCursor(value: string | null): AuditCursor | undefined {
   }
 }
 
-export function auditLogUrl(cursor?: AuditCursor) {
-  return cursor
-    ? `/audit-log?before=${encodeURIComponent(JSON.stringify(cursor))}`
-    : "/audit-log";
+export interface AuditFilters {
+  /** User id of the person who made the change. */
+  user?: string;
+  /** A `kind:action` key from {@link auditActions}. */
+  action?: string;
 }
 
-const actionLabels: Record<string, string> = {
-  profile_viewed: "Viewed profile",
-  profile_updated: "Updated profile",
-  approval_changed: "Changed approval",
-  application_rejected: "Rejected application",
-  role_changed: "Changed account role",
-  active_changed: "Changed account activity",
-  orientation_completed: "Recorded orientation completion",
-  signup_joined: "Registered for event",
-  signup_cancelled: "Unregistered from event",
-  signup_manually_added: "Added event attendee",
-  signup_moved: "Moved event attendee",
-  signup_removed: "Removed event attendee",
-  series_occurrence_created: "Created recurring event",
-  updated_future: "Updated future patrols",
-  stopped: "Stopped patrol series",
-};
+export function auditFilters(params: URLSearchParams): AuditFilters {
+  const user = params.get("user");
+  const action = params.get("action");
+  return {
+    user: user && user.length <= 300 ? user : undefined,
+    action: action && auditActionsByKey.has(action) ? action : undefined,
+  };
+}
 
-export function auditActionLabel(kind: AuditKind, action: string) {
-  const subject = kind === "series" ? "patrol series" : "event";
-  if (action === "created") return `Created ${subject}`;
-  if (action === "updated") return `Updated ${subject}`;
-  if (action === "cancelled") return `Cancelled ${subject}`;
-  if (action === "deleted") return `Removed ${subject}`;
-  return actionLabels[action] ?? humanize(action);
+export function auditLogUrl(filters: AuditFilters = {}, cursor?: AuditCursor) {
+  const params = new URLSearchParams();
+  if (filters.user) params.set("user", filters.user);
+  if (filters.action) params.set("action", filters.action);
+  if (cursor) params.set("before", JSON.stringify(cursor));
+  const query = params.toString();
+  return `/audit-log${query ? `?${query}` : ""}`;
+}
+
+export type AuditTone = "create" | "update" | "remove" | "view";
+
+export interface AuditAction {
+  kind: AuditKind;
+  action: string;
+  label: string;
+  tone: AuditTone;
+  /** Sentence text around the subject, following the actor's name. */
+  sentence: [before: string, after: string];
+  /** Wording when people changed their own account. */
+  selfSentence?: string;
+}
+
+const entry = (
+  kind: AuditKind,
+  action: string,
+  label: string,
+  tone: AuditTone,
+  sentence: string | [string, string],
+  selfSentence?: string,
+): AuditAction => ({
+  kind,
+  action,
+  label,
+  tone,
+  sentence: typeof sentence === "string" ? [sentence, ""] : sentence,
+  selfSentence,
+});
+
+/** Every action the audit tables record, in the order the filter lists them. */
+export const auditActions: AuditAction[] = [
+  entry(
+    "person",
+    "profile_viewed",
+    "Viewed profile",
+    "view",
+    "viewed the profile of",
+  ),
+  entry(
+    "person",
+    "profile_updated",
+    "Updated profile",
+    "update",
+    "updated the profile of",
+    "updated their profile",
+  ),
+  entry(
+    "person",
+    "approval_changed",
+    "Changed approval",
+    "update",
+    "changed approval for",
+  ),
+  entry(
+    "person",
+    "application_rejected",
+    "Rejected application",
+    "remove",
+    "rejected the application from",
+  ),
+  entry(
+    "person",
+    "role_changed",
+    "Changed account role",
+    "update",
+    "changed the account role of",
+    "changed their account role",
+  ),
+  entry(
+    "person",
+    "active_changed",
+    "Changed account activity",
+    "update",
+    "changed account activity for",
+  ),
+  entry(
+    "person",
+    "orientation_completed",
+    "Recorded orientation completion",
+    "create",
+    "recorded orientation completion for",
+  ),
+  entry("event", "created", "Created event", "create", "created"),
+  entry(
+    "event",
+    "series_occurrence_created",
+    "Created recurring event",
+    "create",
+    ["scheduled", "from its patrol series"],
+  ),
+  entry("event", "updated", "Updated event", "update", "updated"),
+  entry(
+    "event",
+    "series_updated",
+    "Updated event from patrol series",
+    "update",
+    ["updated", "from its patrol series"],
+  ),
+  entry("event", "cancelled", "Cancelled event", "remove", "cancelled"),
+  entry("event", "deleted", "Removed event", "remove", "removed"),
+  entry(
+    "event",
+    "signup_joined",
+    "Registered for event",
+    "create",
+    "registered for",
+  ),
+  entry(
+    "event",
+    "signup_cancelled",
+    "Unregistered from event",
+    "remove",
+    "unregistered from",
+  ),
+  entry(
+    "event",
+    "signup_manually_added",
+    "Added event attendee",
+    "create",
+    "added attendees to",
+  ),
+  entry(
+    "event",
+    "signup_moved",
+    "Moved event attendee",
+    "update",
+    "moved an attendee from",
+  ),
+  entry(
+    "event",
+    "signup_removed",
+    "Removed event attendee",
+    "remove",
+    "removed an attendee from",
+  ),
+  entry("series", "created", "Created patrol series", "create", "created"),
+  entry("series", "updated", "Updated patrol series", "update", "updated"),
+  entry(
+    "series",
+    "updated_future",
+    "Updated future patrols",
+    "update",
+    "updated future patrols in",
+  ),
+  entry("series", "stopped", "Stopped patrol series", "remove", "stopped"),
+  entry("series", "deleted", "Removed patrol series", "remove", "removed"),
+];
+
+export const auditActionKey = (kind: AuditKind, action: string) =>
+  `${kind}:${action}`;
+
+const auditActionsByKey = new Map(
+  auditActions.map((item) => [auditActionKey(item.kind, item.action), item]),
+);
+
+export function auditAction(kind: AuditKind, action: string): AuditAction {
+  return (
+    auditActionsByKey.get(auditActionKey(kind, action)) ??
+    entry(kind, action, humanize(action), "update", [
+      `recorded ${humanize(action).toLowerCase()} for`,
+      "",
+    ])
+  );
+}
+
+export const auditActionLabel = (kind: AuditKind, action: string) =>
+  auditAction(kind, action).label;
+
+const vancouver = (options: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Vancouver",
+    ...options,
+  });
+
+/** Days since the epoch for the Vancouver calendar date of an instant. */
+function vancouverDay(instant: number) {
+  const parts = Object.fromEntries(
+    vancouver({ year: "numeric", month: "numeric", day: "numeric" })
+      .formatToParts(new Date(instant))
+      .map(({ type, value }) => [type, Number(value)]),
+  );
+  return Date.UTC(parts.year, parts.month - 1, parts.day) / 86_400_000;
+}
+
+/** Vancouver time relative to today, such as "Yesterday at 2:46 PM". */
+export function formatAuditTime(instant: number, now = Date.now()) {
+  const date = new Date(instant);
+  const days = vancouverDay(now) - vancouverDay(instant);
+  const time = vancouver({
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+  if (days === 0) return `Today at ${time}`;
+  if (days === 1) return `Yesterday at ${time}`;
+  if (days > 1 && days < 7)
+    return `Last ${vancouver({ weekday: "long" }).format(date)} at ${time}`;
+  const sameYear =
+    vancouver({ year: "numeric" }).format(date) ===
+    vancouver({ year: "numeric" }).format(new Date(now));
+  return `${vancouver({
+    month: "short",
+    day: "numeric",
+    year: sameYear ? undefined : "numeric",
+  }).format(date)} at ${time}`;
+}
+
+/** Applicants open in application review; approved volunteers in their profile. */
+export function auditProfileUrl(
+  id: string,
+  applicationApproved: boolean,
+  returnTo: string,
+) {
+  return `/${applicationApproved ? "volunteers" : "applications"}/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(returnTo)}`;
 }
 
 const fieldLabels: Record<string, string> = {

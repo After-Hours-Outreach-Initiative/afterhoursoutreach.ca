@@ -86,13 +86,13 @@ const returnUrl = volunteerListReturnUrl(
 >
   <a class="volunteer-back-link" href={returnUrl}>
     <ArrowRightIcon class="size-[1.25em] shrink-0 rotate-180" />
-    <span
-      >{
-        returnUrl.startsWith("/applications")
-          ? "Back to applications"
-          : "Back to volunteers"
-      }</span
-    >
+    <span>
+      {returnUrl.startsWith("/applications")
+        ? "Back to applications"
+        : returnUrl.startsWith("/audit-log")
+          ? "Back to audit log"
+          : "Back to volunteers"}
+    </span>
   </a>
   <section class="volunteer-panel">
     <VolunteerProfileView

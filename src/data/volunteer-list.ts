@@ -1,4 +1,5 @@
 import type { AttendeeCategory } from "./event-roster";
+import { auditCursor, auditFilters, auditLogUrl } from "./audit-log";
 
 export type VolunteerApprovalFilter = "all" | "awaiting";
 // Preserve the existing review-queue URL while sharing the table's exact labels.
@@ -222,6 +223,10 @@ export function directoryListUrl(
 
 /** Only return to organizer lists, never a supplied external destination. */
 export function volunteerListReturnUrl(value: string | null) {
+  if (value && /^\/audit-log(?:\?|$)/.test(value)) {
+    const params = new URLSearchParams(value.split("?")[1]);
+    return auditLogUrl(auditFilters(params), auditCursor(params.get("before")));
+  }
   if (!value || !/^\/(?:applications|volunteers)(?:\?|$)/.test(value))
     return "/volunteers";
   const params = new URLSearchParams(value.split("?")[1]);

@@ -1,4 +1,8 @@
-import type { AuditCursor, AuditKind } from "../../data/audit-log";
+import type {
+  AuditCursor,
+  AuditFilters,
+  AuditKind,
+} from "../../data/audit-log";
 import { auditFieldLabels } from "../../data/audit-log";
 import {
   requireOrganizer,
@@ -13,9 +17,13 @@ export interface AuditEntry {
   kind: AuditKind;
   createdAt: number;
   action: string;
+  actorId: string;
   actorName: string;
+  actorApproved: boolean;
   subjectId: string;
   subjectName: string;
+  /** Application approval of a person subject; null for events and series. */
+  subjectApproved: boolean | null;
   startsAt: number | null;
   firstDate: string | null;
   localTime: string | null;
@@ -36,7 +44,9 @@ export async function listAuditLog(
   db: Env["DB"],
   actor: Actor,
   before?: AuditCursor,
+  filters: AuditFilters = {},
 ): Promise<{ entries: AuditEntry[]; next?: AuditCursor }> {
+  const [filterKind, filterAction] = filters.action?.split(":") ?? [];
   requireOrganizer(actor);
   const { results } = await db
     .prepare(
@@ -45,27 +55,33 @@ export async function listAuditLog(
       SELECT a.id, 'person' AS kind, a.created_at AS createdAt, a.action,
         a.actor_id AS actorId, a.subject_id AS subjectId,
         ${displayName("subject", "sp")} AS subjectName,
+        coalesce(sv.registration_approved, 0) AS subjectApproved,
         NULL AS startsAt, NULL AS firstDate, NULL AS localTime, NULL AS intervalWeeks,
         a.changed_fields AS changedFieldsJson
       FROM audit_log a JOIN user subject ON subject.id = a.subject_id
       LEFT JOIN profile sp ON sp.user_id = subject.id
+      LEFT JOIN volunteer_status sv ON sv.user_id = subject.id
       UNION ALL
       SELECT a.id, 'event', a.created_at, a.action, a.actor_id, a.event_id,
         CASE WHEN coalesce(e.includes_orientation, e.type = 'orientation')
           THEN 'Patrol with orientation' ELSE 'Patrol' END
           || CASE WHEN trim(e.meeting_point) <> '' THEN ' · ' || e.meeting_point ELSE '' END,
-        e.starts_at, NULL, NULL, NULL, a.changed_fields
+        NULL, e.starts_at, NULL, NULL, NULL, a.changed_fields
       FROM event_audit a JOIN event e ON e.id = a.event_id
       UNION ALL
       SELECT a.id, 'series', a.created_at, a.action, a.actor_id, a.series_id,
         'Patrol series' || CASE WHEN trim(s.meeting_point) <> '' THEN ' · ' || s.meeting_point ELSE '' END,
-        NULL, s.first_date, s.local_time, s.interval_weeks, a.changed_fields
+        NULL, NULL, s.first_date, s.local_time, s.interval_weeks, a.changed_fields
       FROM patrol_series_audit a JOIN patrol_series s ON s.id = a.series_id
     )
-    SELECT h.*, ${displayName("actor", "ap")} AS actorName
+    SELECT h.*, ${displayName("actor", "ap")} AS actorName,
+      coalesce(av.registration_approved, 0) AS actorApproved
     FROM history h JOIN user actor ON actor.id = h.actorId
     LEFT JOIN profile ap ON ap.user_id = actor.id
+    LEFT JOIN volunteer_status av ON av.user_id = actor.id
     WHERE ${writePermission(true)}
+      ${filters.user ? "AND h.actorId = ?" : ""}
+      ${filterKind ? "AND h.kind = ? AND h.action = ?" : ""}
       ${before ? "AND (h.createdAt, h.kind, h.id) < (?, ?, ?)" : ""}
     ORDER BY h.createdAt DESC, h.kind DESC, h.id DESC
     LIMIT 51
@@ -73,18 +89,27 @@ export async function listAuditLog(
     )
     .bind(
       ...permissionValues(actor),
+      ...(filters.user ? [filters.user] : []),
+      ...(filterKind ? [filterKind, filterAction] : []),
       ...(before ? [before.createdAt, before.kind, before.id] : []),
     )
     .all<
-      Omit<AuditEntry, "changedFields"> & {
-        actorId: string;
+      Omit<
+        AuditEntry,
+        "changedFields" | "actorApproved" | "subjectApproved"
+      > & {
+        actorApproved: number;
+        subjectApproved: number | null;
         changedFieldsJson: string | null;
       }
     >();
   const entries = results
     .slice(0, 50)
-    .map(({ actorId: _actorId, changedFieldsJson, ...entry }) => ({
+    .map(({ changedFieldsJson, actorApproved, subjectApproved, ...entry }) => ({
       ...entry,
+      actorApproved: Boolean(actorApproved),
+      subjectApproved:
+        subjectApproved === null ? null : Boolean(subjectApproved),
       changedFields: auditFieldLabels(changedFieldsJson),
     }));
   const last = entries.at(-1);
@@ -95,4 +120,30 @@ export async function listAuditLog(
         ? { createdAt: last.createdAt, kind: last.kind, id: last.id }
         : undefined,
   };
+}
+
+/** People who appear as the actor of at least one audit entry, by name. */
+export async function listAuditUsers(
+  db: Env["DB"],
+  actor: Actor,
+): Promise<{ id: string; name: string }[]> {
+  requireOrganizer(actor);
+  const { results } = await db
+    .prepare(
+      `
+    WITH actors AS (
+      SELECT actor_id AS id FROM audit_log
+      UNION SELECT actor_id FROM event_audit
+      UNION SELECT actor_id FROM patrol_series_audit
+    )
+    SELECT actor.id, ${displayName("actor", "ap")} AS name
+    FROM actors JOIN user actor ON actor.id = actors.id
+    LEFT JOIN profile ap ON ap.user_id = actor.id
+    WHERE ${writePermission(true)}
+    ORDER BY name COLLATE NOCASE, actor.id
+  `,
+    )
+    .bind(...permissionValues(actor))
+    .all<{ id: string; name: string }>();
+  return results;
 }

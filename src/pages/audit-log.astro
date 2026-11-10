@@ -1,17 +1,39 @@
 ---
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import AccountIcon from "@/components/icons/AccountIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import CalendarIcon from "@/components/icons/CalendarIcon.astro";
+import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+import MinusIcon from "@/components/icons/MinusIcon.astro";
+import PlusIcon from "@/components/icons/PlusIcon.astro";
+import RecurringIcon from "@/components/icons/RecurringIcon.astro";
 import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/db/access";
-import { listAuditLog } from "@/server/db/audit-log";
+import { listAuditLog, listAuditUsers } from "@/server/db/audit-log";
 import { forwardCookies } from "@/server/auth";
 import { RequestError } from "@/server/http";
-import { auditActionLabel, auditCursor, auditLogUrl } from "@/data/audit-log";
-import { formatEventDate, formatTimeInput } from "@/data/event-time";
+import {
+  auditAction,
+  auditActionKey,
+  auditActions,
+  auditCursor,
+  auditFilters,
+  auditLogUrl,
+  auditProfileUrl,
+  formatAuditTime,
+} from "@/data/audit-log";
+import {
+  formatEventDate,
+  formatEventDay,
+  formatTimeInput,
+} from "@/data/event-time";
 
 export const prerender = false;
 const before = auditCursor(Astro.url.searchParams.get("before"));
+const filters = auditFilters(Astro.url.searchParams);
+const pageUrl = auditLogUrl(filters, before);
 let history: Awaited<ReturnType<typeof listAuditLog>> = { entries: [] };
+let users: Awaited<ReturnType<typeof listAuditUsers>> = [];
 let lock = "";
 let accountName = "";
 let accountGreeting = "";
@@ -24,7 +46,7 @@ try {
   forwardCookies(headers, Astro.response.headers);
   if (!actor)
     return Astro.redirect(
-      `/volunteer/sign-in?returnTo=${encodeURIComponent(auditLogUrl(before))}`,
+      `/volunteer/sign-in?returnTo=${encodeURIComponent(pageUrl)}`,
     );
   if (actor.role !== "organizer")
     return new Response("Organizer access is required.", { status: 403 });
@@ -37,12 +59,28 @@ try {
     if (error instanceof RequestError) lock = error.message;
     else throw error;
   }
-  if (!lock) history = await listAuditLog(env.DB, actor, before);
+  if (!lock)
+    [history, users] = await Promise.all([
+      listAuditLog(env.DB, actor, before, filters),
+      listAuditUsers(env.DB, actor),
+    ]);
 } catch {
   return new Response("Audit history is temporarily unavailable.", {
     status: 503,
   });
 }
+const now = Date.now();
+const filtered = Boolean(filters.user || filters.action);
+const kindIcons = {
+  person: AccountIcon,
+  event: CalendarIcon,
+  series: RecurringIcon,
+};
+const kindLabels = {
+  person: "Account",
+  event: "Event",
+  series: "Patrol series",
+};
 ---
 
 <AccountLayout
@@ -54,71 +92,213 @@ try {
   greetingName={accountGreeting}
   email={accountEmail}
 >
-  <h1 slot="heading" class="text-2xl font-bold">
-    Audit log
-  </h1>
+  <div slot="heading" class="audit-header">
+    <h1 class="text-2xl font-bold">Audit log</h1>
+    {!lock && (
+      <form
+        class="audit-filters"
+        method="get"
+        action="/audit-log"
+        data-audit-filters
+      >
+        <label>
+          <span>Filter by user</span>
+          <span class="audit-select">
+            <select name="user">
+              <option value="">All users</option>
+              {users.map((user) => (
+                <option value={user.id} selected={user.id === filters.user}>
+                  {user.name || "Unnamed account"}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon class="audit-select-icon" />
+          </span>
+        </label>
+        <label>
+          <span>Filter by action</span>
+          <span class="audit-select">
+            <select name="action">
+              <option value="">All actions</option>
+              {auditActions.map((item) => {
+                const key = auditActionKey(item.kind, item.action);
+                return (
+                  <option value={key} selected={key === filters.action}>
+                    {item.label}
+                  </option>
+                );
+              })}
+            </select>
+            <ChevronDownIcon class="audit-select-icon" />
+          </span>
+        </label>
+        <noscript>
+          <button class="btn btn-outline" type="submit">
+            Apply
+          </button>
+        </noscript>
+      </form>
+    )}
+  </div>
   {lock ? (
     <p class="volunteer-notice">
       {lock} <a href="/volunteer/account">Your account</a>
     </p>
   ) : (
     <section class="audit-history" aria-label="Audit history">
-      <p class="audit-description">
-        Volunteer, event, and patrol series activity, newest first. Times are
-        shown in Vancouver time.
-      </p>
       {history.entries.length ? (
         <ol class="audit-entries">
-          {history.entries.map((entry) => (
-            <li class="audit-entry">
-              <time datetime={new Date(entry.createdAt).toISOString()}>
-                {formatEventDate(entry.createdAt)}
-              </time>
-              <div>
-                <h2>{auditActionLabel(entry.kind, entry.action)}</h2>
-                <p class="audit-subject">
-                  {entry.subjectName}
-                  {entry.startsAt !== null && (
-                    <> · {formatEventDate(entry.startsAt)}</>
+          {history.entries.map((entry) => {
+            const info = auditAction(entry.kind, entry.action);
+            const Icon = kindIcons[entry.kind];
+            const self =
+              entry.kind === "person" &&
+              entry.actorId === entry.subjectId &&
+              info.selfSentence;
+            const series =
+              entry.kind === "series" && entry.localTime && entry.firstDate
+                ? `Every ${entry.intervalWeeks === 1 ? "week" : `${entry.intervalWeeks} weeks`} at ${formatTimeInput(entry.localTime)} from ${entry.firstDate}`
+                : "";
+            const expandable =
+              entry.changedFields.length > 0 ||
+              entry.startsAt !== null ||
+              Boolean(series);
+            const detailsId = `audit-details-${entry.kind}-${entry.id}`;
+            const actorUrl = auditProfileUrl(
+              entry.actorId,
+              entry.actorApproved,
+              pageUrl,
+            );
+            return (
+              <li
+                class="audit-entry"
+                data-audit-entry={expandable ? "" : undefined}
+              >
+                <div class="audit-row">
+                  <span
+                    class="audit-kind"
+                    data-tone={info.tone}
+                    role="img"
+                    aria-label={`${kindLabels[entry.kind]}: ${info.label}`}
+                    title={`${kindLabels[entry.kind]}: ${info.label}`}
+                  >
+                    <Icon class="audit-kind-icon" />
+                    {info.tone !== "view" && (
+                      <span class="audit-tone">
+                        {info.tone === "create" ? (
+                          <PlusIcon class="audit-tone-icon" />
+                        ) : info.tone === "remove" ? (
+                          <MinusIcon class="audit-tone-icon" />
+                        ) : null}
+                      </span>
+                    )}
+                  </span>
+                  <span class="audit-avatar" aria-hidden="true">
+                    {(entry.actorName || "?")
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((word) => word[0])
+                      .join("")
+                      .toUpperCase()}
+                  </span>
+                  <div class="audit-text">
+                    <p class="audit-sentence">
+                      {entry.actorName ? (
+                        <a class="audit-name" href={actorUrl}>
+                          {entry.actorName}
+                        </a>
+                      ) : (
+                        <strong class="audit-name">Deleted account</strong>
+                      )}{" "}
+                      {self ? (
+                        self
+                      ) : (
+                        <>
+                          {info.sentence[0]}{" "}
+                          {entry.kind === "person" ? (
+                            <a
+                              class="audit-name"
+                              href={auditProfileUrl(
+                                entry.subjectId,
+                                Boolean(entry.subjectApproved),
+                                pageUrl,
+                              )}
+                            >
+                              {entry.subjectName}
+                            </a>
+                          ) : (
+                            <strong class="audit-name">
+                              {entry.subjectName}
+                            </strong>
+                          )}
+                          {entry.startsAt !== null && (
+                            <> on {formatEventDay(entry.startsAt)}</>
+                          )}
+                          {info.sentence[1] && <> {info.sentence[1]}</>}
+                        </>
+                      )}
+                    </p>
+                    <time
+                      datetime={new Date(entry.createdAt).toISOString()}
+                      title={`${formatEventDate(entry.createdAt)} Vancouver time`}
+                    >
+                      {formatAuditTime(entry.createdAt, now)}
+                    </time>
+                  </div>
+                  {expandable && (
+                    <button
+                      class="audit-toggle"
+                      type="button"
+                      aria-expanded="false"
+                      aria-controls={detailsId}
+                      aria-label="Show details"
+                      data-audit-toggle
+                    >
+                      <ChevronDownIcon class="audit-toggle-icon" />
+                    </button>
                   )}
-                  {entry.kind === "series" && (
-                    <>
-                      {" "}
-                      · Every{" "}
-                      {entry.intervalWeeks === 1
-                        ? "week"
-                        : `${entry.intervalWeeks} weeks`}{" "}
-                      at {formatTimeInput(entry.localTime!)} from{" "}
-                      {entry.firstDate}
-                    </>
-                  )}
-                </p>
-                <p class="audit-actor">
-                  By {entry.actorName || "Deleted account"}
-                </p>
-                {entry.changedFields.length > 0 && (
-                  <p class="audit-fields">
-                    Fields: {entry.changedFields.join(", ")}
-                  </p>
+                </div>
+                {expandable && (
+                  <div class="audit-details" id={detailsId} hidden>
+                    {entry.startsAt !== null && (
+                      <p>Starts {formatEventDate(entry.startsAt)}</p>
+                    )}
+                    {series && <p>{series}</p>}
+                    {entry.changedFields.length > 0 && (
+                      <ul class="audit-fields" aria-label="Fields">
+                        {entry.changedFields.map((field) => (
+                          <li>{field}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       ) : (
         <p class="volunteer-notice">
-          {before ? "No older audit entries." : "No audit activity yet."}
+          {before
+            ? "No older audit entries."
+            : filtered
+              ? "No audit entries match these filters."
+              : "No audit activity yet."}
         </p>
       )}
       {(before || history.next) && (
         <nav class="audit-pagination" aria-label="Audit history pages">
           {before && (
-            <a class="btn btn-outline" href="/audit-log">
+            <a class="btn btn-outline" href={auditLogUrl(filters)}>
               Newest entries
             </a>
           )}
           {history.next && (
-            <a class="btn btn-outline" href={auditLogUrl(history.next)}>
+            <a
+              class="btn btn-outline"
+              href={auditLogUrl(filters, history.next)}
+            >
               Older entries <ArrowRightIcon class="btn-icon" />
             </a>
           )}
@@ -128,34 +308,234 @@ try {
   )}
 </AccountLayout>
 
+<script>
+  document
+    .querySelector<HTMLFormElement>("[data-audit-filters]")
+    ?.addEventListener("change", (event) => {
+      const form = event.currentTarget as HTMLFormElement;
+      // Omit unset filters so the address only names the active ones.
+      const params = new URLSearchParams();
+      for (const [name, value] of new FormData(form))
+        if (value) params.set(name, String(value));
+      const query = params.toString();
+      location.assign(`${form.action}${query ? `?${query}` : ""}`);
+    });
+
+  function toggle(button: HTMLButtonElement) {
+    const expanded = button.getAttribute("aria-expanded") !== "true";
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute(
+      "aria-label",
+      expanded ? "Hide details" : "Show details",
+    );
+    const details = document.getElementById(
+      button.getAttribute("aria-controls") ?? "",
+    );
+    if (details) details.hidden = !expanded;
+  }
+
+  document
+    .querySelector(".audit-entries")
+    ?.addEventListener("click", (event) => {
+      const target = event.target as Element;
+      if (target.closest("a")) return;
+      const button = target.closest<HTMLButtonElement>("[data-audit-toggle]");
+      if (button) return toggle(button);
+      // The whole summary row opens its details, as the chevron does.
+      const row = target.closest(".audit-row");
+      const rowButton = row?.querySelector<HTMLButtonElement>(
+        "[data-audit-toggle]",
+      );
+      if (rowButton && !getSelection()?.toString()) toggle(rowButton);
+    });
+</script>
+
 <style>
-  .audit-description {
-    margin: 1rem 0 1.5rem;
-    color: #a1a1aa;
+  .audit-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    max-width: 52rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #27272a;
+  }
+  .audit-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .audit-filters label {
+    display: grid;
+    gap: 0.375rem;
+    width: 15rem;
+    max-width: 100%;
+    font-size: 0.875rem;
+  }
+  .audit-select {
+    position: relative;
+    display: block;
+  }
+  .audit-filters select {
+    appearance: none;
+    min-height: 2.5rem;
+    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+    border-color: #3f3f46;
+    background: #18181b;
+    font-size: 0.9375rem;
+    cursor: pointer;
+  }
+  .audit-select :global(.audit-select-icon) {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    width: 1.25em;
+    height: 1.25em;
+    translate: 0 -50%;
+    pointer-events: none;
   }
   .audit-entries {
-    list-style: none;
+    display: grid;
+    gap: 0.5rem;
+    max-width: 52rem;
     padding: 0;
+    list-style: none;
   }
   .audit-entry {
-    display: grid;
-    grid-template-columns: 14rem minmax(0, 1fr);
-    gap: 1rem 2rem;
-    padding: 1.5rem 0;
-    border-top: 1px solid #3f3f46;
+    border: 1px solid #27272a;
+    border-radius: 0.5rem;
+    background: #18181b;
     overflow-wrap: anywhere;
   }
-  .audit-entry time,
-  .audit-actor,
-  .audit-fields {
+  .audit-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+  }
+  [data-audit-entry] .audit-row {
+    cursor: pointer;
+  }
+  [data-audit-entry]:hover {
+    --audit-entry-bg: #1f1f23;
+    background: var(--audit-entry-bg);
+  }
+  .audit-kind {
+    position: relative;
+    display: inline-flex;
+    flex: none;
     color: #a1a1aa;
   }
-  .audit-entry h2 {
+  .audit-kind :global(.audit-kind-icon) {
+    width: 1.25em;
+    height: 1.25em;
+  }
+  .audit-tone {
+    position: absolute;
+    right: -0.25em;
+    bottom: -0.25em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.75em;
+    height: 0.75em;
+    border-radius: 999px;
+    background: #f59e0b;
+    box-shadow: 0 0 0 2px var(--audit-entry-bg, #18181b);
+    color: #18181b;
+  }
+  [data-tone="create"] .audit-tone {
+    background: #22c55e;
+  }
+  [data-tone="remove"] .audit-tone {
+    background: #ef4444;
+  }
+  .audit-tone :global(.audit-tone-icon) {
+    width: 0.75em;
+    height: 0.75em;
+    stroke-width: 4;
+  }
+  .audit-avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+    background: var(--color-blue-deep);
+    color: #c7d2fe;
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+  .audit-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .audit-sentence {
+    color: #d4d4d8;
+    line-height: 1.35;
+  }
+  .audit-name {
+    color: #fff;
     font-weight: 600;
   }
-  .audit-subject,
+  .audit-sentence a.audit-name {
+    text-decoration: none;
+  }
+  .audit-sentence a.audit-name:hover,
+  .audit-sentence a.audit-name:focus-visible {
+    text-decoration: underline;
+  }
+  .audit-text time {
+    display: block;
+    margin-top: 0.125rem;
+    color: #a1a1aa;
+    font-size: 0.8125rem;
+  }
+  .audit-toggle {
+    display: inline-flex;
+    flex: none;
+    padding: 0.375rem;
+    border-radius: 0.375rem;
+    color: #d4d4d8;
+  }
+  .audit-toggle:hover {
+    background: #27272a;
+  }
+  .audit-toggle :global(.audit-toggle-icon) {
+    width: 1.25em;
+    height: 1.25em;
+    rotate: -90deg;
+    transition: rotate 150ms ease;
+  }
+  .audit-toggle[aria-expanded="true"] :global(.audit-toggle-icon) {
+    rotate: 0deg;
+  }
+  .audit-details {
+    display: grid;
+    gap: 0.375rem;
+    margin: 0 0.75rem 0.75rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.375rem;
+    background: #101013;
+    color: #a1a1aa;
+    font-size: 0.875rem;
+  }
   .audit-fields {
-    margin-top: 0.375rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding: 0;
+    list-style: none;
+  }
+  .audit-fields li {
+    padding: 0.125rem 0.5rem;
+    border: 1px solid #3f3f46;
+    border-radius: 999px;
+    color: #d4d4d8;
   }
   .audit-pagination {
     display: flex;
@@ -164,9 +544,19 @@ try {
     margin-top: 1.5rem;
   }
   @media (max-width: 640px) {
-    .audit-entry {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0.5rem;
+    .audit-filters,
+    .audit-filters label {
+      width: 100%;
+    }
+    .audit-avatar {
+      width: 2rem;
+      height: 2rem;
+      font-size: 0.75rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .audit-toggle :global(.audit-toggle-icon) {
+      transition: none;
     }
   }
 </style>

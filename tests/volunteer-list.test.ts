@@ -271,3 +271,12 @@ test("empty messages describe search and status, never removed pagination", () =
     ),
   ).toBe("No approved volunteers yet.");
 });
+
+test("profile return links keep audit log filters and pages", () => {
+  const url =
+    "/audit-log?user=abc&action=event%3Acancelled&before=%7B%22createdAt%22%3A5%2C%22kind%22%3A%22event%22%2C%22id%22%3A%22x%22%7D";
+  expect(volunteerListReturnUrl(url)).toBe(url);
+  expect(volunteerListReturnUrl("/audit-log?action=unknown&extra=1")).toBe(
+    "/audit-log",
+  );
+});

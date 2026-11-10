@@ -44,7 +44,7 @@ import {
   loadApplicationProgress,
 } from "../src/server/db/application-progress";
 import type { Actor } from "../src/server/db/access";
-import { listAuditLog } from "../src/server/db/audit-log";
+import { listAuditLog, listAuditUsers } from "../src/server/db/audit-log";
 import {
   applicationDraftAnswersSchema,
   draftProfileValues,
@@ -324,6 +324,28 @@ test("organizer audit history combines all sources, paginates tied timestamps, a
   assert.deepEqual(first.entries[1].changedFields, [
     "What motivates you to volunteer with us?",
   ]);
+  assert.equal(first.entries[1].actorId, organizer.id);
+  assert.equal(typeof first.entries[1].subjectApproved, "boolean");
+  assert.equal(first.entries[0].subjectApproved, null);
+  const stops = await listAuditLog(env.DB, organizer, undefined, {
+    action: "series:stopped",
+  });
+  assert.deepEqual(
+    stops.entries.map(({ id }) => id),
+    ["audit-stop"],
+  );
+  assert.equal(
+    (
+      await listAuditLog(env.DB, organizer, undefined, {
+        user: volunteer.id,
+      })
+    ).entries.length,
+    0,
+  );
+  assert.deepEqual(
+    (await listAuditUsers(env.DB, organizer)).map(({ id }) => id),
+    [organizer.id],
+  );
   const second = await listAuditLog(env.DB, organizer, first.next);
   assert.equal(second.entries.length, 3);
   assert.equal(second.next, undefined);
@@ -707,7 +729,9 @@ test("organizer staged additions to past events search eligible accounts and com
   await assert.rejects(
     env.DB.prepare(
       "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES ('past-self','staged-event',?,0,0)",
-    ).bind(organizer.id).run(),
+    )
+      .bind(organizer.id)
+      .run(),
     /signup_not_eligible/,
   );
   await assert.rejects(
@@ -2232,7 +2256,10 @@ test("review queue loads every submitted entry and counts search matches indepen
   );
   assert.match(revokedEmail!.body, /awaiting organizer approval again/);
   assert.match(revokedEmail!.body, /application steps on the Volunteer page/);
-  assert.match(revokedEmail!.body, /Check your account for registration changes/);
+  assert.match(
+    revokedEmail!.body,
+    /Check your account for registration changes/,
+  );
   assert.doesNotMatch(
     revokedEmail!.body,
     /check your events|register for an available spot/,
