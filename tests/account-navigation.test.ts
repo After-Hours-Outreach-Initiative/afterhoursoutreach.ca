@@ -57,6 +57,7 @@ test("site navigation keeps Volunteer until event access is available", () => {
     "/events",
     "/applications",
     "/volunteers",
+    "/audit-log",
     "/donate",
     "/about",
   ]);

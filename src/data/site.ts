@@ -28,6 +28,7 @@ export function siteNavigation(
             ? [
                 { label: "Applications", href: "/applications" },
                 { label: "Volunteers", href: "/volunteers" },
+                { label: "Audit log", href: "/audit-log" },
               ]
             : []),
         ]

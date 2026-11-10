@@ -44,6 +44,7 @@ import {
   loadApplicationProgress,
 } from "../src/server/db/application-progress";
 import type { Actor } from "../src/server/db/access";
+import { listAuditLog } from "../src/server/db/audit-log";
 import {
   applicationDraftAnswersSchema,
   draftProfileValues,
@@ -262,6 +263,85 @@ async function manualRosterActor(
   ]);
   return actor;
 }
+
+test("organizer audit history combines all sources, paginates tied timestamps, and respects access", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("audit-volunteer", "volunteer");
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO event
+      (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at,cancelled_at)
+      VALUES ('audit-event','patrol',1000,'Point',6,?,0,0,2000)`,
+    ).bind(organizer.id),
+    env.DB.prepare(
+      `INSERT INTO patrol_series
+      (id,first_date,local_time,interval_weeks,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES ('audit-series','2026-11-01','19:00',1,'Point',6,?,0,0)`,
+    ).bind(organizer.id),
+    env.DB.prepare(
+      `UPDATE profile SET motivation='Private application answer'
+      WHERE user_id=?`,
+    ).bind(volunteer.id),
+  ]);
+  await env.DB.batch([
+    ...Array.from({ length: 51 }, (_, index) =>
+      env.DB.prepare(
+        `INSERT INTO audit_log
+      (id,actor_id,subject_id,action,changed_fields,created_at)
+      VALUES (?,?,?,'profile_updated','["motivation"]',2000)`,
+      ).bind(
+        `audit-${String(index).padStart(2, "0")}`,
+        organizer.id,
+        volunteer.id,
+      ),
+    ),
+    env.DB.prepare(
+      `INSERT INTO event_audit
+      (id,event_id,actor_id,action,changed_fields,created_at)
+      VALUES ('audit-cancel','audit-event',?,'cancelled','["cancelledAt"]',2000)`,
+    ).bind(organizer.id),
+    env.DB.prepare(
+      `INSERT INTO patrol_series_audit
+      (id,series_id,actor_id,action,changed_fields,created_at)
+      VALUES ('audit-stop','audit-series',?,'stopped','["stoppedFrom"]',2000)`,
+    ).bind(organizer.id),
+  ]);
+
+  for (const actor of [
+    volunteer,
+    { ...organizer, active: false },
+    { ...organizer, twoFactorEnabled: true, twoFactorVerified: false },
+  ])
+    await assert.rejects(listAuditLog(env.DB, actor), { status: 403 });
+
+  const first = await listAuditLog(env.DB, organizer);
+  assert.equal(first.entries.length, 50);
+  assert.ok(first.next);
+  assert.equal(first.entries[0].action, "stopped");
+  assert.equal(first.entries[0].subjectName, "Patrol series · Point");
+  assert.equal(first.entries[1].actorName, organizer.id);
+  assert.equal(first.entries[1].subjectName, volunteer.id);
+  assert.deepEqual(first.entries[1].changedFields, [
+    "What motivates you to volunteer with us?",
+  ]);
+  const second = await listAuditLog(env.DB, organizer, first.next);
+  assert.equal(second.entries.length, 3);
+  assert.equal(second.next, undefined);
+  assert.equal(second.entries.at(-1)?.action, "cancelled");
+  assert.equal(second.entries.at(-1)?.startsAt, 1000);
+  assert.equal(
+    new Set([...first.entries, ...second.entries].map(({ id }) => id)).size,
+    53,
+  );
+  assert.ok(
+    !JSON.stringify([first, second]).includes("Private application answer"),
+  );
+
+  await env.DB.prepare("DELETE FROM session WHERE id=?")
+    .bind(organizer.sessionId)
+    .run();
+  assert.deepEqual((await listAuditLog(env.DB, organizer)).entries, []);
+});
 
 test("organizers add, move and remove name-only attendees with shared rosters, limits, audits and no mail", async () => {
   const organizer = await manualRosterActor("manual-organizer", "organizer");

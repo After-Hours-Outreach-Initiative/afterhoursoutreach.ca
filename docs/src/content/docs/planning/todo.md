@@ -3,7 +3,6 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
-- make an audit log visible for organizers
 - dont want cancelled events to remain inthe events list, they can just be
   removed. the history will be visibiel inthe audit log
 - make the unregister time window configurable per event, with a 30 minute

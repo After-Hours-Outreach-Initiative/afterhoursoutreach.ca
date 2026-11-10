@@ -1,0 +1,172 @@
+---
+import AccountLayout from "@/components/volunteer/AccountLayout.astro";
+import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
+import { env } from "cloudflare:workers";
+import { accountContext, requireOrganizer } from "@/server/db/access";
+import { listAuditLog } from "@/server/db/audit-log";
+import { forwardCookies } from "@/server/auth";
+import { RequestError } from "@/server/http";
+import { auditActionLabel, auditCursor, auditLogUrl } from "@/data/audit-log";
+import { formatEventDate, formatTimeInput } from "@/data/event-time";
+
+export const prerender = false;
+const before = auditCursor(Astro.url.searchParams.get("before"));
+let history: Awaited<ReturnType<typeof listAuditLog>> = { entries: [] };
+let lock = "";
+let accountName = "";
+let accountGreeting = "";
+let accountEmail = "";
+try {
+  const { actor, headers, email, greetingName } = await accountContext(
+    env,
+    Astro.request,
+  );
+  forwardCookies(headers, Astro.response.headers);
+  if (!actor)
+    return Astro.redirect(
+      `/volunteer/sign-in?returnTo=${encodeURIComponent(auditLogUrl(before))}`,
+    );
+  if (actor.role !== "organizer")
+    return new Response("Organizer access is required.", { status: 403 });
+  accountName = actor.name;
+  accountGreeting = greetingName;
+  accountEmail = email;
+  try {
+    requireOrganizer(actor);
+  } catch (error) {
+    if (error instanceof RequestError) lock = error.message;
+    else throw error;
+  }
+  if (!lock) history = await listAuditLog(env.DB, actor, before);
+} catch {
+  return new Response("Audit history is temporarily unavailable.", {
+    status: 503,
+  });
+}
+---
+
+<AccountLayout
+  title="Audit log"
+  description="Organizer history of volunteer, event, and patrol series changes."
+  signedIn
+  organizer
+  name={accountName}
+  greetingName={accountGreeting}
+  email={accountEmail}
+>
+  <h1 slot="heading" class="text-2xl font-bold">
+    Audit log
+  </h1>
+  {lock ? (
+    <p class="volunteer-notice">
+      {lock} <a href="/volunteer/account">Your account</a>
+    </p>
+  ) : (
+    <section class="audit-history" aria-label="Audit history">
+      <p class="audit-description">
+        Volunteer, event, and patrol series activity, newest first. Times are
+        shown in Vancouver time.
+      </p>
+      {history.entries.length ? (
+        <ol class="audit-entries">
+          {history.entries.map((entry) => (
+            <li class="audit-entry">
+              <time datetime={new Date(entry.createdAt).toISOString()}>
+                {formatEventDate(entry.createdAt)}
+              </time>
+              <div>
+                <h2>{auditActionLabel(entry.kind, entry.action)}</h2>
+                <p class="audit-subject">
+                  {entry.subjectName}
+                  {entry.startsAt !== null && (
+                    <> · {formatEventDate(entry.startsAt)}</>
+                  )}
+                  {entry.kind === "series" && (
+                    <>
+                      {" "}
+                      · Every{" "}
+                      {entry.intervalWeeks === 1
+                        ? "week"
+                        : `${entry.intervalWeeks} weeks`}{" "}
+                      at {formatTimeInput(entry.localTime!)} from{" "}
+                      {entry.firstDate}
+                    </>
+                  )}
+                </p>
+                <p class="audit-actor">
+                  By {entry.actorName || "Deleted account"}
+                </p>
+                {entry.changedFields.length > 0 && (
+                  <p class="audit-fields">
+                    Fields: {entry.changedFields.join(", ")}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p class="volunteer-notice">
+          {before ? "No older audit entries." : "No audit activity yet."}
+        </p>
+      )}
+      {(before || history.next) && (
+        <nav class="audit-pagination" aria-label="Audit history pages">
+          {before && (
+            <a class="btn btn-outline" href="/audit-log">
+              Newest entries
+            </a>
+          )}
+          {history.next && (
+            <a class="btn btn-outline" href={auditLogUrl(history.next)}>
+              Older entries <ArrowRightIcon class="btn-icon" />
+            </a>
+          )}
+        </nav>
+      )}
+    </section>
+  )}
+</AccountLayout>
+
+<style>
+  .audit-description {
+    margin: 1rem 0 1.5rem;
+    color: #a1a1aa;
+  }
+  .audit-entries {
+    list-style: none;
+    padding: 0;
+  }
+  .audit-entry {
+    display: grid;
+    grid-template-columns: 14rem minmax(0, 1fr);
+    gap: 1rem 2rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid #3f3f46;
+    overflow-wrap: anywhere;
+  }
+  .audit-entry time,
+  .audit-actor,
+  .audit-fields {
+    color: #a1a1aa;
+  }
+  .audit-entry h2 {
+    font-weight: 600;
+  }
+  .audit-subject,
+  .audit-fields {
+    margin-top: 0.375rem;
+  }
+  .audit-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  @media (max-width: 640px) {
+    .audit-entry {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.5rem;
+    }
+  }
+</style>
