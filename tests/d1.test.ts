@@ -566,6 +566,30 @@ test("concurrent manual and account signups cannot take each other's reserved ca
   );
 });
 
+test("volunteers can unregister until the event's unregister window closes", async () => {
+  const organizer = await manualRosterActor("manual-organizer", "organizer");
+  const volunteer = await manualRosterActor("window-volunteer", "volunteer");
+  for (const id of ["window-open", "window-closed"]) {
+    await env.DB.prepare(
+      `INSERT INTO event (id,type,starts_at,meeting_point,spots,created_by,created_at,updated_at)
+      VALUES (?,'orientation',?,'Point',8,?,0,0)`,
+    )
+      .bind(id, Date.now() + 86_400_000, organizer.id)
+      .run();
+    await changeSignup(env.DB, volunteer, id, "join");
+  }
+  await env.DB.prepare(
+    "UPDATE event SET starts_at=? - CASE id WHEN 'window-open' THEN 600000 ELSE 2400000 END WHERE id IN ('window-open','window-closed')",
+  )
+    .bind(Date.now())
+    .run();
+  await changeSignup(env.DB, volunteer, "window-open", "cancel");
+  await assert.rejects(
+    changeSignup(env.DB, volunteer, "window-closed", "cancel"),
+    { status: 409, message: "Unregistering has closed for this event." },
+  );
+});
+
 test("organizers silently remove past account and name-only registrations without moving them or clearing orientation history", async () => {
   const organizer = await manualRosterActor("manual-organizer", "organizer");
   const volunteer = await manualRosterActor("past-volunteer", "volunteer");

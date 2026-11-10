@@ -32,6 +32,12 @@ as off until an organizer explicitly turns visibility on.
 requests. Edits use version checks to reject stale writes rather than overwrite
 another organizer's changes.
 
+Each event, recurring series, and series template stores `unregister_minutes`
+(0 to 10080, default 30). A volunteer's own cancellation succeeds only while
+`starts_at + unregister_minutes` is in the future, checked in the same `UPDATE`.
+Started events stay in the past list, where the unregister button remains until
+that time. Organizer roster removals are unaffected.
+
 Cancelled events disappear from event lists and calendars. Their details,
 registration and attendance records, and audit history are retained. Organizers
 can see cancellations in the audit log, including events with no registrations.

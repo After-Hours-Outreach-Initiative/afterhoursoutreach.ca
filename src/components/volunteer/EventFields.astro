@@ -2,6 +2,10 @@
 import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
 import { defaultEventLimits, minimumEventSpots } from "@/data/event-limits";
+import {
+  defaultUnregisterMinutes,
+  maxUnregisterMinutes,
+} from "@/data/event-unregistration";
 import FieldError from "@/components/FieldError.astro";
 import RecurringIcon from "@/components/icons/RecurringIcon.astro";
 import MinusIcon from "@/components/icons/MinusIcon.astro";
@@ -187,6 +191,29 @@ const publicVisibility = settings
     </div>
   ))
 }
+<div class="volunteer-field">
+  <label for={`${id}-unregisterMinutes`}
+    >Unregister until (minutes after start)</label
+  >
+  <input
+    id={`${id}-unregisterMinutes`}
+    name="unregisterMinutes"
+    type="number"
+    min="0"
+    max={maxUnregisterMinutes}
+    step="1"
+    required
+    value={settings?.unregisterMinutes ?? defaultUnregisterMinutes}
+    aria-describedby={`${id}-unregisterMinutes-help error-${id}-unregisterMinutes`}
+  />
+  <p class="volunteer-help" id={`${id}-unregisterMinutes-help`}>
+    Volunteers can unregister until this many minutes after the event starts.
+  </p>
+  <FieldError
+    field={`${id}-unregisterMinutes`}
+    message={`Enter a whole number from 0 to ${maxUnregisterMinutes}.`}
+  />
+</div>
 <div class="volunteer-field">
   <label for={`${id}-meetingPoint`}>Meeting point</label>
   <input

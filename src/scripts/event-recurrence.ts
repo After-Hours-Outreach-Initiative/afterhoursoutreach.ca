@@ -1,4 +1,5 @@
 import { defaultEventLimits, minimumEventSpots } from "../data/event-limits";
+import { defaultUnregisterMinutes } from "../data/event-unregistration";
 
 const str = (values: FormData, key: string) => String(values.get(key) ?? "");
 
@@ -16,6 +17,9 @@ export function eventFields(values: FormData) {
     ),
     maxNewVolunteers: Number(
       values.get("maxNewVolunteers") ?? defaultEventLimits.maxNewVolunteers,
+    ),
+    unregisterMinutes: Number(
+      values.get("unregisterMinutes") ?? defaultUnregisterMinutes,
     ),
     includesOrientation: values.has("includesOrientation"),
     open: str(values, "publicVisibility") === "true",

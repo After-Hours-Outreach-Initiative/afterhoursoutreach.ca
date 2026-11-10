@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defaultEventLimits, type EventLimits } from "../../data/event-limits";
+import { defaultEventLimits } from "../../data/event-limits";
 
 export const eventLimitFields = {
   minMedicSpots: z
@@ -32,10 +32,3 @@ export const eventLimitInputFields = {
   maxNewVolunteers: eventLimitFields.maxNewVolunteers.unwrap().optional(),
 };
 
-/** Older clients may omit the new fields; edits must retain saved limits. */
-export function withEventLimits(input: unknown, saved?: EventLimits) {
-  if (!saved || !input || typeof input !== "object" || Array.isArray(input))
-    return input;
-  const { minMedicSpots, minNewVolunteerSpots, maxNewVolunteers } = saved;
-  return { minMedicSpots, minNewVolunteerSpots, maxNewVolunteers, ...input };
-}

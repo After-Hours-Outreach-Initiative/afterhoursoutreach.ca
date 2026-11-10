@@ -439,6 +439,7 @@ test("effective day shifts plan the true earliest starts across template boundar
       minMedicSpots: 2,
       minNewVolunteerSpots: 2,
       maxNewVolunteers: 4,
+      unregisterMinutes: 30,
     }));
     const candidates = Array.from({ length: 63 }, (_, index) => {
       const date = addCalendarDays(firstDate, index * 7);

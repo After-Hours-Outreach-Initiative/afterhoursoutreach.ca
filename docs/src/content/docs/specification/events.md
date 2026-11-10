@@ -30,7 +30,9 @@ Orientations use the same cards, edit view, and volunteer list as patrols.
 
 A list of event cards for patrols and orientations, each consists of the date,
 the start time, the meeting location, and how many spots are left. Event signups
-should be closed when the start time passes.
+should be closed when the start time passes. Volunteers can still unregister
+until each event's unregister time, set in minutes after the start (30 by
+default).
 
 Event cards update when events or application approval change. Updates preserve
 filters, focus, and unsaved editor drafts.

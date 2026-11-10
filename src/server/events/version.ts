@@ -5,6 +5,7 @@ import type {
   PatrolSeriesRow,
   PublicRoster,
 } from "../db/events";
+import { eventUnregisterDeadline } from "../../data/event-unregistration";
 
 // Only an opaque view version is returned by polling. The normal page rendering
 // still authorizes and supplies event details, signup controls and rosters.
@@ -21,6 +22,9 @@ export async function eventViewVersion(
     series: actor?.role === "organizer" && canViewEvents(actor) ? series : [],
     // Crossing the start time changes the controls even if no database row changes.
     started: events.map((event) => event.startsAt <= now),
+    unregisterClosed: events.map(
+      (event) => eventUnregisterDeadline(event) <= now,
+    ),
     // Counts alone miss attendee swaps, renamed volunteers and marked attendance.
     // Privileged data remains organizer-only. The public projection/digest is
     // scoped to the SAME visible event IDs as the normal volunteer page.

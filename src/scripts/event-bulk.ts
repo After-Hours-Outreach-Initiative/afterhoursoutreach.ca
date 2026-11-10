@@ -32,6 +32,7 @@ export function bulkEventAction(values: FormData) {
     "minMedicSpots",
     "minNewVolunteerSpots",
     "maxNewVolunteers",
+    "unregisterMinutes",
     "includesOrientation",
     "open",
     "hidden",
@@ -47,6 +48,7 @@ export function bulkEventAction(values: FormData) {
       "minMedicSpots",
       "minNewVolunteerSpots",
       "maxNewVolunteers",
+      "unregisterMinutes",
     ].includes(name)
       ? Number(value)
       : ["includesOrientation", "open", "hidden"].includes(name)
@@ -143,6 +145,7 @@ export function initBulkEvents(root: HTMLElement) {
         "minMedicSpots",
         "minNewVolunteerSpots",
         "maxNewVolunteers",
+        "unregisterMinutes",
       ])
         form.querySelector<HTMLInputElement>(`[name="${name}"]`)!.disabled =
           true;

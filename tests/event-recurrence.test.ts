@@ -56,6 +56,7 @@ const values = (extra: Record<string, string> = {}) => {
     minMedicSpots: "2",
     minNewVolunteerSpots: "2",
     maxNewVolunteers: "4",
+    unregisterMinutes: "45",
     publicVisibility: "true",
     ...extra,
   }))
@@ -81,6 +82,7 @@ test("creation keeps Vancouver wall time and inclusive end date with optional or
       minMedicSpots: 2,
       minNewVolunteerSpots: 2,
       maxNewVolunteers: 4,
+      unregisterMinutes: 45,
       includesOrientation: false,
       open: true,
       hidden: false,
@@ -171,6 +173,7 @@ test("series settings send the create-event fields without a recurring checkbox"
       minMedicSpots: 2,
       minNewVolunteerSpots: 2,
       maxNewVolunteers: 4,
+      unregisterMinutes: 45,
       open: false,
       hidden: true,
       includesOrientation: true,

@@ -2,6 +2,10 @@
 import DialogHeader from "@/components/DialogHeader.astro";
 import FieldError from "@/components/FieldError.astro";
 import { defaultEventLimits } from "@/data/event-limits";
+import {
+  defaultUnregisterMinutes,
+  maxUnregisterMinutes,
+} from "@/data/event-unregistration";
 ---
 
 <div
@@ -126,14 +130,31 @@ import { defaultEventLimits } from "@/data/event-limits";
         </div>
         {
           [
-            ["minMedicSpots", "Minimum medic spots"],
-            ["minNewVolunteerSpots", "Minimum new volunteer spots"],
-            ["maxNewVolunteers", "Maximum new volunteers"],
-          ].map(([name, label]) => (
+            ...(
+              [
+                ["minMedicSpots", "Minimum medic spots"],
+                ["minNewVolunteerSpots", "Minimum new volunteer spots"],
+                ["maxNewVolunteers", "Maximum new volunteers"],
+              ] as const
+            ).map(([name, label]) => ({
+              name,
+              label,
+              change: `Change ${label.toLowerCase()}`,
+              max: 100,
+              value: defaultEventLimits[name],
+            })),
+            {
+              name: "unregisterMinutes",
+              label: "Unregister until (minutes after start)",
+              change: "Change unregister time",
+              max: maxUnregisterMinutes,
+              value: defaultUnregisterMinutes,
+            },
+          ].map(({ name, label, change, max, value }) => (
             <div class="volunteer-field">
               <label class="volunteer-check">
                 <input type="checkbox" data-bulk-enable={name} />
-                <span>Change {label.toLowerCase()}</span>
+                <span>{change}</span>
               </label>
               <label class="sr-only" for={`bulk-${name}`}>
                 {label}
@@ -143,18 +164,16 @@ import { defaultEventLimits } from "@/data/event-limits";
                 name={name}
                 type="number"
                 min="0"
-                max="100"
+                max={max}
                 step="1"
                 required
                 disabled
-                value={
-                  defaultEventLimits[name as keyof typeof defaultEventLimits]
-                }
+                value={value}
                 aria-describedby={`error-bulk-${name}`}
               />
               <FieldError
                 field={`bulk-${name}`}
-                message="Enter a whole number from 0 to 100."
+                message={`Enter a whole number from 0 to ${max}.`}
               />
             </div>
           ))

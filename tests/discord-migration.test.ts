@@ -47,6 +47,7 @@ test("Discord migration preserves existing volunteers and drafts without inventi
                 min_medic_spots: 2,
                 min_new_volunteer_spots: 2,
                 max_new_volunteers: 4,
+                unregister_minutes: 30,
               }
             : {}),
           ...(table === "signup"

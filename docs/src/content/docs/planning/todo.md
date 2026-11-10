@@ -3,9 +3,6 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
-- make the unregister time window configurable per event, with a 30 minute
-  after start time default. so people can still unregister after an event has
-  started
 - add a team lead role
 - add properly filter and sort controls
   - sort by role and can drag around the roles to set the sort order

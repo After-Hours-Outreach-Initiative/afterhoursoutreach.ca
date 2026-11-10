@@ -194,6 +194,8 @@ END;
 CREATE TRIGGER event_orientation_capacity_insert
 BEFORE INSERT ON event
 BEGIN
+  SELECT RAISE(ABORT, 'event_invalid_unregister_minutes') WHERE
+    typeof(NEW.unregister_minutes) != 'integer' OR NEW.unregister_minutes NOT BETWEEN 0 AND 10080;
   SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
     typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
     OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
@@ -203,8 +205,10 @@ BEGIN
 END;
 --> statement-breakpoint
 CREATE TRIGGER event_orientation_capacity_update
-BEFORE UPDATE OF type, includes_orientation, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers, starts_at, meeting_point, meeting_point_url, open, hidden ON event
+BEFORE UPDATE OF type, includes_orientation, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers, unregister_minutes, starts_at, meeting_point, meeting_point_url, open, hidden ON event
 BEGIN
+  SELECT RAISE(ABORT, 'event_invalid_unregister_minutes') WHERE
+    typeof(NEW.unregister_minutes) != 'integer' OR NEW.unregister_minutes NOT BETWEEN 0 AND 10080;
   SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
     typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
     OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
@@ -216,6 +220,8 @@ END;
 CREATE TRIGGER patrol_series_orientation_capacity_insert
 BEFORE INSERT ON patrol_series
 BEGIN
+  SELECT RAISE(ABORT, 'event_invalid_unregister_minutes') WHERE
+    typeof(NEW.unregister_minutes) != 'integer' OR NEW.unregister_minutes NOT BETWEEN 0 AND 10080;
   SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
     typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
     OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
@@ -225,8 +231,10 @@ BEGIN
 END;
 --> statement-breakpoint
 CREATE TRIGGER patrol_series_orientation_capacity_update
-BEFORE UPDATE OF includes_orientation, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers, meeting_point, meeting_point_url, open, hidden, end_date ON patrol_series
+BEFORE UPDATE OF includes_orientation, spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers, unregister_minutes, meeting_point, meeting_point_url, open, hidden, end_date ON patrol_series
 BEGIN
+  SELECT RAISE(ABORT, 'event_invalid_unregister_minutes') WHERE
+    typeof(NEW.unregister_minutes) != 'integer' OR NEW.unregister_minutes NOT BETWEEN 0 AND 10080;
   SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
     typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
     OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
@@ -238,6 +246,8 @@ END;
 CREATE TRIGGER patrol_template_orientation_capacity_insert
 BEFORE INSERT ON patrol_series_template
 BEGIN
+  SELECT RAISE(ABORT, 'event_invalid_unregister_minutes') WHERE
+    typeof(NEW.unregister_minutes) != 'integer' OR NEW.unregister_minutes NOT BETWEEN 0 AND 10080;
   SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
     typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
     OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100
@@ -249,6 +259,8 @@ END;
 CREATE TRIGGER patrol_template_orientation_capacity_update
 BEFORE UPDATE ON patrol_series_template
 BEGIN
+  SELECT RAISE(ABORT, 'event_invalid_unregister_minutes') WHERE
+    typeof(NEW.unregister_minutes) != 'integer' OR NEW.unregister_minutes NOT BETWEEN 0 AND 10080;
   SELECT RAISE(ABORT, 'event_invalid_limits') WHERE
     typeof(NEW.min_medic_spots) != 'integer' OR NEW.min_medic_spots NOT BETWEEN 0 AND 100
     OR typeof(NEW.min_new_volunteer_spots) != 'integer' OR NEW.min_new_volunteer_spots NOT BETWEEN 0 AND 100

@@ -164,6 +164,7 @@ export function createEventCardFixture(
     minMedicSpots: 2,
     minNewVolunteerSpots: 2,
     maxNewVolunteers: 4,
+    unregisterMinutes: 30,
     open: 1,
     hidden: 0,
     cancelledAt: null,

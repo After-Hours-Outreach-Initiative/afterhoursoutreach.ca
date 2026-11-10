@@ -37,11 +37,12 @@ import {
 } from "./policy";
 import { databaseErrorMessage, databaseWriteError } from "./errors";
 import {
-  eventLimitFields,
-  eventLimitInputFields,
-  withEventLimits,
-} from "./event-limits";
+  eventSettingFields,
+  eventSettingInputFields,
+  withEventSettings,
+} from "./event-settings";
 import type { EventLimits } from "../../data/event-limits";
+import { eventUnregisterDeadline } from "../../data/event-unregistration";
 import {
   ensurePatrolOccurrences,
   recurringSignupWindowSql,
@@ -80,12 +81,12 @@ const eventFieldsSchema = z.strictObject({
       .refine((value) => new URL(value).protocol === "https:"),
   ]),
   spots: z.number().int().min(1).max(100),
-  ...eventLimitFields,
+  ...eventSettingFields,
   open: z.boolean(),
   hidden: z.boolean(),
 });
 export const eventRequestSchema = eventFieldsSchema.extend(
-  eventLimitInputFields,
+  eventSettingInputFields,
 );
 export const eventSchema = eventFieldsSchema
   .refine(
@@ -119,12 +120,13 @@ export const bulkEventSchema = z.strictObject({
       minMedicSpots: true,
       minNewVolunteerSpots: true,
       maxNewVolunteers: true,
+      unregisterMinutes: true,
       includesOrientation: true,
       open: true,
       hidden: true,
     })
     .partial()
-    .extend(eventLimitInputFields)
+    .extend(eventSettingInputFields)
     .refine((changes) =>
       Object.values(changes).some((value) => value !== undefined),
     ),
@@ -137,6 +139,7 @@ export interface EventRow extends EventLimits {
   occurrenceDate: string | null;
   inSignupWindow: number;
   startsAt: number;
+  unregisterMinutes: number;
   meetingPoint: string;
   meetingPointUrl: string | null;
   spots: number;
@@ -193,7 +196,8 @@ const eventColumns = `
   e.meeting_point AS meetingPoint, e.meeting_point_url AS meetingPointUrl,
   e.spots, e.min_medic_spots AS minMedicSpots,
   e.min_new_volunteer_spots AS minNewVolunteerSpots,
-  e.max_new_volunteers AS maxNewVolunteers, e.open, e.hidden,
+  e.max_new_volunteers AS maxNewVolunteers,
+  e.unregister_minutes AS unregisterMinutes, e.open, e.hidden,
   e.cancelled_at AS cancelledAt, e.updated_at AS updatedAt`;
 const confirmedSignupsSql = `(SELECT count(*) FROM signup
   WHERE event_id = e.id AND status = 'confirmed')`;
@@ -606,7 +610,7 @@ export async function saveEvent(
   requireOrganizer(actor);
   const old = id ? await findEvent(db, id) : null;
   const parsed = eventSchema.safeParse(
-    withEventLimits(input, old ?? undefined),
+    withEventSettings(input, old ?? undefined),
   );
   if (!parsed.success)
     throw new RequestError(
@@ -630,10 +634,10 @@ export async function saveEvent(
           .prepare(
             `INSERT INTO event (
               id, type, includes_orientation, starts_at, meeting_point, meeting_point_url,
-              spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers,
+              spots, min_medic_spots, min_new_volunteer_spots, max_new_volunteers, unregister_minutes,
               open, hidden, created_by, created_at, updated_at
             )
-            SELECT ?, 'patrol', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            SELECT ?, 'patrol', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             WHERE ${writePermission(true)}`,
           )
           .bind(
@@ -646,6 +650,7 @@ export async function saveEvent(
             data.minMedicSpots,
             data.minNewVolunteerSpots,
             data.maxNewVolunteers,
+            data.unregisterMinutes,
             Number(data.open),
             Number(data.hidden),
             actor.id,
@@ -691,6 +696,7 @@ export async function saveEvent(
                 min_medic_spots = ?,
                 min_new_volunteer_spots = ?,
                 max_new_volunteers = ?,
+                unregister_minutes = ?,
                 open = ?,
                 hidden = ?,
                 updated_at = ?
@@ -709,6 +715,7 @@ export async function saveEvent(
             data.minMedicSpots,
             data.minNewVolunteerSpots,
             data.maxNewVolunteers,
+            data.unregisterMinutes,
             Number(data.open),
             Number(data.hidden),
             Math.max(now, old.updatedAt + 1),
@@ -851,6 +858,7 @@ export async function bulkSaveEvents(
     minMedicSpots: "min_medic_spots",
     minNewVolunteerSpots: "min_new_volunteer_spots",
     maxNewVolunteers: "max_new_volunteers",
+    unregisterMinutes: "unregister_minutes",
     includesOrientation: "includes_orientation",
     open: "open",
     hidden: "hidden",
@@ -995,8 +1003,10 @@ export async function changeSignup(
   requireVolunteer(actor);
   if (action === "join") await ensurePatrolOccurrences(db);
   const event = await findEvent(db, eventId);
-  if (event.startsAt <= Date.now())
+  if (action === "join" && event.startsAt <= Date.now())
     throw new RequestError(409, "Registration closes when the event starts.");
+  if (action === "cancel" && eventUnregisterDeadline(event) <= Date.now())
+    throw new RequestError(409, "Unregistering has closed for this event.");
   const operation = crypto.randomUUID();
   const now = Date.now();
   try {
@@ -1032,7 +1042,7 @@ export async function changeSignup(
               AND EXISTS(
                 SELECT 1 FROM event e
                 WHERE e.id = signup.event_id
-                  AND e.starts_at > ${nowMsSql}
+                  AND e.starts_at + e.unregister_minutes * 60000 > ${nowMsSql}
               )
               AND ${writePermission()}`,
           )

@@ -71,6 +71,7 @@ const fieldLabels: Record<string, string> = {
   minMedicSpots: "Reserved medic places",
   minNewVolunteerSpots: "Reserved new volunteer places",
   maxNewVolunteers: "New volunteer limit",
+  unregisterMinutes: "Unregister time",
   open: "Registration open",
   hidden: "Hidden from volunteers",
   cancelledAt: "Cancellation",

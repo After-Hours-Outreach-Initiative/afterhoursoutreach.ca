@@ -8,6 +8,7 @@ import type {
 } from "@/server/db/events";
 import { eventSignupBlockReason } from "@/server/db/policy";
 import { formatEventDate } from "@/data/event-time";
+import { eventUnregisterDeadline } from "@/data/event-unregistration";
 import { matchesEventFilter } from "@/data/event-browser";
 import EventEditor from "./EventEditor.astro";
 import EventRoster from "./EventRoster.astro";
@@ -36,6 +37,10 @@ const {
   publicRoster = [],
 } = Astro.props;
 const future = event.startsAt > Date.now();
+const unregisterOpen =
+  Boolean(event.signedUp) &&
+  !event.cancelledAt &&
+  eventUnregisterDeadline(event) > Date.now();
 const registrationOpen =
   future &&
   Boolean(event.open) &&
@@ -166,7 +171,7 @@ const blocked =
     </div>
     <div class="volunteer-actions">
       {
-        !future ? null : event.signedUp ? (
+        unregisterOpen ? (
           <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="cancel" />
@@ -180,7 +185,7 @@ const blocked =
             </button>
             <p data-form-message role="status" hidden />
           </form>
-        ) : !blocked ? (
+        ) : future && !event.signedUp && !blocked ? (
           <form data-live-signup action="/api/v1/events/action" method="post">
             <input name="id" type="hidden" value={event.id} />
             <input name="action" type="hidden" value="join" />

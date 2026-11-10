@@ -18,6 +18,7 @@ test("view versions detect capacity, signups, visibility and access changes with
     minMedicSpots: 2,
     minNewVolunteerSpots: 2,
     maxNewVolunteers: 4,
+    unregisterMinutes: 30,
     open: 1,
     hidden: 0,
     cancelledAt: null,
@@ -190,5 +191,9 @@ test("view versions detect capacity, signups, visibility and access changes with
     await eventViewVersion([event], organizer, roster, event.startsAt - 1),
   ).not.toBe(
     await eventViewVersion([event], organizer, roster, event.startsAt),
+  );
+  const deadline = event.startsAt + 30 * 60_000;
+  expect(await eventViewVersion([event], actor, [], deadline - 1)).not.toBe(
+    await eventViewVersion([event], actor, [], deadline),
   );
 });

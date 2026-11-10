@@ -775,7 +775,10 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     );
     await expect(pastCard).toBeVisible();
     await expect(pastCard).toContainText("You registered");
-    await expect(pastCard.locator("[data-live-signup]")).toHaveCount(0);
+    // The default unregister window stays open after the start.
+    await expect(pastCard.locator("[data-live-signup] button")).toHaveText(
+      "Unregister",
+    );
     await page.locator('[data-event-filter="orientation"]').click();
     await expect(pastCard).toBeHidden();
     await page.locator('[data-event-filter="all"]').click();
