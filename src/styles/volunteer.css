@@ -1889,21 +1889,18 @@ body:has(
   padding: 0.0625rem 0.375rem;
   border-radius: 999rem;
   background: #27272a;
-  color: #d4d4d8;
+  color: white;
   @apply text-sm;
   font-variant-numeric: tabular-nums;
 }
 .volunteer-filter[data-state="ready"] .volunteer-filter-count {
   background: #052e16;
-  color: #4ade80;
 }
 .volunteer-filter[data-state="approved"] .volunteer-filter-count {
   background: #172554;
-  color: #93c5fd;
 }
 .volunteer-filter[data-state="rejected"] .volunteer-filter-count {
   background: #450a0a;
-  color: #fca5a5;
 }
 .volunteer-filter:hover {
   border-color: white;

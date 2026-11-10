@@ -14,10 +14,8 @@ const { count } = Astro.props;
 
 <style>
   .header-application-badge {
-    position: absolute;
-    top: 0;
-    left: 100%;
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
     min-width: 1.6em;
@@ -30,8 +28,6 @@ const { count } = Astro.props;
     font-weight: 600;
     line-height: 1;
     white-space: nowrap;
-    box-shadow: 0 0 0 0.15em black;
-    transform: translate(-0.45em, -30%);
   }
   .header-application-number {
     text-box: trim-both cap alphabetic;
