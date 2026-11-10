@@ -222,15 +222,10 @@ export function directoryListUrl(
 
 /** Only return to organizer lists, never a supplied external destination. */
 export function volunteerListReturnUrl(value: string | null) {
-  if (
-    !value ||
-    !/^\/(?:(?:manage\/)?applications|(?:(?:manage|volunteer)\/)?volunteers)(?:\?|$)/.test(
-      value,
-    )
-  )
+  if (!value || !/^\/(?:applications|volunteers)(?:\?|$)/.test(value))
     return "/volunteers";
   const params = new URLSearchParams(value.split("?")[1]);
-  return /^\/(?:manage\/)?applications(?:\?|$)/.test(value)
+  return /^\/applications(?:\?|$)/.test(value)
     ? applicationListUrl(applicationListState(params))
     : volunteerListUrl(volunteerListState(params));
 }

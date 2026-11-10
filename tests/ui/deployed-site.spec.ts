@@ -40,11 +40,6 @@ test("deployed site uses real account features and shows a banner only on previe
     ).toHaveCount(0);
   }
   expect(errors).toEqual([]);
-  await page.goto("/patrols");
-  await expect(page).toHaveURL(/\/volunteer\/?$/);
-  await expect(
-    page.locator("[data-account-switcher], [data-view]"),
-  ).toHaveCount(0);
 });
 
 test("account and organizer routes require sign-in without loading mockups", async ({

@@ -16,20 +16,14 @@ access. Technical details are in [Account implementation](/implementation/accoun
 
 ## Authentication
 
-Authentication is passwordless, using an emailed link or code.
+People create an account and sign in using their email, without a password.
+They must verify access to that address before entering their account. The same
+sign-in flow serves volunteers and organizers; new volunteers start their
+application after signing in, and returning volunteers keep their existing
+profile and progress.
 
-1. The person enters their email address.
-2. The email holds a sign in link and a 6 digit code. Having both lets someone
-   open the email on a different device from the one they are signing in on.
-3. The link opens a confirmation page on whichever device opens it, then
-   redirects to the page they started from. The code signs in the device that
-   asked for it.
-4. Using one spends the other. Both expire after 10 minutes. 3 wrong codes cancel
-   the request and a new one has to be asked for.
-5. Requesting another email replaces the previous code and link.
-
-The first sign in with a new address creates the account and goes to the
-application form at `/apply`. See [Application](#application).
+See [Authentication implementation](/implementation/accounts/#authentication)
+for verification mechanics and security limits.
 
 ## Application
 
@@ -152,14 +146,14 @@ See [Discord](/specification/discord/) for the complete connection workflow and 
 ## Two-factor authentication
 
 Two-factor authentication is optional for both organizers and volunteers. They
-can add an authenticator app (TOTP) from their account settings. Backup codes are
+can add an authenticator app from their account settings. Backup codes are
 given when TOTP is set up. Once enabled, the authenticator or a backup code is
 required each time that account signs in.
 
 ## Sessions
 
-Sessions last 30 days and renew while the person keeps using the site. Signing out ends the session on that device. `/volunteer/account` lists
-active sessions and can end them.
+People can stay signed in between visits, view their active sessions, and end
+them from account settings. Signing out ends the session on that device.
 
 ## Changing email
 
@@ -191,13 +185,9 @@ roles through the website. Role changes end the affected account's sessions.
 
 ## Abuse protection
 
-Sign in requests are rate limited to reduce fake accounts and mailbombing.
-Requests are counted by both the address being sent to and the IP asking,
-since either one on its own is easy to work around.
+Sign-in and email verification must protect accounts against repeated guessing
+and prevent unsolicited email abuse. Expired or already-used verification cannot
+grant access. People can request fresh verification when needed.
 
-Sign-in emails have a 30-second per-address cooldown; email-change requests keep
-a one-minute cooldown. Both share limits of ten per address per hour, ten per
-IP per hour, and 80 total per day.
-
-Code verification: 3 attempts per code, plus 10 submissions per address per hour
-and 30 per IP per minute. The per-address budget survives resends and code rotation.
+Cooldowns, attempt limits, and delivery budgets are documented in
+[Sessions and abuse counters](/implementation/accounts/#sessions-and-abuse-counters).

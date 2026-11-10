@@ -552,7 +552,7 @@ test.each(
       undefined,
       "/volunteer",
       "/events",
-      "/manage/events",
+      "/applications",
       "https://evil.example",
     ]) {
       const proof = await createSignInOTP(
@@ -590,7 +590,7 @@ test("link and code redemption race produces exactly one successful result", asy
 test("automatic email links require an unexpired signed requesting-browser binding before touching the OTP", async () => {
   const email = "browser-bound@example.org";
   const sent = await request(
-    "/email-otp/send-verification-otp?returnTo=%2Fmanage%2Fevents",
+    "/email-otp/send-verification-otp?returnTo=%2Fevents",
     {
       email,
       type: "sign-in",
@@ -2805,6 +2805,15 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
     "/manage/volunteers-other",
     "/manage/applications-other",
     "/manage/unrelated",
+    "/register",
+    "/volunteer/register",
+    "/patrols",
+    "/manage/events?occurrence=a%2Fb",
+    "/manage/applications?approval=awaiting&q=Alex",
+    "/manage/volunteers?q=Alex",
+    "/manage/volunteers/alex",
+    "/volunteer/volunteers?q=Alex",
+    "/volunteer/volunteers/alex?returnTo=%2Fvolunteers",
   ])
     assert.equal(safeReturnTo(value), "/volunteer/account");
   for (const [value, expected] of [
@@ -2818,19 +2827,17 @@ test("origins and redirect targets are checked; JSON bodies are bounded even wit
       "/volunteers?approval=awaiting&q=Alex+Lee",
     ],
     [
-      "/volunteer/volunteers/alex?returnTo=%2Fvolunteers",
+      "/volunteers/alex?returnTo=%2Fvolunteers",
       "/volunteers/alex?returnTo=%2Fvolunteers",
     ],
-    [
-      "/manage/events?occurrence=a%2Fb",
-      "/events?occurrence=a%2Fb&view=organizer",
-    ],
+    ["/events?occurrence=a%2Fb", "/events?occurrence=a%2Fb"],
     ["/events?view=volunteer", "/events?view=volunteer"],
-    ["/manage/volunteers?q=Alex", "/volunteers?q=Alex"],
     [
-      "/manage/applications?approval=awaiting&q=Alex",
+      "/applications?approval=awaiting&q=Alex",
       "/applications?approval=awaiting&q=Alex",
     ],
+    ["/apply?step=review", "/apply?step=review"],
+    ["/volunteer/account?tab=sessions", "/volunteer/account?tab=sessions"],
     ["/applications?q=Alex", "/applications?q=Alex"],
     [
       "/applications/alex?returnTo=%2Fapplications%3Fq%3DAlex",

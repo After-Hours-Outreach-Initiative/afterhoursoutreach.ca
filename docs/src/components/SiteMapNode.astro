@@ -1,0 +1,39 @@
+---
+import ChevronDownIcon from "../../../src/components/icons/ChevronDownIcon.astro";
+import VolunteerRoleBadge from "../../../src/components/volunteer/VolunteerRoleBadge.astro";
+import type { SiteMapNode } from "../data/site-map";
+
+interface Props {
+  node: SiteMapNode;
+}
+
+const { node } = Astro.props;
+const hasChildren = Boolean(node.children?.length);
+const Wrapper = hasChildren ? "details" : "div";
+const Row = hasChildren ? "summary" : "div";
+---
+
+<li class="site-map-node">
+  <Wrapper open={hasChildren ? true : undefined}>
+    <Row class:list={["site-map-row", { "site-map-leaf": !hasChildren }]}>
+      {hasChildren && <ChevronDownIcon class="site-map-chevron" />}
+      {node.path ? (
+        <code>{node.path}</code>
+      ) : (
+        <span class="site-map-label">{node.label}</span>
+      )}
+      {node.role && (
+        <span class="site-map-role">
+          <VolunteerRoleBadge role={node.role} />
+        </span>
+      )}
+    </Row>
+    {node.children && (
+      <ul class="site-map-branches">
+        {node.children.map((child) => (
+          <Astro.self node={child} />
+        ))}
+      </ul>
+    )}
+  </Wrapper>
+</li>

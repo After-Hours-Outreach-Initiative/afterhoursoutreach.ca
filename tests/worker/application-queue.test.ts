@@ -140,33 +140,22 @@ test("organizers review pending and approved applications with persistent list c
       "/volunteers/applicant-50",
     ])
       assert.equal((await get(path, volunteerCookie)).status, 403);
-    for (const [oldPath, destination] of [
-      [
-        "/volunteer/volunteers?approval=awaiting&q=applicant&offset=50",
-        "/volunteers?approval=awaiting&q=applicant&offset=50",
-      ],
-      [
-        "/volunteer/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
-        "/volunteers/applicant-50?returnTo=%2Fvolunteer%2Fvolunteers%3Fapproval%3Dawaiting",
-      ],
-      [
-        "/manage/volunteers?approval=awaiting&q=applicant&offset=50",
-        "/volunteers?approval=awaiting&q=applicant&offset=50",
-      ],
-      ["/manage/volunteers/applicant-50", "/volunteers/applicant-50"],
-      [
-        "/manage/applications?approval=awaiting&q=applicant&offset=50",
-        "/applications?approval=awaiting&q=applicant&offset=50",
-      ],
-      [
-        "/manage/events?type=orientation&occurrence=a%2Fb",
-        "/events?type=orientation&occurrence=a%2Fb&view=organizer",
-      ],
+    for (const path of [
+      "/register",
+      "/volunteer/register",
+      "/patrols",
+      "/volunteer/volunteers?approval=awaiting&q=applicant&offset=50",
+      "/volunteer/volunteers/applicant-50",
+      "/manage/volunteers?approval=awaiting&q=applicant&offset=50",
+      "/manage/volunteers/applicant-50",
+      "/manage/applications?approval=awaiting&q=applicant&offset=50",
+      "/manage/events?type=orientation&occurrence=a%2Fb",
     ]) {
-      const legacy = await get(oldPath);
-      assert.equal(legacy.status, 301);
-      assert.equal(legacy.headers.get("location"), destination);
-      assert.equal(legacy.headers.get("cache-control"), "no-store");
+      for (const auth of ["", cookie]) {
+        const response = await get(path, auth);
+        assert.equal(response.status, 404, path);
+        assert.equal(response.headers.get("location"), null, path);
+      }
     }
     const eventPath = "/events?type=orientation&occurrence=a%2Fb";
     const introduction = await get("/volunteer?type=orientation", "");
@@ -197,10 +186,7 @@ test("organizers review pending and approved applications with persistent list c
       eventPath,
     );
     for (const auth of [cookie, volunteerCookie]) {
-      const signIn = await get(
-        "/volunteer/sign-in?returnTo=%2Fmanage%2Fevents",
-        auth,
-      );
+      const signIn = await get("/volunteer/sign-in?returnTo=%2Fevents", auth);
       assert.equal(signIn.status, 302);
       assert.equal(signIn.headers.get("location"), "/events");
       const landing = await get(

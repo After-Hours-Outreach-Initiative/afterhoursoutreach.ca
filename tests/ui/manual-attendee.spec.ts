@@ -43,7 +43,7 @@ test("staged volunteer additions support keyboard search, manual roles, errors a
     },
   });
   expect(created.status(), await created.text()).toBe(200);
-  await page.goto("/manage/events");
+  await page.goto("/events");
   const card = page
     .locator("[data-live-event]")
     .filter({ hasText: meetingPoint });

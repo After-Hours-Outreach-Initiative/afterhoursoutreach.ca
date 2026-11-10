@@ -1,0 +1,64 @@
+---
+import SiteMapNode from "./SiteMapNode.astro";
+import { siteMap, type SiteMapNode as MapNode } from "../data/site-map";
+import "../styles/site-map.css";
+
+function countPages(nodes: MapNode[]): number {
+  return nodes.reduce(
+    (total, node) =>
+      total + (node.path ? 1 : 0) + countPages(node.children ?? []),
+    0,
+  );
+}
+---
+
+<section class="site-map not-content" aria-label="Website page tree">
+  <div class="site-map-toolbar">
+    <span>{countPages(siteMap)} page routes</span>
+    <div class="site-map-controls" hidden>
+      <button type="button" data-tree-action="expand" disabled>
+        Expand all
+      </button>
+      <button type="button" data-tree-action="collapse">
+        Collapse all
+      </button>
+    </div>
+  </div>
+  <ul class="site-map-root">
+    {siteMap.map((node) => (
+      <SiteMapNode node={node} />
+    ))}
+  </ul>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>(".site-map").forEach((tree) => {
+    const branches = [...tree.querySelectorAll("details")];
+    const expand = tree.querySelector<HTMLButtonElement>(
+      '[data-tree-action="expand"]',
+    );
+    const collapse = tree.querySelector<HTMLButtonElement>(
+      '[data-tree-action="collapse"]',
+    );
+    const controls = tree.querySelector<HTMLElement>(".site-map-controls");
+    if (!expand || !collapse || !controls) return;
+
+    const updateControls = () => {
+      expand.disabled = branches.every((branch) => branch.open);
+      collapse.disabled = branches.every((branch) => !branch.open);
+    };
+
+    function setExpanded(open: boolean) {
+      for (const branch of branches) branch.open = open;
+      updateControls();
+    }
+
+    expand.addEventListener("click", () => setExpanded(true));
+    collapse.addEventListener("click", () => setExpanded(false));
+    for (const branch of branches) {
+      branch.addEventListener("toggle", updateControls);
+    }
+    updateControls();
+    controls.hidden = false;
+  });
+</script>

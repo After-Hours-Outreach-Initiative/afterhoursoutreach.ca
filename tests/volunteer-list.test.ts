@@ -29,11 +29,9 @@ test("application list state preserves approval, search and sorting, dropping ob
   expect(applicationListUrl({ ...state, sort: "name", direction: "asc" })).toBe(
     "/applications?q=Alex+%26+Sam&approval=awaiting&sort=name",
   );
-  expect(volunteerListReturnUrl("/manage/applications")).toBe("/applications");
+  expect(volunteerListReturnUrl("/applications")).toBe("/applications");
   expect(
-    volunteerListReturnUrl(
-      "/volunteer/volunteers?q=Alex+%26+Sam&approval=awaiting",
-    ),
+    volunteerListReturnUrl("/volunteers?q=Alex+%26+Sam&approval=awaiting"),
   ).toBe("/volunteers?q=Alex+%26+Sam");
   const sorted = { ...state, sort: "name", direction: "desc" } as const;
   expect(volunteerListReturnUrl(volunteerListUrl(sorted))).toBe(
@@ -75,8 +73,11 @@ test("list return destinations are restricted and untrusted filter inputs are no
     "https://evil.example/volunteers?q=x",
     "//evil.example",
     "/volunteers/another?q=x",
-    "/manage/applications/another?q=x",
-    "/manage/applications-other?q=x",
+    "/applications/another?q=x",
+    "/applications-other?q=x",
+    "/manage/applications?direction=desc",
+    "/manage/volunteers?q=Alex",
+    "/volunteer/volunteers?q=Alex",
     "/volunteer/events",
   ])
     expect(volunteerListReturnUrl(value)).toBe("/volunteers");
@@ -87,7 +88,7 @@ test("list return destinations are restricted and untrusted filter inputs are no
   ).toBe("/volunteers");
   expect(
     volunteerListReturnUrl(
-      "/manage/applications?sort=progress&direction=desc&offset=50",
+      "/applications?sort=progress&direction=desc&offset=50",
     ),
   ).toBe("/applications?direction=desc");
   expect(applicationListState(new URLSearchParams()).sort).toBe("progress");

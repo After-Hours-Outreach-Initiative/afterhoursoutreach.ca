@@ -1,0 +1,54 @@
+---
+title: Site map
+description: An interactive tree of website URLs and access badges.
+---
+
+import SiteMapTree from "../../../components/SiteMapTree.astro";
+
+Explore the website's public information, volunteer journey, event booking, and
+organizer pages. Every branch starts expanded; select a branch to collapse it, or
+use **Collapse all** and **Expand all**. Organizer badges mark pages restricted to
+organizers.
+
+The tree includes current pages and the not-found page. It was reviewed against
+the repository on **November 9, 2026**.
+
+## Page tree
+
+<SiteMapTree />
+
+`[id]` represents one person's identifier. Each application or volunteer profile
+route appears once, covering every matching person. Pages are grouped by purpose;
+nesting does not change their URLs.
+
+## Navigation and access
+
+The header provides Home, About, and Donate. Its Volunteer entry becomes Events
+when the signed-in person has event access. Organizers also see Applications and
+Volunteers. The signed-in account menu leads to Your account; the footer links to
+Privacy.
+
+Event access follows the [Accounts](/specification/accounts/) and
+[Events](/specification/events/) rules. For new volunteers it requires the
+completed application steps and organizer application approval. Existing
+patrol-approved volunteers and organizers retain the documented progression
+exceptions. Regular patrol booking requires separate patrol approval; people
+awaiting it can book eligible orientation places.
+
+Event filters, selected occurrences, directory searches, and account sections are
+states within existing pages. Query strings and section anchors do not create
+additional pages or grant access. Missing or inaccessible records may return a
+not-found or access-denied response within the relevant route.
+
+## Keeping the map current
+
+Update the tree when a page is added, removed, renamed, or given a different
+audience. Agreed future pages belong in [Planning](/planning/) until available.
+API actions, authentication callbacks, health checks, and assets are service
+endpoints rather than website pages.
+
+The inventory comes from
+[website page routes](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/tree/main/src/pages)
+and [primary navigation](https://github.com/After-Hours-Outreach-Initiative/afterhoursoutreach.ca/blob/main/src/data/site.ts).
+Route handling and access enforcement belong in the
+[implementation guides](/implementation/).

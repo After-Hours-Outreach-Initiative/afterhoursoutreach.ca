@@ -8,6 +8,17 @@ account switching and simulations are covered in [Local development](/implementa
 
 ## Authentication
 
+The sign-in form requests email verification through Better Auth's Email OTP
+plugin. Delivery includes a sign-in link and a six-digit code. The code can be
+read on another device and entered in the requesting browser. Link completion
+requires the browser binding established when the email was requested; opening
+the email elsewhere does not transfer that binding.
+
+The link and code use the same single-use verification value. Both expire after
+ten minutes; using either consumes it. Three wrong code attempts invalidate the
+challenge, and requesting another email replaces the previous code and link.
+New verified addresses create accounts and enter the application flow.
+
 Better Auth's official Email OTP plugin generates, stores, expires, and consumes
 the code, creates verified accounts, and manages sessions. The link carries that
 same code in its URL fragment, not a separate token; fragments are not sent in
@@ -43,10 +54,9 @@ values for them.
 
 ## Routes and presentation
 
-`/apply` is canonical. GET requests to `/register` and `/volunteer/register`
-redirect there permanently without forwarding legacy query strings. Sign-in
-return URLs normalize those paths too. Application and redirect responses use
-private-page headers: no caching or indexing.
+The application form lives at `/apply`. Application responses use private-page
+headers: no caching or indexing. Return URLs accept current account, application,
+event, and organizer directory routes.
 
 The Code of Conduct initially shows two rules with a fade. **Read all rules**
 expands the list and removes the fade; **Show fewer rules** collapses it. The
@@ -70,10 +80,26 @@ legacy free text when present.
 
 ## Sessions and abuse counters
 
-Session cookies are HttpOnly, Secure, and SameSite=Lax. Better Auth stores hashed
-codes in its verification table. D1 counters enforce the address/IP cooldowns
-and budgets in the [Accounts specification](/specification/accounts/#abuse-protection).
-The per-address verification budget survives resends and code rotation.
+Sessions are configured for 30 days and renew with use. Their cookies are
+HttpOnly, SameSite=Lax, and Secure on HTTPS. Optional authenticator setup uses
+TOTP with backup codes; enrolled accounts must complete the second factor at
+sign-in.
+
+Better Auth stores hashed codes in its verification table. D1 counters enforce
+the following limits in `src/server/db/rate-limits.ts`, with auth configuration
+in `src/server/auth/index.ts` and the shared email budget in
+`src/server/db/policy.ts`:
+
+| Operation              | Current limit                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| Sign-in email request  | 30-second per-address cooldown.                                                          |
+| Email-change request   | One-minute per-address cooldown.                                                         |
+| Email requests         | Ten per address per hour and ten per IP per hour.                                        |
+| Shared delivery budget | 80 emails per day, shared with notification mail.                                        |
+| Code verification      | Three attempts per code, ten submissions per address per hour, and 30 per IP per minute. |
+
+The per-address verification budget survives resends and code rotation. These
+mechanisms implement the specification's [abuse-protection requirement](/specification/accounts/#abuse-protection).
 
 ## Organizer access
 
@@ -90,7 +116,7 @@ sign in again. It cannot target production. No organizer
 is promoted automatically or based on the email address supplied to a web form.
 
 Organizers manage application approval, active status, patrol approval, and roles at
-`/volunteer/volunteers`. Promotions require an active account with
+`/volunteers`. Promotions require an active account with
 a verified email and approved application. Role changes revoke
 the target's sessions. The last active organizer cannot be demoted/deactivated.
 Two-factor authentication is optional for organizers and volunteers; accounts

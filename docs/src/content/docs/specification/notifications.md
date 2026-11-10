@@ -10,9 +10,10 @@ in [Email previews](/implementation/emails/).
 
 ## Account messages
 
-Sign-in requests send an email containing a link and a six-digit code. New-address
-verification sends a code before an email change takes effect. Expiry, attempts,
-and request limits follow the [Accounts specification](/specification/accounts/).
+Send verification email for sign-in and to confirm a new account email address
+before the change takes effect. The account and access rules follow the
+[Accounts specification](/specification/accounts/). Message formats, verification
+expiry, and retry limits belong in [Account implementation](/implementation/accounts/#authentication).
 
 ## Organizer choices
 

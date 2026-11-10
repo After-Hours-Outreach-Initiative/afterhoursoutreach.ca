@@ -42,6 +42,8 @@ active-account, application, patrol, or qualification checks.
 
 ## Specifications
 
+- [Site map](/specification/site-map/): a collapsible tree of current website URLs
+  and role badges.
 - [Accounts](/specification/accounts/): authentication, applications, profile fields,
   sessions, email changes, and roles.
 - [Events](/specification/events/): eligibility, capacity, visibility, sign-ups,

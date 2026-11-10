@@ -76,6 +76,7 @@ export default defineConfig({
           label: "Specification",
           items: [
             { label: "Product overview", slug: "specification" },
+            { label: "Site map", slug: "specification/site-map" },
             { label: "Accounts", slug: "specification/accounts" },
             { label: "Events", slug: "specification/events" },
             { label: "Discord", slug: "specification/discord" },

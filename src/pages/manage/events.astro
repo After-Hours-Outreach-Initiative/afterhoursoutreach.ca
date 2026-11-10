@@ -1,6 +1,0 @@
----
-export const prerender = false;
-const params = new URLSearchParams(Astro.url.search);
-params.set("view", "organizer");
-return Astro.redirect(`/events?${params}`, 301);
----
