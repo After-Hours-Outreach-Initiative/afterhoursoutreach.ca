@@ -3,16 +3,6 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
-- privacy page changes:
-  - tons of details that should not be mentioned need to be removed:
-    - "In production, first application submissions automatically queue a
-      minimal email to three fixed organizer inboxes:
-      ivan.zheng@afterhoursoutreach.ca, info@afterhoursoutreach.ca, and
-      molina.dewilde@afterhoursoutreach.ca. "
-    - "Local development uses a local database and simulated emails, not real
-      email delivery. Development account-switching tools can bypass normal
-      sign-in challenges for local accounts. Use sample answers only in
-      development and preview testing."
 - make an audit log visible for organizers
 - dont want cancelled events to remain inthe events list, they can just be
   removed. the history will be visibiel inthe audit log

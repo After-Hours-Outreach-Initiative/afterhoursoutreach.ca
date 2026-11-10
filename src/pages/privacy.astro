@@ -216,20 +216,10 @@ const account = await loadAccountNavigation(
         already delivered to recipients’ inboxes.
       </p>
       <p class="mt-6">
-        In production, first application submissions automatically queue a
-        minimal email to three fixed organizer inboxes:
-        ivan.zheng@afterhoursoutreach.ca, info@afterhoursoutreach.ca, and
-        molina.dewilde@afterhoursoutreach.ca. Resend receives the applicant’s
+        When your application is ready for review, organizers receive an email with your
         display name (preferred first name or first name, plus last initial),
-        submission time, and an organizer-only review link, not the other
-        application answers. The link requires authorized organizer sign-in and
-        grants no access by itself. D1 keeps the fixed recipient, message
-        content, delivery attempts, and status, including unresolved deliveries
-        that can no longer be retried safely. Provider acceptance is not
-        confirmation of inbox delivery. Draft saves, submission retries, and
-        later profile edits do not create another notification. Local
-        development simulates these messages; preview builds suppress them
-        without storing message content or sending to the organizer inboxes.
+        submission time, and a link to review it after signing in. This email
+        uses Resend and does not include your other application answers.
       </p>
       <p class="mt-6">
         Discord authorization requests only identity and permission to join our
@@ -270,12 +260,6 @@ const account = await loadAccountNavigation(
         separate services such as GoFundMe and Discord, whose own practices
         apply when you visit them. This policy does not describe those services’
         records or all information the Society may receive outside this portal.
-      </p>
-      <p class="mt-6">
-        Local development uses a local database and simulated emails, not real
-        email delivery. Development account-switching tools can bypass normal
-        sign-in challenges for local accounts. Use sample answers only in
-        development and preview testing.
       </p>
 
       <h2 class="mt-12">Safeguards and limitations</h2>
