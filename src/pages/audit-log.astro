@@ -98,6 +98,12 @@ const filterMenus = [
           .map((user) => ({
             value: user.id,
             label: user.name || "Unnamed account",
+            person: {
+              category: user.category,
+              medicMark: user.medicMark,
+              applicant: !user.approved,
+              organizer: user.role === "organizer",
+            },
           }))
           .sort(
             (a, b) =>

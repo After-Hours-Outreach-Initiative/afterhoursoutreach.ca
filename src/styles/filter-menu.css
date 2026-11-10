@@ -67,8 +67,28 @@
   padding: 0.375rem 0;
   cursor: pointer;
 }
+/* Avatars and badges are taller than text, so center the check beside them. */
+.filter-menu-group .volunteer-check:has(.filter-menu-option-label) {
+  align-items: center;
+}
+.filter-menu-group .volunteer-check:has(.filter-menu-option-label) > input {
+  margin-top: 0;
+}
 .filter-menu-option-label {
+  display: flex;
   flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  min-width: 0;
+}
+.filter-menu-option-name {
+  overflow-wrap: anywhere;
+}
+/* A compact status badge that fits the option row. */
+.filter-menu .application-table-progress {
+  padding: 0.0625rem 0.5rem;
+  line-height: 1.5;
 }
 .filter-menu-option-count {
   color: #a1a1aa;

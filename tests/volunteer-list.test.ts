@@ -61,14 +61,14 @@ test("application list state preserves approval, search and sorting, dropping ob
   // Several statuses and roles, and a custom role order, round-trip in order.
   const multiple = applicationListState(
     new URLSearchParams(
-      "approval=rejected&approval=awaiting&approval=all&role=medic&role=organizer&order=volunteer,medic",
+      "approval=rejected&approval=awaiting&approval=all&role=medic&role=organizer&order=medic,volunteer",
     ),
   );
   expect(multiple.approval).toEqual(["awaiting", "rejected"]);
   expect(multiple.roles).toEqual(["medic"]);
-  expect(multiple.roleOrder).toEqual(["volunteer", "medic"]);
+  expect(multiple.roleOrder).toEqual(["medic", "volunteer"]);
   expect(applicationListUrl(multiple)).toBe(
-    "/applications?approval=awaiting&approval=rejected&role=medic&order=volunteer%2Cmedic",
+    "/applications?approval=awaiting&approval=rejected&role=medic&order=medic%2Cvolunteer",
   );
   const volunteers = volunteerListState(new URLSearchParams("sort=role"));
   expect(volunteerListUrl(volunteers)).toBe("/volunteers");
@@ -76,7 +76,7 @@ test("application list state preserves approval, search and sorting, dropping ob
   expect(
     volunteerListState(new URLSearchParams("order=medic,medic,new,volunteer"))
       .roleOrder,
-  ).toEqual(["organizer", "medic", "new", "volunteer"]);
+  ).toEqual(["new", "volunteer", "medic", "organizer"]);
   expect(
     volunteerListState(
       new URL(volunteerListUrl(volunteers), "https://example.org").searchParams,
@@ -139,7 +139,7 @@ test("list return destinations are restricted and untrusted filter inputs are no
     search: "x".repeat(100),
     approval: [],
     roles: [],
-    roleOrder: ["organizer", "medic", "new", "volunteer"],
+    roleOrder: ["new", "volunteer", "medic", "organizer"],
     sort: "role",
     direction: "asc",
   });

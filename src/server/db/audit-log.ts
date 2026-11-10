@@ -10,7 +10,18 @@ import {
   writePermission,
   type Actor,
 } from "./access";
-import { personDisplayNameSql } from "./sql";
+import { attendeeCategorySql, medicMarkSql, personDisplayNameSql } from "./sql";
+import type { AttendeeCategory } from "../../data/event-roster";
+
+/** A person who appears in the audit log, with what their avatar shows. */
+export interface AuditUser {
+  id: string;
+  name: string;
+  role: "volunteer" | "organizer";
+  category: AttendeeCategory;
+  medicMark: boolean;
+  approved: boolean;
+}
 
 export interface AuditEntry {
   id: string;
@@ -128,7 +139,7 @@ export async function listAuditLog(
 export async function listAuditUsers(
   db: Env["DB"],
   actor: Actor,
-): Promise<{ id: string; name: string }[]> {
+): Promise<AuditUser[]> {
   requireOrganizer(actor);
   const { results } = await db
     .prepare(
@@ -138,14 +149,27 @@ export async function listAuditUsers(
       UNION SELECT actor_id FROM event_audit
       UNION SELECT actor_id FROM patrol_series_audit
     )
-    SELECT actor.id, ${displayName("actor", "ap")} AS name
+    SELECT actor.id, ${displayName("actor", "ap")} AS name, actor.role,
+      ${attendeeCategorySql("actor.id")} AS category,
+      ${medicMarkSql("actor.id")} AS medicMark,
+      coalesce(av.registration_approved, 0) AS approved
     FROM actors JOIN user actor ON actor.id = actors.id
     LEFT JOIN profile ap ON ap.user_id = actor.id
+    LEFT JOIN volunteer_status av ON av.user_id = actor.id
     WHERE ${writePermission(true)}
     ORDER BY name COLLATE NOCASE, actor.id
   `,
     )
     .bind(...permissionValues(actor))
-    .all<{ id: string; name: string }>();
-  return results;
+    .all<
+      Omit<AuditUser, "medicMark" | "approved"> & {
+        medicMark: number;
+        approved: number;
+      }
+    >();
+  return results.map((user) => ({
+    ...user,
+    medicMark: Boolean(user.medicMark),
+    approved: Boolean(user.approved),
+  }));
 }

@@ -1,5 +1,6 @@
 ---
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+import DirectoryRoleLabel from "./DirectoryRoleLabel.astro";
 import GripIcon from "@/components/icons/GripIcon.astro";
 import {
   directoryRoles,
@@ -85,34 +86,25 @@ const current =
         Role order
       </p>
       <input type="hidden" name="order" value={state.roleOrder.join(",")} />
+      <p class="sr-only" id={`${id}-order-hint`}>
+        Drag a role, or focus it and use the up and down arrow keys, to change
+        the order.
+      </p>
       <ol aria-labelledby={`${id}-order-label`} data-role-order-list>
         {state.roleOrder.map((role) => (
-          <li class="directory-role-order-item" data-role-order-item={role}>
-            <span class="directory-role-order-handle" data-role-order-handle>
-              <GripIcon class="directory-role-order-grip" />
-            </span>
-            <span class="directory-role-order-label">
-              {directoryRoles[role]}
-            </span>
-            <button
-              class="directory-role-order-move"
-              type="button"
-              data-role-order-move="up"
-              aria-label={`Move ${directoryRoles[role]} up`}
-            >
-              <ChevronDownIcon class="directory-role-order-icon rotate-180" />
-            </button>
-            <button
-              class="directory-role-order-move"
-              type="button"
-              data-role-order-move="down"
-              aria-label={`Move ${directoryRoles[role]} down`}
-            >
-              <ChevronDownIcon class="directory-role-order-icon" />
-            </button>
+          <li
+            class="directory-role-order-item"
+            tabindex="0"
+            aria-label={directoryRoles[role]}
+            aria-describedby={`${id}-order-hint`}
+            data-role-order-item={role}
+          >
+            <GripIcon class="directory-role-order-grip" />
+            <DirectoryRoleLabel {role} {kind} />
           </li>
         ))}
       </ol>
+      <p class="sr-only" role="status" data-role-order-status></p>
     </div>
   </div>
   <div class="filter-menu-actions">
@@ -140,6 +132,8 @@ const current =
     display: none;
   }
   [data-role-order-list] {
+    /* Anchors the drop slot drawn while an item is dragged. */
+    position: relative;
     display: grid;
     gap: 0.375rem;
     margin: 0;
@@ -147,55 +141,73 @@ const current =
     list-style: none;
   }
   .directory-role-order-item {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.25rem 0.25rem 0.25rem 0;
+    min-height: 2.75rem;
+    padding: 0.25rem 0.75rem 0.25rem 0.375rem;
     border: 1px solid #3f3f46;
     border-radius: 0.375rem;
     background: #0c0d10;
+    cursor: grab;
     touch-action: none;
+    user-select: none;
+    transition:
+      transform 200ms cubic-bezier(0.2, 0, 0, 1),
+      border-color 150ms ease,
+      background-color 150ms ease,
+      box-shadow 150ms ease;
   }
+  .directory-role-order-item:hover {
+    border-color: #52525b;
+  }
+  .directory-role-order-item:focus-visible {
+    outline: 3px solid #a5b4fc;
+    outline-offset: 2px;
+  }
+  /* Follows the pointer directly, above the items it passes. */
   .directory-role-order-item[data-dragging] {
+    z-index: 1;
     border-color: #818cf8;
     background: #16214a;
-  }
-  .directory-role-order-handle {
-    display: inline-flex;
-    align-self: stretch;
-    align-items: center;
-    padding-inline: 0.375rem;
-    color: #a1a1aa;
-    cursor: grab;
-  }
-  [data-dragging] .directory-role-order-handle {
+    box-shadow: 0 0.75rem 1.5rem #000a;
     cursor: grabbing;
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease,
+      box-shadow 150ms ease;
   }
-  .directory-role-order-handle :global(.directory-role-order-grip) {
+  /* Settles into its slot after release. */
+  .directory-role-order-item[data-dropping] {
+    z-index: 1;
+  }
+  .directory-role-order-item :global(.directory-role-order-grip) {
+    flex: none;
     width: 1.25em;
     height: 1.25em;
+    color: #71717a;
   }
-  .directory-role-order-label {
-    flex: 1;
-  }
-  .directory-role-order-move {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 0.375rem;
+  .directory-role-order-item:is(:hover, [data-dragging])
+    :global(.directory-role-order-grip) {
     color: #d4d4d8;
   }
-  .directory-role-order-move:hover:enabled {
-    background: #27272a;
-    color: white;
+  /* The script creates the slot, so it has no scoped style attribute. */
+  [data-role-order-list] :global(.directory-role-order-slot) {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    border: 1px dashed #818cf8;
+    border-radius: 0.375rem;
+    background: #818cf81a;
+    pointer-events: none;
+    transition: transform 200ms cubic-bezier(0.2, 0, 0, 1);
   }
-  .directory-role-order-move:disabled {
-    color: #52525b;
-  }
-  .directory-role-order-move :global(.directory-role-order-icon) {
-    width: 1.25em;
-    height: 1.25em;
+  @media (prefers-reduced-motion: reduce) {
+    .directory-role-order-item,
+    /* The script creates the slot, so it has no scoped style attribute. */
+  [data-role-order-list] :global(.directory-role-order-slot) {
+      transition: none;
+    }
   }
 </style>

@@ -1,0 +1,52 @@
+---
+import AttendeeAvatar from "./AttendeeAvatar.astro";
+import NewVolunteerBadge from "./NewVolunteerBadge.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
+import {
+  directoryRoles,
+  type DirectoryKind,
+  type DirectoryRole,
+} from "@/data/volunteer-list";
+
+interface Props {
+  role: DirectoryRole;
+  kind: DirectoryKind;
+}
+const { role, kind } = Astro.props;
+// Show each role the way its people appear in the directory table.
+const applicant = kind === "applications";
+const category =
+  role === "medic"
+    ? "medic"
+    : role === "new"
+      ? "new-volunteer"
+      : "outreach-volunteer";
+---
+
+<span class="directory-role-label">
+  <AttendeeAvatar
+    category={category}
+    medicMark={role === "medic"}
+    applicant={applicant}
+    decorative
+  />
+  {role === "organizer" ? (
+    <VolunteerRoleBadge role="organizer" />
+  ) : role === "medic" ? (
+    <VolunteerRoleBadge role="medic" />
+  ) : role === "new" ? (
+    <NewVolunteerBadge />
+  ) : (
+    <span>{directoryRoles[role]}</span>
+  )}
+  {role === "new" && <span class="sr-only"> volunteer</span>}
+</span>
+
+<style>
+  .directory-role-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+</style>

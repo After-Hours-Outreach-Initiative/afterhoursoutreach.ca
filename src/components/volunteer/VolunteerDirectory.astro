@@ -122,6 +122,7 @@ const sortOptions = applications
                   ([value, status]) => ({
                     value,
                     label: status.label,
+                    status: value as ApplicationStatus,
                     count: statusCounts[value as ApplicationStatus],
                     // The review queue's count is a stable page hook.
                     countAttributes:
@@ -144,6 +145,7 @@ const sortOptions = applications
               options: directoryRoleKeys(kind).map((role) => ({
                 value: role,
                 label: directoryRoles[role],
+                role: { role, kind },
                 count: people.roleCounts[role] ?? 0,
               })),
             },

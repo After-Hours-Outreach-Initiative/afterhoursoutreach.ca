@@ -14,18 +14,18 @@ export type ApplicationApprovalFilter = "all" | ApplicationStatus;
 
 /** Directory roles, in their default sort order. */
 export const directoryRoles = {
-  organizer: "Organizer",
-  medic: "Medic",
   new: "New volunteer",
   volunteer: "Outreach Volunteer",
+  medic: "Medic",
+  organizer: "Organizer",
 } as const;
 export type DirectoryRole = keyof typeof directoryRoles;
 
 /** Applicants only differ by medic team interest, not account roles. */
 export function directoryRoleKeys(kind: DirectoryKind): DirectoryRole[] {
   return kind === "applications"
-    ? ["medic", "volunteer"]
-    : ["organizer", "medic", "new", "volunteer"];
+    ? ["volunteer", "medic"]
+    : ["new", "volunteer", "medic", "organizer"];
 }
 
 export function directoryRole(

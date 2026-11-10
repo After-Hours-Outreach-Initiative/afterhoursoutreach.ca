@@ -15,6 +15,19 @@ function place(menu: HTMLElement, trigger: HTMLElement) {
   menu.style.left = `${left + scrollX}px`;
   menu.style.top = `${bounds.bottom + gap + scrollY}px`;
   menu.style.maxHeight = `${Math.max(12 * 16, innerHeight - bounds.bottom - gap * 2)}px`;
+  clip(menu);
+}
+
+/**
+ * Menus sit in the top layer, above the sticky site header. Clip the part of
+ * an open menu that scrolls up behind the header so it passes under it.
+ */
+function clip(menu: HTMLElement) {
+  const header = document.querySelector(".site-header");
+  const edge = header?.getBoundingClientRect().bottom ?? 0;
+  const hidden = edge - menu.getBoundingClientRect().top;
+  if (hidden > 0) menu.style.clipPath = `inset(${hidden}px -3rem -3rem)`;
+  else menu.style.removeProperty("clip-path");
 }
 
 /**
@@ -74,6 +87,17 @@ export function initFilterMenus(
     }
     menu.querySelector<HTMLElement>("[data-filter-empty]")!.hidden = shown > 0;
   });
+
+  addEventListener(
+    "scroll",
+    () => {
+      for (const menu of root.querySelectorAll<HTMLElement>(
+        "[data-filter-menu]:popover-open",
+      ))
+        clip(menu);
+    },
+    { passive: true },
+  );
 
   addEventListener("resize", () => {
     for (const menu of root.querySelectorAll<HTMLElement>(

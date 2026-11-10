@@ -1750,9 +1750,9 @@ test("volunteer directory defaults to displayed roles and sorts the entire direc
   for (const [sort, direction, expected] of [
     ["name", "asc", ["outreach", "tie", "organizer", "medic", "new"]],
     ["name", "desc", ["new", "medic", "organizer", "outreach", "tie"]],
-    // Default role order: organizer, medic, new volunteer, outreach volunteer.
-    ["role", "asc", ["organizer", "medic", "tie", "new", "outreach"]],
-    ["role", "desc", ["outreach", "tie", "new", "medic", "organizer"]],
+    // Default role order: new volunteer, outreach volunteer, medic, organizer.
+    ["role", "asc", ["tie", "new", "outreach", "medic", "organizer"]],
+    ["role", "desc", ["organizer", "medic", "outreach", "tie", "new"]],
   ] as const) {
     const page = await listVolunteers(env.DB, actor, "", sort, direction);
     assert.deepEqual(
@@ -1763,16 +1763,16 @@ test("volunteer directory defaults to displayed roles and sorts the entire direc
   }
   assert.deepEqual(
     (await listVolunteers(env.DB, actor)).rows.map(({ id }) => id),
-    ["organizer", "medic", "tie", "new", "outreach"],
+    ["tie", "new", "outreach", "medic", "organizer"],
   );
   // A custom role order and role filter apply to the whole directory.
   assert.deepEqual(
     (
       await listVolunteers(env.DB, actor, "", "role", "asc", {
-        roleOrder: ["new", "volunteer", "medic", "organizer"],
+        roleOrder: ["organizer", "medic", "new", "volunteer"],
       })
     ).rows.map(({ id }) => id),
-    ["tie", "new", "outreach", "medic", "organizer"],
+    ["organizer", "medic", "tie", "new", "outreach"],
   );
   const medics = await listVolunteers(env.DB, actor, "", "role", "asc", {
     roles: ["medic"],
@@ -2002,9 +2002,9 @@ test("review queue loads every submitted entry and counts search matches indepen
       "desc",
       [...approved, "pending-01", "pending-52", ...reviewByCompletion],
     ],
-    // Medic interest leads the default role order.
-    ["role", "asc", ["pending-01", "pending-52", ...reviewAndApprovedNames]],
-    ["role", "desc", [...reviewAndApprovedNames, "pending-01", "pending-52"]],
+    // Medic interest follows outreach in the default role order.
+    ["role", "asc", [...reviewAndApprovedNames, "pending-01", "pending-52"]],
+    ["role", "desc", ["pending-01", "pending-52", ...reviewAndApprovedNames]],
     [
       "completed",
       "asc",

@@ -1,6 +1,17 @@
 ---
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
+import AttendeeAvatar from "./AttendeeAvatar.astro";
+import DirectoryRoleLabel from "./DirectoryRoleLabel.astro";
+import NewVolunteerBadge from "./NewVolunteerBadge.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
+import type { AttendeeCategory } from "@/data/event-roster";
+import {
+  applicationStatuses,
+  type ApplicationStatus,
+  type DirectoryKind,
+  type DirectoryRole,
+} from "@/data/volunteer-list";
 import "@/styles/filter-menu.css";
 
 export interface FilterMenuOption {
@@ -10,6 +21,17 @@ export interface FilterMenuOption {
   count?: number;
   /** Extra attributes for the count, such as a stable hook for its value. */
   countAttributes?: Record<string, string>;
+  /** Show the option as a person, with their avatar and role badges. */
+  person?: {
+    category: AttendeeCategory;
+    medicMark: boolean;
+    applicant: boolean;
+    organizer: boolean;
+  };
+  /** Show the option as a directory role's avatar and badge. */
+  role?: { role: DirectoryRole; kind: DirectoryKind };
+  /** Show the option as an application status badge. */
+  status?: ApplicationStatus;
 }
 interface Props {
   /** Checkbox name; each checked option submits one value. */
@@ -76,7 +98,40 @@ const id = `${idPrefix}-${name}`;
               value={option.value}
               checked={selected.includes(option.value)}
             />
-            <span class="filter-menu-option-label">{option.label}</span>
+            <span class="filter-menu-option-label">
+              {option.person ? (
+                <>
+                  <AttendeeAvatar
+                    category={option.person.category}
+                    medicMark={option.person.medicMark}
+                    applicant={option.person.applicant}
+                    decorative
+                  />
+                  <span class="filter-menu-option-name">{option.label}</span>
+                  {option.person.organizer && (
+                    <VolunteerRoleBadge role="organizer" />
+                  )}
+                  {!option.person.applicant &&
+                    option.person.category === "new-volunteer" && (
+                      <NewVolunteerBadge />
+                    )}
+                  {option.person.medicMark && (
+                    <VolunteerRoleBadge role="medic" />
+                  )}
+                </>
+              ) : option.role ? (
+                <DirectoryRoleLabel {...option.role} />
+              ) : option.status ? (
+                <span
+                  class="application-table-progress application-status-text"
+                  data-state={applicationStatuses[option.status].state}
+                >
+                  {option.label}
+                </span>
+              ) : (
+                option.label
+              )}
+            </span>
             {option.count !== undefined && (
               <span
                 class="filter-menu-option-count"
