@@ -65,6 +65,10 @@ is required.
 
 Each event has an extra edit button and a roster details dropdown.
 
+**Select** shows a checkbox tab on top of each upcoming event card. While
+selecting, a bar at the bottom of the screen shows the selection count with
+**Select all**, **Clear**, and **Bulk edit**.
+
 ### Edit view
 
 A popup for editing event details, public visibility, or cancelling the event.

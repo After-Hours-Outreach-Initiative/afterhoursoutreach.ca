@@ -9,11 +9,6 @@ description: Stuff that is ready to work on.
 - add an organizer volunteer view for events
   - type of volunteer view: new, medic, etc.
   - specific volunteer view: "as Johnson Emmet"
-- change organizer event multi select UI to just have a select button to show
-  the select checkbox, while should appear attached to the top of the event
-  cards
-  - the selection count and actions will be a floating bar at the bottom of the
-    screen, and the buttons will be "Select all", "Clear", "Bulk edit"
 - calendar looks bad need to make it nicer looking
 - replace the signed in browsers section with just 2 actions, sign out and sign
   out all devices. too much detail to list the sessions with user agent and not

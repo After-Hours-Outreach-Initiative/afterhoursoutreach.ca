@@ -42,6 +42,10 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   const ids = await cards.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-live-event")),
   );
+  const selectMode = page.getByRole("button", { name: "Select", exact: true });
+  await expect(page.locator("[data-bulk-event]:visible")).toHaveCount(0);
+  await selectMode.click();
+  await expect(selectMode).toHaveAttribute("aria-pressed", "true");
   await cards.first().locator("[data-bulk-event]").check();
   await expect(page.locator("[data-bulk-count]")).toHaveText("1 selected");
   await page.getByRole("button", { name: /^Recurring events \d+$/ }).click();
@@ -50,15 +54,11 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     page.getByRole("button", { name: "Bulk edit", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: /^One-off events \d+$/ }).click();
-  await page
-    .getByRole("button", { name: "Select all shown", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Select all", exact: true }).click();
   expect(await page.locator("[data-bulk-event]:checked").count()).toBe(
     await page.locator("[data-bulk-event]:visible").count(),
   );
-  await page
-    .getByRole("button", { name: "Clear selection", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
   for (const checkbox of await cards.locator("[data-bulk-event]").all())
     await checkbox.check();
   await page.getByRole("button", { name: "Bulk edit", exact: true }).click();
@@ -129,4 +129,7 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
   ).toHaveValue("true");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.locator("[data-bulk-count]")).toContainText("0 selected");
+  await selectMode.click();
+  await expect(page.locator("[data-bulk-actions]")).toBeHidden();
+  await expect(page.locator("[data-bulk-event]:visible")).toHaveCount(0);
 });

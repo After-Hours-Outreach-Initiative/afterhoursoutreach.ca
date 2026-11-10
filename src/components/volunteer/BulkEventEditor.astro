@@ -9,28 +9,31 @@ import {
 ---
 
 <div
-  class="volunteer-bulk-actions"
+  class="volunteer-bulk-bar"
   data-bulk-actions
   role="group"
-  aria-label="Select events to edit"
+  aria-label="Selected events"
+  hidden
 >
   <p data-bulk-count role="status" aria-live="polite" aria-atomic="true">
     0 selected
   </p>
-  <button class="btn btn-quiet" type="button" data-bulk-select-all
-    >Select all shown</button
-  >
-  <button class="btn btn-quiet" type="button" data-bulk-clear disabled
-    >Clear selection</button
-  >
-  <button
-    class="btn btn-primary"
-    type="button"
-    data-bulk-open
-    aria-haspopup="dialog"
-    aria-controls="bulk-event-editor"
-    disabled>Bulk edit</button
-  >
+  <div class="volunteer-bulk-buttons">
+    <button class="btn btn-quiet" type="button" data-bulk-select-all
+      >Select all</button
+    >
+    <button class="btn btn-quiet" type="button" data-bulk-clear disabled
+      >Clear</button
+    >
+    <button
+      class="btn btn-primary"
+      type="button"
+      data-bulk-open
+      aria-haspopup="dialog"
+      aria-controls="bulk-event-editor"
+      disabled>Bulk edit</button
+    >
+  </div>
 </div>
 <dialog
   id="bulk-event-editor"
@@ -232,12 +235,44 @@ import {
 </dialog>
 
 <style>
-  .volunteer-bulk-actions {
+  .volunteer-bulk-bar {
+    position: fixed;
+    z-index: 40;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    left: 50%;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
-    margin: 0 0 1.5rem;
+    justify-content: space-between;
+    gap: 0.75rem 1.25rem;
+    width: min(42rem, calc(100% - 2rem));
+    padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+    border: 1px solid #52525b;
+    border-radius: 0.75rem;
+    background: var(--color-panel-soft);
+    box-shadow: 0 0.75rem 2rem #000000b3;
+    translate: -50% 0;
+  }
+  [data-bulk-count] {
+    color: #e4e4e7;
+    font-variant-numeric: tabular-nums;
+  }
+  .volunteer-bulk-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+  @media (max-width: 40rem) {
+    .volunteer-bulk-bar {
+      padding: 0.75rem;
+    }
+    .volunteer-bulk-buttons {
+      width: 100%;
+    }
+    .volunteer-bulk-buttons > .btn {
+      flex: 1 1 0;
+      min-width: 0;
+      padding-inline: 0.75rem;
+    }
   }
   [data-bulk-targets] {
     padding-left: 1.5em;

@@ -82,27 +82,27 @@ const blocked =
     Boolean(event.includesOrientation),
   )}
 >
+  {
+    organizer && future && !event.cancelledAt && (
+      <label class="volunteer-event-select">
+        <input
+          type="checkbox"
+          data-bulk-event={event.id}
+          data-bulk-version={event.updatedAt}
+          data-bulk-label={`${formatEventDate(event.startsAt)} · ${event.meetingPoint}${event.seriesId ? " (occurrence)" : ""}`}
+        />
+        <span>
+          Select
+          <span class="sr-only">
+            {" "}
+            {formatEventDate(event.startsAt)} at {event.meetingPoint}
+          </span>
+        </span>
+      </label>
+    )
+  }
   <div class="volunteer-event-layout">
     <div class="volunteer-event-info">
-      {
-        organizer && future && !event.cancelledAt && (
-          <label class="volunteer-check volunteer-event-selection">
-            <input
-              type="checkbox"
-              data-bulk-event={event.id}
-              data-bulk-version={event.updatedAt}
-              data-bulk-label={`${formatEventDate(event.startsAt)} · ${event.meetingPoint}${event.seriesId ? " (occurrence)" : ""}`}
-            />
-            <span>
-              Select
-              <span class="sr-only">
-                {" "}
-                {formatEventDate(event.startsAt)} at {event.meetingPoint}
-              </span>
-            </span>
-          </label>
-        )
-      }
       {
         event.cancelledAt ? (
           <p class="volunteer-hidden">Cancelled</p>
@@ -243,6 +243,7 @@ const blocked =
 <style>
   .volunteer-event-card {
     --event-card-gap: 1rem;
+    --event-select-height: 2.25rem;
     container: event-card / inline-size;
     padding: 1rem;
     scroll-margin-top: calc(
@@ -279,8 +280,44 @@ const blocked =
     min-width: 0;
     overflow-wrap: anywhere;
   }
-  .volunteer-event-selection {
-    margin-bottom: 0.75rem;
+  .volunteer-event-select {
+    display: none;
+  }
+  /* In selection mode the checkbox is a tab joined to the card's top edge. */
+  :global([data-bulk-selecting])
+    .volunteer-event-card:has(> .volunteer-event-select) {
+    position: relative;
+    margin-top: var(--event-select-height);
+  }
+  :global([data-bulk-selecting]) .volunteer-event-select {
+    position: absolute;
+    bottom: 100%;
+    left: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: var(--event-select-height);
+    padding: 0 0.875rem 0 0.75rem;
+    border: 1px solid #3f3f46;
+    border-bottom: 0;
+    border-radius: 0.5rem 0.5rem 0 0;
+    background: var(--color-black);
+    color: #d4d4d8;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .volunteer-event-select:hover {
+    color: white;
+  }
+  .volunteer-event-card:has(> .volunteer-event-select > input:checked),
+  .volunteer-event-card:has(> .volunteer-event-select > input:checked)
+    > .volunteer-event-select {
+    border-color: #818cf8;
+  }
+  .volunteer-event-select:has(> input:checked) {
+    background: var(--color-blue-deep);
+    color: #e0e7ff;
   }
   .volunteer-event-info h3 {
     font-size: 1.25rem;

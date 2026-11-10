@@ -34,6 +34,7 @@ import {
   loadApplicationProgress,
 } from "@/server/db/application-progress";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
+import CheckIcon from "@/components/icons/CheckIcon.astro";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
 import { contactEmail, social } from "@/data/site";
 import "@/styles/volunteer.css";
@@ -256,14 +257,25 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
               )}
             </div>
             {manage && (
-              <button
-                class="btn btn-primary"
-                data-show-dialog="event-editor-new"
-                type="button"
-              >
-                <PlusIcon class="btn-icon" />
-                Create
-              </button>
+              <div class="volunteer-event-tools">
+                <button
+                  class="btn btn-quiet"
+                  type="button"
+                  data-bulk-select-mode
+                  aria-pressed="false"
+                >
+                  <CheckIcon class="btn-icon" />
+                  Select
+                </button>
+                <button
+                  class="btn btn-primary"
+                  data-show-dialog="event-editor-new"
+                  type="button"
+                >
+                  <PlusIcon class="btn-icon" />
+                  Create
+                </button>
+              </div>
             )}
           </div>
           <form
@@ -465,6 +477,20 @@ const hasVisiblePastEvents = countEvents(pastEvents, filter) > 0;
   }
   .volunteer-event-results {
     min-width: 0;
+  }
+  .volunteer-event-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  [data-bulk-select-mode][aria-pressed="true"] {
+    border-color: #818cf8;
+    background: var(--color-blue-deep);
+    color: #e0e7ff;
+  }
+  /* Keep the last cards reachable above the floating selection bar. */
+  [data-event-browser][data-bulk-selecting] {
+    padding-bottom: 9rem;
   }
   .volunteer-event-schedule > .volunteer-event-results {
     /* Wrap based on actual content width, including any account navigation. */

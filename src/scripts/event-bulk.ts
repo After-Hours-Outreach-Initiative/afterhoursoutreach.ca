@@ -66,6 +66,11 @@ export function bulkEventAction(values: FormData) {
 export function syncBulkEventSelection(root: HTMLElement) {
   const count = root.querySelector<HTMLElement>("[data-bulk-count]");
   if (!count) return;
+  // Selection mode lives on the root so it survives refreshed cards and toolbars.
+  const selecting = "bulkSelecting" in root.dataset;
+  root.querySelector<HTMLElement>("[data-bulk-actions]")!.hidden = !selecting;
+  for (const toggle of root.querySelectorAll("[data-bulk-select-mode]"))
+    toggle.setAttribute("aria-pressed", String(selecting));
   const selected = selectedFor(root);
   const inputs = checkboxes(root);
   let removed = false;
@@ -114,10 +119,19 @@ export function clearBulkEventSelection(root: HTMLElement) {
   syncBulkEventSelection(root);
 }
 
+function setBulkEventSelecting(root: HTMLElement, selecting: boolean) {
+  selectedFor(root).clear();
+  if (selecting) root.dataset.bulkSelecting = "";
+  else delete root.dataset.bulkSelecting;
+  syncBulkEventSelection(root);
+}
+
 export function initBulkEvents(root: HTMLElement) {
   if (!root.querySelector("[data-bulk-actions]")) return;
   root.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
+    if (event.target.closest("[data-bulk-select-mode]"))
+      setBulkEventSelecting(root, !("bulkSelecting" in root.dataset));
     if (event.target.closest("[data-bulk-clear]"))
       clearBulkEventSelection(root);
     if (event.target.closest("[data-bulk-select-all]")) {
