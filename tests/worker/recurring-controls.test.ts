@@ -641,7 +641,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await organizerPage
       .getByRole("button", { name: "Save without email", exact: true })
       .click();
-    await expect(uiCard).toContainText("Cancelled");
+    await expect(uiCard).toHaveCount(0);
     await expect(uiGroup).toHaveCount(1);
     expect(
       await DB.prepare(
@@ -650,7 +650,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
         .bind(uiSeries)
         .first("includes_orientation"),
     ).toBe(1);
-    // Existing cancellation history remains accessible beyond the shortened end.
+    // Cancelled dates stay out of event lists, even when opened directly.
     await uiGroup
       .locator('[data-series-occurrence] [name="occurrenceDate"]')
       .fill(uiDate);
@@ -658,16 +658,11 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .getByRole("button", { name: "Open occurrence", exact: true })
       .click();
     await expect(
-      uiCard.getByRole("button", { name: "Edit", exact: true }),
-    ).toHaveCount(1);
-    await expect(editor).toBeVisible();
-    await expect(
-      editor.locator("[data-event-save], [data-event-cancel]"),
-    ).toHaveCount(0);
-    await expect(
-      editor.getByRole("button", { name: /Delete|Cancel event/ }),
-    ).toHaveCount(0);
-    await editor.getByRole("button", { name: "Close", exact: true }).click();
+      uiGroup.locator("[data-series-occurrence] [data-form-message]"),
+    ).toContainText(
+      "This occurrence was cancelled. Its history is available in the audit log.",
+    );
+    await expect(uiCard).toHaveCount(0);
     await expect(
       uiGroup.getByRole("button", { name: "Open occurrence", exact: true }),
     ).toBeEnabled();
@@ -689,9 +684,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await uiFirstCard
       .getByRole("button", { name: "Confirm cancellation", exact: true })
       .click();
-    await expect(uiFirstCard.locator(".volunteer-hidden")).toHaveText(
-      "Cancelled",
-    );
+    await expect(uiFirstCard).toHaveCount(0);
     expect(
       await DB.prepare("SELECT stopped_from FROM patrol_series WHERE id=?")
         .bind(uiSeries)
@@ -702,16 +695,10 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     ).toBe(0);
     expect(organizerErrors).toEqual([]);
     await organizerPage.reload();
-    await expect(uiCard).toBeVisible();
+    await expect(uiCard).toHaveCount(0);
     await expect(uiGroup).toHaveCount(1);
-    // Cancelled dates are read-only; no second action can hide their history.
-    await uiCard.getByRole("button", { name: "Edit", exact: true }).click();
-    await expect(
-      editor.getByRole("button", { name: /Delete|Cancel event/ }),
-    ).toHaveCount(0);
-    await editor.getByRole("button", { name: "Close", exact: true }).click();
-    await expect(uiCard).toBeVisible();
-    await expect(uiGroup).toHaveCount(1);
+    // Their event records and audit history remain after reload.
+    await expect(uiFirstCard).toHaveCount(0);
     expect(
       await DB.prepare("SELECT count(*) n FROM event WHERE id=?")
         .bind(uiId)

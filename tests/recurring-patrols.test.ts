@@ -36,6 +36,7 @@ import {
   type PatrolTemplate,
 } from "../src/server/db/patrol-series";
 import { RequestError } from "../src/server/http";
+import { listAuditLog } from "../src/server/db/audit-log";
 import { setVolunteerStatus } from "../src/server/db/volunteers";
 import { sourceSchemaStatements } from "./helpers/source-schema";
 
@@ -735,7 +736,7 @@ test("cancellation advances the window, cancels only that roster, and is a perma
     Array.from({ length: 5 }, () => ensurePatrolOccurrences(db)),
   );
   assert.equal((await window()).length, 3);
-  assert.equal((await all(series.id)).length, 4);
+  assert.equal((await all(series.id)).length, 3);
   assert.equal(await count("signup"), 2);
   const rows = (
     await db
@@ -763,21 +764,19 @@ test("cancellation advances the window, cancels only that roster, and is a perma
       .run(),
     /recurring_occurrence_tombstone/,
   );
-  assert.equal(
-    (
-      await materializePatrolOccurrence(
-        db,
-        organizer,
-        series.id,
-        events[0].occurrenceDate!,
-      )
-    ).id,
-    events[0].id,
+  await assert.rejects(
+    materializePatrolOccurrence(
+      db,
+      organizer,
+      series.id,
+      events[0].occurrenceDate!,
+    ),
+    status(409),
   );
   assert.ok((await findEvent(db, events[0].id)).cancelledAt);
 });
 
-test("legacy deletion uses versioned cancellation and keeps registered occurrences visible without regeneration", async () => {
+test("legacy deletion uses versioned cancellation and retains registered occurrences outside event lists without regeneration", async () => {
   const series = await savePatrolSeries(db, organizer, input());
   const unrelated = await savePatrolSeries(db, organizer, input());
   const [first, second] = await all(series.id);
@@ -823,25 +822,23 @@ test("legacy deletion uses versioned cancellation and keeps registered occurrenc
   await ensurePatrolOccurrences(db);
   assert.equal(
     (await all(series.id)).some((event) => event.id === first.id),
-    true,
+    false,
   );
   assert.equal(
     (await all(series.id)).filter((event) => !event.cancelledAt).length,
     3,
   );
   assert.deepEqual(await all(unrelated.id), unrelatedRows);
-  assert.equal(
-    (
-      await materializePatrolOccurrence(
-        db,
-        organizer,
-        series.id,
-        first.occurrenceDate!,
-      )
-    ).id,
-    first.id,
+  await assert.rejects(
+    materializePatrolOccurrence(
+      db,
+      organizer,
+      series.id,
+      first.occurrenceDate!,
+    ),
+    status(409),
   );
-  // A second action cannot hide already-cancelled registered history.
+  // A second action cannot change already-cancelled registered history.
   await cancelEvent(db, organizer, second.id, second.updatedAt, "");
   const cancelled = await findEvent(db, second.id);
   await assert.rejects(
@@ -968,7 +965,7 @@ test("past events reject cancellation and legacy deletion; series removal preser
   assert.equal((await listEvents(db, organizer)).length, 0);
 });
 
-test("cancellation removes never-registered one-offs, leaves minimal recurring tombstones, and keeps previous registrations", async () => {
+test("cancellation hides empty and previously registered events while retaining their details and audit history", async () => {
   const series = await savePatrolSeries(db, organizer, input());
   const [empty, previouslyRegistered] = await all(series.id);
   await changeSignup(db, alice, previouslyRegistered.id, "join");
@@ -982,7 +979,7 @@ test("cancellation removes never-registered one-offs, leaves minimal recurring t
     "",
     true,
   );
-  assert.match(kept.message, /history was kept/);
+  assert.match(kept.message, /history is available in the audit log/);
   assert.ok((await findEvent(db, previouslyRegistered.id)).cancelledAt);
   assert.deepEqual(
     (await db.prepare("SELECT * FROM signup").all()).results,
@@ -991,7 +988,7 @@ test("cancellation removes never-registered one-offs, leaves minimal recurring t
   assert.equal(await count("event_notification"), 0);
   await cancelEvent(db, organizer, empty.id, empty.updatedAt, "");
   await ensurePatrolOccurrences(db);
-  await assert.rejects(findEvent(db, empty.id), status(404));
+  assert.ok((await findEvent(db, empty.id)).cancelledAt);
   await assert.rejects(
     materializePatrolOccurrence(
       db,
@@ -1004,7 +1001,7 @@ test("cancellation removes never-registered one-offs, leaves minimal recurring t
   assert.equal(
     await db
       .prepare(
-        "SELECT count(*) n FROM event WHERE id=? AND cancelled_at IS NOT NULL AND open=0 AND hidden=1 AND meeting_point='' AND meeting_point_url IS NULL",
+        "SELECT count(*) n FROM event WHERE id=? AND cancelled_at IS NOT NULL AND open=0 AND hidden=1 AND meeting_point='Meeting point'",
       )
       .bind(empty.id)
       .first("n"),
@@ -1013,11 +1010,13 @@ test("cancellation removes never-registered one-offs, leaves minimal recurring t
   assert.deepEqual(
     (
       await db
-        .prepare("SELECT action FROM event_audit WHERE event_id=?")
+        .prepare(
+          "SELECT action FROM event_audit WHERE event_id=? ORDER BY action",
+        )
         .bind(empty.id)
         .all()
     ).results,
-    [{ action: "deleted" }],
+    [{ action: "cancelled" }, { action: "series_occurrence_created" }],
   );
 
   for (const registered of [false, true]) {
@@ -1043,18 +1042,45 @@ test("cancellation removes never-registered one-offs, leaves minimal recurring t
         .prepare("SELECT count(*) n FROM event WHERE id=?")
         .bind(event.id)
         .first("n"),
-      Number(registered),
+      1,
     );
-    if (registered) assert.ok((await findEvent(db, event.id)).cancelledAt);
-    else
-      assert.equal(
-        await db
-          .prepare("SELECT count(*) n FROM event_audit WHERE event_id=?")
-          .bind(event.id)
-          .first("n"),
-        0,
-      );
+    assert.ok((await findEvent(db, event.id)).cancelledAt);
+    const log = await listAuditLog(db, organizer);
+    assert.ok(
+      log.entries.some(
+        (entry) =>
+          entry.subjectId === event.id &&
+          entry.action === "created" &&
+          entry.subjectName.includes("One-off"),
+      ),
+    );
+    assert.ok(
+      log.entries.some(
+        (entry) => entry.subjectId === event.id && entry.action === "cancelled",
+      ),
+    );
   }
+
+  const log = await listAuditLog(db, organizer);
+  assert.ok(
+    log.entries.some(
+      (entry) =>
+        entry.subjectId === empty.id &&
+        entry.action === "cancelled" &&
+        entry.subjectName.includes("Meeting point"),
+    ),
+  );
+  for (const view of ["manage", "manage-upcoming", "volunteer"] as const)
+    assert.ok(
+      (await listEvents(db, organizer, empty.id, view)).every(
+        (row) => !row.cancelledAt,
+      ),
+    );
+  await db
+    .prepare("UPDATE event SET starts_at=0 WHERE cancelled_at IS NOT NULL")
+    .run();
+  for (const view of ["manage-past", "past"] as const)
+    assert.equal((await listEvents(db, organizer, empty.id, view)).length, 0);
 });
 
 test("a signup committed just before cancellation preserves the event and registration history", async () => {
@@ -1326,7 +1352,7 @@ test("time/interval defaults persist without rewriting history, bookings or tomb
   );
   await changeSignup(db, alice, initial[2].id, "cancel");
   await ensurePatrolOccurrences(db, series.id);
-  await assert.rejects(findEvent(db, cancelled.id), status(404));
+  assert.ok((await findEvent(db, cancelled.id)).cancelledAt);
   assert.ok(
     await db
       .prepare("SELECT cancelled_at FROM event WHERE id=?")
@@ -1700,7 +1726,7 @@ test("this-and-future updates booked materialized occurrences with stable IDs, p
     1,
   );
   await ensurePatrolOccurrences(db);
-  await assert.rejects(findEvent(db, distant.id), status(404));
+  assert.ok((await findEvent(db, distant.id)).cancelledAt);
   assert.ok(
     await db
       .prepare("SELECT cancelled_at FROM event WHERE id=?")
@@ -2147,17 +2173,13 @@ test("stopping at the first date cancels exceptions/bookings, preserves history 
   );
   await ensurePatrolOccurrences(db);
   assert.equal((await window()).length, 0);
-  assert.equal((await all(series.id)).length, 3);
-  assert.equal(
-    (
-      await materializePatrolOccurrence(
-        db,
-        organizer,
-        series.id,
-        data.firstDate,
-      )
-    ).id,
-    events[0].id,
+  assert.deepEqual(
+    (await all(series.id)).map((event) => event.id),
+    [events[2].id],
+  );
+  await assert.rejects(
+    materializePatrolOccurrence(db, organizer, series.id, data.firstDate),
+    status(409),
   );
   assert.ok((await findEvent(db, events[0].id)).cancelledAt);
   await assert.rejects(

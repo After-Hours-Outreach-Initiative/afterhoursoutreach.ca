@@ -1950,8 +1950,7 @@ describe(
                   exact: true,
                 })
                 .click(),
-            updated: () =>
-              card.getByText("Cancelled", { exact: true }).waitFor(),
+            updated: () => card.waitFor({ state: "detached" }),
             loadingLabel: "Cancelling…",
           });
           await expect(cancelEditor).toBeHidden();

@@ -32,11 +32,12 @@ as off until an organizer explicitly turns visibility on.
 requests. Edits use version checks to reject stale writes rather than overwrite
 another organizer's changes.
 
-Cancellation retains existing registration and attendance history. An occurrence
-that has never had registrations may be removed; recurring cancellation
-tombstones are retained. Hiding/closing updates visibility and registration state
-without cancelling existing bookings. Access-revocation workflows cancel affected
-future bookings atomically.
+Cancelled events disappear from event lists and calendars. Their details,
+registration and attendance records, and audit history are retained. Organizers
+can see cancellations in the audit log, including events with no registrations.
+Recurring cancellation tombstones prevent regeneration. Hiding/closing updates
+visibility and registration state without cancelling existing bookings.
+Access-revocation workflows cancel affected future bookings atomically.
 
 Organizer mutations default to no email unless the API receives `notify: true`.
 The prompt behavior and silent actions are defined in the

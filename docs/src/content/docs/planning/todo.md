@@ -3,8 +3,6 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
-- dont want cancelled events to remain inthe events list, they can just be
-  removed. the history will be visibiel inthe audit log
 - make the unregister time window configurable per event, with a 30 minute
   after start time default. so people can still unregister after an event has
   started

@@ -484,7 +484,7 @@ export async function listEvents(
   const statement = organizer
     ? db
         .prepare(
-          `${select} WHERE ${notDeleted}
+          `${select} WHERE ${notDeleted} AND e.cancelled_at IS NULL
           ${view === "manage" ? "" : `AND e.starts_at ${past ? "<=" : ">"} ${nowMsSql}`}
         ORDER BY
           (e.id = ?) DESC,
@@ -914,10 +914,9 @@ export async function bulkSaveEvents(
   }
 }
 
-/** Registration rows (including cancelled bookings), signup audits and attendance
- * all count as history. Decide removal inside the cancellation transaction, not
- * from a roster read: a signup committed before this batch must prevent removal.
- * Once closed, signup triggers reject any later/concurrent registration. */
+/** Keep every event and audit for organizer history, including empty events.
+ * Closing the event and cancelling its roster commit together; signup triggers
+ * reject any later/concurrent registration. Recurring rows prevent regeneration. */
 export async function cancelEvent(
   db: Env["DB"],
   actor: Actor,
@@ -931,7 +930,6 @@ export async function cancelEvent(
   if (old.startsAt <= Date.now())
     throw new RequestError(409, "Past events cannot be cancelled.");
   const operation = crypto.randomUUID();
-  const removedAudit = `${operation}:removed`;
   const now = Date.now();
   const results = await db.batch([
     db
@@ -962,47 +960,6 @@ export async function cancelEvent(
           AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
       )
       .bind(now, id, operation),
-    db
-      .prepare(
-        `INSERT INTO event_audit (id, event_id, actor_id, action, changed_fields, created_at)
-        SELECT ?, e.id, ?, 'deleted', '[]', ? FROM event e
-        WHERE e.id = ? AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)
-          AND NOT EXISTS(SELECT 1 FROM signup WHERE event_id = e.id)
-          AND NOT EXISTS(SELECT 1 FROM orientation_completion WHERE event_id = e.id)
-          AND NOT EXISTS(SELECT 1 FROM event_audit WHERE event_id = e.id
-            AND action IN ('signup_joined', 'signup_cancelled', 'signup_moved', 'signup_removed', 'signup_manually_added'))`,
-      )
-      .bind(removedAudit, actor.id, now, id, operation),
-    // The immutable recurring row/nominal key must remain. Keep only its required
-    // columns and one listing-removal marker, not optional location details/audits.
-    db
-      .prepare(
-        `UPDATE event SET meeting_point = '', meeting_point_url = NULL, includes_orientation = NULL
-        WHERE id = ? AND series_id IS NOT NULL
-          AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
-      )
-      .bind(id, removedAudit),
-    db
-      .prepare(
-        `DELETE FROM event_audit WHERE event_id = ? AND id != ?
-          AND EXISTS(SELECT 1 FROM event_audit WHERE id = ?)`,
-      )
-      .bind(id, removedAudit, removedAudit),
-    db
-      .prepare(
-        `DELETE FROM event_audit WHERE id = ?
-          AND EXISTS(SELECT 1 FROM event WHERE id = ? AND series_id IS NULL)`,
-      )
-      .bind(removedAudit, id),
-    // changes() refers ONLY to removing this operation's one-off marker above.
-    // No references remain; a failed version/permission check cannot reach here.
-    db
-      .prepare(
-        `DELETE FROM event WHERE id = ? AND series_id IS NULL AND changes() = 1
-          AND NOT EXISTS(SELECT 1 FROM signup WHERE event_id = event.id)
-          AND NOT EXISTS(SELECT 1 FROM orientation_completion WHERE event_id = event.id)`,
-      )
-      .bind(id),
   ]);
   if (!results[0].meta.changes)
     throw new RequestError(
@@ -1012,9 +969,8 @@ export async function cancelEvent(
   if (old.seriesId) await ensurePatrolOccurrences(db, old.seriesId);
   return {
     operation,
-    message: results[4].meta.changes
-      ? "Event cancelled and removed because no one had ever registered."
-      : "Event cancelled. Any current registrations were cancelled; registration and attendance history was kept.",
+    message:
+      "Event cancelled. Any current registrations were cancelled; history is available in the audit log.",
   };
 }
 

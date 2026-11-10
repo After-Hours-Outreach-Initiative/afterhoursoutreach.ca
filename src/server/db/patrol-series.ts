@@ -577,18 +577,22 @@ export async function materializePatrolOccurrence(
   occurrenceDate: string,
 ) {
   const series = await findPatrolSeries(db, actor, seriesId);
-  // Existing snapshots remain addressable after stopping/shortening, including
-  // cancellations and past history. This path never recreates an occurrence.
+  // Existing active snapshots remain addressable after stopping/shortening.
+  // Cancelled dates stay in the audit log and must never be recreated or reopened.
   const existing = await db
     .prepare(
-      `SELECT id, EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = event.id AND a.action = 'deleted') AS deleted
+      `SELECT id, cancelled_at AS cancelledAt,
+        EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = event.id AND a.action = 'deleted') AS deleted
       FROM event WHERE series_id = ? AND occurrence_date = ?`,
     )
     .bind(seriesId, occurrenceDate)
-    .first<{ id: string; deleted: number }>();
+    .first<{ id: string; cancelledAt: number | null; deleted: number }>();
   if (existing) {
-    if (existing.deleted)
-      throw new RequestError(409, "This occurrence was cancelled and removed.");
+    if (existing.cancelledAt !== null || existing.deleted)
+      throw new RequestError(
+        409,
+        "This occurrence was cancelled. Its history is available in the audit log.",
+      );
     const result = await db
       .prepare(
         `UPDATE patrol_series SET generation_until = generation_until
