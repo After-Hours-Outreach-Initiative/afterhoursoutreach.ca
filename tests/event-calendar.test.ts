@@ -29,10 +29,9 @@ test("calendar uses Vancouver dates, stable chronological ordering and month bou
     ["earlier", "earlier-tie", "a-earlier-tie", "later"],
   );
   assert.match(today.events[0].description, /Patrol at earlier/);
-  assert.ok(
-    days
-      .filter((day) => day.date < calendar.start)
-      .every((day) => !day.events.length),
+  assert.deepEqual(
+    days.filter((day) => !day.inMonth).map((day) => day.date),
+    ["2026-11-29", "2026-11-30", "2027-01-01", "2027-01-02"],
   );
   assert.equal(
     days.find((day) => day.date === "2027-01-01")!.events[0].id,
@@ -46,6 +45,11 @@ test("calendar uses Vancouver dates, stable chronological ordering and month bou
     january.weeks.flat().find((day) => day.date === "2027-01-01")!.events[0].id,
     "next-day",
   );
+  const leading = january.weeks
+    .flat()
+    .find((day) => day.date === "2026-12-31")!;
+  assert.equal(leading.inMonth, false);
+  assert.equal(leading.events[0].id, "earlier");
 });
 
 for (const [month, count, weeks] of [

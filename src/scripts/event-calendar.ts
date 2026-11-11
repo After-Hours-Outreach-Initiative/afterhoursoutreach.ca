@@ -121,10 +121,7 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
         const cell = document.createElement("td");
         cell.dataset.calendarDate = day.date;
         row.appendChild(cell);
-        if (!day.inMonth) {
-          if (day.date < model.start) continue;
-          cell.dataset.calendarOverflow = "";
-        }
+        if (!day.inMonth) cell.dataset.calendarOverflow = "";
         if (day.today) cell.setAttribute("aria-current", "date");
         const date = document.createElement("span");
         date.className = "event-calendar-day";

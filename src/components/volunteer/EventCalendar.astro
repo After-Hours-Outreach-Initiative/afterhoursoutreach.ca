@@ -72,26 +72,23 @@ const weekdays = [
             {week.map((day) => (
               <td
                 data-calendar-date={day.date}
-                data-calendar-overflow={
-                  !day.inMonth && day.date > calendar.start ? "" : undefined
-                }
+                data-calendar-overflow={day.inMonth ? undefined : ""}
                 aria-current={day.today ? "date" : undefined}
               >
-                {(day.inMonth || day.date > calendar.start) &&
-                  (day.events.length ? (
-                    <a
-                      href={`#event-${day.events[0].id}`}
-                      data-calendar-event={day.events[0].id}
-                      aria-label={day.events[0].description}
-                      title={day.events[0].label}
-                    >
-                      <span class="event-calendar-day event-calendar-circle">
-                        {day.day}
-                      </span>
-                    </a>
-                  ) : (
-                    <span class="event-calendar-day">{day.day}</span>
-                  ))}
+                {day.events.length ? (
+                  <a
+                    href={`#event-${day.events[0].id}`}
+                    data-calendar-event={day.events[0].id}
+                    aria-label={day.events[0].description}
+                    title={day.events[0].label}
+                  >
+                    <span class="event-calendar-day event-calendar-circle">
+                      {day.day}
+                    </span>
+                  </a>
+                ) : (
+                  <span class="event-calendar-day">{day.day}</span>
+                )}
               </td>
             ))}
           </tr>

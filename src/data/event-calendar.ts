@@ -48,10 +48,7 @@ export function eventCalendar(
       day: Number(date.slice(-2)),
       inMonth,
       today: inMonth && date === today,
-      events:
-        date.slice(0, 7) >= month
-          ? dated.filter((event) => event.date === date)
-          : [],
+      events: dated.filter((event) => event.date === date),
     };
   });
   return {
