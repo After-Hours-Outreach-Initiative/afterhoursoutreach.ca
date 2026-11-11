@@ -3,6 +3,7 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
+- remove application ready notification from sending to info@...
 - cancelled events shouldnt show on the calendar or the main event list
 - make the emails not be centered they should just flow normally and be left
   aligned
