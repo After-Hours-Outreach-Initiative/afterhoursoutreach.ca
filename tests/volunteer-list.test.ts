@@ -3,6 +3,7 @@ import {
   applicationListUrl,
   applicationListState,
   applicationStatuses,
+  directoryCountLabel,
   directoryListUrl,
   directoryView,
   directoryEmptyMessage,
@@ -84,6 +85,52 @@ test("application list state preserves approval, search and sorting, dropping ob
   ).toEqual(volunteers);
 });
 
+test("a custom status order sorts applications and round-trips in the URL", () => {
+  const state = applicationListState(
+    new URLSearchParams("statusOrder=rejected,awaiting,in-progress,approved"),
+  );
+  expect(state.statusOrder).toEqual([
+    "rejected",
+    "awaiting",
+    "in-progress",
+    "approved",
+  ]);
+  expect(applicationListUrl(state)).toBe(
+    "/applications?statusOrder=rejected%2Cawaiting%2Cin-progress%2Capproved",
+  );
+  const view = directoryView(
+    [
+      person("ready", { status: "awaiting" }),
+      person("declined", { status: "rejected" }),
+    ],
+    "applications",
+    state,
+  );
+  expect(view.rows.map(({ id }) => id)).toEqual(["declined", "ready"]);
+  // Partial orders fall back to the default, which stays out of the URL.
+  const partial = applicationListState(
+    new URLSearchParams("statusOrder=rejected,awaiting"),
+  );
+  expect(partial.statusOrder).toEqual([
+    "awaiting",
+    "in-progress",
+    "rejected",
+    "approved",
+  ]);
+  expect(applicationListUrl(partial)).toBe("/applications");
+  // Volunteers have no statuses to order.
+  expect(
+    directoryListUrl(
+      "volunteers",
+      volunteerListState(
+        new URLSearchParams(
+          "statusOrder=rejected,awaiting,in-progress,approved",
+        ),
+      ),
+    ),
+  ).toBe("/volunteers");
+});
+
 test("list return destinations are restricted and untrusted filter inputs are normalized", () => {
   for (const value of [
     null,
@@ -140,6 +187,7 @@ test("list return destinations are restricted and untrusted filter inputs are no
     approval: [],
     roles: [],
     roleOrder: ["new", "volunteer", "medic", "organizer"],
+    statusOrder: ["awaiting", "in-progress", "rejected", "approved"],
     sort: "role",
     direction: "asc",
   });
@@ -297,5 +345,18 @@ test("profile return links keep audit log filters and pages", () => {
   expect(volunteerListReturnUrl(url)).toBe(url);
   expect(volunteerListReturnUrl("/audit-log?action=unknown&extra=1")).toBe(
     "/audit-log",
+  );
+});
+
+test("the result count names the directory and how much of it is shown", () => {
+  expect(directoryCountLabel("volunteers", 8, 8)).toBe("Showing 8 volunteers");
+  expect(directoryCountLabel("volunteers", 2, 8)).toBe(
+    "Showing 2 of 8 volunteers",
+  );
+  expect(directoryCountLabel("applications", 1, 1)).toBe(
+    "Showing 1 application",
+  );
+  expect(directoryCountLabel("applications", 0, 1)).toBe(
+    "Showing 0 of 1 application",
   );
 });

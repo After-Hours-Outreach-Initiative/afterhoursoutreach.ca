@@ -27,7 +27,8 @@ let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
 const state = applicationListState(Astro.url.searchParams);
-const { search, approval, sort, direction, roles, roleOrder } = state;
+const { search, approval, sort, direction, roles, roleOrder, statusOrder } =
+  state;
 const listUrl = applicationListUrl(state);
 try {
   const { actor, headers, email, greetingName } = await accountContext(
@@ -58,7 +59,7 @@ try {
       approval,
       sort,
       direction,
-      { roles, roleOrder },
+      { roles, roleOrder, statusOrder },
     );
 } catch {
   return new Response("Application management is temporarily unavailable.", {
@@ -76,19 +77,17 @@ try {
   greetingName={accountGreeting}
   email={accountEmail}
 >
-  {
-    lock ? (
-      <p class="volunteer-notice">
-        {lock} <a href="/volunteer/account">Your account</a>
-      </p>
-    ) : (
-      <VolunteerDirectory
-        kind="applications"
-        people={applications}
-        state={state}
-      />
-    )
-  }
+  {lock ? (
+    <p class="volunteer-notice">
+      {lock} <a href="/volunteer/account">Your account</a>
+    </p>
+  ) : (
+    <VolunteerDirectory
+      kind="applications"
+      people={applications}
+      state={state}
+    />
+  )}
 </AccountLayout>
 <script>
   import { initVolunteerBrowser } from "@/scripts/volunteer-browser";

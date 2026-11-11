@@ -1,11 +1,16 @@
 ---
+import SearchClearButton from "./SearchClearButton.astro";
 import DirectoryRow from "./DirectoryRow.astro";
 import SearchIcon from "../icons/SearchIcon.astro";
-import FilterMenu from "./FilterMenu.astro";
-import DirectorySortMenu from "./DirectorySortMenu.astro";
+import SearchXIcon from "../icons/SearchXIcon.astro";
+import FilterPanel from "./FilterPanel.astro";
+import FilterSection from "./FilterSection.astro";
+import DirectorySortSection from "./DirectorySortSection.astro";
 import {
+  directoryListState,
   directoryListUrl,
   applicationStatuses,
+  directoryCountLabel,
   directoryEmptyMessage,
   directoryRoleKeys,
   directoryRoles,
@@ -29,11 +34,13 @@ const urlForState =
   Astro.props.urlForState ??
   ((next: DirectoryListState) => directoryListUrl(kind, next));
 const listUrl = urlForState(state);
+// Nothing searched, filtered or re-sorted.
+const defaultUrl = urlForState(directoryListState(new URLSearchParams(), kind));
 const profileHref =
   Astro.props.profileHref ??
   ((id: string) =>
     `/${kind}/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(listUrl)}`);
-const { search, approval, roles, sort, direction } = state;
+const { search, approval, roles } = state;
 const visibleIds = new Set(people.rows.map(({ id }) => id));
 const cachedRows = people.allRows.filter(({ id }) => !visibleIds.has(id));
 const statusCounts: Record<ApplicationStatus, number> = {
@@ -65,7 +72,7 @@ const sortOptions = applications
     <h2 id={`${kind}-heading`}>{title}</h2>
   </div>
   <form
-    class="directory-controls"
+    class="filter-layout"
     method="get"
     data-volunteer-search-form
     data-directory-controls
@@ -73,103 +80,82 @@ const sortOptions = applications
     {Object.entries(formFields).map(([name, value]) => (
       <input type="hidden" name={name} value={value} />
     ))}
-    <div class="volunteer-search">
-      <label class="volunteer-search-field">
-        <span class="sr-only">
-          {applications ? "Find an applicant" : "Find a volunteer"}
-        </span>
-        <SearchIcon class="volunteer-search-icon" />
-        <input
-          type="search"
-          name="q"
-          data-volunteer-search
-          value={search}
-          maxlength="100"
-          placeholder="Search by name"
-        />
-      </label>
-    </div>
-    <div class="directory-control-row">
-      <div class="directory-filters" role="group" aria-label="Filters">
-        {applications && (
-          <FilterMenu
-            name="approval"
-            label="Status"
-            idPrefix={kind}
-            selected={approval}
-            groups={[
-              {
-                options: Object.entries(applicationStatuses).map(
-                  ([value, status]) => ({
-                    value,
-                    label: status.label,
-                    status: value as ApplicationStatus,
-                    count: statusCounts[value as ApplicationStatus],
-                    // The review queue's count is a stable page hook.
-                    countAttributes:
-                      value === "awaiting"
-                        ? { "data-awaiting-approval-count": "" }
-                        : undefined,
-                  }),
-                ),
-              },
-            ]}
-          />
-        )}
-        <FilterMenu
-          name="role"
-          label="Role"
+    <label class="volunteer-search-field filter-layout-search">
+      <span class="sr-only">
+        {applications ? "Find an applicant" : "Find a volunteer"}
+      </span>
+      <SearchIcon class="volunteer-search-icon" />
+      <input
+        type="search"
+        name="q"
+        data-volunteer-search
+        value={search}
+        maxlength="100"
+        placeholder="Search by name"
+      />
+      <SearchClearButton />
+    </label>
+    <FilterPanel
+      id={`${kind}-filters`}
+      title="Filter"
+      active={approval.length + roles.length}
+      resetHref={urlForState({ ...state, approval: [], roles: [] })}
+    >
+      {applications && (
+        <FilterSection
+          name="approval"
+          label="Status"
           idPrefix={kind}
-          selected={roles}
+          selected={approval}
           groups={[
             {
-              options: directoryRoleKeys(kind).map((role) => ({
-                value: role,
-                label: directoryRoles[role],
-                role: { role, kind },
-                count: people.roleCounts[role] ?? 0,
-              })),
+              options: Object.entries(applicationStatuses).map(
+                ([value, status]) => ({
+                  value,
+                  label: status.label,
+                  status: value as ApplicationStatus,
+                  count: statusCounts[value as ApplicationStatus],
+                  // The review queue's count is a stable page hook.
+                  countAttributes:
+                    value === "awaiting"
+                      ? { "data-awaiting-approval-count": "" }
+                      : undefined,
+                }),
+              ),
             },
           ]}
         />
-        <a
-          class="directory-filters-reset"
-          href={urlForState({ ...state, approval: [], roles: [] })}
-          data-directory-reset
-          hidden={!approval.length && !roles.length}
-        >
-          Clear filters
-        </a>
-      </div>
-      <DirectorySortMenu {kind} {state} options={sortOptions} />
-    </div>
-  </form>
-  <div data-volunteer-results>
-    <ul
-      class="directory-list"
-      id={`${kind}-list`}
-      aria-label={applications ? "Applications" : "Volunteers"}
-      data-volunteer-list
-      hidden={!people.rows.length}
-    >
-      {people.rows.map((person) => (
-        <DirectoryRow
-          person={person}
-          applications={applications}
-          href={profileHref(person.id)}
-        />
-      ))}
-    </ul>
-    <p
-      class="volunteer-notice"
-      data-volunteer-empty
-      hidden={Boolean(people.rows.length)}
-    >
-      {directoryEmptyMessage(kind, state)}
-    </p>
-    <template data-volunteer-cached-rows>
-      <ul>
-        {cachedRows.map((person) => (
+      )}
+      <FilterSection
+        name="role"
+        label="Role"
+        idPrefix={kind}
+        selected={roles}
+        groups={[
+          {
+            options: directoryRoleKeys(kind).map((role) => ({
+              value: role,
+              label: directoryRoles[role],
+              role: { role, kind },
+              count: people.roleCounts[role] ?? 0,
+            })),
+          },
+        ]}
+      />
+    </FilterPanel>
+    <DirectorySortSection {kind} {state} options={sortOptions} />
+    <div class="filter-layout-results" data-volunteer-results>
+      <p class="directory-count" role="status" data-volunteer-result-count>
+        {directoryCountLabel(kind, people.rows.length, people.allRows.length)}
+      </p>
+      <ul
+        class="directory-list"
+        id={`${kind}-list`}
+        aria-label={applications ? "Applications" : "Volunteers"}
+        data-volunteer-list
+        hidden={!people.rows.length}
+      >
+        {people.rows.map((person) => (
           <DirectoryRow
             person={person}
             applications={applications}
@@ -177,9 +163,39 @@ const sortOptions = applications
           />
         ))}
       </ul>
-    </template>
-  </div>
-  <p class="sr-only" role="status" data-volunteer-result-count></p>
+      <div
+        class="volunteer-notice empty-results directory-empty"
+        data-volunteer-empty
+        hidden={Boolean(people.rows.length)}
+      >
+        <SearchXIcon class="empty-results-icon" />
+        <div class="empty-results-body">
+          <p data-volunteer-empty-message>
+            {directoryEmptyMessage(kind, state)}
+          </p>
+          <a
+            class="btn btn-outline"
+            href={defaultUrl}
+            data-directory-reset-all
+            hidden={listUrl === defaultUrl}
+          >
+            Reset search, filters and sort
+          </a>
+        </div>
+      </div>
+      <template data-volunteer-cached-rows>
+        <ul>
+          {cachedRows.map((person) => (
+            <DirectoryRow
+              person={person}
+              applications={applications}
+              href={profileHref(person.id)}
+            />
+          ))}
+        </ul>
+      </template>
+    </div>
+  </form>
   <p
     data-volunteer-search-error
     class="volunteer-notice"
@@ -189,31 +205,14 @@ const sortOptions = applications
 </section>
 
 <style>
-  .directory-controls {
-    margin-bottom: 1rem;
+  /* Sits where the list would. */
+  .directory-empty {
+    margin: 0;
   }
-  .directory-controls .volunteer-search {
-    margin-bottom: 1rem;
-  }
-  .directory-control-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .directory-filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .directory-filters-reset {
-    margin-left: 0.25rem;
-    color: #d4d4d8;
-    text-decoration: underline;
-    text-underline-offset: 0.25rem;
-  }
-  .directory-filters-reset[hidden] {
-    display: none;
+  .directory-count {
+    margin-bottom: 0.5rem;
+    color: #a1a1aa;
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
   }
 </style>

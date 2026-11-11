@@ -257,7 +257,7 @@ test("organizers review pending and approved applications with persistent list c
       );
       assert.doesNotMatch(
         directoryHtml,
-        /applicant-\d+|data-filter-menu="approval"|draft-only|account-only/,
+        /applicant-\d+|data-filter-section="approval"|draft-only|account-only/,
       );
     }
     const auditCount = () =>
@@ -398,28 +398,26 @@ test("organizers review pending and approved applications with persistent list c
       page.locator("[data-volunteer-results] [data-volunteer-row]"),
     ).toHaveCount(53);
     // Filtering keeps the current sort.
-    await page.getByRole("button", { name: /^Status/ }).click();
     await page
-      .locator('[data-filter-menu="approval"] input[value="awaiting"]')
+      .locator('[data-filter-section="approval"] input[value="awaiting"]')
       .check();
-    await page
-      .locator('[data-filter-menu="approval"]')
-      .getByRole("button", { name: "Apply" })
-      .click();
     await expect(page).toHaveURL(/approval=awaiting/);
     await expectDirectorySort(page, "progress", "desc");
     await sortDirectory(page, "name", "asc");
     await expectDirectorySort(page, "name", "asc");
+    // Choosing the sort and then its direction are two history entries.
+    await page.goBack();
+    await expectDirectorySort(page, "name", "desc");
     await page.goBack();
     await expectDirectorySort(page, "progress", "desc");
+    await page.goForward();
     await page.goForward();
     await expectDirectorySort(page, "name", "asc");
     await page.goto(`${origin}${listPath}`);
     const count = page.locator("[data-awaiting-approval-count]");
     const results = page.locator("[data-volunteer-results]");
-    // Status filters are a menu; its counts add up to every matching applicant.
-    const statusMenu = page.locator('[data-filter-menu="approval"]');
-    const statusTrigger = page.getByRole("button", { name: /^Status/ });
+    // The status filter's counts add up to every matching applicant.
+    const statusMenu = page.locator('[data-filter-section="approval"]');
     const readyInput = statusMenu.locator('input[value="awaiting"]');
     const expectAllCount = (total: number) =>
       expect
@@ -429,13 +427,12 @@ test("organizers review pending and approved applications with persistent list c
           ).reduce((sum, value) => sum + Number(value.trim()), 0),
         )
         .toBe(total);
+    // Each change in the sidebar applies at once.
     const chooseStatuses = async (values: string[]) => {
-      await statusTrigger.click();
-      await statusMenu.getByRole("button", { name: "Clear" }).click();
-      for (const value of values)
-        await statusMenu.locator(`input[value="${value}"]`).check();
-      await statusMenu.getByRole("button", { name: "Apply" }).click();
-      await expect(statusMenu).toBeHidden();
+      for (const input of await statusMenu.locator("input").all())
+        await input.setChecked(
+          values.includes((await input.getAttribute("value"))!),
+        );
     };
     await expect(count).toHaveText("53");
     await expectAllCount(53);
@@ -479,7 +476,6 @@ test("organizers review pending and approved applications with persistent list c
     await chooseStatuses([]);
     await expect(page).toHaveURL(`${origin}/applications?q=applicant`);
     await expect(readyInput).not.toBeChecked();
-    await expect(statusTrigger).toBeFocused();
     await expect(results.locator("[data-volunteer-row]")).toHaveCount(53);
     await chooseStatuses(["awaiting"]);
     await expect(page).toHaveURL(
@@ -1008,16 +1004,15 @@ test("organizers review pending and approved applications with persistent list c
     expect(new URL(plain.url()).searchParams.get("sort")).toBe("progress");
     expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");
     expect(new URL(plain.url()).searchParams.has("offset")).toBe(false);
-    // Without scripts the menu is a native popover in a GET form.
-    const plainStatus = plain.locator('[data-filter-menu="approval"]');
-    await plain.getByRole("button", { name: /^Status/ }).click();
+    // Without scripts the sidebar is a GET form with its own Apply button.
+    const plainStatus = plain.locator('[data-filter-section="approval"]');
+    const plainApply = plain.getByRole("button", { name: "Apply" });
     await plainStatus.locator('input[value="awaiting"]').uncheck();
-    await plainStatus.getByRole("button", { name: "Apply" }).click();
+    await plainApply.click();
     expect(new URL(plain.url()).searchParams.get("q")).toBe("applicant-52");
     expect(new URL(plain.url()).searchParams.has("approval")).toBe(false);
-    await plain.getByRole("button", { name: /^Status/ }).click();
     await plainStatus.locator('input[value="awaiting"]').check();
-    await plainStatus.getByRole("button", { name: "Apply" }).click();
+    await plainApply.click();
     expect(new URL(plain.url()).searchParams.get("approval")).toBe("awaiting");
     expect(new URL(plain.url()).searchParams.get("sort")).toBe("progress");
     expect(new URL(plain.url()).searchParams.get("direction")).toBe("desc");

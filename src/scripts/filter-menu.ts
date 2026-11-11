@@ -31,8 +31,8 @@ function clip(menu: HTMLElement) {
 }
 
 /**
- * Popover filter and sort menus. Closing a menu reports it, so the page can
- * apply its choices the same way as the menu's Apply button.
+ * Popover menus placed under their triggers. Closing a menu reports it to the
+ * page.
  */
 export function initFilterMenus(
   root: HTMLElement,
@@ -61,16 +61,6 @@ export function initFilterMenus(
       } else onClose(menu);
     });
   }
-
-  root.addEventListener("click", (event) => {
-    if (!(event.target instanceof Element)) return;
-    const clear = event.target.closest("[data-filter-clear]");
-    if (!clear) return;
-    for (const input of clear
-      .closest("[data-filter-menu]")!
-      .querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
-      input.checked = false;
-  });
 
   root.addEventListener("input", (event) => {
     if (!(event.target instanceof HTMLInputElement)) return;

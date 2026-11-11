@@ -1378,6 +1378,25 @@ body:has(
   margin: 1.5rem 0;
   @apply text-base/8;
 }
+/* An empty result: an icon beside its message and any way out. */
+.empty-results {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.empty-results-icon {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: 0.25rem;
+  color: #a1a1aa;
+}
+.empty-results-body {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  min-width: 0;
+}
 .volunteer-notice a {
   color: #a5b4fc;
 }
@@ -1530,6 +1549,44 @@ body:has(
 .volunteer-portal .volunteer-search input {
   padding-left: 2.75rem;
 }
+/* Search fields clear with their own button, which hides while they are
+   empty. Text stops short of it. */
+.volunteer-portal .volunteer-search-field input {
+  padding-right: 2.75rem;
+}
+.volunteer-search-field input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.volunteer-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.375rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.375rem;
+  color: #f87171;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.volunteer-search-clear:hover {
+  background: #27272a;
+  color: #fca5a5;
+}
+.volunteer-search-clear:focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 0;
+}
+/* Match the search icon on the other side of the field. */
+.volunteer-search-clear svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.volunteer-search-field:has(input:placeholder-shown) .volunteer-search-clear {
+  display: none;
+}
 /* Each person is one linked row; the whole row is the profile link's hit area. */
 .directory-list {
   container-type: inline-size;
@@ -1555,8 +1612,13 @@ body:has(
 .directory-item + .directory-item {
   border-top: var(--volunteer-border);
 }
-.directory-item:has(:focus-visible) {
+.directory-item:has(:focus-visible),
+.directory-item[data-pressed] {
   background: #16214a;
+}
+/* Touch feedback comes from data-pressed, which ignores scrolls. */
+.directory-item-link {
+  -webkit-tap-highlight-color: transparent;
 }
 @media (hover: hover) and (pointer: fine) {
   .directory-item:hover {
@@ -1591,6 +1653,14 @@ body:has(
   position: absolute;
   inset: 0;
   z-index: 1;
+}
+/* Badges, statuses and times sit above the link's overlay; let clicks on them
+   reach the row link too. */
+.directory-item * {
+  pointer-events: none;
+}
+.directory-item .directory-item-link {
+  pointer-events: auto;
 }
 .directory-item-link:focus-visible {
   outline: none;

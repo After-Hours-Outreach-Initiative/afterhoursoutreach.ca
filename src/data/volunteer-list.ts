@@ -68,16 +68,33 @@ function roleFilter(values: string[], kind: DirectoryKind) {
   return directoryRoleKeys(kind).filter((role) => values.includes(role));
 }
 
-/** A complete permutation of the directory's roles, or the default order. */
-function roleOrder(value: string | null, kind: DirectoryKind) {
-  const keys = directoryRoleKeys(kind);
+/** A complete permutation of `keys` from a comma-separated value, or `keys`. */
+function permutation<T extends string>(
+  value: string | null,
+  keys: readonly T[],
+) {
   const order = (value ?? "")
     .split(",")
     .filter(
-      (role, index, all) =>
-        keys.includes(role as DirectoryRole) && all.indexOf(role) === index,
-    ) as DirectoryRole[];
-  return order.length === keys.length ? order : keys;
+      (key, index, all) =>
+        keys.includes(key as T) && all.indexOf(key) === index,
+    ) as T[];
+  return order.length === keys.length ? order : [...keys];
+}
+
+/** A complete permutation of the directory's roles, or the default order. */
+function roleOrder(value: string | null, kind: DirectoryKind) {
+  return permutation(value, directoryRoleKeys(kind));
+}
+
+/** Application statuses, in their default sort order. */
+export const applicationStatusKeys = Object.keys(
+  applicationStatuses,
+) as ApplicationStatus[];
+
+/** A complete permutation of the application statuses, or the default order. */
+function statusOrder(value: string | null) {
+  return permutation(value, applicationStatusKeys);
 }
 
 export type VolunteerSort = "name" | "role";
@@ -133,10 +150,9 @@ export function directoryView<T extends DirectoryPerson>(
       ).length,
     ]),
   ) as Partial<Record<DirectoryRole, number>>;
-  const progress = { awaiting: 0, "in-progress": 1, rejected: 2, approved: 3 };
   const primary = (person: T) => {
     if (applications && state.sort === "progress")
-      return progress[person.status];
+      return state.statusOrder.indexOf(person.status);
     if (applications && state.sort === "completed")
       return person.applicationCompletedAt ?? -Infinity;
     if (state.sort === "role") return state.roleOrder.indexOf(roleOf(person));
@@ -166,6 +182,19 @@ export function directoryView<T extends DirectoryPerson>(
     approvedCount: count("approved"),
     roleCounts,
   };
+}
+
+/** "Showing 8 volunteers", or "Showing 3 of 8 volunteers" when narrowed. */
+export function directoryCountLabel(
+  kind: DirectoryKind,
+  shown: number,
+  total: number,
+) {
+  const noun = kind === "applications" ? "application" : "volunteer";
+  const plural = total === 1 ? noun : `${noun}s`;
+  return shown === total
+    ? `Showing ${total} ${plural}`
+    : `Showing ${shown} of ${total} ${plural}`;
 }
 
 export function directoryEmptyMessage(
@@ -252,6 +281,7 @@ function listState(params: URLSearchParams, kind: DirectoryKind) {
     approval: [] as ApplicationStatus[],
     roles: roleFilter(params.getAll("role"), kind),
     roleOrder: roleOrder(params.get("order"), kind),
+    statusOrder: statusOrder(params.get("statusOrder")),
     direction: (params.get("direction") === "desc"
       ? "desc"
       : "asc") as VolunteerSortDirection,
@@ -288,6 +318,9 @@ export function directoryListUrl(
   const order = roleOrder(state.roleOrder.join(","), kind);
   if (order.join(",") !== directoryRoleKeys(kind).join(","))
     params.set("order", order.join(","));
+  const statuses = statusOrder(state.statusOrder.join(","));
+  if (applications && statuses.join(",") !== applicationStatusKeys.join(","))
+    params.set("statusOrder", statuses.join(","));
   const query = params.toString();
   return `/${applications ? "applications" : "volunteers"}${query ? `?${query}` : ""}`;
 }

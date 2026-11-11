@@ -63,18 +63,22 @@ test("application table opens a focused review with guarded decisions and list c
       "href",
       `${applicationPath}?returnTo=${encodeURIComponent(listPath)}`,
     );
-    const status = page.locator('[data-filter-menu="approval"]');
-    const statusTrigger = page.getByRole("button", { name: /^Status/ });
+    // Small screens choose filters in a sheet that applies when it closes.
+    const status = page.locator('[data-filter-section="approval"]');
+    const filterTrigger = page.getByRole("button", {
+      name: /^Filter/,
+    });
     const chooseStatus = async (label: string) => {
-      await statusTrigger.click();
-      await status.getByRole("button", { name: "Clear" }).click();
+      await filterTrigger.click();
+      for (const input of await status.getByRole("checkbox").all())
+        await input.uncheck();
       await status
         .getByRole("checkbox", { name: new RegExp(`^${label}`) })
         .check();
-      await status.getByRole("button", { name: "Apply" }).click();
+      await page.getByRole("button", { name: "Show results" }).click();
       await expect(status).toBeHidden();
     };
-    await statusTrigger.click();
+    await filterTrigger.click();
     await expect(status.locator("[data-filter-option]")).toHaveText([
       /Ready for review\s*0/,
       /In Progress\s*1/,
@@ -88,7 +92,7 @@ test("application table opens a focused review with guarded decisions and list c
       ["Approved", "approved"],
     ]) {
       await chooseStatus(label);
-      // Closing the menu applies it after the close event.
+      // Closing the sheet applies it after the close event.
       await expect(page).toHaveURL(new RegExp(`[?&]approval=${value}(&|$)`));
       await expect(row).toHaveCount(0);
       const params = new URL(page.url()).searchParams;
@@ -99,11 +103,13 @@ test("application table opens a focused review with guarded decisions and list c
     await chooseStatus("In Progress");
     await expect(page).toHaveURL(/approval=in-progress/);
     await expect(row).toHaveCount(1);
-    await expect(statusTrigger).toBeFocused();
+    await expect(filterTrigger).toBeFocused();
     expect(new URL(page.url()).searchParams.get("approval")).toBe(
       "in-progress",
     );
+    await filterTrigger.click();
     await page.getByRole("link", { name: "Clear filters" }).click();
+    await page.getByRole("button", { name: "Show results" }).click();
     await expect(page).toHaveURL(new URL(listPath, baseURL!).href);
     await row.click({ position: { x: 2, y: 2 } });
     const review = page.locator("[data-application-review]");

@@ -1,4 +1,5 @@
 ---
+import SearchClearButton from "./SearchClearButton.astro";
 import type { EventRow } from "@/server/db/events";
 import { manualAttendeeCategory } from "@/data/event-roster";
 import PlusIcon from "@/components/icons/PlusIcon.astro";
@@ -67,6 +68,7 @@ const roles = [
             placeholder="Search by name"
             data-attendee-search
           />
+          <SearchClearButton />
         </label>
         <span id={`${id}-search-help`} class="sr-only"
           >Use arrow keys or Tab to choose a result, Enter to add it to the

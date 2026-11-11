@@ -1,0 +1,60 @@
+---
+import ArrowUpIcon from "@/components/icons/ArrowUpIcon.astro";
+---
+
+<a class="back-to-top" href="#" inert data-back-to-top>
+  <ArrowUpIcon class="back-to-top-icon" />
+  Back to top
+</a>
+
+<style>
+  /* Rises from the bottom edge while a reader scrolls back up a long page. */
+  .back-to-top {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    z-index: 30;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-zinc-600);
+    border-radius: 999rem;
+    background: #171a20;
+    color: #f4f4f5;
+    font-weight: 500;
+    text-decoration: none;
+    box-shadow: 0 0.5rem 1.5rem #0009;
+    opacity: 0;
+    translate: -50% 150%;
+    transition:
+      opacity 150ms ease,
+      translate 200ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  .back-to-top[data-visible] {
+    opacity: 1;
+    translate: -50% 0;
+  }
+  .back-to-top:hover {
+    border-color: white;
+    color: white;
+  }
+  .back-to-top:focus-visible {
+    outline: 3px solid #a5b4fc;
+    outline-offset: 0.25rem;
+  }
+  .back-to-top :global(.back-to-top-icon) {
+    width: 1.25em;
+    height: 1.25em;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .back-to-top {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  import "@/scripts/back-to-top";
+</script>

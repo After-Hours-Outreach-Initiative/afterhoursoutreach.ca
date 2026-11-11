@@ -4,8 +4,10 @@ import AccountIcon from "@/components/icons/AccountIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import CalendarIcon from "@/components/icons/CalendarIcon.astro";
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
-import FilterMenu from "@/components/volunteer/FilterMenu.astro";
+import FilterPanel from "@/components/volunteer/FilterPanel.astro";
+import FilterSection from "@/components/volunteer/FilterSection.astro";
 import RecurringIcon from "@/components/icons/RecurringIcon.astro";
+import SearchXIcon from "@/components/icons/SearchXIcon.astro";
 import { env } from "cloudflare:workers";
 import { accountContext, requireOrganizer } from "@/server/db/access";
 import { listAuditLog, listAuditUsers } from "@/server/db/audit-log";
@@ -70,7 +72,8 @@ try {
   });
 }
 const now = Date.now();
-const filtered = filters.users.length + filters.actions.length > 0;
+const activeFilters = filters.users.length + filters.actions.length;
+const filtered = activeFilters > 0;
 const kindIcons = {
   person: AccountIcon,
   event: CalendarIcon,
@@ -149,167 +152,182 @@ const filterMenus = [
   ) : (
     <>
       <form
-        class="audit-filters"
+        class="filter-layout"
         method="get"
         action="/audit-log"
         data-audit-filters
       >
-        {filterMenus.map((menu) => (
-          <FilterMenu {...menu} idPrefix="audit-filter" />
-        ))}
-        {filtered && (
-          <a class="audit-filters-reset" href="/audit-log">
-            Clear filters
-          </a>
-        )}
-      </form>
-      <section class="audit-history" aria-label="Audit history">
-        {history.entries.length ? (
-          <ol class="audit-entries">
-            {history.entries.map((entry) => {
-              const info = auditAction(entry.kind, entry.action);
-              const Icon = kindIcons[entry.kind];
-              const self =
-                entry.kind === "person" &&
-                entry.actorId === entry.subjectId &&
-                info.selfSentence;
-              const series =
-                entry.kind === "series" && entry.localTime && entry.firstDate
-                  ? `Every ${entry.intervalWeeks === 1 ? "week" : `${entry.intervalWeeks} weeks`} at ${formatTimeInput(entry.localTime)} from ${entry.firstDate}`
-                  : "";
-              const expandable =
-                entry.changedFields.length > 0 ||
-                entry.startsAt !== null ||
-                Boolean(series);
-              const summary = (
-                <>
-                  <span
-                    class="audit-kind"
-                    role="img"
-                    aria-label={kindLabels[entry.kind]}
-                    title={kindLabels[entry.kind]}
-                  >
-                    <Icon class="audit-kind-icon" />
-                  </span>
-                  <span class="audit-text">
-                    <span class="audit-sentence">
-                      <a
-                        class="audit-name"
-                        href={auditProfileUrl(
-                          entry.actorId,
-                          entry.actorApproved,
-                          pageUrl,
-                        )}
-                      >
-                        {entry.actorName}
-                      </a>{" "}
-                      {self ? (
-                        self
-                      ) : (
-                        <>
-                          {info.sentence[0]}{" "}
-                          {entry.kind === "person" ? (
-                            <a
-                              class="audit-name"
-                              href={auditProfileUrl(
-                                entry.subjectId,
-                                Boolean(entry.subjectApproved),
-                                pageUrl,
-                              )}
-                            >
-                              {entry.subjectName}
-                            </a>
-                          ) : (
-                            <strong class="audit-name">
-                              {entry.subjectName}
-                            </strong>
-                          )}
-                          {entry.startsAt !== null && (
-                            <> on {formatEventDay(entry.startsAt)}</>
-                          )}
-                          {info.sentence[1] && <> {info.sentence[1]}</>}
-                        </>
-                      )}
-                    </span>
-                    <time
-                      datetime={new Date(entry.createdAt).toISOString()}
-                      title={`${formatEventDate(entry.createdAt)} Vancouver time`}
+        <FilterPanel
+          id="audit-filters"
+          title="Filter"
+          active={activeFilters}
+          resetHref="/audit-log"
+        >
+          {filterMenus.map((menu) => (
+            <FilterSection {...menu} idPrefix="audit-filter" />
+          ))}
+        </FilterPanel>
+        <section
+          class="audit-history filter-layout-results"
+          aria-label="Audit history"
+        >
+          {history.entries.length ? (
+            <ol class="audit-entries">
+              {history.entries.map((entry) => {
+                const info = auditAction(entry.kind, entry.action);
+                const Icon = kindIcons[entry.kind];
+                const self =
+                  entry.kind === "person" &&
+                  entry.actorId === entry.subjectId &&
+                  info.selfSentence;
+                const series =
+                  entry.kind === "series" && entry.localTime && entry.firstDate
+                    ? `Every ${entry.intervalWeeks === 1 ? "week" : `${entry.intervalWeeks} weeks`} at ${formatTimeInput(entry.localTime)} from ${entry.firstDate}`
+                    : "";
+                const expandable =
+                  entry.changedFields.length > 0 ||
+                  entry.startsAt !== null ||
+                  Boolean(series);
+                const summary = (
+                  <>
+                    <span
+                      class="audit-kind"
+                      role="img"
+                      aria-label={kindLabels[entry.kind]}
+                      title={kindLabels[entry.kind]}
                     >
-                      {formatAuditTime(entry.createdAt, now)}
-                    </time>
-                  </span>
-                </>
-              );
-              return (
-                <li class="audit-entry">
-                  {expandable ? (
-                    <details>
-                      <summary class="audit-row">
-                        {summary}
-                        <ChevronDownIcon class="audit-chevron" />
-                        <span class="sr-only">Details</span>
-                      </summary>
-                      <dl class="audit-details">
-                        {entry.startsAt !== null && (
-                          <div>
-                            <dt>Starts</dt>
-                            <dd>{formatEventDate(entry.startsAt)}</dd>
-                          </div>
+                      <Icon class="audit-kind-icon" />
+                    </span>
+                    <span class="audit-text">
+                      <span class="audit-sentence">
+                        <a
+                          class="audit-name"
+                          href={auditProfileUrl(
+                            entry.actorId,
+                            entry.actorApproved,
+                            pageUrl,
+                          )}
+                        >
+                          {entry.actorName}
+                        </a>{" "}
+                        {self ? (
+                          self
+                        ) : (
+                          <>
+                            {info.sentence[0]}{" "}
+                            {entry.kind === "person" ? (
+                              <a
+                                class="audit-name"
+                                href={auditProfileUrl(
+                                  entry.subjectId,
+                                  Boolean(entry.subjectApproved),
+                                  pageUrl,
+                                )}
+                              >
+                                {entry.subjectName}
+                              </a>
+                            ) : (
+                              <strong class="audit-name">
+                                {entry.subjectName}
+                              </strong>
+                            )}
+                            {entry.startsAt !== null && (
+                              <> on {formatEventDay(entry.startsAt)}</>
+                            )}
+                            {info.sentence[1] && <> {info.sentence[1]}</>}
+                          </>
                         )}
-                        {series && (
-                          <div>
-                            <dt>Schedule</dt>
-                            <dd>{series}</dd>
-                          </div>
-                        )}
-                        {entry.changedFields.length > 0 && (
-                          <div>
-                            <dt>Changed</dt>
-                            <dd>{entry.changedFields.join(", ")}</dd>
-                          </div>
-                        )}
-                      </dl>
-                    </details>
-                  ) : (
-                    <div class="audit-row">{summary}</div>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        ) : (
-          <p class="volunteer-notice">
-            {before
-              ? "No older audit entries."
-              : filtered
-                ? "No audit entries match these filters."
-                : "No audit activity yet."}
-          </p>
-        )}
-        {(before || history.next) && (
-          <nav class="audit-pagination" aria-label="Audit history pages">
-            {before && (
-              <a class="btn btn-outline" href={auditLogUrl(filters)}>
-                Newest entries
-              </a>
-            )}
-            {history.next && (
-              <a
-                class="btn btn-outline"
-                href={auditLogUrl(filters, history.next)}
-              >
-                Older entries <ArrowRightIcon class="btn-icon" />
-              </a>
-            )}
-          </nav>
-        )}
-      </section>
+                      </span>
+                      <time
+                        datetime={new Date(entry.createdAt).toISOString()}
+                        title={`${formatEventDate(entry.createdAt)} Vancouver time`}
+                      >
+                        {formatAuditTime(entry.createdAt, now)}
+                      </time>
+                    </span>
+                  </>
+                );
+                return (
+                  <li class="audit-entry">
+                    {expandable ? (
+                      <details>
+                        <summary class="audit-row">
+                          {summary}
+                          <ChevronDownIcon class="audit-chevron" />
+                          <span class="sr-only">Details</span>
+                        </summary>
+                        <dl class="audit-details">
+                          {entry.startsAt !== null && (
+                            <div>
+                              <dt>Starts</dt>
+                              <dd>{formatEventDate(entry.startsAt)}</dd>
+                            </div>
+                          )}
+                          {series && (
+                            <div>
+                              <dt>Schedule</dt>
+                              <dd>{series}</dd>
+                            </div>
+                          )}
+                          {entry.changedFields.length > 0 && (
+                            <div>
+                              <dt>Changed</dt>
+                              <dd>{entry.changedFields.join(", ")}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </details>
+                    ) : (
+                      <div class="audit-row">{summary}</div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <div class="volunteer-notice empty-results">
+              <SearchXIcon class="empty-results-icon" />
+              <div class="empty-results-body">
+                <p>
+                  {before
+                    ? "No older audit entries."
+                    : filtered
+                      ? "No audit entries match these filters."
+                      : "No audit activity yet."}
+                </p>
+                {filtered && (
+                  <a class="btn btn-outline" href="/audit-log">
+                    Reset filters
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+          {(before || history.next) && (
+            <nav class="audit-pagination" aria-label="Audit history pages">
+              {before && (
+                <a class="btn btn-outline" href={auditLogUrl(filters)}>
+                  Newest entries
+                </a>
+              )}
+              {history.next && (
+                <a
+                  class="btn btn-outline"
+                  href={auditLogUrl(filters, history.next)}
+                >
+                  Older entries <ArrowRightIcon class="btn-icon" />
+                </a>
+              )}
+            </nav>
+          )}
+        </section>
+      </form>
     </>
   )}
 </AccountLayout>
 
 <script>
-  import { initFilterMenus } from "@/scripts/filter-menu";
+  import { initFilterPanel } from "@/scripts/filter-panel";
 
   const form = document.querySelector<HTMLFormElement>("[data-audit-filters]");
   const query = (target: HTMLFormElement) => {
@@ -332,25 +350,12 @@ const filterMenus = [
       apply();
     });
 
-    // Closing a menu applies its choices, as the Apply button does.
-    initFilterMenus(form, apply);
+    // Choices apply as they change beside the list, or when the sheet closes.
+    initFilterPanel(form, apply);
   }
 </script>
 
 <style>
-  .audit-filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-  }
-  .audit-filters-reset {
-    margin-left: 0.25rem;
-    color: #d4d4d8;
-    text-decoration: underline;
-    text-underline-offset: 0.25rem;
-  }
   .audit-entries {
     padding: 0;
     border: var(--volunteer-border);

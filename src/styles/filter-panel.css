@@ -1,0 +1,316 @@
+/* A list's filters: a sidebar on wide screens, and a sheet opened from a
+   button on small ones. The same controls serve both. Sorting is a menu. */
+.filter-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "search"
+    "trigger"
+    "results";
+  align-items: start;
+  gap: 0.75rem;
+}
+.filter-layout:not(:has(.filter-layout-search)) {
+  grid-template-areas:
+    "trigger"
+    "results";
+}
+/* Small screens split the filter and sort buttons evenly under the search. */
+.filter-layout:has(.directory-sort-trigger) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    "search search"
+    "trigger sort"
+    "results results";
+}
+.filter-layout-search {
+  grid-area: search;
+}
+.filter-layout-results {
+  grid-area: results;
+  min-width: 0;
+  margin-top: 0.25rem;
+}
+.filter-layout .filter-panel-trigger {
+  grid-area: trigger;
+  min-height: 2.75rem;
+}
+.filter-layout .filter-button-icon {
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+}
+.filter-layout .directory-sort-trigger {
+  min-width: 0;
+  min-height: 2.75rem;
+}
+.filter-layout .directory-sort-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.filter-panel-trigger[data-active] {
+  border-color: #818cf8;
+  background: var(--color-blue-deep);
+  color: #e0e7ff;
+}
+.filter-panel-trigger .volunteer-filter-count {
+  min-width: calc(2.75rem - 0.5rem - 2px);
+}
+.filter-panel-trigger .volunteer-filter-count[hidden] {
+  display: none;
+}
+
+/* Small screens: a sheet rising from the bottom of the screen. */
+.filter-panel {
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: min(48rem, 90dvh);
+  margin: 0;
+  padding: 0;
+  border: 1px solid #52525b;
+  border-bottom: 0;
+  border-radius: 0.75rem 0.75rem 0 0;
+  background: #0c0d10;
+  color: #f4f4f5;
+  color-scheme: dark;
+}
+.filter-panel[open] {
+  display: flex;
+  flex-direction: column;
+}
+.filter-panel::backdrop {
+  background: #000b;
+}
+.filter-panel .dialog-header,
+.filter-panel .dialog-footer {
+  --dialog-padding: 1.25rem;
+}
+.filter-panel .dialog-header h2 {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.25;
+}
+.filter-panel-footer > .btn {
+  flex: 1;
+}
+.filter-panel-body {
+  display: grid;
+  align-content: start;
+  gap: 1.5rem;
+  min-height: 0;
+  padding: 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .filter-panel,
+  .filter-panel::backdrop {
+    transition:
+      translate 200ms cubic-bezier(0.2, 0, 0, 1),
+      opacity 200ms ease-out,
+      display 200ms allow-discrete,
+      overlay 200ms allow-discrete;
+  }
+  .filter-panel:not([open]) {
+    translate: 0 100%;
+  }
+  .filter-panel:not([open])::backdrop {
+    opacity: 0;
+  }
+  @starting-style {
+    .filter-panel[open] {
+      translate: 0 100%;
+    }
+    .filter-panel[open]::backdrop {
+      opacity: 0;
+    }
+  }
+}
+
+/* Wide screens: the same panel, always shown beside the list. */
+@media (min-width: 64rem) {
+  .filter-layout,
+  .filter-layout:not(:has(.filter-layout-search)) {
+    grid-template-columns: 17rem minmax(0, 1fr);
+    grid-template-areas:
+      "panel search"
+      "panel results";
+    grid-template-rows: auto 1fr;
+    /* Match the space between the search and the list. */
+    column-gap: 1rem;
+  }
+  .filter-layout:not(:has(.filter-layout-search)) {
+    grid-template-areas: "panel results";
+    grid-template-rows: auto;
+  }
+  /* Without a search above it, the list starts level with the panel. */
+  .filter-layout:not(:has(.filter-layout-search)) .filter-layout-results {
+    margin-top: 0;
+  }
+  /* A sort menu sits to the right of the search. */
+  .filter-layout:has(.directory-sort-trigger) {
+    grid-template-columns: 17rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "panel search sort"
+      "panel results results";
+  }
+  .filter-layout .filter-panel-trigger {
+    display: none;
+  }
+  .filter-panel,
+  .filter-panel:not([open]) {
+    grid-area: panel;
+    position: static;
+    display: block;
+    max-height: none;
+    /* Boxed like the list beside it. */
+    border: var(--volunteer-border);
+    border-radius: 0.5rem;
+    background: #0c0d10;
+    translate: none;
+    overflow: clip;
+    transition: none;
+  }
+  /* The sheet's header becomes the sidebar's heading, without a close button. */
+  .filter-panel .filter-panel-header {
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    background: none;
+  }
+  .filter-panel .filter-panel-header .dialog-close,
+  .filter-panel-footer {
+    display: none;
+  }
+  .filter-panel-body {
+    padding: 1rem;
+    overflow: visible;
+  }
+}
+
+.filter-section {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.filter-section[hidden] {
+  display: none;
+}
+.filter-section-heading {
+  color: white;
+  font-weight: 600;
+}
+/* Sections after the first are divided from the one above. */
+.filter-panel-body
+  > :is(.filter-section, .filter-sort)
+  ~ :is(.filter-section, .filter-sort),
+.filter-sort > .filter-section + .filter-section {
+  padding-top: 1.5rem;
+  border-top: var(--volunteer-border, 1px solid #3f3f46);
+}
+.filter-sort {
+  display: grid;
+  gap: 1.5rem;
+}
+/* Outrank the portal's general input padding so text clears the icon. */
+.filter-section .filter-section-search input[type="search"] {
+  padding-left: 2.75rem;
+}
+.filter-section-options {
+  display: grid;
+  gap: 0.125rem;
+}
+/* A long list scrolls within its section, under its search field. */
+.filter-section-scroll {
+  max-height: 20rem;
+  padding-right: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.filter-section-group {
+  display: grid;
+  gap: 0.125rem;
+}
+/* Hide option groups whose options are all filtered out by search. */
+.filter-section-group:not(:has([data-filter-option]:not([hidden]))) {
+  display: none;
+}
+.filter-section-group-label {
+  margin-bottom: 0.125rem;
+  color: #a1a1aa;
+  font-size: 0.875rem;
+}
+.filter-option {
+  align-items: center;
+  padding: 0.375rem 0;
+  cursor: pointer;
+}
+.filter-option > input {
+  margin-top: 0;
+}
+.filter-option[hidden] {
+  display: none;
+}
+.filter-option-label {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  min-width: 0;
+}
+.filter-option-name {
+  overflow-wrap: anywhere;
+}
+/* A compact status badge that fits the option row. */
+.filter-option .application-table-progress {
+  padding: 0.0625rem 0.5rem;
+  line-height: 1.5;
+}
+.filter-option-count {
+  color: #a1a1aa;
+}
+.filter-section-empty {
+  color: #a1a1aa;
+}
+.filter-panel-heading-icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  color: #a1a1aa;
+}
+/* Sits on the heading's line, no taller than the heading, so showing it
+   moves nothing. */
+.filter-panel-reset {
+  flex: none;
+  line-height: 1.5rem;
+  color: #d4d4d8;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+.filter-panel-reset:hover {
+  color: white;
+}
+.filter-panel-reset[hidden] {
+  display: none;
+}
+/* Outrank the portal's general input padding so text clears the icon. */
+.filter-layout .filter-layout-search input[type="search"] {
+  padding-left: 2.75rem;
+}
+/* Without scripts, wide screens submit the sidebar with this button. Small
+   screens use the sheet's own button. */
+.filter-panel-apply {
+  justify-self: start;
+}
+@media (width < 64rem) {
+  .filter-panel-apply {
+    display: none;
+  }
+}

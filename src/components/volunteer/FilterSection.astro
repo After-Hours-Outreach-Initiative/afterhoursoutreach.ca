@@ -1,5 +1,5 @@
 ---
-import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
+import SearchClearButton from "./SearchClearButton.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
 import AttendeeAvatar from "./AttendeeAvatar.astro";
 import DirectoryRoleLabel from "./DirectoryRoleLabel.astro";
@@ -12,9 +12,8 @@ import {
   type DirectoryKind,
   type DirectoryRole,
 } from "@/data/volunteer-list";
-import "@/styles/filter-menu.css";
 
-export interface FilterMenuOption {
+export interface FilterOption {
   value: string;
   label: string;
   /** Shown beside the option and kept current by the page's script. */
@@ -37,45 +36,27 @@ interface Props {
   /** Checkbox name; each checked option submits one value. */
   name: string;
   label: string;
-  groups: { label?: string; options: FilterMenuOption[] }[];
+  groups: { label?: string; options: FilterOption[] }[];
   selected: readonly string[];
   search?: boolean;
+  /** Makes the section's ids unique on the page. */
   idPrefix: string;
 }
 const { name, label, groups, selected, search = false, idPrefix } = Astro.props;
 const id = `${idPrefix}-${name}`;
 ---
 
-<button
-  class="volunteer-filter filter-menu-trigger"
-  type="button"
-  id={`${id}-trigger`}
-  popovertarget={id}
-  aria-expanded="false"
-  data-filter-trigger={name}
-  data-active={selected.length ? "" : undefined}
->
-  {label}
-  <span
-    class="volunteer-filter-count"
-    data-filter-selected
-    hidden={!selected.length}
-  >
-    {selected.length}
-    <span class="sr-only"> selected</span>
-  </span>
-  <ChevronDownIcon class="filter-menu-chevron" />
-</button>
 <div
-  class="filter-menu"
-  id={id}
-  popover="auto"
+  class="filter-section"
   role="group"
-  aria-labelledby={`${id}-trigger`}
-  data-filter-menu={name}
+  aria-labelledby={`${id}-heading`}
+  data-filter-section={name}
 >
+  <p class="filter-section-heading" id={`${id}-heading`}>
+    {label}
+  </p>
   {search && (
-    <label class="volunteer-search-field filter-menu-search">
+    <label class="volunteer-search-field filter-section-search">
       <span class="sr-only">Search {label.toLowerCase()}</span>
       <input
         type="search"
@@ -84,21 +65,24 @@ const id = `${idPrefix}-${name}`;
         data-filter-search
       />
       <SearchIcon class="volunteer-search-icon" />
+      <SearchClearButton />
     </label>
   )}
-  <div class="filter-menu-options">
+  <div
+    class:list={["filter-section-options", { "filter-section-scroll": search }]}
+  >
     {groups.map((group) => (
-      <div class="filter-menu-group">
-        {group.label && <p class="filter-menu-group-label">{group.label}</p>}
+      <div class="filter-section-group">
+        {group.label && <p class="filter-section-group-label">{group.label}</p>}
         {group.options.map((option) => (
-          <label class="volunteer-check" data-filter-option>
+          <label class="volunteer-check filter-option" data-filter-option>
             <input
               type="checkbox"
               name={name}
               value={option.value}
               checked={selected.includes(option.value)}
             />
-            <span class="filter-menu-option-label">
+            <span class="filter-option-label">
               {option.person ? (
                 <>
                   <AttendeeAvatar
@@ -107,7 +91,7 @@ const id = `${idPrefix}-${name}`;
                     applicant={option.person.applicant}
                     decorative
                   />
-                  <span class="filter-menu-option-name">{option.label}</span>
+                  <span class="filter-option-name">{option.label}</span>
                   {option.person.organizer && (
                     <VolunteerRoleBadge role="organizer" />
                   )}
@@ -134,7 +118,7 @@ const id = `${idPrefix}-${name}`;
             </span>
             {option.count !== undefined && (
               <span
-                class="filter-menu-option-count"
+                class="filter-option-count"
                 data-filter-count={option.value}
                 {...option.countAttributes}
               >
@@ -145,16 +129,10 @@ const id = `${idPrefix}-${name}`;
         ))}
       </div>
     ))}
-    <p class="filter-menu-empty" data-filter-empty hidden>
-      No matches.
-    </p>
-  </div>
-  <div class="filter-menu-actions">
-    <button class="btn btn-quiet" type="button" data-filter-clear>
-      Clear
-    </button>
-    <button class="btn btn-primary" type="submit" data-filter-apply>
-      Apply
-    </button>
+    {search && (
+      <p class="filter-section-empty" data-filter-empty hidden>
+        No matches.
+      </p>
+    )}
   </div>
 </div>

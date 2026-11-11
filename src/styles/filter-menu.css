@@ -1,4 +1,4 @@
-/* Shared popover menus for list filters and sorting. */
+/* Popover menus, such as the events page's view-as menu. */
 .filter-menu-trigger[data-active] {
   border-color: #818cf8;
   background: var(--color-blue-deep);
@@ -63,47 +63,8 @@
   color: #a1a1aa;
   font-size: 0.875rem;
 }
-.filter-menu-group .volunteer-check {
-  padding: 0.375rem 0;
-  cursor: pointer;
-}
-/* Avatars and badges are taller than text, so center the check beside them. */
-.filter-menu-group .volunteer-check:has(.filter-menu-option-label) {
-  align-items: center;
-}
-.filter-menu-group .volunteer-check:has(.filter-menu-option-label) > input {
-  margin-top: 0;
-}
-.filter-menu-option-label {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 0.5rem;
-  min-width: 0;
-}
-.filter-menu-option-name {
-  overflow-wrap: anywhere;
-}
-/* A compact status badge that fits the option row. */
-.filter-menu .application-table-progress {
-  padding: 0.0625rem 0.5rem;
-  line-height: 1.5;
-}
-.filter-menu-option-count {
-  color: #a1a1aa;
-  font-variant-numeric: tabular-nums;
-}
 .filter-menu-empty {
   color: #a1a1aa;
-}
-.filter-menu-actions {
-  display: flex;
-  flex: none;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border-top: var(--volunteer-border, 1px solid #3f3f46);
 }
 @media (prefers-reduced-motion: reduce) {
   .filter-menu-trigger .filter-menu-chevron {

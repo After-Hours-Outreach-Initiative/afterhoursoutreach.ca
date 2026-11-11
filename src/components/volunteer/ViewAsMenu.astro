@@ -1,4 +1,5 @@
 ---
+import SearchClearButton from "./SearchClearButton.astro";
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
 import CompactPersonName from "./CompactPersonName.astro";
@@ -62,6 +63,7 @@ const href = (value: string) => `/events?viewAs=${encodeURIComponent(value)}`;
             data-filter-search
           />
           <SearchIcon class="volunteer-search-icon" />
+          <SearchClearButton />
         </label>
         <div class="view-as-people">
           {people.map((person) => (

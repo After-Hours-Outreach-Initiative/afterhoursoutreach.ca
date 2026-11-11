@@ -1,6 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 
-/** Choose a directory sort through the sort menu, as a person would. */
+/**
+ * Choose a directory sort from the sort menu, as a person would. With scripts,
+ * each change applies at once and is recorded in history.
+ */
 export async function sortDirectory(
   page: Page,
   sort: string,
@@ -11,13 +14,14 @@ export async function sortDirectory(
   await page.getByRole("button", { name: /^Sort:/ }).click();
   await menu.locator(`input[name="sort"][value="${sort}"]`).check();
   await menu.locator(`input[name="direction"][value="${direction}"]`).check();
-  await menu.getByRole("button", { name: "Apply" }).click();
-  await expect(menu).toBeHidden();
-  // Closing the menu applies the sort and records it in history.
+  // Without scripts, the menu applies through its Apply button.
+  const apply = menu.getByRole("button", { name: "Apply" });
+  if (await apply.isVisible()) await apply.click();
+  else await page.keyboard.press("Escape");
   await expect.poll(() => page.url()).not.toBe(before);
 }
 
-/** The closed sort menu always reflects the applied sort. */
+/** The sort controls always reflect the applied sort. */
 export async function expectDirectorySort(
   page: Page,
   sort: string,

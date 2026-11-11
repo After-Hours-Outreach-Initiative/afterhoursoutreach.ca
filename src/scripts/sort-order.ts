@@ -1,4 +1,4 @@
-const itemSelector = "[data-role-order-item]";
+const itemSelector = "[data-sort-order-item]";
 /** How much of a neighbour the dragged item covers before they swap. */
 const reach = 1 / 3;
 
@@ -12,24 +12,54 @@ async function settled(element: HTMLElement) {
 }
 
 /**
- * A reorderable role list. Drag an item to move it: it follows the pointer,
- * the other items slide out of its way, and a slot marks where it will land.
- * A focused item also moves with the up and down arrow keys. The order is
- * written to the menu's hidden `order` input.
+ * A reorderable list of a sort's values, such as roles or statuses. Drag an
+ * item to move it: it follows the pointer, the other items slide out of its
+ * way, and a slot marks where it will land. A focused item also moves with the
+ * up and down arrow keys. The order is written to the section's hidden input,
+ * which reports each move as a change.
  */
-export function initRoleOrder(menu: HTMLElement) {
-  const section = menu.querySelector<HTMLElement>("[data-role-order]");
-  const list = menu.querySelector<HTMLOListElement>("[data-role-order-list]");
-  const input = menu.querySelector<HTMLInputElement>('input[name="order"]');
-  const status = menu.querySelector<HTMLElement>("[data-role-order-status]");
-  if (!section || !list || !input) return () => {};
+function initSortOrder(section: HTMLElement) {
+  const list = section.querySelector<HTMLOListElement>(
+    "[data-sort-order-list]",
+  );
+  const input = section.querySelector<HTMLInputElement>('input[type="hidden"]');
+  const status = section.querySelector<HTMLElement>("[data-sort-order-status]");
+  if (!list || !input) return () => {};
   const items = () => [...list.querySelectorAll<HTMLElement>(itemSelector)];
   let busy = false;
 
+  const reset = section.querySelector<HTMLElement>("[data-sort-order-reset]");
+  const defaults = section.dataset.sortOrderDefault ?? "";
   const sync = () => {
     input.value = items()
-      .map((item) => item.dataset.roleOrderItem)
+      .map((item) => item.dataset.sortOrderItem)
       .join(",");
+    // Offer a reset only while the order differs from the default.
+    if (reset) reset.hidden = input.value === defaults;
+  };
+  /** Put the items in `order`, sliding each from where it was. */
+  const arrange = (order: readonly string[]) => {
+    const before = new Map(
+      items().map((item) => [item, item.getBoundingClientRect().top]),
+    );
+    for (const value of order) {
+      const item = list.querySelector(`[data-sort-order-item="${value}"]`);
+      if (item) list.appendChild(item);
+    }
+    for (const [item, top] of before) {
+      item.style.transition = "none";
+      item.style.transform = `translateY(${top - item.getBoundingClientRect().top}px)`;
+    }
+    void list.offsetHeight;
+    for (const item of before.keys()) {
+      item.style.removeProperty("transition");
+      item.style.removeProperty("transform");
+    }
+  };
+  /** Report a move a person made, as a changed control does. */
+  const moved = () => {
+    sync();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   };
   const announce = (item: HTMLElement) => {
     if (!status) return;
@@ -46,12 +76,14 @@ export function initRoleOrder(menu: HTMLElement) {
     for (const item of items()) item.style.removeProperty("transition");
   };
 
-  menu.addEventListener("change", (event) => {
-    if (
-      event.target instanceof HTMLInputElement &&
-      event.target.name === "sort"
-    )
-      section.hidden = event.target.value !== "role";
+  reset?.addEventListener("click", () => {
+    if (busy) return;
+    // The reset button hides, so keep focus in the list.
+    const first = items()[0];
+    arrange(defaults.split(","));
+    moved();
+    (items()[0] ?? first)?.focus({ preventScroll: true });
+    if (status) status.textContent = "Order reset to the default.";
   });
 
   list.addEventListener("keydown", (event) => {
@@ -81,7 +113,7 @@ export function initRoleOrder(menu: HTMLElement) {
       other.style.removeProperty("transition");
       other.style.removeProperty("transform");
     }
-    sync();
+    moved();
     announce(item);
   });
 
@@ -106,7 +138,7 @@ export function initRoleOrder(menu: HTMLElement) {
     let landing = own.top;
 
     const slot = document.createElement("div");
-    slot.className = "directory-role-order-slot";
+    slot.className = "directory-sort-order-slot";
     slot.setAttribute("aria-hidden", "true");
     slot.style.height = `${own.height}px`;
     slot.style.transform = `translateY(${own.top - listTop}px)`;
@@ -174,8 +206,9 @@ export function initRoleOrder(menu: HTMLElement) {
       delete item.dataset.dropping;
       if (focused) item.focus({ preventScroll: true });
       busy = false;
-      sync();
-      if (target !== from) announce(item);
+      if (target === from) return;
+      moved();
+      announce(item);
     };
 
     item.addEventListener("pointermove", move);
@@ -186,12 +219,48 @@ export function initRoleOrder(menu: HTMLElement) {
 
   sync();
   /** Show a saved order, as when the page restores another state. */
-  return (order: readonly string[], sort: string) => {
-    for (const role of order) {
-      const item = list.querySelector(`[data-role-order-item="${role}"]`);
-      if (item) list.appendChild(item);
+  return (order: readonly string[]) => {
+    const current = items().map((item) => item.dataset.sortOrderItem);
+    // Moving items drops focus, so leave an unchanged order alone.
+    if (order.join(",") !== current.join(",")) {
+      const focused = document.activeElement;
+      for (const value of order) {
+        const item = list.querySelector(`[data-sort-order-item="${value}"]`);
+        if (item) list.appendChild(item);
+      }
+      if (focused instanceof HTMLElement && list.contains(focused))
+        focused.focus({ preventScroll: true });
     }
-    section.hidden = sort !== "role";
     sync();
+  };
+}
+
+/**
+ * Each sort with a custom order shows its reorderable list while that sort is
+ * chosen. Returns a function that shows saved orders, keyed by input name.
+ */
+export function initSortOrders(menu: HTMLElement) {
+  const sections = [
+    ...menu.querySelectorAll<HTMLElement>("[data-sort-order]"),
+  ].map((section) => ({ section, show: initSortOrder(section) }));
+  const reveal = (sort: string) => {
+    for (const { section } of sections)
+      section.hidden = section.dataset.sortOrder !== sort;
+  };
+  menu.addEventListener("change", (event) => {
+    if (
+      event.target instanceof HTMLInputElement &&
+      event.target.name === "sort"
+    )
+      reveal(event.target.value);
+  });
+  return (orders: Record<string, readonly string[]>, sort: string) => {
+    for (const { section, show } of sections) {
+      const name = section.querySelector<HTMLInputElement>(
+        'input[type="hidden"]',
+      )!.name;
+      if (orders[name]) show(orders[name]);
+    }
+    reveal(sort);
   };
 }

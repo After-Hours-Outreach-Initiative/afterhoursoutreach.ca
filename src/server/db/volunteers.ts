@@ -40,16 +40,18 @@ import type {
   VolunteerSortDirection,
 } from "../../data/volunteer-list";
 import {
+  applicationStatusKeys,
   directoryRoleKeys,
   directoryView,
   type DirectoryPerson,
   type DirectoryListState,
 } from "../../data/volunteer-list";
 
-/** Role filters and the custom role sort order shared by both directories. */
+/** Role filters and the custom sort orders shared by both directories. */
 interface DirectoryRoleOptions {
   roles?: DirectoryRole[];
   roleOrder?: DirectoryRole[];
+  statusOrder?: ApplicationStatus[];
 }
 
 export interface VolunteerRow {
@@ -81,6 +83,7 @@ export async function listVolunteers(
     approval: [],
     roles,
     roleOrder,
+    statusOrder: applicationStatusKeys,
     sort,
     direction,
   });
@@ -96,6 +99,7 @@ export async function listApplications(
   {
     roles = [],
     roleOrder = directoryRoleKeys("applications"),
+    statusOrder = applicationStatusKeys,
   }: DirectoryRoleOptions = {},
 ) {
   return listPeople(db, actor, true, {
@@ -108,6 +112,7 @@ export async function listApplications(
           : [...approval],
     roles,
     roleOrder,
+    statusOrder,
     sort,
     direction,
   });
