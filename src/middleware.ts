@@ -16,7 +16,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (!import.meta.env.DEV)
     headers.set(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'inline-speculation-rules'; style-src 'self' 'unsafe-inline'; frame-src 'none'; connect-src 'self'; img-src 'self' data:; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'none'; connect-src 'self'; img-src 'self' data:; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
     );
   return new Response(response.body, {
     status: response.status,

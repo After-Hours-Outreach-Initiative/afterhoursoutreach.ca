@@ -23,6 +23,8 @@ simulation controls; production and hosted previews exclude those controls.
 ## Event and access notifications
 
 Opted-in notification records are written in the same transaction as the change.
+An application approval also writes a notice to the organization inbox in that
+transaction, sent with the volunteer's email. Branch previews skip the notice.
 Skipping email creates no outbox records, so there is nothing to send on retry.
 Delivery failure leaves the change saved and the notification pending. Public
 requests attempt at most five notifications to keep Worker subrequests bounded;

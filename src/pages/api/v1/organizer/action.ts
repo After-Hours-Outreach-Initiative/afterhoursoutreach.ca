@@ -14,6 +14,7 @@ import {
 import { forwardCookies } from "@/server/auth";
 import { takeRateLimit } from "@/server/db/rate-limits";
 import { actionEmailResult } from "@/server/events/notifications";
+import { submissionNotificationMode } from "@/server/db/submission-notifications";
 import { readJson, RequestError, errorResponse } from "@/server/http";
 
 const id = z.string().min(1).max(200);
@@ -81,7 +82,12 @@ export const POST: APIRoute = async ({ request }) => {
               patrolApproved: input.patrolApproved,
               notify: input.notify,
               reason: input.reason,
-            })
+            },
+            // Branch previews never email the organization inbox.
+            submissionNotificationMode(bindings) === "preview"
+              ? undefined
+              : { origin: bindings.AUTH_BASE_URL },
+          )
           : input.action === "approve-patrols"
             ? await approveForPatrols(env.DB, actor, {
                 userId: input.userId,
@@ -107,7 +113,8 @@ export const POST: APIRoute = async ({ request }) => {
       result,
       input.action === "retry-notifications" ||
         input.action === "reject-application" ||
-        ("notify" in input && input.notify),
+        ("notify" in input && input.notify) ||
+        ("staffNotified" in result && result.staffNotified === true),
     );
     const response = Response.json(
       {

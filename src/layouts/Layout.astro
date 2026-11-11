@@ -102,6 +102,14 @@ const {
 </html>
 
 <script>
+  // The browser skips a page transition when the next page cannot take part,
+  // such as after typing an address. Skipping is expected, not an error.
+  addEventListener("pageswap", (event) => {
+    const transition = (event as PageSwapEvent).viewTransition;
+    transition?.ready.catch(() => {});
+    transition?.finished.catch(() => {});
+  });
+
   document
     .querySelector<HTMLAnchorElement>("[data-skip-to-main]")
     ?.addEventListener("click", (event) => {

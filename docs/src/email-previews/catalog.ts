@@ -1,5 +1,6 @@
 import {
   accessRegistrationCancelledEmail,
+  applicationApprovedNoticeEmail,
   applicationSubmittedEmail,
   emailSenders,
   eventCancelledEmail,
@@ -190,6 +191,30 @@ export const emailPreviews: EmailPreview[] = [
         ),
       ),
     ),
+  },
+  {
+    id: "application-approved-notice",
+    name: "Application approved notice",
+    group: "Applications and access",
+    trigger: "An organizer approves a previously unapproved application.",
+    delivery:
+      "Sent to the organization inbox with every approval, whether or not the volunteer is emailed. Not sent from branch previews.",
+    source: source.volunteers,
+    examples: [
+      example(
+        "Organization inbox",
+        eventNotificationEmail(
+          applicationApprovedNoticeEmail({
+            applicant: "Sam V.",
+            approvedBy: "Robin O.",
+            profileUrl: `${origin}/volunteers/sample-applicant`,
+          }),
+          origin,
+        ),
+        false,
+        "organizer@example.invalid",
+      ),
+    ],
   },
   {
     id: "application-revoked",

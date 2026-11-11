@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { profileWriteBody } from "../helpers/profile-write";
-import { existsSync } from "node:fs";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
-import { chromium, expect, type Locator, type Route } from "@playwright/test";
+import { expect, type Locator, type Route } from "@playwright/test";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { fillDateInput } from "../helpers/date-input";
 import { createSignInOTP } from "../helpers/email-otp";
@@ -441,10 +441,11 @@ describe(
         assert.equal(result.pending, 0);
         assert.equal(result.message, "Your registration is confirmed.");
         assert.equal(result.localNotifications, undefined);
+        // Earlier approvals told the organization inbox; signups email no one.
         assert.equal(
           (
             await DB.prepare(
-              "SELECT count(*) AS n FROM event_notification",
+              "SELECT count(*) AS n FROM event_notification WHERE delivery_to!='info@afterhoursoutreach.ca'",
             ).first()
           )?.n,
           0,
@@ -1100,11 +1101,7 @@ describe(
         await DB.prepare("DELETE FROM auth_rate_limit WHERE key=?")
           .bind(eventRateKey)
           .run();
-        const browser = await chromium.launch({
-          executablePath:
-            process.env.CHROMIUM_PATH ??
-            (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-        });
+        const browser = await launchWorkerBrowser();
         try {
           const page = await browser.newPage({
             viewport: { width: 375, height: 812 },

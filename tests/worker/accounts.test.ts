@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { profileWriteBody } from "../helpers/profile-write";
-import { existsSync } from "node:fs";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
-import { chromium, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createAuth } from "../../src/server/auth";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { createSignInOTP } from "../helpers/email-otp";
@@ -1195,11 +1195,7 @@ describe(
     });
 
     test("sign-in pages stay first-party and completed links land on /volunteer", async () => {
-      const browser = await chromium.launch({
-        executablePath:
-          process.env.CHROMIUM_PATH ??
-          (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-      });
+      const browser = await launchWorkerBrowser();
       try {
         const page = await browser.newPage();
         const external: string[] = [];
@@ -1267,11 +1263,7 @@ describe(
     });
 
     test("browser edits persisted profile answers without browser storage or third-party requests", async () => {
-      const browser = await chromium.launch({
-        executablePath:
-          process.env.CHROMIUM_PATH ??
-          (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-      });
+      const browser = await launchWorkerBrowser();
       try {
         const context = await browser.newContext();
         const browserCookie = cookie.split(";")[0];

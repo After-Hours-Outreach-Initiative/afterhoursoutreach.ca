@@ -2126,14 +2126,19 @@ test("review queue loads every submitted entry and counts search matches indepen
   await env.DB.prepare(
     "DELETE FROM discord_requirement WHERE user_id='pending-02'",
   ).run();
-  const approval = await setVolunteerStatus(env.DB, actor, {
-    userId: "pending-02",
-    version: 0,
-    active: true,
-    applicationApproved: true,
-    patrolApproved: false,
-    notify: true,
-  });
+  const approval = await setVolunteerStatus(
+    env.DB,
+    actor,
+    {
+      userId: "pending-02",
+      version: 0,
+      active: true,
+      applicationApproved: true,
+      patrolApproved: false,
+      notify: true,
+    },
+    { origin: "https://afterhoursoutreach.ca" },
+  );
   await deliverNotifications(
     {
       ...env,
@@ -2148,10 +2153,21 @@ test("review queue loads every submitted entry and counts search matches indepen
     .bind(approval.operation)
     .first<string>("payload");
   const approvalEmails = JSON.parse(payload!) as {
+    to: string[];
     subject: string;
     text: string;
   }[];
-  assert.equal(approvalEmails.length, 1);
+  // The volunteer's email, then the organization inbox's notice.
+  assert.equal(approvalEmails.length, 2);
+  assert.deepEqual(approvalEmails[1].to, ["info@afterhoursoutreach.ca"]);
+  assert.equal(approvalEmails[1].subject, "Volunteer application approved");
+  assert.match(approvalEmails[1].text, /^Applicant: \S.*\n/);
+  assert.ok(approvalEmails[1].text.includes(`Approved by: ${actor.name}\n`));
+  assert.ok(
+    approvalEmails[1].text.includes(
+      "Volunteer profile: https://afterhoursoutreach.ca/volunteers/pending-02",
+    ),
+  );
   assert.equal(
     approvalEmails[0].subject,
     "Your volunteer application is approved",
@@ -2228,15 +2244,30 @@ test("review queue loads every submitted entry and counts search matches indepen
   );
   const version = (await listVolunteers(env.DB, actor, "pending-02")).rows[0]
     .updatedAt;
-  const revocation = await setVolunteerStatus(env.DB, actor, {
-    userId: "pending-02",
-    version,
-    active: true,
-    applicationApproved: false,
-    patrolApproved: false,
-    notify: true,
-    reason: "Approved by mistake.",
-  });
+  const revocation = await setVolunteerStatus(
+    env.DB,
+    actor,
+    {
+      userId: "pending-02",
+      version,
+      active: true,
+      applicationApproved: false,
+      patrolApproved: false,
+      notify: true,
+      reason: "Approved by mistake.",
+    },
+    { origin: "https://afterhoursoutreach.ca" },
+  );
+  // Only approvals reach the organization inbox.
+  assert.equal(revocation.staffNotified, false);
+  assert.equal(
+    await env.DB.prepare(
+      "SELECT count(*) AS count FROM event_notification WHERE operation_id=?",
+    )
+      .bind(revocation.operation)
+      .first("count"),
+    1,
+  );
   const revokedEmail = await env.DB.prepare(
     "SELECT subject, body FROM event_notification WHERE operation_id=?",
   )

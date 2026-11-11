@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
+import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { chromium, expect as browserExpect } from "@playwright/test";
+import { expect as browserExpect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { seedVerifiedDiscordMembership } from "../helpers/discord";
@@ -72,11 +72,7 @@ describe("launch readiness regressions", { concurrent: false }, () => {
   afterAll(() => server.close());
 
   const browserWithSession = async (initialCookie: string) => {
-    const browser = await chromium.launch({
-      executablePath:
-        process.env.CHROMIUM_PATH ??
-        (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-    });
+    const browser = await launchWorkerBrowser();
     const page = await browser.newPage();
     let cookie = initialCookie;
     await page.route("**/*", async (route) => {

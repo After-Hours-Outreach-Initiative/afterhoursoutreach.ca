@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
+import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { test } from "vitest";
 import { createTestHarness } from "wrangler";
-import { existsSync } from "node:fs";
-import { chromium, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createSignInOTP } from "../helpers/email-otp";
 
 test("self-service deletion requires fresh, confirmed same-origin authentication and preserves retained history", async () => {
@@ -176,11 +176,7 @@ test("self-service deletion requires fresh, confirmed same-origin authentication
     );
     // Exercise the actual client handler and keyboard-accessible confirmation,
     // routing every browser request to this isolated Worker, never the live site.
-    const browser = await chromium.launch({
-      executablePath:
-        process.env.CHROMIUM_PATH ??
-        (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-    });
+    const browser = await launchWorkerBrowser();
     let deletionResponse: Awaited<ReturnType<typeof worker.fetch>> | undefined;
     try {
       const context = await browser.newContext();

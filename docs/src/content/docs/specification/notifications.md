@@ -20,7 +20,9 @@ expiry, and retry limits belong in [Account implementation](/implementation/acco
 Approving, rejecting, or revoking an application, and approving or revoking
 patrol approval from a volunteer profile, always email the volunteer once the
 organizer confirms. Rejection and revocation require a reason, which the email
-includes.
+includes. Approving an application also emails the organization inbox,
+info@afterhoursoutreach.ca, with the applicant, the approving organizer, and a
+link to their profile.
 
 Organizers choose whether to send email when they change active status, roles,
 event details, or event cancellation, approve patrols from an event roster, or

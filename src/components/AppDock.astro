@@ -199,22 +199,3 @@ const items = [
     }
   }
 </style>
-
-<script>
-  // Make the dock's other pages feel instant on small screens, where the dock
-  // shows: fetch them as soon as the page loads, and render the one a finger
-  // lands on before it lifts. Browsers without speculation rules skip this.
-  if (
-    matchMedia("(width < 64rem)").matches &&
-    HTMLScriptElement.supports?.("speculationrules")
-  ) {
-    const where = { selector_matches: ".app-dock-item:not([aria-current])" };
-    const rules = document.createElement("script");
-    rules.type = "speculationrules";
-    rules.textContent = JSON.stringify({
-      prefetch: [{ source: "document", where, eagerness: "immediate" }],
-      prerender: [{ source: "document", where, eagerness: "conservative" }],
-    });
-    document.head.append(rules);
-  }
-</script>

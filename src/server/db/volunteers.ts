@@ -1,10 +1,12 @@
 import { z } from "zod";
 import {
   accessRegistrationCancelledTemplate,
+  applicationApprovedNoticeEmail,
   applicationRejectedEmail,
   roleChangedEmail,
   volunteerAccessEmail,
 } from "../../data/email-templates";
+import { contactEmail } from "../../data/site";
 import { emailTextSql } from "./email-text";
 import {
   requireOrganizer,
@@ -434,6 +436,8 @@ export async function setVolunteerStatus(
   db: Env["DB"],
   actor: Actor,
   input: unknown,
+  /** Also tell the organization inbox when an application is approved. */
+  staffNotice?: { origin: string },
 ) {
   requireOrganizer(actor);
   const parsed = statusSchema.safeParse(input);
@@ -443,15 +447,19 @@ export async function setVolunteerStatus(
     parsed.data;
   const old = await db
     .prepare(
-      `SELECT active, registration_approved AS applicationApproved, patrol_approved AS patrolApproved
-      FROM volunteer_status
-      WHERE user_id = ?`,
+      `SELECT v.active, v.registration_approved AS applicationApproved, v.patrol_approved AS patrolApproved,
+        ${profileDisplayNameSql} AS name
+      FROM volunteer_status v
+      JOIN user u ON u.id = v.user_id
+      LEFT JOIN profile p ON p.user_id = v.user_id
+      WHERE v.user_id = ?`,
     )
     .bind(userId)
     .first<{
       active: number;
       applicationApproved: number;
       patrolApproved: number;
+      name: string;
     }>();
   if (!old) throw new RequestError(404, "Volunteer not found.");
   if (
@@ -508,6 +516,14 @@ export async function setVolunteerStatus(
     actor.name,
     reason,
   );
+  const notice =
+    staffNotice && applicationApproved && !old.applicationApproved
+      ? applicationApprovedNoticeEmail({
+          applicant: old.name || "Unnamed applicant",
+          approvedBy: actor.name,
+          profileUrl: `${staffNotice.origin}/volunteers/${encodeURIComponent(userId)}`,
+        })
+      : undefined;
   const operation = crypto.randomUUID();
   const now = Math.max(Date.now(), version + 1);
   try {
@@ -631,13 +647,36 @@ export async function setVolunteerStatus(
           operation,
           Number(notify),
         ),
+      // The organization inbox hears of every approval, whatever the choice
+      // about emailing the volunteer.
+      db
+        .prepare(
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
+          SELECT ?, ?, ?, ?, ?, ?, ?
+          WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          operation,
+          userId,
+          notice?.subject ?? "",
+          notice?.text ?? "",
+          now,
+          contactEmail,
+          operation,
+          Number(Boolean(notice)),
+        ),
     ]);
     if (!results[0].meta.changes)
       throw new RequestError(
         409,
         "This volunteer's status changed. Reload before saving.",
       );
-    return { operation, message: "Volunteer access saved." };
+    return {
+      operation,
+      message: "Volunteer access saved.",
+      staffNotified: Boolean(notice),
+    };
   } catch (error) {
     return databaseWriteError(error);
   }

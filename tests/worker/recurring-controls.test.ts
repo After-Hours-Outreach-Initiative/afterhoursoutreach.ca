@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
+import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { test } from "vitest";
-import { chromium, expect, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { profileWriteBody } from "../helpers/profile-write";
@@ -20,11 +20,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       },
     ],
   });
-  const browser = await chromium.launch({
-    executablePath:
-      process.env.CHROMIUM_PATH ??
-      (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-  });
+  const browser = await launchWorkerBrowser();
   try {
     await server.listen();
     const worker = server.getWorker<Env>();

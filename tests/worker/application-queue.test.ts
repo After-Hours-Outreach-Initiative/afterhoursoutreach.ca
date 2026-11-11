@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { test } from "vitest";
-import { chromium, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createTestHarness } from "wrangler";
 import { createSignInOTP } from "../helpers/email-otp";
 import { expectDirectorySort, sortDirectory } from "../helpers/directory-sort";
@@ -22,11 +22,7 @@ test("organizers review pending and approved applications with persistent list c
       },
     ],
   });
-  const browser = await chromium.launch({
-    executablePath:
-      process.env.CHROMIUM_PATH ??
-      (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-  });
+  const browser = await launchWorkerBrowser();
   try {
     await server.listen();
     const worker = server.getWorker<Env>();
@@ -714,6 +710,7 @@ test("organizers review pending and approved applications with persistent list c
     await expect(headerCount).toHaveText([
       "52 ready for review",
       "52 ready for review",
+      "52 ready for review",
     ]);
     await expect(
       approvedReview.locator("[data-application-approved-by] dd"),
@@ -893,6 +890,7 @@ test("organizers review pending and approved applications with persistent list c
         .map(({ subject }) => subject)
         .sort(),
       [
+        "Volunteer application approved",
         "Your volunteer access changed",
         "Your volunteer access changed",
         "Your volunteer access changed",
@@ -1059,6 +1057,7 @@ test("organizers review pending and approved applications with persistent list c
     );
     await expect(count).toHaveText("50");
     await expect(headerCount).toHaveText([
+      "50 ready for review",
       "50 ready for review",
       "50 ready for review",
     ]);

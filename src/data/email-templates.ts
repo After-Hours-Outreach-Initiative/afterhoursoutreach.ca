@@ -222,6 +222,20 @@ export function volunteerAccessEmail(
   );
 }
 
+/** Tells the organization inbox that an organizer approved an application. */
+export function applicationApprovedNoticeEmail(values: {
+  applicant: string;
+  approvedBy: string;
+  profileUrl: string;
+}): EmailContent {
+  const line = (value: string) =>
+    value.replaceAll("\r", " ").replaceAll("\n", " ");
+  return emailContent(
+    "Volunteer application approved",
+    `Applicant: ${line(values.applicant)}\nApproved by: ${line(values.approvedBy)}\n\nVolunteer profile: ${values.profileUrl}\n\nOrganizer sign-in required.`,
+  );
+}
+
 export function roleChangedEmail(
   role: "volunteer" | "organizer",
 ): EmailContent {

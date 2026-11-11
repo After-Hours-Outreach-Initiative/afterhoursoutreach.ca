@@ -166,12 +166,13 @@ describe(
           count = expected,
         ) => {
           const row = (await DB.prepare(
-            "SELECT updated_at AS version, active, patrol_approved AS patrolApproved FROM volunteer_status WHERE user_id=?",
+            "SELECT updated_at AS version, active, registration_approved AS applicationApproved, patrol_approved AS patrolApproved FROM volunteer_status WHERE user_id=?",
           )
             .bind(volunteer.id)
             .first<{
               version: number;
               active: number;
+              applicationApproved: number;
               patrolApproved: number;
             }>())!;
           return checkMutation(
@@ -184,10 +185,13 @@ describe(
               applicationApproved: true,
               patrolApproved,
             },
-            row.active === Number(active) &&
-              row.patrolApproved === Number(patrolApproved)
+            (row.active === Number(active) &&
+            row.patrolApproved === Number(patrolApproved) &&
+            row.applicationApproved
               ? 0
-              : count,
+              : count) +
+              // Approval always tells the organization inbox.
+              (row.applicationApproved ? 0 : 1),
           );
         };
         await status(true, true);
@@ -313,7 +317,13 @@ describe(
             },
             body: JSON.stringify({ action: "retry-notifications" }),
           });
-          assert.equal(await notificationCount(), 0);
+          // Only the organization inbox's approval notice is ever queued.
+          assert.equal(
+            await DB.prepare(
+              "SELECT count(*) AS n FROM event_notification WHERE delivery_to!='info@afterhoursoutreach.ca'",
+            ).first("n"),
+            0,
+          );
           assert.equal(retry.status, 400);
         }
       });
