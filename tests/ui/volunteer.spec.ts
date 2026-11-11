@@ -608,7 +608,7 @@ test("View as can choose a D1 account without an application without changing it
   );
   await expect(
     portal.getByRole("link", {
-      name: "Complete application form",
+      name: "Complete form",
     }),
   ).toHaveAttribute("href", "/apply");
   const discord = portal.getByRole("link", { name: "Join Discord" });
@@ -626,7 +626,7 @@ test("View as can choose a D1 account without an application without changing it
   await expect(page).toHaveURL(
     /\/volunteer\?type=orientation&occurrence=example$/,
   );
-  await page.getByRole("link", { name: "Complete application form" }).click();
+  await page.getByRole("link", { name: "Complete form" }).click();
   await expect(page).toHaveURL(/\/apply$/);
 });
 

@@ -633,7 +633,7 @@ describe(
       const prompt = await applicationPortal.text();
       assert.match(prompt, /data-application-tracker/);
       assert.match(prompt, /href="\/apply"/);
-      assert.match(prompt, /Complete application form/);
+      assert.match(prompt, /Complete form/);
       assert.doesNotMatch(prompt, /data-event-list/);
       for (const input of [
         answers,
@@ -1478,7 +1478,7 @@ describe(
           .click();
         await expect(newPage).toHaveURL(`${origin}/volunteer`);
         await newPage
-          .getByRole("link", { name: "Complete application form", exact: true })
+          .getByRole("link", { name: "Complete form", exact: true })
           .click();
         await newPage
           .getByRole("heading", {

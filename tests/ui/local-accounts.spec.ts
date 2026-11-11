@@ -601,7 +601,7 @@ test("unfinished application shows current milestones and a keyboard-accessible 
   await page.goto("/volunteer");
   const tracker = page.locator("[data-application-tracker]");
   const formLink = page.getByRole("link", {
-    name: "Complete application form",
+    name: "Complete form",
     exact: true,
   });
   await expect(tracker).toHaveCount(0);
