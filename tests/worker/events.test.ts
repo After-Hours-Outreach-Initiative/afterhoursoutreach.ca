@@ -871,7 +871,7 @@ describe(
       test("deactivation silently cancels future spots and last organizer cannot be removed", async () => {
         await ok(await status(alice.id, false, false));
         const notifications = await DB.prepare(
-          "SELECT count(*) AS n FROM event_notification WHERE user_id=? AND subject='Your event registration was cancelled' AND body LIKE '%volunteer access changed%'",
+          "SELECT count(*) AS n FROM event_notification WHERE user_id=? AND body LIKE '%volunteer access changed%'",
         )
           .bind(alice.id)
           .first<{ n: number }>();
@@ -1203,7 +1203,6 @@ describe(
             form: profileView.locator(
               '[data-organizer-status][data-access-kind="patrol"]',
             ),
-            notify: true,
             trigger: async () => {
               await profileView
                 .getByRole("button", {
@@ -1290,7 +1289,7 @@ describe(
                 page.getByLabel("Active volunteer", { exact: true }),
               ).toBeChecked();
             },
-            loadingLabel: "Saving…",
+            loadingLabel: "Sending…",
           });
           assert.deepEqual(
             await DB.prepare(
@@ -1320,8 +1319,12 @@ describe(
                 "organizer",
               );
             },
-            loadingLabel: "Saving…",
+            loadingLabel: "Sending…",
           });
+          await page
+            .locator("dialog[data-action-email-feedback]")
+            .getByRole("button", { name: "Close", exact: true })
+            .click();
           await expect(profileView).toBeVisible();
           assert.equal(
             (
@@ -1338,8 +1341,12 @@ describe(
               profileView.getByLabel("Account role").selectOption("volunteer"),
             updated: () =>
               expect(profileView.getByLabel("Account role")).toBeEnabled(),
-            loadingLabel: "Saving…",
+            loadingLabel: "Sending…",
           });
+          await page
+            .locator("dialog[data-action-email-feedback]")
+            .getByRole("button", { name: "Close", exact: true })
+            .click();
           await expect(profileView).toBeVisible();
           const activeForm = profileView.locator(
             "[data-organizer-status][data-submit-on-change]",
@@ -1361,7 +1368,7 @@ describe(
               expect(activeForm.locator("[data-form-message]")).toHaveText(
                 "This volunteer's status changed.",
               ),
-            loadingLabel: "Saving…",
+            loadingLabel: "Sending…",
           });
           await expect(
             profileView.getByLabel("Active volunteer", { exact: true }),
@@ -1650,7 +1657,6 @@ describe(
           await inPlaceAction(page, {
             endpoint: "/api/v1/events/action",
             form: signupDialog.locator("[data-manage-signup]"),
-            notify: true,
             trigger: () =>
               signupDialog
                 .getByRole("button", {
@@ -1738,8 +1744,12 @@ describe(
                 destinationCard.locator(".volunteer-roster"),
               ).toHaveCount(0);
             },
-            loadingLabel: "Moving…",
+            loadingLabel: "Sending…",
           });
+          await page
+            .locator("dialog[data-action-email-feedback]")
+            .getByRole("button", { name: "Close", exact: true })
+            .click();
           await card.locator(".volunteer-roster > summary").click();
           await card.locator("[data-signup-menu-trigger]").click();
           await card
@@ -1764,9 +1774,13 @@ describe(
                 .click(),
             updated: () =>
               expect(card.locator(".volunteer-roster")).toHaveCount(0),
-            loadingLabel: "Removing…",
+            loadingLabel: "Sending…",
           });
           assert.equal(await removeSignupDialog.isVisible(), false);
+          await page
+            .locator("dialog[data-action-email-feedback]")
+            .getByRole("button", { name: "Close", exact: true })
+            .click();
           routeCookie = bob.cookie;
           await page.goto(`${origin}/events`);
           await changeSpot("join", () =>
@@ -1860,7 +1874,6 @@ describe(
           await inPlaceAction(page, {
             endpoint: "/api/v1/organizer/action",
             form: approvalForm,
-            notify: false,
             trigger: () =>
               attendanceCard
                 .getByRole("button", {
@@ -1872,7 +1885,7 @@ describe(
               approvedAttendee
                 .locator("[data-patrol-approval-status]")
                 .waitFor(),
-            loadingLabel: "Saving…",
+            loadingLabel: "Sending…",
           });
           await expect(approvalForm).toHaveCount(0);
           await expect(
@@ -1893,6 +1906,10 @@ describe(
           await expect(
             attendanceCard.locator(".volunteer-roster"),
           ).toHaveAttribute("open", "");
+          await page
+            .locator("dialog[data-action-email-feedback]")
+            .getByRole("button", { name: "Close", exact: true })
+            .click();
           await card.getByRole("button", { name: "Edit", exact: true }).click();
           const cancelEditor = page.getByRole("dialog", {
             name: "Edit event",

@@ -508,9 +508,6 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await manager
       .getByRole("button", { name: "Save series defaults", exact: true })
       .click();
-    await organizerPage
-      .getByRole("button", { name: "Save without email", exact: true })
-      .click();
     await expect(manager).not.toBeVisible();
     expect(
       await DB.prepare(
@@ -570,10 +567,6 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .fill("UI future meeting point");
     await editor.getByRole("button", { name: "Save", exact: true }).click();
     await expect(uiCard.locator("dialog")).not.toBeVisible();
-    // Empty occurrences do not offer roster email or a cancellation reason.
-    await expect(
-      organizerPage.getByRole("dialog", { name: "Send an email?" }),
-    ).not.toBeVisible();
     await expect(uiCard).toContainText("UI future meeting point");
     expect(
       await DB.prepare(
@@ -616,9 +609,6 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .fill(addCalendarDays(firstDate, 28));
     await manager
       .getByRole("button", { name: "Save series defaults", exact: true })
-      .click();
-    await organizerPage
-      .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(uiCard).toHaveCount(0);
     await expect(uiGroup).toHaveCount(1);
@@ -693,9 +683,6 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await organizerPage
       .getByRole("dialog", { name: "Delete series?", exact: true })
       .getByRole("button", { name: "Delete", exact: true })
-      .click();
-    await organizerPage
-      .getByRole("button", { name: "Save without email", exact: true })
       .click();
     await expect(emptyGroup).toHaveCount(0);
     await expect(uiGroup).toHaveCount(1);

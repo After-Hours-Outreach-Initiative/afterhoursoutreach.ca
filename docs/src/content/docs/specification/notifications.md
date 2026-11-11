@@ -24,18 +24,13 @@ includes. Approving an application also emails the organization inbox,
 info@afterhoursoutreach.ca, with the applicant, the approving organizer, and a
 link to their profile.
 
-Organizers choose whether to send email when they change active status, roles,
-event details, or event cancellation, approve patrols from an event roster, or
-move or remove a volunteer's sign-up. A reason may accompany relevant changes.
-
-- **Save without email** applies the change without queuing a notification.
-- **Save and send email** applies the change and requests the relevant messages.
-- Cancelling the prompt applies neither the change nor the notification.
-
-If access revocation cancels future sign-ups, cancellation emails are included
-only when the organizer chooses to send email. Delivery failure leaves the
-underlying change saved and exposes pending delivery for follow-up. Organizers
-can retry pending notifications; unresolved older deliveries require investigation.
+Changing active status, roles, event details, or event cancellation, approving
+patrols from an event roster, and moving or removing a volunteer's sign-up email
+the affected volunteers. A reason may accompany relevant changes. If access
+revocation cancels future sign-ups, their cancellation emails are included.
+Delivery failure leaves the underlying change saved and exposes pending delivery
+for follow-up. Organizers can retry pending notifications; unresolved older
+deliveries require investigation.
 
 Volunteer self-service sign-ups and cancellations, event creation, and orientation
 completion confirm on screen without sending email.

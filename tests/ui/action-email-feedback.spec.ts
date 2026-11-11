@@ -63,10 +63,6 @@ test("email feedback preserves errors, retries only its operation, and closes si
     document.querySelector(".volunteer-wrap")!.appendChild(form);
   });
   await page.getByRole("button", { name: "Remove test registration" }).click();
-  await page
-    .getByRole("dialog", { name: "Send an email?", exact: true })
-    .getByRole("button", { name: "Save and send email", exact: true })
-    .click();
   await sending;
   await expect(
     page.getByRole("button", { name: "Sending…", exact: true }),
@@ -98,10 +94,6 @@ test("email feedback preserves errors, retries only its operation, and closes si
   emailIssue = false;
   const button = page.getByRole("button", { name: "Remove test registration" });
   await button.click();
-  await page
-    .getByRole("dialog", { name: "Send an email?", exact: true })
-    .getByRole("button", { name: "Save and send email", exact: true })
-    .click();
   await expect(button).toBeEnabled();
   await expect(page.locator("[data-action-email-feedback]")).toHaveCount(0);
   const message = page.locator("[data-manage-signup] [data-form-message]");

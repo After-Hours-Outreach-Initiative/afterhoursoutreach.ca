@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  accessRegistrationCancelledEmail,
   accessRegistrationCancelledTemplate,
   applicationApprovedNoticeEmail,
   applicationRejectedEmail,
@@ -8,6 +9,7 @@ import {
 } from "../../data/email-templates";
 import { contactEmail } from "../../data/site";
 import { emailTextSql } from "./email-text";
+import { emailButtonValue } from "./notifications";
 import {
   requireOrganizer,
   writePermission,
@@ -437,7 +439,7 @@ export async function setVolunteerStatus(
   actor: Actor,
   input: unknown,
   /** Also tell the organization inbox when an application is approved. */
-  staffNotice?: { origin: string },
+  staffNotice = false,
 ) {
   requireOrganizer(actor);
   const parsed = statusSchema.safeParse(input);
@@ -492,13 +494,14 @@ export async function setVolunteerStatus(
         "The applicant must complete Naloxone 101 before approval.",
       );
   }
-  const fields = [
-    old.active !== Number(active) ? "active" : "",
-    old.applicationApproved !== Number(applicationApproved)
-      ? "applicationApproved"
-      : "",
-    old.patrolApproved !== Number(patrolApproved) ? "patrolApproved" : "",
-  ].filter(Boolean);
+  const fields = (
+    [
+      old.active !== Number(active) && "active",
+      old.applicationApproved !== Number(applicationApproved) &&
+        "applicationApproved",
+      old.patrolApproved !== Number(patrolApproved) && "patrolApproved",
+    ] as const
+  ).filter((field) => field !== false);
   if (
     reason !== undefined &&
     !(old.applicationApproved && !applicationApproved) &&
@@ -512,7 +515,7 @@ export async function setVolunteerStatus(
     return { operation: crypto.randomUUID(), message: "No access changes." };
   const email = volunteerAccessEmail(
     { active, applicationApproved, patrolApproved },
-    fields.includes("applicationApproved"),
+    fields,
     actor.name,
     reason,
   );
@@ -521,11 +524,32 @@ export async function setVolunteerStatus(
       ? applicationApprovedNoticeEmail({
           applicant: old.name || "Unnamed applicant",
           approvedBy: actor.name,
-          profileUrl: `${staffNotice.origin}/volunteers/${encodeURIComponent(userId)}`,
+          profilePath: `/volunteers/${encodeURIComponent(userId)}`,
         })
       : undefined;
   const operation = crypto.randomUUID();
   const now = Math.max(Date.now(), version + 1);
+  // Vancouver dates cannot be formatted in SQL. Registrations made after this
+  // read fall back to the undated template inside the atomic write.
+  const upcoming = await db
+    .prepare(
+      `SELECT e.id, e.starts_at AS startsAt, ${includesOrientationSql()} AS includesOrientation
+      FROM signup s JOIN event e ON e.id = s.event_id
+      WHERE s.user_id = ? AND s.status = 'confirmed' AND e.starts_at > ?`,
+    )
+    .bind(userId, now)
+    .all<{ id: string; startsAt: number; includesOrientation: number }>();
+  const cancellations = JSON.stringify(
+    Object.fromEntries(
+      upcoming.results.map((event) => [
+        event.id,
+        accessRegistrationCancelledEmail(
+          event.startsAt,
+          Boolean(event.includesOrientation),
+        ),
+      ]),
+    ),
+  );
   try {
     const results = await db.batch([
       db
@@ -583,13 +607,17 @@ export async function setVolunteerStatus(
         .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
           SELECT lower(hex(randomblob(16))), ?, s.user_id,
-            ?, ${emailTextSql(accessRegistrationCancelledTemplate.text, {
-              orientation: `CASE WHEN ${includesOrientationSql()} THEN ' (includes orientation)' ELSE '' END`,
-              meetingPoint: "e.meeting_point",
-            })}, ?, u.email
+            coalesce(json_extract(dated.value, '$.subject'), ?),
+            coalesce(json_extract(dated.value, '$.text'), ${emailTextSql(
+              accessRegistrationCancelledTemplate.text,
+              {
+                eventType: `CASE WHEN ${includesOrientationSql()} THEN 'Orientation + Patrol' ELSE 'Patrol' END`,
+              },
+            )}), ?, u.email
           FROM signup s
           JOIN event e ON e.id = s.event_id
           JOIN user u ON u.id=s.user_id AND u.email_verified=1
+          LEFT JOIN json_each(?) dated ON dated.key = e.id
           WHERE s.user_id = ?
             AND s.status = 'confirmed'
             AND e.starts_at > ?
@@ -601,6 +629,7 @@ export async function setVolunteerStatus(
           operation,
           accessRegistrationCancelledTemplate.subject,
           now,
+          cancellations,
           userId,
           now,
           Number(active),
@@ -632,8 +661,8 @@ export async function setVolunteerStatus(
         ),
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-          SELECT ?, ?, ?, ?, ?, ?, email FROM user
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, action, created_at, delivery_to)
+          SELECT ?, ?, ?, ?, ?, ?, ?, email FROM user
           WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
@@ -642,6 +671,7 @@ export async function setVolunteerStatus(
           userId,
           email.subject,
           email.text,
+          emailButtonValue(email.action),
           now,
           userId,
           operation,
@@ -651,8 +681,8 @@ export async function setVolunteerStatus(
       // about emailing the volunteer.
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-          SELECT ?, ?, ?, ?, ?, ?, ?
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, action, created_at, delivery_to)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?
           WHERE EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
@@ -661,6 +691,7 @@ export async function setVolunteerStatus(
           userId,
           notice?.subject ?? "",
           notice?.text ?? "",
+          emailButtonValue(notice?.action),
           now,
           contactEmail,
           operation,
@@ -727,8 +758,8 @@ export async function rejectApplication(
         .bind(operation, actor.id, userId, now),
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-        SELECT ?, ?, id, ?, ?, ?, email FROM user
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, action, created_at, delivery_to)
+        SELECT ?, ?, id, ?, ?, ?, ?, email FROM user
         WHERE id=? AND EXISTS (SELECT 1 FROM audit_log WHERE id=?)`,
         )
         .bind(
@@ -736,6 +767,7 @@ export async function rejectApplication(
           operation,
           email.subject,
           email.text,
+          emailButtonValue(email.action),
           now,
           userId,
           operation,
@@ -826,8 +858,8 @@ export async function setRole(
         .bind(userId, operation),
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-          SELECT ?, ?, ?, ?, ?, ?, email FROM user
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, action, created_at, delivery_to)
+          SELECT ?, ?, ?, ?, ?, ?, ?, email FROM user
           WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
         )
         .bind(
@@ -836,6 +868,7 @@ export async function setRole(
           userId,
           email.subject,
           email.text,
+          emailButtonValue(email.action),
           now,
           userId,
           operation,
@@ -890,7 +923,7 @@ export async function approveForPatrols(
       applicationApproved: true,
       patrolApproved: true,
     },
-    false,
+    ["patrolApproved"],
   );
   try {
     const results = await db.batch([
@@ -921,8 +954,8 @@ export async function approveForPatrols(
         .bind(operation, actor.id, userId, now),
       db
         .prepare(
-          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-         SELECT ?, ?, id, ?, ?, ?, email FROM user
+          `INSERT INTO event_notification (id, operation_id, user_id, subject, body, action, created_at, delivery_to)
+         SELECT ?, ?, id, ?, ?, ?, ?, email FROM user
          WHERE id=? AND email_verified=1 AND ?=1
            AND EXISTS(SELECT 1 FROM audit_log WHERE id=?)`,
         )
@@ -931,6 +964,7 @@ export async function approveForPatrols(
           operation,
           email.subject,
           email.text,
+          emailButtonValue(email.action),
           now,
           userId,
           Number(notify),

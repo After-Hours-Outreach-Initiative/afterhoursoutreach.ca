@@ -44,7 +44,6 @@ export function submissionNotificationStatements(
       preferredName:
         "json_extract(submitted_application,'$.answers.preferredName')",
     })},char(13),' '),char(10),' ')`,
-    submittedAt: "json_extract(submitted_application,'$.submittedAt')",
     reviewUrl: "?",
   };
   return ({ userId, operationId, writeGuard }) =>
@@ -56,7 +55,7 @@ export function submissionNotificationStatements(
           CASE WHEN ?='preview' THEN NULL ELSE json_object(
             'from',?,
             'to',json_array(?),
-            'subject',?,
+            'subject',${emailTextSql(applicationSubmittedTemplate.subject, values)},
             'text',${emailTextSql(applicationSubmittedTemplate.text, values)},
             'html',${emailHtmlSql(applicationSubmittedTemplate.html, values)}
           ) END,?,naloxone_completed_at,naloxone_completed_at
@@ -73,10 +72,9 @@ export function submissionNotificationStatements(
         mode,
         emailSenders.notifications,
         recipient,
-        applicationSubmittedTemplate.subject,
         // Not a capability URL; the existing route enforces organizer access.
-        `https://afterhoursoutreach.ca/volunteers/${encodeURIComponent(userId)}`,
-        `https://afterhoursoutreach.ca/volunteers/${encodeURIComponent(userId)}`,
+        `https://afterhoursoutreach.ca/applications/${encodeURIComponent(userId)}`,
+        `https://afterhoursoutreach.ca/applications/${encodeURIComponent(userId)}`,
         mode === "preview" ? "suppressed" : "pending",
         userId,
         operationId,

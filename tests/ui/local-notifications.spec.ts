@@ -96,15 +96,6 @@ test("local approval notifications work without crypto.randomUUID", async ({
         exact: true,
       })
       .click();
-    const choiceDialog = page.getByRole("dialog", {
-      name: "Send an email?",
-      exact: true,
-    });
-    await expect(choiceDialog).toBeVisible();
-    expect(submissions).toHaveLength(index);
-    await choiceDialog
-      .getByRole("button", { name: "Save and send email", exact: true })
-      .click();
     await expect(emailDialog).toBeVisible();
     await expect(emailDialog).toContainText(`Patrol approval: ${approve}.`);
     const headingId = (await emailDialog.getAttribute("aria-labelledby"))!;

@@ -73,21 +73,22 @@ export const POST: APIRoute = async ({ request }) => {
               "Email retry complete. The account change was not repeated.",
           }
         : input.action === "status"
-          ? await setVolunteerStatus(env.DB, actor, {
-              userId: input.userId,
-              version: input.version,
-              active: input.active,
-              applicationApproved: input.applicationApproved,
-              registrationApproved: input.registrationApproved,
-              patrolApproved: input.patrolApproved,
-              notify: input.notify,
-              reason: input.reason,
-            },
-            // Branch previews never email the organization inbox.
-            submissionNotificationMode(bindings) === "preview"
-              ? undefined
-              : { origin: bindings.AUTH_BASE_URL },
-          )
+          ? await setVolunteerStatus(
+              env.DB,
+              actor,
+              {
+                userId: input.userId,
+                version: input.version,
+                active: input.active,
+                applicationApproved: input.applicationApproved,
+                registrationApproved: input.registrationApproved,
+                patrolApproved: input.patrolApproved,
+                notify: input.notify,
+                reason: input.reason,
+              },
+              // Branch previews never email the organization inbox.
+              submissionNotificationMode(bindings) !== "preview",
+            )
           : input.action === "approve-patrols"
             ? await approveForPatrols(env.DB, actor, {
                 userId: input.userId,

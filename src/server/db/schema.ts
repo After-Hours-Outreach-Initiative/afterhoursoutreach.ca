@@ -558,6 +558,8 @@ export const eventNotification = sqliteTable(
       .references(() => user.id),
     subject: text().notNull(),
     body: text().notNull(),
+    // Notification button: null is "View events", "none" or a JSON EmailButton.
+    action: text(),
     // Freeze the sending origin across retries on previews sharing one D1.
     delivery_origin: text(),
     // Null on legacy records, which must not be swept into a new send action.

@@ -399,7 +399,7 @@ form("[data-email-change-request]", async (element, values) => {
       emails: [
         {
           to: result.localEmail.email,
-          subject: "Confirm your email change",
+          subject: `${result.localEmail.code} is your email change code`,
           body: `Your verification code is ${result.localEmail.code}. It expires in ten minutes. Your email address has not changed yet.`,
         },
       ],

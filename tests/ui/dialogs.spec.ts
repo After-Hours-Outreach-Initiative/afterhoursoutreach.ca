@@ -202,9 +202,6 @@ test("event dialogs offer only cancellation for future events and keep ended his
   await settings
     .getByRole("button", { name: "Save series defaults", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Save without email", exact: true })
-    .click();
   await expect(settings).toBeHidden();
   await expect(seriesButton).toBeFocused();
   expect((await seriesRequest).postDataJSON()).toMatchObject({
@@ -327,13 +324,10 @@ test("event dialogs offer only cancellation for future events and keep ended his
     .getByRole("dialog", { name: "Delete series?", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Save without email", exact: true })
-    .click();
   await expect(group).toHaveCount(0);
 });
 
-test("event cancellation morphs in place and preserves its draft after notification dismissal and failure", async ({
+test("event cancellation morphs in place and preserves its draft after failure", async ({
   page,
 }) => {
   await page.goto("/volunteer");
@@ -429,18 +423,6 @@ test("event cancellation morphs in place and preserves its draft after notificat
       "justify-content",
       "flex-end",
     );
-    await confirm.click();
-    const notification = page.getByRole("dialog", {
-      name: "Send an email?",
-      exact: true,
-    });
-    await expect(notification).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(notification).toBeHidden();
-    await expect(confirm).toBeEnabled();
-    await expect(form.getByLabel("Reason (optional)")).toHaveValue(
-      "Unsafe conditions",
-    );
 
     await inPlaceAction(page, {
       endpoint: "/api/v1/events/action",
@@ -450,7 +432,7 @@ test("event cancellation morphs in place and preserves its draft after notificat
         expect(form.locator("[data-form-message]")).toHaveText(
           "Please try again.",
         ),
-      loadingLabel: "Cancelling…",
+      loadingLabel: "Sending…",
       pending: async () => {
         await expect(
           form.getByRole("button", { name: "Keep event" }),

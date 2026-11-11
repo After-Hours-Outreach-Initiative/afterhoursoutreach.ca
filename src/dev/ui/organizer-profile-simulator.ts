@@ -1,4 +1,3 @@
-import { chooseNotification } from "../../scripts/notification-choice";
 import { showActionEmailFeedback } from "../../scripts/action-email-feedback";
 import {
   disposeVolunteerProfileContents,
@@ -268,19 +267,9 @@ function initializeProfileSimulator() {
     }
     let paused = false;
     try {
-      let notify = form.matches("[data-organizer-rejection], [data-notify]");
-      if (form.dataset.emailPrompt) {
-        phase = "choosing-notification";
-        report();
-        const choice = await chooseNotification(form.dataset.emailPrompt);
-        if (actionGeneration !== generation) return;
-        if (choice === null) {
-          form.reset();
-          phase = "cancelled";
-          return;
-        }
-        notify = choice;
-      }
+      const notify =
+        form.matches("[data-organizer-rejection], [data-notify]") ||
+        Boolean(form.dataset.emailPrompt);
       phase = "saving";
       form.setAttribute("aria-busy", "true");
       if (button)

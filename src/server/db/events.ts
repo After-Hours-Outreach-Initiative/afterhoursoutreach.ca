@@ -410,8 +410,6 @@ export async function addEventVolunteers(
   }
 }
 
-export { eventDescription } from "../../data/email-templates";
-
 /** Anonymous homepage summary: no locations, rosters, IDs or viewer state. */
 export async function listUpcomingPublicEvents(db: Env["DB"]) {
   await ensurePatrolOccurrences(db);
@@ -727,15 +725,12 @@ export async function saveEvent(
           db,
           operation,
           id,
-          eventChangedEmail(
-            {
-              ...old,
-              includesOrientation: Number(data.includesOrientation),
-              startsAt,
-              meetingPoint: data.meetingPoint,
-            },
-            data.open,
-          ),
+          eventChangedEmail({
+            ...old,
+            includesOrientation: Number(data.includesOrientation),
+            startsAt,
+            meetingPoint: data.meetingPoint,
+          }),
           notify,
         ),
       ]);
@@ -843,15 +838,12 @@ export async function bulkSaveEvents(
         ? operation
         : `${operation}:${old.id}`
       : null;
-    const content = eventChangedEmail(
-      {
-        ...old,
-        includesOrientation: Number(next.includesOrientation),
-        startsAt,
-        meetingPoint: changes.meetingPoint ?? old.meetingPoint,
-      },
-      changes.open ?? Boolean(old.open),
-    );
+    const content = eventChangedEmail({
+      ...old,
+      includesOrientation: Number(next.includesOrientation),
+      startsAt,
+      meetingPoint: changes.meetingPoint ?? old.meetingPoint,
+    });
     return {
       ...selected,
       startsAt,

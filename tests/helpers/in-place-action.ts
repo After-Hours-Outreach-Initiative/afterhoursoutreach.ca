@@ -15,7 +15,6 @@ export async function inPlaceAction(
     trigger: () => Promise<unknown>;
     updated: () => Promise<unknown>;
     loadingLabel: string;
-    notify?: boolean;
     pending?: () => Promise<unknown>;
   },
 ) {
@@ -41,25 +40,7 @@ export async function inPlaceAction(
   const pattern = `**${options.endpoint}*`;
   await page.route(pattern, pause);
   try {
-    const emailPrompt = await options.form.getAttribute("data-email-prompt");
     await options.trigger();
-    if (emailPrompt) {
-      const choice = page.getByRole("dialog", {
-        name: "Send an email?",
-        exact: true,
-      });
-      await expect(choice).toBeVisible();
-      expect(submissions).toBe(0);
-      await expect(
-        choice.getByRole("button", { name: "Save without email", exact: true }),
-      ).toBeFocused();
-      await choice
-        .getByRole("button", {
-          name: options.notify ? "Save and send email" : "Save without email",
-          exact: true,
-        })
-        .click();
-    }
     await expect(options.form).toHaveAttribute("aria-busy", "true");
     const formId = await options.form.getAttribute("id");
     let loading = options.form.locator(

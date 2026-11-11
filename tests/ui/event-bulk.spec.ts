@@ -98,13 +98,10 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
       request.method() === "POST",
   );
   await dialog.getByRole("button", { name: "Save selected events" }).click();
-  await page
-    .getByRole("button", { name: "Save without email", exact: true })
-    .click();
   const body = (await submitted).postDataJSON();
   expect(body.changes).toEqual({ meetingPoint: `${label} updated` });
   expect(body.selection.map((row: { id: string }) => row.id)).toEqual(ids);
-  expect(body.notify).toBe(false);
+  expect(body.notify).toBe(true);
   await expect(dialog).not.toBeVisible();
   await expect(cards.first()).toContainText(`${label} updated`);
   expect(

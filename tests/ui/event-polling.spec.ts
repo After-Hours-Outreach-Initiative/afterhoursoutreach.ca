@@ -567,9 +567,6 @@ test("events retain recurring dates, polling, actions and past events without fi
   await pastOccurrence
     .getByRole("button", { name: "Approve for patrols", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Save without email", exact: true })
-    .click();
   await expect(
     pastOccurrence.locator("[data-patrol-approval-status]"),
   ).toContainText("Approved by");

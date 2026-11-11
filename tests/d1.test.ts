@@ -2137,7 +2137,7 @@ test("review queue loads every submitted entry and counts search matches indepen
       patrolApproved: false,
       notify: true,
     },
-    { origin: "https://afterhoursoutreach.ca" },
+    true,
   );
   await deliverNotifications(
     {
@@ -2157,51 +2157,57 @@ test("review queue loads every submitted entry and counts search matches indepen
     subject: string;
     text: string;
   }[];
-  // The volunteer's email, then the organization inbox's notice.
+  // The volunteer's email and the organization inbox's notice share one batch.
   assert.equal(approvalEmails.length, 2);
-  assert.deepEqual(approvalEmails[1].to, ["info@afterhoursoutreach.ca"]);
-  assert.equal(approvalEmails[1].subject, "Volunteer application approved");
-  assert.match(approvalEmails[1].text, /^Applicant: \S.*\n/);
-  assert.ok(approvalEmails[1].text.includes(`Approved by: ${actor.name}\n`));
-  assert.ok(
-    approvalEmails[1].text.includes(
-      "Volunteer profile: https://afterhoursoutreach.ca/volunteers/pending-02",
-    ),
+  const notice = approvalEmails.find(
+    ({ to }) => to[0] === "info@afterhoursoutreach.ca",
+  )!;
+  const approvalEmail = approvalEmails.find(
+    ({ to }) => to[0] === "pending-02@example.org",
+  )!;
+  const applicant = /^Applicant: (\S.*)\n/.exec(notice.text)?.[1];
+  assert.ok(applicant);
+  assert.equal(
+    notice.subject,
+    `Volunteer application from ${applicant} approved`,
   );
   assert.equal(
-    approvalEmails[0].subject,
-    "Your volunteer application is approved",
+    notice.text,
+    `Applicant: ${applicant}\nApproved by: ${actor.name}\n\nView profile: https://afterhoursoutreach.ca/volunteers/pending-02`,
   );
-  assert.ok(approvalEmails[0].text.includes(`approved by ${actor.name}!`));
-  assert.match(approvalEmails[0].text, /Thank you for volunteering/);
-  assert.match(
-    approvalEmails[0].text,
-    /If needed, complete Naloxone 101, then confirm completion on the Volunteer page/,
-  );
-  assert.match(
-    approvalEmails[0].text,
-    /Register for an "Orientation \+ Patrol" event/,
-  );
-  assert.doesNotMatch(approvalEmails[0].text, /Includes orientation/);
-  assert.match(
-    approvalEmails[0].text,
-    /Patrols without orientation require separate organizer approval/,
+  assert.equal(approvalEmail.subject, "Your volunteer application is approved");
+  assert.ok(
+    approvalEmail.text.startsWith(
+      `${actor.name} approved your volunteer application. Thank you for volunteering!`,
+    ),
   );
   assert.match(
-    approvalEmails[0].text,
+    approvalEmail.text,
+    /You can register for any upcoming orientation patrol with open spots\./,
+  );
+  assert.doesNotMatch(approvalEmail.text, /Includes orientation|Naloxone/);
+  assert.match(
+    approvalEmail.text,
     /Events: https:\/\/afterhoursoutreach\.ca\/events$/,
   );
-  for (const [active, patrolApproved, guidance] of [
+  for (const [active, patrolApproved, subject, guidance] of [
     [
       false,
       false,
-      /currently inactive.*contact an organizer at info@afterhoursoutreach\.ca to restore access/,
+      "Your volunteer account is inactive",
+      /Contact an organizer at info@afterhoursoutreach\.ca to restore access/,
     ],
-    [true, true, /browse upcoming patrols and register for an available spot/],
+    [
+      true,
+      true,
+      "Your volunteer account is active again",
+      /^You can register for any upcoming patrol with open spots\.$/,
+    ],
     [
       true,
       false,
-      /complete Naloxone 101, then confirm completion on the Volunteer page.*"Orientation \+ Patrol"/,
+      "Your patrol approval was revoked",
+      /^You can still register for any upcoming orientation patrol/,
     ],
   ] as const) {
     const current = (await listVolunteers(env.DB, actor, "pending-02")).rows[0];
@@ -2217,7 +2223,7 @@ test("review queue loads every submitted entry and counts search matches indepen
     )
       .bind(accessChange.operation)
       .first<{ subject: string; body: string; recipient: string }>();
-    assert.equal(email?.subject, "Your volunteer access changed");
+    assert.equal(email?.subject, subject);
     assert.equal(email?.recipient, "pending-02@example.org");
     assert.match(email!.body, guidance);
     assert.doesNotMatch(
@@ -2256,7 +2262,7 @@ test("review queue loads every submitted entry and counts search matches indepen
       notify: true,
       reason: "Approved by mistake.",
     },
-    { origin: "https://afterhoursoutreach.ca" },
+    true,
   );
   // Only approvals reach the organization inbox.
   assert.equal(revocation.staffNotified, false);
@@ -2279,11 +2285,7 @@ test("review queue loads every submitted entry and counts search matches indepen
   );
   assert.match(revokedEmail!.body, /awaiting organizer approval again/);
   assert.match(revokedEmail!.body, /Reason: Approved by mistake\./);
-  assert.match(revokedEmail!.body, /application steps on the Volunteer page/);
-  assert.match(
-    revokedEmail!.body,
-    /Check your account for registration changes/,
-  );
+  assert.match(revokedEmail!.body, /Any upcoming registrations were cancelled/);
   assert.doesNotMatch(
     revokedEmail!.body,
     /check your events|register for an available spot/,

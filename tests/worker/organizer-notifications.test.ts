@@ -291,17 +291,18 @@ describe(
               body: string;
             }>()
           ).results;
-          for (const action of ["moved", "removed", "cancelled"]) {
-            assert.ok(
-              notifications.some(
-                (mail) =>
-                  mail.subject === `Your event registration was ${action}`,
-              ),
-            );
+          for (const subject of [
+            /^Your registration moved to .+$/,
+            /^Your registration for .+ was removed$/,
+            /^Your registration for .+ was cancelled$/,
+          ]) {
+            assert.ok(notifications.some((mail) => subject.test(mail.subject)));
           }
           assert.ok(
-            notifications.some((mail) =>
-              mail.body.includes("Registration is open."),
+            notifications.some(
+              (mail) =>
+                /^Your event on .+ changed$/.test(mail.subject) &&
+                mail.body.endsWith("Your spot is still reserved."),
             ),
           );
           assert.doesNotMatch(JSON.stringify(notifications), /sign.?up/i);
@@ -347,15 +348,11 @@ describe(
         organizer.cookie,
       );
       const mail = await DB.prepare(
-        "SELECT body FROM event_notification WHERE user_id=? AND subject='Your event changed' ORDER BY created_at DESC LIMIT 1",
+        "SELECT body FROM event_notification WHERE user_id=? AND subject LIKE 'Your event on % changed' ORDER BY created_at DESC LIMIT 1",
       )
         .bind(volunteer.id)
         .first<{ body: string }>();
-      assert.ok(
-        mail?.body.includes(
-          "Registration is closed. Your existing spot is still reserved.",
-        ),
-      );
+      assert.ok(mail?.body.endsWith("Your spot is still reserved."));
       assert.equal(
         (
           await DB.prepare(

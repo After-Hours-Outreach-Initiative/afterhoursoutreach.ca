@@ -101,6 +101,7 @@ export async function deliverNotifications(
             to: email.to[0],
             subject: email.subject,
             body: email.text,
+            action: null,
             created_at: Date.now(),
           })),
         );

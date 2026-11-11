@@ -1,7 +1,17 @@
 import {
   emailSenders,
   eventNotificationEmail,
+  type EmailButton,
 } from "../../data/email-templates";
+
+/** Serialize EmailContent.action for the event_notification.action column. */
+export function emailButtonValue(action: EmailButton | undefined) {
+  return action === undefined
+    ? null
+    : action === "none"
+      ? action
+      : JSON.stringify(action);
+}
 
 // Stay inside Resend's 24-hour idempotency lifetime, including after a timeout.
 export const notificationRetryHours = 23;
@@ -13,6 +23,8 @@ export interface EventEmail {
   to: string;
   subject: string;
   body: string;
+  /** Stored form of EmailContent.action; see emailButtonValue. */
+  action: string | null;
   created_at: number;
 }
 export interface NotificationBatch {
@@ -60,7 +72,7 @@ export async function countNotifications(db: Env["DB"], operation: string) {
 export async function pendingNotifications(db: Env["DB"], operation: string) {
   const rows = await db
     .prepare(
-      `SELECT id, delivery_to AS "to", subject, body, created_at FROM event_notification
+      `SELECT id, delivery_to AS "to", subject, body, action, created_at FROM event_notification
     WHERE operation_id=? AND batch_id IS NULL AND delivery_to IS NOT NULL
     AND status='pending' AND created_at > ? ORDER BY created_at, id LIMIT 100`,
     )
@@ -83,7 +95,18 @@ export async function createNotificationBatch(
       from: emailSenders.notifications,
       to: [email.to],
       ...eventNotificationEmail(
-        { subject: email.subject, text: email.body },
+        {
+          subject: email.subject,
+          text: email.body,
+          ...(email.action
+            ? {
+                action:
+                  email.action === "none"
+                    ? ("none" as const)
+                    : (JSON.parse(email.action) as EmailButton),
+              }
+            : {}),
+        },
         origin,
       ),
     })),

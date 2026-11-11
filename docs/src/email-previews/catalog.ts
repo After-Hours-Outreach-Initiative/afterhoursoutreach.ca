@@ -1,6 +1,7 @@
 import {
   accessRegistrationCancelledEmail,
   applicationApprovedNoticeEmail,
+  applicationRejectedEmail,
   applicationSubmittedEmail,
   emailSenders,
   eventCancelledEmail,
@@ -47,7 +48,7 @@ const source = {
   medic: "src/server/medic-certifications.ts",
 };
 const optionalDelivery =
-  'Only sent when an organizer chooses "Save and send email". The saved change itself does not depend on email delivery.';
+  "The saved change itself does not depend on email delivery.";
 
 function example(
   name: string,
@@ -87,6 +88,10 @@ const events: { name: string; event: EmailEvent }[] = [
     },
   },
 ];
+const seriesEvent = {
+  startsAt: events[0].event.startsAt,
+  includesOrientation: false,
+};
 const reasons = [
   { name: "without a reason", value: "" },
   { name: "with a reason", value: reason },
@@ -151,8 +156,7 @@ export const emailPreviews: EmailPreview[] = [
         index ? "Full name fallback" : "Preferred name",
         applicationSubmittedEmail({
           applicant,
-          submittedAt: "2026-10-23T18:30:00.000Z",
-          reviewUrl: `${origin}/volunteers/sample-applicant`,
+          reviewUrl: `${origin}/applications/sample-applicant`,
         }),
         false,
         "organizer@example.invalid",
@@ -187,7 +191,8 @@ export const emailPreviews: EmailPreview[] = [
             ...status,
             applicationApproved: true,
           },
-          true,
+          ["applicationApproved"],
+          "Robin O.",
         ),
       ),
     ),
@@ -207,12 +212,28 @@ export const emailPreviews: EmailPreview[] = [
           applicationApprovedNoticeEmail({
             applicant: "Sam V.",
             approvedBy: "Robin O.",
-            profileUrl: `${origin}/volunteers/sample-applicant`,
+            profilePath: "/volunteers/sample-applicant",
           }),
           origin,
         ),
         false,
         "organizer@example.invalid",
+      ),
+    ],
+  },
+  {
+    id: "application-rejected",
+    name: "Application not approved",
+    group: "Applications and access",
+    trigger: "An organizer rejects an application that is ready for review.",
+    delivery: "Always sent with the organizer's reason.",
+    source: source.volunteers,
+    examples: [
+      notification(
+        "With a reason",
+        applicationRejectedEmail(
+          "We need a reference we can reach before approving.",
+        ),
       ),
     ],
   },
@@ -229,7 +250,7 @@ export const emailPreviews: EmailPreview[] = [
         active ? "Account remains active" : "Account is inactive",
         volunteerAccessEmail(
           { active, applicationApproved: false, patrolApproved: false },
-          true,
+          ["applicationApproved"],
           undefined,
           "We need to confirm your emergency contact before you patrol.",
         ),
@@ -245,26 +266,50 @@ export const emailPreviews: EmailPreview[] = [
     delivery: `${optionalDelivery} Approving or revoking patrol approval from a volunteer profile always sends this email; revocation includes the organizer's reason.`,
     source: source.volunteers,
     examples: [
-      ...[true, false].flatMap((active) =>
-        [true, false].flatMap((applicationApproved) =>
-          [true, false].map((patrolApproved) =>
-            notification(
-              `${active ? "Active" : "Inactive"}, application ${applicationApproved ? "approved" : "pending"}, patrol ${patrolApproved ? "approved" : "not approved"}`,
-              volunteerAccessEmail(
-                { active, applicationApproved, patrolApproved },
-                false,
-              ),
-            ),
+      notification(
+        "Patrol access approved",
+        volunteerAccessEmail(
+          { active: true, applicationApproved: true, patrolApproved: true },
+          ["patrolApproved"],
+        ),
+      ),
+      notification(
+        "Patrol access revoked",
+        volunteerAccessEmail(
+          { active: true, applicationApproved: true, patrolApproved: false },
+          ["patrolApproved"],
+          undefined,
+          "Please attend another orientation before your next patrol.",
+        ),
+      ),
+      notification(
+        "Account deactivated",
+        volunteerAccessEmail(
+          { active: false, applicationApproved: true, patrolApproved: true },
+          ["active"],
+        ),
+      ),
+      ...[true, false].map((patrolApproved) =>
+        notification(
+          `Account reactivated, patrol ${patrolApproved ? "approved" : "not approved"}`,
+          volunteerAccessEmail(
+            { active: true, applicationApproved: true, patrolApproved },
+            ["active"],
           ),
         ),
       ),
       notification(
-        "Patrol approval revoked",
+        "Account reactivated, application pending",
         volunteerAccessEmail(
-          { active: true, applicationApproved: true, patrolApproved: false },
-          false,
-          undefined,
-          "Please attend another orientation before your next patrol.",
+          { active: true, applicationApproved: false, patrolApproved: false },
+          ["active"],
+        ),
+      ),
+      notification(
+        "Patrol access approved while inactive",
+        volunteerAccessEmail(
+          { active: false, applicationApproved: true, patrolApproved: true },
+          ["patrolApproved"],
         ),
       ),
     ],
@@ -292,7 +337,7 @@ export const emailPreviews: EmailPreview[] = [
       notification(
         name,
         accessRegistrationCancelledEmail(
-          event.meetingPoint,
+          event.startsAt,
           Boolean(event.includesOrientation),
         ),
       ),
@@ -306,13 +351,8 @@ export const emailPreviews: EmailPreview[] = [
       "An organizer edits an upcoming event that has confirmed registrations.",
     delivery: optionalDelivery,
     source: source.events,
-    examples: events.flatMap(({ name, event }) =>
-      [true, false].map((open) =>
-        notification(
-          `${name}, registration ${open ? "open" : "closed"}`,
-          eventChangedEmail(event, open),
-        ),
-      ),
+    examples: events.map(({ name, event }) =>
+      notification(name, eventChangedEmail(event)),
     ),
   },
   {
@@ -385,7 +425,7 @@ export const emailPreviews: EmailPreview[] = [
     examples: [
       notification(
         "Registration beyond the new end date",
-        patrolSeriesShortenedEmail(),
+        patrolSeriesShortenedEmail(seriesEvent),
       ),
     ],
   },
@@ -400,7 +440,10 @@ export const emailPreviews: EmailPreview[] = [
     examples: [
       notification(
         "Existing registration preserved",
-        patrolSeriesChangedEmail(),
+        patrolSeriesChangedEmail({
+          ...seriesEvent,
+          meetingPoint: events[0].event.meetingPoint,
+        }),
       ),
     ],
   },
@@ -415,7 +458,7 @@ export const emailPreviews: EmailPreview[] = [
     examples: reasons.map((reason) =>
       notification(
         `Series stopped ${reason.name}`,
-        patrolSeriesStoppedEmail(reason.value),
+        patrolSeriesStoppedEmail(reason.value, seriesEvent),
       ),
     ),
   },

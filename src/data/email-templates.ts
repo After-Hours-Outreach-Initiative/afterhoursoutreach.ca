@@ -1,3 +1,4 @@
+import { formatEventDate, formatEventDay } from "./event-time";
 import { contactEmail } from "./site";
 
 // Pure message formatting shared by delivery and the local docs preview. Keep
@@ -6,7 +7,11 @@ export interface EmailContent {
   subject: string;
   text: string;
   html?: string;
+  /** Notification button; omitted means "View events". Paths are site-relative. */
+  action?: EmailButton;
 }
+
+export type EmailButton = "none" | { label: string; path: string };
 
 export const emailSenders = {
   accounts: "After Hours Outreach <accounts@afterhoursoutreach.ca>",
@@ -20,7 +25,7 @@ export interface SignInEmailInput {
 }
 
 const signInExpiry =
-  "The link and code expire in 10 minutes and can only be used once.";
+  "The code and link expire in 10 minutes and can only be used once.";
 const signInSecurity =
   "If you did not request this, you can safely ignore this email.";
 
@@ -73,12 +78,17 @@ function actionLink({ label, url }: EmailAction) {
   return `<p style="margin:24px 0 16px;"><a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 20px;border-radius:6px;background-color:#4169e1;color:#ffffff;font-size:15px;font-weight:bold;line-height:24px;text-decoration:none;">${escapeHtml(label)}</a></p>`;
 }
 
-function emailContent(subject: string, text: string, action?: EmailAction) {
+function emailContent(
+  subject: string,
+  text: string,
+  action?: EmailAction,
+  heading = subject,
+) {
   return {
     subject,
     text: `${text}${action ? `\n\n${action.textLabel}: ${action.url}` : ""}`,
     html: emailLayout(
-      subject,
+      heading,
       paragraphs(text) + (action ? actionLink(action) : ""),
     ),
   };
@@ -90,16 +100,16 @@ function verificationCode(code: string) {
 
 export function signInEmailContent(email: SignInEmailInput): EmailContent {
   if (email.purpose === "change-email") {
-    const subject = "Confirm your email change";
+    const subject = `${email.code} is your email change code`;
     const instructions =
-      "Enter this code in your account settings to confirm your new email address:";
+      "Enter this code in your account settings to confirm your new email address.";
     const expiry =
-      "The code expires in 10 minutes and can only be used once. A new code replaces the previous code. Your email address changes only after confirmation.";
+      "The code expires in 10 minutes and can only be used once. Requesting a new code replaces this one.";
     return {
       subject,
-      text: `${instructions} ${email.code}\n\n${expiry}\n\n${signInSecurity}`,
+      text: `${instructions}\n\n${email.code}\n\n${expiry}\n\n${signInSecurity}`,
       html: emailLayout(
-        subject,
+        "Confirm your email change",
         paragraphs(instructions) +
           verificationCode(email.code) +
           paragraphs(`${expiry}\n\n${signInSecurity}`),
@@ -110,7 +120,7 @@ export function signInEmailContent(email: SignInEmailInput): EmailContent {
     subject: `${email.code} is your sign-in code`,
     text: `Sign in: ${email.url}\n\nOr enter this code on the device that requested it: ${email.code}\n\n${signInExpiry}\n\n${signInSecurity}`,
     html: emailLayout(
-      "Sign in to After Hours Outreach",
+      "Sign in to afterhoursoutreach.ca",
       paragraphs(
         "Enter this code on the sign-in page, or use the link below.",
       ) +
@@ -124,18 +134,24 @@ export function signInEmailContent(email: SignInEmailInput): EmailContent {
 // These messages are composed inside atomic SQL writes. Sharing their templates
 // keeps previews accurate without moving transactional reads into JS.
 export const applicationSubmittedTemplate = emailContent(
-  "Volunteer application ready for review",
-  "Applicant: {{applicant}}\nSubmitted: {{submittedAt}}\n\nOrganizer sign-in required.",
+  "New volunteer application from {{applicant}}",
+  "Applicant: {{applicant}}",
   {
     label: "Review application",
     textLabel: "Review application",
     url: "{{reviewUrl}}",
   },
+  "Volunteer application ready for review",
 );
 
+const accessCancellationHeading = "Your event registration was cancelled";
+const accessCancellationReason =
+  "Your registration was cancelled because your volunteer access changed. You'll get a separate email explaining the change.";
+
+/** SQL fallback for a registration created after the dates were formatted. */
 export const accessRegistrationCancelledTemplate = emailContent(
-  "Your event registration was cancelled",
-  "Your registration for a patrol{{orientation}} at {{meetingPoint}} was cancelled because your volunteer access changed. Check your account or contact an organizer.",
+  accessCancellationHeading,
+  `Event type: {{eventType}}\n\n${accessCancellationReason}`,
 );
 
 export function renderEmailText(
@@ -151,7 +167,6 @@ export function renderEmailText(
 
 export function applicationSubmittedEmail(values: {
   applicant: string;
-  submittedAt: string;
   reviewUrl: string;
 }): EmailContent {
   const normalized = {
@@ -159,7 +174,7 @@ export function applicationSubmittedEmail(values: {
     applicant: values.applicant.replaceAll("\r", " ").replaceAll("\n", " "),
   };
   return {
-    subject: applicationSubmittedTemplate.subject,
+    subject: renderEmailText(applicationSubmittedTemplate.subject, normalized),
     text: renderEmailText(applicationSubmittedTemplate.text, normalized),
     html: renderEmailText(
       applicationSubmittedTemplate.html,
@@ -174,15 +189,14 @@ export function applicationSubmittedEmail(values: {
 }
 
 export function accessRegistrationCancelledEmail(
-  meetingPoint: string,
+  startsAt: number,
   includesOrientation: boolean,
 ): EmailContent {
   return emailContent(
-    accessRegistrationCancelledTemplate.subject,
-    renderEmailText(accessRegistrationCancelledTemplate.text, {
-      orientation: includesOrientation ? " (includes orientation)" : "",
-      meetingPoint,
-    }),
+    `Your registration for ${formatEventDay(startsAt)} was cancelled`,
+    `${eventDetails(startsAt, includesOrientation)}\n\n${accessCancellationReason}`,
+    undefined,
+    accessCancellationHeading,
   );
 }
 
@@ -192,64 +206,130 @@ interface VolunteerAccess {
   patrolApproved: boolean;
 }
 
+export type VolunteerAccessField =
+  "active" | "applicationApproved" | "patrolApproved";
+
 export function volunteerAccessEmail(
   { active, applicationApproved, patrolApproved }: VolunteerAccess,
-  applicationApprovalChanged: boolean,
+  changed: readonly VolunteerAccessField[],
   approvingOrganizerName?: string,
   revocationReason?: string,
 ): EmailContent {
   const reason = revocationReason ? `Reason: ${revocationReason}\n\n` : "";
-  const nextStep = !active
-    ? `Your volunteer account is currently inactive. Please contact an organizer at ${contactEmail} to restore access.`
-    : !applicationApproved
-      ? "Sign in to review your application steps on the Volunteer page."
-      : patrolApproved
-        ? "Sign in to browse upcoming patrols and register for an available spot."
-        : 'If needed, complete Naloxone 101, then confirm completion on the Volunteer page. Register for an "Orientation + Patrol" event. Patrols without orientation require separate organizer approval.';
-  if (!applicationApprovalChanged)
+  const inactive = `Contact an organizer at ${contactEmail} to restore access.`;
+  const cancelled =
+    "Any upcoming registrations were cancelled, and you'll get a separate email for each.";
+  const register = patrolApproved
+    ? "You can register for any upcoming patrol with open spots."
+    : "You can register for any upcoming orientation patrol with open spots.";
+  const applicationButton = {
+    label: "View application",
+    path: "/volunteer",
+  } as const;
+  const approvedNextStep = !active
+    ? `Your volunteer account is inactive, so you can't register for events yet. ${inactive}`
+    : register;
+  if (!changed.includes("applicationApproved")) {
+    if (changed.includes("active") && !active)
+      return {
+        ...emailContent(
+          "Your volunteer account is inactive",
+          `You can't register for events while your account is inactive. ${inactive}\n\n${cancelled}`,
+        ),
+        action: "none",
+      };
+    if (changed.includes("active"))
+      return applicationApproved
+        ? emailContent(
+            "Your volunteer account is active again",
+            `${reason}${register}`,
+          )
+        : {
+            ...emailContent(
+              "Your volunteer account is active again",
+              "Your application is awaiting organizer approval.",
+            ),
+            action: applicationButton,
+          };
+    const subject = patrolApproved
+      ? "You're approved for patrols"
+      : "Your patrol approval was revoked";
+    if (!active)
+      return {
+        ...emailContent(
+          subject,
+          `${reason}Your volunteer account is inactive, so you can't register for events yet. ${inactive}`,
+        ),
+        action: "none",
+      };
     return emailContent(
-      "Your volunteer access changed",
-      `Account: ${active ? "active" : "inactive"}. Application: ${applicationApproved ? "approved" : "awaiting approval"}. Patrol access: ${patrolApproved ? "approved" : "not approved"}.\n\n${reason}${nextStep}`,
+      subject,
+      patrolApproved
+        ? "You can now register for any upcoming patrol with open spots, not just orientation patrols."
+        : `${reason}You can still register for any upcoming orientation patrol with open spots. Any other upcoming registrations were cancelled, and you'll get a separate email for each.`,
     );
+  }
   if (!applicationApproved)
-    return emailContent(
-      "Your volunteer application approval was revoked",
-      `Your application is awaiting organizer approval again.\n\n${reason}${nextStep}\n\nCheck your account for registration changes.`,
-    );
-  return emailContent(
-    "Your volunteer application is approved",
-    `Your volunteer application is approved${approvingOrganizerName ? ` by ${approvingOrganizerName}` : ""}! Thank you for volunteering.\n\n${nextStep}`,
-  );
+    return {
+      ...emailContent(
+        "Your volunteer application approval was revoked",
+        `Your application is awaiting organizer approval again, so you can't register for events until it's approved.\n\n${reason}${active ? "" : `Your volunteer account is also inactive. ${inactive}\n\n`}${cancelled}`,
+      ),
+      action: applicationButton,
+    };
+  return {
+    ...emailContent(
+      "Your volunteer application is approved",
+      `${approvingOrganizerName ?? "An organizer"} approved your volunteer application. Thank you for volunteering!\n\n${approvedNextStep}`,
+    ),
+    ...(active ? {} : { action: "none" as const }),
+  };
 }
 
 /** Tells the organization inbox that an organizer approved an application. */
 export function applicationApprovedNoticeEmail(values: {
   applicant: string;
   approvedBy: string;
-  profileUrl: string;
+  profilePath: string;
 }): EmailContent {
   const line = (value: string) =>
     value.replaceAll("\r", " ").replaceAll("\n", " ");
-  return emailContent(
-    "Volunteer application approved",
-    `Applicant: ${line(values.applicant)}\nApproved by: ${line(values.approvedBy)}\n\nVolunteer profile: ${values.profileUrl}\n\nOrganizer sign-in required.`,
-  );
+  return {
+    ...emailContent(
+      `Volunteer application from ${line(values.applicant)} approved`,
+      `Applicant: ${line(values.applicant)}\nApproved by: ${line(values.approvedBy)}`,
+      undefined,
+      "Volunteer application approved",
+    ),
+    action: { label: "View profile", path: values.profilePath },
+  };
 }
 
 export function roleChangedEmail(
   role: "volunteer" | "organizer",
 ): EmailContent {
-  return emailContent(
-    "Your account role changed",
-    `Your role is now ${role}. Sign in again to continue.`,
-  );
+  return {
+    ...(role === "organizer"
+      ? emailContent(
+          "You're now an organizer",
+          "You can now review applications, manage volunteers and run events. You were signed out, so sign in again to use your new access.",
+        )
+      : emailContent(
+          "You're no longer an organizer",
+          "Your account is now a volunteer account. You were signed out, so sign in again to continue.",
+        )),
+    action: { label: "Sign in", path: "/volunteer/sign-in" },
+  };
 }
 
 export function applicationRejectedEmail(reason: string): EmailContent {
-  return emailContent(
-    "Your volunteer application was not approved",
-    `Your volunteer application was not approved.\n\nReason: ${reason}\n\nView the decision on the Volunteer page. Contact ${contactEmail} if you have questions.`,
-  );
+  return {
+    ...emailContent(
+      "Your volunteer application was not approved",
+      `Reason: ${reason}\n\nIf you have questions, contact ${contactEmail}.`,
+    ),
+    action: { label: "View application", path: "/volunteer" },
+  };
 }
 
 export interface EmailEvent {
@@ -259,24 +339,31 @@ export interface EmailEvent {
   meetingPoint: string;
 }
 
-export function eventDescription(event: EmailEvent) {
-  return `Patrol${(event.includesOrientation ?? event.type === "orientation") ? " (includes orientation)" : ""}: ${new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "America/Vancouver",
-      dateStyle: "full",
-      timeStyle: "short",
-    },
-  ).format(new Date(event.startsAt))}\nMeeting point: ${event.meetingPoint}`;
+/** Event lines matching the event cards; the meeting point only where it is still useful. */
+export function eventDetails(
+  startsAt: number,
+  includesOrientation: boolean,
+  meetingPoint?: string,
+) {
+  return [
+    `Date: ${formatEventDate(startsAt)}`,
+    `Event type: ${includesOrientation ? "Orientation + Patrol" : "Patrol"}`,
+    ...(meetingPoint ? [`Meeting point: ${meetingPoint}`] : []),
+  ].join("\n");
 }
 
-export function eventChangedEmail(
-  event: EmailEvent,
-  open: boolean,
-): EmailContent {
+function withOrientation(event: EmailEvent) {
+  return Boolean(event.includesOrientation ?? event.type === "orientation");
+}
+
+const reasonLine = (reason: string) => (reason ? `\nReason: ${reason}` : "");
+
+export function eventChangedEmail(event: EmailEvent): EmailContent {
   return emailContent(
+    `Your event on ${formatEventDay(event.startsAt)} changed`,
+    `${eventDetails(event.startsAt, withOrientation(event), event.meetingPoint)}\n\nYour spot is still reserved.`,
+    undefined,
     "Your event changed",
-    `${eventDescription(event)}\n\n${open ? "Registration is open." : "Registration is closed. Your existing spot is still reserved."}`,
   );
 }
 
@@ -285,8 +372,10 @@ export function eventCancelledEmail(
   reason: string,
 ): EmailContent {
   return emailContent(
+    `Your event on ${formatEventDay(event.startsAt)} was cancelled`,
+    `${eventDetails(event.startsAt, withOrientation(event))}${reasonLine(reason)}\n\nAn organizer cancelled this event.`,
+    undefined,
     "Your event was cancelled",
-    `${eventDescription(event)}\n\nThis event was cancelled.${reason ? `\nReason: ${reason}` : ""}`,
   );
 }
 
@@ -295,32 +384,75 @@ export function registrationChangedEmail(
   next: EmailEvent | null,
   reason: string,
 ): EmailContent {
+  if (!next)
+    return emailContent(
+      `Your registration for ${formatEventDay(previous.startsAt)} was removed`,
+      `${eventDetails(previous.startsAt, withOrientation(previous))}${reasonLine(reason)}\n\nAn organizer removed your registration.`,
+      undefined,
+      "Your event registration was removed",
+    );
   return emailContent(
-    next
-      ? "Your event registration was moved"
-      : "Your event registration was removed",
-    `${eventDescription(previous)}\n\n${next ? `An organizer moved your registration to:\n${eventDescription(next)}` : "An organizer removed your registration."}${reason ? `\nReason: ${reason}` : ""}`,
+    `Your registration moved to ${formatEventDay(next.startsAt)}`,
+    `New event\n${eventDetails(next.startsAt, withOrientation(next), next.meetingPoint)}\n\nPrevious event\n${eventDetails(previous.startsAt, withOrientation(previous))}${reason ? `\n\nReason: ${reason}` : ""}\n\nAn organizer moved your registration.`,
+    undefined,
+    "Your event registration was moved",
   );
 }
 
-export function patrolSeriesShortenedEmail(): EmailContent {
+export interface SeriesEmailEvent {
+  startsAt: number;
+  includesOrientation: boolean;
+}
+
+/** Without an event, the undated fallback for registrations made after the date read. */
+export function patrolSeriesShortenedEmail(
+  event?: SeriesEmailEvent,
+): EmailContent {
+  const note =
+    "This recurring patrol now ends earlier, so this event and your registration were cancelled.";
   return emailContent(
+    event
+      ? `Your event on ${formatEventDay(event.startsAt)} was cancelled`
+      : "Your event was cancelled",
+    event
+      ? `${eventDetails(event.startsAt, event.includesOrientation)}\n\n${note}`
+      : note,
+    undefined,
     "Your event was cancelled",
-    "This patrol series ended before your scheduled event. Your registration was cancelled.",
   );
 }
 
-export function patrolSeriesChangedEmail(): EmailContent {
+export function patrolSeriesChangedEmail(
+  event?: SeriesEmailEvent & { meetingPoint: string },
+): EmailContent {
+  if (event)
+    return eventChangedEmail({
+      type: "patrol",
+      includesOrientation: Number(event.includesOrientation),
+      startsAt: event.startsAt,
+      meetingPoint: event.meetingPoint,
+    });
   return emailContent(
-    "Your patrol changed",
-    "This patrol series changed. Your existing spot is still reserved. Check the Volunteer page for the updated date, time and meeting point.",
+    "Your event changed",
+    "This recurring patrol changed. Your spot is still reserved.",
   );
 }
 
-export function patrolSeriesStoppedEmail(reason: string): EmailContent {
+export function patrolSeriesStoppedEmail(
+  reason: string,
+  event?: SeriesEmailEvent,
+): EmailContent {
+  const note =
+    "This recurring patrol was stopped, so this event and your registration were cancelled.";
   return emailContent(
-    "Your patrol was cancelled",
-    `This patrol series was stopped. Your registration was cancelled.${reason ? `\nReason: ${reason}` : ""}`,
+    event
+      ? `Your event on ${formatEventDay(event.startsAt)} was cancelled`
+      : "Your event was cancelled",
+    event
+      ? `${eventDetails(event.startsAt, event.includesOrientation)}${reasonLine(reason)}\n\n${note}`
+      : `${reason ? `Reason: ${reason}\n\n` : ""}${note}`,
+    undefined,
+    "Your event was cancelled",
   );
 }
 
@@ -331,11 +463,23 @@ export function eventNotificationEmail(
   content: EmailContent,
   origin: string,
 ): EmailContent {
-  return emailContent(content.subject, content.text, {
-    label: "View events",
-    textLabel: "Events",
-    url: `${origin}/events`,
-  });
+  return emailContent(
+    content.subject,
+    content.text,
+    content.action === "none"
+      ? undefined
+      : content.action
+        ? {
+            label: content.action.label,
+            textLabel: content.action.label,
+            url: `${origin}${content.action.path}`,
+          }
+        : {
+            label: "View events",
+            textLabel: "Events",
+            url: `${origin}/events`,
+          },
+  );
 }
 
 export function medicCertificationEmail(
@@ -344,19 +488,35 @@ export function medicCertificationEmail(
   origin: string,
 ): EmailContent {
   const warning = kind === "warning";
-  return emailContent(
-    warning
-      ? "Your medic certification is expiring soon"
-      : "Your medic certification has expired",
-    `${
+  const subject = warning
+    ? `Your medic certification expires on ${expiry}`
+    : `Your medic certification expired on ${expiry}`;
+  const [before, after] = warning
+    ? [
+        "Your medic certification expires on ",
+        ". It stays valid through that date.",
+      ]
+    : [
+        "Your medic certification expired on ",
+        ". Renew it before volunteering as a medic.",
+      ];
+  const update =
+    "If you've already renewed it or the date is wrong, update it in your account.";
+  const action = {
+    label: "Update certification",
+    textLabel: "Your account",
+    url: `${origin}/volunteer/account`,
+  };
+  return {
+    subject,
+    text: `${before}${expiry}${after}\n\n${update}\n\n${action.textLabel}: ${action.url}`,
+    html: emailLayout(
       warning
-        ? `Your medic certification expires on ${expiry}, within the next 30 days. It remains valid through that date. Please arrange renewal.`
-        : `Your medic certification expired on ${expiry}. Please renew before volunteering as a medic.`
-    }\n\nIf you have renewed or the date is incorrect, update it in your account.`,
-    {
-      label: "Update certification",
-      textLabel: "Your account",
-      url: `${origin}/volunteer/account`,
-    },
-  );
+        ? "Your medic certification is expiring soon"
+        : "Your medic certification has expired",
+      `<p style="margin:0 0 16px;">${escapeHtml(before)}<strong>${escapeHtml(expiry)}</strong>${escapeHtml(after)}</p>\n` +
+        paragraphs(update) +
+        actionLink(action),
+    ),
+  };
 }

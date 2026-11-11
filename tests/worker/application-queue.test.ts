@@ -887,14 +887,16 @@ test("organizers review pending and approved applications with persistent list c
           "SELECT subject FROM event_notification WHERE user_id='applicant-50'",
         ).all<{ subject: string }>()
       ).results
-        .map(({ subject }) => subject)
+        .map(({ subject }) =>
+          subject.replace(/^Volunteer application from .+ approved$/, "notice"),
+        )
         .sort(),
       [
-        "Volunteer application approved",
-        "Your volunteer access changed",
-        "Your volunteer access changed",
-        "Your volunteer access changed",
+        "You're approved for patrols",
+        "You're approved for patrols",
+        "Your patrol approval was revoked",
         "Your volunteer application is approved",
+        "notice",
       ],
     );
     await page.getByRole("link", { name: "Back to applications" }).click();

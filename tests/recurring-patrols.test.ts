@@ -1265,6 +1265,20 @@ test("series defaults are versioned and future-only; inclusive end dates stop ge
     "cancelled",
   );
   assert.equal(await count("event_notification"), 1);
+  assert.match(
+    String(
+      await db
+        .prepare("SELECT subject FROM event_notification")
+        .first("subject"),
+    ),
+    /^Your event on \w{3}, \w{3} \d+ was cancelled$/,
+  );
+  assert.match(
+    String(
+      await db.prepare("SELECT body FROM event_notification").first("body"),
+    ),
+    /^Date: [^\n]+\nEvent type: /,
+  );
   const shortened = await findPatrolSeries(db, organizer, series.id);
   await savePatrolSeries(
     db,
@@ -1734,6 +1748,20 @@ test("this-and-future updates booked materialized occurrences with stable IDs, p
       .first("n"),
     1,
   );
+  assert.match(
+    String(
+      await db
+        .prepare("SELECT subject FROM event_notification")
+        .first("subject"),
+    ),
+    /^Your event on \w{3}, \w{3} \d+ changed$/,
+  );
+  assert.match(
+    String(
+      await db.prepare("SELECT body FROM event_notification").first("body"),
+    ),
+    /^Date: [^\n]+\nEvent type: [^\n]+\nMeeting point: /,
+  );
   await ensurePatrolOccurrences(db);
   assert.ok((await findEvent(db, distant.id)).cancelledAt);
   assert.ok(
@@ -1888,7 +1916,7 @@ test("revoking patrol approval preserves orientation bookings but cancels regula
   assert.equal(
     await db
       .prepare(
-        "SELECT count(*) n FROM event_notification WHERE subject='Your event registration was cancelled'",
+        "SELECT count(*) n FROM event_notification WHERE subject LIKE 'Your registration for % was cancelled' AND body LIKE 'Date: %volunteer access changed%'",
       )
       .first("n"),
     1,
@@ -2160,6 +2188,20 @@ test("stopping at the first date cancels exceptions/bookings, preserves history 
     "cancelled",
   );
   assert.equal(await count("event_notification"), 1);
+  assert.match(
+    String(
+      await db
+        .prepare("SELECT subject FROM event_notification")
+        .first("subject"),
+    ),
+    /^Your event on \w{3}, \w{3} \d+ was cancelled$/,
+  );
+  assert.match(
+    String(
+      await db.prepare("SELECT body FROM event_notification").first("body"),
+    ),
+    /^Date: [^\n]+\nEvent type: /,
+  );
   const stopped = await findPatrolSeries(db, organizer, series.id);
   await savePatrolSeries(
     db,

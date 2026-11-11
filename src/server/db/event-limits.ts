@@ -31,4 +31,3 @@ export const eventLimitInputFields = {
     .optional(),
   maxNewVolunteers: eventLimitFields.maxNewVolunteers.unwrap().optional(),
 };
-

@@ -456,9 +456,6 @@ test("active status, account roles and patrol access can be changed through the 
   );
   const preview = page.frameLocator("[data-ui-profile-frame]");
   const save = async () => {
-    await preview
-      .getByRole("button", { name: "Save without email", exact: true })
-      .click();
     await expect(page.locator("[data-ui-profile-status]")).toContainText(
       "Simulation: saved",
     );

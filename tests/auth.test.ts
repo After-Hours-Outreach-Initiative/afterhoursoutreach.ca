@@ -2681,7 +2681,7 @@ test("Resend receives the same sign-in message in every hosted environment and h
         for (const content of [body.text, body.html]) {
           assert.ok(
             content.includes(
-              "The link and code expire in 10 minutes and can only be used once.",
+              "The code and link expire in 10 minutes and can only be used once.",
             ),
           );
           assert.match(
@@ -2744,8 +2744,8 @@ test("email-change messages contain a verification code rather than a sign-in li
     "production",
     async (_url, options) => {
       const body = JSON.parse(String(options?.body));
-      assert.equal(body.subject, "Confirm your email change");
-      assert.match(body.text, /account settings.*123456/);
+      assert.equal(body.subject, "123456 is your email change code");
+      assert.match(body.text, /account settings[\s\S]*123456/);
       assert.doesNotMatch(body.text, /Sign in:|sign-in\/complete/);
       assert.match(body.html, /123456/);
       assert.doesNotMatch(body.html, /href=|sign-in\/complete/);

@@ -274,14 +274,17 @@ test("form submission is silent; only the winning review transition records thre
       "to",
     ]);
     assert.deepEqual(payload.to, [row.recipient]);
-    assert.equal(payload.subject, "Volunteer application ready for review");
+    assert.equal(
+      payload.subject,
+      `New volunteer application from ${snapshot.answers.preferredName} A.`,
+    );
     assert.equal(
       payload.text,
-      `Applicant: ${snapshot.answers.preferredName} A.\nSubmitted: ${snapshot.submittedAt}\n\nOrganizer sign-in required.\n\nReview application: https://afterhoursoutreach.ca/volunteers/applicant`,
+      `Applicant: ${snapshot.answers.preferredName} A.\n\nReview application: https://afterhoursoutreach.ca/applications/applicant`,
     );
     assert.match(
       payload.html,
-      /href="https:\/\/afterhoursoutreach\.ca\/volunteers\/applicant"/,
+      /href="https:\/\/afterhoursoutreach\.ca\/applications\/applicant"/,
     );
     assert.doesNotMatch(
       row.payload!,

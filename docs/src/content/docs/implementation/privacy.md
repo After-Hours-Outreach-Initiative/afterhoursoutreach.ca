@@ -93,8 +93,7 @@ The policy's organizer-only roster statement is therefore stale.
 Hosted authentication and notification mail uses Resend; local development
 simulates delivery. D1 stores delivery state and, where required, message payloads.
 The review-ready notification goes to three fixed organizer inboxes with a display
-name, submission time, and organizer-authenticated review link rather than full
-answers. The current trigger is the winning Naloxone-confirmation transaction,
+name and organizer-authenticated review link rather than full answers. The current trigger is the winning Naloxone-confirmation transaction,
 not the original form submission. Preview mode suppresses these organizer emails
 without storing their message content.
 

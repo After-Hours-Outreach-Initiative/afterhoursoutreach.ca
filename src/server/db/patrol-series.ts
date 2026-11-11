@@ -19,7 +19,7 @@ import {
   type Actor,
 } from "./access";
 import { databaseWriteError } from "./errors";
-import { nowMsSql } from "./sql";
+import { includesOrientationSql, nowMsSql } from "./sql";
 import { orientationCapacityMessage, validOrientationCapacity } from "./policy";
 import {
   eventSettingFields,
@@ -513,7 +513,13 @@ export async function savePatrolSeries(
         ),
     ];
     if (old && data.endDate !== null) {
-      const email = patrolSeriesShortenedEmail();
+      const dated = await datedSeriesEmails(
+        db,
+        id,
+        data.endDate,
+        false,
+        (event) => patrolSeriesShortenedEmail(event),
+      );
       // Capture exactly the affected rows before mutation; the series operation
       // authorizes every following audit, notification, and cancellation.
       statements.push(
@@ -525,22 +531,14 @@ export async function savePatrolSeries(
             AND EXISTS(SELECT 1 FROM patrol_series_audit WHERE id = ?)`,
           )
           .bind(operation, actor.id, now, id, data.endDate, operation),
-        db
-          .prepare(
-            `INSERT INTO event_notification (id, operation_id, user_id, subject, body, created_at, delivery_to)
-          SELECT lower(hex(randomblob(16))), ?, s.user_id, ?, ?, ?, u.email
-          FROM signup s JOIN user u ON u.id = s.user_id AND u.email_verified = 1
-          WHERE s.status = 'confirmed' AND ? = 1
-            AND EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || s.event_id)`,
-          )
-          .bind(
-            operation,
-            email.subject,
-            email.text,
-            now,
-            Number(notify),
-            operation,
-          ),
+        seriesNotifications(
+          db,
+          operation,
+          now,
+          notify,
+          patrolSeriesShortenedEmail(),
+          dated,
+        ),
         db
           .prepare(
             `UPDATE event SET cancelled_at = ?, open = 0, hidden = 1,
@@ -834,6 +832,16 @@ export async function updatePatrolSeriesFrom(
         now,
         notify,
         patrolSeriesChangedEmail(),
+        Object.fromEntries(
+          updates.map((update) => [
+            update.id,
+            patrolSeriesChangedEmail({
+              startsAt: update.startsAt,
+              includesOrientation: data.includesOrientation,
+              meetingPoint: data.meetingPoint,
+            }),
+          ]),
+        ),
       ),
     ]);
     if (!results[0].meta.changes)
@@ -857,23 +865,66 @@ function seriesNotifications(
   operation: string,
   now: number,
   notify: boolean,
-  content: EmailContent,
+  fallback: EmailContent,
+  dated: Record<string, EmailContent>,
 ) {
   return db
     .prepare(
       `INSERT INTO event_notification (id,operation_id,user_id,subject,body,created_at,delivery_to)
-    SELECT lower(hex(randomblob(16))),?,s.user_id,?,?,?,u.email FROM signup s
-    JOIN user u ON u.id = s.user_id AND u.email_verified = 1 WHERE s.status = 'confirmed' AND ? = 1
+    SELECT lower(hex(randomblob(16))),?,s.user_id,
+      coalesce(json_extract(dated.value,'$.subject'),?),coalesce(json_extract(dated.value,'$.text'),?),?,u.email FROM signup s
+    JOIN user u ON u.id = s.user_id AND u.email_verified = 1
+    LEFT JOIN json_each(?) dated ON dated.key = s.event_id
+    WHERE s.status = 'confirmed' AND ? = 1
       AND EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || s.event_id)`,
     )
     .bind(
       operation,
-      content.subject,
-      content.text,
+      fallback.subject,
+      fallback.text,
       now,
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(dated).map(([id, email]) => [
+            id,
+            { subject: email.subject, text: email.text },
+          ]),
+        ),
+      ),
       Number(notify),
       operation,
     );
+}
+
+/** Vancouver dates cannot be formatted in SQL. Events generated after this read
+ * fall back to the undated message inside the atomic write.
+ */
+async function datedSeriesEmails(
+  db: Env["DB"],
+  seriesId: string,
+  date: string,
+  inclusive: boolean,
+  email: (event: {
+    startsAt: number;
+    includesOrientation: boolean;
+  }) => EmailContent,
+) {
+  const events = await db
+    .prepare(
+      `SELECT e.id, e.starts_at AS startsAt, ${includesOrientationSql()} AS includesOrientation FROM event e
+      WHERE e.series_id = ? AND e.occurrence_date ${inclusive ? ">=" : ">"} ? AND e.cancelled_at IS NULL AND e.starts_at > ${nowMsSql}`,
+    )
+    .bind(seriesId, date)
+    .all<{ id: string; startsAt: number; includesOrientation: number }>();
+  return Object.fromEntries(
+    events.results.map((event) => [
+      event.id,
+      email({
+        startsAt: event.startsAt,
+        includesOrientation: Boolean(event.includesOrientation),
+      }),
+    ]),
+  );
 }
 
 /** Stop is exclusive and permanent, even when a later end-date edit extends a series. */
@@ -925,6 +976,9 @@ async function stopSeries(
     throw new RequestError(400, "Keep the reason to 1000 characters or fewer.");
   const series = await findPatrolSeries(db, actor, id);
   await requireScheduledDate(db, series, date, true);
+  const dated = await datedSeriesEmails(db, id, date, true, (event) =>
+    patrolSeriesStoppedEmail(reason, event),
+  );
   const now = Date.now();
   const operation = crypto.randomUUID();
   const results = await db.batch([
@@ -961,6 +1015,7 @@ async function stopSeries(
       now,
       notify,
       patrolSeriesStoppedEmail(reason),
+      dated,
     ),
     db
       .prepare(

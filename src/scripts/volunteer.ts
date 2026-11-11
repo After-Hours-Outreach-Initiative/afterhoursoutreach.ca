@@ -4,7 +4,6 @@ import { handleEventCalendarClick, syncEventCalendar } from "./event-calendar";
 import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
-import { chooseNotification } from "./notification-choice";
 import { confirmSeriesDeletion } from "./event-deletion";
 import { confirmEventUnregistration } from "./event-unregistration";
 import { initDateInputs, readDateInputs } from "./date-input";
@@ -731,24 +730,16 @@ function form(
         !(await confirmSeriesDeletion())
       )
         return;
-      let notify: boolean | undefined = element.matches(
-        "[data-organizer-rejection], [data-notify]",
-      )
-        ? true
-        : undefined;
-      const prompt = eventEmailPrompt(
-        values,
-        element.dataset.emailPrompt,
-        element.dataset.futureEmailPrompt,
-      );
-      if (prompt) {
-        const choice = await chooseNotification(prompt);
-        if (choice === null) {
-          if (element.hasAttribute("data-submit-on-change")) element.reset();
-          return;
-        }
-        notify = choice;
-      }
+      const notify =
+        element.matches("[data-organizer-rejection], [data-notify]") ||
+        Boolean(
+          eventEmailPrompt(
+            values,
+            element.dataset.emailPrompt,
+            element.dataset.futureEmailPrompt,
+          ),
+        ) ||
+        undefined;
       element.setAttribute("aria-busy", "true");
       if (loading) {
         loading.hidden = false;
