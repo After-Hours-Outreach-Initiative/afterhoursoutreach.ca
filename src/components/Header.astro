@@ -38,6 +38,8 @@ const isCurrent = (href: string) =>
 const links = siteNavigation(signedIn, organizer, eventAccess);
 const applicationCount = signedIn && organizer ? readyApplicationCount : 0;
 const accountPage = current === "/volunteer/account" || current === "/apply";
+const auditLog = signedIn && organizer;
+const auditLogPage = current === "/audit-log";
 ---
 
 <header class="site-header sticky top-0 z-50 bg-black text-white">
@@ -143,6 +145,8 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
           {name}
           {email}
           {accountPage}
+          {auditLog}
+          {auditLogPage}
         />
       </details>
     </nav>
@@ -204,6 +208,8 @@ const accountPage = current === "/volunteer/account" || current === "/apply";
             {name}
             {email}
             {accountPage}
+            {auditLog}
+            {auditLogPage}
             showIcon
             showArrows
           />

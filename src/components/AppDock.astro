@@ -1,0 +1,220 @@
+---
+import AccountIcon from "@/components/icons/AccountIcon.astro";
+import CalendarIcon from "@/components/icons/CalendarIcon.astro";
+import ClipboardIcon from "@/components/icons/ClipboardIcon.astro";
+import UsersIcon from "@/components/icons/UsersIcon.astro";
+import HeaderApplicationBadge from "@/components/HeaderApplicationBadge.astro";
+import { siteNavigation } from "@/data/site";
+
+interface Props {
+  organizer?: boolean;
+  eventAccess?: boolean;
+  readyApplicationCount?: number;
+}
+const {
+  organizer = false,
+  eventAccess = false,
+  readyApplicationCount = 0,
+} = Astro.props;
+
+const current = Astro.url.pathname.replace(/\/$/, "");
+const under = (href: string) =>
+  current === href || current.startsWith(`${href}/`);
+// Events, or Volunteer until event access, as in the site navigation.
+const portal = siteNavigation(true, organizer, eventAccess)[0];
+const items = [
+  {
+    ...portal,
+    icon: CalendarIcon,
+    current: current === portal.href || current === "/apply",
+  },
+  ...(organizer
+    ? [
+        {
+          label: "Applications",
+          href: "/applications",
+          icon: ClipboardIcon,
+          current: under("/applications"),
+        },
+        {
+          label: "Volunteers",
+          href: "/volunteers",
+          icon: UsersIcon,
+          current: under("/volunteers"),
+        },
+      ]
+    : []),
+  {
+    label: "Account",
+    href: "/volunteer/account",
+    icon: AccountIcon,
+    // The audit log is reached from the account menu.
+    current: current === "/volunteer/account" || current === "/audit-log",
+  },
+];
+---
+
+<nav class="app-dock" aria-label="Quick navigation">
+  {
+    items.map(({ icon: Icon, ...item }) => (
+      <a
+        class="app-dock-item"
+        href={item.href}
+        aria-current={item.current ? "page" : undefined}
+        data-header-applications={
+          item.href === "/applications" ? "" : undefined
+        }
+        data-volunteer-nav={
+          item.href === "/volunteer" || item.href === "/events" ? "" : undefined
+        }
+      >
+        <span class="app-dock-icon">
+          <Icon class="app-dock-glyph" />
+        </span>
+        <span class="app-dock-label" data-volunteer-nav-label>
+          {item.label}
+          {item.href === "/applications" && (
+            <HeaderApplicationBadge count={readyApplicationCount} />
+          )}
+        </span>
+      </a>
+    ))
+  }
+</nav>
+
+<style>
+  /* A floating tab bar for signed-in people on small screens. */
+  .app-dock {
+    display: none;
+  }
+  @media (width < 64rem) {
+    .app-dock {
+      position: fixed;
+      /* Lines up with the page content's side margins. */
+      inset-inline: 1.5rem;
+      bottom: max(0.75rem, env(safe-area-inset-bottom));
+      z-index: 40;
+      display: flex;
+      gap: 0.25rem;
+      padding: 0.375rem;
+      border: 1px solid #ffffff1a;
+      border-radius: 999rem;
+      background: #18181bd9;
+      box-shadow:
+        0 0.75rem 2rem #000c,
+        inset 0 1px 0 #ffffff14;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
+  }
+  @media (width < 40rem) {
+    .app-dock {
+      inset-inline: 1rem;
+    }
+  }
+  .app-dock-item {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    min-width: 0;
+    min-height: 3.25rem;
+    padding: 0.375rem 0.25rem;
+    border-radius: 999rem;
+    color: #a1a1aa;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      color 150ms ease,
+      background-color 150ms ease,
+      scale 150ms ease;
+  }
+  .app-dock-item:hover {
+    color: #f4f4f5;
+  }
+  .app-dock-item:active {
+    scale: 0.94;
+  }
+  .app-dock-item[aria-current="page"] {
+    background: #ffffff14;
+    color: white;
+  }
+  .app-dock-item:focus-visible {
+    outline: 2px solid #a5b4fc;
+    outline-offset: -2px;
+  }
+  .app-dock-icon {
+    position: relative;
+    display: flex;
+  }
+  .app-dock-item :global(.app-dock-glyph) {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  .app-dock-item[aria-current="page"] :global(.app-dock-glyph) {
+    color: #a5b4fc;
+  }
+  .app-dock-label {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The review count sits on the icon's corner, as an app badge. */
+  .app-dock-item :global(.header-application-badge) {
+    position: absolute;
+    top: 0.125rem;
+    left: calc(50% + 0.375rem);
+    border: 2px solid #18181b;
+    font-size: 0.625rem;
+    box-sizing: content-box;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-dock-item {
+      transition: none;
+    }
+  }
+  @media print {
+    .app-dock {
+      display: none;
+    }
+  }
+
+  /* Keep the page's end, and other floating controls, clear of the dock. */
+  @media (width < 64rem) {
+    :global(body[data-app-dock]) {
+      padding-bottom: calc(5rem + max(0.75rem, env(safe-area-inset-bottom)));
+    }
+    :global(body[data-app-dock] .back-to-top) {
+      bottom: calc(5.25rem + max(0.75rem, env(safe-area-inset-bottom)));
+    }
+    :global(body[data-app-dock] [data-open-account-switcher]) {
+      bottom: calc(5.25rem + max(0.75rem, env(safe-area-inset-bottom)));
+    }
+  }
+</style>
+
+<script>
+  // Make the dock's other pages feel instant on small screens, where the dock
+  // shows: fetch them as soon as the page loads, and render the one a finger
+  // lands on before it lifts. Browsers without speculation rules skip this.
+  if (
+    matchMedia("(width < 64rem)").matches &&
+    HTMLScriptElement.supports?.("speculationrules")
+  ) {
+    const where = { selector_matches: ".app-dock-item:not([aria-current])" };
+    const rules = document.createElement("script");
+    rules.type = "speculationrules";
+    rules.textContent = JSON.stringify({
+      prefetch: [{ source: "document", where, eagerness: "immediate" }],
+      prerender: [{ source: "document", where, eagerness: "conservative" }],
+    });
+    document.head.append(rules);
+  }
+</script>

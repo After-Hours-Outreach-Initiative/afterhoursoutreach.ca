@@ -43,6 +43,54 @@ function clip(menu: HTMLElement) {
   else menu.style.removeProperty("clip-path");
 }
 
+const isOpen = (menu: HTMLElement) =>
+  menu.matches(":popover-open") || (menu as HTMLDialogElement).open;
+
+function hide(menu: HTMLDialogElement) {
+  if (menu.open) menu.close();
+  else if (menu.matches(":popover-open")) menu.hidePopover();
+}
+
+/**
+ * On small screens a sheet menu opens as a modal dialog instead of a popover,
+ * so the page beneath ignores taps, presses and holds until it closes. A tap
+ * on the backdrop, a drag down, Escape or its own buttons close it.
+ */
+function initSheet(menu: HTMLDialogElement) {
+  const trigger = triggerFor(menu);
+  trigger?.addEventListener("click", (event) => {
+    if (!isSheet(menu)) return;
+    // Cancels the trigger's popover toggle.
+    event.preventDefault();
+    if (menu.open) return menu.close();
+    unplace(menu);
+    menu.showModal();
+    trigger.setAttribute("aria-expanded", "true");
+  });
+  menu.addEventListener("close", () =>
+    trigger?.setAttribute("aria-expanded", "false"),
+  );
+  menu.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    // A click on the dialog itself lands on its backdrop.
+    if (
+      (event.target === menu && menu.open) ||
+      event.target.closest("[data-sheet-close]")
+    )
+      hide(menu);
+  });
+  const handle = menu.querySelector<HTMLElement>("[data-sheet-handle]");
+  if (handle)
+    initSheetDrag(
+      menu,
+      handle,
+      () => hide(menu),
+      () => isOpen(menu) && isSheet(menu),
+    );
+  // The sheet becomes a menu when the screen widens, and the reverse.
+  wide.addEventListener("change", () => hide(menu));
+}
+
 /**
  * Popover menus placed under their triggers. Closing a menu reports it to the
  * page.
@@ -67,14 +115,7 @@ export function initFilterMenus(
         menu.style.removeProperty("visibility");
       });
     });
-    const handle = menu.querySelector<HTMLElement>("[data-sheet-handle]");
-    if (handle)
-      initSheetDrag(
-        menu,
-        handle,
-        () => menu.hidePopover(),
-        () => menu.matches(":popover-open") && isSheet(menu),
-      );
+    if (menu instanceof HTMLDialogElement) initSheet(menu);
     menu.addEventListener("toggle", (event) => {
       if ((event as ToggleEvent).newState === "open") {
         // Skip focusing search on touch screens, where it opens the keyboard.

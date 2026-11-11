@@ -63,11 +63,10 @@ const orders = [
   </span>
   <ChevronDownIcon class="filter-menu-chevron" />
 </button>
-<div
+<dialog
   class="filter-menu directory-sort-menu sheet"
   id={id}
   popover="auto"
-  role="group"
   aria-labelledby={`${id}-trigger`}
   data-filter-menu="sort"
   data-filter-menu-align="end"
@@ -83,8 +82,7 @@ const orders = [
       class="btn btn-quiet dialog-close"
       type="button"
       aria-label="Close"
-      popovertarget={id}
-      popovertargetaction="hide"
+      data-sheet-close
     >
       <CloseIcon />
     </button>
@@ -230,27 +228,32 @@ const orders = [
     <button
       class="btn btn-primary"
       type="button"
-      popovertarget={id}
-      popovertargetaction="hide"
+      data-sheet-close
     >
       Show results
     </button>
   </div>
-</div>
+</dialog>
 
 <style>
-  /* Small screens: a sheet rising from the bottom of the screen, like the
-     filters. Wide screens keep a menu under the button. */
+  /* Small screens: a modal sheet rising from the bottom of the screen, like
+     the filters. Wide screens keep a popover menu under the button. */
   @media (width < 64rem) {
     .directory-sort-menu {
       position: fixed;
       inset: auto 0 0;
+      margin: 0;
       width: 100%;
       max-width: 100%;
       max-height: min(48rem, 90dvh);
       border: 0;
       border-radius: 0.75rem 0.75rem 0 0;
       box-shadow: none;
+      overflow: clip;
+    }
+    .directory-sort-menu[open] {
+      display: flex;
+      flex-direction: column;
     }
     .directory-sort-menu::backdrop {
       background: #000b;
@@ -278,17 +281,17 @@ const orders = [
           display 200ms allow-discrete,
           overlay 200ms allow-discrete;
       }
-      .directory-sort-menu:not(:popover-open) {
+      .directory-sort-menu:not([open]) {
         translate: 0 100%;
       }
-      .directory-sort-menu:not(:popover-open)::backdrop {
+      .directory-sort-menu:not([open])::backdrop {
         opacity: 0;
       }
       @starting-style {
-        .directory-sort-menu:popover-open {
+        .directory-sort-menu[open] {
           translate: 0 100%;
         }
-        .directory-sort-menu:popover-open::backdrop {
+        .directory-sort-menu[open]::backdrop {
           opacity: 0;
         }
       }

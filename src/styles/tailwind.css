@@ -262,3 +262,33 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Page changes fade the content between the header and the dock, which stay
+   put like an app's chrome. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+  .site-header {
+    view-transition-name: site-header;
+  }
+  .app-dock {
+    view-transition-name: app-dock;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 150ms;
+    animation-timing-function: ease-out;
+  }
+  /* The chrome swaps instantly instead of cross-fading its own changes. */
+  ::view-transition-old(site-header),
+  ::view-transition-new(site-header),
+  ::view-transition-old(app-dock),
+  ::view-transition-new(app-dock) {
+    animation: none;
+  }
+  ::view-transition-old(site-header),
+  ::view-transition-old(app-dock) {
+    display: none;
+  }
+}

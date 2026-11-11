@@ -227,7 +227,7 @@ test("organizers review pending and approved applications with persistent list c
       assert.equal(eventHtml.includes('href="/applications"'), auth === cookie);
       assert.equal(
         [...eventHtml.matchAll(/data-header-application-count/g)].length,
-        auth === cookie ? 2 : 0,
+        auth === cookie ? 3 : 0,
       );
       assert.doesNotMatch(eventHtml, /data-event-view-link/);
       assert.doesNotMatch(eventHtml, /href="\/manage\//);
@@ -313,7 +313,9 @@ test("organizers review pending and approved applications with persistent list c
     );
     await page.goto(`${origin}/volunteers`);
     const headerCount = page.locator("[data-header-application-count]");
+    // The desktop menu, mobile menu and mobile dock each show the count.
     await expect(headerCount).toHaveText([
+      "53 ready for review",
       "53 ready for review",
       "53 ready for review",
     ]);

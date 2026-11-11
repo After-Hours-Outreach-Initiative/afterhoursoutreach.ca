@@ -7,6 +7,9 @@ interface Props {
   name?: string;
   email?: string;
   accountPage: boolean;
+  /** Organizers reach the audit log from here, not the main navigation. */
+  auditLog?: boolean;
+  auditLogPage?: boolean;
   class?: string;
   showIcon?: boolean;
   showArrows?: boolean;
@@ -17,6 +20,8 @@ const {
   name,
   email,
   accountPage,
+  auditLog = false,
+  auditLogPage = false,
   class: className,
   showIcon = false,
   showArrows = false,
@@ -56,6 +61,14 @@ const {
     Account
     {showArrows && <ArrowRightIcon class="header-mobile-arrow" />}
   </a>
+  {
+    auditLog && (
+      <a href="/audit-log" aria-current={auditLogPage ? "page" : undefined}>
+        Audit Log
+        {showArrows && <ArrowRightIcon class="header-mobile-arrow" />}
+      </a>
+    )
+  }
   <form data-sign-out action="/api/v1/auth/sign-out" method="post">
     <button type="submit">Sign out</button>
     <p class="header-account-message" data-form-message role="status" hidden>
