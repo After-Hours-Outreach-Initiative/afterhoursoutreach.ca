@@ -1,5 +1,6 @@
 ---
 import DirectoryRoleLabel from "./DirectoryRoleLabel.astro";
+import CloseIcon from "@/components/icons/CloseIcon.svg";
 import ArrowDownIcon from "@/components/icons/ArrowDownIcon.astro";
 import ArrowUpIcon from "@/components/icons/ArrowUpIcon.astro";
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
@@ -15,7 +16,9 @@ import {
   type DirectoryListState,
   type DirectoryRole,
 } from "@/data/volunteer-list";
+import "@/styles/dialog.css";
 import "@/styles/filter-menu.css";
+import "@/styles/sheet.css";
 
 interface Props {
   kind: DirectoryKind;
@@ -61,14 +64,31 @@ const orders = [
   <ChevronDownIcon class="filter-menu-chevron" />
 </button>
 <div
-  class="filter-menu directory-sort-menu"
+  class="filter-menu directory-sort-menu sheet"
   id={id}
   popover="auto"
   role="group"
   aria-labelledby={`${id}-trigger`}
   data-filter-menu="sort"
   data-filter-menu-align="end"
+  data-filter-menu-sheet
 >
+  <div class="dialog-header sheet-header directory-sort-header" data-sheet-handle>
+    <span class="sheet-grabber" aria-hidden="true"></span>
+    <h2>
+      <SortIcon class="filter-panel-heading-icon" />
+      Sort
+    </h2>
+    <button
+      class="btn btn-quiet dialog-close"
+      type="button"
+      aria-label="Close"
+      popovertarget={id}
+      popovertargetaction="hide"
+    >
+      <CloseIcon />
+    </button>
+  </div>
   <div class="filter-menu-options">
     <div
       class="filter-sort"
@@ -206,9 +226,80 @@ const orders = [
       </button>
     </noscript>
   </div>
+  <div class="dialog-footer directory-sort-footer">
+    <button
+      class="btn btn-primary"
+      type="button"
+      popovertarget={id}
+      popovertargetaction="hide"
+    >
+      Show results
+    </button>
+  </div>
 </div>
 
 <style>
+  /* Small screens: a sheet rising from the bottom of the screen, like the
+     filters. Wide screens keep a menu under the button. */
+  @media (width < 64rem) {
+    .directory-sort-menu {
+      position: fixed;
+      inset: auto 0 0;
+      width: 100%;
+      max-width: 100%;
+      max-height: min(48rem, 90dvh);
+      border: 0;
+      border-radius: 0.75rem 0.75rem 0 0;
+      box-shadow: none;
+    }
+    .directory-sort-menu::backdrop {
+      background: #000b;
+    }
+    .directory-sort-header,
+    .directory-sort-footer {
+      --dialog-padding: 1.25rem;
+    }
+    /* Sort applies each change at once, so this only returns to the list. */
+    .directory-sort-footer {
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+    .directory-sort-footer > .btn {
+      flex: 1;
+    }
+    .directory-sort-menu :global(.filter-menu-options) {
+      padding: 1.25rem;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .directory-sort-menu,
+      .directory-sort-menu::backdrop {
+        transition:
+          translate 200ms cubic-bezier(0.2, 0, 0, 1),
+          opacity 200ms ease-out,
+          display 200ms allow-discrete,
+          overlay 200ms allow-discrete;
+      }
+      .directory-sort-menu:not(:popover-open) {
+        translate: 0 100%;
+      }
+      .directory-sort-menu:not(:popover-open)::backdrop {
+        opacity: 0;
+      }
+      @starting-style {
+        .directory-sort-menu:popover-open {
+          translate: 0 100%;
+        }
+        .directory-sort-menu:popover-open::backdrop {
+          opacity: 0;
+        }
+      }
+    }
+  }
+  @media (min-width: 64rem) {
+    .directory-sort-header,
+    .directory-sort-footer {
+      display: none;
+    }
+  }
   /* The sort menu is tighter than the filter sidebar. */
   .directory-sort-menu .filter-sort {
     gap: 1rem;

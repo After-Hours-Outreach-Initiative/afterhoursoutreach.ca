@@ -48,6 +48,70 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Small screens join the search, filter and sort into one control: the
+   search on top, and a filled bar of the two buttons under it. */
+@media (width < 64rem) {
+  .filter-layout:has(.directory-sort-trigger) {
+    row-gap: 0;
+    column-gap: 0;
+  }
+  .filter-layout:has(.directory-sort-trigger) .filter-layout-results {
+    margin-top: 1rem;
+  }
+  .filter-layout:has(.directory-sort-trigger)
+    .filter-layout-search
+    input[type="search"] {
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
+  .filter-layout:has(.directory-sort-trigger)
+    :is(.filter-panel-trigger, .directory-sort-trigger) {
+    position: relative;
+    margin-top: -1px;
+    border-color: #52525b;
+    background: #18181b;
+  }
+  .filter-layout:has(.directory-sort-trigger) .filter-panel-trigger {
+    border-radius: 0 0 0 0.5rem;
+  }
+  /* Sort opens a sheet like the filters here, not a dropdown. */
+  .filter-layout .directory-sort-trigger .filter-menu-chevron {
+    display: none;
+  }
+  .filter-layout:has(.directory-sort-trigger) .directory-sort-trigger {
+    margin-left: -1px;
+    border-radius: 0 0 0.5rem 0;
+  }
+  /* Focus rings sit inside each part of the joined control, tracing its own
+     corners instead of spilling over or under its neighbours. */
+  .filter-layout:has(.directory-sort-trigger)
+    :is(
+      .filter-layout-search input[type="search"],
+      .filter-panel-trigger,
+      .directory-sort-trigger
+    ):focus-visible {
+    outline: 2px solid #a5b4fc;
+    outline-offset: -2px;
+  }
+  /* Bring the hovered or focused button's border above its neighbours. */
+  .filter-layout:has(.directory-sort-trigger)
+    :is(.filter-panel-trigger, .directory-sort-trigger):is(
+      :hover,
+      :focus-visible,
+      [aria-expanded="true"],
+      [data-active]
+    ) {
+    z-index: 1;
+  }
+  .filter-layout:has(.directory-sort-trigger)
+    :is(.filter-panel-trigger, .directory-sort-trigger):hover {
+    border-color: #a1a1aa;
+    background: #27272a;
+  }
+  .filter-layout:has(.directory-sort-trigger) .filter-panel-trigger[data-active] {
+    border-color: #818cf8;
+    background: var(--color-blue-deep);
+  }
+}
 .filter-panel-trigger[data-active] {
   border-color: #818cf8;
   background: var(--color-blue-deep);
@@ -68,8 +132,7 @@
   max-height: min(48rem, 90dvh);
   margin: 0;
   padding: 0;
-  border: 1px solid #52525b;
-  border-bottom: 0;
+  border: 0;
   border-radius: 0.75rem 0.75rem 0 0;
   background: #0c0d10;
   color: #f4f4f5;
@@ -85,15 +148,6 @@
 .filter-panel .dialog-header,
 .filter-panel .dialog-footer {
   --dialog-padding: 1.25rem;
-}
-.filter-panel .dialog-header h2 {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  font-size: 1.25rem;
-  line-height: 1.25;
 }
 .filter-panel-footer > .btn {
   flex: 1;

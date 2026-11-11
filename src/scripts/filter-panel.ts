@@ -1,3 +1,5 @@
+import { initSheetDrag } from "./sheet-drag";
+
 const wide = matchMedia("(min-width: 64rem)");
 
 /**
@@ -71,6 +73,14 @@ export function initFilterPanel(root: HTMLElement, apply: () => void) {
     section.querySelector<HTMLElement>("[data-filter-empty]")!.hidden =
       shown > 0;
   });
+  const handle = panel.querySelector<HTMLElement>("[data-sheet-handle]");
+  if (handle)
+    initSheetDrag(
+      panel,
+      handle,
+      () => panel.close(),
+      () => panel.open && !wide.matches,
+    );
   // The sheet becomes the sidebar when the screen widens.
   wide.addEventListener("change", () => {
     if (wide.matches && panel.open) panel.close();

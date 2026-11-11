@@ -1,4 +1,17 @@
+import { initSheetDrag } from "./sheet-drag";
+
 const gap = 8;
+const wide = matchMedia("(min-width: 64rem)");
+
+/** Some menus become bottom sheets on small screens. */
+const isSheet = (menu: HTMLElement) =>
+  menu.hasAttribute("data-filter-menu-sheet") && !wide.matches;
+
+/** Drop a menu's placement so its sheet styles apply. */
+function unplace(menu: HTMLElement) {
+  for (const property of ["left", "top", "max-height", "clip-path"])
+    menu.style.removeProperty(property);
+}
 
 function triggerFor(menu: HTMLElement) {
   return document.getElementById(menu.getAttribute("aria-labelledby") ?? "");
@@ -44,6 +57,7 @@ export function initFilterMenus(
       const trigger = triggerFor(menu);
       trigger?.setAttribute("aria-expanded", String(open));
       if (!open || !trigger) return;
+      if (isSheet(menu)) return unplace(menu);
       // The menu is not laid out yet. Hide it until it is placed in the frame
       // before its first paint, so it never flashes at the page origin.
       menu.style.visibility = "hidden";
@@ -53,6 +67,14 @@ export function initFilterMenus(
         menu.style.removeProperty("visibility");
       });
     });
+    const handle = menu.querySelector<HTMLElement>("[data-sheet-handle]");
+    if (handle)
+      initSheetDrag(
+        menu,
+        handle,
+        () => menu.hidePopover(),
+        () => menu.matches(":popover-open") && isSheet(menu),
+      );
     menu.addEventListener("toggle", (event) => {
       if ((event as ToggleEvent).newState === "open") {
         // Skip focusing search on touch screens, where it opens the keyboard.
@@ -84,7 +106,7 @@ export function initFilterMenus(
       for (const menu of root.querySelectorAll<HTMLElement>(
         "[data-filter-menu]:popover-open",
       ))
-        clip(menu);
+        if (!isSheet(menu)) clip(menu);
     },
     { passive: true },
   );
@@ -94,7 +116,8 @@ export function initFilterMenus(
       "[data-filter-menu]:popover-open",
     )) {
       const trigger = triggerFor(menu);
-      if (trigger) place(menu, trigger);
+      if (isSheet(menu)) unplace(menu);
+      else if (trigger) place(menu, trigger);
     }
   });
 }

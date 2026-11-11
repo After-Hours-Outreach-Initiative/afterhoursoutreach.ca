@@ -3,6 +3,7 @@ import CloseIcon from "@/components/icons/CloseIcon.svg";
 import FilterIcon from "@/components/icons/FilterIcon.astro";
 import "@/styles/dialog.css";
 import "@/styles/filter-panel.css";
+import "@/styles/sheet.css";
 
 interface Props {
   id: string;
@@ -34,12 +35,13 @@ const { id, title, active, resetHref } = Astro.props;
   </span>
 </button>
 <dialog
-  class="filter-panel"
+  class="filter-panel sheet"
   id={id}
   aria-labelledby={`${id}-heading`}
   data-filter-panel
 >
-  <div class="dialog-header filter-panel-header">
+  <div class="dialog-header filter-panel-header sheet-header" data-sheet-handle>
+    <span class="sheet-grabber" aria-hidden="true"></span>
     <h2 id={`${id}-heading`}>
       <FilterIcon class="filter-panel-heading-icon" />
       Filters
