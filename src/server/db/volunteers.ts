@@ -852,12 +852,6 @@ export async function setRole(
         .bind(operation, actor.id, userId, now),
       db
         .prepare(
-          `DELETE FROM session
-          WHERE user_id = ? AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?)`,
-        )
-        .bind(userId, operation),
-      db
-        .prepare(
           `INSERT INTO event_notification (id, operation_id, user_id, subject, body, action, created_at, delivery_to)
           SELECT ?, ?, ?, ?, ?, ?, ?, email FROM user
           WHERE id=? AND email_verified=1 AND EXISTS(SELECT 1 FROM audit_log WHERE id = ?) AND ? = 1`,
@@ -882,7 +876,7 @@ export async function setRole(
       );
     return {
       operation,
-      message: "Role saved. The volunteer must sign in again.",
+      message: "Role saved.",
     };
   } catch (error) {
     return databaseWriteError(error);

@@ -117,8 +117,8 @@ is promoted automatically or based on the email address supplied to a web form.
 
 Organizers manage application approval, active status, patrol approval, and roles at
 `/volunteers`. Promotions require an active account with
-a verified email and approved application. Role changes revoke
-the target's sessions. The last active organizer cannot be demoted/deactivated.
+a verified email and approved application. Role changes take effect on the
+target's next request without ending their sessions. The last active organizer cannot be demoted/deactivated.
 Two-factor authentication is optional for organizers and volunteers; accounts
 that enable it must complete it when signing in. Full profile
 views are logged atomically before answers are returned; lists/rosters contain

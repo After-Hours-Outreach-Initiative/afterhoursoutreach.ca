@@ -1006,7 +1006,7 @@ describe(
         );
       });
 
-      test("organizer promotions require verified application, not two-factor, and revoke sessions", async () => {
+      test("organizer promotions require verified application, not two-factor, and keep sessions", async () => {
         await DB.prepare("UPDATE user SET email_verified=0 WHERE id=?")
           .bind(bob.id)
           .run();
@@ -1036,17 +1036,6 @@ describe(
             organizer.cookie,
           ),
         );
-        assert.equal(
-          (
-            await DB.prepare(
-              "SELECT count(*) AS n FROM session WHERE user_id=?",
-            )
-              .bind(bob.id)
-              .first()
-          )?.n,
-          0,
-        );
-        bob.cookie = await signIn(bob.email);
         await ok(await send("/volunteers", undefined, bob.cookie));
         await ok(
           await send(
@@ -1055,17 +1044,6 @@ describe(
             organizer.cookie,
           ),
         );
-        assert.equal(
-          (
-            await DB.prepare(
-              "SELECT count(*) AS n FROM session WHERE user_id=?",
-            )
-              .bind(bob.id)
-              .first()
-          )?.n,
-          0,
-        );
-        bob.cookie = await signIn(bob.email);
         await ok(await send("/volunteers", undefined, bob.cookie), 403);
         const audit = await DB.prepare(
           "SELECT changed_fields FROM audit_log WHERE action='role_changed' AND subject_id=?",

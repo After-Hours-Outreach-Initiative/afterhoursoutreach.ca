@@ -15,7 +15,7 @@ export async function loadActionPage(
     });
     if (response.redirected) {
       const next = new URL(response.url);
-      // Changing your own role can revoke your session. That is an auth
+      // A session that ended elsewhere redirects to sign-in. That is an auth
       // navigation, not a routine action refresh.
       if (
         next.origin === location.origin &&
