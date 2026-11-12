@@ -3,13 +3,19 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
-- application steps should have a "1 of N" indicated somewhere
+- rearrange the event type options to be orientation first and default to the
+  orientation too
 - remove application ready notification from sending to info@...
-- cancelled events shouldnt show on the calendar or the main event list
-- make the emails not be centered they should just flow normally and be left
-  aligned
+  - and make an organizer account setting to receive application ready to
+    review email notifications
+
+- change volunteer spots to show a visual with avatars of total spots and
+  reservations and limits
+- application steps should have a "1 of N" indicated somewhere
 - fix rejected application scenarios: implement a way for applicants to change
   their application after being rejected and resubmit
+- make the emails not be centered they should just flow normally and be left
+  aligned
 - add a team lead role
 - add an email footer to the google workspace emails with logo, AHOI name, and
   website link
