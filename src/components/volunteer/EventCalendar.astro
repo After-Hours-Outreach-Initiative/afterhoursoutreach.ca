@@ -82,7 +82,12 @@ const weekdays = [
                     aria-label={day.events[0].description}
                     title={day.events[0].label}
                   >
-                    <span class="event-calendar-day event-calendar-circle">
+                    <span
+                      class:list={[
+                        "event-calendar-day event-calendar-circle",
+                        day.cancelled && "event-calendar-cancelled",
+                      ]}
+                    >
                       {day.day}
                     </span>
                   </a>

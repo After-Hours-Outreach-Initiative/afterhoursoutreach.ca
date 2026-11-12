@@ -86,12 +86,13 @@ const blocked =
   data-event-start={event.startsAt}
   data-event-label={`${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`}
   data-event-type="patrol"
+  data-event-cancelled={event.cancelledAt && event.seriesId ? "" : undefined}
   data-includes-orientation={String(Boolean(event.includesOrientation))}
 >
   <div class="volunteer-event-layout">
     <div class="volunteer-event-info">
       {event.cancelledAt ? (
-        <p class="volunteer-hidden">Cancelled</p>
+        <p class="volunteer-hidden volunteer-cancelled">Cancelled</p>
       ) : event.hidden ? (
         <p class="volunteer-hidden">Public visibility off</p>
       ) : !event.open ? (

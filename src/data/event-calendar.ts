@@ -4,6 +4,7 @@ export interface CalendarEvent {
   id: string;
   startsAt: number;
   label: string;
+  cancelled?: boolean;
 }
 
 export function calendarWeekStart(date: string) {
@@ -30,7 +31,7 @@ export function eventCalendar(
     .map((event) => ({
       ...event,
       date: vancouverInput(event.startsAt).slice(0, 10),
-      description: `${formatEventDate(event.startsAt)} · ${event.label}`,
+      description: `${formatEventDate(event.startsAt)} · ${event.cancelled ? "Cancelled · " : ""}${event.label}`,
     }));
   const firstDate = dated[0]?.date ?? today;
   const lastDate = dated.at(-1)?.date ?? today;
@@ -43,12 +44,18 @@ export function eventCalendar(
   const days = Array.from({ length: 42 }, (_, index) => {
     const date = addCalendarDays(gridStart, index);
     const inMonth = date.slice(0, 7) === month;
+    const events = dated.filter((event) => event.date === date);
     return {
       date,
       day: Number(date.slice(-2)),
       inMonth,
       today: inMonth && date === today,
-      events: dated.filter((event) => event.date === date),
+      // A date links to its first running event; cancelled ones come last.
+      events: [
+        ...events.filter((event) => !event.cancelled),
+        ...events.filter((event) => event.cancelled),
+      ],
+      cancelled: events.length > 0 && events.every((event) => event.cancelled),
     };
   });
   return {

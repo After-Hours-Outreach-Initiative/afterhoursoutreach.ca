@@ -98,3 +98,30 @@ test("navigation advances one month, crosses empty months, and clamps after even
   assert.equal(empty.previous, null);
   assert.equal(empty.next, null);
 });
+
+test("calendar marks dates whose events are all cancelled series occurrences", () => {
+  const now = Date.parse("2027-01-01T20:00:00Z");
+  const cancelled = (id: string, instant: string) => ({
+    ...event(id, instant),
+    cancelled: true,
+  });
+  const days = eventCalendar(
+    [
+      cancelled("cancelled-only", "2027-01-05T03:00:00Z"),
+      cancelled("cancelled-first", "2027-01-08T02:00:00Z"),
+      event("running", "2027-01-08T04:00:00Z"),
+    ],
+    undefined,
+    now,
+  ).weeks.flat();
+  const date = (value: string) => days.find((day) => day.date === value)!;
+  assert.equal(date("2027-01-04").cancelled, true);
+  assert.match(date("2027-01-04").events[0].description, /Cancelled/);
+  // A running event on the same date keeps its usual colour and the link.
+  assert.equal(date("2027-01-07").cancelled, false);
+  assert.deepEqual(
+    date("2027-01-07").events.map((item) => item.id),
+    ["running", "cancelled-first"],
+  );
+  assert.equal(date("2027-01-10").cancelled, false);
+});

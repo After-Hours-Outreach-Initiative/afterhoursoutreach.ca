@@ -202,12 +202,22 @@
   background: #16214a;
   color: #e0e7ff;
 }
+/* Dates whose events are all cancelled series occurrences, in the event
+   card's cancelled colour. */
+[data-event-calendar] .event-calendar-circle.event-calendar-cancelled {
+  border-color: #7f1d1d;
+  background: #2a1114;
+  color: #f87171;
+}
 [data-event-calendar] td[aria-current="date"] .event-calendar-day {
   border-color: #d4d4d8;
   color: white;
 }
 [data-event-calendar] td[aria-current="date"] .event-calendar-circle {
   background: #4169e1;
+}
+[data-event-calendar] td[aria-current="date"] .event-calendar-cancelled {
+  background: #7f1d1d;
 }
 [data-event-calendar] a {
   min-width: 0;
@@ -222,6 +232,11 @@
   border-color: #818cf8;
   background: #223265;
   color: white;
+}
+[data-event-calendar] a:hover .event-calendar-circle.event-calendar-cancelled {
+  border-color: #b91c1c;
+  background: #3f1519;
+  color: #fca5a5;
 }
 [data-event-calendar] .event-calendar-header > button {
   display: inline-flex;

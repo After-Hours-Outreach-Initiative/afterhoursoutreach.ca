@@ -2132,6 +2132,10 @@ body:has(
   color: #fcd34d;
   margin: 0 0 0.75rem;
 }
+/* Matches cancelled dates in the event calendar. */
+.volunteer-event-card .volunteer-cancelled {
+  color: #f87171;
+}
 .volunteer-roster {
   margin-top: 0.5rem;
   border-top: 1px solid #27272a;

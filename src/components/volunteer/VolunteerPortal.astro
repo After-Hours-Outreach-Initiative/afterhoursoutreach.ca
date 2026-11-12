@@ -302,11 +302,13 @@ const destinations = events.filter(
         <div class="volunteer-event-schedule">
           <EventCalendar
             events={events
-              .filter((event) => !event.cancelledAt)
+              // Cancelled series dates stay listed so they can be restored.
+              .filter((event) => !event.cancelledAt || event.seriesId)
               .map((event) => ({
                 id: event.id,
                 startsAt: event.startsAt,
                 label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
+                cancelled: Boolean(event.cancelledAt),
               }))}
           />
           <div class="volunteer-event-results">

@@ -87,6 +87,7 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
       id: card.dataset.liveEvent!,
       startsAt: Number(card.dataset.eventStart),
       label: card.dataset.eventLabel!,
+      cancelled: card.dataset.eventCancelled !== undefined,
     });
   }
   const model = eventCalendar(events, start ?? calendar.dataset.calendarStart);
@@ -134,6 +135,7 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
           link.setAttribute("aria-label", event.description);
           link.title = event.label;
           date.classList.add("event-calendar-circle");
+          if (day.cancelled) date.classList.add("event-calendar-cancelled");
           link.appendChild(date);
           cell.appendChild(link);
         } else cell.appendChild(date);
