@@ -175,11 +175,11 @@ const blocked =
     <div class="volunteer-actions">
       {preview ? (
         unregisterOpen ? (
-          <button class="btn btn-red" type="button" disabled>
+          <button class="btn btn-red" type="button" disabled data-preview>
             Unregister
           </button>
         ) : future && !event.signedUp && !blocked ? (
-          <button class="btn btn-green" type="button" disabled>
+          <button class="btn btn-green" type="button" disabled data-preview>
             Register
           </button>
         ) : null
@@ -335,8 +335,22 @@ const blocked =
   .volunteer-actions > form > .btn {
     width: 100%;
   }
-  .volunteer-actions > form > .btn {
+  .volunteer-actions > form > .btn,
+  .volunteer-actions > .btn[data-preview] {
     white-space: nowrap;
+  }
+  /* A preview shows the viewer's own buttons in their colours, unusable. */
+  .volunteer-actions > .btn[data-preview]:disabled {
+    cursor: not-allowed;
+    color: white;
+  }
+  .volunteer-actions > .btn-green[data-preview]:disabled {
+    border-color: var(--color-green-700);
+    background: var(--color-green-700);
+  }
+  .volunteer-actions > .btn-red[data-preview]:disabled {
+    border-color: var(--color-red-700);
+    background: var(--color-red-700);
   }
   .volunteer-event-card > :global(.event-roster) {
     margin-top: var(--event-card-gap);

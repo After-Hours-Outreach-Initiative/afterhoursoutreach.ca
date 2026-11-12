@@ -27,5 +27,6 @@ const { name, category, medicMark, href, gradientId } = Astro.props;
       data-volunteer-profile-link={href ? true : undefined}
     />
     {category === "new-volunteer" && <NewVolunteerBadge />}
+    <slot />
   </div>
 </div>

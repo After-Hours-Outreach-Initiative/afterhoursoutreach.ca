@@ -15,6 +15,8 @@ import { eventViewVersion } from "@/server/events/version";
 import { countReadyApplications, listVolunteers } from "@/server/db/volunteers";
 import { listViewerEvents, type EventViewer } from "@/server/events/view-as";
 import ViewAsMenu from "./ViewAsMenu.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
+import RosterPerson from "./RosterPerson.astro";
 import AccountLayout from "./AccountLayout.astro";
 import EventCard from "./EventCard.astro";
 import EventCalendar from "./EventCalendar.astro";
@@ -74,7 +76,14 @@ const viewAsPeople =
   manage || viewer
     ? (await listVolunteers(env.DB, actor, "", "name")).allRows
         .filter((person) => person.active && person.applicationApproved)
-        .map(({ id, name }) => ({ id, name }))
+        .map(({ id, name, searchName, role, category, medicMark }) => ({
+          id,
+          name,
+          searchName,
+          role,
+          category,
+          medicMark: Boolean(medicMark),
+        }))
     : [];
 const readyApplicationCount =
   actor.role === "organizer" && eventAccess
@@ -273,13 +282,29 @@ const seriesItems = manage
           )}
         </div>
         {viewer && (
-          <p class="volunteer-notice view-as-notice" data-view-as-notice>
-            <span>
-              Viewing events as <strong>{viewer.label}</strong>. Buttons are
-              disabled in this view.
-            </span>
+          <div class="volunteer-notice view-as-notice" data-view-as-notice>
+            <div class="view-as-viewer">
+              Viewing events as
+              {viewer.person ? (
+                <RosterPerson
+                  name={viewer.label}
+                  category={viewer.person.category}
+                  medicMark={viewer.person.medicMark}
+                >
+                  {viewer.actor.role === "organizer" && (
+                    <VolunteerRoleBadge role="organizer" />
+                  )}
+                  {(viewer.person.category === "medic" ||
+                    viewer.person.medicMark) && (
+                    <VolunteerRoleBadge role="medic" />
+                  )}
+                </RosterPerson>
+              ) : (
+                <strong>{viewer.label}</strong>
+              )}
+            </div>
             <a href="/events">Back to managing events</a>
-          </p>
+          </div>
         )}
         <div class="volunteer-event-schedule">
           <EventCalendar
@@ -422,9 +447,20 @@ const seriesItems = manage
   .view-as-notice {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
     gap: 0.5rem 1rem;
     margin-bottom: 1.5rem;
+  }
+  .view-as-viewer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+  }
+  .view-as-viewer :global(.event-roster-name) {
+    flex: none;
+    font-weight: 700;
   }
   .volunteer-event-tools {
     display: flex;

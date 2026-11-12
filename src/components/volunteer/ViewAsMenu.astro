@@ -2,16 +2,26 @@
 import SearchClearButton from "./SearchClearButton.astro";
 import ChevronDownIcon from "@/components/icons/ChevronDownIcon.astro";
 import SearchIcon from "@/components/icons/SearchIcon.astro";
-import CompactPersonName from "./CompactPersonName.astro";
+import RosterPerson from "./RosterPerson.astro";
+import VolunteerRoleBadge from "./VolunteerRoleBadge.astro";
+import type { AttendeeCategory } from "@/data/event-roster";
 import { viewAsTypes, type EventViewer } from "@/server/events/view-as";
 import "@/styles/filter-menu.css";
 
 interface Props {
-  people: { id: string; name: string }[];
+  people: {
+    id: string;
+    name: string;
+    searchName: string;
+    role: "volunteer" | "organizer";
+    category: AttendeeCategory;
+    medicMark: boolean;
+  }[];
   current: EventViewer | null;
 }
 const { people, current } = Astro.props;
 const href = (value: string) => `/events?viewAs=${encodeURIComponent(value)}`;
+const searchId = `view-as-search-${crypto.randomUUID()}`;
 ---
 
 <view-as-menu>
@@ -54,35 +64,70 @@ const href = (value: string) => `/events?viewAs=${encodeURIComponent(value)}`;
         <p class="filter-menu-group-label" id="view-as-people">
           Volunteer
         </p>
-        <label class="volunteer-search-field filter-menu-search view-as-search">
+        <label
+          class="volunteer-search-field filter-menu-search view-as-search"
+          for={searchId}
+        >
           <span class="sr-only">Search volunteers</span>
           <input
-            type="search"
-            placeholder="Search"
+            id={searchId}
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls={`${searchId}-suggestions`}
+            placeholder="Search by name"
             autocomplete="off"
             data-filter-search
+            data-view-as-search
           />
           <SearchIcon class="volunteer-search-icon" />
           <SearchClearButton />
         </label>
-        <div class="view-as-people">
-          {people.map((person) => (
-            <a
-              class="view-as-option"
-              href={href(`person:${person.id}`)}
-              aria-current={
-                current?.value === `person:${person.id}` ? "page" : undefined
-              }
-              title={person.name}
-              data-filter-option
+        <ul
+          id={`${searchId}-suggestions`}
+          class="event-roster-list view-as-suggestions"
+          role="listbox"
+          aria-label="Matching volunteers"
+          data-view-as-suggestions
+          hidden
+        >
+          {people.map((person, index) => (
+            <li
+              class="event-roster-row"
+              id={`${searchId}-option-${index}`}
+              role="option"
+              aria-selected="false"
+              data-search={person.searchName.toLocaleLowerCase()}
+              hidden
             >
-              <CompactPersonName name={person.name} />
-            </a>
+              <a
+                class="event-roster-details"
+                href={href(`person:${person.id}`)}
+                tabindex="-1"
+                aria-current={
+                  current?.value === `person:${person.id}` ? "page" : undefined
+                }
+              >
+                <RosterPerson
+                  name={person.name}
+                  category={person.category}
+                  medicMark={person.medicMark}
+                >
+                  {person.role === "organizer" && (
+                    <VolunteerRoleBadge role="organizer" />
+                  )}
+                  {(person.category === "medic" || person.medicMark) && (
+                    <VolunteerRoleBadge role="medic" />
+                  )}
+                </RosterPerson>
+              </a>
+            </li>
           ))}
-          <p class="filter-menu-empty" data-filter-empty hidden>
-            No matches.
-          </p>
-        </div>
+        </ul>
+        <p class="filter-menu-empty" data-view-as-empty hidden>
+          No matches.
+        </p>
       </nav>
     </div>
   </div>
@@ -92,10 +137,83 @@ const href = (value: string) => `/events?viewAs=${encodeURIComponent(value)}`;
   import { initFilterMenus } from "@/scripts/filter-menu";
 
   class ViewAsMenu extends HTMLElement {
+    private selected = -1;
+
+    private get search() {
+      return this.querySelector<HTMLInputElement>("[data-view-as-search]")!;
+    }
+    private get list() {
+      return this.querySelector<HTMLElement>("[data-view-as-suggestions]")!;
+    }
+    private get shown() {
+      return [
+        ...this.list.querySelectorAll<HTMLElement>(
+          "[role=option]:not([hidden])",
+        ),
+      ];
+    }
+
     connectedCallback() {
       if (this.dataset.ready) return;
       this.dataset.ready = "";
-      initFilterMenus(this, () => {});
+      initFilterMenus(this, () => {
+        this.search.value = "";
+        this.filter();
+      });
+      this.search.addEventListener("input", () => this.filter());
+      this.search.addEventListener("keydown", (event) => {
+        const options = this.shown;
+        if (event.isComposing || this.list.hidden || !options.length) return;
+        if (["ArrowDown", "ArrowUp", "Tab"].includes(event.key)) {
+          event.preventDefault();
+          const step =
+            event.key === "ArrowUp" || (event.key === "Tab" && event.shiftKey)
+              ? -1
+              : 1;
+          this.select((this.selected + step + options.length) % options.length);
+        } else if (event.key === "Enter") {
+          event.preventDefault();
+          options[this.selected]?.querySelector("a")?.click();
+        } else if (event.key === "Escape") {
+          // Close the suggestions before the menu itself.
+          event.preventDefault();
+          event.stopPropagation();
+          this.search.value = "";
+          this.filter();
+        }
+      });
+      // Keep focus in the search while a pointer picks a result.
+      this.list.addEventListener("pointerdown", (event) =>
+        event.preventDefault(),
+      );
+    }
+
+    private filter() {
+      const term = this.search.value.trim().toLocaleLowerCase();
+      let count = 0;
+      for (const option of this.list.querySelectorAll<HTMLElement>(
+        "[role=option]",
+      )) {
+        option.hidden = !term || !option.dataset.search!.includes(term);
+        if (!option.hidden) count++;
+      }
+      this.list.hidden = !count;
+      this.search.setAttribute("aria-expanded", String(count > 0));
+      this.querySelector<HTMLElement>("[data-view-as-empty]")!.hidden =
+        !term || count > 0;
+      this.select(count ? 0 : -1);
+    }
+
+    private select(index: number) {
+      this.selected = index;
+      this.shown.forEach((option, i) =>
+        option.setAttribute("aria-selected", String(i === index)),
+      );
+      const option = this.shown[index];
+      if (option) {
+        this.search.setAttribute("aria-activedescendant", option.id);
+        option.scrollIntoView({ block: "nearest" });
+      } else this.search.removeAttribute("aria-activedescendant");
     }
   }
 
@@ -110,13 +228,27 @@ const href = (value: string) => `/events?viewAs=${encodeURIComponent(value)}`;
   .view-as-search {
     margin: 0 0 0.25rem;
   }
-  .view-as-people {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.125rem;
-    max-height: 16rem;
+  .view-as-suggestions {
+    max-height: 18rem;
     overflow-y: auto;
     overscroll-behavior: contain;
+    border: 1px solid #3f3f46;
+    border-radius: 0.5rem;
+  }
+  .view-as-suggestions [role="option"][hidden] {
+    display: none;
+  }
+  .view-as-suggestions a {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+  .view-as-suggestions [role="option"]:hover {
+    background: #27272a;
+  }
+  .view-as-suggestions [aria-selected="true"] {
+    background: #213653;
+    box-shadow: inset 3px 0 var(--color-blue);
   }
   .view-as-option {
     display: block;
@@ -124,13 +256,6 @@ const href = (value: string) => `/events?viewAs=${encodeURIComponent(value)}`;
     border-radius: 0.375rem;
     color: #e4e4e7;
     text-decoration: none;
-  }
-  .view-as-people .view-as-option {
-    /* Names are shortened; the full name stays in the title and search. */
-    overflow-wrap: anywhere;
-  }
-  .view-as-option[hidden] {
-    display: none;
   }
   .view-as-option:hover {
     background: #27272a;

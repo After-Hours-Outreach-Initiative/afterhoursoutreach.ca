@@ -38,7 +38,7 @@
   margin: 0.75rem 0.75rem 0;
 }
 /* Outrank the portal's general input padding so text clears the icon. */
-.filter-menu .filter-menu-search input[type="search"] {
+.filter-menu .filter-menu-search input:is([type="search"], [role="combobox"]) {
   padding-left: 2.75rem;
 }
 .filter-menu-options {

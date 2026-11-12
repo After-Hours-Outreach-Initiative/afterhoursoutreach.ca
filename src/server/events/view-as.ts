@@ -7,6 +7,8 @@ import { listEvents } from "../db/events";
 import { availableSignupSpots } from "../db/policy";
 import { RequestError } from "../http";
 import { personDisplayName } from "../../data/person-name";
+import type { AttendeeCategory } from "../../data/event-roster";
+import { attendeeCategorySql, medicMarkSql } from "../db/sql";
 
 /** Volunteer types an organizer can preview the event list as. */
 export const viewAsTypes = {
@@ -23,6 +25,8 @@ export interface EventViewer {
   label: string;
   /** Read-only stand-in for the viewer; never used for writes. */
   actor: Actor;
+  /** How a specific volunteer's avatar and badges appear. */
+  person?: { category: AttendeeCategory; medicMark: boolean };
   /** Medic eligibility for a type, which has no account to derive it from. */
   medicEligible?: boolean;
 }
@@ -71,7 +75,8 @@ export async function resolveEventViewer(
           `SELECT u.id, u.name, u.role, p.first_name AS firstName, p.last_name AS lastName,
             p.preferred_name AS preferredName, p.naloxone_completed_at AS naloxoneCompletedAt,
             v.active, v.registration_approved AS applicationApproved,
-            v.patrol_approved AS patrolApproved
+            v.patrol_approved AS patrolApproved,
+            ${attendeeCategorySql("u.id")} AS category, ${medicMarkSql("u.id")} AS medicMark
           FROM user u JOIN profile p ON p.user_id = u.id
           JOIN volunteer_status v ON v.user_id = u.id
           WHERE u.id = ? AND u.deleted_at IS NULL`,
@@ -88,6 +93,8 @@ export async function resolveEventViewer(
           active: number;
           applicationApproved: number;
           patrolApproved: number;
+          category: AttendeeCategory;
+          medicMark: number;
         }>()
     : null;
   if (!person) throw new RequestError(404, "Volunteer not found.");
@@ -95,6 +102,7 @@ export async function resolveEventViewer(
   return {
     value,
     label: name,
+    person: { category: person.category, medicMark: Boolean(person.medicMark) },
     actor: {
       ...base,
       id: person.id,

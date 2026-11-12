@@ -138,7 +138,8 @@ export function initFilterMenus(
       option.hidden = !option.textContent!.toLocaleLowerCase().includes(term);
       if (!option.hidden) shown++;
     }
-    menu.querySelector<HTMLElement>("[data-filter-empty]")!.hidden = shown > 0;
+    const empty = menu.querySelector<HTMLElement>("[data-filter-empty]");
+    if (empty) empty.hidden = shown > 0;
   });
 
   addEventListener(
