@@ -8,8 +8,9 @@ Use these tools to exercise the [account](/specification/accounts/) and
 
 ## Run the application
 
-Apply `pnpm db:migrate:local`, configure a local `BETTER_AUTH_SECRET` of at least
-32 characters in `.dev.vars`, then start `pnpm dev`. No extra
+Configure a local `BETTER_AUTH_SECRET` of at least 32 characters in
+`.dev.vars`, then start `pnpm dev`. It applies local migrations, starts the
+background server, and seeds the sample accounts and events the first time. No extra
 frontend mode is needed. Dev, production builds, and Worker previews use the same components and
 account/event backend. D1 persists under `.wrangler/state/`; remote bindings
 are disabled. A Resend key is not required locally. Sign-in links and codes
@@ -74,7 +75,7 @@ sandbox and begin again. Saved accounts are never reset by these buttons.
 Signed-out requests, cross-origin requests, and requests for a different account
 are rejected. These endpoints are absent from deployed builds.
 
-State buttons work without seeding. To add persistent sample accounts and events,
+State buttons work without seeding. To reseed the sample accounts and events,
 click **Seed local accounts** in the DEV panel or run
 `pnpm db:seed:local` with the dev server running and local migrations applied.
 The button refreshes the panel in place without switching your account or

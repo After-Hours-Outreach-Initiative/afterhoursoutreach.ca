@@ -8,10 +8,9 @@ import {
 } from "../src/server/db/patrol-series";
 import { sourceSchemaStatements } from "./helpers/source-schema";
 
-test("the SQL window and signup guards advance exactly at the October 20 start, not at its end or midnight", () => {
+test("the SQL window and signup guards open each date two months ahead, at Vancouver midnight", () => {
   const db = new DatabaseSync(":memory:");
-  const first = vancouverOccurrenceInstant("2026-10-20", "20:30");
-  let now = first - 1;
+  let now = vancouverOccurrenceInstant("2026-10-29", "23:59");
   // Deterministic SQLite statement-time clock; production still uses SQLite's
   // own julianday('now'), never a client-supplied timestamp.
   db.function("julianday", (_value) => now / 86_400_000 + 2440587.5);
@@ -31,7 +30,14 @@ test("the SQL window and signup guards advance exactly at the October 20 start, 
       INSERT INTO patrol_series (id,first_date,local_time,interval_weeks,meeting_point,spots,created_by,created_at,updated_at)
         VALUES ('series','2026-10-20','20:30',2,'Meeting point',3,'organizer',0,0);
     `);
-    const dates = ["2026-10-20", "2026-11-03", "2026-11-17", "2026-12-01"];
+    const dates = [
+      "2026-10-20",
+      "2026-11-03",
+      "2026-11-17",
+      "2026-12-01",
+      "2026-12-15",
+      "2026-12-29",
+    ];
     for (const date of dates) {
       db.prepare(
         `INSERT INTO event (id,type,series_id,occurrence_date,starts_at,meeting_point,spots,created_by,created_at,updated_at)
@@ -49,9 +55,10 @@ test("the SQL window and signup guards advance exactly at the October 20 start, 
       startsAt: vancouverOccurrenceInstant(date, "20:30"),
       cancelledAt: null,
     }));
-    db.prepare("UPDATE patrol_series SET generation_until=?").run(
-      planPatrolOccurrences(series, existing, now).generationUntil,
-    );
+    const maintain = () =>
+      db
+        .prepare("UPDATE patrol_series SET generation_until=?")
+        .run(planPatrolOccurrences(series, existing, now).generationUntil);
     const window = () =>
       db
         .prepare(
@@ -63,18 +70,22 @@ test("the SQL window and signup guards advance exactly at the October 20 start, 
     const signup = db.prepare(
       "INSERT INTO signup (id,event_id,user_id,created_at,updated_at) VALUES (?,?,'alice',0,0)",
     );
-    assert.deepEqual(window(), dates.slice(0, 3));
-    signup.run("october-booking", dates[0]);
+    maintain();
+    assert.deepEqual(window(), dates.slice(1, 5));
+    signup.run("november-booking", dates[1]);
     assert.throws(
-      () => signup.run("too-early", dates[3]),
+      () => signup.run("too-early", dates[5]),
       /recurring_signup_window/,
     );
-    now = first;
+    now = vancouverOccurrenceInstant("2026-10-30", "00:00");
+    // The frontier only moves when maintenance runs.
+    assert.deepEqual(window(), dates.slice(1, 5));
+    maintain();
     assert.deepEqual(window(), dates.slice(1));
-    signup.run("december-booking", dates[3]);
+    signup.run("december-booking", dates[5]);
     assert.throws(() => signup.run("started", dates[0]), /signup_not_eligible/);
     assert.equal(
-      db.prepare("SELECT status FROM signup WHERE id='october-booking'").get()
+      db.prepare("SELECT status FROM signup WHERE id='november-booking'").get()
         ?.status,
       "confirmed",
     );

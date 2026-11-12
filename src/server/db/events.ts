@@ -47,6 +47,8 @@ import { vancouverInput, vancouverInstant } from "../../data/event-time";
 import {
   ensurePatrolOccurrences,
   recurringSignupWindowSql,
+  restorableEventSql,
+  separateEditSql,
 } from "./patrol-series";
 
 export {
@@ -56,7 +58,7 @@ export {
   listPatrolSeries,
   findPatrolSeries,
   ensurePatrolOccurrences,
-  materializePatrolOccurrence,
+  restorePatrolOccurrence,
   patrolOccurrenceId,
   patrolTemplateSchema,
   patrolTemplateRequestSchema,
@@ -66,6 +68,7 @@ export {
   stopPatrolSeries,
   deletePatrolSeries,
   type PatrolSeriesRow,
+  type SeriesScope,
 } from "./patrol-series";
 
 const eventFieldsSchema = z.strictObject({
@@ -163,6 +166,14 @@ export interface EventRow extends EventLimits {
   // This and later nominal occurrences, including bookings outside the page/window.
   futureConfirmed: number;
   futureEditableConfirmed: number;
+  // Every upcoming occurrence in the series.
+  seriesConfirmed: number;
+  /** The series' repeat interval at this date; null for one-off events. */
+  intervalWeeks: number | null;
+  /** Organizer views only: edited on its own, so series edits skip it. */
+  edited: number;
+  /** Organizer views only: a cancelled series date that can be restored. */
+  restorable: number;
   signedUp: number;
 }
 export interface RosterRow {
@@ -460,10 +471,18 @@ export async function listEvents(
     actor.active &&
     (!actor.twoFactorEnabled || actor.twoFactorVerified),
   );
-  const futureSignups = `SELECT count(*) FROM signup s JOIN event future ON future.id = s.event_id
-    WHERE future.series_id = e.series_id AND future.occurrence_date >= e.occurrence_date
+  const futureSignups = (
+    from: boolean,
+  ) => `SELECT count(*) FROM signup s JOIN event future ON future.id = s.event_id
+    WHERE future.series_id = e.series_id ${from ? "AND future.occurrence_date >= e.occurrence_date" : ""}
       AND future.cancelled_at IS NULL AND future.starts_at > ${nowMsSql}
       AND s.status = 'confirmed'`;
+  const editableSignups = `(${futureSignups(true)} AND NOT ${separateEditSql("future")})`;
+  // The interval in force at this date, from the latest template that sets one.
+  const intervalSql = `coalesce((SELECT t.interval_weeks FROM patrol_series_template t
+      WHERE t.series_id = e.series_id AND t.effective_date <= e.occurrence_date AND t.interval_weeks IS NOT NULL
+      ORDER BY t.effective_date DESC LIMIT 1),
+    (SELECT ps.interval_weeks FROM patrol_series ps WHERE ps.id = e.series_id))`;
   const select = `SELECT ${eventColumns},
     ${confirmedSignupsSql} AS confirmed,
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
@@ -471,14 +490,12 @@ export async function listEvents(
     (SELECT count(*) FROM signup s WHERE s.event_id = e.id AND s.status = 'confirmed'
       AND ${signupMedicSql()}) AS medicConfirmed,
     ${approvedMedicSql("?")} AS medicEligible,
-    ${organizer ? `(${futureSignups})` : "0"} AS futureConfirmed,
-    ${
-      organizer
-        ? `(${futureSignups}
-        AND NOT EXISTS(SELECT 1 FROM event_audit a
-          WHERE a.event_id = future.id AND a.action = 'updated'))`
-        : "0"
-    } AS futureEditableConfirmed,
+    ${organizer ? `(${futureSignups(true)})` : "0"} AS futureConfirmed,
+    ${organizer ? editableSignups : "0"} AS futureEditableConfirmed,
+    ${organizer ? `(${futureSignups(false)})` : "0"} AS seriesConfirmed,
+    ${intervalSql} AS intervalWeeks,
+    ${organizer ? separateEditSql() : "0"} AS edited,
+    ${organizer ? restorableEventSql() : "0"} AS restorable,
     EXISTS(SELECT 1 FROM signup
       WHERE event_id = e.id AND user_id = ? AND status = 'confirmed') AS signedUp
     FROM event e`;
@@ -491,7 +508,8 @@ export async function listEvents(
   const statement = organizer
     ? db
         .prepare(
-          `${select} WHERE ${notDeleted} AND e.cancelled_at IS NULL
+          `${select} WHERE ${notDeleted}
+          AND (e.cancelled_at IS NULL${view === "manage-upcoming" ? ` OR ${restorableEventSql()}` : ""})
           ${view === "manage" ? "" : `AND e.starts_at ${past ? "<=" : ">"} ${nowMsSql}`}
         ORDER BY
           (e.id = ?) DESC,

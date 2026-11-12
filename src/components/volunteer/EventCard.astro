@@ -15,6 +15,10 @@ import {
 } from "@/data/event-time";
 import { eventUnregisterDeadline } from "@/data/event-unregistration";
 import EventEditor from "./EventEditor.astro";
+import PencilIcon from "@/components/icons/PencilIcon.astro";
+import RestoreIcon from "@/components/icons/RestoreIcon.astro";
+import RecurringIcon from "@/components/icons/RecurringIcon.astro";
+import { seriesCadence } from "@/data/event-series";
 import EventRoster from "./EventRoster.astro";
 import PublicEventRoster from "./PublicEventRoster.astro";
 import AddAttendee from "./AddAttendee.astro";
@@ -42,6 +46,7 @@ const {
   preview = false,
 } = Astro.props;
 const future = event.startsAt > Date.now();
+const cadence = seriesCadence(event);
 const unregisterOpen =
   Boolean(event.signedUp) &&
   !event.cancelledAt &&
@@ -59,7 +64,7 @@ const canAddAttendee =
   event.confirmed < event.spots;
 const blocked =
   future && event.seriesId && !event.inSignupWindow && !event.cancelledAt
-    ? "Registration is available only for the next three patrol occurrences in this series."
+    ? "Registration opens two months before each patrol in this series."
     : eventSignupBlockReason(
         actor,
         {
@@ -126,6 +131,15 @@ const blocked =
         {!future && "Past event · "}
         {event.includesOrientation ? "Orientation + Patrol" : "Patrol"}
       </p>
+      {cadence && (
+        <p class="volunteer-event-cadence">
+          <RecurringIcon class="volunteer-event-cadence-icon" />
+          <span>
+            {cadence}
+            {organizer && event.edited ? " · Edited separately" : ""}
+          </span>
+        </p>
+      )}
       <p>
         Meeting at{" "}
         {event.meetingPointUrl ? (
@@ -211,7 +225,25 @@ const blocked =
           <p data-form-message role="status" hidden />
         </form>
       ) : null}
-      {organizer && future && (
+      {organizer && future && event.cancelledAt ? (
+        event.restorable ? (
+          // Earlier registrations stay cancelled; restoring reopens the date.
+          <form data-event-restore action="/api/v1/events/action" method="post">
+            <input type="hidden" name="id" value={event.id} />
+            <input type="hidden" name="version" value={event.updatedAt} />
+            <button
+              class="btn btn-quiet"
+              type="submit"
+              disabled={preview}
+              data-loading-label="Restoring…"
+            >
+              <RestoreIcon class="btn-icon" />
+              Restore
+            </button>
+            <p data-form-message role="status" hidden />
+          </form>
+        ) : null
+      ) : organizer && future ? (
         <button
           class="btn btn-quiet"
           type="button"
@@ -219,9 +251,10 @@ const blocked =
           aria-haspopup="dialog"
           aria-controls={`event-editor-${event.id}`}
         >
+          <PencilIcon class="btn-icon" />
           Edit
         </button>
-      )}
+      ) : null}
     </div>
   </div>
   {!organizer && future && publicRoster.length > 0 && (
@@ -240,7 +273,9 @@ const blocked =
       <AddAttendee event={event} />
     </div>
   )}
-  {organizer && future && <EventEditor event={event} series={series} />}
+  {organizer && future && !event.cancelledAt && (
+    <EventEditor event={event} series={series} />
+  )}
 </li>
 
 <style>
@@ -271,6 +306,17 @@ const blocked =
       outline: 3px solid #a5b4fc;
       outline-offset: 3px;
     }
+  }
+  .volunteer-event-cadence {
+    display: flex;
+    align-items: baseline;
+    gap: 0.375em;
+  }
+  .volunteer-event-cadence :global(.volunteer-event-cadence-icon) {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    align-self: center;
   }
   .volunteer-event-layout {
     display: grid;

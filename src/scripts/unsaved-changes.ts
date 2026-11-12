@@ -51,3 +51,13 @@ document.addEventListener("reset", (event) => {
   if (form?.matches("[data-track-changes]"))
     setTimeout(() => syncUnsavedChanges(form));
 });
+
+/** The form's values as last loaded or saved, to tell which fields changed. */
+export function savedFormValues(form: HTMLFormElement) {
+  const baseline = baselines.get(form);
+  if (baseline === undefined) return undefined;
+  const values = new FormData();
+  for (const [name, value] of JSON.parse(baseline) as [string, string][])
+    values.append(name, value);
+  return values;
+}

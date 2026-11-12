@@ -39,7 +39,7 @@ export function databaseWriteError(error: unknown): never {
   if (message.includes("recurring_signup_window"))
     throw new RequestError(
       409,
-      "Registration is available only for the next three patrol occurrences in this series.",
+      "Registration opens two months before each patrol in this series.",
     );
   if (message.includes("signup_not_eligible"))
     throw new RequestError(

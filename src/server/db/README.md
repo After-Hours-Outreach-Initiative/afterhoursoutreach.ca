@@ -227,24 +227,34 @@ was recorded with.
 
 `patrol-series.ts` owns recurrence; its public operations are re-exported by
 `events.ts`. A nominal `(series_id, occurrence_date)` and its deterministic event
-ID never change, even when the actual start date/time changes. Volunteers can
-register only for the earliest three future, non-cancelled occurrences per series;
-hidden, closed, and full occurrences consume slots. Reads and version polling
-await generation, and SQL signup guards fail closed beyond its coverage frontier.
+ID never change, even when the actual start date/time changes. Generation creates
+every scheduled date before Vancouver midnight on the same day two months ahead
+(`recurringHorizon`), and volunteers can register for any of them. Reads and
+version polling await generation, and SQL signup guards fail closed beyond its
+coverage frontier.
 
 - `savePatrolSeries(db, actor, input, id?, version?, notify?)` creates a series or
-  updates its base defaults/end date, including local time and interval (1–52
-  weeks). Existing snapshots are not rewritten, even if now off-cadence; the new
+  updates its base defaults/end date, including local time and interval (1–8
+  weeks, so a series always has a date within two months). New series must
+  start within two months. Existing snapshots are not rewritten, even if now off-cadence; the new
   interval stays anchored to the fixed first date. Effective this-and-future
   templates continue to override base defaults, including local time. Time,
   interval and end-date changes invalidate generation coverage atomically.
-  Booked occurrences pushed beyond the signup window remain visible/cancellable
-  to their volunteers, without admitting new registrations outside that window.
   End dates are inclusive; shortening atomically cancels affected future snapshots
-  and bookings, including individual exceptions. Extending never restores them.
+  and bookings, including individual exceptions. Extending does not restore them
+  automatically.
 - `updatePatrolSeriesFrom(db, actor, seriesId, nominalDate, template, version,
-notify?)` provides actual **this-and-future** editing, including already-generated
-  occurrences. The template contains `localTime`, `dayOffset` (−366…366 relative to
+notify?, scope?)` provides **this and following** editing, including
+  already-generated occurrences. Scope `all` starts instead at the series' next
+  upcoming date, so past dates never change. The template may also carry
+  `intervalWeeks` and `endDate`. Every template field is optional: omitted
+  fields keep the series values for that date, so clients send only what
+  changed. A new interval is stored on the template and
+  restarts the cadence from its effective date (`onCadence`/`onCadenceSql`);
+  upcoming dates that leave the cadence, or fall after a new end date, are
+  cancelled with their bookings in the same batch. Upcoming dates cancelled by
+  an earlier schedule change come back when the new schedule includes them.
+  The template contains `localTime`, `dayOffset` (−366…366 relative to
   each nominal date), meeting point/link, capacity, open and hidden. The effective
   template applies during generation too. Both series defaults and effective
   templates include `includesOrientation` and all three volunteer limits, copied
@@ -252,18 +262,23 @@ notify?)` provides actual **this-and-future** editing, including already-generat
   edits; new records use the defaults. Bulk edits change only selected fields;
   individual overrides use the same setting through `saveEvent`. An earlier edit
   replaces later templates,
-  but preserves earlier templates, individual `saveEvent` exceptions, cancellation
-  tombstones, past occurrences, event IDs, and every booking row. Capacity failures
-  roll back the entire operation. Any `event_audit` action `updated` marks a permanent
-  individual exception; series updates use `series_updated`, not `updated`.
-- `stopPatrolSeries(db, actor, seriesId, nominalDate, version, reason?, notify?)`
-  permanently stops generation from that date (exclusive boundary). It cancels
-  existing future occurrences and bookings at/after it, including exceptions, but
-  keeps past history. End-date extension cannot restart a stopped series.
-- `materializePatrolOccurrence` lets organizers select any scheduled date beyond
-  the volunteer window. Existing past/cancelled snapshots remain addressable even
-  after shortening/stopping. It never restores a cancellation. Organizer listings
-  accept an optional selected occurrence ID so the 100-row limit cannot hide it.
+  but preserves earlier templates, cancellation tombstones, past occurrences,
+  event IDs, and every booking row. Individual `saveEvent` exceptions are kept by
+  `future` edits and replaced by `all` edits. Capacity failures roll back the
+  entire operation. An `event_audit` action `updated` marks an individual
+  exception until a later `series_updated` row for that event (`separateEditSql`).
+- `stopPatrolSeries(db, actor, seriesId, nominalDate, version, reason?, notify?,
+scope?)` cancels from that date, or from the next upcoming date for scope
+  `all`, by setting the end date to the day before; extending it later restores
+  those dates. When nothing would remain before it, it sets `stopped_from`
+  instead, which, like deletion, is permanent. It cancels existing future
+  occurrences and bookings at/after it, including exceptions, but keeps past
+  history.
+- Organizer upcoming lists include cancelled dates that
+  `restorePatrolOccurrence(db, actor, eventId, version)` can reopen
+  (`restorableEventSql`): on cadence, before any stop date and within the end
+  date. Restoring applies the series' current details for that date unless the
+  date was edited on its own; cancelled bookings stay cancelled.
 
 The first date and time zone remain immutable. Time/interval settings affect only
 newly generated future snapshots; use this-and-future edits to change existing

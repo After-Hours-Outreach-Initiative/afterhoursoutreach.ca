@@ -27,25 +27,64 @@ export function eventFields(values: FormData) {
   };
 }
 
-export function recurringSaveAction(values: FormData) {
+const seriesScope = (values: FormData) => {
+  const scope = str(values, "scope");
+  return values.has("seriesId") && (scope === "future" || scope === "all")
+    ? scope
+    : null;
+};
+
+function seriesTemplate(values: FormData) {
   const start = str(values, "startsAt");
-  if (values.has("seriesId") && str(values, "scope") === "future") {
-    const dayOffset =
-      (Date.parse(`${start.slice(0, 10)}T00:00:00Z`) -
-        Date.parse(`${str(values, "occurrenceDate")}T00:00:00Z`)) /
-      86_400_000;
+  const dayOffset =
+    (Date.parse(`${start.slice(0, 10)}T00:00:00Z`) -
+      Date.parse(`${str(values, "occurrenceDate")}T00:00:00Z`)) /
+    86_400_000;
+  return {
+    ...eventFields(values),
+    localTime: start.slice(11, 16),
+    dayOffset,
+    ...(values.has("intervalWeeks")
+      ? {
+          intervalWeeks: Number(values.get("intervalWeeks")),
+          endDate: str(values, "endDate") || null,
+        }
+      : {}),
+  };
+}
+
+/** True when the repeat interval or last date differs from the saved form. */
+export function seriesScheduleChanged(values: FormData, saved?: FormData) {
+  return Boolean(
+    saved &&
+    ["intervalWeeks", "endDate"].some(
+      (key) => values.has(key) && str(values, key) !== str(saved, key),
+    ),
+  );
+}
+
+/** Series edits send only the fields changed since the form was loaded, so a
+ * date's own edits never spread to the other dates. */
+export function recurringSaveAction(values: FormData, saved?: FormData) {
+  const scope = seriesScope(values);
+  if (scope) {
+    const template = seriesTemplate(values);
+    const before: Record<string, unknown> = saved ? seriesTemplate(saved) : {};
     return {
       action: "update-series-from",
       id: str(values, "seriesId"),
       version: Number(values.get("seriesVersion")),
       occurrenceDate: str(values, "occurrenceDate"),
-      template: {
-        ...eventFields(values),
-        localTime: start.slice(11, 16),
-        dayOffset,
-      },
+      scope,
+      template: Object.fromEntries(
+        Object.entries(template).filter(
+          ([key, value]) =>
+            !saved || JSON.stringify(value) !== JSON.stringify(before[key]),
+        ),
+      ),
     };
   }
+  const start = str(values, "startsAt");
   if (values.has("recurring"))
     return {
       action: "save-series",
@@ -61,41 +100,31 @@ export function recurringSaveAction(values: FormData) {
 }
 
 export function recurringCancelAction(values: FormData) {
-  return values.has("seriesId") && str(values, "scope") === "future"
+  const scope = seriesScope(values);
+  return scope
     ? {
         action: "stop-series",
         id: str(values, "seriesId"),
         version: Number(values.get("seriesVersion")),
         occurrenceDate: str(values, "occurrenceDate"),
+        scope,
         reason: str(values, "reason"),
       }
     : null;
-}
-
-export function seriesSaveAction(values: FormData) {
-  const start = str(values, "startsAt");
-  return {
-    action: "save-series",
-    id: str(values, "seriesId"),
-    version: Number(values.get("version")),
-    series: {
-      ...eventFields(values),
-      firstDate: start.slice(0, 10),
-      localTime: start.slice(11, 16),
-      intervalWeeks: Number(values.get("intervalWeeks")),
-      endDate: str(values, "endDate") || null,
-    },
-  };
 }
 
 export function eventEmailPrompt(
   values: FormData,
   occurrencePrompt?: string,
   futurePrompt?: string,
+  allPrompt?: string,
 ) {
-  return values.has("seriesId") && values.get("scope") === "future"
-    ? futurePrompt
-    : occurrencePrompt;
+  const scope = seriesScope(values);
+  return scope === "all"
+    ? allPrompt
+    : scope === "future"
+      ? futurePrompt
+      : occurrencePrompt;
 }
 
 export function initRecurrenceControls(root: Document | HTMLElement) {
@@ -113,18 +142,20 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
         new FormData(form),
         form.dataset.emailPrompt,
         form.dataset.futureEmailPrompt,
+        form.dataset.allEmailPrompt,
       );
       input.disabled = reason.hidden;
     };
     if (!form.dataset.cancelReasonReady) {
       form.dataset.cancelReasonReady = "true";
-      form.querySelector('[name="scope"]')?.addEventListener("change", update);
+      for (const scope of form.querySelectorAll('[name="scope"]'))
+        scope.addEventListener("change", update);
       form.addEventListener("reset", () => queueMicrotask(update));
     }
     update();
   }
   for (const form of root.querySelectorAll<HTMLFormElement>(
-    "[data-event-save], [data-series-save]",
+    "[data-event-save]",
   )) {
     if (form.dataset.submitting) continue;
     const orientation = form.querySelector<HTMLInputElement>(
@@ -203,26 +234,4 @@ export function initRecurrenceControls(root: Document | HTMLElement) {
     }
     update();
   }
-}
-
-/** Reconcile only this card's settings; occurrences have independent live state. */
-export function syncSeriesControls(
-  card: HTMLElement,
-  updatedCard: HTMLElement,
-  element?: HTMLFormElement,
-) {
-  const current = card.querySelector<HTMLDialogElement>("[data-live-series]")!;
-  const updated =
-    updatedCard.querySelector<HTMLDialogElement>("[data-live-series]")!;
-  if (current.dataset.seriesVersion === updated.dataset.seriesVersion)
-    return false;
-  if (
-    current.open ||
-    [...current.querySelectorAll('[data-submitting="true"]')].some(
-      (form) => form !== element,
-    )
-  )
-    return true;
-  current.replaceWith(document.importNode(updated, true));
-  return false;
 }

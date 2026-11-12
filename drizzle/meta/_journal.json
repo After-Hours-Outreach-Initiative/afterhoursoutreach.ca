@@ -253,6 +253,20 @@
       "when": 1794422698971,
       "tag": "0035_notification_action",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1794434745872,
+      "tag": "0036_recurring_two_month_window",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1794444437396,
+      "tag": "0037_recurring_interval_changes",
+      "breakpoints": true
     }
   ]
 }

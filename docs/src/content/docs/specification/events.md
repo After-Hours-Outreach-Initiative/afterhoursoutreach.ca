@@ -64,6 +64,26 @@ is required.
 
 Each event has an extra edit button and a roster details dropdown.
 
+Recurring series show their dates for the next two months to volunteers. A
+series repeats every 1 to 8 weeks and starts within the next two months, so it
+always has a date to edit.
+
+Saving a recurring date asks whether to apply the change to **This event**,
+**This and following events** or **All events**. Cancelling asks the same in
+the cancel form. Only the fields the organizer changed apply to the other
+dates. All events means every upcoming date, including dates edited on their
+own; this and following events skip those. Past events never change. Changing
+how often the series repeats or its last date applies only to this and
+following events or all events, and cancels upcoming dates that no longer fit.
+Changing it back brings those dates back. Cancelling this and following events
+sets the last date to the day before, so it can be extended later.
+
+Cancelled recurring dates stay in the organizer's event list, marked
+**Cancelled**. Their card shows **Restore** instead of **Edit**, which brings
+the date back with the series' current details, unless it was edited on its
+own, and without its earlier registrations. Volunteers and the calendar don't
+show cancelled dates.
+
 **Select** shows a checkbox tab on top of each upcoming event card. While
 selecting, a bar at the bottom of the screen shows the selection count with
 **Select all**, **Clear**, and **Bulk edit**.

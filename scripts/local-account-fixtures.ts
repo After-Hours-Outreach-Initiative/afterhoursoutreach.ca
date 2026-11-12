@@ -1,4 +1,8 @@
-import { vancouverInput, vancouverInstant } from "../src/data/event-time";
+import {
+  addCalendarDays,
+  vancouverInput,
+  vancouverInstant,
+} from "../src/data/event-time";
 import { applicationDraftAnswersSchema } from "../src/data/application-draft";
 import { localAccountUserId, manualAccountPresets } from "../src/dev/accounts";
 import { approvedMedicSql, newVolunteerSql } from "../src/server/db/sql";
@@ -148,6 +152,16 @@ export function localAccountFixtures(now = Date.now()) {
       WHERE NOT EXISTS (SELECT 1 FROM event WHERE id=${quote(eventId(key))})
       AND EXISTS (SELECT 1 FROM user WHERE id=${organizer} AND email='organizer.v2.local@example.org' AND role='organizer')`);
   }
+  // A recurring Orientation + Patrol every two weeks on Tuesday, from the next
+  // Tuesday. Its dates are generated when events are read.
+  const today = vancouverInput(now).slice(0, 10);
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const firstTuesday = addCalendarDays(today, (2 - weekday + 7) % 7 || 7);
+  const series = quote("local-account-v2-series-orientation");
+  statements.push(`INSERT INTO patrol_series (id, first_date, local_time, interval_weeks, meeting_point, spots, open, hidden, includes_orientation, created_by, created_at, updated_at)
+    SELECT ${series}, ${quote(firstTuesday)}, '18:00', 2, 'Strathcona Community Centre', 12, 1, 0, 1, ${organizer}, ${now}, ${now}
+    WHERE NOT EXISTS (SELECT 1 FROM patrol_series WHERE id=${series})
+    AND EXISTS (SELECT 1 FROM user WHERE id=${organizer} AND email='organizer.v2.local@example.org' AND role='organizer')`);
   const past = quote(eventId("past-orientation"));
   // Historical attendance is inserted only with its newly-created hidden event;
   // reseeding never restores a developer-deleted signup.

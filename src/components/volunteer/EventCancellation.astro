@@ -1,6 +1,7 @@
 ---
 import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 import FieldError from "@/components/FieldError.astro";
+import SeriesScope from "./SeriesScope.astro";
 
 interface Props {
   event: EventRow;
@@ -30,6 +31,9 @@ const id = `${dialogId}-cancel`;
       data-future-email-prompt={
         event.futureConfirmed > 0 ? "series-cancel" : undefined
       }
+      data-all-email-prompt={
+        event.seriesConfirmed > 0 ? "series-cancel" : undefined
+      }
       action="/api/v1/events/action"
       method="post"
       aria-labelledby={`${id}-heading`}
@@ -51,15 +55,7 @@ const id = `${dialogId}-cancel`;
             name="occurrenceDate"
             value={event.occurrenceDate!}
           />
-          <label class="volunteer-field">
-            Cancel
-            <select name="scope">
-              <option value="occurrence">Only this occurrence</option>
-              <option value="future">
-                This and future occurrences (stop recurrence)
-              </option>
-            </select>
-          </label>
+          <SeriesScope legend="Cancel" />
         </>
       )}
       <div

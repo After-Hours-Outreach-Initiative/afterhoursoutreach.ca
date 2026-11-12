@@ -152,6 +152,7 @@ export const auditActions: AuditAction[] = [
     ["updated", "from its patrol series"],
   ),
   entry("event", "cancelled", "Cancelled event", "remove", "cancelled"),
+  entry("event", "restored", "Restored event", "create", "restored"),
   entry("event", "deleted", "Removed event", "remove", "removed"),
   entry(
     "event",
@@ -298,6 +299,8 @@ const fieldLabels: Record<string, string> = {
   effectiveDate: "Changes effective from",
   stoppedFrom: "Stopped from",
   seriesEndDate: "Last patrol date",
+  seriesSchedule: "Repeat schedule",
+  seriesTemplate: "Series details",
   seriesId: "Patrol series",
   occurrenceDate: "Patrol date",
 };

@@ -30,6 +30,10 @@ test("view versions detect capacity, signups, visibility and access changes with
     availableSpots: 1,
     futureConfirmed: 0,
     futureEditableConfirmed: 0,
+    seriesConfirmed: 0,
+    intervalWeeks: null,
+    edited: 0,
+    restorable: 0,
     signedUp: 0,
   };
   const actor: Actor = {

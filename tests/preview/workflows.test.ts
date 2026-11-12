@@ -181,9 +181,9 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       "1",
     );
     await page.locator("[data-volunteer-search]").fill("Sample Applicant");
-    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
-      1,
-    );
+    await expect(
+      page.locator("[data-volunteer-results] [data-volunteer-row]"),
+    ).toHaveCount(1);
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
       "1",
     );
@@ -207,9 +207,9 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
     await expect(page.locator("[data-awaiting-approval-count]")).toHaveText(
       "0",
     );
-    await expect(page.locator("[data-volunteer-results] tbody tr")).toHaveCount(
-      0,
-    );
+    await expect(
+      page.locator("[data-volunteer-results] [data-volunteer-row]"),
+    ).toHaveCount(0);
     assert.equal(new URL(page.url()).searchParams.get("approval"), "awaiting");
     assert.equal(
       await DB.prepare(
@@ -286,24 +286,36 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
     ).json()) as { id: string };
     const eventId = `patrol:${created.id}:${firstDate}`;
     await ok(await action({ action: "join", id: eventId }, applicant.cookie));
-    const farDate = addCalendarDays(firstDate, 84);
-    const farId = `patrol:${created.id}:${farDate}`;
+    const farId = `patrol:${created.id}:${addCalendarDays(firstDate, 84)}`;
+    await ok(
+      await action({ action: "join", id: farId }, applicant.cookie),
+      404,
+    );
+    const secondId = `patrol:${created.id}:${addCalendarDays(firstDate, 14)}`;
+    const eventVersion = (id: string) =>
+      DB.prepare("SELECT updated_at FROM event WHERE id=?")
+        .bind(id)
+        .first<number>("updated_at");
     await ok(
       await action({
-        action: "materialize-occurrence",
-        id: created.id,
-        occurrenceDate: farDate,
+        action: "cancel-event",
+        id: secondId,
+        version: await eventVersion(secondId),
+        reason: "",
       }),
     );
     await ok(
-      await action({ action: "join", id: farId }, applicant.cookie),
-      409,
+      await action({
+        action: "restore-occurrence",
+        id: secondId,
+        version: await eventVersion(secondId),
+      }),
     );
-    await page.goto(`${origin}/events?occurrence=${encodeURIComponent(farId)}`);
-    const farCard = page.locator(`[data-live-event="${farId}"]`);
-    await expect(farCard).toBeVisible();
+    await page.goto(`${origin}/events`);
+    const secondCard = page.locator(`[data-live-event="${secondId}"]`);
+    await expect(secondCard).toBeVisible();
     await expect(
-      farCard.getByRole("button", { name: "Edit", exact: true }),
+      secondCard.getByRole("button", { name: "Edit", exact: true }),
     ).toBeEnabled();
     const version = () =>
       DB.prepare("SELECT updated_at FROM patrol_series WHERE id=?")
@@ -347,7 +359,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
       visible.events.filter((event) =>
         event.id.startsWith(`patrol:${created.id}:`),
       ).length,
-      3,
+      5,
     );
     await ok(
       await action({

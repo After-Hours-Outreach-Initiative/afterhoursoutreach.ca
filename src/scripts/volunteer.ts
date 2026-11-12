@@ -1,5 +1,6 @@
 import { vancouverInstant } from "../data/event-time";
-import { trackUnsavedChanges } from "./unsaved-changes";
+import { savedFormValues, trackUnsavedChanges } from "./unsaved-changes";
+import { chooseSeriesScope, type SaveScope } from "./series-scope-prompt";
 import {
   handleEventCalendarClick,
   initEventCalendarSwipe,
@@ -8,7 +9,6 @@ import {
 import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
-import { confirmSeriesDeletion } from "./event-deletion";
 import { confirmEventUnregistration } from "./event-unregistration";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
@@ -29,9 +29,8 @@ import {
 import {
   initRecurrenceControls,
   recurringSaveAction,
+  seriesScheduleChanged,
   recurringCancelAction,
-  seriesSaveAction,
-  syncSeriesControls,
   eventEmailPrompt,
   eventFields,
 } from "./event-recurrence";
@@ -54,7 +53,7 @@ function initEventDates(root: Document | HTMLElement) {
   initDateInputs(root);
   initRecurrenceControls(root);
   for (const form of root.querySelectorAll<HTMLFormElement>(
-    "[data-event-save]:not([data-submitting]), [data-series-save]:not([data-submitting])",
+    "[data-event-save]:not([data-submitting])",
   )) {
     if (form.matches("[data-track-changes]")) trackUnsavedChanges(form);
     else {
@@ -200,18 +199,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
   const eventId =
     element?.closest<HTMLElement>("[data-live-event]")?.dataset.liveEvent ??
     focusedCard?.dataset.liveEvent;
-  const focusedSeries =
-    focused instanceof HTMLElement
-      ? focused.closest<HTMLElement>("[data-series-card]")
-      : null;
-  const seriesId =
-    element?.closest<HTMLElement>("[data-series-card]")?.dataset.seriesCard ??
-    focusedSeries?.dataset.seriesCard;
-  const focusedSeriesSummary = focused?.matches(
-    "[data-series-occurrences] > summary",
-  )
-    ? "[data-series-occurrences] > summary"
-    : null;
   const focusedEventSummary = [
     ".volunteer-roster > summary",
     ".public-event-roster > summary",
@@ -222,7 +209,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       ? element.contains(focused) ||
           dialog?.contains(focused) ||
           focused === document.body
-      : focusedCard || focusedSeries,
+      : focusedCard,
   );
   dialog?.close();
   let added: HTMLElement | undefined;
@@ -235,10 +222,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
         ),
       ].some((form) => form !== element),
     );
-  const key = (card: HTMLElement) =>
-    card.dataset.seriesCard
-      ? `series:${card.dataset.seriesCard}`
-      : `event:${card.dataset.liveEvent}`;
+  const key = (card: HTMLElement) => `event:${card.dataset.liveEvent}`;
   // A date can move between upcoming events and history as it starts.
   // Reuse its roster expansion state, and never duplicate an open editor.
   const existingEvents = new Map(
@@ -257,36 +241,10 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     for (const updated of nextList.children) {
       if (!(updated instanceof HTMLElement)) continue;
       const id = key(updated);
-      let card =
-        previous.get(id) ??
-        (!updated.dataset.seriesCard ? existingEvents.get(id) : undefined);
+      let card = previous.get(id) ?? existingEvents.get(id);
       previous.delete(id);
       if (card && card.parentElement !== list && protectedEvent(card)) {
         deferredEventRefresh = true;
-        continue;
-      }
-      if (updated.dataset.seriesCard) {
-        if (!card) {
-          card = document.importNode(updated, true);
-          added ??= card;
-        } else {
-          card.dataset.includesOrientation =
-            updated.dataset.includesOrientation;
-          for (const selector of [
-            "[data-series-summary]",
-            "[data-series-occurrence-summary]",
-            "[data-series-empty]",
-          ]) {
-            const current = card.querySelector(selector)!;
-            const next = updated.querySelector(selector)!;
-            if (current.outerHTML !== next.outerHTML)
-              current.replaceWith(document.importNode(next, true));
-          }
-          deferredEventRefresh =
-            syncSeriesControls(card, updated, element) || deferredEventRefresh;
-        }
-        if (card !== position) list.insertBefore(card, position);
-        position = card.nextElementSibling;
         continue;
       }
       // Don't discard an unrelated editor's draft or another action in flight.
@@ -316,6 +274,7 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
           for (const attribute of [
             "data-email-prompt",
             "data-future-email-prompt",
+            "data-all-email-prompt",
           ]) {
             const value = nextForm.getAttribute(attribute);
             if (value === null) form.removeAttribute(attribute);
@@ -351,10 +310,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     }
   };
   syncList(list, refreshed.querySelector("[data-event-list]")!);
-  const seriesList = root.querySelector<HTMLElement>("[data-series-list]");
-  const nextSeriesList =
-    refreshed.querySelector<HTMLElement>("[data-series-list]");
-  if (seriesList && nextSeriesList) syncList(seriesList, nextSeriesList);
   let pastList = root.querySelector<HTMLElement>("[data-past-event-list]");
   const nextPastList = refreshed.querySelector<HTMLElement>(
     "[data-past-event-list]",
@@ -374,7 +329,6 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
     "[data-empty-events]",
     "[data-event-limit]",
     "[data-past-event-limit]",
-    "[data-empty-series]",
   ]) {
     const target = root.querySelector(selector);
     if (target) target.replaceWith(actionFragment(page, selector));
@@ -388,37 +342,27 @@ function syncEvents(page: Document, element?: HTMLFormElement) {
       ? [...root.querySelectorAll<HTMLElement>("[data-live-event]")].find(
           (card) => card.dataset.liveEvent === eventId,
         )
-      : seriesId
-        ? [...root.querySelectorAll<HTMLElement>("[data-series-card]")].find(
-            (card) => card.dataset.seriesCard === seriesId,
-          )
-        : added;
+      : added;
     const selector =
       !element && focused?.matches("[data-bulk-event]")
         ? "[data-bulk-event]"
         : element?.matches("[data-live-signup]") ||
             (!element && focused?.closest("[data-live-signup]"))
           ? '[data-live-signup] button[type="submit"]'
-          : element?.matches("[data-series-occurrence]")
-            ? '[data-series-occurrence] button[type="submit"]'
-            : element?.matches("[data-series-save]")
-              ? `[data-show-dialog="series-editor-${CSS.escape(seriesId ?? "")}"]`
-              : element?.matches("[data-event-save], [data-event-cancel]")
-                ? card?.dataset.seriesCard
-                  ? "[data-series-occurrences] > summary"
-                  : "[data-show-dialog]"
-                : element?.matches("[data-add-attendee]") ||
-                    (!element && focused?.matches("[data-attendee-open]"))
-                  ? "[data-attendee-open]"
-                  : !element && focusedSeriesSummary
-                    ? focusedSeriesSummary
-                    : !element && focusedEventSummary
-                      ? focusedEventSummary
-                      : !element &&
-                          focused instanceof HTMLElement &&
-                          focused.dataset.showDialog
-                        ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
-                        : ".volunteer-roster summary";
+          : element?.matches(
+                "[data-event-save], [data-event-cancel], [data-event-restore]",
+              )
+            ? "[data-show-dialog]"
+            : element?.matches("[data-add-attendee]") ||
+                (!element && focused?.matches("[data-attendee-open]"))
+              ? "[data-attendee-open]"
+              : !element && focusedEventSummary
+                ? focusedEventSummary
+                : !element &&
+                    focused instanceof HTMLElement &&
+                    focused.dataset.showDialog
+                  ? `[data-show-dialog="${CSS.escape(focused.dataset.showDialog)}"]`
+                  : ".volunteer-roster summary";
     (card && !card.hidden
       ? !element && focused === focusedCard
         ? card
@@ -541,7 +485,7 @@ if (eventBrowser) {
         const needsDeferredRefresh =
           deferredEventRefresh &&
           !eventBrowser.querySelector(
-            'dialog[open], add-attendee[data-expanded], [data-signup-menu]:popover-open, [data-live-series][open], form[data-submitting="true"]',
+            'dialog[open], add-attendee[data-expanded], [data-signup-menu]:popover-open, form[data-submitting="true"]',
           );
         if (
           !forceRefresh &&
@@ -642,7 +586,7 @@ if (eventBrowser) {
       if (
         deferredEventRefresh &&
         event.target instanceof HTMLDialogElement &&
-        event.target.closest("[data-live-event], [data-live-series]")
+        event.target.closest("[data-live-event]")
       )
         refreshDeferredEvents();
     },
@@ -657,7 +601,7 @@ if (eventBrowser) {
 function form(
   selector: string,
   endpoint: string,
-  body: (values: FormData) => object,
+  body: (values: FormData, element: HTMLFormElement) => object,
   complete: (element: HTMLFormElement) => Promise<void> = refreshEvents,
 ) {
   document.addEventListener("submit", async (event) => {
@@ -678,17 +622,29 @@ function form(
       );
       if (!element.reportValidity()) return;
     }
-    if (element.matches("[data-event-save], [data-series-save]")) {
+    if (element.matches("[data-event-save]")) {
       initEventDates(element);
       readDateInputs(element);
       if (!element.reportValidity()) return;
     }
     const button = submitButton(element);
     if (button?.disabled) return;
+    let seriesScope: SaveScope | null = null;
+    if (
+      element.matches("[data-event-save]") &&
+      element.elements.namedItem("seriesId")
+    ) {
+      seriesScope = await chooseSeriesScope(
+        element,
+        seriesScheduleChanged(new FormData(element), savedFormValues(element)),
+      );
+      if (!seriesScope || scope.dataset.submitting) return;
+    }
     const focused = document.activeElement;
     element.dataset.submitting = "true";
     scope.dataset.submitting = "true";
     const values = new FormData(element);
+    if (seriesScope) values.set("scope", seriesScope);
     const controls = [
       ...scope.querySelectorAll<HTMLElement & { disabled: boolean }>(
         'input:not([type="hidden"]), select, textarea, button',
@@ -696,27 +652,26 @@ function form(
     ].filter((control) => !control.disabled);
     for (const control of controls) control.disabled = true;
     const loading = element.querySelector<HTMLElement>("[data-action-loading]");
-    const label = button?.textContent;
+    // Keep any icon beside the label once the loading text is replaced.
+    const label = button?.innerHTML;
     const loadingLabel = loading?.textContent;
     const resultTitle = element.matches("[data-bulk-event-save]")
       ? "Selected events saved"
-      : element.matches("[data-event-delete]")
-        ? "Deleted"
-        : element.matches("[data-series-save]")
-          ? "Patrol series saved"
-          : element.matches("[data-event-save]")
-            ? "Event saved"
-            : element.matches("[data-event-cancel]")
-              ? "Event cancelled"
-              : element.matches("[data-manage-signup]")
-                ? "Registration changed"
-                : element.matches("[data-add-attendee]")
-                  ? "Volunteers added"
-                  : element.matches("[data-organizer-role]")
-                    ? "Account role saved"
-                    : element.matches("[data-organizer-rejection]")
-                      ? "Application rejected"
-                      : "Volunteer access saved";
+      : element.matches("[data-event-restore]")
+        ? "Event restored"
+        : element.matches("[data-event-save]")
+          ? "Event saved"
+          : element.matches("[data-event-cancel]")
+            ? "Event cancelled"
+            : element.matches("[data-manage-signup]")
+              ? "Registration changed"
+              : element.matches("[data-add-attendee]")
+                ? "Volunteers added"
+                : element.matches("[data-organizer-role]")
+                  ? "Account role saved"
+                  : element.matches("[data-organizer-rejection]")
+                    ? "Application rejected"
+                    : "Volunteer access saved";
     const message = element.querySelector<HTMLElement>("[data-form-message]");
     if (message) {
       message.hidden = true;
@@ -730,11 +685,6 @@ function form(
         !(await confirmEventUnregistration(element))
       )
         return;
-      if (
-        element.matches("[data-event-delete]") &&
-        !(await confirmSeriesDeletion())
-      )
-        return;
       const notify =
         element.matches("[data-organizer-rejection], [data-notify]") ||
         Boolean(
@@ -742,6 +692,7 @@ function form(
             values,
             element.dataset.emailPrompt,
             element.dataset.futureEmailPrompt,
+            element.dataset.allEmailPrompt,
           ),
         ) ||
         undefined;
@@ -764,7 +715,7 @@ function form(
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...body(values),
+          ...body(values, element),
           ...(notify === undefined ||
           element.matches("[data-organizer-rejection]")
             ? {}
@@ -823,7 +774,7 @@ function form(
       if (button) {
         button.removeAttribute("aria-busy");
         if (button.dataset.loadingLabel || button.textContent === "Sending…")
-          button.textContent = label ?? "";
+          button.innerHTML = label ?? "";
       }
       element.removeAttribute("aria-busy");
       if (loading) {
@@ -884,8 +835,8 @@ form("[data-add-attendee]", "/api/v1/events/action", (values) => ({
 form(
   "[data-event-save]",
   "/api/v1/events/action",
-  (v) =>
-    recurringSaveAction(v) ?? {
+  (v, element) =>
+    recurringSaveAction(v, savedFormValues(element)) ?? {
       action: "save",
       ...(v.has("id")
         ? { id: str(v, "id"), version: Number(v.get("version")) }
@@ -907,40 +858,11 @@ form(
       reason: str(v, "reason"),
     },
 );
-form("[data-series-save]", "/api/v1/events/action", seriesSaveAction);
-form("[data-event-delete]", "/api/v1/events/action", (v) => ({
-  action: str(v, "action"),
+form("[data-event-restore]", "/api/v1/events/action", (v) => ({
+  action: "restore-occurrence",
   id: str(v, "id"),
   version: Number(v.get("version")),
 }));
-form(
-  "[data-series-occurrence]",
-  "/api/v1/events/action",
-  (v) => ({
-    action: "materialize-occurrence",
-    id: str(v, "seriesId"),
-    occurrenceDate: str(v, "occurrenceDate"),
-  }),
-  async (element) => {
-    const value = (name: string) =>
-      element.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value;
-    const id = `patrol:${value("seriesId")}:${value("occurrenceDate")}`;
-    const url = new URL(location.href);
-    url.searchParams.set("occurrence", id);
-    const page = await loadActionPage(url.href);
-    history.replaceState(null, "", url);
-    syncEvents(page, element);
-    const card = [
-      ...document.querySelectorAll<HTMLElement>("[data-live-event]"),
-    ].find((item) => item.dataset.liveEvent === id);
-    const occurrences = card?.closest<HTMLDetailsElement>(
-      "[data-series-occurrences]",
-    );
-    if (occurrences) occurrences.open = true;
-    card?.scrollIntoView({ block: "nearest" });
-    card?.querySelector<HTMLButtonElement>("[data-show-dialog]")?.click();
-  },
-);
 form("[data-manage-signup]", "/api/v1/events/action", (v) => ({
   action: "manage-signup",
   id: str(v, "id"),

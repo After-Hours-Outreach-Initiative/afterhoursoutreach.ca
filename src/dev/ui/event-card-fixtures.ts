@@ -176,6 +176,10 @@ export function createEventCardFixture(
     availableSpots: 0,
     futureConfirmed: publicRoster.length,
     futureEditableConfirmed: publicRoster.length,
+    seriesConfirmed: publicRoster.length,
+    intervalWeeks: null,
+    edited: 0,
+    restorable: 0,
     signedUp: 0,
   };
   const requested = registeredOverride ?? Boolean(scenario.registered);

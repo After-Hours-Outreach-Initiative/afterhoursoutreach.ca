@@ -1,4 +1,5 @@
 ---
+import PencilIcon from "@/components/icons/PencilIcon.astro";
 interface Props {
   id: string;
   heading: string;
@@ -57,16 +58,7 @@ const sectionDescribedBy =
           aria-expanded="false"
           disabled
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
-          >
-            <path d="m16 3 5 5-12 12-6 1 1-6L16 3Z" />
-            <path d="m13 6 5 5" />
-          </svg>
+          <PencilIcon />
           Edit
         </button>
       </div>

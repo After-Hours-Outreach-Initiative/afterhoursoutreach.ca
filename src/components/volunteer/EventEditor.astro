@@ -19,7 +19,13 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
 >
   <DialogHeader
     id={`${dialogId}-heading`}
-    title={event ? "Edit event" : "Create event"}
+    title={
+      event?.seriesId
+        ? "Edit recurring event"
+        : event
+          ? "Edit event"
+          : "Create event"
+    }
   />
   <div class="dialog-body">
     {editable && (
@@ -31,6 +37,9 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
         data-email-prompt={event && event.confirmed > 0 ? "event" : undefined}
         data-future-email-prompt={
           event && event.futureEditableConfirmed > 0 ? "series" : undefined
+        }
+        data-all-email-prompt={
+          event && event.seriesConfirmed > 0 ? "series" : undefined
         }
         action="/api/v1/events/action"
         method="post"
@@ -55,27 +64,9 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
                 name="occurrenceDate"
                 value={event.occurrenceDate!}
               />
-              <fieldset class="volunteer-radio-field volunteer-wide">
-                <legend>Apply changes to</legend>
-                <div class="volunteer-radio-group">
-                  <label class="volunteer-check">
-                    <input
-                      type="radio"
-                      name="scope"
-                      value="occurrence"
-                      checked
-                    />
-                    <span>Only this occurrence</span>
-                  </label>
-                  <label class="volunteer-check">
-                    <input type="radio" name="scope" value="future" />
-                    <span>This and future occurrences</span>
-                  </label>
-                </div>
-              </fieldset>
             </>
           )}
-          <EventFields id={dialogId} {event} />
+          <EventFields id={dialogId} {event} {series} />
         </div>
         <p data-form-message role="status" hidden />
         <noscript>

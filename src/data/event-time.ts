@@ -98,3 +98,14 @@ export function vancouverOccurrenceInstant(date: string, time: string) {
   if (time.startsWith("02:") && shifted !== undefined) return shifted;
   throw new Error("Invalid recurrence date or local time.");
 }
+
+/** Add calendar months, clamping to the last day of shorter months. */
+export function addCalendarMonths(date: string, months: number) {
+  const [year, month, day] = date.split("-").map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + months, 1));
+  const last = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(day, last));
+  return target.toISOString().slice(0, 10);
+}

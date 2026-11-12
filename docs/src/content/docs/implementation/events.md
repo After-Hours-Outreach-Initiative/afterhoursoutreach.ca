@@ -38,11 +38,20 @@ Each event, recurring series, and series template stores `unregister_minutes`
 Started events stay in the past list, where the unregister button remains until
 that time. Organizer roster removals are unaffected.
 
+Recurring series generate their dates two months ahead, and volunteers can
+register for any of them.
+
 Cancelled events disappear from event lists and calendars. Their details,
 registration records, and audit history are retained. Organizers
 can see cancellations in the audit log, including events with no registrations.
-Recurring cancellation tombstones prevent regeneration. Hiding/closing updates
-visibility and registration state without cancelling existing bookings.
+Cancelled recurring dates are not regenerated. A future cancelled date that is
+still on its series' schedule stays in the organizer's list and can be restored
+with its card's **Restore** button; its registrations stay cancelled. Dates
+cancelled by a schedule change (`seriesSchedule` or `seriesEndDate` in the
+cancellation audit) are restored automatically when a later schedule edit
+includes them again.
+Hiding/closing updates visibility and registration state without cancelling
+existing bookings.
 Access-revocation workflows cancel affected future bookings atomically.
 
 Organizer mutations default to no email unless the API receives `notify: true`.

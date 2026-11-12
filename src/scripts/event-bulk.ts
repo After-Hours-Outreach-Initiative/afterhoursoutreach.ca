@@ -255,16 +255,5 @@ export function initBulkEvents(root: HTMLElement) {
     },
     true,
   );
-  root.addEventListener(
-    "toggle",
-    (event) => {
-      if (
-        event.target instanceof HTMLDetailsElement &&
-        event.target.matches("[data-series-occurrences]")
-      )
-        syncBulkEventSelection(root);
-    },
-    true,
-  );
   syncBulkEventSelection(root);
 }

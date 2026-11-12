@@ -22,8 +22,6 @@ import EventCard from "./EventCard.astro";
 import EventCalendar from "./EventCalendar.astro";
 import EventEditor from "./EventEditor.astro";
 import BulkEventEditor from "./BulkEventEditor.astro";
-import PatrolSeriesCard from "./PatrolSeriesCard.astro";
-import { groupManagementEvents } from "@/data/event-browser";
 import ApplicationProgress from "./ApplicationProgress.astro";
 // Discord connection is temporarily disabled.
 // import DiscordConnectionNotice from "./DiscordConnectionNotice.astro";
@@ -135,11 +133,6 @@ const destinations = events.filter(
     event.inSignupWindow &&
     !event.cancelledAt,
 );
-const seriesItems = manage
-  ? groupManagementEvents(events, series).filter(
-      (item) => item.kind === "series",
-    )
-  : [];
 ---
 
 <AccountLayout
@@ -308,11 +301,13 @@ const seriesItems = manage
         )}
         <div class="volunteer-event-schedule">
           <EventCalendar
-            events={events.map((event) => ({
-              id: event.id,
-              startsAt: event.startsAt,
-              label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
-            }))}
+            events={events
+              .filter((event) => !event.cancelledAt)
+              .map((event) => ({
+                id: event.id,
+                startsAt: event.startsAt,
+                label: `${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`,
+              }))}
           />
           <div class="volunteer-event-results">
             {manage && <BulkEventEditor />}
@@ -347,29 +342,10 @@ const seriesItems = manage
               data-event-limit
               hidden={events.length !== 100}
             >
-              {manage
-                ? "Showing up to 100 events. Open another date under Manage recurring series."
-                : "Showing up to 100 events."}
+              Showing up to 100 events.
             </p>
           </div>
         </div>
-        {manage && (
-          <details class="volunteer-series-management" data-series-management>
-            <summary>Manage recurring series</summary>
-            <ul class="volunteer-event-list" data-series-list>
-              {seriesItems.map((item) => (
-                <PatrolSeriesCard series={item.series} events={item.events} />
-              ))}
-            </ul>
-            <p
-              class="volunteer-help"
-              data-empty-series
-              hidden={seriesItems.length > 0}
-            >
-              No recurring series have been created.
-            </p>
-          </details>
-        )}
       </section>
     )}
     {eventAccess && pastEvents.length > 0 && (
@@ -394,9 +370,7 @@ const seriesItems = manage
           data-past-event-limit
           hidden={pastEvents.length !== 100}
         >
-          {manage
-            ? "Showing up to 100 past events. Open another date under Manage recurring series."
-            : "Showing the 100 most recent past events."}
+          Showing the 100 most recent past events.
         </p>
       </section>
     )}

@@ -369,6 +369,8 @@ export const patrolSeriesTemplate = sqliteTable(
     effective_date: text().notNull(),
     local_time: text().notNull(),
     day_offset: integer().notNull().default(0),
+    // Null keeps the earlier cadence; a value restarts it from effective_date.
+    interval_weeks: integer(),
     meeting_point: text().notNull(),
     meeting_point_url: text(),
     spots: integer().notNull(),
@@ -381,6 +383,10 @@ export const patrolSeriesTemplate = sqliteTable(
     includes_orientation: integer({ mode: "boolean" }).notNull().default(false),
   },
   (table) => [
+    check(
+      "patrol_template_interval",
+      sql`${table.interval_weeks} IS NULL OR ${table.interval_weeks} BETWEEN 1 AND 52`,
+    ),
     uniqueIndex("patrol_series_template_date").on(
       table.series_id,
       table.effective_date,

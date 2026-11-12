@@ -3866,8 +3866,13 @@ test("manual presets resolve real application completion, event access and roste
     };
     actors.set(preset.key, actor);
     const events = await listEvents(env.DB, actor, undefined, "volunteer");
+    // The recurring Orientation + Patrol dates are open to everyone with access.
+    const seriesDates = events.filter(
+      (event) => event.seriesId === "local-account-v2-series-orientation",
+    ).length;
+    if (complete && actor.active) assert.ok(seriesDates >= 4, preset.label);
     assert.equal(
-      events.length,
+      events.length - seriesDates,
       !complete || !actor.active
         ? 0
         : actor.patrolApproved || actor.role === "organizer"

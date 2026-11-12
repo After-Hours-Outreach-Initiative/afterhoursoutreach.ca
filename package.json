@@ -7,7 +7,7 @@
     "node": ">=22.23.4"
   },
   "scripts": {
-    "dev": "wrangler types --strict-vars false && astro dev --host --background",
+    "dev": "tsx scripts/dev.ts",
     "docs:dev": "pnpm --dir docs dev",
     "docs:stop": "pnpm --dir docs stop",
     "docs:status": "pnpm --dir docs status",

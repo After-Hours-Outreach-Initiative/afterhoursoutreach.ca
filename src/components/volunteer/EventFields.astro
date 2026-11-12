@@ -10,6 +10,7 @@ import FieldError from "@/components/FieldError.astro";
 import FieldGroup from "./FieldGroup.astro";
 import StepperField from "./StepperField.astro";
 import RecurringIcon from "@/components/icons/RecurringIcon.astro";
+import { maxIntervalWeeks } from "@/data/event-series";
 import DateInput from "./DateInput.astro";
 import NativePickerInput from "./NativePickerInput.astro";
 
@@ -19,7 +20,9 @@ interface Props {
   series?: PatrolSeriesRow;
 }
 const { id, event, series } = Astro.props;
-const settings = event ?? series;
+const settings = event;
+// Repeat settings for an existing date come from its series.
+const recurring = Boolean(event?.seriesId && series);
 const limits = { ...defaultEventLimits, ...settings };
 const publicVisibility = settings
   ? Boolean(settings.open && !settings.hidden)
@@ -55,23 +58,16 @@ const publicVisibility = settings
       name="startsAt"
       id={`${id}-startsAt`}
       errorField={`${id}-startsAt`}
-      label={series ? "Start date (fixed)" : "Start date"}
-      value={
-        event
-          ? vancouverInput(event.startsAt)
-          : series
-            ? `${series.firstDate}T${series.localTime}`
-            : ""
-      }
+      label="Start date"
+      value={event ? vancouverInput(event.startsAt) : ""}
       withTime
       defaultTime="21:00"
-      readonlyDate={Boolean(series)}
-      warnPast={!series}
+      warnPast
     />
   </div>
-  {!event && (
+  {(!event || recurring) && (
     <div class="volunteer-field volunteer-wide" data-recurrence-controls>
-      {!series && (
+      {!recurring && (
         <label class="volunteer-check volunteer-recurrence-toggle">
           <input
             type="checkbox"
@@ -84,16 +80,17 @@ const publicVisibility = settings
           </span>
         </label>
       )}
-      <div class="volunteer-fields" data-recurrence-fields hidden={!series}>
+      <div class="volunteer-fields" data-recurrence-fields hidden={!recurring}>
         <label class="volunteer-field">
-          Interval (weeks)
+          Repeat every (weeks)
           <input
             name="intervalWeeks"
             type="number"
             min="1"
-            max="52"
-            value={series?.intervalWeeks ?? 1}
-            disabled={!series}
+            max={maxIntervalWeeks}
+            value={event?.intervalWeeks ?? 2}
+            disabled={!recurring}
+            data-series-schedule={recurring ? "" : undefined}
             required
           />
         </label>
@@ -104,10 +101,11 @@ const publicVisibility = settings
           <NativePickerInput
             id={`${id}-endDate`}
             name="endDate"
-            min={series?.firstDate}
+            min={event?.occurrenceDate ?? undefined}
             value={series?.endDate ?? ""}
             aria-describedby={`error-${id}-endDate`}
-            disabled={!series}
+            disabled={!recurring}
+            data-series-schedule={recurring ? "" : undefined}
           />
           <FieldError
             field={`${id}-endDate`}
@@ -115,11 +113,11 @@ const publicVisibility = settings
           />
         </div>
       </div>
-      {!series && (
-        <p class="volunteer-help" id={`${id}-recurring-help`}>
-          Volunteers see the next 3 occurrences per series.
-        </p>
-      )}
+      <p class="volunteer-help" id={`${id}-recurring-help`}>
+        {recurring
+          ? "Changing these applies to this and following events, or all events."
+          : "Volunteers can register for dates up to two months ahead."}
+      </p>
     </div>
   )}
 </FieldGroup>

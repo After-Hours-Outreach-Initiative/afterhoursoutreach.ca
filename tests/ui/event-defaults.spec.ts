@@ -52,9 +52,7 @@ test("organizers share the event calendar and cards with role-gated controls", a
   );
   await expect(page.locator("[data-event-calendar]")).toBeVisible();
   await expect(
-    page.locator(
-      "[data-event-save], [data-manage-signup], [data-series-management]",
-    ),
+    page.locator("[data-event-save], [data-manage-signup]"),
   ).toHaveCount(0);
   expect((await page.request.get("/events?view=organizer")).status()).toBe(403);
   await expect(page.locator('a[href^="/manage"]')).toHaveCount(0);

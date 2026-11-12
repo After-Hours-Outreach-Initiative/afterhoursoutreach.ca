@@ -3130,7 +3130,7 @@ test("event editor shows native number and URL errors without submitting invalid
   const recurring = form.getByLabel("Recurring patrol", {
     exact: true,
   });
-  const interval = form.getByLabel("Interval (weeks)", { exact: true });
+  const interval = form.getByLabel("Repeat every (weeks)", { exact: true });
   const endDate = form.locator('[name="endDate"]');
   await expect(form.locator('[name="type"]')).toHaveCount(0);
   await expect(orientation).not.toBeChecked();
@@ -3138,6 +3138,7 @@ test("event editor shows native number and URL errors without submitting invalid
     recurrence.locator(".volunteer-recurrence-label svg"),
   ).toHaveAttribute("aria-hidden", "true");
   await recurring.check();
+  await expect(interval).toHaveValue("2");
   await interval.fill("3");
   await endDate.fill("2030-02-01");
   await eventType.getByText("Orientation + Patrol", { exact: true }).click();
@@ -3217,7 +3218,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await expect(orientation).not.toBeChecked();
   await expect(recurrence).toBeVisible();
   await expect(recurring).toBeEnabled();
-  await expect(interval).toHaveValue("1");
+  await expect(interval).toHaveValue("2");
   await expect(endDate).toHaveValue("");
   await expect(interval).toBeDisabled();
   await expect(date).toHaveValue("");

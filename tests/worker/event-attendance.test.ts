@@ -243,10 +243,6 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
         await expect(list).toHaveCSS("display", "grid");
         await expect(list).toHaveCSS("align-items", "start");
         expect(await list.evaluate(columns)).toBe(1);
-        if (manage)
-          await expect(
-            page.locator("[data-series-list] > [data-series-card]"),
-          ).toHaveCount(1);
         await list.evaluate((element) =>
           window.scrollTo({
             top: element.getBoundingClientRect().top + scrollY - 110,

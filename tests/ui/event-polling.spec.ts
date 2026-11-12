@@ -484,7 +484,6 @@ test("events retain recurring dates, polling, actions and past events without fi
     .toBeGreaterThan(1);
   const added = await occurrences.count();
   await expect(cards).toHaveCount(before + added, { timeout: 15_000 });
-  const series = page.locator(`[data-series-card="${id}"]`);
   await expect(create).toBeFocused();
 
   await page.getByRole("button", { name: "Create", exact: true }).click();
@@ -500,7 +499,7 @@ test("events retain recurring dates, polling, actions and past events without fi
   ).toBeVisible();
 
   // An occurrence with an expanded roster moves into management history at its start,
-  // without losing series tools or attendance actions.
+  // without losing attendance actions.
   const occurrence = occurrences.first();
   const occurrenceId = (await occurrence.getAttribute("data-live-event"))!;
   // Robin is already patrol approved, so add a volunteer who still needs it.
@@ -563,7 +562,8 @@ test("events retain recurring dates, polling, actions and past events without fi
       '[data-event-save], [data-event-cancel], [data-show-dialog^="event-editor-"]',
     ),
   ).toHaveCount(0);
-  await expect(cards).toHaveCount(before + added + 2);
+  // The started date moves to history; every later date was already listed.
+  await expect(cards).toHaveCount(before + added + 1);
   await pastOccurrence
     .getByRole("button", { name: "Approve for patrols", exact: true })
     .click();
@@ -581,10 +581,7 @@ test("events retain recurring dates, polling, actions and past events without fi
   await expect(
     page.locator(`[data-event-list] > [data-live-event="${occurrenceId}"]`),
   ).toHaveCount(0);
-  await page.locator("[data-series-management] > summary").click();
-  await expect(
-    series.getByRole("button", { name: "Edit series", exact: true }),
-  ).toBeVisible();
+  await expect(occurrences.first()).toBeVisible();
 
   await page.goto("/events?type=orientation");
   expect(

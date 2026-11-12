@@ -65,23 +65,16 @@ BEGIN
 END;
 --> statement-breakpoint
 
--- Rank ALL future non-cancelled occurrences: closed, full and hidden ones still
--- consume slots. The materialization frontier prevents a sparse/far-future row
--- from becoming bookable when maintenance has not yet filled intervening dates.
+-- Series dates open for signup two months ahead. The materialization frontier
+-- also keeps a far-future row closed when maintenance has not run yet.
 CREATE TRIGGER signup_recurring_window_insert
 BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
 BEGIN
   SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
     SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
     WHERE e.id = NEW.event_id
-      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER) AND (
-      e.starts_at >= ps.generation_until OR
-      (SELECT count(*) FROM event preceding
-        WHERE preceding.series_id = e.series_id AND preceding.cancelled_at IS NULL
-          AND preceding.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
-          AND (preceding.starts_at < e.starts_at OR
-            (preceding.starts_at = e.starts_at AND preceding.id < e.id))) >= 3
-    )
+      AND e.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+      AND e.starts_at >= ps.generation_until
   );
 END;
 --> statement-breakpoint
@@ -90,19 +83,12 @@ BEFORE UPDATE OF status, event_id, user_id, manual_medic, manual_new ON signup W
 BEGIN
   SELECT RAISE(ABORT, 'recurring_signup_window') WHERE EXISTS (
     SELECT 1 FROM event e JOIN patrol_series ps ON ps.id = e.series_id
-    WHERE e.id = NEW.event_id AND (
-      e.starts_at >= ps.generation_until OR
-      (SELECT count(*) FROM event preceding
-        WHERE preceding.series_id = e.series_id AND preceding.cancelled_at IS NULL
-          AND preceding.starts_at > CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
-          AND (preceding.starts_at < e.starts_at OR
-            (preceding.starts_at = e.starts_at AND preceding.id < e.id))) >= 3
-    )
+    WHERE e.id = NEW.event_id AND e.starts_at >= ps.generation_until
   );
 END;
 --> statement-breakpoint
 
--- Occurrence identity and cancellation tombstones are permanent. An exception
+-- Occurrence identity is permanent and cancellations stop regeneration. An exception
 -- edits starts_at, never its nominal date; generation can only insert missing keys.
 CREATE TRIGGER recurring_occurrence_identity
 BEFORE UPDATE OF id, type, series_id, occurrence_date ON event
@@ -119,11 +105,27 @@ BEGIN
   SELECT RAISE(ABORT, 'recurring_occurrence_tombstone');
 END;
 --> statement-breakpoint
+-- Only a future, undeleted date still on its series' schedule can be restored.
 CREATE TRIGGER recurring_occurrence_no_restore
 BEFORE UPDATE OF cancelled_at ON event
 WHEN OLD.series_id IS NOT NULL AND OLD.cancelled_at IS NOT NULL AND NEW.cancelled_at IS NOT OLD.cancelled_at
 BEGIN
-  SELECT RAISE(ABORT, 'recurring_occurrence_tombstone');
+  SELECT RAISE(ABORT, 'recurring_occurrence_tombstone') WHERE NEW.cancelled_at IS NOT NULL
+    OR OLD.starts_at <= CAST(round((julianday('now') - 2440587.5) * 86400000) AS INTEGER)
+    OR EXISTS(SELECT 1 FROM event_audit a WHERE a.event_id = OLD.id AND a.action = 'deleted')
+    OR NOT EXISTS(SELECT 1 FROM patrol_series ps WHERE ps.id = OLD.series_id
+      AND NOT EXISTS(SELECT 1 FROM patrol_series_audit a WHERE a.series_id = ps.id AND a.action = 'deleted')
+      AND (ps.stopped_from IS NULL OR OLD.occurrence_date < ps.stopped_from)
+      AND (ps.end_date IS NULL OR OLD.occurrence_date <= ps.end_date)
+      -- The cadence restarts at the latest template that sets an interval.
+      AND CAST(julianday(OLD.occurrence_date) - julianday(coalesce(
+        (SELECT t.effective_date FROM patrol_series_template t WHERE t.series_id = ps.id
+          AND t.effective_date <= OLD.occurrence_date AND t.interval_weeks IS NOT NULL
+          ORDER BY t.effective_date DESC LIMIT 1), ps.first_date)) AS INTEGER)
+        % (7 * coalesce(
+        (SELECT t.interval_weeks FROM patrol_series_template t WHERE t.series_id = ps.id
+          AND t.effective_date <= OLD.occurrence_date AND t.interval_weeks IS NOT NULL
+          ORDER BY t.effective_date DESC LIMIT 1), ps.interval_weeks)) = 0);
 END;
 --> statement-breakpoint
 CREATE TRIGGER recurring_occurrence_created

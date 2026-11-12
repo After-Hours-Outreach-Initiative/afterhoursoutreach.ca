@@ -1,0 +1,24 @@
+---
+interface Props {
+  legend?: string;
+}
+const { legend = "Apply changes to" } = Astro.props;
+---
+
+<fieldset class="volunteer-radio-field volunteer-wide" data-series-scope>
+  <legend>{legend}</legend>
+  <div class="volunteer-radio-group">
+    <label class="volunteer-check">
+      <input type="radio" name="scope" value="occurrence" checked />
+      <span>This event</span>
+    </label>
+    <label class="volunteer-check">
+      <input type="radio" name="scope" value="future" />
+      <span>This and following events</span>
+    </label>
+    <label class="volunteer-check">
+      <input type="radio" name="scope" value="all" />
+      <span>All events</span>
+    </label>
+  </div>
+</fieldset>

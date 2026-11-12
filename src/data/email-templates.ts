@@ -422,6 +422,23 @@ export function patrolSeriesShortenedEmail(
   );
 }
 
+export function patrolSeriesRescheduledEmail(
+  event?: SeriesEmailEvent,
+): EmailContent {
+  const note =
+    "This recurring patrol now repeats on a different schedule, so this event and your registration were cancelled.";
+  return emailContent(
+    event
+      ? `Your event on ${formatEventDay(event.startsAt)} was cancelled`
+      : "Your event was cancelled",
+    event
+      ? `${eventDetails(event.startsAt, event.includesOrientation)}\n\n${note}`
+      : note,
+    undefined,
+    "Your event was cancelled",
+  );
+}
+
 export function patrolSeriesChangedEmail(
   event?: SeriesEmailEvent & { meetingPoint: string },
 ): EmailContent {

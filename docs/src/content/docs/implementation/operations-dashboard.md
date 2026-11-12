@@ -125,10 +125,10 @@ cancel an event; or remove a registration.
 
 Capacity edits remain subject to the database's reservations for medics and new volunteers,
 total-capacity and existing-registration guards. Hiding/closing an event does
-not cancel bookings. Cancelling an event does; recurring cancellation tombstones
-remain permanent. Actions affect **only the selected occurrence**, not future
+not cancel bookings. Cancelling an event does; cancelled recurring dates are not
+regenerated. Actions affect **only the selected occurrence**, not future
 series defaults. Use the application's organizer interface for creating events,
-changing recurring schedules or this-and-future edits.
+changing recurring schedules or edits to following or all events.
 
 ## Monitoring
 

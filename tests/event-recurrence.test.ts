@@ -2,33 +2,9 @@ import { expect, test } from "vitest";
 import {
   recurringSaveAction,
   recurringCancelAction,
-  seriesSaveAction,
   eventEmailPrompt,
+  seriesScheduleChanged,
 } from "../src/scripts/event-recurrence";
-import { groupManagementEvents } from "../src/data/event-browser";
-import type { EventRow, PatrolSeriesRow } from "../src/server/db/events";
-
-test("management groups selected occurrences once per series, retaining one-offs and series without loaded occurrences", () => {
-  const event = (id: string, seriesId: string | null) =>
-    ({ id, seriesId }) as EventRow;
-  const series = ["first", "second", "empty"].map(
-    (id) => ({ id }) as PatrolSeriesRow,
-  );
-  const events = [
-    event("selected", "second"),
-    event("one-off", null),
-    event("next", "first"),
-    event("later", "second"),
-  ];
-  const grouped = groupManagementEvents(events, series);
-  expect(grouped).toEqual([
-    { kind: "series", series: series[1], events: [events[0], events[3]] },
-    { kind: "event", event: events[1] },
-    { kind: "series", series: series[0], events: [events[2]] },
-    { kind: "series", series: series[2], events: [] },
-  ]);
-});
-
 const values = (extra: Record<string, string> = {}) => {
   const result = new FormData();
   for (const [key, value] of Object.entries({
@@ -99,6 +75,7 @@ test("this-and-future edits use nominal identities and series versions, not occu
     id: "series",
     version: 8,
     occurrenceDate: "2026-11-01",
+    scope: "future",
     template: {
       dayOffset: 2,
       localTime: "20:30",
@@ -115,6 +92,7 @@ test("this-and-future edits use nominal identities and series versions, not occu
     id: "series",
     version: 8,
     occurrenceDate: "2026-11-01",
+    scope: "future",
     reason: "",
   });
   // An empty occurrence must still offer mail for later affected bookings;
@@ -134,34 +112,58 @@ test("this-and-future edits use nominal identities and series versions, not occu
     "event-cancel",
   );
 });
-test("series settings send the create-event fields without a recurring checkbox", () => {
+test("all-events edits and cancellations carry their scope, repeat settings and series-wide email prompt", () => {
   const data = values({
     seriesId: "series",
-    version: "9",
+    seriesVersion: "8",
+    occurrenceDate: "2026-11-03",
+    scope: "all",
+    intervalWeeks: "3",
     endDate: "",
-    intervalWeeks: "2",
-    includesOrientation: "true",
-    publicVisibility: "false",
   });
-  expect(seriesSaveAction(data)).toEqual({
-    action: "save-series",
-    id: "series",
-    version: 9,
-    series: {
-      firstDate: "2026-11-03",
-      localTime: "20:30",
-      intervalWeeks: 2,
-      endDate: null,
-      meetingPoint: "Meeting point",
-      meetingPointUrl: "",
-      spots: 8,
-      minMedicSpots: 2,
-      minNewVolunteerSpots: 2,
-      maxNewVolunteers: 4,
-      unregisterMinutes: 45,
-      open: false,
-      hidden: true,
-      includesOrientation: true,
-    },
+  expect(recurringSaveAction(data)).toMatchObject({
+    action: "update-series-from",
+    scope: "all",
+    template: { dayOffset: 0, intervalWeeks: 3, endDate: null },
+  });
+  expect(recurringCancelAction(data)).toMatchObject({
+    action: "stop-series",
+    scope: "all",
+  });
+  expect(eventEmailPrompt(data, "event", "future", "all")).toBe("all");
+  data.set("scope", "future");
+  expect(eventEmailPrompt(data, "event", "future", "all")).toBe("future");
+});
+
+test("series edits send only the fields changed since the form loaded", () => {
+  const series = {
+    seriesId: "series",
+    seriesVersion: "1",
+    occurrenceDate: "2026-11-03",
+    intervalWeeks: "2",
+    endDate: "",
+  };
+  const saved = values({ ...series, startsAt: "2026-11-02T19:00" });
+  const data = values({
+    ...series,
+    startsAt: "2026-11-02T19:00",
+    spots: "10",
+    scope: "all",
+  });
+  expect(recurringSaveAction(data, saved)).toMatchObject({
+    action: "update-series-from",
+    scope: "all",
+    template: { spots: 10 },
+  });
+  expect(
+    Object.keys(
+      (recurringSaveAction(data, saved) as { template: object }).template,
+    ),
+  ).toEqual(["spots"]);
+  expect(seriesScheduleChanged(data, saved)).toBe(false);
+  data.set("intervalWeeks", "3");
+  expect(seriesScheduleChanged(data, saved)).toBe(true);
+  expect(recurringSaveAction(data, saved)).toMatchObject({
+    template: { spots: 10, intervalWeeks: 3 },
   });
 });

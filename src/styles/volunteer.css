@@ -347,8 +347,8 @@ body:has(
   margin-inline-start: auto;
 }
 .volunteer-profile-section-heading svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1em;
+  height: 1em;
 }
 [data-profile-fields] > [data-profile-actions] {
   margin-top: 1.5rem;
@@ -2069,8 +2069,7 @@ body:has(
   align-items: start;
   gap: 1.125rem;
 }
-[data-event-list],
-[data-series-event-list] {
+[data-event-list] {
   grid-template-columns: minmax(0, 1fr);
 }
 .volunteer-event-card {
@@ -2087,13 +2086,6 @@ body:has(
   margin-top: 1.25rem;
   border-top: 1px solid #3f3f46;
   padding-top: 1rem;
-}
-.volunteer-series-occurrences > summary {
-  cursor: pointer;
-  color: #d4d4d8;
-}
-.volunteer-series-occurrences > .volunteer-event-list {
-  margin-top: 1rem;
 }
 .volunteer-event-card p {
   @apply text-base;
@@ -2445,9 +2437,6 @@ body:has(
   .volunteer-panel,
   .volunteer-event-card {
     padding: 1.25rem;
-  }
-  .volunteer-series-card {
-    padding: 0.75rem;
   }
   .volunteer-fields {
     grid-template-columns: 1fr;

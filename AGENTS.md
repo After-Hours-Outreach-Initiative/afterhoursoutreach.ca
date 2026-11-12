@@ -57,6 +57,9 @@ weight.
 
 Use icon components for arrows in UI, never Unicode or text arrow glyphs.
 
+Never draw or write custom icons, including from memory. Copy each icon's SVG
+from an icon library, preferably Lucide, using the library's exact current paths.
+
 ## Documentation
 
 For any work under docs/, read and follow docs/AGENTS.md.

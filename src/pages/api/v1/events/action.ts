@@ -24,13 +24,14 @@ import {
   savePatrolSeries,
   updatePatrolSeriesFrom,
   stopPatrolSeries,
-  materializePatrolOccurrence,
+  restorePatrolOccurrence,
 } from "@/server/db/events";
 import { actionEmailResult } from "@/server/events/notifications";
 import { orientationCapacityMessage } from "@/server/db/policy";
 
 const id = z.string().min(1).max(200);
 const reason = z.string().trim().max(1000).default("");
+const seriesScope = z.enum(["future", "all"]).default("future");
 const inputSchema = z.discriminatedUnion("action", [
   bulkEventSchema.extend({
     action: z.literal("bulk-save"),
@@ -53,6 +54,7 @@ const inputSchema = z.discriminatedUnion("action", [
     action: z.literal("update-series-from"),
     id,
     occurrenceDate: z.iso.date(),
+    scope: seriesScope,
     version: z.number().int().nonnegative(),
     template: patrolTemplateRequestSchema,
     notify: z.boolean().default(false),
@@ -61,14 +63,15 @@ const inputSchema = z.discriminatedUnion("action", [
     action: z.literal("stop-series"),
     id,
     occurrenceDate: z.iso.date(),
+    scope: seriesScope,
     version: z.number().int().nonnegative(),
     reason,
     notify: z.boolean().default(false),
   }),
   z.strictObject({
-    action: z.literal("materialize-occurrence"),
+    action: z.literal("restore-occurrence"),
     id,
-    occurrenceDate: z.iso.date(),
+    version: z.number().int().nonnegative(),
   }),
   z.strictObject({
     action: z.literal("save"),
@@ -186,6 +189,7 @@ export const POST: APIRoute = async ({ request }) => {
           input.template,
           input.version,
           input.notify,
+          input.scope,
         );
         break;
       case "stop-series":
@@ -197,18 +201,16 @@ export const POST: APIRoute = async ({ request }) => {
           input.version,
           input.reason,
           input.notify,
+          input.scope,
         );
         break;
-      case "materialize-occurrence":
-        result = {
-          ...(await materializePatrolOccurrence(
-            env.DB,
-            actor,
-            input.id,
-            input.occurrenceDate,
-          )),
-          message: "Occurrence ready to manage. Find it in the event list.",
-        };
+      case "restore-occurrence":
+        result = await restorePatrolOccurrence(
+          env.DB,
+          actor,
+          input.id,
+          input.version,
+        );
         break;
       case "save":
         result = await saveEvent(
