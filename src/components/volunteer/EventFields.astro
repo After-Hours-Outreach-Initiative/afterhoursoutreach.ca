@@ -37,19 +37,19 @@ const publicVisibility = settings
         <input
           type="radio"
           name="includesOrientation"
-          value="false"
-          checked={!settings?.includesOrientation}
+          value="true"
+          checked={settings ? Boolean(settings.includesOrientation) : true}
         />
-        <span>Patrol</span>
+        <span>Orientation + Patrol</span>
       </label>
       <label class="volunteer-check">
         <input
           type="radio"
           name="includesOrientation"
-          value="true"
-          checked={Boolean(settings?.includesOrientation)}
+          value="false"
+          checked={settings ? !settings.includesOrientation : false}
         />
-        <span>Orientation + Patrol</span>
+        <span>Patrol</span>
       </label>
     </div>
   </fieldset>

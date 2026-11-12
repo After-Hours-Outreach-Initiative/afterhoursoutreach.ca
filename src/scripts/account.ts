@@ -466,4 +466,12 @@ form("[data-delete-account]", async (element, values) => {
   location.replace(result.next ?? "/volunteer/sign-in?deleted");
 });
 
+form("[data-account-notifications]", async (element, values) => {
+  const result = await post("/api/v1/account/notifications", {
+    userId: element.dataset.userId,
+    applicationReviewEmails: values.has("applicationReviewEmails"),
+  });
+  message(element, result.message ?? "Email notifications saved.", "success");
+});
+
 export {};

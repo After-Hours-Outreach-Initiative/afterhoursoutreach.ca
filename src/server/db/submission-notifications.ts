@@ -9,12 +9,6 @@ import { emailPolicy } from "./policy";
 import { hashAuthValue } from "./rate-limits";
 import { personDisplayNameSql } from "./sql";
 
-export const submissionNotificationRecipients = [
-  "ivan.zheng@afterhoursoutreach.ca",
-  "info@afterhoursoutreach.ca",
-  "molina.dewilde@afterhoursoutreach.ca",
-] as const;
-
 // Resend retains keys for 24 hours. Keep a full hour of safety margin, and
 // NEVER mint a replacement key after ambiguous acceptance or expiration.
 // https://resend.com/docs/dashboard/emails/idempotency-keys
@@ -46,40 +40,39 @@ export function submissionNotificationStatements(
     })},char(13),' '),char(10),' ')`,
     reviewUrl: "?",
   };
-  return ({ userId, operationId, writeGuard }) =>
-    submissionNotificationRecipients.map((recipient) =>
-      bindings.DB.prepare(
-        `INSERT INTO application_submission_notification
-          (id,operation_id,user_id,recipient,mode,payload,status,next_attempt_at,created_at)
-        SELECT ?,?,user_id,?,?,
-          CASE WHEN ?='preview' THEN NULL ELSE json_object(
-            'from',?,
-            'to',json_array(?),
-            'subject',${emailTextSql(applicationSubmittedTemplate.subject, values)},
-            'text',${emailTextSql(applicationSubmittedTemplate.text, values)},
-            'html',${emailHtmlSql(applicationSubmittedTemplate.html, values)}
-          ) END,?,naloxone_completed_at,naloxone_completed_at
-        FROM profile WHERE user_id=? AND submitted_application IS NOT NULL
-          AND naloxone_completed_at IS NOT NULL AND ${writeGuard}
-          AND EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id=profile.user_id
-            AND v.registration_approved=0 AND v.application_rejection_reason IS NULL)
-        ON CONFLICT(user_id,recipient) DO NOTHING`,
-      ).bind(
-        crypto.randomUUID(),
-        operationId,
-        recipient,
-        mode,
-        mode,
-        emailSenders.notifications,
-        recipient,
-        // Not a capability URL; the existing route enforces organizer access.
-        `https://afterhoursoutreach.ca/applications/${encodeURIComponent(userId)}`,
-        `https://afterhoursoutreach.ca/applications/${encodeURIComponent(userId)}`,
-        mode === "preview" ? "suppressed" : "pending",
-        userId,
-        operationId,
-      ),
-    );
+  return ({ userId, operationId, writeGuard }) => [
+    bindings.DB.prepare(
+      `INSERT INTO application_submission_notification
+        (id,operation_id,user_id,recipient,mode,payload,status,next_attempt_at,created_at)
+      SELECT lower(hex(randomblob(16))),?,p.user_id,u.email,?,
+        CASE WHEN ?='preview' THEN NULL ELSE json_object(
+          'from',?, 'to',json_array(u.email),
+          'subject',${emailTextSql(applicationSubmittedTemplate.subject, values)},
+          'text',${emailTextSql(applicationSubmittedTemplate.text, values)},
+          'html',${emailHtmlSql(applicationSubmittedTemplate.html, values)}
+        ) END,?,p.naloxone_completed_at,p.naloxone_completed_at
+      FROM profile p CROSS JOIN user u
+        JOIN volunteer_status organizer_status ON organizer_status.user_id=u.id
+      WHERE p.user_id=? AND p.submitted_application IS NOT NULL
+        AND p.naloxone_completed_at IS NOT NULL AND ${writeGuard}
+        AND u.role='organizer' AND u.email_verified=1 AND u.deleted_at IS NULL
+        AND u.application_review_emails=1 AND organizer_status.active=1
+        AND lower(u.email) != 'info@afterhoursoutreach.ca'
+        AND EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id=p.user_id
+          AND v.registration_approved=0 AND v.application_rejection_reason IS NULL)
+      ON CONFLICT(user_id,recipient) DO NOTHING`,
+    ).bind(
+      operationId,
+      mode,
+      mode,
+      emailSenders.notifications,
+      `https://afterhoursoutreach.ca/applications/${encodeURIComponent(userId)}`,
+      `https://afterhoursoutreach.ca/applications/${encodeURIComponent(userId)}`,
+      mode === "preview" ? "suppressed" : "pending",
+      userId,
+      operationId,
+    ),
+  ];
 }
 
 export interface SubmissionNotification {
@@ -88,6 +81,13 @@ export interface SubmissionNotification {
   attempts: number;
   first_attempt_at: number | null;
 }
+
+const subscribedRecipientGuard = `EXISTS (SELECT 1 FROM user u
+  JOIN volunteer_status v ON v.user_id=u.id
+  WHERE u.email=application_submission_notification.recipient
+    AND u.role='organizer' AND u.email_verified=1 AND u.deleted_at IS NULL
+    AND u.application_review_emails=1 AND v.active=1
+    AND lower(u.email) != 'info@afterhoursoutreach.ca')`;
 
 // Provenance distinguishes review intents from the old initial-form outbox,
 // including legacy applicants already ready for review. Never sweep/backfill
@@ -112,7 +112,7 @@ export async function pendingSubmissionNotifications(
     .prepare(
       `UPDATE application_submission_notification
       SET status='suppressed',lease_until=NULL,lease_token=NULL
-      WHERE mode=? AND status IN ('pending','sending') AND NOT (${reviewIntentGuard})`,
+      WHERE mode=? AND status IN ('pending','sending') AND (NOT (${reviewIntentGuard}) OR NOT (${subscribedRecipientGuard}))`,
     )
     .bind(mode)
     .run();
@@ -130,7 +130,7 @@ export async function pendingSubmissionNotifications(
     WHERE mode=? AND status IN ('pending','sending') AND next_attempt_at <= ?
       AND (lease_until IS NULL OR lease_until <= ?)
       AND (first_attempt_at IS NULL OR first_attempt_at > ?)
-      AND ${reviewIntentGuard}
+      AND ${reviewIntentGuard} AND ${subscribedRecipientGuard}
       ${operationId ? "AND operation_id=?" : ""}
     ORDER BY next_attempt_at,created_at,id LIMIT ?`,
     )
@@ -161,7 +161,7 @@ export function claimSubmissionNotification(
     WHERE id=? AND mode=? AND status IN ('pending','sending')
       AND next_attempt_at <= ? AND (lease_until IS NULL OR lease_until <= ?)
       AND (first_attempt_at IS NULL OR first_attempt_at > ?)
-      AND ${reviewIntentGuard}
+      AND ${reviewIntentGuard} AND ${subscribedRecipientGuard}
     RETURNING id,payload,attempts,first_attempt_at`,
     )
     .bind(
@@ -201,7 +201,7 @@ export async function beginSubmissionNotificationAttempt(
         WHERE id=? AND status='sending' AND mode='production' AND lease_token=?
           AND lease_until > ? AND budget_window IS NOT ?
           AND (first_attempt_at IS NULL OR first_attempt_at > ?)
-          AND ${reviewIntentGuard})
+          AND ${reviewIntentGuard} AND ${subscribedRecipientGuard})
       ON CONFLICT(key) DO UPDATE SET count=count+1 WHERE count < ?`,
       )
       .bind(
@@ -227,7 +227,7 @@ export async function beginSubmissionNotificationAttempt(
       WHERE id=? AND lease_token=? AND status='sending' AND mode='production'
         AND lease_until > ? AND budget_window=?
         AND (first_attempt_at IS NULL OR first_attempt_at > ?)
-        AND ${reviewIntentGuard}
+        AND ${reviewIntentGuard} AND ${subscribedRecipientGuard}
       RETURNING id,payload,attempts,first_attempt_at`,
       )
       .bind(now, id, token, now, start, now - submissionRetryWindowMs),

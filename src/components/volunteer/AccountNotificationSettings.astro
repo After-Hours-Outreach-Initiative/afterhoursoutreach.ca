@@ -1,0 +1,47 @@
+---
+import { env } from "cloudflare:workers";
+interface Props {
+  userId: string;
+}
+const { userId } = Astro.props;
+const enabled = await env.DB.prepare(
+  "SELECT application_review_emails FROM user WHERE id=?",
+)
+  .bind(userId)
+  .first<number>("application_review_emails");
+---
+
+<div class="volunteer-setting">
+  <div class="w-full">
+    <h3 id="account-notifications-heading" data-contents-section>
+      Email notifications
+    </h3>
+    <form
+      data-account-notifications
+      data-user-id={userId}
+      action="/api/v1/account/notifications"
+      method="post"
+      class="mt-6"
+    >
+      <label class="volunteer-check">
+        <input
+          type="checkbox"
+          name="applicationReviewEmails"
+          checked={Boolean(enabled)}
+        />
+        <span>Email me when a volunteer application is ready to review</span>
+      </label>
+      <p class="volunteer-help">
+        Notifications are sent to your account email address.
+      </p>
+      <button
+        class="btn btn-outline mt-4"
+        type="submit"
+        data-loading-label="Saving…"
+      >
+        Save notifications
+      </button>
+      <p data-form-message role="status" hidden />
+    </form>
+  </div>
+</div>

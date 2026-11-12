@@ -86,8 +86,8 @@ import { maxUnregisterMinutes } from "@/data/event-unregistration";
             <div class="volunteer-radio-group">
               {(
                 [
-                  ["false", "Patrol"],
                   ["true", "Orientation + Patrol"],
+                  ["false", "Patrol"],
                 ] as const
               ).map(([value, text]) => (
                 <label class="volunteer-check">

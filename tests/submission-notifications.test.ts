@@ -21,7 +21,6 @@ import {
   claimSubmissionNotification,
   finishSubmissionNotification,
   submissionNotificationMode,
-  submissionNotificationRecipients,
   submissionNotificationStatements,
   submissionRetryWindowMs,
 } from "../src/server/db/submission-notifications";
@@ -60,6 +59,11 @@ const harness = createTestHarness({
 });
 let db: Env["DB"];
 let actor: Actor;
+const submissionNotificationRecipients = [
+  "reviewer1@example.org",
+  "reviewer2@example.org",
+  "reviewer3@example.org",
+];
 const secret = "submission-notifications-test-secret-12345678901234567890";
 const bindings = (APP_ENV = "production"): AuthBindings => ({
   DB: db,
@@ -214,6 +218,20 @@ beforeEach(async () => {
       )
       .bind(Date.now() + 86_400_000),
   ]);
+  for (const [index, email] of submissionNotificationRecipients.entries()) {
+    await db
+      .prepare(
+        "INSERT INTO user (id,name,email,email_verified,role,application_review_emails,created_at,updated_at) VALUES (?,?,?,1,'organizer',1,0,0)",
+      )
+      .bind(`reviewer-${index}`, "Reviewer", email)
+      .run();
+    await db
+      .prepare(
+        "INSERT INTO volunteer_status (user_id,active,updated_at) VALUES (?,1,0)",
+      )
+      .bind(`reviewer-${index}`)
+      .run();
+  }
   actor = {
     id: "applicant",
     name: "Original account name",
@@ -230,7 +248,7 @@ beforeEach(async () => {
   };
 });
 
-test("form submission is silent; only the winning review transition records three private fixed-mailbox intents", async () => {
+test("form submission is silent; only the winning review transition records private intents for subscribed organizer accounts", async () => {
   const network = vi.spyOn(globalThis, "fetch");
   await saveApplicationDraft(db, actor, {
     userId: actor.id,
@@ -259,7 +277,7 @@ test("form submission is silent; only the winning review transition records thre
     pending.map((row) => row.recipient).sort(),
     [...submissionNotificationRecipients].sort(),
   );
-  assert.equal(await count("user"), 1); // No organizer mailbox has a site account.
+  assert.equal(await count("user"), 4);
   for (const row of pending) {
     assert.equal(row.operation_id, winner.reviewOperationId);
     assert.equal(row.mode, "production");
@@ -321,7 +339,7 @@ test("notification write failure rolls back course confirmation and its audit, l
   await db
     .prepare(
       `CREATE TRIGGER fail_second_recipient BEFORE INSERT ON application_submission_notification
-    WHEN NEW.recipient='info@afterhoursoutreach.ca' BEGIN SELECT RAISE(ABORT,'test outbox failure'); END`,
+    WHEN NEW.recipient='reviewer2@example.org' BEGIN SELECT RAISE(ABORT,'test outbox failure'); END`,
     )
     .run();
   await assert.rejects(confirm(), /test outbox failure/);
@@ -369,7 +387,9 @@ test("guard losers, invalid consent, discarded drafts, and stale sessions cannot
 test("frozen metadata comes from the stored submission, not mutable account/profile values at review time", async () => {
   await submitForm({ ...answers, preferredName: "" });
   await db
-    .prepare("UPDATE user SET name='Changed',email='changed@example.org'")
+    .prepare(
+      "UPDATE user SET name='Changed',email='changed@example.org' WHERE id='applicant'",
+    )
     .run();
   await db.prepare("UPDATE profile SET preferred_name='Changed'").run();
   await confirm();
@@ -938,4 +958,48 @@ test("catch-safe automatic jobs log aggregate categories only and cannot undo a 
   assert.equal(saved.firstSubmitted, true);
   assert.ok(await loadSubmittedApplication(db, actor.id));
   assert.equal(await count("application_submission_notification"), 3);
+});
+
+test("review mail only targets verified active organizers who opted in, excluding the info inbox", async () => {
+  await db
+    .prepare(
+      "UPDATE user SET application_review_emails=0 WHERE id='reviewer-0'",
+    )
+    .run();
+  await db
+    .prepare("UPDATE user SET email_verified=0 WHERE id='reviewer-1'")
+    .run();
+  await db
+    .prepare("UPDATE volunteer_status SET active=0 WHERE user_id='reviewer-2'")
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO user (id,name,email,email_verified,role,application_review_emails,created_at,updated_at) VALUES ('info','Inbox','info@afterhoursoutreach.ca',1,'organizer',1,0,0)",
+    )
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO volunteer_status (user_id,active,updated_at) VALUES ('info',1,0)",
+    )
+    .run();
+  await submit();
+  assert.equal(await count("application_submission_notification"), 0);
+});
+
+test("opting out suppresses queued review mail before delivery", async () => {
+  await submit();
+  await db
+    .prepare(
+      "UPDATE user SET application_review_emails=0 WHERE id='reviewer-0'",
+    )
+    .run();
+  const provider = vi.fn(accepted);
+  await deliverSubmissionNotifications(bindings(), {}, provider);
+  assert.equal(provider.mock.calls.length, 2);
+  assert.equal(
+    (await rows()).find(
+      (row) => row.recipient === submissionNotificationRecipients[0],
+    )?.status,
+    "suppressed",
+  );
 });

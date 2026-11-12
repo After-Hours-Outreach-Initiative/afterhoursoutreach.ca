@@ -2,6 +2,7 @@
 import { env } from "cloudflare:workers";
 import AccountLayout from "@/components/volunteer/AccountLayout.astro";
 import AccountProfileForm from "@/components/volunteer/AccountProfileForm.astro";
+import AccountNotificationSettings from "@/components/volunteer/AccountNotificationSettings.astro";
 import AccountEmailSettings from "@/components/volunteer/AccountEmailSettings.astro";
 import AccountDeleteSettings from "@/components/volunteer/AccountDeleteSettings.astro";
 // Discord connection is temporarily disabled; keep the integration for later.
@@ -106,6 +107,15 @@ const contents = [
       ]
     : []),
   { id: "account-settings-heading", heading: "Account settings" },
+  ...(organizer
+    ? [
+        {
+          id: "account-notifications-heading",
+          heading: "Email notifications",
+          nested: true,
+        },
+      ]
+    : []),
   { id: "account-email-heading", heading: "Email address", nested: true },
   // { id: "account-discord-heading", heading: "Discord", nested: true },
   {
@@ -240,6 +250,7 @@ const contents = [
         <h2 id="account-settings-heading" data-contents-section>
           Account settings
         </h2>
+        {organizer && <AccountNotificationSettings {userId} />}
         <AccountEmailSettings email={email} needsSignIn={emailNeedsSignIn} />
         {/* Discord connection is temporarily disabled.
         <div class="volunteer-setting">

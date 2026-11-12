@@ -125,6 +125,16 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
     );
     await ok(
       await send(
+        "/api/v1/account/notifications",
+        {
+          userId: organizer.id,
+          applicationReviewEmails: true,
+        },
+        organizer.cookie,
+      ),
+    );
+    await ok(
+      await send(
         "/api/v1/account/naloxone",
         { userId: applicant.id, completed: true },
         applicant.cookie,
@@ -136,7 +146,7 @@ test("built Preview walkthrough: submission suppression, conflicts, approval que
           "SELECT mode,status,payload FROM application_submission_notification",
         ).all()
       ).results,
-      Array.from({ length: 3 }, () => ({
+      Array.from({ length: 1 }, () => ({
         mode: "preview",
         status: "suppressed",
         payload: null,

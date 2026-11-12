@@ -25,6 +25,9 @@ export const user = sqliteTable(
     role: text({ enum: ["volunteer", "organizer"] })
       .notNull()
       .default("volunteer"),
+    application_review_emails: integer({ mode: "boolean" })
+      .notNull()
+      .default(false),
     two_factor_enabled: integer({ mode: "boolean" }).notNull().default(false),
     created_at: timestamp().notNull(),
     updated_at: timestamp().notNull(),
@@ -733,8 +736,8 @@ export const medicCertificationNotification = sqliteTable(
   ],
 );
 
-// One immutable request per applicant entering review and fixed organizer mailbox. No
-// recipient account is required; only name/time/review metadata is copied.
+// One immutable request per applicant entering review and subscribed organizer.
+// Only name/time/review metadata is copied.
 export const applicationSubmissionNotification = sqliteTable(
   "application_submission_notification",
   {
@@ -773,10 +776,6 @@ export const applicationSubmissionNotification = sqliteTable(
       table.next_attempt_at,
     ),
     index("application_submission_operation").on(table.operation_id),
-    check(
-      "application_submission_recipient_fixed",
-      sql`${table.recipient} IN ('ivan.zheng@afterhoursoutreach.ca','info@afterhoursoutreach.ca','molina.dewilde@afterhoursoutreach.ca')`,
-    ),
     check(
       "application_submission_mode",
       sql`${table.mode} IN ('production','local','preview')`,
