@@ -1421,6 +1421,26 @@ body:has(
 .volunteer-check > input {
   margin-top: calc(0.5lh - var(--volunteer-check-size) / 2);
 }
+/* Disabled options read as unavailable, not just as unselected. */
+.volunteer-check:has(> input:disabled) {
+  color: #71717a;
+  cursor: not-allowed;
+}
+.volunteer-check > input:disabled {
+  opacity: 0.4;
+}
+/* Ruled out for a reason, which the note under it gives. A whole form
+   disabled while it saves keeps its labels readable. */
+.volunteer-check[data-unavailable] > span {
+  text-decoration: line-through;
+}
+.volunteer-radio-group .volunteer-check-note {
+  margin: 0.25rem 0 0
+    calc(var(--volunteer-check-size) + var(--volunteer-check-gap));
+  color: #a1a1aa;
+  @apply text-sm;
+  line-height: 1.5;
+}
 .volunteer-code-of-conduct ul {
   display: grid;
   gap: 1rem;

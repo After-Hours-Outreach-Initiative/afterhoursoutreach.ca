@@ -1,7 +1,11 @@
 ---
 import type { EventRow, PatrolSeriesRow } from "@/server/db/events";
 import { vancouverInput } from "@/data/event-time";
-import { defaultEventLimits, minimumEventSpots } from "@/data/event-limits";
+import {
+  defaultEventLimits,
+  minimumEventSpots,
+  orientationNeededMessage,
+} from "@/data/event-limits";
 import {
   defaultUnregisterMinutes,
   maxUnregisterMinutes,
@@ -24,6 +28,10 @@ const settings = event;
 // Repeat settings for an existing date come from its series.
 const recurring = Boolean(event?.seriesId && series);
 const limits = { ...defaultEventLimits, ...settings };
+// New volunteers already booked need the orientation, so it cannot be dropped.
+const orientationNeeded = Boolean(
+  event?.includesOrientation && event.newVolunteerConfirmed > 0,
+);
 const publicVisibility = settings
   ? Boolean(settings.open && !settings.hidden)
   : true;
@@ -42,15 +50,29 @@ const publicVisibility = settings
         />
         <span>Orientation + Patrol</span>
       </label>
-      <label class="volunteer-check">
-        <input
-          type="radio"
-          name="includesOrientation"
-          value="false"
-          checked={settings ? !settings.includesOrientation : false}
-        />
-        <span>Patrol</span>
-      </label>
+      <div>
+        <label
+          class="volunteer-check"
+          data-unavailable={orientationNeeded ? "" : undefined}
+        >
+          <input
+            type="radio"
+            name="includesOrientation"
+            value="false"
+            checked={settings ? !settings.includesOrientation : false}
+            disabled={orientationNeeded}
+            aria-describedby={orientationNeeded
+              ? `${id}-orientation-needed`
+              : undefined}
+          />
+          <span>Patrol</span>
+        </label>
+        {orientationNeeded && (
+          <p class="volunteer-check-note" id={`${id}-orientation-needed`}>
+            {orientationNeededMessage}
+          </p>
+        )}
+      </div>
     </div>
   </fieldset>
   <div class="volunteer-event-start volunteer-wide">

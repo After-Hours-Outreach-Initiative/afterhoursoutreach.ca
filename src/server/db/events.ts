@@ -1,3 +1,4 @@
+import { assertOrientationKept } from "./orientation-check";
 import { z } from "zod";
 import {
   eventCancelledEmail,
@@ -633,7 +634,7 @@ export async function saveEvent(
       parsed.error.issues.find(
         (issue) => issue.message === orientationCapacityMessage,
       )?.message ??
-        "Check the orientation setting, date, capacity (1–100), volunteer limits (0–100), meeting point, and HTTPS map link.",
+        "Check the event type, date, capacity (1–100), volunteer limits (0–100), meeting point, and HTTPS map link.",
     );
   const data = parsed.data;
   const startsAt = new Date(data.startsAt).getTime();
@@ -700,6 +701,8 @@ export async function saveEvent(
         return old[key as keyof EventRow] !== expected;
       });
       if (!fields.length) return { operation, message: "No event changes." };
+      if (old.includesOrientation && !data.includesOrientation)
+        await assertOrientationKept(db, [old.id]);
       const results = await db.batch([
         db
           .prepare(
@@ -796,6 +799,12 @@ export async function bulkSaveEvents(
       .all<EventRow>()
   ).results;
   const oldById = new Map(oldRows.map((row) => [row.id, row]));
+  // Dropping the orientation from selected events that need it.
+  if (changes.includesOrientation === false)
+    await assertOrientationKept(
+      db,
+      oldRows.filter((row) => row.includesOrientation).map((row) => row.id),
+    );
   const operation = crypto.randomUUID();
   const now = Date.now();
   let changedCount = 0;

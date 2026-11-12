@@ -1,3 +1,4 @@
+import { assertOrientationKept } from "./orientation-check";
 import { z } from "zod";
 import {
   patrolSeriesChangedEmail,
@@ -815,7 +816,8 @@ export async function updatePatrolSeriesFrom(
     await db
       .prepare(
         `SELECT id, occurrence_date AS date, starts_at AS startsAt,
-        ${includesOrientationSql()} AS includesOrientation FROM event e
+        ${includesOrientationSql()} AS includesOrientation,
+        ${separateEditSql()} AS edited FROM event e
     WHERE series_id = ? AND occurrence_date >= ? AND cancelled_at IS NULL AND starts_at > ${nowMsSql}`,
       )
       .bind(id, date)
@@ -824,6 +826,7 @@ export async function updatePatrolSeriesFrom(
         date: string;
         startsAt: number;
         includesOrientation: number;
+        edited: number;
       }>()
   ).results;
   // Dates that already ran off the old cadence are kept, as before.
@@ -856,6 +859,20 @@ export async function updatePatrolSeriesFrom(
       onCadence(series, nextTemplates, row.date) &&
       templateStart(row.date, data) > now,
   );
+  // Dropping the orientation from dates that keep it and have new
+  // volunteers booked. "This and following" leaves separately edited dates.
+  if (!data.includesOrientation)
+    await assertOrientationKept(
+      db,
+      rows
+        .filter(
+          (row) =>
+            row.includesOrientation &&
+            !dropped.some((drop) => drop.id === row.id) &&
+            (scope === "all" || !row.edited),
+        )
+        .map((row) => row.id),
+    );
   const updates = [
     ...rows.filter((row) => !dropped.some((drop) => drop.id === row.id)),
     ...returning,

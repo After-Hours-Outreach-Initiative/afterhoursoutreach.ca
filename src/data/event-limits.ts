@@ -22,3 +22,7 @@ export function minimumEventSpots(
         : 0),
   );
 }
+
+/** Why an Orientation + Patrol with new volunteers cannot become a patrol. */
+export const orientationNeededMessage =
+  "New volunteers are registered and need the orientation. Move or remove them before making this a patrol.";
