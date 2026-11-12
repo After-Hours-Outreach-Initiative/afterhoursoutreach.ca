@@ -1,0 +1,151 @@
+---
+import LocalLayout from "./LocalLayout.astro";
+import PlaygroundHeader from "./PlaygroundHeader.astro";
+import { timerScenarios, timerSections } from "./pending-timer-fixtures";
+import "../../styles/volunteer.css";
+import "../../styles/pending-actions.css";
+import "./playground.css";
+
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+---
+
+<LocalLayout title="Change timers">
+  <main class="ui-playground" data-ui-timer-playground>
+    <PlaygroundHeader active="pending-timers" />
+    <section class="ui-section" aria-labelledby="timers-heading">
+      <div class="ui-section-heading">
+        <div>
+          <h2 id="timers-heading">Change timers</h2>
+          <p>
+            Changes that email people wait five minutes so they can be undone.
+            Their author sees a toast on every page; everyone sees a banner on
+            the changed item. These are the real toasts and banners with
+            fictional changes; the timers run live and the buttons only change
+            these previews.
+          </p>
+        </div>
+      </div>
+      <div class="ui-controls">
+        <label class="ui-field">
+          View as
+          <select data-ui-timer-view>
+            <option value="mine">The organizer who made it</option>
+            <option value="other">Another organizer</option>
+          </select>
+        </label>
+        <button type="button" class="btn btn-quiet" data-ui-timer-restart>
+          Restart timers
+        </button>
+      </div>
+      <nav class="ui-section-nav" aria-label="Timer sections">
+        {
+          timerSections.map((section) => (
+            <a href={`#timers-${section.id}`}>{section.title}</a>
+          ))
+        }
+      </nav>
+    </section>
+    {
+      timerSections.map((section) => (
+        <section
+          class="ui-section"
+          id={`timers-${section.id}`}
+          aria-labelledby={`timers-${section.id}-heading`}
+        >
+          <h2 id={`timers-${section.id}-heading`}>{section.title}</h2>
+          <p>{section.description}</p>
+          <div class="ui-gallery">
+            {timerScenarios
+              .filter((scenario) => scenario.section === section.id)
+              .map((scenario) => (
+                <section
+                  class:list={[
+                    "ui-gallery-card",
+                    scenario.compare && "ui-timer-wide",
+                  ]}
+                  aria-labelledby={`timer-${scenario.id}`}
+                >
+                  <div class="ui-gallery-description">
+                    <h3 id={`timer-${scenario.id}`}>{scenario.title}</h3>
+                    <p>{scenario.description}</p>
+                  </div>
+                  <div
+                    class="ui-timer-surface"
+                    data-ui-timer-scenario={scenario.id}
+                  />
+                </section>
+              ))}
+          </div>
+        </section>
+      ))
+    }
+  </main>
+</LocalLayout>
+
+<script>
+  import "./pending-timer-playground";
+</script>
+
+<style is:global>
+  .ui-timer-surface {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding: 1.25rem;
+    border-top: 1px solid #3f3f46;
+    background: #000;
+  }
+  .ui-timer-wide {
+    grid-column: 1 / -1;
+  }
+  .ui-timer-view {
+    display: grid;
+    flex: 1 1 22rem;
+    align-content: start;
+    gap: 1rem;
+    min-width: 0;
+  }
+  .ui-timer-column {
+    display: grid;
+    flex: 1 1 22rem;
+    align-content: start;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .ui-playground .ui-timer-note {
+    margin: 0;
+    color: #a1a1aa;
+  }
+  .ui-playground .ui-timer-label {
+    margin: 0;
+    color: #d4d4d8;
+  }
+  /* The page's fixed toast column, placed in the flow. */
+  .ui-timer-toasts .ui-timer-closed {
+    display: none;
+  }
+  .ui-timer-toasts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: min(28rem, 100%);
+  }
+  .ui-timer-narrow .ui-timer-toasts {
+    width: min(22.375rem, 100%);
+  }
+  .ui-timer-item {
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid #3f3f46;
+    border-radius: 0.75rem;
+    background: #0c0d10;
+  }
+  .ui-playground .ui-timer-item p {
+    margin: 0;
+  }
+  .ui-playground .ui-timer-item .ui-timer-item-heading {
+    color: white;
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+</style>

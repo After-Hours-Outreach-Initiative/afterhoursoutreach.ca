@@ -80,6 +80,14 @@ export default defineConfig({
             prerender: false,
           });
           injectRoute({
+            pattern: "/dev/ui/pending-timers",
+            entrypoint: new URL(
+              "./src/dev/ui/PendingTimersPlayground.astro",
+              import.meta.url,
+            ),
+            prerender: false,
+          });
+          injectRoute({
             pattern: "/dev/ui/organizer-profile",
             entrypoint: new URL(
               "./src/dev/ui/OrganizerProfilePlayground.astro",

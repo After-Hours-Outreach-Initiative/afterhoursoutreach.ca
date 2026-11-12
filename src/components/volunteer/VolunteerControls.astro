@@ -14,6 +14,7 @@ const { person } = Astro.props;
   <h2 id="volunteer-organizer-controls-heading" data-contents-section>
     Organizer controls
   </h2>
+  <div data-pending-slot="access application"></div>
   {
     Boolean(person.applicationApproved) && (
       <>

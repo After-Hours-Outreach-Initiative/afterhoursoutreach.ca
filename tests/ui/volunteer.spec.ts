@@ -1,3 +1,4 @@
+import { makeWaitingRequest } from "../helpers/pending-action";
 import { calendarMonthStart } from "../../src/data/event-calendar";
 import { expect, test } from "@playwright/test";
 import {
@@ -411,10 +412,19 @@ test("event calendar links visible cards, reaches later months, and survives liv
   await expect(link(laterDistant.id)).toHaveCount(0);
   await expect(link(distant.id)).toBeFocused();
   await expect(calendar).toHaveAttribute("data-calendar-start", start!);
-  const cancelled = await page.request.post("/api/v1/events/action", {
-    headers: { origin: baseURL! },
-    data: { action: "cancel-event", id: distant.id, version: await version() },
-  });
+  // Cancelling waits for undo; make it now.
+  const cancelled = await makeWaitingRequest(
+    page.request,
+    baseURL!,
+    await page.request.post("/api/v1/events/action", {
+      headers: { origin: baseURL! },
+      data: {
+        action: "cancel-event",
+        id: distant.id,
+        version: await version(),
+      },
+    }),
+  );
   expect(cancelled.status(), await cancelled.text()).toBe(200);
   await expect(card(distant.id)).toHaveCount(0, { timeout: 15_000 });
   await expect(link(distant.id)).toHaveCount(0);

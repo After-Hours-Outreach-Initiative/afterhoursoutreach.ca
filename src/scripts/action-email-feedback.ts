@@ -7,7 +7,7 @@ export interface EmailActionResult {
   expired?: number;
   unconfirmed?: number;
   /** Set when the change waits for its undo timer instead of being made. */
-  pendingAction?: import("./pending-actions").PendingAction;
+  pendingAction?: import("./pending-action-view").PendingAction;
 }
 
 export function actionEmailNeedsFeedback(result: EmailActionResult) {

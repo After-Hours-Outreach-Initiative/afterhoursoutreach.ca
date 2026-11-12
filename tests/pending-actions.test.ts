@@ -3,7 +3,11 @@ import { beforeEach, test, vi } from "vitest";
 import { env } from "cloudflare:workers";
 import type { AuthBindings } from "../src/server/auth";
 import type { Actor } from "../src/server/db/access";
-import { addManualSignup } from "../src/server/db/events";
+import {
+  addManualSignup,
+  ensurePatrolOccurrences,
+  savePatrolSeries,
+} from "../src/server/db/events";
 import { eventActionSchema } from "../src/server/events/actions";
 import { RequestError } from "../src/server/http";
 import {
@@ -123,10 +127,10 @@ test("a waiting capacity cut holds its limit until it runs, and locks the event"
   );
   assert.ok(pending);
   assert.equal(
-    pending.action.summary.startsWith("Changing the spots of the patrol on"),
+    pending.action.summary.startsWith("Changing the spots of the event on"),
     true,
   );
-  assert.equal(pending.action.verb, "Save");
+  assert.equal(pending.action.verb, "Change");
   // Changes without email never wait.
   assert.equal(
     await schedulePendingAction(
@@ -224,6 +228,111 @@ test("undo releases the hold and the lock, and cannot be repeated", async () => 
   assert.deepEqual(await listPendingActions(env.DB, actor), []);
 });
 
+test("cancelling or deleting an event waits even when it emails nobody", async () => {
+  const actor = await organizer();
+  await patrol(actor, "quiet", 4, 0);
+  // An edit that emails nobody is made at once.
+  assert.equal(
+    await schedulePendingAction(
+      bindings,
+      actor,
+      "events",
+      save("quiet", 5, false),
+    ),
+    null,
+  );
+  for (const input of [
+    { action: "cancel-event", reason: "" },
+    { action: "delete-event" },
+  ]) {
+    const action = input.action;
+    const pending = await schedulePendingAction(
+      bindings,
+      actor,
+      "events",
+      eventActionSchema.parse({
+        ...input,
+        id: "quiet",
+        version: 0,
+        notify: false,
+      }),
+    );
+    assert.ok(pending, action);
+    await undoPendingAction(env.DB, actor, pending.action.id);
+  }
+});
+
+test("dropping the orientation with new volunteers booked is refused before it waits", async () => {
+  const actor = await organizer();
+  // An account booking, so the edit would email someone and wait.
+  await patrol(actor, "oriented", 8, 1);
+  await env.DB.prepare(
+    "UPDATE event SET includes_orientation = 1 WHERE id = 'oriented'",
+  ).run();
+  await addManualSignup(env.DB, actor, "oriented", {
+    name: "New person",
+    medic: false,
+    newVolunteer: true,
+  });
+  const version = (await env.DB.prepare(
+    "SELECT updated_at AS v FROM event WHERE id = 'oriented'",
+  ).first<number>("v"))!;
+  const input = save("oriented", 8);
+  if (input.action === "save") input.version = version;
+  await assert.rejects(
+    schedulePendingAction(bindings, actor, "events", input),
+    (error: unknown) =>
+      error instanceof RequestError &&
+      error.status === 409 &&
+      error.message.startsWith("New volunteers are registered"),
+  );
+  assert.equal(await count("SELECT count(*) n FROM pending_action"), 0);
+  // Editing selected events the same way is refused just as early.
+  await assert.rejects(
+    schedulePendingAction(
+      bindings,
+      actor,
+      "events",
+      eventActionSchema.parse({
+        action: "bulk-save",
+        selection: [{ id: "oriented", version }],
+        changes: { includesOrientation: false },
+        notify: true,
+      }),
+    ),
+    (error: unknown) =>
+      error instanceof RequestError &&
+      error.status === 409 &&
+      error.message.startsWith("New volunteers are registered"),
+  );
+  assert.equal(await count("SELECT count(*) n FROM pending_action"), 0);
+});
+
+test("only the author can undo a waiting change or make it early", async () => {
+  const actor = await organizer();
+  const other = await organizer("pending-watcher");
+  await patrol(actor, "watched", 4, 1);
+  const pending = await schedulePendingAction(
+    bindings,
+    actor,
+    "events",
+    save("watched", 3),
+  );
+  assert.ok(pending);
+  const [listed] = await listPendingActions(env.DB, other);
+  assert.equal(listed.mine, false);
+  await assert.rejects(
+    undoPendingAction(env.DB, other, pending.action.id),
+    statusError(403),
+  );
+  await assert.rejects(
+    runPendingAction(bindings, pending.action.id, other),
+    statusError(403),
+  );
+  assert.equal(await count("SELECT spots n FROM event WHERE id='watched'"), 4);
+  await undoPendingAction(env.DB, actor, pending.action.id);
+});
+
 test("due actions run as their author, signed out or not, and fail visibly once they lose access", async () => {
   const actor = await organizer();
   const other = await organizer("pending-other");
@@ -276,7 +385,7 @@ test("due actions run as their author, signed out or not, and fail visibly once 
   assert.deepEqual(await listPendingActions(env.DB, actor), []);
 });
 
-test("the timer ends before the event starts, or is skipped when that is too soon", async () => {
+test("the timer ends before the event starts, is skipped when too soon, and cancelling always gets a minute", async () => {
   const actor = await organizer();
   const soon = Date.now() + 20 * 60_000;
   await patrol(actor, "soon", 4, 1);
@@ -305,10 +414,66 @@ test("the timer ends before the event starts, or is skipped when that is too soo
   );
   assert.ok(pending);
   assert.ok(Math.abs(pending.action.runAt - (soon - 15 * 60_000)) < 1_000);
+  // Too close for the usual wait: an edit is made at once, but cancelling
+  // still gets a minute to undo.
   assert.equal(
-    await schedulePendingAction(bindings, actor, "events", cancel("now")),
+    await schedulePendingAction(bindings, actor, "events", save("now", 5)),
     null,
   );
+  const close = await schedulePendingAction(
+    bindings,
+    actor,
+    "events",
+    cancel("now"),
+  );
+  assert.ok(close);
+  assert.ok(Math.abs(close.action.runAt - Date.now() - 60_000) < 1_000);
+});
+
+test("moving a series' last date before its upcoming dates waits even when it emails nobody", async () => {
+  const actor = await organizer();
+  const day = (offset: number) =>
+    new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  const series = {
+    firstDate: day(2),
+    localTime: "18:00",
+    intervalWeeks: 1,
+    endDate: null,
+    meetingPoint: "Point",
+    meetingPointUrl: "",
+    spots: 8,
+    open: true,
+    hidden: false,
+    includesOrientation: false,
+  };
+  const { id } = await savePatrolSeries(env.DB, actor, series);
+  await ensurePatrolOccurrences(env.DB, id);
+  const version = (await env.DB.prepare(
+    "SELECT updated_at AS v FROM patrol_series WHERE id = ?",
+  )
+    .bind(id)
+    .first<number>("v"))!;
+  const shorten = (endDate: string) =>
+    eventActionSchema.parse({
+      action: "save-series",
+      id,
+      version,
+      series: { ...series, endDate },
+      notify: false,
+    });
+  // An end date after every generated date drops nothing, so it is made at once.
+  assert.equal(
+    await schedulePendingAction(bindings, actor, "events", shorten(day(400))),
+    null,
+  );
+  const pending = await schedulePendingAction(
+    bindings,
+    actor,
+    "events",
+    shorten(day(3)),
+  );
+  assert.ok(pending);
+  await undoPendingAction(env.DB, actor, pending.action.id);
 });
 
 test("a refused change names the waiting change that blocks it", async () => {

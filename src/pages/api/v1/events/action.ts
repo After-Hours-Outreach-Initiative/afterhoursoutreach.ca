@@ -52,7 +52,7 @@ export const POST: APIRoute = async ({ request }) => {
     // first, so the organizer is offered that change instead of a stale
     // version error.
     await assertUnlocked(env.DB, "events", input);
-    // Actions that email wait so they can be undone.
+    // Actions that email, cancel or delete wait so they can be undone.
     const pending = await schedulePendingAction(
       bindings,
       actor,

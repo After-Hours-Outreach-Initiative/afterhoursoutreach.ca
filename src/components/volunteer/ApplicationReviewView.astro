@@ -68,6 +68,7 @@ const contents = [
           class="application-decision-actions"
           data-volunteer-controls
         >
+          <div data-pending-slot />
           <div class="organizer-application-review-actions">
             <AccessDecision {person} decision="revoke" />
           </div>
@@ -87,6 +88,9 @@ const contents = [
       <p class="mt-4 whitespace-pre-wrap" data-application-rejection>
         Reason: {person.applicationRejectionReason}
       </p>
+    )}
+    {!person.applicationApproved && (
+      <div data-pending-slot />
     )}
     {!person.applicationApproved && (
       <div

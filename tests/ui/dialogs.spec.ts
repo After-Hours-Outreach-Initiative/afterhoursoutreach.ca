@@ -1,3 +1,7 @@
+import {
+  makeWaitingChangeNow,
+  makeWaitingRequest,
+} from "../helpers/pending-action";
 import { expect, test, type Locator } from "@playwright/test";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 import { fillDateInput } from "../helpers/date-input";
@@ -91,10 +95,15 @@ test("event dialogs offer only cancellation for future events and keep ended his
     page.getByRole("button", { name: "Create", exact: true }),
   ).toBeVisible();
   const action = async (data: object) => {
-    const response = await page.request.post("/api/v1/events/action", {
-      headers: { origin: baseURL! },
-      data,
-    });
+    // Cancellations wait for undo; make them now.
+    const response = await makeWaitingRequest(
+      page.request,
+      baseURL!,
+      await page.request.post("/api/v1/events/action", {
+        headers: { origin: baseURL! },
+        data,
+      }),
+    );
     expect(response.status(), await response.text()).toBe(200);
     return await response.json();
   };
@@ -148,6 +157,8 @@ test("event dialogs offer only cancellation for future events and keep ended his
       await form
         .getByRole("button", { name: "Confirm cancellation", exact: true })
         .click();
+      // Cancelling waits for undo; make it now.
+      await makeWaitingChangeNow(page, "Cancel event");
       await expect(card).toHaveCount(0);
       continue;
     }
@@ -572,7 +583,10 @@ test("application dialogs keep their chrome visible while only their body scroll
         loadingLabel: "Creating…",
         pending: async () => {
           await expect(
-            create.getByRole("spinbutton", { name: "Volunteer spots" }),
+            create.getByRole("spinbutton", {
+              name: "Volunteer spots",
+              exact: true,
+            }),
           ).toBeDisabled();
           for (const name of [
             "Decrease volunteer spots",

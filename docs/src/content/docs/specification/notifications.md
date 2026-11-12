@@ -37,18 +37,21 @@ completion confirm on screen without sending email.
 
 ### Undo timer
 
-An organizer change that would email anyone waits five minutes before it is made,
-or until 15 minutes before the event it changes starts if that is sooner. Closer
-than that, it is made at once. It is made even if its organizer signs out, as long
-as they are still an active organizer. The organizer who made it sees a countdown
-toast on every page. Every organizer
-sees the countdown on the changed item, with the organizer's name when someone
-else made it. Any organizer can undo the change or make it now. Volunteers see no
-change while it waits, but sign-ups cannot take places that a waiting capacity
-change would remove. Other changes to the same item wait until it is made or
-undone; an edit refused for this shows the waiting change as a toast. Undoing an
-edit reopens its form as it was entered. A change that fails when its timer ends
-stays in its organizer's toasts with the reason.
+An organizer change that would email anyone, and any event cancellation or
+deletion, including a recurring event's earlier last date, waits five minutes
+before it is made, or until 15 minutes before the event it changes starts if that
+is sooner. Closer than that, an edit is made at once, while a cancellation or
+deletion still waits one minute. It is made even if its organizer signs out, as
+long as they are still an active organizer. The organizer who made it sees a
+corner chip with the countdown on every page, which opens to a toast for each
+change. Every organizer sees the countdown on the changed item, with the
+organizer's name when someone else made it; only the organizer who made it can
+undo it or make it now, from there. Volunteers see no change while it waits, but
+sign-ups cannot take places that a waiting capacity change would remove. Other
+changes to the same item wait until it is made or undone; an edit refused for
+this shows the waiting change as a toast. Undoing an edit reopens its form as it
+was entered. A change that fails when its timer ends stays in its organizer's
+toasts with the reason.
 
 ## Medic certification reminders
 

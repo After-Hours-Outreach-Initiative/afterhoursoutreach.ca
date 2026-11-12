@@ -25,8 +25,10 @@ import {
   type OrganizerActionInput,
 } from "./organizer-actions";
 import { formatEventDay } from "../data/event-time";
+import { compactPersonDisplayName } from "../data/person-name";
 
-/** How long an action that sends email waits before it is made. */
+/** How long an action that sends email, cancels or deletes waits before it
+ * is made. */
 export const undoDelayMs = 5 * 60_000;
 // A run that outlives its lease may or may not have committed.
 const leaseMs = 60_000;
@@ -38,6 +40,10 @@ const keepFinishedMs = 30 * 24 * 60 * 60_000;
 const beforeStartMs = 15 * 60_000;
 // A shorter wait than this is no chance to undo, so the change is made at once.
 const shortestWaitMs = 60_000;
+// Cancelling or deleting close to the start still waits this long, ending a
+// little before the start so the change can still be made.
+const removalWaitMs = 60_000;
+const beforeStartRemovalMs = 5_000;
 
 type Endpoint = "events" | "organizer";
 type Input = EventActionInput | OrganizerActionInput;
@@ -75,6 +81,7 @@ export interface PendingActionView {
   endpoint: Endpoint;
   summary: string;
   inlineSummary?: string;
+  area?: PendingArea;
   verb: string;
   runAt: number;
   createdAt: number;
@@ -167,17 +174,62 @@ async function hasRecipients(db: Env["DB"], event: EventActionInput) {
   }
 }
 
-async function wouldEmail(
+// Losing an event by accident is hard to put right, so these always wait.
+const destructiveEventActions: string[] = [
+  "cancel-event",
+  "delete-event",
+  "stop-series",
+  "delete-series",
+];
+
+/** Whether a series change moves its last date before dates that exist. */
+async function dropsSeriesDates(
+  db: Env["DB"],
+  event: EventActionInput,
+): Promise<boolean> {
+  const [seriesId, endDate, from] =
+    event.action === "save-series"
+      ? [event.id, event.series.endDate, undefined]
+      : event.action === "update-series-from"
+        ? [
+            event.id,
+            (event.template as { endDate?: string | null }).endDate,
+            event.occurrenceDate,
+          ]
+        : [];
+  if (!seriesId || !endDate) return false;
+  return db
+    .prepare(
+      `SELECT 1 FROM event WHERE series_id = ? AND occurrence_date > ?
+      AND occurrence_date >= ? AND cancelled_at IS NULL AND starts_at > ? LIMIT 1`,
+    )
+    .bind(seriesId, endDate, from ?? endDate, Date.now())
+    .first()
+    .then(Boolean);
+}
+
+/** Why a change waits for undo: it removes events, or it emails someone.
+ * Anything else is made at once. */
+async function waitReason(
   bindings: AuthBindings,
   endpoint: Endpoint,
   input: Input,
-) {
-  if (input.action === "retry-notifications") return false;
+): Promise<"removes" | "emails" | null> {
+  if (input.action === "retry-notifications") return null;
   if (endpoint === "events") {
     const event = input as EventActionInput;
-    if (!("notify" in event && event.notify)) return false;
-    return hasRecipients(bindings.DB, event);
+    if (
+      destructiveEventActions.includes(event.action) ||
+      (await dropsSeriesDates(bindings.DB, event))
+    )
+      return "removes";
+    if (!("notify" in event && event.notify)) return null;
+    return (await hasRecipients(bindings.DB, event)) ? "emails" : null;
   }
+  return (await organizerEmails(bindings, input)) ? "emails" : null;
+}
+
+async function organizerEmails(bindings: AuthBindings, input: Input) {
   const organizer = input as OrganizerActionInput;
   if (organizer.action === "reject-application") return true;
   if ("notify" in organizer && organizer.notify) return true;
@@ -216,12 +268,8 @@ const hasOrientation = (event: EventSummary) =>
   event.includesOrientation === null
     ? event.type === "orientation"
     : Boolean(event.includesOrientation);
-const eventKind = (event: EventSummary | undefined) =>
-  event?.type === "orientation" ? "orientation" : "patrol";
-const eventName = (event: EventSummary | undefined) =>
-  event
-    ? `the ${event.type === "orientation" ? "orientation" : "patrol"} on ${formatEventDay(event.startsAt)}`
-    : "the event";
+const eventDay = (event: EventSummary | undefined) =>
+  event ? `the event on ${formatEventDay(event.startsAt)}` : "the event";
 // Midday UTC is the same calendar date in Vancouver.
 const formatDate = (date: string) =>
   formatEventDay(Date.parse(`${date}T20:00:00Z`));
@@ -240,8 +288,8 @@ const fieldNames: Record<string, string> = {
   minNewVolunteerSpots: "new volunteer spots",
   maxNewVolunteers: "new volunteer limit",
   unregisterMinutes: "unregister deadline",
-  includesOrientation: "orientation setting",
-  type: "orientation setting",
+  includesOrientation: "event type",
+  type: "event type",
   open: "visibility",
   hidden: "visibility",
 };
@@ -321,7 +369,8 @@ async function personName(db: Env["DB"], userId: string) {
     )
     .bind(userId)
     .first<{ name: string | null }>();
-  return row?.name || "this volunteer";
+  // Long names shorten as they do in rosters and tables.
+  return row?.name ? compactPersonDisplayName(row.name) : "this volunteer";
 }
 
 function eventHold(
@@ -359,6 +408,10 @@ function requireCurrent(event: EventSummary | undefined, version: number) {
     );
 }
 
+/** Which controls on a person's page made a change, so its banner sits
+ * beside them. Event changes have none. */
+export type PendingArea = "application" | "patrol" | "access";
+
 /** What the timer shows, what it locks, and the limits it holds. */
 async function describe(
   db: Env["DB"],
@@ -369,11 +422,15 @@ async function describe(
   summary: string;
   /** Shorter wording shown on the item itself, which needs no name or date. */
   inline?: string;
+  /** The button's verb: the summary's first word, as "Update" for
+   * "Updating…", plus what it cancels for "Cancel". It reads "<verb> now". */
   verb: string;
   targets: Target[];
   holds: Hold[];
   /** When the soonest event it changes starts. */
   startsAt?: number;
+  /** Which controls on a person's page made it. */
+  area?: PendingArea;
 }> {
   const targets = lockedTargets(endpoint, input).map((target) => ({
     target,
@@ -414,6 +471,7 @@ async function describe(
     if (organizer.action === "reject-application")
       return {
         summary: `Rejecting ${name}'s application`,
+        area: "application",
         verb: "Reject",
         targets,
         holds,
@@ -421,6 +479,7 @@ async function describe(
     if (organizer.action === "approve-patrols")
       return {
         summary: `Approving ${name} for patrols`,
+        area: "patrol",
         verb: "Approve",
         targets,
         holds,
@@ -428,7 +487,8 @@ async function describe(
     if (organizer.action === "role")
       return {
         summary: `Making ${name} ${organizer.role === "organizer" ? "an organizer" : "a volunteer"}`,
-        verb: "Change",
+        area: "access",
+        verb: "Make",
         targets,
         holds,
       };
@@ -445,23 +505,27 @@ async function describe(
       }>();
     const applicationApproved =
       organizer.applicationApproved ?? organizer.registrationApproved;
-    const [summary, verb] =
+    const [summary, verb, area]: [string, string, PendingArea] =
       old && Boolean(old.active) !== organizer.active
         ? organizer.active
-          ? [`Reactivating ${name}`, "Reactivate"]
-          : [`Deactivating ${name}`, "Deactivate"]
+          ? [`Reactivating ${name}`, "Reactivate", "access"]
+          : [`Deactivating ${name}`, "Deactivate", "access"]
         : old &&
             applicationApproved !== undefined &&
             Boolean(old.applicationApproved) !== applicationApproved
           ? applicationApproved
-            ? [`Approving ${name}'s application`, "Approve"]
-            : [`Revoking ${name}'s application approval`, "Revoke"]
+            ? [`Approving ${name}'s application`, "Approve", "application"]
+            : [
+                `Revoking ${name}'s application approval`,
+                "Revoke",
+                "application",
+              ]
           : old && Boolean(old.patrolApproved) !== organizer.patrolApproved
             ? organizer.patrolApproved
-              ? [`Approving ${name} for patrols`, "Approve"]
-              : [`Revoking ${name}'s patrol approval`, "Revoke"]
-            : [`Updating ${name}'s access`, "Save"];
-    return { summary, verb, targets, holds };
+              ? [`Approving ${name} for patrols`, "Approve", "patrol"]
+              : [`Revoking ${name}'s patrol approval`, "Revoke", "patrol"]
+            : [`Updating ${name}'s access`, "Update", "access"];
+    return { summary, verb, area, targets, holds };
   }
   const event = input as EventActionInput;
   switch (event.action) {
@@ -472,10 +536,10 @@ async function describe(
       const fields = old && savedFields(old, event.event);
       return {
         summary: fields
-          ? `Changing the ${fields} of ${eventName(old)}`
-          : `Saving changes to ${eventName(old)}`,
-        inline: fields ? `Changing the ${fields}` : "Saving changes",
-        verb: "Save",
+          ? `Changing the ${fields} of ${eventDay(old)}`
+          : `Updating ${eventDay(old)}`,
+        inline: fields ? `Changing the ${fields}` : "Updating this event",
+        verb: fields ? "Change" : "Update",
         targets,
         holds,
         startsAt: earliest([old?.startsAt, Date.parse(event.event.startsAt)]),
@@ -487,17 +551,17 @@ async function describe(
       requireCurrent(old, event.version);
       return event.action === "cancel-event"
         ? {
-            summary: `Cancelling ${eventName(old)}`,
-            inline: `Cancelling this ${eventKind(old)}`,
-            // Names what it cancels, so it never reads as undoing the wait.
+            summary: `Cancelling ${eventDay(old)}`,
+            inline: "Cancelling this event",
+            // Names what it cancels, so it never reads as cancelling the timer.
             verb: "Cancel event",
             targets,
             holds,
             startsAt: old?.startsAt,
           }
         : {
-            summary: `Deleting ${eventName(old)}`,
-            inline: `Deleting this ${eventKind(old)}`,
+            summary: `Deleting ${eventDay(old)}`,
+            inline: "Deleting this event",
             verb: "Delete",
             targets,
             holds,
@@ -520,20 +584,22 @@ async function describe(
           .filter(([, value]) => value !== undefined)
           .map(([key]) => key),
       );
-      const what = fields ? `Changing the ${fields} of` : "Saving changes to";
+      const first = events.get(event.selection[0].id);
       return {
-        summary:
-          count === 1
-            ? `${what} ${eventName(events.get(event.selection[0].id))}`
-            : `${what} ${count} events`,
+        summary: fields
+          ? `Changing the ${fields} of ${count === 1 ? eventDay(first) : `${count} events`}`
+          : count === 1
+            ? `Updating ${eventDay(first)}`
+            : `Updating ${count} events`,
         // Undo reverts every selected event, so each card says how many.
-        inline:
-          count === 1
-            ? fields
-              ? `Changing the ${fields}`
-              : "Saving changes"
-            : `${what} ${count} events`,
-        verb: "Save",
+        inline: fields
+          ? count === 1
+            ? `Changing the ${fields}`
+            : `Changing the ${fields} of ${count} events`
+          : count === 1
+            ? "Updating this event"
+            : `Updating ${count} events`,
+        verb: fields ? "Change" : "Update",
         targets,
         holds,
         startsAt: earliest([...events.values()].map((old) => old.startsAt)),
@@ -558,9 +624,9 @@ async function describe(
         for (const old of events.values()) holds.push(eventHold(old, limits));
       }
       return {
-        summary: `Saving patrol series changes from ${formatDate(event.occurrenceDate)}`,
-        inline: `Saving changes from ${formatDate(event.occurrenceDate)}`,
-        verb: "Save",
+        summary: `Updating ${formatDate(event.occurrenceDate)} and following events`,
+        inline: `Updating ${formatDate(event.occurrenceDate)} and following events`,
+        verb: "Update",
         targets: [...targets, ...reached.targets],
         holds,
         startsAt: reached.startsAt,
@@ -578,9 +644,9 @@ async function describe(
             )
           : undefined;
       return {
-        summary: "Saving the patrol series",
-        inline: "Saving changes",
-        verb: "Save",
+        summary: "Updating all occurrences of this recurring event",
+        inline: "Updating all occurrences",
+        verb: "Update",
         targets: [...targets, ...(reached?.targets ?? [])],
         holds,
         startsAt: reached?.startsAt,
@@ -594,9 +660,9 @@ async function describe(
         event.occurrenceDate,
       );
       return {
-        summary: `Ending the patrol series from ${formatDate(event.occurrenceDate)}`,
-        inline: `Ending this series from ${formatDate(event.occurrenceDate)}`,
-        verb: "End",
+        summary: `Cancelling ${formatDate(event.occurrenceDate)} and following events`,
+        inline: `Cancelling ${formatDate(event.occurrenceDate)} and following events`,
+        verb: "Cancel events",
         targets: [...targets, ...reached.targets],
         holds,
         startsAt: reached.startsAt,
@@ -605,8 +671,8 @@ async function describe(
     case "delete-series": {
       const reached = await occurrences(db, event.id);
       return {
-        summary: "Deleting the patrol series",
-        inline: "Deleting this series",
+        summary: "Deleting all occurrences of this recurring event",
+        inline: "Deleting all occurrences",
         verb: "Delete",
         targets: [...targets, ...reached.targets],
         holds,
@@ -629,20 +695,22 @@ async function describe(
         db,
         [signup.eventId, event.destination].filter(Boolean) as string[],
       );
-      const name = signup.name || "this volunteer";
+      const name = signup.name
+        ? compactPersonDisplayName(signup.name)
+        : "this volunteer";
       const startsAt = earliest(
         [...events.values()].map((found) => found.startsAt),
       );
       return event.destination
         ? {
-            summary: `Moving ${name} to ${eventName(events.get(event.destination))}`,
+            summary: `Moving ${name} to ${eventDay(events.get(event.destination))}`,
             verb: "Move",
             targets,
             holds,
             startsAt,
           }
         : {
-            summary: `Removing ${name} from ${eventName(events.get(signup.eventId))}`,
+            summary: `Removing ${name} from ${eventDay(events.get(signup.eventId))}`,
             inline: `Removing ${name}`,
             verb: "Remove",
             targets,
@@ -744,7 +812,8 @@ export async function schedulePendingAction(
   endpoint: Endpoint,
   input: Input,
 ) {
-  if (!(await wouldEmail(bindings, endpoint, input))) return null;
+  const reason = await waitReason(bindings, endpoint, input);
+  if (!reason) return null;
   requireOrganizer(actor);
   const db = bindings.DB;
   await validate(bindings, actor, endpoint, input);
@@ -752,18 +821,25 @@ export async function schedulePendingAction(
   const id = crypto.randomUUID();
   const now = Date.now();
   // Volunteers hear about a change to an event before it starts.
-  const runAt = Math.min(
+  let runAt = Math.min(
     now + undoDelayMs,
     (plan.startsAt ?? Infinity) - beforeStartMs,
   );
+  // Removing events always gets a short chance to undo, even right before
+  // they start, but is made before the soonest one starts.
+  if (reason === "removes" && runAt - now < removalWaitMs)
+    runAt = Math.min(
+      now + removalWaitMs,
+      (plan.startsAt ?? Infinity) - beforeStartRemovalMs,
+    );
   if (runAt - now < shortestWaitMs) return null;
   const exists = "EXISTS(SELECT 1 FROM pending_action WHERE id = ?)";
   try {
     const results = await db.batch([
       db
         .prepare(
-          `INSERT INTO pending_action (id, endpoint, input, actor_id, session_id, origin, summary, inline_summary, verb, run_at, created_at)
-          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
+          `INSERT INTO pending_action (id, endpoint, input, actor_id, session_id, origin, summary, inline_summary, area, verb, run_at, created_at)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
         )
         .bind(
           id,
@@ -774,6 +850,7 @@ export async function schedulePendingAction(
           bindings.AUTH_BASE_URL,
           plan.summary,
           plan.inline ?? null,
+          plan.area ?? null,
           plan.verb,
           runAt,
           now,
@@ -829,6 +906,7 @@ export async function schedulePendingAction(
     endpoint,
     summary: plan.summary,
     ...(plan.inline ? { inlineSummary: plan.inline } : {}),
+    ...(plan.area ? { area: plan.area } : {}),
     verb: plan.verb,
     runAt,
     createdAt: now,
@@ -900,14 +978,18 @@ export async function runPendingAction(
 ) {
   const db = bindings.DB;
   const now = Date.now();
-  if (runner) requireOrganizer(runner);
+  if (runner) {
+    requireOrganizer(runner);
+    await requireAuthor(db, runner, id);
+  }
+  // Only the author makes a change before its timer ends.
   const claimed = await db
     .prepare(
       `UPDATE pending_action SET status = 'running', lease_until = ?
-      WHERE id = ? AND status = 'pending' AND (run_at <= ? OR ?)
+      WHERE id = ? AND status = 'pending' AND (run_at <= ? OR actor_id = ?)
       RETURNING endpoint, input, actor_id AS actorId, session_id AS sessionId, origin`,
     )
-    .bind(now + leaseMs, id, now, Number(Boolean(runner)))
+    .bind(now + leaseMs, id, now, runner?.id ?? null)
     .first<{
       endpoint: Endpoint;
       input: string;
@@ -1003,19 +1085,33 @@ export async function runDuePendingActions(bindings: AuthBindings) {
   for (const { id } of due.results) await runPendingAction(bindings, id);
 }
 
+/** Other organizers see a waiting change but cannot undo it or make it early. */
+async function requireAuthor(db: Env["DB"], actor: Actor, id: string) {
+  const row = await db
+    .prepare("SELECT actor_id AS actorId FROM pending_action WHERE id = ?")
+    .bind(id)
+    .first<{ actorId: string }>();
+  if (row && row.actorId !== actor.id)
+    throw new RequestError(
+      403,
+      "Only the organizer who made this change can undo it or make it now.",
+    );
+}
+
 export async function undoPendingAction(
   db: Env["DB"],
   actor: Actor,
   id: string,
 ) {
   requireOrganizer(actor);
+  await requireAuthor(db, actor, id);
   const results = await db.batch([
     db
       .prepare(
         `UPDATE pending_action SET status = 'undone', finished_at = ?, finished_by = ?
-        WHERE id = ? AND status = 'pending' AND ${writePermission(true)}`,
+        WHERE id = ? AND status = 'pending' AND actor_id = ? AND ${writePermission(true)}`,
       )
-      .bind(Date.now(), actor.id, id, ...permissionValues(actor)),
+      .bind(Date.now(), actor.id, id, actor.id, ...permissionValues(actor)),
     ...["pending_action_target", "event_capacity_hold"].map((table) =>
       db
         .prepare(
@@ -1052,7 +1148,7 @@ export async function listPendingActions(
   requireOrganizer(actor);
   const rows = await db
     .prepare(
-      `SELECT a.id, a.endpoint, a.summary, a.inline_summary AS inlineSummary, a.verb,
+      `SELECT a.id, a.endpoint, a.summary, a.inline_summary AS inlineSummary, a.area, a.verb,
         a.run_at AS runAt, a.created_at AS createdAt, a.status, a.message,
         a.actor_id AS actorId, ${profileDisplayNameSql} AS actorName,
         (SELECT json_group_array(json_object('target', t.target, 'locked', t.locked))
@@ -1069,6 +1165,7 @@ export async function listPendingActions(
       endpoint: Endpoint;
       summary: string;
       inlineSummary: string | null;
+      area: PendingArea | null;
       verb: string;
       runAt: number;
       createdAt: number;
@@ -1083,6 +1180,7 @@ export async function listPendingActions(
     endpoint: row.endpoint,
     summary: row.summary,
     ...(row.inlineSummary ? { inlineSummary: row.inlineSummary } : {}),
+    ...(row.area ? { area: row.area } : {}),
     verb: row.verb,
     runAt: row.runAt,
     createdAt: row.createdAt,

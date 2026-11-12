@@ -43,12 +43,13 @@ export async function makeWaitingChange<
   ) as unknown as T;
 }
 
-/** Press a waiting change's "<Verb> in m:ss" button in the organizer's toast,
- * which makes it now. Its accessible name is "<Verb> now". */
+/** Press a waiting change's "<Verb> now" button on the changed item's
+ * banner, which makes it now. Toasts only link to the banner. */
 export async function makeWaitingChangeNow(page: Page, verb: string) {
   await page
-    .locator("[data-pending-actions]")
+    .locator("[data-pending-inline]")
     .getByRole("button", { name: `${verb} now`, exact: true })
+    .first()
     .click();
 }
 

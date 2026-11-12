@@ -9,7 +9,8 @@ interface Props {
     | "organizer-profile"
     | "event-card"
     | "applications"
-    | "volunteers";
+    | "volunteers"
+    | "pending-timers";
 }
 const { active } = Astro.props;
 const examples = [
@@ -22,6 +23,11 @@ const examples = [
     href: "/dev/ui/applications",
   },
   { id: "volunteers", label: "Volunteers table", href: "/dev/ui/volunteers" },
+  {
+    id: "pending-timers",
+    label: "Change timers",
+    href: "/dev/ui/pending-timers",
+  },
   {
     id: "organizer-profile",
     label: "Organizer profile",

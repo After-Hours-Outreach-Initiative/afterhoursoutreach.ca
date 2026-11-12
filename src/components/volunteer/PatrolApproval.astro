@@ -71,6 +71,9 @@ const { person, orientation, accessChangedBy } = Astro.props;
   )}
   {!person.active && <p>Volunteer account inactive</p>}
   {Boolean(person.applicationApproved) && (
+    <div data-pending-slot="patrol" />
+  )}
+  {Boolean(person.applicationApproved) && (
     <div class="patrol-approval-actions">
       <AccessDecision
         {person}

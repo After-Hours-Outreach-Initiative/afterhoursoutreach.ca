@@ -1,3 +1,10 @@
+/* Registered so the fill can glide between the timer's once-a-second
+   updates instead of stepping. */
+@property --progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
 /* Changes that email people wait here, newest on top, until they are made. */
 .pending-actions {
   position: fixed;
@@ -10,6 +17,13 @@
   width: min(28rem, calc(100vw - 2rem));
   pointer-events: none;
 }
+/* Bottom right on desktop, clear of the page's left-aligned content. */
+@media (width >= 64rem) {
+  .pending-actions {
+    left: auto;
+    right: max(1rem, env(safe-area-inset-right));
+  }
+}
 /* Above the app dock on small screens. */
 @media (width < 64rem) {
   body[data-app-dock] .pending-actions {
@@ -19,27 +33,140 @@
 .pending-actions > * {
   pointer-events: auto;
 }
-.pending-toast {
+/* Every toast shows while open; with many, they scroll above the chip. */
+.pending-list {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: calc(100dvh - var(--site-header-height, 5.5rem) - 7rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  /* Room inside the scroll area so the toasts' shadows are not cut off. */
+  margin: -1rem -1rem 0;
+  padding: 1rem 1rem 0;
+}
+.pending-list:empty {
+  display: none;
+}
+/* Toasts keep their height; the list scrolls instead of squeezing them. */
+.pending-list > * {
+  flex: none;
+}
+/* The change and its timer on top, "View change" on its own row below. */
+.pending-toast {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.25rem 1rem;
   padding: 0.75rem 0.75rem 0.75rem 1rem;
   border: 1px solid #3f3f46;
   border-radius: 0.75rem;
   background: #18181b;
+  --fill: #ffffff12;
   box-shadow: 0 0.5rem 1.5rem #000000b3;
   color: #f4f4f5;
+}
+/* The whole toast opens the change: the link's area covers it. */
+.pending-toast {
+  position: relative;
+}
+.pending-toast-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.pending-toast:has(.pending-toast-link:not([hidden])):hover {
+  border-color: #71717a;
+}
+.pending-toast:has(.pending-toast-link:not([hidden])):hover
+  .pending-toast-link {
+  color: white;
+}
+/* The ring goes round the whole toast, the link's real size. */
+.pending-toast:has(.pending-toast-link:focus-visible) {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+.pending-toast .pending-toast-link:focus-visible {
+  outline: none;
+}
+/* Dismiss stays its own button, above the link's area. */
+.pending-toast .pending-toast-close {
+  position: relative;
+  z-index: 1;
 }
 .pending-toast[data-status="failed"] {
   border-color: #b91c1c;
 }
+/* A pencil marks it as a change that is still waiting to be made. */
+.pending-body {
+  display: flex;
+  flex: 1 1 12rem;
+  align-items: flex-start;
+  gap: 0.625rem;
+  min-width: 0;
+}
+.pending-actor {
+  color: #f4f4f5;
+  font-weight: 600;
+}
+.pending-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 1.5rem;
+  color: #a5b4fc;
+}
+.pending-icon-alert {
+  color: #f87171;
+}
+.pending-icon-done {
+  color: #4ade80;
+}
+.pending-icon-alert,
+.pending-icon-done,
+:is([data-status="failed"], [data-status="done"], [data-error])
+  .pending-icon-waiting {
+  display: none;
+}
+[data-status="done"] .pending-icon-done {
+  display: flex;
+}
+/* Undone: the undo arrow, in the muted grey of the text. */
+.pending-icon-undone {
+  display: none;
+  color: #a1a1aa;
+}
+[data-status="undone"] .pending-icon-undone {
+  display: flex;
+}
+[data-status="undone"] .pending-icon-waiting {
+  display: none;
+}
+:is([data-status="failed"], [data-error]) .pending-icon-alert {
+  display: flex;
+}
+.pending-icon svg {
+  width: 1.125em;
+  height: 1.125em;
+}
 /* Beats page paragraph rules, such as the event card's top margin. */
 .pending-toast .pending-toast-text,
 .pending-inline .pending-inline-text {
-  flex: 1 1 12rem;
+  flex: 1;
   min-width: 0;
   margin: 0;
+  /* Names are already shortened; anything else long still wraps. */
+  overflow-wrap: anywhere;
+}
+/* Tailwind's text-base, in place of the site's larger paragraph text, so
+   the icons line up with it wherever the banner sits. */
+.pending-toast .pending-toast-text,
+.pending-inline .pending-inline-text {
+  font-size: 1rem;
+  line-height: 1.5rem;
 }
 .pending-toast-message:empty {
   display: none;
@@ -49,31 +176,24 @@
   color: #d4d4d8;
   font-size: 0.875rem;
 }
-/* The countdown lives in the button that skips it, with a fill that grows
-   until the change happens. */
-.pending-run {
-  position: relative;
-  overflow: hidden;
+/* The countdown follows the change, in amber so it reads as waiting. */
+.pending-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  color: #fcd34d;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.pending-run-fill {
-  position: absolute;
-  inset: 0;
-  background: #ffffff33;
-  transform: scaleX(var(--progress, 0));
-  transform-origin: left;
-  transition: transform 1s linear;
+.pending-timer[hidden] {
+  display: none;
 }
-.pending-run[data-fresh] .pending-run-fill {
-  transition: none;
+.pending-timer-icon {
+  display: flex;
 }
-@media (prefers-reduced-motion: reduce) {
-  .pending-run-fill {
-    transition: none;
-  }
-}
-.pending-run-label {
-  position: relative;
+.pending-timer-icon svg {
+  width: 1em;
+  height: 1em;
 }
 /* Several waiting changes on one item stack. */
 .pending-inline + .pending-inline {
@@ -87,31 +207,99 @@
   gap: 0.5rem;
   margin-left: auto;
 }
-.pending-toast-close {
-  min-width: 2.75rem;
+/* Nothing to show, such as a made change: give the text the whole row. */
+:is(.pending-toast-actions, .pending-inline-actions):not(
+  :has(> :not([hidden]))
+) {
+  display: none;
+}
+/* Compact buttons, so the change stays the focus. */
+:is(.pending-toast-actions, .pending-inline-actions) .btn {
+  min-height: 2.25rem;
+  padding-inline: 0.875rem;
+  /* Tailwind's text-base, with a tighter line so the button stays short. */
+  font-size: 1rem;
+  line-height: 1.25rem;
+}
+.pending-toast-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 1.5rem;
+  color: #c7d2fe;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  white-space: nowrap;
+}
+.pending-toast-link[hidden] {
+  display: none;
+}
+.pending-toast-link:hover {
+  color: white;
+}
+.pending-toast-link:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+.pending-toast-link-icon {
+  display: flex;
+}
+.pending-toast-link-icon svg {
+  width: 1em;
+  height: 1em;
+}
+/* Solid, so the progress fill never shows through it. */
+.pending-undo {
+  gap: 0.375rem;
+  border: 1px solid #3f3f46;
+  background: #3f3f46;
+  color: white;
+  font-weight: 500;
+}
+.pending-undo:not(:disabled):hover {
+  border-color: #52525b;
+  background: #52525b;
+}
+.pending-undo:disabled {
+  background: #27272a;
+  border-color: #27272a;
+  color: #71717a;
+}
+.pending-undo-icon {
+  display: flex;
+}
+.pending-undo-icon svg {
+  width: 1em;
+  height: 1em;
+}
+/* No border, even on hover: the X is enough. */
+.pending-toast .pending-toast-actions {
+  min-height: 1.5rem;
+  margin-left: 0;
+}
+/* Keep the first row as tall as its text. */
+.pending-toast .pending-toast-close {
+  min-height: 2.25rem;
+  margin-block: -0.375rem;
+}
+/* "View change" in the bottom right corner. */
+.pending-toast-footer {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+.pending-toast-footer:not(:has(> :not([hidden]))) {
+  display: none;
+}
+.pending-toast-actions .pending-toast-close,
+.pending-toast-actions .pending-toast-close:hover {
+  min-width: 2.25rem;
   padding: 0;
+  border-color: transparent;
 }
 .pending-toast-close svg {
   width: 1.25em;
   height: 1.25em;
-}
-.pending-more {
-  align-self: flex-start;
-  min-height: 2.25rem;
-  padding: 0 0.875rem;
-  border: 1px solid #3f3f46;
-  border-radius: 999px;
-  background: #18181b;
-  color: #d4d4d8;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-.pending-more:hover {
-  color: white;
-}
-.pending-more:focus-visible {
-  outline: 2px solid #a5b4fc;
-  outline-offset: 2px;
 }
 /* The same timer on the item it changes. */
 .pending-inline {
@@ -121,14 +309,198 @@
   gap: 0.5rem 1rem;
   margin-bottom: 0.75rem;
   padding: 0.625rem 0.75rem;
-  border: 1px solid #4f46e5;
+  border: 1px solid #78530f;
   border-radius: 0.625rem;
-  background: #1e1b4b80;
+  background: #1c1a17;
+  --fill: #ffffff10;
   color: #e4e4e7;
+}
+/* Amber marks a change still waiting on the item it changes. */
+.pending-inline .pending-icon-waiting {
+  color: #fcd34d;
 }
 @media print {
   .pending-actions,
   .pending-inline {
     display: none;
   }
+}
+/* The corner chip: the soonest timer while closed, "Minimize" while open. */
+.pending-chip {
+  display: inline-flex;
+  align-self: flex-end;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 0.875rem;
+  border: 1px solid #78530f;
+  border-radius: 999px;
+  background: #1c1a17;
+  box-shadow: 0 0.5rem 1.5rem #000000b3;
+  color: #f4f4f5;
+  font-variant-numeric: tabular-nums;
+}
+.pending-chip[hidden] {
+  display: none;
+}
+.pending-chip:hover {
+  border-color: #b4790f;
+}
+.pending-chip:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+.pending-chip-closed,
+.pending-chip-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pending-chip[aria-expanded="true"] .pending-chip-closed,
+.pending-chip[aria-expanded="false"] .pending-chip-open {
+  display: none;
+}
+.pending-chip-closed [data-pending-chip-time] {
+  color: #fcd34d;
+}
+.pending-chip
+  :is(
+    .pending-chip-timer,
+    .pending-chip-done,
+    .pending-chip-failed,
+    .pending-chip-undone,
+    .pending-chip-icon
+  ) {
+  display: flex;
+}
+.pending-chip svg {
+  width: 1em;
+  height: 1em;
+}
+.pending-chip-timer {
+  color: #fcd34d;
+}
+.pending-chip-done {
+  color: #4ade80;
+}
+.pending-chip-failed {
+  color: #f87171;
+}
+.pending-chip-undone {
+  color: #a1a1aa;
+}
+.pending-chip-icon {
+  color: #a1a1aa;
+}
+.pending-chip:not([data-state="waiting"]) .pending-chip-timer,
+.pending-chip:not([data-state="done"]) .pending-chip-done,
+.pending-chip:not([data-state="failed"]) .pending-chip-failed,
+.pending-chip:not([data-state="undone"]) .pending-chip-undone {
+  display: none;
+}
+.pending-chip:not([data-state="waiting"]) [data-pending-chip-time] {
+  color: #f4f4f5;
+}
+/* The fill grows from the left as the timer runs out. It is its own layer,
+   scaled rather than redrawn, so the compositor moves it smoothly. */
+:is(.pending-toast, .pending-inline) {
+  position: relative;
+  /* The fill sits above the background and below the content. */
+  isolation: isolate;
+  overflow: hidden;
+}
+:is(.pending-toast, .pending-inline)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--fill);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left;
+  pointer-events: none;
+}
+.pending-inline-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+/* On phones the timer moves to the banner's top right, so Undo and the run
+   button share their own row instead of wrapping. */
+@media (width < 40rem) {
+  .pending-inline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.5rem 1rem;
+  }
+  .pending-inline .pending-inline-actions {
+    display: contents;
+  }
+  .pending-inline .pending-timer {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 1.5rem;
+  }
+  .pending-inline .pending-inline-buttons {
+    grid-column: 1 / -1;
+    justify-self: end;
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+  /* A long label wraps inside its button rather than moving it. */
+  .pending-inline .pending-inline-buttons .btn {
+    min-width: 0;
+    white-space: normal;
+  }
+  .pending-inline .pending-inline-buttons:not(:has(> :not([hidden]))) {
+    display: none;
+  }
+}
+/* While the toasts are open, the page behind them dims and the toasts sit
+   above everything, the header included. */
+.pending-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #000000b3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.pending-actions[data-open] {
+  z-index: 61;
+}
+.pending-backdrop:has(+ .pending-actions[data-open]) {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pending-backdrop {
+    transition: none;
+  }
+}
+@media print {
+  .pending-backdrop {
+    display: none;
+  }
+}
+/* A page's place for banners, beside the controls they affect. Empty, it
+   takes no room; with banners, it spaces them and keeps the controls below
+   close under them. */
+[data-pending-slot]:empty {
+  display: none;
+}
+[data-pending-slot]:not(:empty) {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: 1.5rem 0.75rem;
+}
+[data-pending-slot]:not(:empty) + * {
+  margin-top: 0;
+}
+[data-pending-slot] > .pending-inline {
+  margin-bottom: 0;
+}
+/* Sections that space their children with a gap need no extra margin. */
+.volunteer-profile-controls > [data-pending-slot] {
+  margin-block: 0;
 }

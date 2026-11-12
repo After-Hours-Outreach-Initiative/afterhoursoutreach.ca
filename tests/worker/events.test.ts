@@ -1300,7 +1300,7 @@ describe(
             trigger: () =>
               profileView.getByLabel("Account role").selectOption("organizer"),
             updated: async () => {
-              await makeWaitingChangeNow(page, "Change");
+              await makeWaitingChangeNow(page, "Make");
               await expect(
                 profileView.getByLabel("Account role"),
               ).toBeEnabled();
@@ -1329,7 +1329,7 @@ describe(
             trigger: () =>
               profileView.getByLabel("Account role").selectOption("volunteer"),
             updated: async () => {
-              await makeWaitingChangeNow(page, "Change");
+              await makeWaitingChangeNow(page, "Make");
               await expect(
                 profileView.getByLabel("Account role"),
               ).toBeEnabled();
