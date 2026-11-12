@@ -246,7 +246,7 @@ export async function findPatrolSeries(
     )
     .bind(id)
     .first<PatrolSeriesRow>();
-  if (!row) throw new RequestError(404, "Patrol series not found.");
+  if (!row) throw new RequestError(404, "Recurring event not found.");
   return row;
 }
 
@@ -431,7 +431,7 @@ export async function ensurePatrolOccurrences(
     if (!results[1].meta.changes)
       throw new RequestError(
         409,
-        "This patrol series changed. Reload the page.",
+        "This recurring event changed. Reload the page.",
       );
   }
 }
@@ -615,11 +615,11 @@ export async function savePatrolSeries(
       throw new RequestError(
         old ? 409 : 403,
         old
-          ? "This patrol series changed. Reload before editing it."
+          ? "This recurring event changed. Reload before editing it."
           : "Organizer authorization changed. Sign in again.",
       );
     await ensurePatrolOccurrences(db, id);
-    return { id, operation, message: "Patrol series saved." };
+    return { id, operation, message: "Recurring event saved." };
   } catch (error) {
     return databaseWriteError(error);
   }
@@ -1050,7 +1050,7 @@ export async function updatePatrolSeriesFrom(
     if (!results[0].meta.changes)
       throw new RequestError(
         409,
-        "This patrol series or your organizer authorization changed. Reload before editing it.",
+        "This recurring event or your organizer authorization changed. Reload before editing it.",
       );
     await ensurePatrolOccurrences(db, id);
     const restored = returning.length
@@ -1285,7 +1285,7 @@ async function stopSeries(
   if (!results[0].meta.changes)
     throw new RequestError(
       409,
-      "This patrol series or your organizer authorization changed. Reload the page.",
+      "This recurring event or your organizer authorization changed. Reload the page.",
     );
   await ensurePatrolOccurrences(db, id);
   return {

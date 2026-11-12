@@ -316,7 +316,7 @@ test("organizer audit history combines all sources, paginates tied timestamps, a
   assert.equal(first.entries.length, 50);
   assert.ok(first.next);
   assert.equal(first.entries[0].action, "stopped");
-  assert.equal(first.entries[0].subjectName, "Patrol series · Point");
+  assert.equal(first.entries[0].subjectName, "Recurring event · Point");
   assert.equal(first.entries[1].actorName, organizer.id);
   assert.equal(first.entries[1].subjectName, volunteer.id);
   assert.deepEqual(first.entries[1].changedFields, [

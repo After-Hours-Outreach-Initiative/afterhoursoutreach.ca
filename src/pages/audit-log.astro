@@ -82,10 +82,10 @@ const kindIcons = {
 const kindLabels: Record<AuditKind, string> = {
   person: "Account",
   event: "Event",
-  series: "Patrol series",
+  series: "Recurring event",
 };
 const actionGroups = (["person", "event", "series"] as const).map((kind) => ({
-  label: { person: "Accounts", event: "Events", series: "Patrol series" }[kind],
+  label: { person: "Accounts", event: "Events", series: "Recurring events" }[kind],
   actions: auditActions.filter((item) => item.kind === kind),
 }));
 const filterMenus = [
@@ -135,7 +135,7 @@ const filterMenus = [
 
 <AccountLayout
   title="Audit Log"
-  description="Organizer history of volunteer, event, and patrol series changes."
+  description="Organizer history of volunteer, event, and recurring event changes."
   signedIn
   organizer
   name={accountName}

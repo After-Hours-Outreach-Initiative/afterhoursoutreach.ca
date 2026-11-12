@@ -83,7 +83,7 @@ export async function listAuditLog(
       FROM event_audit a JOIN event e ON e.id = a.event_id
       UNION ALL
       SELECT a.id, 'series', a.created_at, a.action, a.actor_id, a.series_id,
-        'Patrol series' || CASE WHEN trim(s.meeting_point) <> '' THEN ' · ' || s.meeting_point ELSE '' END,
+        'Recurring event' || CASE WHEN trim(s.meeting_point) <> '' THEN ' · ' || s.meeting_point ELSE '' END,
         NULL, NULL, s.first_date, s.local_time, s.interval_weeks, a.changed_fields
       FROM patrol_series_audit a JOIN patrol_series s ON s.id = a.series_id
     )

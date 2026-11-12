@@ -141,15 +141,15 @@ export const auditActions: AuditAction[] = [
     "series_occurrence_created",
     "Created recurring event",
     "create",
-    ["scheduled", "from its patrol series"],
+    ["scheduled", "from its recurring event"],
   ),
   entry("event", "updated", "Updated event", "update", "updated"),
   entry(
     "event",
     "series_updated",
-    "Updated event from patrol series",
+    "Updated event from recurring event",
     "update",
-    ["updated", "from its patrol series"],
+    ["updated", "from its recurring event"],
   ),
   entry("event", "cancelled", "Cancelled event", "remove", "cancelled"),
   entry("event", "restored", "Restored event", "create", "restored"),
@@ -189,8 +189,8 @@ export const auditActions: AuditAction[] = [
     "remove",
     "removed an attendee from",
   ),
-  entry("series", "created", "Created patrol series", "create", "created"),
-  entry("series", "updated", "Updated patrol series", "update", "updated"),
+  entry("series", "created", "Created recurring event", "create", "created"),
+  entry("series", "updated", "Updated recurring event", "update", "updated"),
   entry(
     "series",
     "updated_future",
@@ -198,8 +198,8 @@ export const auditActions: AuditAction[] = [
     "update",
     "updated future patrols in",
   ),
-  entry("series", "stopped", "Stopped patrol series", "remove", "stopped"),
-  entry("series", "deleted", "Removed patrol series", "remove", "removed"),
+  entry("series", "stopped", "Stopped recurring event", "remove", "stopped"),
+  entry("series", "deleted", "Removed recurring event", "remove", "removed"),
 ];
 
 export const auditActionKey = (kind: AuditKind, action: string) =>
@@ -301,7 +301,7 @@ const fieldLabels: Record<string, string> = {
   seriesEndDate: "Last patrol date",
   seriesSchedule: "Repeat schedule",
   seriesTemplate: "Series details",
-  seriesId: "Patrol series",
+  seriesId: "Recurring event",
   occurrenceDate: "Patrol date",
 };
 
