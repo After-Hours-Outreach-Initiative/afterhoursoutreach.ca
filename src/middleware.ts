@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 
 export const onRequest = defineMiddleware(async (context, next) => {
+  const started = performance.now();
   const response = await next();
   const privateRoute =
     /^\/(?:api\/v1\/(?:auth|account|events|organizer)(?:\/|$)|(?:volunteer|volunteers|applications)(?:\/|$)|(?:events|apply|privacy|audit-log)\/?$)/.test(
@@ -8,6 +9,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     );
   if (!privateRoute) return response;
   const headers = new Headers(response.headers);
+  headers.append(
+    "Server-Timing",
+    `app;dur=${(performance.now() - started).toFixed(1)}`,
+  );
   headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   headers.set("Cache-Control", "no-store");
   headers.set("Referrer-Policy", "no-referrer");

@@ -1,3 +1,5 @@
+import { type PageScope } from "./page-lifecycle";
+import { updateLocalUrl } from "./local-history";
 import { actionFragment, syncHeaderApplications } from "./action-page";
 import { initFilterMenus } from "./filter-menu";
 import { initFilterPanel } from "./filter-panel";
@@ -35,7 +37,10 @@ function readRows(root: HTMLElement) {
   return rows;
 }
 
-export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
+export function initVolunteerBrowser(
+  fetchPage: typeof fetch = fetch,
+  page?: PageScope,
+) {
   const root = document.querySelector<HTMLElement>("[data-volunteer-browser]");
   const search = root?.querySelector<HTMLInputElement>(
     "[data-volunteer-search]",
@@ -64,6 +69,7 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   )
     return;
   const kind = root.dataset.directoryKind as DirectoryKind;
+  const pathname = location.pathname;
   let rows = readRows(root);
   let pending: AbortController | undefined;
   // Nothing searched, filtered or re-sorted.
@@ -102,14 +108,19 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
   const sortSection = form.querySelector<HTMLElement>("[data-directory-sort]");
   const showSortOrders = sortSection ? initSortOrders(sortSection) : () => {};
   // Choices apply as they change beside the list, or when the sheet closes.
-  const panel = initFilterPanel(form, () => render(stateFromForm(), "push"));
+  const panel = initFilterPanel(
+    form,
+    () => render(stateFromForm(), "push"),
+    page?.signal,
+  );
   const sortMenu = form.querySelector<HTMLElement>('[data-filter-menu="sort"]');
   const sortLabels = new Map(
     [...form.querySelectorAll<HTMLInputElement>('input[name="sort"]')].map(
       (input) => [input.value, input.closest("label")!.textContent!.trim()],
     ),
   );
-  if (sortMenu) initFilterMenus(sortMenu.parentElement!, () => {});
+  if (sortMenu)
+    initFilterMenus(sortMenu.parentElement!, () => {}, page?.signal);
   sortMenu?.addEventListener("click", (event) => {
     if (
       !(event.target instanceof Element) ||
@@ -180,6 +191,9 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
       state,
     );
     const url = urlFor(state);
+    if (historyMode === "push" && url.href !== location.href)
+      updateLocalUrl(url, "push");
+    else if (historyMode === "replace") updateLocalUrl(url, "replace");
     search.value = state.search;
     const counts: Record<string, Record<string, number>> = {
       approval: {
@@ -226,9 +240,6 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     empty.hidden = Boolean(view.rows.length);
     list.hidden = !view.rows.length;
     count.textContent = directoryCountLabel(kind, view.rows.length, rows.size);
-    if (historyMode === "push" && url.href !== location.href)
-      history.pushState(null, "", url);
-    else if (historyMode !== "none") history.replaceState(null, "", url);
   };
 
   // A refresh never owns the search state: typing, sorting and filtering remain
@@ -287,14 +298,24 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     }
   };
 
-  search.addEventListener("input", () =>
-    render({ ...stateFor(), search: search.value.slice(0, 100) }),
+  (page?.onDocument ?? document.addEventListener.bind(document))(
+    "input",
+    (event) => {
+      const target = event.target;
+      if (
+        !(target instanceof HTMLInputElement) ||
+        !target.matches("[data-volunteer-search]") ||
+        !root.contains(target)
+      )
+        return;
+      render({ ...stateFor(), search: target.value.slice(0, 100) });
+    },
   );
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     render(stateFromForm(), "push");
   });
-  initPressFeedback(results, "[data-volunteer-row]");
+  initPressFeedback(results, "[data-volunteer-row]", page?.signal);
   // The empty result's reset returns everything to the defaults in place.
   empty.addEventListener("click", (event) => {
     if (
@@ -311,18 +332,42 @@ export function initVolunteerBrowser(fetchPage: typeof fetch = fetch) {
     render(defaultState, "push");
     search.focus();
   });
-  window.addEventListener("popstate", () => render(stateFor(), "none"));
-  window.addEventListener("focus", () => void refresh());
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) void refresh();
+  const restoreLocalState = () => {
+    if (root.isConnected && location.pathname === pathname)
+      render(stateFor(), "none");
+  };
+  (page?.onWindow ?? window.addEventListener.bind(window))(
+    "app:local-history",
+    restoreLocalState,
+  );
+  (page?.onWindow ?? window.addEventListener.bind(window))("popstate", () => {
+    // Standalone component previews have no router and keep native history.
+    if (!document.querySelector('[name="astro-view-transitions-enabled"]'))
+      restoreLocalState();
   });
-  window.addEventListener("pagehide", () => {
+  (page?.onWindow ?? window.addEventListener.bind(window))(
+    "focus",
+    () => void refresh(),
+  );
+  (page?.onDocument ?? document.addEventListener.bind(document))(
+    "visibilitychange",
+    () => {
+      if (!document.hidden) void refresh();
+    },
+  );
+  (page?.onWindow ?? window.addEventListener.bind(window))("pagehide", () => {
     pending?.abort();
     pending = undefined;
     results.removeAttribute("aria-busy");
   });
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted) void refresh();
-  });
+  (page?.onWindow ?? window.addEventListener.bind(window))(
+    "pageshow",
+    (event) => {
+      if (event.persisted) void refresh();
+    },
+  );
+  page?.cleanup(() => pending?.abort());
   render(stateFor());
+  root.dataset.directoryReady = "";
+  page?.cleanup(() => delete root.dataset.directoryReady);
 }

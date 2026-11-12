@@ -3,11 +3,12 @@ import { forwardCookies, type AuthBindings } from "./auth";
 import { accountContext, canViewEvents } from "./db/access";
 import { countReadyApplications } from "./db/volunteers";
 
-/** Resolve the header before rendering; personalized HTML must never be cached. */
+/** Resolve the header before rendering; personalized HTML must never enter HTTP caches. */
 export async function loadAccountNavigation(
   bindings: AuthBindings,
   request: Request,
   responseHeaders: Headers,
+  resolved?: Awaited<ReturnType<typeof accountContext>>,
 ): Promise<AccountNavigation> {
   responseHeaders.set("Cache-Control", "no-store");
   const signedOut: AccountNavigation = {
@@ -21,11 +22,10 @@ export async function loadAccountNavigation(
   };
   if (!bindings.BETTER_AUTH_SECRET) return signedOut;
   try {
-    const { actor, email, greetingName, headers } = await accountContext(
-      bindings,
-      request,
-    );
-    forwardCookies(headers, responseHeaders);
+    const { actor, email, greetingName, headers } =
+      resolved ?? (await accountContext(bindings, request));
+    // Pages supplying their resolved context have already forwarded cookies.
+    if (!resolved) forwardCookies(headers, responseHeaders);
     const eventAccess = canViewEvents(actor);
     return actor
       ? {

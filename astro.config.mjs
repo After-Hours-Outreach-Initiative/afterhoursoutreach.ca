@@ -2,9 +2,34 @@
 import { defineConfig, fontProviders } from "astro/config";
 import cloudflare from "@astrojs/cloudflare";
 import { chmod } from "node:fs/promises";
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
+
+// Isolated dev checkouts share node_modules outside their project root. Astro
+// 7.4 cannot match external component CSS IDs there. Use an exact generated
+// copy of its installed router component inside that checkout; never maintain
+// a fork of the framework component or change dependency resolution globally.
+const projectRoot = fileURLToPath(new URL(".", import.meta.url));
+/** @type {Record<string, string>} */
+const routerAliases = {};
+if (
+  !fileURLToPath(import.meta.resolve("astro/package.json")).startsWith(
+    projectRoot,
+  )
+) {
+  const localRouter = new URL("./.astro/ClientRouter.astro", import.meta.url);
+  const source = readFileSync(
+    fileURLToPath(import.meta.resolve("astro/components/ClientRouter.astro")),
+    "utf8",
+  );
+  mkdirSync(new URL("./.astro", import.meta.url), { recursive: true });
+  if (!existsSync(localRouter) || readFileSync(localRouter, "utf8") !== source)
+    writeFileSync(localRouter, source);
+  routerAliases["astro/components/ClientRouter.astro"] =
+    fileURLToPath(localRouter);
+}
 
 // https://astro.build/config
 export default defineConfig({
@@ -24,6 +49,8 @@ export default defineConfig({
   ],
   // Better Auth will own database-backed sessions, not Astro's KV sessions.
   session: false,
+  // Private app screens use a bounded, session-only cache instead.
+  prefetch: false,
   integrations: [
     {
       name: "local-ui-playground",
@@ -153,6 +180,7 @@ export default defineConfig({
       ),
     ),
     plugins: [tailwindcss()],
+    resolve: { alias: routerAliases },
     // Discover account dependencies before a cold-start reload can reset a form.
     optimizeDeps: {
       include: [

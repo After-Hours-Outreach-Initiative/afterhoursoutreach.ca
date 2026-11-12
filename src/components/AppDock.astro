@@ -78,29 +78,6 @@ const items = [
   ))}
 </nav>
 
-<script>
-  // Dims the dock from the start of a page load until the next page replaces
-  // this one. Same-page updates, downloads and cancelled loads leave it alone.
-  const dock = document.querySelector<HTMLElement>(".app-dock");
-  if (dock && "navigation" in window) {
-    const busy = (on: boolean) =>
-      on
-        ? dock.setAttribute("aria-busy", "true")
-        : dock.removeAttribute("aria-busy");
-    navigation.addEventListener("navigate", (event) => {
-      if (
-        !event.hashChange &&
-        event.downloadRequest === null &&
-        !event.destination.sameDocument
-      )
-        busy(true);
-    });
-    navigation.addEventListener("navigateerror", () => busy(false));
-    // Back and forward can restore this page with the dock still dimmed.
-    addEventListener("pageshow", () => busy(false));
-  }
-</script>
-
 <style>
   /* A full-width tab bar for signed-in people on small screens. */
   .app-dock {
@@ -147,6 +124,10 @@ const items = [
     background: #ffffff14;
     color: white;
   }
+  .app-dock-item:active {
+    background: #ffffff14;
+    color: white;
+  }
   .app-dock-item:focus-visible {
     outline: 2px solid #a5b4fc;
     outline-offset: -2px;
@@ -180,16 +161,14 @@ const items = [
     box-shadow: 0 0 0 2px black;
     font-size: 0.8125rem;
   }
-  /* Taps do nothing while another page loads, so the dock says so. The
-     delay keeps quick page changes from flickering. */
-  .app-dock[aria-busy="true"] .app-dock-item {
+  /* Keep navigation available when a slower destination is superseded. */
+  .app-dock-item[data-loading] {
     opacity: 0.4;
-    pointer-events: none;
     transition: opacity 150ms ease 100ms;
   }
   @media (prefers-reduced-motion: reduce) {
     .app-dock-item,
-    .app-dock[aria-busy="true"] .app-dock-item {
+    .app-dock-item[data-loading] {
       transition: none;
     }
   }

@@ -202,6 +202,7 @@ const sortOptions = applications
     role="status"
     hidden
   ></p>
+  {!Astro.url.pathname.startsWith("/dev/") && <directory-controller hidden />}
 </section>
 
 <style>

@@ -22,6 +22,7 @@ let applications: Awaited<ReturnType<typeof listApplications>> = {
   approvedCount: 0,
   roleCounts: {},
 };
+let context: Awaited<ReturnType<typeof accountContext>> | undefined;
 let lock = "";
 let accountName = "";
 let accountGreeting = "";
@@ -31,10 +32,8 @@ const { search, approval, sort, direction, roles, roleOrder, statusOrder } =
   state;
 const listUrl = applicationListUrl(state);
 try {
-  const { actor, headers, email, greetingName } = await accountContext(
-    env,
-    Astro.request,
-  );
+  context = await accountContext(env, Astro.request);
+  const { actor, headers, email, greetingName } = context;
   forwardCookies(headers, Astro.response.headers);
   if (!actor)
     return Astro.redirect(
@@ -69,6 +68,7 @@ try {
 ---
 
 <AccountLayout
+  {context}
   title="Applications"
   description="Organizer application review."
   signedIn
@@ -90,6 +90,5 @@ try {
   )}
 </AccountLayout>
 <script>
-  import { initVolunteerBrowser } from "@/scripts/volunteer-browser";
-  initVolunteerBrowser();
+  import "@/scripts/directory";
 </script>

@@ -139,15 +139,16 @@ export function initAccountSwitcher() {
   };
   setBusy(true);
   // The yellow crescent in the header opens the panel.
-  const triggers = document.querySelectorAll<HTMLButtonElement>(
-    "[data-open-account-switcher]",
-  );
+  const triggers = () =>
+    document.querySelectorAll<HTMLButtonElement>(
+      "[data-open-account-switcher]",
+    );
   const visitor = states.querySelector<HTMLButtonElement>("[data-visitor]");
   const toggle = () => {
     if (root.open) root.close();
     else {
       root.showModal();
-      triggers.forEach((trigger) =>
+      triggers().forEach((trigger) =>
         trigger.setAttribute("aria-expanded", "true"),
       );
       // Public pages and the fixture playground need no account API until opened.
@@ -159,7 +160,13 @@ export function initAccountSwitcher() {
       }
     }
   };
-  triggers.forEach((trigger) => trigger.addEventListener("click", toggle));
+  document.addEventListener("click", (event) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-open-account-switcher]")
+    )
+      toggle();
+  });
   // The header crescent is there before this script; tests wait for this.
   root.dataset.ready = "";
   document.addEventListener("keydown", (event) => {
@@ -181,7 +188,7 @@ export function initAccountSwitcher() {
     ?.addEventListener("click", () => root.close());
   root.addEventListener("close", () => {
     resetDeleteConfirmation();
-    triggers.forEach((trigger) =>
+    triggers().forEach((trigger) =>
       trigger.setAttribute("aria-expanded", "false"),
     );
   });

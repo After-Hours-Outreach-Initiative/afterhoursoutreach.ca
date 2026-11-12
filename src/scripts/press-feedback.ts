@@ -11,7 +11,11 @@ const flash = 150;
  * briefly, or when a quick touch lifts without moving. Moving the finger, or
  * the browser taking the touch over for scrolling, cancels it.
  */
-export function initPressFeedback(root: HTMLElement, selector: string) {
+export function initPressFeedback(
+  root: HTMLElement,
+  selector: string,
+  signal?: AbortSignal,
+) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let item: HTMLElement | undefined;
   let start = { x: 0, y: 0 };
@@ -56,5 +60,6 @@ export function initPressFeedback(root: HTMLElement, selector: string) {
   });
   root.addEventListener("pointercancel", clear);
   // A page restored from history must not keep an item lit.
-  addEventListener("pageshow", clear);
+  addEventListener("pageshow", clear, { signal });
+  signal?.addEventListener("abort", clear, { once: true });
 }

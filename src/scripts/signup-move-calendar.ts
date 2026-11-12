@@ -1,3 +1,4 @@
+import type { PageScope } from "./page-lifecycle";
 import { signupMoveCalendar } from "../data/signup-move-calendar";
 import { vancouverInput } from "../data/event-time";
 
@@ -104,28 +105,37 @@ export function syncSignupMoveCalendar(dialog: HTMLElement, month?: string) {
       ?.focus({ preventScroll: true });
 }
 
-export function initSignupMoveCalendars() {
-  document.addEventListener("change", (event) => {
-    const select = event.target;
-    if (!(select instanceof HTMLSelectElement) || select.name !== "destination")
-      return;
-    const dialog = select.closest<HTMLElement>("dialog");
-    if (dialog) syncSignupMoveCalendar(dialog);
-  });
-  document.addEventListener("click", (event) => {
-    if (!(event.target instanceof Element)) return;
-    const button = event.target.closest<HTMLButtonElement>(
-      "[data-signup-month-step], [data-signup-destination]",
-    );
-    if (!button || button.disabled) return;
-    const dialog = button.closest<HTMLElement>("dialog")!;
-    const select = dialog.querySelector('select[name="destination"]');
-    if (!(select instanceof HTMLSelectElement)) return;
-    if (button.dataset.signupDestination) {
-      select.value = button.dataset.signupDestination;
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    } else {
-      syncSignupMoveCalendar(dialog, button.dataset.signupMonthTarget);
-    }
-  });
+export function initSignupMoveCalendars(page?: PageScope) {
+  (page?.onDocument ?? document.addEventListener.bind(document))(
+    "change",
+    (event) => {
+      const select = event.target;
+      if (
+        !(select instanceof HTMLSelectElement) ||
+        select.name !== "destination"
+      )
+        return;
+      const dialog = select.closest<HTMLElement>("dialog");
+      if (dialog) syncSignupMoveCalendar(dialog);
+    },
+  );
+  (page?.onDocument ?? document.addEventListener.bind(document))(
+    "click",
+    (event) => {
+      if (!(event.target instanceof Element)) return;
+      const button = event.target.closest<HTMLButtonElement>(
+        "[data-signup-month-step], [data-signup-destination]",
+      );
+      if (!button || button.disabled) return;
+      const dialog = button.closest<HTMLElement>("dialog")!;
+      const select = dialog.querySelector('select[name="destination"]');
+      if (!(select instanceof HTMLSelectElement)) return;
+      if (button.dataset.signupDestination) {
+        select.value = button.dataset.signupDestination;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      } else {
+        syncSignupMoveCalendar(dialog, button.dataset.signupMonthTarget);
+      }
+    },
+  );
 }

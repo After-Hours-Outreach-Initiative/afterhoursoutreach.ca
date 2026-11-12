@@ -17,12 +17,8 @@ import {
 import PageContents from "@/components/volunteer/PageContents.astro";
 import { accountGreeting } from "@/data/account-navigation";
 import { contactEmail } from "@/data/site";
-import {
-  authBindingsForRequest,
-  createAuth,
-  forwardCookies,
-  readAccountSession,
-} from "@/server/auth";
+import { forwardCookies } from "@/server/auth";
+import { accountContext } from "@/server/db/access";
 import { loadProfile, loadSubmittedApplication } from "@/server/db/profiles";
 import { createDatabase } from "@/server/db";
 import { accountDeletionFreshAge } from "@/server/db/account-deletion";
@@ -33,6 +29,7 @@ import {
   type ApplicationAnswers,
 } from "@/data/application";
 export const prerender = false;
+let context: Awaited<ReturnType<typeof accountContext>> | undefined;
 let values: ApplicationAnswers | null = null;
 let submission: Awaited<ReturnType<typeof loadSubmittedApplication>> = null;
 let applicationProgress: Awaited<ReturnType<typeof loadApplicationProgress>>;
@@ -52,20 +49,19 @@ let emailNeedsSignIn = false;
 let deletionNeedsSignIn = false;
 if (!env.BETTER_AUTH_SECRET) return Astro.redirect("/volunteer/sign-in");
 try {
-  const auth = createAuth(authBindingsForRequest(env, Astro.request));
-  const { response: current, headers } = await readAccountSession(
-    auth,
-    Astro.request,
-  );
+  context = await accountContext(env, Astro.request);
+  const { auth, current, headers } = context;
   forwardCookies(headers, Astro.response.headers);
   if (
     !current?.user.emailVerified ||
     (current.user.twoFactorEnabled && !current.session.twoFactorVerified)
   )
     return Astro.redirect("/volunteer/sign-in?returnTo=/volunteer/account");
-  values = await loadProfile(env.DB, current.user.id);
-  submission = await loadSubmittedApplication(env.DB, current.user.id);
-  applicationProgress = await loadApplicationProgress(env.DB, current.user.id);
+  [values, submission, applicationProgress] = await Promise.all([
+    loadProfile(env.DB, current.user.id),
+    loadSubmittedApplication(env.DB, current.user.id),
+    loadApplicationProgress(env.DB, current.user.id),
+  ]);
   accountCreatedAt = current.user.createdAt;
   email = current.user.email;
   legacyName = current.user.name;
@@ -133,6 +129,7 @@ const contents = [
 ---
 
 <AccountLayout
+  {context}
   title="Your account"
   description="Edit your volunteer profile and manage your account settings."
   signedIn

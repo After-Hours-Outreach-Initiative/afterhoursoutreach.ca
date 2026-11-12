@@ -26,5 +26,6 @@ export function initNativePickerInputs() {
     }
   });
   window.addEventListener("pageshow", () => sync(document));
+  document.addEventListener("astro:page-load", () => sync(document));
   sync(document);
 }

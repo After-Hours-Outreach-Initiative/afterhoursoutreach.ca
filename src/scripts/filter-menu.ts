@@ -56,7 +56,7 @@ function hide(menu: HTMLDialogElement) {
  * so the page beneath ignores taps, presses and holds until it closes. A tap
  * on the backdrop, a drag down, Escape or its own buttons close it.
  */
-function initSheet(menu: HTMLDialogElement) {
+function initSheet(menu: HTMLDialogElement, signal?: AbortSignal) {
   const trigger = triggerFor(menu);
   trigger?.addEventListener("click", (event) => {
     if (!isSheet(menu)) return;
@@ -88,7 +88,7 @@ function initSheet(menu: HTMLDialogElement) {
       () => isOpen(menu) && isSheet(menu),
     );
   // The sheet becomes a menu when the screen widens, and the reverse.
-  wide.addEventListener("change", () => hide(menu));
+  wide.addEventListener("change", () => hide(menu), { signal });
 }
 
 /**
@@ -98,6 +98,7 @@ function initSheet(menu: HTMLDialogElement) {
 export function initFilterMenus(
   root: HTMLElement,
   onClose: (menu: HTMLElement) => void,
+  signal?: AbortSignal,
 ) {
   for (const menu of root.querySelectorAll<HTMLElement>("[data-filter-menu]")) {
     menu.addEventListener("beforetoggle", (event) => {
@@ -115,7 +116,7 @@ export function initFilterMenus(
         menu.style.removeProperty("visibility");
       });
     });
-    if (menu instanceof HTMLDialogElement) initSheet(menu);
+    if (menu instanceof HTMLDialogElement) initSheet(menu, signal);
     menu.addEventListener("toggle", (event) => {
       if ((event as ToggleEvent).newState === "open") {
         // Skip focusing search on touch screens, where it opens the keyboard.
@@ -150,16 +151,20 @@ export function initFilterMenus(
       ))
         if (!isSheet(menu)) clip(menu);
     },
-    { passive: true },
+    { passive: true, signal },
   );
 
-  addEventListener("resize", () => {
-    for (const menu of root.querySelectorAll<HTMLElement>(
-      "[data-filter-menu]:popover-open",
-    )) {
-      const trigger = triggerFor(menu);
-      if (isSheet(menu)) unplace(menu);
-      else if (trigger) place(menu, trigger);
-    }
-  });
+  addEventListener(
+    "resize",
+    () => {
+      for (const menu of root.querySelectorAll<HTMLElement>(
+        "[data-filter-menu]:popover-open",
+      )) {
+        const trigger = triggerFor(menu);
+        if (isSheet(menu)) unplace(menu);
+        else if (trigger) place(menu, trigger);
+      }
+    },
+    { signal },
+  );
 }

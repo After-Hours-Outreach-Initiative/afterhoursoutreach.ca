@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { playwrightTarget } from "./scripts/ui-test-target.mjs";
 
 const baseURL = playwrightTarget();
+const browserName =
+  process.env.PLAYWRIGHT_BROWSER === "webkit" ? "webkit" : "chromium";
 
 export default defineConfig({
   testDir: "./tests/ui",
@@ -13,12 +15,17 @@ export default defineConfig({
   fullyParallel: true,
   use: {
     baseURL,
-    browserName: "chromium",
-    launchOptions: {
-      executablePath:
-        process.env.CHROMIUM_PATH ??
-        (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
-    },
+    browserName,
+    launchOptions:
+      browserName === "chromium"
+        ? {
+            executablePath:
+              process.env.CHROMIUM_PATH ??
+              (existsSync("/usr/bin/chromium")
+                ? "/usr/bin/chromium"
+                : undefined),
+          }
+        : {},
     trace: "retain-on-failure",
   },
 });

@@ -4,7 +4,9 @@ import "@/styles/account.css";
 import "@/styles/volunteer.css";
 import { env } from "cloudflare:workers";
 import { loadAccountNavigation } from "@/server/account-navigation";
+import type { accountContext } from "@/server/db/access";
 interface Props {
+  context?: Awaited<ReturnType<typeof accountContext>>;
   title: string;
   description: string;
   signedIn?: boolean;
@@ -17,6 +19,7 @@ interface Props {
   publicSpacing?: boolean;
 }
 const {
+  context,
   title,
   description,
   signedIn = false,
@@ -31,7 +34,12 @@ const {
 // Account forms also need the same authoritative navigation as public pages.
 const account =
   signedIn && eventAccess === undefined
-    ? await loadAccountNavigation(env, Astro.request, Astro.response.headers)
+    ? await loadAccountNavigation(
+        env,
+        Astro.request,
+        Astro.response.headers,
+        context,
+      )
     : {
         signedIn,
         organizer,

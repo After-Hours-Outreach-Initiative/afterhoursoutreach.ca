@@ -81,7 +81,10 @@ export function clearFormMessage(element: Element) {
   delete target.dataset.messageKind;
 }
 
-export function initMedicCertifications(element: HTMLFormElement) {
+export function initMedicCertifications(
+  element: HTMLFormElement,
+  signal?: AbortSignal,
+) {
   const section = element.querySelector<HTMLElement>(
     "[data-medic-certifications]",
   );
@@ -139,9 +142,13 @@ export function initMedicCertifications(element: HTMLFormElement) {
     );
     transition.onfinish = finishTransition;
   };
-  reducedMotion.addEventListener("change", () => {
-    if (reducedMotion.matches) finishTransition();
-  });
+  reducedMotion.addEventListener(
+    "change",
+    () => {
+      if (reducedMotion.matches) finishTransition();
+    },
+    { signal },
+  );
   const update = () => {
     // Retain checked answers in FormData and drafts without hidden validation.
     for (const field of fields) field.required = medic.checked;

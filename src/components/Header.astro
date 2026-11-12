@@ -44,67 +44,61 @@ const auditLog = signedIn && organizer;
 const auditLogPage = current === "/audit-log";
 ---
 
-<header class="site-header sticky top-0 z-50 bg-black text-white">
-  <div
-    class="relative mx-auto flex w-full max-w-site items-center gap-6 px-6 py-3 max-lg:gap-3 max-sm:gap-2 max-sm:px-4"
-  >
-    {
-      import.meta.env.DEV ? (
-        // In development the crescent turns yellow and opens the DEV panel.
-        <div class="flex min-w-0 items-center gap-3.5">
-          <DevPanelTrigger class="size-12 max-sm:size-10" />
-          <a
-            class="flex min-w-0 flex-col leading-tight"
-            href="/"
-            aria-label="After Hours Outreach Initiative, home"
-          >
-            <strong class="font-heading text-xl font-bold">After Hours</strong>
-            <span class="text-base text-zinc-400">Outreach Initiative</span>
-          </a>
-        </div>
-      ) : (
+<header class="site-header relative top-0 z-50 bg-black text-white lg:sticky">
+  <div class="relative mx-auto flex w-full max-w-site items-center gap-6 px-6 py-3 max-lg:gap-3 max-sm:gap-2 max-sm:px-4">
+    {import.meta.env.DEV ? (
+      // In development the crescent turns yellow and opens the DEV panel.
+      <div class="flex min-w-0 items-center gap-3.5">
+        <DevPanelTrigger class="size-12 max-sm:size-10" />
         <a
-          class="flex min-w-0 items-center gap-3.5"
+          class="flex min-w-0 flex-col leading-tight"
           href="/"
           aria-label="After Hours Outreach Initiative, home"
         >
-          <MoonIcon class="size-12 shrink-0 fill-current text-blue max-sm:size-10" />
-          <span class="flex min-w-0 flex-col leading-tight">
-            <strong class="font-heading text-xl font-bold">After Hours</strong>
-            <span class="text-base text-zinc-400">Outreach Initiative</span>
-          </span>
+          <strong class="font-heading text-xl font-bold">After Hours</strong>
+          <span class="text-base text-zinc-400">Outreach Initiative</span>
         </a>
-      )
-    }
+      </div>
+    ) : (
+      <a
+        class="flex min-w-0 items-center gap-3.5"
+        href="/"
+        aria-label="After Hours Outreach Initiative, home"
+      >
+        <MoonIcon class="size-12 shrink-0 fill-current text-blue max-sm:size-10" />
+        <span class="flex min-w-0 flex-col leading-tight">
+          <strong class="font-heading text-xl font-bold">After Hours</strong>
+          <span class="text-base text-zinc-400">Outreach Initiative</span>
+        </span>
+      </a>
+    )}
 
     <nav
       class="ml-auto hidden items-center gap-6 lg:flex"
       aria-label="Primary navigation"
     >
-      {
-        links.map((link) => (
-          <a
-            class="header-link"
-            href={link.href}
-            data-header-applications={
-              link.href === "/applications" ? "" : undefined
-            }
-            data-volunteer-nav={
-              link.href === "/volunteer" || link.href === "/events"
-                ? ""
-                : undefined
-            }
-            aria-current={isCurrent(link.href) ? "page" : undefined}
-          >
-            <span class="header-link-label" data-volunteer-nav-label>
-              {link.label}
-              {link.href === "/applications" && (
-                <HeaderApplicationBadge count={applicationCount} />
-              )}
-            </span>
-          </a>
-        ))
-      }
+      {links.map((link) => (
+        <a
+          class="header-link"
+          href={link.href}
+          data-header-applications={
+            link.href === "/applications" ? "" : undefined
+          }
+          data-volunteer-nav={
+            link.href === "/volunteer" || link.href === "/events"
+              ? ""
+              : undefined
+          }
+          aria-current={isCurrent(link.href) ? "page" : undefined}
+        >
+          <span class="header-link-label" data-volunteer-nav-label>
+            {link.label}
+            {link.href === "/applications" && (
+              <HeaderApplicationBadge count={applicationCount} />
+            )}
+          </span>
+        </a>
+      ))}
     </nav>
 
     <a
@@ -133,18 +127,20 @@ const auditLogPage = current === "/audit-log";
         <summary
           class="header-account-toggle"
           role="button"
-          aria-label={greetingName === "Account"
-            ? "Account"
-            : `Account for ${greetingName}`}
+          aria-label={
+            greetingName === "Account"
+              ? "Account"
+              : `Account for ${greetingName}`
+          }
           aria-expanded="false"
           data-current={accountPage ? "true" : undefined}
         >
-          <span class="header-account-icon"
-            ><AccountIcon class="size-5 shrink-0" /></span
-          >
-          <span class="header-account-label" data-account-greeting
-            >{greetingName}</span
-          >
+          <span class="header-account-icon">
+            <AccountIcon class="size-5 shrink-0" />
+          </span>
+          <span class="header-account-label" data-account-greeting>
+            {greetingName}
+          </span>
           <ChevronDown size="1em" aria-hidden="true" class="header-chevron" />
         </summary>
         <HeaderAccountCard
@@ -177,33 +173,31 @@ const auditLogPage = current === "/audit-log";
         aria-label="Mobile navigation"
       >
         <ul class="header-mobile-links" aria-label="Site pages">
-          {
-            links.map((link) => (
-              <li>
-                <a
-                  class="header-mobile-link"
-                  href={link.href}
-                  data-header-applications={
-                    link.href === "/applications" ? "" : undefined
-                  }
-                  data-volunteer-nav={
-                    link.href === "/volunteer" || link.href === "/events"
-                      ? ""
-                      : undefined
-                  }
-                  aria-current={isCurrent(link.href) ? "page" : undefined}
-                >
-                  <span class="header-link-label" data-volunteer-nav-label>
-                    {link.label}
-                    {link.href === "/applications" && (
-                      <HeaderApplicationBadge count={applicationCount} />
-                    )}
-                  </span>
-                  <ArrowRightIcon class="header-mobile-arrow" />
-                </a>
-              </li>
-            ))
-          }
+          {links.map((link) => (
+            <li>
+              <a
+                class="header-mobile-link"
+                href={link.href}
+                data-header-applications={
+                  link.href === "/applications" ? "" : undefined
+                }
+                data-volunteer-nav={
+                  link.href === "/volunteer" || link.href === "/events"
+                    ? ""
+                    : undefined
+                }
+                aria-current={isCurrent(link.href) ? "page" : undefined}
+              >
+                <span class="header-link-label" data-volunteer-nav-label>
+                  {link.label}
+                  {link.href === "/applications" && (
+                    <HeaderApplicationBadge count={applicationCount} />
+                  )}
+                </span>
+                <ArrowRightIcon class="header-mobile-arrow" />
+              </a>
+            </li>
+          ))}
         </ul>
         <section
           class="header-mobile-account"

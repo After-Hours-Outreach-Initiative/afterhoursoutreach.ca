@@ -11,10 +11,7 @@ import { accountGreeting } from "../../data/account-navigation";
 import { personDisplayName } from "../../data/person-name";
 import { contactEmail } from "../../data/site";
 import { RequestError, requireSameOrigin } from "../http";
-import {
-  isApplicationComplete,
-  loadApplicationProgress,
-} from "./application-progress";
+import { isApplicationComplete } from "./application-progress";
 export { canViewEvents } from "./policy";
 
 export async function accountContext(
@@ -24,8 +21,9 @@ export async function accountContext(
 ) {
   const scoped = authBindingsForRequest(bindings, request);
   if (write) requireSameOrigin(request, new URL(scoped.AUTH_BASE_URL).origin);
+  const auth = createAuth(scoped);
   const { response: current, headers } = await readAccountSession(
-    createAuth(scoped),
+    auth,
     request,
   );
   if (!current?.user.emailVerified)
@@ -35,6 +33,8 @@ export async function accountContext(
       greetingName: "Account",
       headers,
       bindings: scoped,
+      auth,
+      current,
     };
   const { actor, greetingName } = await actorFor(
     bindings,
@@ -47,6 +47,8 @@ export async function accountContext(
     greetingName,
     headers,
     bindings: scoped,
+    auth,
+    current,
   };
 }
 
@@ -69,19 +71,21 @@ async function actorFor(
   const db = createDatabase(bindings.DB);
   // Better Auth reads this user from D1: cookie caching and secondary storage
   // are disabled. Authorization is still rechecked inside each atomic write.
-  const status = await db.query.volunteerStatus.findFirst({
-    where: eq(volunteerStatus.user_id, person.id),
-  });
-  const application = await db.query.profile.findFirst({
-    where: eq(profile.user_id, person.id),
-    columns: {
-      first_name: true,
-      last_name: true,
-      preferred_name: true,
-      registered_at: true,
-      naloxone_completed_at: true,
-    },
-  });
+  const [status, application] = await Promise.all([
+    db.query.volunteerStatus.findFirst({
+      where: eq(volunteerStatus.user_id, person.id),
+    }),
+    db.query.profile.findFirst({
+      where: eq(profile.user_id, person.id),
+      columns: {
+        first_name: true,
+        last_name: true,
+        preferred_name: true,
+        registered_at: true,
+        naloxone_completed_at: true,
+      },
+    }),
+  ]);
   const names = {
     firstName: application?.first_name,
     lastName: application?.last_name,
@@ -95,9 +99,12 @@ async function actorFor(
     twoFactorEnabled: person.twoFactorEnabled,
     twoFactorVerified: session.twoFactorVerified,
     applicationSubmitted: Boolean(application),
-    applicationComplete: isApplicationComplete(
-      await loadApplicationProgress(bindings.DB, person.id),
-    ),
+    applicationComplete: isApplicationComplete({
+      submittedAt: application?.registered_at?.getTime() ?? null,
+      naloxoneCompletedAt:
+        application?.naloxone_completed_at?.getTime() ?? null,
+      applicationApproved: status?.registration_approved ?? false,
+    }),
     naloxoneCompleted: Boolean(application?.naloxone_completed_at),
     active: status?.active ?? false,
     applicationApproved: status?.registration_approved ?? false,

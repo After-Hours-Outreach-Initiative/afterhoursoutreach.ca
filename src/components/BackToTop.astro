@@ -8,14 +8,10 @@ import ArrowUpIcon from "@/components/icons/ArrowUpIcon.astro";
 </a>
 
 <style>
-  /* Slides down from under the header while a reader scrolls back up a long
-     page. */
+  /* Appears below the visible sticky header and table-of-contents bar. */
   .back-to-top {
     position: fixed;
-    top: calc(
-      var(--site-header-rendered-height, var(--site-header-height, 5.5rem)) +
-        0.75rem
-    );
+    top: calc(var(--back-to-top-offset, 0px) + 0.75rem);
     left: 50%;
     z-index: 30;
     display: inline-flex;

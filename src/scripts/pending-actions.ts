@@ -146,6 +146,7 @@ function init(region: HTMLElement) {
     const result = (await response
       .json()
       .catch(() => ({}))) as EmailActionResult & { status?: string };
+    if (response.ok) document.dispatchEvent(new Event("app-data-changed"));
     return { response, result };
   }
 
@@ -542,7 +543,7 @@ function init(region: HTMLElement) {
       queued = false;
       decorate();
     });
-  }).observe(document.body, { childList: true, subtree: true });
+  }).observe(document.documentElement, { childList: true, subtree: true });
 
   let poll: number | undefined;
   const startPolling = () => {

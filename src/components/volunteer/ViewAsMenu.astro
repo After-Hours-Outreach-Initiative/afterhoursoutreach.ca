@@ -138,6 +138,7 @@ const searchId = `view-as-search-${crypto.randomUUID()}`;
 
   class ViewAsMenu extends HTMLElement {
     private selected = -1;
+    private controller?: AbortController;
 
     private get search() {
       return this.querySelector<HTMLInputElement>("[data-view-as-search]")!;
@@ -156,10 +157,15 @@ const searchId = `view-as-search-${crypto.randomUUID()}`;
     connectedCallback() {
       if (this.dataset.ready) return;
       this.dataset.ready = "";
-      initFilterMenus(this, () => {
-        this.search.value = "";
-        this.filter();
-      });
+      this.controller = new AbortController();
+      initFilterMenus(
+        this,
+        () => {
+          this.search.value = "";
+          this.filter();
+        },
+        this.controller.signal,
+      );
       this.search.addEventListener("input", () => this.filter());
       this.search.addEventListener("keydown", (event) => {
         const options = this.shown;
@@ -186,6 +192,10 @@ const searchId = `view-as-search-${crypto.randomUUID()}`;
       this.list.addEventListener("pointerdown", (event) =>
         event.preventDefault(),
       );
+    }
+
+    disconnectedCallback() {
+      this.controller?.abort();
     }
 
     private filter() {

@@ -594,9 +594,6 @@ body:has(
   [data-application-draft-actions] > .volunteer-actions {
     flex-direction: column;
   }
-  body:has([data-application-flow]) > .site-header {
-    position: relative;
-  }
   [data-application-flow] {
     --contents-scroll-offset: 4.875rem;
   }

@@ -19,6 +19,7 @@ let team: Awaited<ReturnType<typeof listVolunteers>> = {
   approvedCount: 0,
   roleCounts: {},
 };
+let context: Awaited<ReturnType<typeof accountContext>> | undefined;
 let lock = "";
 let accountName = "";
 let accountGreeting = "";
@@ -27,10 +28,8 @@ const state = volunteerListState(Astro.url.searchParams);
 const { search, sort, direction, roles, roleOrder } = state;
 const listUrl = volunteerListUrl(state);
 try {
-  const { actor, headers, email, greetingName } = await accountContext(
-    env,
-    Astro.request,
-  );
+  context = await accountContext(env, Astro.request);
+  const { actor, headers, email, greetingName } = context;
   forwardCookies(headers, Astro.response.headers);
   if (!actor)
     return Astro.redirect(
@@ -60,6 +59,7 @@ try {
 ---
 
 <AccountLayout
+  {context}
   title="Volunteers"
   description="Organizer volunteer management."
   signedIn
@@ -68,17 +68,14 @@ try {
   greetingName={accountGreeting}
   email={accountEmail}
 >
-  {
-    lock ? (
-      <p class="volunteer-notice">
-        {lock} <a href="/volunteer/account">Your account</a>
-      </p>
-    ) : (
-      <VolunteerDirectory kind="volunteers" people={team} state={state} />
-    )
-  }
+  {lock ? (
+    <p class="volunteer-notice">
+      {lock} <a href="/volunteer/account">Your account</a>
+    </p>
+  ) : (
+    <VolunteerDirectory kind="volunteers" people={team} state={state} />
+  )}
 </AccountLayout>
 <script>
-  import { initVolunteerBrowser } from "@/scripts/volunteer-browser";
-  initVolunteerBrowser();
+  import "@/scripts/directory";
 </script>

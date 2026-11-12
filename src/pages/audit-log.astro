@@ -36,15 +36,14 @@ const filters = auditFilters(Astro.url.searchParams);
 const pageUrl = auditLogUrl(filters, before);
 let history: Awaited<ReturnType<typeof listAuditLog>> = { entries: [] };
 let users: Awaited<ReturnType<typeof listAuditUsers>> = [];
+let context: Awaited<ReturnType<typeof accountContext>> | undefined;
 let lock = "";
 let accountName = "";
 let accountGreeting = "";
 let accountEmail = "";
 try {
-  const { actor, headers, email, greetingName } = await accountContext(
-    env,
-    Astro.request,
-  );
+  context = await accountContext(env, Astro.request);
+  const { actor, headers, email, greetingName } = context;
   forwardCookies(headers, Astro.response.headers);
   if (!actor)
     return Astro.redirect(
@@ -85,7 +84,9 @@ const kindLabels: Record<AuditKind, string> = {
   series: "Recurring event",
 };
 const actionGroups = (["person", "event", "series"] as const).map((kind) => ({
-  label: { person: "Accounts", event: "Events", series: "Recurring events" }[kind],
+  label: { person: "Accounts", event: "Events", series: "Recurring events" }[
+    kind
+  ],
   actions: auditActions.filter((item) => item.kind === kind),
 }));
 const filterMenus = [
@@ -134,6 +135,7 @@ const filterMenus = [
 ---
 
 <AccountLayout
+  {context}
   title="Audit Log"
   description="Organizer history of volunteer, event, and recurring event changes."
   signedIn

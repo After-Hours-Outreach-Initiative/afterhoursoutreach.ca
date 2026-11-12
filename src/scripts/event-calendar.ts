@@ -1,3 +1,4 @@
+import { updateLocalUrl } from "./local-history";
 import { eventCalendar, type CalendarEvent } from "../data/event-calendar";
 
 const selections = new WeakMap<
@@ -335,7 +336,7 @@ export function handleEventCalendarClick(root: HTMLElement, event: MouseEvent) {
   if (!card || card.hidden) return;
   event.preventDefault();
   // Keep occurrence query parameters and native back/forward navigation.
-  if (location.hash !== link.hash) history.pushState(null, "", link.hash);
+  if (location.hash !== link.hash) updateLocalUrl(link.hash, "push");
   card.focus({ preventScroll: true });
   highlightEvent(root, card);
   card.scrollIntoView({

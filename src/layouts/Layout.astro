@@ -1,4 +1,5 @@
 ---
+import ClientRouter from "astro/components/ClientRouter.astro";
 import AppDock from "@/components/AppDock.astro";
 import BackToTop from "@/components/BackToTop.astro";
 import Footer from "@/components/Footer.astro";
@@ -11,6 +12,12 @@ import "@/styles/tailwind.css";
 import { devFavicon } from "@/dev/favicon";
 
 // Preview mode changes only the banner, never account or event availability.
+// Keep public and authentication pages on ordinary document navigation.
+const appNavigation =
+  Boolean(Astro.props.account.signedIn) &&
+  /^\/(?:events|applications|volunteers|volunteer(?:\/account)?)\/?$/.test(
+    Astro.url.pathname,
+  );
 const showPreviewBanner = import.meta.env.MODE === "preview";
 
 interface Props {
@@ -33,20 +40,23 @@ const {
 ---
 
 <!doctype html>
-<html lang="en" class="scroll-smooth bg-ink">
+<html lang="en" class="scroll-smooth bg-ink" transition:animate="none">
   <head>
     <meta charset="utf-8" />
-    {
-      import.meta.env.DEV ? (
-        // A yellow crescent tells development tabs apart.
-        <link rel="icon" type="image/svg+xml" href={devFavicon} />
-      ) : (
-        <Fragment>
-          <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-          <link rel="icon" href="/favicon.ico" />
-        </Fragment>
-      )
-    }
+    <script>
+      // Register local-entry history handling before the router's popstate handler.
+      import "@/scripts/local-history";
+    </script>
+    {appNavigation && <ClientRouter fallback="swap" />}
+    {import.meta.env.DEV ? (
+      // A yellow crescent tells development tabs apart.
+      <link rel="icon" type="image/svg+xml" href={devFavicon} />
+    ) : (
+      <Fragment>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" href="/favicon.ico" />
+      </Fragment>
+    )}
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width" />
@@ -60,31 +70,40 @@ const {
   </head>
   <body
     data-app-dock={account.signedIn ? "" : undefined}
+    data-app-scope={
+      appNavigation
+        ? JSON.stringify([
+            account.email,
+            account.organizer,
+            account.eventAccess,
+          ])
+        : undefined
+    }
     class="m-0 flex min-h-dvh flex-col overflow-x-hidden bg-ink font-body text-base leading-relaxed text-zinc-100 antialiased"
   >
     <a
       data-skip-to-main
       class="fixed top-4 left-4 z-[100] -translate-y-40 rounded-lg bg-blue px-5 py-3 text-base font-bold text-white transition-transform focus:translate-y-0"
-      href="#main-content">Skip to main content</a
+      href="#main-content"
     >
+      Skip to main content
+    </a>
 
-    {
-      showPreviewBanner && (
-        <aside
-          class="border-b border-amber-800 bg-amber-950 px-4 py-3 text-center text-sm text-amber-100"
-          aria-label="Preview environment"
+    {showPreviewBanner && (
+      <aside
+        class="border-b border-amber-800 bg-amber-950 px-4 py-3 text-center text-sm text-amber-100"
+        aria-label="Preview environment"
+      >
+        Preview testing site.{" "}
+        <a
+          class="underline underline-offset-4 hover:text-white"
+          href="https://afterhoursoutreach.ca"
         >
-          Preview testing site.{" "}
-          <a
-            class="underline underline-offset-4 hover:text-white"
-            href="https://afterhoursoutreach.ca"
-          >
-            Visit the regular site
-          </a>
-          .
-        </aside>
-      )
-    }
+          Visit the regular site
+        </a>
+        .
+      </aside>
+    )}
     <Header {...account} />
     {
       /* Sent with the header, so the dock and the space kept for it are there
@@ -109,11 +128,15 @@ const {
     />
     <BackToTop />
     {account.signedIn && account.organizer && <PendingActions />}
-    <DevPanel />
+    <div style="display: contents" transition:persist="development-panel">
+      <DevPanel />
+    </div>
   </body>
 </html>
 
 <script>
+  import "@/scripts/app-navigation";
+  import { onPageLoad } from "@/scripts/page-lifecycle";
   // The browser skips a page transition when the next page cannot take part,
   // such as after typing an address. Skipping is expected, not an error.
   addEventListener("pageswap", (event) => {
@@ -122,25 +145,27 @@ const {
     transition?.finished.catch(() => {});
   });
 
-  document
-    .querySelector<HTMLAnchorElement>("[data-skip-to-main]")
-    ?.addEventListener("click", (event) => {
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      )
-        return;
+  onPageLoad(() => {
+    document
+      .querySelector<HTMLAnchorElement>("[data-skip-to-main]")
+      ?.addEventListener("click", (event) => {
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        )
+          return;
 
-      const main = document.getElementById("main-content");
-      if (!main) return;
+        const main = document.getElementById("main-content");
+        if (!main) return;
 
-      // Skip navigation, not the viewport. Keep the fragment as a fallback
-      // without JavaScript or if focus cannot move to the main landmark.
-      main.focus({ preventScroll: true });
-      if (document.activeElement === main) event.preventDefault();
-    });
+        // Skip navigation, not the viewport. Keep the fragment as a fallback
+        // without JavaScript or if focus cannot move to the main landmark.
+        main.focus({ preventScroll: true });
+        if (document.activeElement === main) event.preventDefault();
+      });
+  });
 </script>

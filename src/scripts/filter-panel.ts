@@ -7,7 +7,11 @@ const wide = matchMedia("(min-width: 64rem)");
  * applies each change at once. On small screens it opens as a modal sheet and
  * applies its choices when it closes.
  */
-export function initFilterPanel(root: HTMLElement, apply: () => void) {
+export function initFilterPanel(
+  root: HTMLElement,
+  apply: () => void,
+  signal?: AbortSignal,
+) {
   const panel = root.querySelector<HTMLDialogElement>("[data-filter-panel]");
   const trigger = root.querySelector<HTMLElement>("[data-filter-panel-open]");
   if (!panel) return { update() {}, isOpen: () => false };
@@ -82,9 +86,13 @@ export function initFilterPanel(root: HTMLElement, apply: () => void) {
       () => panel.open && !wide.matches,
     );
   // The sheet becomes the sidebar when the screen widens.
-  wide.addEventListener("change", () => {
-    if (wide.matches && panel.open) panel.close();
-  });
+  wide.addEventListener(
+    "change",
+    () => {
+      if (wide.matches && panel.open) panel.close();
+    },
+    { signal },
+  );
   update();
   return { update, isOpen: () => panel.open };
 }
