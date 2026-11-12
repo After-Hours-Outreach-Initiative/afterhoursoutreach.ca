@@ -373,6 +373,10 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await lastCard
       .getByRole("button", { name: "Restore", exact: true })
       .click();
+    await organizerPage
+      .getByRole("dialog", { name: "Restore this event?", exact: true })
+      .getByRole("button", { name: "Restore", exact: true })
+      .click();
     await expect(lastCard.locator(".volunteer-hidden")).toHaveCount(0);
     await expect(
       lastCard.getByRole("button", { name: "Edit", exact: true }),

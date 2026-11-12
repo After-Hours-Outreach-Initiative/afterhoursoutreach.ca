@@ -269,9 +269,22 @@ test("event dialogs offer only cancellation for future events and keep ended his
     cancelledOccurrence.getByRole("button", { name: "Edit", exact: true }),
   ).toHaveCount(0);
   await expect(cancelledOccurrence.locator("dialog")).toHaveCount(0);
-  await cancelledOccurrence
-    .getByRole("button", { name: "Restore", exact: true })
-    .click();
+  // Restoring asks first; cancelling the prompt leaves the date cancelled.
+  const restore = cancelledOccurrence.getByRole("button", {
+    name: "Restore",
+    exact: true,
+  });
+  const confirm = page.getByRole("dialog", {
+    name: "Restore this event?",
+    exact: true,
+  });
+  await restore.click();
+  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(confirm).toHaveCount(0);
+  await expect(restore).toBeFocused();
+  await expect(cancelledOccurrence.locator(".volunteer-hidden")).toHaveCount(1);
+  await restore.click();
+  await confirm.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(cancelledOccurrence.locator(".volunteer-hidden")).toHaveCount(0);
   await expect(
     cancelledOccurrence.getByRole("button", { name: "Edit", exact: true }),

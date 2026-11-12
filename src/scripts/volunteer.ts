@@ -9,7 +9,10 @@ import {
 import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
-import { confirmEventUnregistration } from "./event-unregistration";
+import {
+  confirmEventRestore,
+  confirmEventUnregistration,
+} from "./confirm-dialog";
 import { initDateInputs, readDateInputs } from "./date-input";
 import {
   disposeVolunteerProfileContents,
@@ -683,6 +686,11 @@ function form(
         element.matches("[data-live-signup]") &&
         values.get("action") === "cancel" &&
         !(await confirmEventUnregistration(element))
+      )
+        return;
+      if (
+        element.matches("[data-event-restore]") &&
+        !(await confirmEventRestore(element))
       )
         return;
       const notify =

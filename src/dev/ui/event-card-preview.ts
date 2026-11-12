@@ -1,5 +1,5 @@
 import { eventCardChannel } from "./event-card-fixtures";
-import { confirmEventUnregistration } from "../../scripts/event-unregistration";
+import { confirmEventUnregistration } from "../../scripts/confirm-dialog";
 
 if (import.meta.env.DEV) {
   const root = document.querySelector<HTMLElement>("[data-ui-event-preview]");
