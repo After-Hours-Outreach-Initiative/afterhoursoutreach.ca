@@ -84,3 +84,49 @@ export async function seedLocalAccounts(
     if (cookies.size) await post("/sign-out", {});
   }
 }
+
+/** Empty every app table, keeping applied migrations. */
+export async function clearLocalData(db: AuthBindings["DB"]) {
+  const tables = await db
+    .prepare(
+      `SELECT name FROM sqlite_master WHERE type='table'
+      AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE '\\_cf\\_%' ESCAPE '\\'
+      AND name <> 'd1_migrations'`,
+    )
+    .all<{ name: string }>();
+  // Triggers guard real data, such as keeping the last organizer or never
+  // deleting a recurring date. Lift them while emptying, then restore them.
+  const triggers = await db
+    .prepare(
+      "SELECT name, sql FROM sqlite_master WHERE type='trigger' AND sql IS NOT NULL",
+    )
+    .all<{ name: string; sql: string }>();
+  const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
+  // One transaction, so a failure leaves everything as it was. Foreign keys
+  // are checked only once every table is empty.
+  await db.batch([
+    db.prepare("PRAGMA defer_foreign_keys = ON"),
+    ...triggers.results.map(({ name }) =>
+      db.prepare(`DROP TRIGGER ${quote(name)}`),
+    ),
+    ...tables.results.map(({ name }) =>
+      db.prepare(`DELETE FROM ${quote(name)}`),
+    ),
+    ...triggers.results.map(({ sql }) => db.prepare(sql)),
+  ]);
+}
+
+/** Empty the local database, then seed it as `pnpm dev` does. Everything
+ * else, including accounts and events made by hand, is removed. */
+export async function resetLocalData(bindings: AuthBindings) {
+  try {
+    await assertDatabaseReady(bindings.DB);
+  } catch {
+    throw new RequestError(
+      503,
+      "Apply local migrations with pnpm db:migrate:local, then try again.",
+    );
+  }
+  await clearLocalData(bindings.DB);
+  await seedLocalAccounts(bindings);
+}

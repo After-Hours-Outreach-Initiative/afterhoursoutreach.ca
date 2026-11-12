@@ -29,6 +29,7 @@ const allowed = new Map([
         ["/dev/delete-user", "POST"],
         ["/dev/application-step", "POST"],
         ["/dev/seed-accounts", "POST"],
+        ["/dev/reset-data", "POST"],
       ] as const)
     : []),
 ]);

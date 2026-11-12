@@ -92,6 +92,32 @@ export function developmentAccounts(bindings: AuthBindings) {
           });
         },
       ),
+      developmentResetData: createAuthEndpoint(
+        "/dev/reset-data",
+        {
+          method: "POST",
+          requireHeaders: true,
+          body: z.strictObject({ confirm: z.literal(true) }),
+        },
+        async (ctx) => {
+          requireLocal(ctx.request);
+          const { resetLocalData } = await import("./seed-accounts");
+          try {
+            await resetLocalData(bindings);
+          } catch (error) {
+            throw new APIError("SERVICE_UNAVAILABLE", {
+              message:
+                error instanceof RequestError
+                  ? error.message
+                  : "Could not reset local data. Check local migrations and try again.",
+            });
+          }
+          // Every session is gone, so the page reloads signed out.
+          return ctx.json({
+            message: "Local data reset to the sample accounts and events.",
+          });
+        },
+      ),
       developmentSwitchUser: createAuthEndpoint(
         "/dev/switch-user",
         {

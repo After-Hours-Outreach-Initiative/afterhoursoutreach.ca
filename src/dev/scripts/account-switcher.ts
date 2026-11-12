@@ -29,6 +29,7 @@ const developmentAuthClient = createAuthClient({
         "/dev/delete-user": "POST",
         "/dev/application-step": "POST",
         "/dev/seed-accounts": "POST",
+        "/dev/reset-data": "POST",
       },
     },
   ],
@@ -58,6 +59,7 @@ export function initAccountSwitcher() {
   const createAccount = root.querySelector<HTMLAnchorElement>(
     "[data-create-account]",
   );
+  const resetData = root.querySelector<HTMLButtonElement>("[data-reset-data]");
   const seedAccounts = root.querySelector<HTMLButtonElement>(
     "[data-seed-accounts]",
   );
@@ -132,6 +134,7 @@ export function initAccountSwitcher() {
       .forEach((button) => (button.disabled = value));
     createAccount?.setAttribute("aria-disabled", String(value));
     if (seedAccounts) seedAccounts.disabled = value;
+    if (resetData) resetData.disabled = value;
     updateSteps();
   };
   setBusy(true);
@@ -204,6 +207,34 @@ export function initAccountSwitcher() {
     message.textContent = accountErrorMessage(error);
     message.hidden = false;
   };
+  // Two clicks: the first asks to confirm, as deleting an account does.
+  const confirmReset = (confirming: boolean) => {
+    if (!resetData) return;
+    resetData.toggleAttribute("data-confirming", confirming);
+    resetData.classList.toggle("btn-quiet", !confirming);
+    resetData.classList.toggle("btn-red", confirming);
+    resetData.textContent = confirming ? "Confirm reset" : "Reset local data";
+  };
+  resetData?.addEventListener("blur", () => confirmReset(false));
+  resetData?.addEventListener("click", async () => {
+    if (busy) return;
+    if (!resetData.hasAttribute("data-confirming")) {
+      confirmReset(true);
+      return;
+    }
+    setBusy(true);
+    message.hidden = true;
+    resetData.textContent = "Resetting…";
+    try {
+      await developmentAuthClient.dev.resetData({ confirm: true });
+      // Every session is gone; reload signed out.
+      location.assign(location.pathname + location.search);
+    } catch (error) {
+      confirmReset(false);
+      setBusy(false);
+      fail(error);
+    }
+  });
   seedAccounts?.addEventListener("click", async () => {
     if (busy) return;
     setBusy(true);

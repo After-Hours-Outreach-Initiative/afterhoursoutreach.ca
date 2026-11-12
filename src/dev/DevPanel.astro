@@ -88,13 +88,22 @@ import DialogHeader from "@/components/DialogHeader.astro";
     </div>
     <div class="dialog-footer">
       <button
-        class="btn btn-quiet mr-auto"
+        class="btn btn-quiet"
         type="button"
         data-seed-accounts
         title="Add the sample accounts and events. Edited accounts are kept."
         disabled
       >
         Seed local accounts
+      </button>
+      <button
+        class="btn btn-quiet mr-auto"
+        type="button"
+        data-reset-data
+        title="Empty the local database and seed it again. Removes every account and event, including your own."
+        disabled
+      >
+        Reset local data
       </button>
       <a class="btn btn-quiet" href="/volunteer/sign-in" data-create-account>
         Create an account
