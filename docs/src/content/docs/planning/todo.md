@@ -3,12 +3,6 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
-- rearrange the event type options to be orientation first and default to the
-  orientation too
-- remove application ready notification from sending to info@...
-  - and make an organizer account setting to receive application ready to
-    review email notifications
-
 - change volunteer spots to show a visual with avatars of total spots and
   reservations and limits
 - application steps should have a "1 of N" indicated somewhere

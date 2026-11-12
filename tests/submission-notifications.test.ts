@@ -960,7 +960,7 @@ test("catch-safe automatic jobs log aggregate categories only and cannot undo a 
   assert.equal(await count("application_submission_notification"), 3);
 });
 
-test("review mail only targets verified active organizers who opted in, excluding the info inbox", async () => {
+test("review mail only targets verified active organizers who opted in", async () => {
   await db
     .prepare(
       "UPDATE user SET application_review_emails=0 WHERE id='reviewer-0'",
@@ -971,16 +971,6 @@ test("review mail only targets verified active organizers who opted in, excludin
     .run();
   await db
     .prepare("UPDATE volunteer_status SET active=0 WHERE user_id='reviewer-2'")
-    .run();
-  await db
-    .prepare(
-      "INSERT INTO user (id,name,email,email_verified,role,application_review_emails,created_at,updated_at) VALUES ('info','Inbox','info@afterhoursoutreach.ca',1,'organizer',1,0,0)",
-    )
-    .run();
-  await db
-    .prepare(
-      "INSERT INTO volunteer_status (user_id,active,updated_at) VALUES ('info',1,0)",
-    )
     .run();
   await submit();
   assert.equal(await count("application_submission_notification"), 0);

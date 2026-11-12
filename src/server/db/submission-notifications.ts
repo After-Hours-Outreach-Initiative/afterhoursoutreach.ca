@@ -57,7 +57,6 @@ export function submissionNotificationStatements(
         AND p.naloxone_completed_at IS NOT NULL AND ${writeGuard}
         AND u.role='organizer' AND u.email_verified=1 AND u.deleted_at IS NULL
         AND u.application_review_emails=1 AND organizer_status.active=1
-        AND lower(u.email) != 'info@afterhoursoutreach.ca'
         AND EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id=p.user_id
           AND v.registration_approved=0 AND v.application_rejection_reason IS NULL)
       ON CONFLICT(user_id,recipient) DO NOTHING`,
@@ -86,8 +85,7 @@ const subscribedRecipientGuard = `EXISTS (SELECT 1 FROM user u
   JOIN volunteer_status v ON v.user_id=u.id
   WHERE u.email=application_submission_notification.recipient
     AND u.role='organizer' AND u.email_verified=1 AND u.deleted_at IS NULL
-    AND u.application_review_emails=1 AND v.active=1
-    AND lower(u.email) != 'info@afterhoursoutreach.ca')`;
+    AND u.application_review_emails=1 AND v.active=1)`;
 
 // Provenance distinguishes review intents from the old initial-form outbox,
 // including legacy applicants already ready for review. Never sweep/backfill
