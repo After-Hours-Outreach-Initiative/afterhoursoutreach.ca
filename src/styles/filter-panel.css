@@ -107,7 +107,8 @@
     border-color: #a1a1aa;
     background: #27272a;
   }
-  .filter-layout:has(.directory-sort-trigger) .filter-panel-trigger[data-active] {
+  .filter-layout:has(.directory-sort-trigger)
+    .filter-panel-trigger[data-active] {
     border-color: #818cf8;
     background: var(--color-blue-deep);
   }
@@ -126,6 +127,9 @@
 
 /* Small screens: a sheet rising from the bottom of the screen. */
 .filter-panel {
+  /* Keep the column layout during the discrete display exit transition,
+     after close() removes [open]. */
+  flex-direction: column;
   inset: auto 0 0;
   width: 100%;
   max-width: 100%;
@@ -140,7 +144,6 @@
 }
 .filter-panel[open] {
   display: flex;
-  flex-direction: column;
 }
 .filter-panel::backdrop {
   background: #000b;

@@ -72,7 +72,10 @@ const orders = [
   data-filter-menu-align="end"
   data-filter-menu-sheet
 >
-  <div class="dialog-header sheet-header directory-sort-header" data-sheet-handle>
+  <div
+    class="dialog-header sheet-header directory-sort-header"
+    data-sheet-handle
+  >
     <span class="sheet-grabber" aria-hidden="true"></span>
     <h2>
       <SortIcon class="filter-panel-heading-icon" />
@@ -225,11 +228,7 @@ const orders = [
     </noscript>
   </div>
   <div class="dialog-footer directory-sort-footer">
-    <button
-      class="btn btn-primary"
-      type="button"
-      data-sheet-close
-    >
+    <button class="btn btn-primary" type="button" data-sheet-close>
       Show results
     </button>
   </div>
@@ -240,6 +239,8 @@ const orders = [
      the filters. Wide screens keep a popover menu under the button. */
   @media (width < 64rem) {
     .directory-sort-menu {
+      /* Closing removes [open] before the display exit transition ends. */
+      flex-direction: column;
       position: fixed;
       inset: auto 0 0;
       margin: 0;
@@ -253,7 +254,6 @@ const orders = [
     }
     .directory-sort-menu[open] {
       display: flex;
-      flex-direction: column;
     }
     .directory-sort-menu::backdrop {
       background: #000b;
