@@ -1,4 +1,6 @@
 ---
+import Instagram from "@/components/icons/InstagramIcon.astro";
+import { Mail, Phone } from "@lucide/astro";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import FacebookIcon from "@/components/icons/FacebookIcon.astro";
 import LinkedInIcon from "@/components/icons/LinkedInIcon.astro";
@@ -61,17 +63,11 @@ const links = siteNavigation(signedIn, organizer, eventAccess);
           href={`mailto:${contactEmail}`}
         >
           {/* lucide: mail */}
-          <svg
-            class="lucide size-[1.25em] shrink-0 text-blue"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+          <Mail
+            size="1em"
             aria-hidden="true"
-          >
-            <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path>
-            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-          </svg>
+            class="lucide size-[1.25em] shrink-0 text-blue"
+          />
           <span class="min-w-0 wrap-anywhere">{contactEmail}</span></a
         >
         <a
@@ -79,20 +75,11 @@ const links = siteNavigation(signedIn, organizer, eventAccess);
           href={`tel:+1${contactPhone.replace(/\D/g, "")}`}
         >
           {/* lucide: phone */}
-          <svg
-            class="lucide size-[1.25em] shrink-0 text-blue"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+          <Phone
+            size="1em"
             aria-hidden="true"
-          >
-            <path
-              d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"
-            ></path>
-          </svg>
+            class="lucide size-[1.25em] shrink-0 text-blue"
+          />
           {contactPhone}</a
         >
         <a
@@ -145,19 +132,10 @@ const links = siteNavigation(signedIn, organizer, eventAccess);
           target="_blank"
           rel="noreferrer"
         >
-          <svg
-            class="size-[1.25em] shrink-0 text-blue"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+          <Instagram
             aria-hidden="true"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="5"></rect>
-            <circle cx="12" cy="12" r="4"></circle>
-            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"
-            ></circle>
-          </svg>
+            class="size-[1.25em] shrink-0 text-blue"
+          />
           Instagram</a
         >
         <a

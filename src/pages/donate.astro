@@ -1,4 +1,5 @@
 ---
+import { Check, CircleAlert, Copy, ExternalLink } from "@lucide/astro";
 import { Image } from "astro:assets";
 import Layout from "@/layouts/Layout.astro";
 import donateTeam from "@/assets/donate-team.jpg";
@@ -98,18 +99,11 @@ const equipmentNeeds = [
             rel="noreferrer"
           >
             {/* lucide: external-link */}
-            <svg
-              class="lucide btn-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
+            <ExternalLink
+              size="1em"
               aria-hidden="true"
-            >
-              <path d="M15 3h6v6"></path>
-              <path d="M10 14 21 3"></path>
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            </svg>
+              class="lucide btn-icon"
+            />
             Donate on GoFundMe
           </a>
         </div>
@@ -138,18 +132,12 @@ const equipmentNeeds = [
                   aria-hidden="false"
                 >
                   {/* lucide: copy */}
-                  <svg
+                  <Copy
+                    size="1em"
+                    aria-hidden="true"
                     class="lucide btn-icon"
                     data-etransfer-copy-icon="copy"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                  >
-                    <rect x="8" y="8" width="14" height="14" rx="2"></rect>
-                    <path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"></path>
-                  </svg>
+                  />
                   <span data-etransfer-copy-label>Copy</span>
                 </span>
                 <span
@@ -158,17 +146,12 @@ const equipmentNeeds = [
                   aria-hidden="true"
                 >
                   {/* lucide: check */}
-                  <svg
+                  <Check
+                    size="1em"
+                    aria-hidden="true"
                     class="lucide btn-icon text-green-300"
                     data-etransfer-copy-icon="copied"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                  >
-                    <path d="m20 6-11 11-5-5"></path>
-                  </svg>
+                  />
                   <span data-etransfer-copy-label>Copied</span>
                 </span>
                 <span
@@ -177,19 +160,12 @@ const equipmentNeeds = [
                   aria-hidden="true"
                 >
                   {/* lucide: circle-alert */}
-                  <svg
+                  <CircleAlert
+                    size="1em"
+                    aria-hidden="true"
                     class="lucide btn-icon text-red-300"
                     data-etransfer-copy-icon="error"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                  >
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M12 8v4"></path>
-                    <path d="M12 16h.01"></path>
-                  </svg>
+                  />
                   <span class="text-red-300" data-etransfer-copy-label>
                     Error
                   </span>

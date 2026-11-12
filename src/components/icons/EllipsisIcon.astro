@@ -1,17 +1,7 @@
 ---
-interface Props {
-  class?: string;
-}
-const { class: className } = Astro.props;
+import { Ellipsis } from "@lucide/astro";
+import type { LucideProps } from "@lucide/astro";
+interface Props extends LucideProps {}
 ---
 
-<svg
-  class={className}
-  viewBox="0 0 24 24"
-  fill="currentColor"
-  aria-hidden="true"
->
-  <circle cx="5" cy="12" r="2"></circle>
-  <circle cx="12" cy="12" r="2"></circle>
-  <circle cx="19" cy="12" r="2"></circle>
-</svg>
+<Ellipsis size="1em" aria-hidden="true" {...Astro.props} />

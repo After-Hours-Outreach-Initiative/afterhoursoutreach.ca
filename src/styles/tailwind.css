@@ -75,19 +75,13 @@
     outline-offset: 0.25rem;
   }
 
-  svg path,
-  svg circle {
+  /* Preserve the original custom avatar and save-state stroke treatment. */
+  .attendee-avatar path,
+  .attendee-avatar circle,
+  .volunteer-draft-save-icon path,
+  .volunteer-draft-save-icon circle {
     stroke-linecap: square;
     stroke-linejoin: miter;
-  }
-
-  /* Lucide icons are drawn with round caps and joins */
-  .lucide path,
-  .lucide circle,
-  .lucide line,
-  .lucide rect {
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
 }
 

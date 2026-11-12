@@ -1,4 +1,5 @@
 ---
+import { Pencil } from "@lucide/astro";
 import {
   applicationFields,
   certificationQuestion,
@@ -126,16 +127,7 @@ const reviewSections = sections.map((section) => {
                   data-application-edit={`application-${section.key}`}
                   aria-label={`Edit ${section.heading.toLowerCase()}`}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                  >
-                    <path d="m16 3 5 5-12 12-6 1 1-6L16 3Z" />
-                    <path d="m13 6 5 5" />
-                  </svg>
+                  <Pencil size="1em" aria-hidden="true" />
                   Edit
                 </button>
               </div>

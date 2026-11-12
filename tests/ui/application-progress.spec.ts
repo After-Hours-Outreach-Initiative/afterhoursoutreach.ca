@@ -61,7 +61,10 @@ async function expectProgress(page: Page, completed: number) {
   await expect(progress).toHaveText("");
   await expect(progress).toHaveCSS("width", "28px");
   await expect(progress).toHaveCSS("height", "28px");
-  await expect(progress.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  await expect(progress.locator("svg").first()).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
   await expect(
     progress.locator(".volunteer-contents-progress-check"),
   ).toHaveCSS("visibility", completed === 5 ? "visible" : "hidden");
@@ -1039,10 +1042,10 @@ test("the mobile dropdown works from its normal position and Overview restores S
   await expect(icon).toHaveCSS("padding", "0px");
   await expect(icon).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await expect(summary.locator(":scope > :first-child")).toHaveClass(
-    "volunteer-contents-icon",
+    /\bvolunteer-contents-icon\b/,
   );
   await expect(summary.locator(":scope > :last-child")).toHaveClass(
-    "volunteer-contents-chevron",
+    /\bvolunteer-contents-chevron\b/,
   );
   for (const viewport of [
     { width: 320, height: 812 },

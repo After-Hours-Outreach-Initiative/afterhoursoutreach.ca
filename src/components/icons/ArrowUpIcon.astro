@@ -1,20 +1,7 @@
 ---
-interface Props {
-  class?: string;
-}
-const { class: className } = Astro.props;
+import { ArrowUp } from "@lucide/astro";
+import type { LucideProps } from "@lucide/astro";
+interface Props extends LucideProps {}
 ---
 
-<svg
-  class={className}
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
-  aria-hidden="true"
->
-  <path d="M12 19V5"></path>
-  <path d="m5 12 7-7 7 7"></path>
-</svg>
+<ArrowUp size="1em" aria-hidden="true" {...Astro.props} />

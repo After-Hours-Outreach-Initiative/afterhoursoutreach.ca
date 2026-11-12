@@ -434,6 +434,7 @@ body:has(
   height: 100%;
 }
 .volunteer-contents-progress {
+  position: relative;
   display: inline-flex;
   width: 1.75rem;
   height: 1.75rem;
@@ -451,7 +452,12 @@ body:has(
 .volunteer-contents-progress[data-complete="true"] {
   color: #4ade80;
 }
-.volunteer-contents-progress-check {
+.volunteer-contents-progress .volunteer-contents-progress-check {
+  position: absolute;
+  width: 0.875rem;
+  height: 0.875rem;
+  inset: 0;
+  margin: auto;
   visibility: hidden;
 }
 .volunteer-contents-progress[data-complete="true"]
@@ -2446,5 +2452,144 @@ body:has(
   }
   .volunteer-event-top .volunteer-actions .btn {
     flex: 1;
+  }
+}
+
+/* Shared styles also apply to cards inserted by live refresh. */
+
+.volunteer-event-card {
+  --event-card-gap: 1rem;
+  container: event-card / inline-size;
+  padding: 1rem;
+  scroll-margin-top: calc(
+    var(--site-header-rendered-height, var(--site-header-height, 6rem)) + 1rem
+  );
+}
+.volunteer-event-card[data-calendar-highlight] {
+  animation: event-highlight 1.5s ease-out;
+}
+@keyframes event-highlight {
+  from {
+    border-color: #a5b4fc;
+    box-shadow: 0 0 0 4px #818cf880;
+  }
+  to {
+    border-color: #3f3f46;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .volunteer-event-card[data-calendar-highlight] {
+    animation: none;
+    outline: 3px solid #a5b4fc;
+    outline-offset: 3px;
+  }
+}
+.volunteer-event-cadence {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375em;
+}
+.volunteer-event-cadence .volunteer-event-cadence-icon {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  align-self: center;
+}
+.volunteer-event-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--event-card-gap);
+}
+.volunteer-event-info {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.volunteer-event-heading {
+  display: flex;
+  /* Line the checkbox up with the date's first line when it wraps. */
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+.volunteer-event-select {
+  display: none;
+}
+/* In selection mode the checkbox sits just before the date. */
+[data-bulk-selecting] .volunteer-event-heading {
+  position: relative;
+  cursor: pointer;
+}
+[data-bulk-selecting] .volunteer-event-select {
+  display: flex;
+  flex-shrink: 0;
+  margin-top: calc((1.75rem - var(--volunteer-check-size)) / 2);
+}
+[data-bulk-selecting] .volunteer-event-select > input {
+  position: relative;
+  z-index: 1;
+}
+/* The whole checkbox and date row toggles the selection. */
+[data-bulk-selecting] .volunteer-event-select::after {
+  content: "";
+  position: absolute;
+  inset: -0.375rem 0;
+}
+.volunteer-event-card:has(.volunteer-event-select > input:checked) {
+  border-color: #818cf8;
+}
+.volunteer-event-info h3 {
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+.volunteer-event-info > p {
+  margin: 0.25rem 0 0;
+  line-height: 1.5;
+}
+.volunteer-event-info > .volunteer-hidden {
+  margin: 0 0 0.5rem;
+}
+.volunteer-event-card .volunteer-actions:empty {
+  display: none;
+}
+.volunteer-event-card .volunteer-actions {
+  gap: var(--event-card-gap);
+}
+.volunteer-event-card .volunteer-actions > :is(form, .btn),
+.volunteer-event-card .volunteer-actions > form > .btn {
+  width: 100%;
+}
+.volunteer-event-card .volunteer-actions > form > .btn,
+.volunteer-event-card .volunteer-actions > .btn[data-preview] {
+  white-space: nowrap;
+}
+/* A preview shows the viewer's own buttons in their colours, unusable. */
+.volunteer-event-card .volunteer-actions > .btn[data-preview]:disabled {
+  cursor: not-allowed;
+  color: white;
+}
+.volunteer-event-card .volunteer-actions > .btn-green[data-preview]:disabled {
+  border-color: var(--color-green-700);
+  background: var(--color-green-700);
+}
+.volunteer-event-card .volunteer-actions > .btn-red[data-preview]:disabled {
+  border-color: var(--color-red-700);
+  background: var(--color-red-700);
+}
+.volunteer-event-card > .event-roster {
+  margin-top: var(--event-card-gap);
+}
+.volunteer-roster-add {
+  width: 100%;
+  padding-top: var(--event-card-gap);
+}
+@container event-card (min-width: 32rem) {
+  .volunteer-event-layout:has(> .volunteer-actions:not(:empty)) {
+    grid-template-columns: minmax(0, 1fr) 12rem;
+    column-gap: 1.5rem;
+  }
+  .volunteer-event-card .volunteer-actions {
+    grid-column: 2;
+    grid-row: 1;
   }
 }

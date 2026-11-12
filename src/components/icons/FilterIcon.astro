@@ -1,21 +1,7 @@
 ---
-interface Props {
-  class?: string;
-}
-const { class: className } = Astro.props;
+import { ListFilter } from "@lucide/astro";
+import type { LucideProps } from "@lucide/astro";
+interface Props extends LucideProps {}
 ---
 
-<svg
-  class={className}
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
-  aria-hidden="true"
->
-  <path d="M3 6h18"></path>
-  <path d="M7 12h10"></path>
-  <path d="M10 18h4"></path>
-</svg>
+<ListFilter size="1em" aria-hidden="true" {...Astro.props} />

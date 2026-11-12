@@ -1,4 +1,5 @@
 ---
+import { List, ChevronDown, Check } from "@lucide/astro";
 import WarningIcon from "@/components/icons/WarningIcon.astro";
 import DraftSaveStatus from "./DraftSaveStatus.astro";
 import PageContentsList from "./PageContentsList.astro";
@@ -45,17 +46,7 @@ const totalSections = entries.filter((entry) => entry.completable).length;
           data-application-step-heading={application || undefined}
           aria-label={heading}
         >
-          <svg
-            class="volunteer-contents-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            aria-hidden="true"
-          >
-            <path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"></path>
-          </svg>
+          <List class="volunteer-contents-icon" size="1em" aria-hidden="true" />
           <span class="volunteer-contents-current" data-contents-current>
             {idleHeading ?? (application ? heading : entries[0]?.heading)}
           </span>
@@ -109,28 +100,13 @@ const totalSections = entries.filter((entry) => entry.completable).length;
                       stroke-dashoffset="100"
                       transform="rotate(-90 14 14)"
                     />
-                    <path
-                      class="volunteer-contents-progress-check"
-                      d="m11 14 2 2 4-4"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
                   </svg>
+                  <Check class="volunteer-contents-progress-check" size="1em" aria-hidden="true" />
                 </span>
               </>
             )
           }
-          <svg
-            class="volunteer-contents-chevron"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
-          >
-            <path d="m6 9 6 6 6-6"></path>
-          </svg>
+          <ChevronDown class="volunteer-contents-chevron" size="1em" aria-hidden="true" />
         </summary>
         <div class="volunteer-contents-dropdown-band">
           <div class="volunteer-contents-dropdown" data-contents-dropdown>

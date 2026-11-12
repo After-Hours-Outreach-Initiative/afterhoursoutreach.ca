@@ -1,21 +1,7 @@
 ---
-interface Props {
-  class?: string;
-}
-const { class: className } = Astro.props;
+import { GripVertical } from "@lucide/astro";
+import type { LucideProps } from "@lucide/astro";
+interface Props extends LucideProps {}
 ---
 
-<svg
-  class={className}
-  viewBox="0 0 24 24"
-  fill="currentColor"
-  aria-hidden="true"
-  focusable="false"
->
-  <circle cx="9" cy="6" r="1.5"></circle>
-  <circle cx="15" cy="6" r="1.5"></circle>
-  <circle cx="9" cy="12" r="1.5"></circle>
-  <circle cx="15" cy="12" r="1.5"></circle>
-  <circle cx="9" cy="18" r="1.5"></circle>
-  <circle cx="15" cy="18" r="1.5"></circle>
-</svg>
+<GripVertical size="1em" aria-hidden="true" {...Astro.props} />

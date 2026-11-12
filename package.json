@@ -42,6 +42,7 @@
   "dependencies": {
     "@astrojs/cloudflare": "14.4.4",
     "@better-auth/drizzle-adapter": "1.7.15",
+    "@lucide/astro": "^1.72.0",
     "@tailwindcss/vite": "^4.3.4",
     "astro": "7.4.5",
     "better-auth": "1.7.15",

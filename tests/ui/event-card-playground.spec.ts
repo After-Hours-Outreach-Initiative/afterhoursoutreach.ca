@@ -444,3 +444,41 @@ test("event card playground shows varied real rosters, resizes, and simulates re
   ).toBe(true);
   expect(forbidden).toEqual([]);
 });
+
+test("refreshed recurring cards keep their layout without Astro scope attributes", async ({
+  page,
+}) => {
+  await page.goto("/dev/ui/event-card/preview?scenario=mixed");
+  const card = page.locator(".volunteer-event-card");
+  const cadence = card.locator(".volunteer-event-cadence");
+  const icon = cadence.locator("svg");
+  await expect(cadence).toHaveText("Every 2 weeks");
+  // A live refresh can insert markup with a newer component scope than the
+  // stylesheet in an already open tab. Shared card rules must still apply.
+  await card.evaluate((element) => {
+    for (const node of [element, ...element.querySelectorAll("*")]) {
+      for (const attribute of node.getAttributeNames()) {
+        if (attribute.startsWith("data-astro-cid-"))
+          node.removeAttribute(attribute);
+      }
+    }
+  });
+  await expect(cadence).toHaveCSS("display", "flex");
+  await expect(card.locator(".volunteer-event-layout")).toHaveCSS(
+    "display",
+    "grid",
+  );
+  const dimensions = await icon.evaluate((element) => {
+    const { width, height } = element.getBoundingClientRect();
+    return {
+      width,
+      height,
+      fontSize: parseFloat(getComputedStyle(element).fontSize),
+    };
+  });
+  expect(dimensions.width).toBeCloseTo(dimensions.fontSize, 1);
+  expect(dimensions.height).toBeCloseTo(dimensions.fontSize, 1);
+  // The library also supplies intrinsic dimensions as a fallback.
+  await expect(icon).toHaveAttribute("width", "1em");
+  await expect(icon).toHaveAttribute("height", "1em");
+});

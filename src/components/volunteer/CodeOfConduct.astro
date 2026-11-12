@@ -1,4 +1,5 @@
 ---
+import { ChevronDown } from "@lucide/astro";
 import FieldError from "@/components/FieldError.astro";
 import {
   codeOfConductConfirmation,
@@ -21,15 +22,7 @@ import {
     <summary aria-controls="code-of-conduct-more-rules">
       <span class="volunteer-conduct-show-more">Read all rules</span>
       <span class="volunteer-conduct-show-less">Show fewer rules</span>
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        aria-hidden="true"
-      >
-        <path d="m6 9 6 6 6-6"></path>
-      </svg>
+      <ChevronDown size="1em" aria-hidden="true" />
     </summary>
     <ul id="code-of-conduct-more-rules">
       {codeOfConductRules.slice(2).map((rule) => <li>{rule}</li>)}
