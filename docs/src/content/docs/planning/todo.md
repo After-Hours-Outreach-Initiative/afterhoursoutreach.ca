@@ -3,6 +3,9 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
+- fix the TOC bar on ios
+- diagnose and fix flaky tests, testing issues are causing a big slowdown for
+  agents
 - change volunteer spots to show a visual with avatars of total spots and
   reservations and limits
 - application steps should have a "1 of N" indicated somewhere
