@@ -50,6 +50,11 @@ function init(region: HTMLElement) {
   // shows failures only to their author.
   const kept = new Map<string, PendingAction>();
   const warned = new Set<string>();
+  // Signed out in this browser: the server still makes the changes on time,
+  // but this page can neither make nor undo them.
+  let signedOut = false;
+  const signedOutError = (response: Response) =>
+    response.status === 401 || response.status === 403;
   // Failed automatic runs wait before trying again.
   const retryAfter = new Map<string, number>();
   const list = document.createElement("div");
@@ -93,7 +98,12 @@ function init(region: HTMLElement) {
         credentials: "same-origin",
         cache: "no-store",
       });
+      if (signedOutError(response)) {
+        signedOut = true;
+        render();
+      }
       if (!response.ok) return;
+      signedOut = false;
       const date = Date.parse(response.headers.get("Date") ?? "");
       if (Number.isFinite(date)) clockOffset = date - Date.now();
       const result: { actions: PendingAction[] } = await response.json();
@@ -153,6 +163,14 @@ function init(region: HTMLElement) {
     render();
     try {
       const { response, result } = await post(kind, id);
+      if (signedOutError(response)) {
+        requests.delete(id);
+        signedOut = true;
+        action.status = previous;
+        render();
+        if (!automatic) announce(signedOutText(action));
+        return;
+      }
       if (response.status === 409) {
         // Someone else made or undid it first.
         requests.delete(id);
@@ -276,6 +294,11 @@ function init(region: HTMLElement) {
     return [word, ...rest].join(" ");
   };
 
+  const signedOutText = (action: PendingAction) =>
+    remaining(action) > 0
+      ? "You are signed out. This change is still made when its timer ends. Sign in again to undo it."
+      : "You are signed out. This change is still being made. Sign in again to see it.";
+
   function update(element: HTMLElement, action: PendingAction, inline = false) {
     // The short wording fits the item the change is about. Other items it
     // reaches, such as a series' occurrences, need the full summary.
@@ -309,16 +332,20 @@ function init(region: HTMLElement) {
       requestAnimationFrame(() =>
         requestAnimationFrame(() => delete run.dataset.fresh),
       );
-    set("[data-pending-message]", action.message ?? "");
+    const out = signedOut && action.status !== "failed";
+    set(
+      "[data-pending-message]",
+      out ? signedOutText(action) : (action.message ?? ""),
+    );
     element.dataset.status = action.status;
     for (const control of element.querySelectorAll<HTMLButtonElement>(
       "[data-pending-undo], [data-pending-run]",
     )) {
-      control.hidden = action.status === "failed";
+      control.hidden = action.status === "failed" || out;
       control.disabled = action.status !== "pending";
     }
     const close = element.querySelector<HTMLElement>("[data-pending-dismiss]");
-    if (close) close.hidden = action.status !== "failed";
+    if (close) close.hidden = action.status !== "failed" && !out;
   }
 
   function toast(action: PendingAction) {
@@ -447,6 +474,7 @@ function init(region: HTMLElement) {
       }
       if (remaining(action) > 0) continue;
       // The author's page makes the change on time; others wait for it.
+      if (signedOut) continue;
       if (action.mine) {
         if ((retryAfter.get(action.id) ?? 0) <= Date.now())
           void act(action.id, "run", true);

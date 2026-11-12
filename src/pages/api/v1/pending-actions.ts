@@ -22,9 +22,11 @@ export const prerender = false;
 export const GET: APIRoute = async ({ request }) => {
   try {
     const { actor, headers, bindings } = await accountContext(env, request);
+    // Also the fallback scheduler wherever the minute cron does not run, such
+    // as local development. Due changes are made even when the page asking
+    // has been signed out; they run as their author.
+    await runDuePendingActions(bindings).catch(() => {});
     requireOrganizer(actor);
-    // Also the fallback scheduler wherever the minute cron does not run.
-    await runDuePendingActions(bindings);
     const response = Response.json(
       { actions: await listPendingActions(env.DB, actor) },
       { headers: { "Cache-Control": "no-store" } },

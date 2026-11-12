@@ -19,9 +19,10 @@ browser/Playwright tests for its diagrams or editing controls.
 Do not add end-user website setup/configuration warnings for unfinished or
 unconfigured features. Use concise placeholders for planned functionality and
 keep operator diagnostics out of the user interface. External integrations must
-have development-only simulations, like local email delivery, accessible through
-the normal user flow so success, cancellation, pending, and failure states can be
-previewed without real credentials or provider calls. Exclude simulation code
+have development-only simulations accessible through the normal user flow so
+success, cancellation, pending, and failure states can be previewed without real
+credentials or provider calls. Email is the exception: local delivery shows the
+message and always succeeds, with no outcome to choose. Exclude simulation code
 and bypasses from hosted production and preview builds.
 
 ## Cloudflare tooling
