@@ -696,6 +696,24 @@ const seriesScheduleSchema = z.object({
  * new cadence or after a new last date are cancelled with their bookings.
  * Other signups are never recreated, moved or dropped; capacity failures roll back ALL.
  */
+/** The limits a this-and-future edit would apply, or null if it is invalid. */
+export async function patrolTemplateLimits(
+  db: Env["DB"],
+  actor: Actor,
+  id: string,
+  date: string,
+  input: unknown,
+) {
+  const series = await findPatrolSeries(db, actor, id);
+  const parsed = patrolTemplateSchema.safeParse(
+    withEventSettings(
+      input,
+      patrolTemplateFor(series, await readTemplates(db, id), date),
+    ),
+  );
+  return parsed.success ? parsed.data : null;
+}
+
 export async function updatePatrolSeriesFrom(
   db: Env["DB"],
   actor: Actor,

@@ -36,10 +36,39 @@ export async function accountContext(
       headers,
       bindings: scoped,
     };
+  const { actor, greetingName } = await actorFor(
+    bindings,
+    current.user,
+    current.session,
+  );
+  return {
+    actor,
+    email: current.user.email,
+    greetingName,
+    headers,
+    bindings: scoped,
+  };
+}
+
+interface ActorPerson {
+  id: string;
+  name: string;
+  role: "volunteer" | "organizer";
+  twoFactorEnabled?: boolean | null;
+}
+interface ActorSession {
+  id: string;
+  twoFactorVerified: boolean;
+}
+
+async function actorFor(
+  bindings: Pick<AuthBindings, "DB">,
+  person: ActorPerson,
+  session: ActorSession,
+) {
   const db = createDatabase(bindings.DB);
   // Better Auth reads this user from D1: cookie caching and secondary storage
   // are disabled. Authorization is still rechecked inside each atomic write.
-  const person = current.user;
   const status = await db.query.volunteerStatus.findFirst({
     where: eq(volunteerStatus.user_id, person.id),
   });
@@ -58,31 +87,64 @@ export async function accountContext(
     lastName: application?.last_name,
     preferredName: application?.preferred_name,
   };
-  return {
-    actor: {
-      id: person.id,
-      name: personDisplayName(names, person.name),
-      sessionId: current.session.id,
-      role: person.role,
-      twoFactorEnabled: person.twoFactorEnabled,
-      twoFactorVerified: current.session.twoFactorVerified,
-      applicationSubmitted: Boolean(application),
-      applicationComplete: isApplicationComplete(
-        await loadApplicationProgress(bindings.DB, person.id),
-      ),
-      naloxoneCompleted: Boolean(application?.naloxone_completed_at),
-      active: status?.active ?? false,
-      applicationApproved: status?.registration_approved ?? false,
-      ...(status?.application_rejection_reason
-        ? { applicationRejected: true }
-        : {}),
-      patrolApproved: status?.patrol_approved ?? false,
-    },
-    email: person.email,
-    greetingName: accountGreeting(names, person.name),
-    headers,
-    bindings: scoped,
+  const actor = {
+    id: person.id,
+    name: personDisplayName(names, person.name),
+    sessionId: session.id,
+    role: person.role,
+    twoFactorEnabled: person.twoFactorEnabled,
+    twoFactorVerified: session.twoFactorVerified,
+    applicationSubmitted: Boolean(application),
+    applicationComplete: isApplicationComplete(
+      await loadApplicationProgress(bindings.DB, person.id),
+    ),
+    naloxoneCompleted: Boolean(application?.naloxone_completed_at),
+    active: status?.active ?? false,
+    applicationApproved: status?.registration_approved ?? false,
+    ...(status?.application_rejection_reason
+      ? { applicationRejected: true as const }
+      : {}),
+    patrolApproved: status?.patrol_approved ?? false,
   };
+  return { actor, greetingName: accountGreeting(names, person.name) };
+}
+
+/** Act for an account without a request, using one of its live sessions.
+ * Every write still rechecks that session and the account's permissions. */
+export async function storedActor(
+  bindings: Pick<AuthBindings, "DB">,
+  userId: string,
+  preferredSessionId: string,
+) {
+  const row = await bindings.DB.prepare(
+    `SELECT u.id, u.name, u.role, u.two_factor_enabled AS twoFactorEnabled,
+      s.id AS sessionId, s.two_factor_verified AS twoFactorVerified
+    FROM user u JOIN session s ON s.user_id = u.id
+    WHERE u.id = ? AND s.expires_at > ? AND u.email_verified = 1 AND u.deleted_at IS NULL
+      AND (u.two_factor_enabled = 0 OR s.two_factor_verified = 1)
+    ORDER BY s.id = ? DESC, s.expires_at DESC LIMIT 1`,
+  )
+    .bind(userId, Date.now(), preferredSessionId)
+    .first<{
+      id: string;
+      name: string;
+      role: "volunteer" | "organizer";
+      twoFactorEnabled: number;
+      sessionId: string;
+      twoFactorVerified: number;
+    }>();
+  if (!row) return null;
+  const { actor } = await actorFor(
+    bindings,
+    {
+      id: row.id,
+      name: row.name,
+      role: row.role,
+      twoFactorEnabled: Boolean(row.twoFactorEnabled),
+    },
+    { id: row.sessionId, twoFactorVerified: Boolean(row.twoFactorVerified) },
+  );
+  return actor;
 }
 export type Actor = NonNullable<
   Awaited<ReturnType<typeof accountContext>>["actor"]

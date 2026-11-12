@@ -1,3 +1,7 @@
+import {
+  makeWaitingChange,
+  makeWaitingChangeNow,
+} from "../helpers/pending-action";
 import assert from "node:assert/strict";
 import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { test } from "vitest";
@@ -685,7 +689,8 @@ test("organizers review pending and approved applications with persistent list c
     await page.locator('[data-application-mini-step="form"] summary').click();
     const documentsBeforeApproval = documents.length;
     // Access decisions always email; tests have no email transport.
-    const closeEmailFeedback = async () => {
+    const closeEmailFeedback = async (verb: string) => {
+      await makeWaitingChangeNow(page, verb);
       const feedback = page.locator("[data-action-email-feedback][open]");
       await expect(feedback).toBeVisible();
       await feedback.locator(".dialog-close").click();
@@ -697,7 +702,7 @@ test("organizers review pending and approved applications with persistent list c
     await page
       .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
-    await closeEmailFeedback();
+    await closeEmailFeedback("Approve");
     await expect(
       page.getByRole("button", { name: "Revoke application approval" }),
     ).toBeEnabled();
@@ -768,7 +773,7 @@ test("organizers review pending and approved applications with persistent list c
     await page
       .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
-    await closeEmailFeedback();
+    await closeEmailFeedback("Approve");
     await expect(patrolApproval.locator("[data-patrol-status]")).toHaveCount(0);
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
@@ -791,7 +796,7 @@ test("organizers review pending and approved applications with persistent list c
     await page
       .getByRole("button", { name: "Revoke and send email", exact: true })
       .click();
-    await closeEmailFeedback();
+    await closeEmailFeedback("Revoke");
     await expect(approvePatrols).toBeEnabled();
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
@@ -852,7 +857,7 @@ test("organizers review pending and approved applications with persistent list c
     await page
       .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
-    await closeEmailFeedback();
+    await closeEmailFeedback("Approve");
     await expect(patrolApproval.locator("[data-patrol-status]")).toHaveCount(0);
     await expect(
       patrolApproval.locator("[data-patrol-access-change]"),
@@ -918,7 +923,7 @@ test("organizers review pending and approved applications with persistent list c
     await page
       .getByRole("button", { name: "Revoke and send email", exact: true })
       .click();
-    await closeEmailFeedback();
+    await closeEmailFeedback("Revoke");
     await expect(
       page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeEnabled();
@@ -1078,8 +1083,13 @@ test("organizers review pending and approved applications with persistent list c
       results.getByText("No applications are ready for review."),
     ).toBeVisible();
 
-    const postAction = (body: object, auth = cookie, requestOrigin = origin) =>
-      worker.fetch(`${origin}/api/v1/organizer/action`, {
+    const post = (
+      path: string,
+      body: object,
+      auth = cookie,
+      requestOrigin = origin,
+    ) =>
+      worker.fetch(`${origin}${path}`, {
         method: "POST",
         headers: {
           cookie: auth,
@@ -1088,6 +1098,16 @@ test("organizers review pending and approved applications with persistent list c
         },
         body: JSON.stringify(body),
       });
+    const postAction = async (
+      body: object,
+      auth = cookie,
+      requestOrigin = origin,
+    ) =>
+      makeWaitingChange(
+        "/api/v1/organizer/action",
+        await post("/api/v1/organizer/action", body, auth, requestOrigin),
+        (path, body) => post(path, body, auth, requestOrigin),
+      );
     const status = () =>
       DB.prepare(
         "SELECT * FROM volunteer_status WHERE user_id='applicant-50'",
@@ -1140,6 +1160,7 @@ test("organizers review pending and approved applications with persistent list c
         exact: true,
       })
       .click();
+    await makeWaitingChangeNow(page, "Reject");
     await expect(page.locator("[data-application-rejection]")).toHaveText(
       `Reason: ${rejection.reason}`,
     );

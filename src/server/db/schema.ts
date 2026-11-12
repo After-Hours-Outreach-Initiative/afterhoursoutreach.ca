@@ -589,6 +589,96 @@ export const eventNotification = sqliteTable(
   ],
 );
 
+// An organizer action that sends email waits here so it can be undone.
+export const pendingAction = sqliteTable(
+  "pending_action",
+  {
+    id: text().primaryKey(),
+    endpoint: text({ enum: ["events", "organizer"] }).notNull(),
+    // The validated API request, replayed unchanged when the timer ends.
+    input: text().notNull(),
+    actor_id: text()
+      .notNull()
+      .references(() => user.id),
+    session_id: text().notNull(),
+    origin: text().notNull(),
+    summary: text().notNull(),
+    // Shown on the changed item, so it leaves out the item's own name or date.
+    inline_summary: text(),
+    verb: text().notNull(),
+    status: text({
+      enum: ["pending", "running", "done", "failed", "undone"],
+    })
+      .notNull()
+      .default("pending"),
+    message: text(),
+    run_at: timestamp().notNull(),
+    lease_until: timestamp(),
+    created_at: timestamp().notNull(),
+    finished_at: timestamp(),
+    finished_by: text().references(() => user.id),
+    dismissed_at: timestamp(),
+  },
+  (table) => [
+    index("pending_action_due").on(table.status, table.run_at),
+    index("pending_action_actor").on(table.actor_id, table.finished_at),
+    check(
+      "pending_action_status",
+      sql`${table.status} IN ('pending','running','done','failed','undone')`,
+    ),
+    check(
+      "pending_action_endpoint",
+      sql`${table.endpoint} IN ('events','organizer')`,
+    ),
+  ],
+);
+
+// Locked targets block other changes to the same item until the action resolves.
+export const pendingActionTarget = sqliteTable(
+  "pending_action_target",
+  {
+    action_id: text()
+      .notNull()
+      .references(() => pendingAction.id),
+    target: text().notNull(),
+    locked: integer({ mode: "boolean" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("pending_action_target_unique").on(
+      table.action_id,
+      table.target,
+    ),
+    uniqueIndex("pending_action_target_lock")
+      .on(table.target)
+      .where(sql`${table.locked} = 1`),
+  ],
+);
+
+// The limits a pending event edit will apply. Signups must already fit them.
+export const eventCapacityHold = sqliteTable(
+  "event_capacity_hold",
+  {
+    action_id: text()
+      .notNull()
+      .references(() => pendingAction.id),
+    event_id: text()
+      .notNull()
+      .references(() => event.id),
+    spots: integer().notNull(),
+    min_medic_spots: integer().notNull(),
+    min_new_volunteer_spots: integer().notNull(),
+    max_new_volunteers: integer().notNull(),
+    includes_orientation: integer({ mode: "boolean" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("event_capacity_hold_unique").on(
+      table.action_id,
+      table.event_id,
+    ),
+    index("event_capacity_hold_event").on(table.event_id),
+  ],
+);
+
 export const organizerBootstrap = sqliteTable(
   "organizer_bootstrap",
   {

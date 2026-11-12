@@ -192,9 +192,6 @@ for (const root of [16, 20, 24]) {
         .getByRole("textbox", { name: "Email", exact: true })
         .fill(`s-${crypto.randomUUID().slice(0, 6)}@a.test`);
       await page.getByRole("button", { name: "Continue with Email" }).click();
-      await page
-        .getByRole("button", { name: "Simulate successful delivery" })
-        .click();
       const emailDialog = page.getByRole("dialog", {
         name: "Local sign-in email",
         exact: true,

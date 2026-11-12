@@ -75,9 +75,6 @@ test("volunteer-page sign-in is usable on mobile and opens the shared code form"
     .getByRole("textbox", { name: "Email", exact: true })
     .fill("mobile@example.org");
   await page.getByRole("button", { name: "Continue with Email" }).click();
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   await expect(page.getByLabel("Six-digit code")).toBeVisible();
   await expect(page.getByLabel("Six-digit code")).toBeFocused();
   expect(emails).toEqual(["mobile@example.org"]);

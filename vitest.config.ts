@@ -22,6 +22,7 @@ export default defineConfig({
             "tests/d1.test.ts",
             "tests/notifications.test.ts",
             "tests/discord.test.ts",
+            "tests/pending-actions.test.ts",
           ],
         },
       },
@@ -51,6 +52,7 @@ export default defineConfig({
             "tests/d1.test.ts",
             "tests/notifications.test.ts",
             "tests/discord.test.ts",
+            "tests/pending-actions.test.ts",
           ],
           setupFiles: ["tests/helpers/runtime-setup.ts"],
           provide: {

@@ -23,9 +23,6 @@ test("only completed sign-ins are remembered and saved emails can be chosen or f
   await expect(history).toBeHidden();
   await input.fill(email);
   await send.click();
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   const preview = page.getByRole("dialog", { name: "Local sign-in email" });
   const body = await preview.locator(".local-email-body").textContent();
   const code = body!.match(/Your code is (\d{6})/)![1];
@@ -56,9 +53,6 @@ test("only completed sign-ins are remembered and saved emails can be chosen or f
     (route) => route.fulfill({ json: { success: true } }),
   );
   await send.click();
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   await expect(history).toBeHidden();
   await page.getByRole("link", { name: "Use a different email" }).click();
   await expect(history).toBeVisible();

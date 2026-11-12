@@ -34,7 +34,11 @@ const contents = [
 ];
 ---
 
-<article class="application-review" data-application-review>
+<article
+  class="application-review"
+  data-application-review
+  data-pending-target={`user:${person.id}`}
+>
   <PersonHeading
     class="application-review-heading"
     level="h1"

@@ -11,7 +11,6 @@ import {
   pendingBatches,
   pendingNotifications,
   uncertainNotifications,
-  type EventEmail,
 } from "../db/notifications";
 
 /** Only an explicitly requested operation may be sent. Never sweep the outbox. */
@@ -24,7 +23,6 @@ export async function deliverNotifications(
   const db = bindings.DB;
   const local = Boolean(import.meta.env?.DEV) || bindings.APP_ENV === "local";
   const signal = AbortSignal.timeout(emailPolicy.timeoutMs);
-  const emails: EventEmail[] = [];
   let limited = false;
   let unavailable = false;
   let stopped = false;
@@ -94,17 +92,6 @@ export async function deliverNotifications(
         }
       }
       outcome = local ? "local" : "sent";
-      if (local)
-        emails.push(
-          ...payload.map((email, index) => ({
-            id: `${id}/${index}`,
-            to: email.to[0],
-            subject: email.subject,
-            body: email.text,
-            action: null,
-            created_at: Date.now(),
-          })),
-        );
     } catch (error) {
       if (error instanceof RequestError && error.status === 429) limited = true;
       else outcome = requested ? "unconfirmed" : "failed";
@@ -146,7 +133,6 @@ export async function deliverNotifications(
     limited,
     unavailable,
     failed: Math.max(0, counts.pending - unconfirmed),
-    ...(import.meta.env?.DEV ? { localNotifications: emails } : {}),
   };
 }
 

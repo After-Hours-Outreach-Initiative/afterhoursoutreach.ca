@@ -4,6 +4,7 @@ import BackToTop from "@/components/BackToTop.astro";
 import Footer from "@/components/Footer.astro";
 import Header from "@/components/Header.astro";
 import DevPanel from "@/dev/DevPanel.astro";
+import PendingActions from "@/components/PendingActions.astro";
 import type { ComponentProps } from "astro/types";
 import { Font } from "astro:assets";
 import "@/styles/tailwind.css";
@@ -97,6 +98,7 @@ const {
       eventAccess={account.eventAccess}
     />
     <BackToTop />
+    {account.signedIn && account.organizer && <PendingActions />}
     <DevPanel />
   </body>
 </html>

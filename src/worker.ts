@@ -10,11 +10,20 @@ import {
   medicDiscoveryCron,
   processMedicCertificationNotifications,
 } from "./server/medic-certifications";
+import { runDuePendingActions } from "./server/pending-actions";
 
 export default {
   fetch: handle,
   async scheduled(controller, bindings) {
-    if (controller.cron === discordCron) await runDiscordJob(bindings);
+    if (controller.cron === discordCron) {
+      // Changes that waited for their undo timer, independently of Discord.
+      try {
+        await runDuePendingActions(bindings);
+      } catch {
+        console.error(JSON.stringify({ event: "pending_actions_failed" }));
+      }
+      await runDiscordJob(bindings);
+    }
     // Independent catch-safe job: one notification family must not starve another.
     if (controller.cron === submissionDeliveryCron)
       await runSubmissionNotificationJob(bindings);

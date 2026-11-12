@@ -239,9 +239,6 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
   const loading = page.getByRole("button", { name: "Sending email…" });
   await expect(loading).toBeDisabled();
   await expect(loading).toHaveAttribute("aria-busy", "true");
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   await expect.poll(() => emails.length).toBe(1);
   await expect(loading).toBeDisabled();
   finishSending();
@@ -256,9 +253,6 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
   await expect(code).toBeFocused();
   await emailInput.press("Enter");
   await expect(emailForm).not.toHaveAttribute("aria-busy", "true");
-  await expect(
-    page.getByRole("button", { name: "Simulate successful delivery" }),
-  ).toHaveCount(0);
   expect(emails).toEqual(["first@example.org"]);
   const signInButton = codeForm.getByRole("button", {
     name: "Sign in with code",
@@ -319,9 +313,6 @@ test("email sign-in validates, loads, switches to code, and resets", async ({
   ).toBeHidden();
   await emailInput.fill("second@example.org");
   await continueButton.click();
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   await expect(codeForm).toBeVisible();
   await expect(emailInput).toBeVisible();
   await expect(emailInput).toHaveValue("second@example.org");
@@ -349,9 +340,6 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
   await page.getByRole("textbox", { name: "Email", exact: true }).fill(email);
   const button = page.getByRole("button", { name: "Continue with Email" });
   await button.click();
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   const error = page.locator("[data-email-request] [data-form-message]");
   await expect(error).toHaveText(
     "Wait 30 seconds before requesting another email.",
@@ -363,9 +351,6 @@ test("real email cooldowns and empty HTTP 429 responses are readable and retryab
     (route) => route.fulfill({ status: 429, json: {} }),
   );
   await button.click();
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   await expect(error).toHaveText(
     "Too many requests. Please wait before trying again.",
   );

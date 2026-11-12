@@ -1,3 +1,4 @@
+import { makeWaitingRequest } from "./pending-action";
 import {
   expect,
   type APIRequestContext,
@@ -187,7 +188,7 @@ export async function approveLocalApplication(
     /name="version" value="(\d+)"/,
   )?.[1];
   expect(version).toBeDefined();
-  const approved = await organizer.post("/api/v1/organizer/action", {
+  const requested = await organizer.post("/api/v1/organizer/action", {
     headers: { origin },
     data: {
       action: "status",
@@ -198,5 +199,9 @@ export async function approveLocalApplication(
       patrolApproved: false,
     },
   });
+  const approved = await makeWaitingRequest(organizer, origin, requested);
   expect(approved.status(), await approved.text()).toBe(200);
+  expect(((await approved.json()) as { status?: string }).status).not.toBe(
+    "failed",
+  );
 }

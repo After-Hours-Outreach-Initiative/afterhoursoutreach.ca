@@ -3,19 +3,12 @@ import { expect, test, type Page } from "@playwright/test";
 const sendEndpoint = "**/api/v1/auth/email-otp/send-verification-otp**";
 const verifyEndpoint = "**/api/v1/auth/sign-in/email-otp**";
 
-async function chooseDelivery(page: Page) {
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
-}
-
 async function startSignIn(page: Page, email = "resend@example.org") {
   await page.goto(
     "/volunteer/sign-in?returnTo=%2Fvolunteer%2Fevents%3Ffrom%3Dresend",
   );
   await page.getByRole("textbox", { name: "Email", exact: true }).fill(email);
   await page.getByRole("button", { name: "Continue with Email" }).click();
-  await chooseDelivery(page);
   await expect(page.locator("[data-email-code]")).toBeVisible();
 }
 
@@ -65,7 +58,6 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
     .getByRole("textbox", { name: "Email", exact: true })
     .fill("  First@EXAMPLE.org  ");
   await initial.click();
-  await chooseDelivery(page);
   await expect.poll(() => requests.length).toBe(1);
   await page.clock.fastForward(60_000);
   await expect(code).toBeHidden();
@@ -99,7 +91,6 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
   await expect(resend).toBeDisabled();
   await expect(resendHelp).toBeVisible();
   await expect(resend).toHaveAttribute("aria-busy", "true");
-  await chooseDelivery(page);
   await expect.poll(() => requests.length).toBe(2);
   await expect(
     code.getByRole("button", { name: "Sign in with code" }),
@@ -145,12 +136,11 @@ test("cooldown starts after successful delivery and enforces both 30-second boun
     .getByRole("textbox", { name: "Email", exact: true })
     .fill("new@example.org");
   await initial.click();
-  await chooseDelivery(page);
   await expect(resend).toHaveText("Resend code (30s)");
   await expect(resendHelp).toBeHidden();
 });
 
-test("resend failures and cancellations preserve the email and allow retry without a new cooldown", async ({
+test("resend failures preserve the email and allow retry without a new cooldown", async ({
   page,
 }) => {
   await freezeClock(page);
@@ -174,15 +164,6 @@ test("resend failures and cancellations preserve the email and allow retry witho
   const feedback = code.locator("[data-form-message]");
   await code.locator('[name="code"]').fill("123456");
   await page.clock.fastForward(30_000);
-  await resend.click();
-  await page.getByRole("button", { name: "Close email test" }).click();
-  await expect(resend).toBeEnabled();
-  expect(sends).toBe(1);
-  await resend.click();
-  await page.getByRole("button", { name: "Simulate delivery failure" }).click();
-  await expect(feedback).toContainText("Simulated locally");
-  await expect(resend).toBeEnabled();
-  expect(sends).toBe(1);
   for (const [kind, expected] of [
     ["rate", "Too many requests. Try again later."],
     ["network", "We could not connect. Check your connection and try again."],
@@ -193,7 +174,6 @@ test("resend failures and cancellations preserve the email and allow retry witho
   ] as const) {
     failure = kind;
     await resend.click();
-    await chooseDelivery(page);
     await expect(feedback).toHaveText(expected);
     await expect(feedback).toHaveAttribute("role", "alert");
     await expect(feedback).toHaveAttribute("aria-live", "assertive");
@@ -209,7 +189,6 @@ test("resend failures and cancellations preserve the email and allow retry witho
   }
   failure = null;
   await resend.click();
-  await chooseDelivery(page);
   await expect(resend).toHaveText("Resend code (30s)");
   await expect(code.locator('[name="code"]')).toHaveValue("");
   await expect(feedback).toHaveAttribute("role", "status");
@@ -252,7 +231,6 @@ test("different-email reset clears the cooldown, code and errors and starts a fr
   await expect(code.locator("[data-resend-code]")).toHaveText("Resend code");
   await input.fill("second@example.org");
   await page.getByRole("button", { name: "Continue with Email" }).click();
-  await chooseDelivery(page);
   await expect(code.locator("[data-resend-code]")).toHaveText(
     "Resend code (30s)",
   );
@@ -310,7 +288,6 @@ for (const errorCode of ["OTP_EXPIRED", "INVALID_OTP"]) {
     await expect(code.locator("[data-resend-code]")).toBeDisabled();
     await page.clock.fastForward(30_000);
     await code.locator("[data-resend-code]").click();
-    await chooseDelivery(page);
     await expect(code.locator('[name="code"]')).toHaveValue("");
     verified = true;
     await code.locator('[name="code"]').fill("654321");
@@ -383,7 +360,6 @@ for (const errorCode of ["OTP_EXPIRED", "INVALID_OTP"]) {
     ).toBeHidden();
     await expect(code.locator("[data-resend-code]")).toBeEnabled();
     await code.locator("[data-resend-code]").click();
-    await chooseDelivery(page);
     await expect(code.locator("[data-resend-code]")).toHaveText(
       "Resend code (30s)",
     );
@@ -438,7 +414,6 @@ test("local email previews also work after resend, including wrong and valid cod
   ).toContainText("already used");
   await page.clock.fastForward(30_000);
   await page.locator("[data-resend-code]").click();
-  await chooseDelivery(page);
   await expect(dialog).toContainText("Your code is 654321");
   await expect(
     dialog.getByRole("link", { name: "Open local sign-in link" }),
@@ -483,7 +458,6 @@ test("a consumed local-D1 link resends successfully after the real 30-second coo
   const resend = code.locator("[data-resend-code]");
   await expect(resend).toBeEnabled();
   await resend.click();
-  await chooseDelivery(page);
   await expect(code.locator("[data-form-message]")).toHaveText(
     "Wait 30 seconds before requesting another email.",
   );
@@ -500,7 +474,6 @@ test("a consumed local-D1 link resends successfully after the real 30-second coo
     setTimeout(resolve, Math.max(0, deliveredAt + 30_000 - Date.now())),
   );
   await resend.click();
-  await chooseDelivery(page);
   const preview = page.getByRole("dialog", { name: "Local sign-in email" });
   await expect(preview).toContainText(`To: ${email}`);
   await expect(preview).toContainText(

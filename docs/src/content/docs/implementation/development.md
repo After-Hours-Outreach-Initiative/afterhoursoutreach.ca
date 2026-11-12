@@ -128,7 +128,7 @@ details belong on `/privacy`.
 The profile buttons and their `/api/v1/auth/dev/*` endpoints require a development build.
 Local auth uses the current request's origin so phones on
 the LAN can also switch accounts. POSTs require the same Origin as the website.
-These controls and simulated email dialogs are excluded
+These controls and local email dialogs are excluded
 from public builds. Worker previews still use preview D1 and real,
 rate-limited email delivery. Accounts and events are always included in production
 builds; deployment readiness is controlled by the developer, not a feature flag.
@@ -149,5 +149,5 @@ Worker tests check that `GET /api/v1/auth/dev/users`,
 `POST /api/v1/auth/dev/application-step`, and `POST /api/v1/auth/dev/seed-accounts`
 return `404` in production and preview builds;
 local browser tests exercise account switching, application-step shortcuts, and
-simulated email delivery.
+local sign-in emails.
 Dev-tool assets must not be placed in `public/`, which is copied into builds.

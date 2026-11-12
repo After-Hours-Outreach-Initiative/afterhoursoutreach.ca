@@ -1020,32 +1020,13 @@ test.skip("Connect Discord locally simulates consent, cancellation, failure and 
   expect(external).toEqual([]);
 });
 
-test("local D1 sign-in uses dialogs for delivery, errors and valid codes", async ({
+test("local D1 sign-in shows the email in a dialog, with wrong and valid codes", async ({
   page,
 }) => {
-  const requests: string[] = [];
-  page.on("request", (request) => {
-    if (
-      new URL(request.url()).pathname ===
-      "/api/v1/auth/email-otp/send-verification-otp"
-    )
-      requests.push(request.url());
-  });
   await page
     .getByRole("textbox", { name: "Email", exact: true })
     .fill(`local-code-${crypto.randomUUID()}@example.org`);
-  for (const outcome of ["Simulate delivery failure", "Simulate rate limit"]) {
-    await page.getByRole("button", { name: "Continue with Email" }).click();
-    await page.getByRole("button", { name: outcome }).click();
-    await expect(
-      page.locator("[data-email-request] [data-form-message]"),
-    ).toContainText("Simulated locally");
-  }
-  expect(requests).toEqual([]);
   await page.getByRole("button", { name: "Continue with Email" }).click();
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   const dialog = page.getByRole("dialog", { name: "Local sign-in email" });
   await expect(dialog).toBeVisible();
   const code = (await dialog.innerText()).match(/Your code is (\d{6})/)![1];
@@ -1082,9 +1063,6 @@ test("local D1 email links are one-use and sign-in pages have no third-party req
     .getByRole("textbox", { name: "Email", exact: true })
     .fill(`local-link-${crypto.randomUUID()}@example.org`);
   await page.getByRole("button", { name: "Continue with Email" }).click();
-  await page
-    .getByRole("button", { name: "Simulate successful delivery" })
-    .click();
   const link = page.getByRole("link", { name: "Open local sign-in link" });
   const url = new URL((await link.getAttribute("href"))!);
   const proof = Object.fromEntries(new URLSearchParams(url.hash.slice(1)));

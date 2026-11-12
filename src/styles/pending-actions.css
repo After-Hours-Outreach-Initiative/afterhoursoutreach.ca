@@ -1,0 +1,134 @@
+/* Changes that email people wait here, newest on top, until they are made. */
+.pending-actions {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(28rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+/* Above the app dock on small screens. */
+@media (width < 64rem) {
+  body[data-app-dock] .pending-actions {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+}
+.pending-actions > * {
+  pointer-events: auto;
+}
+.pending-toast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0.75rem 0.75rem 1rem;
+  border: 1px solid #3f3f46;
+  border-radius: 0.75rem;
+  background: #18181b;
+  box-shadow: 0 0.5rem 1.5rem #000000b3;
+  color: #f4f4f5;
+}
+.pending-toast[data-status="failed"] {
+  border-color: #b91c1c;
+}
+/* Beats page paragraph rules, such as the event card's top margin. */
+.pending-toast .pending-toast-text,
+.pending-inline .pending-inline-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+}
+.pending-toast-message:empty {
+  display: none;
+}
+.pending-toast-message {
+  display: block;
+  color: #d4d4d8;
+  font-size: 0.875rem;
+}
+/* The countdown lives in the button that skips it, with a fill that grows
+   until the change happens. */
+.pending-run {
+  position: relative;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.pending-run-fill {
+  position: absolute;
+  inset: 0;
+  background: #ffffff33;
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left;
+  transition: transform 1s linear;
+}
+.pending-run[data-fresh] .pending-run-fill {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pending-run-fill {
+    transition: none;
+  }
+}
+.pending-run-label {
+  position: relative;
+}
+/* Several waiting changes on one item stack. */
+.pending-inline + .pending-inline {
+  margin-top: -0.25rem;
+}
+.pending-toast-actions,
+.pending-inline-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.pending-toast-close {
+  min-width: 2.75rem;
+  padding: 0;
+}
+.pending-toast-close svg {
+  width: 1.25em;
+  height: 1.25em;
+}
+.pending-more {
+  align-self: flex-start;
+  min-height: 2.25rem;
+  padding: 0 0.875rem;
+  border: 1px solid #3f3f46;
+  border-radius: 999px;
+  background: #18181b;
+  color: #d4d4d8;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.pending-more:hover {
+  color: white;
+}
+.pending-more:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+/* The same timer on the item it changes. */
+.pending-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #4f46e5;
+  border-radius: 0.625rem;
+  background: #1e1b4b80;
+  color: #e4e4e7;
+}
+@media print {
+  .pending-actions,
+  .pending-inline {
+    display: none;
+  }
+}

@@ -173,28 +173,9 @@ export function initEmailSignIn(finish: (result: object) => void) {
       }
     };
 
-    const send = async (
-      owner: HTMLFormElement,
-      again: boolean,
-      address = email,
-    ) => {
+    const send = async (again: boolean, address = email) => {
       sending = again;
       update();
-      if (import.meta.env.DEV) {
-        const { chooseEmailOutcome } =
-          await import("../dev/scripts/local-email-dialog");
-        const outcome = await chooseEmailOutcome();
-        if (!outcome) return;
-        if (outcome !== "success") {
-          message(
-            owner,
-            outcome === "failure"
-              ? "We could not send the email. Try again later. (Simulated locally.)"
-              : "Too many email requests. Please wait before trying again. (Simulated locally.)",
-          );
-          return;
-        }
-      }
       const result: { success: boolean; localEmail?: SignInEmail } =
         await authClient.emailOtp.sendVerificationOtp(
           { email: address, type: "sign-in" },
@@ -255,7 +236,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
       event.preventDefault();
       if (!requestButton?.disabled && !requestButton?.hidden)
         void run(request, () =>
-          send(request, false, emailInput!.value.trim().toLowerCase()),
+          send(false, emailInput!.value.trim().toLowerCase()),
         );
     });
     code.addEventListener("submit", (event) => {
@@ -265,7 +246,7 @@ export function initEmailSignIn(finish: (result: object) => void) {
     resend.addEventListener("click", () => {
       // Check the deadline as well as disabled state to guard synthetic events.
       if (busy || Date.now() < resendAt || !email) return;
-      void run(code, () => send(code, true));
+      void run(code, () => send(true));
     });
     reset.addEventListener("click", (event) => {
       if (busy) {

@@ -17,8 +17,8 @@ Provider quotas must be checked separately when configuring delivery.
 
 Message formatting is shared in `src/data/email-templates.ts`. Fictional gallery
 examples live in `docs/src/email-previews/catalog.ts`; update them when adding a
-message type or content branch. Local delivery uses the normal flow with
-simulation controls; production and hosted previews exclude those controls.
+message type or content branch. Local delivery uses the normal flow and always
+succeeds without contacting Resend.
 
 ## Event and access notifications
 
@@ -35,7 +35,19 @@ retries on branches sharing preview D1 keep the same provider payload.
 Retries stop 23 hours after
 creation; older pending records require manual follow-up, not a blind resend.
 Sign-in and notification sends share the 80/day budget. Local D1 delivery never
-contacts Resend; DEV-only dialogs simulate notification success/failure.
+contacts Resend and is treated as sent.
+
+## Undo timer
+
+Changes that would email someone are checked, then stored in `pending_action`
+with their validated request instead of being made. When the timer ends, the
+same action code replays the request as its organizer, using one of their live
+sessions or, once they have signed out, a session made for that run and deleted
+after it. `pending_action_target` locks the changed items, including the
+occurrences a series change reaches. Finished actions are deleted after 30 days. `event_capacity_hold` keeps the limits of waiting event edits,
+and sign-up triggers reject bookings that do not fit them. The organizer's open
+page makes the change on time; the minute cron and organizer page loads make any
+that are overdue.
 
 ## Medic certification reminders
 

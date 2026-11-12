@@ -1,3 +1,4 @@
+import { makeWaitingChange } from "../helpers/pending-action";
 import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { test } from "vitest";
 import { expect, type Page } from "@playwright/test";
@@ -95,8 +96,12 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       open: true,
       hidden: false,
     };
-    const action = (body: object, cookie = organizer.cookie) =>
-      send("/api/v1/events/action", body, cookie);
+    const action = async (body: object, cookie = organizer.cookie) =>
+      makeWaitingChange(
+        "/api/v1/events/action",
+        await send("/api/v1/events/action", body, cookie),
+        (path, body) => send(path, body, cookie),
+      );
     const tooSmall = await action({
       action: "save-series",
       series: {

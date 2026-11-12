@@ -25,7 +25,7 @@ export function localEmailDialog(options: {
   // This is only an accessible DOM label, not a security token. Use a counter
   // so development over HTTP LAN addresses doesn't need secure-context crypto.
   heading.id = `local-email-${++nextDialogId}`;
-  heading.textContent = options.title ?? "Test email outcome";
+  heading.textContent = options.title ?? "Local email";
   dialog.setAttribute("aria-labelledby", heading.id);
   const { header, close } = createDialogHeader(heading, "Close email test");
   close.addEventListener("click", () => dialog.close());
@@ -87,24 +87,5 @@ export function localEmailDialog(options: {
       { once: true },
     );
     dialog.showModal();
-  });
-}
-
-export function chooseEmailOutcome(
-  emails?: LocalEmail[],
-  notification = false,
-) {
-  return localEmailDialog({
-    emails,
-    description: notification
-      ? "The change is already saved locally. Choose how its email notification turns out."
-      : "Choose the result of requesting a sign-in email.",
-    actions: [
-      { value: "success", label: "Simulate successful delivery" },
-      { value: "failure", label: "Simulate delivery failure" },
-      ...(!notification
-        ? [{ value: "rate-limited", label: "Simulate rate limit" }]
-        : []),
-    ],
   });
 }

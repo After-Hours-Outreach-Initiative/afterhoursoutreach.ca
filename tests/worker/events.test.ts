@@ -1,3 +1,7 @@
+import {
+  makeWaitingChange,
+  makeWaitingChangeNow,
+} from "../helpers/pending-action";
 import assert from "node:assert/strict";
 import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { profileWriteBody } from "../helpers/profile-write";
@@ -87,7 +91,7 @@ describe(
           (path) => send(path, undefined, cookie),
           body,
         );
-      return worker.fetch(`${origin}${path}`, {
+      const response = await worker.fetch(`${origin}${path}`, {
         method: body ? "POST" : "GET",
         redirect: "manual",
         headers: {
@@ -98,6 +102,9 @@ describe(
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
+      return makeWaitingChange(path, response, (path, body) =>
+        send(path, body, cookie, requestOrigin, ip),
+      );
     };
     const ok = async <
       T extends { status: number; clone(): { text(): Promise<string> } },
@@ -1195,13 +1202,15 @@ describe(
                 })
                 .click();
             },
-            updated: () =>
-              profileView
+            updated: async () => {
+              await makeWaitingChangeNow(page, "Approve");
+              await profileView
                 .getByRole("button", {
                   name: "Revoke patrol approval",
                   exact: true,
                 })
-                .waitFor(),
+                .waitFor();
+            },
             loadingLabel: "Sending…",
             pending: async () => {
               await expect(
@@ -1213,7 +1222,7 @@ describe(
             },
           });
           const accessEmailResult = page.getByRole("dialog", {
-            name: "Volunteer access saved",
+            name: "Change made",
             exact: true,
           });
           await expect(accessEmailResult).toContainText(
@@ -1260,6 +1269,7 @@ describe(
             trigger: () =>
               page.getByLabel("Active volunteer", { exact: true }).check(),
             updated: async () => {
+              await makeWaitingChangeNow(page, "Reactivate");
               await expect(
                 page.getByLabel("Active volunteer", { exact: true }),
               ).toBeEnabled();
@@ -1290,6 +1300,7 @@ describe(
             trigger: () =>
               profileView.getByLabel("Account role").selectOption("organizer"),
             updated: async () => {
+              await makeWaitingChangeNow(page, "Change");
               await expect(
                 profileView.getByLabel("Account role"),
               ).toBeEnabled();
@@ -1317,8 +1328,12 @@ describe(
             form: profileView.locator("[data-organizer-role]"),
             trigger: () =>
               profileView.getByLabel("Account role").selectOption("volunteer"),
-            updated: () =>
-              expect(profileView.getByLabel("Account role")).toBeEnabled(),
+            updated: async () => {
+              await makeWaitingChangeNow(page, "Change");
+              await expect(
+                profileView.getByLabel("Account role"),
+              ).toBeEnabled();
+            },
             loadingLabel: "Sending…",
           });
           await page
@@ -1643,6 +1658,7 @@ describe(
                 })
                 .click(),
             updated: async () => {
+              await makeWaitingChangeNow(page, "Move");
               await expect(card.locator(".volunteer-roster")).toHaveCount(0);
               await expect(
                 destinationCard.locator(".volunteer-roster > summary"),
@@ -1651,7 +1667,7 @@ describe(
             loadingLabel: "Sending…",
           });
           const registrationEmailResult = page.getByRole("dialog", {
-            name: "Registration changed",
+            name: "Change made",
             exact: true,
           });
           await expect(registrationEmailResult).toContainText(
@@ -1715,6 +1731,7 @@ describe(
                 })
                 .click(),
             updated: async () => {
+              await makeWaitingChangeNow(page, "Move");
               await expect(
                 card.locator(".volunteer-roster > summary"),
               ).toHaveText("Volunteers (1)");
@@ -1750,8 +1767,10 @@ describe(
                   exact: true,
                 })
                 .click(),
-            updated: () =>
-              expect(card.locator(".volunteer-roster")).toHaveCount(0),
+            updated: async () => {
+              await makeWaitingChangeNow(page, "Remove");
+              await expect(card.locator(".volunteer-roster")).toHaveCount(0);
+            },
             loadingLabel: "Sending…",
           });
           assert.equal(await removeSignupDialog.isVisible(), false);
@@ -1859,10 +1878,12 @@ describe(
                   exact: true,
                 })
                 .click(),
-            updated: () =>
-              approvedAttendee
+            updated: async () => {
+              await makeWaitingChangeNow(page, "Approve");
+              await approvedAttendee
                 .locator("[data-patrol-approval-status]")
-                .waitFor(),
+                .waitFor();
+            },
             loadingLabel: "Sending…",
           });
           await expect(approvalForm).toHaveCount(0);

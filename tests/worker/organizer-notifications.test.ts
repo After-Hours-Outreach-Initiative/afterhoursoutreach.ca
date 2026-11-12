@@ -1,3 +1,4 @@
+import { makeWaitingChange } from "../helpers/pending-action";
 import assert from "node:assert/strict";
 import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTestHarness } from "wrangler";
@@ -86,7 +87,9 @@ describe(
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
       assert.equal(response.status, 200, await response.clone().text());
-      return response;
+      return makeWaitingChange(path, response, (path, body) =>
+        send(path, body, cookie),
+      );
     };
     const signIn = async (email: string) => {
       const response = await send(

@@ -1,3 +1,4 @@
+import { makeWaitingChangeNow } from "../helpers/pending-action";
 import { expect, test, type Locator } from "@playwright/test";
 import { social } from "../../src/data/site";
 import {
@@ -443,9 +444,7 @@ test("pending applications poll every minute, then approval restores five-second
     await page
       .getByRole("button", { name: "Approve and send email", exact: true })
       .click();
-    await page
-      .getByRole("button", { name: "Simulate successful delivery" })
-      .click();
+    await makeWaitingChangeNow(page, "Approve");
     await expect(
       page.getByRole("button", {
         name: "Revoke application approval",
@@ -542,9 +541,7 @@ test("pending applications poll every minute, then approval restores five-second
     await page
       .getByRole("button", { name: "Revoke and send email", exact: true })
       .click();
-    await page
-      .getByRole("button", { name: "Simulate successful delivery" })
-      .click();
+    await makeWaitingChangeNow(page, "Revoke");
     await expect(
       page.getByRole("button", { name: "Approve application", exact: true }),
     ).toBeEnabled();

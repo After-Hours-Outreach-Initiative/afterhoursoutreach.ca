@@ -81,6 +81,7 @@ const blocked =
   class="volunteer-event-card"
   tabindex="-1"
   data-live-event={event.id}
+  data-pending-target={`event:${event.id}`}
   data-event-series={event.seriesId ?? undefined}
   data-event-start={event.startsAt}
   data-event-label={`${event.includesOrientation ? "Orientation + Patrol" : "Patrol"} at ${event.meetingPoint}`}

@@ -40,7 +40,6 @@ import {
 import {
   actionEmailNeedsFeedback,
   showActionEmailFeedback,
-  simulateActionEmail,
   type EmailActionResult,
 } from "./action-email-feedback";
 
@@ -730,15 +729,43 @@ function form(
             : { notify }),
         }),
       });
-      const result: EmailActionResult = await response.json();
+      const result: EmailActionResult & { pendingActionId?: string } =
+        await response.json();
+      // Blocked by a waiting change: offer that change's buttons.
+      if (result.pendingActionId)
+        document.dispatchEvent(
+          new CustomEvent("pending-action-blocked", {
+            detail: { id: result.pendingActionId },
+          }),
+        );
       if (!response.ok)
         throw new Error(result.message || "The change could not be saved.");
       saved = true;
-      const simulationSucceeded = await simulateActionEmail(result);
-      const emailNeedsFeedback = actionEmailNeedsFeedback(
-        result,
-        simulationSucceeded,
-      );
+      // Changes that email wait for their undo timer; the email comes later.
+      if (result.pendingAction) {
+        pendingForms.set(result.pendingAction.id, formSelector(element));
+        // Undo reopens a dialog form with what was entered, like a draft.
+        // Its "id" field hides element.id.
+        const formId = element.getAttribute("id");
+        if (
+          formId &&
+          element.closest("dialog") &&
+          !element.matches("[data-bulk-event-save]")
+        )
+          pendingDrafts.set(result.pendingAction.id, {
+            formId,
+            values: [...values].filter(
+              (entry): entry is [string, string] =>
+                typeof entry[1] === "string",
+            ),
+          });
+        document.dispatchEvent(
+          new CustomEvent("pending-action-added", {
+            detail: result.pendingAction,
+          }),
+        );
+      }
+      const emailNeedsFeedback = actionEmailNeedsFeedback(result);
       if (notify && message) {
         message.hidden = !emailNeedsFeedback;
         message.textContent = emailNeedsFeedback
@@ -991,6 +1018,99 @@ document.addEventListener("click", (event) => {
     event.clientY > bounds.bottom
   )
     dialog.close();
+});
+
+// Forms that started waiting changes, found again after refreshes replace them.
+const pendingForms = new Map<string, string>();
+const pendingDrafts = new Map<
+  string,
+  { formId: string; values: [string, string][] }
+>();
+
+/** Put an undone change back in its dialog, as the organizer entered it. */
+function restoreDraft(draft: { formId: string; values: [string, string][] }) {
+  const form = document.getElementById(draft.formId);
+  const dialog = form?.closest("dialog");
+  if (!(form instanceof HTMLFormElement) || !dialog || dialog.open) return;
+  initEventDates(dialog);
+  syncSignupMoveCalendar(dialog);
+  for (const control of form.elements) {
+    if (
+      !(
+        control instanceof HTMLInputElement ||
+        control instanceof HTMLSelectElement ||
+        control instanceof HTMLTextAreaElement
+      ) ||
+      !control.name ||
+      ["hidden", "file", "submit", "button"].includes(control.type)
+    )
+      continue;
+    const saved = draft.values
+      .filter(([name]) => name === control.name)
+      .map(([, value]) => value);
+    if (
+      control instanceof HTMLInputElement &&
+      (control.type === "checkbox" || control.type === "radio")
+    ) {
+      const checked = saved.includes(control.value);
+      if (control.checked === checked) continue;
+      control.checked = checked;
+    } else if (!saved.length || control.value === saved[0]) continue;
+    else control.value = saved[0];
+    control.dispatchEvent(new Event("input", { bubbles: true }));
+    control.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  dialog.showModal();
+}
+function formSelector(element: HTMLFormElement) {
+  const kind = element.dataset.accessKind;
+  return [
+    "form",
+    ...[
+      "data-organizer-status",
+      "data-organizer-role",
+      "data-organizer-rejection",
+      "data-submit-on-change",
+    ]
+      .filter((name) => element.hasAttribute(name))
+      .map((name) => `[${name}]`),
+    kind ? `[data-access-kind="${CSS.escape(kind)}"]` : "",
+  ].join("");
+}
+
+// A waiting change was made or undone: show the item as it is now.
+document.addEventListener("pending-action-resolved", (event) => {
+  const { action, outcome, refreshes } = (
+    event as CustomEvent<{
+      action: { id: string };
+      outcome: "done" | "undone";
+      refreshes: Promise<unknown>[];
+    }>
+  ).detail;
+  const draft = pendingDrafts.get(action.id);
+  pendingDrafts.delete(action.id);
+  // After the page shows the item as it is again.
+  if (draft && outcome === "undone")
+    queueMicrotask(
+      () => void Promise.allSettled(refreshes).then(() => restoreDraft(draft)),
+    );
+  if (document.querySelector("[data-event-browser]")) {
+    refreshDeferredEvents();
+    refreshes.push(pendingRefresh);
+  }
+  const selector = pendingForms.get(action.id);
+  pendingForms.delete(action.id);
+  const profile = ":is([data-volunteer-profile], [data-application-review])";
+  const form =
+    (selector &&
+      document.querySelector<HTMLFormElement>(`${profile} ${selector}`)) ||
+    document.querySelector<HTMLFormElement>(
+      `${profile} form:is([data-organizer-status], [data-organizer-role], [data-organizer-rejection])`,
+    );
+  if (!form) return;
+  const refresh = pendingRefresh.then(() => refreshVolunteer(form));
+  pendingRefresh = refresh.catch(() => {});
+  refreshes.push(pendingRefresh);
 });
 
 // Never expose actions before submit/change handlers and email consent are ready.

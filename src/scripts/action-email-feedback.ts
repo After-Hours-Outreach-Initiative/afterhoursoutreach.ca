@@ -6,37 +6,16 @@ export interface EmailActionResult {
   pending?: number;
   expired?: number;
   unconfirmed?: number;
-  localNotifications?: { to: string; subject: string; body: string }[];
+  /** Set when the change waits for its undo timer instead of being made. */
+  pendingAction?: import("./pending-actions").PendingAction;
 }
 
-export async function simulateActionEmail(result: EmailActionResult) {
-  if (import.meta.env.DEV && result.localNotifications?.length) {
-    const { chooseEmailOutcome } =
-      await import("../dev/scripts/local-email-dialog");
-    const outcome = await chooseEmailOutcome(result.localNotifications, true);
-    if (outcome === "success") return true;
-    result.message = `${result.message ?? "Change saved."} ${
-      outcome === "failure"
-        ? "The change is saved, but the local email simulation failed. No real email was sent."
-        : "The change is saved. Local email simulation was dismissed. No real email was sent."
-    }`;
-    return false;
-  }
-  return true;
-}
-
-export function actionEmailNeedsFeedback(
-  result: EmailActionResult,
-  simulationSucceeded: boolean,
-) {
-  return (
-    !simulationSucceeded ||
-    Boolean(
-      result.pending ||
-      result.expired ||
-      result.unconfirmed ||
-      result.retryOperation,
-    )
+export function actionEmailNeedsFeedback(result: EmailActionResult) {
+  return Boolean(
+    result.pending ||
+    result.expired ||
+    result.unconfirmed ||
+    result.retryOperation,
   );
 }
 
@@ -99,10 +78,8 @@ export function showActionEmailFeedback(
       const updated: EmailActionResult = await response.json();
       if (!response.ok)
         throw new Error(updated.message || "Email retry is unavailable.");
-      const simulationSucceeded = await simulateActionEmail(updated);
       result = updated;
-      if (!actionEmailNeedsFeedback(result, simulationSucceeded))
-        dialog.close();
+      if (!actionEmailNeedsFeedback(result)) dialog.close();
     } catch (error) {
       result.message = `The change remains saved. ${error instanceof Error ? error.message : "Email delivery could not be confirmed."} Do not repeat the saved change.`;
     } finally {

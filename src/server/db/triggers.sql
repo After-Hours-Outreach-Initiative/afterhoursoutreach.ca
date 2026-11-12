@@ -189,6 +189,66 @@ BEGIN
 END;
 --> statement-breakpoint
 
+-- A pending email-sending edit holds its limits until it runs or is undone, so
+-- the roster must fit both the current and the pending limits.
+CREATE TRIGGER event_capacity_hold_insert
+BEFORE INSERT ON event_capacity_hold
+BEGIN
+  SELECT RAISE(ABORT, 'capacity_below_signups')
+  WHERE NEW.spots < (SELECT count(*) FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed');
+  SELECT RAISE(ABORT, 'orientation_edit_conflict')
+  FROM (
+    SELECT count(*) AS total,
+      coalesce(sum(CASE WHEN s.user_id IS NULL THEN s.manual_medic = 1 AND s.manual_new = 0 ELSE EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+        WHERE p.user_id = s.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')) END), 0) AS medics,
+      coalesce(sum(CASE WHEN s.user_id IS NULL THEN s.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = s.user_id AND v.patrol_approved = 1) END), 0) AS new_volunteers
+    FROM signup s WHERE s.event_id = NEW.event_id AND s.status = 'confirmed'
+  ) counts
+  WHERE counts.total + max(0, NEW.min_medic_spots - counts.medics)
+      + CASE WHEN NEW.includes_orientation THEN max(0, NEW.min_new_volunteer_spots - counts.new_volunteers) ELSE 0 END > NEW.spots
+    OR (NEW.includes_orientation AND counts.new_volunteers > NEW.max_new_volunteers);
+END;
+--> statement-breakpoint
+CREATE TRIGGER signup_capacity_hold_insert
+BEFORE INSERT ON signup WHEN NEW.status = 'confirmed'
+  AND EXISTS (SELECT 1 FROM event_capacity_hold WHERE event_id = NEW.event_id)
+BEGIN
+  SELECT RAISE(ABORT, 'event_full')
+  FROM event_capacity_hold h CROSS JOIN (
+    SELECT count(*) AS total,
+      coalesce(sum(CASE WHEN booked.user_id IS NULL THEN booked.manual_medic = 1 AND booked.manual_new = 0 ELSE EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+        WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')) END), 0) AS medics,
+      coalesce(sum(CASE WHEN booked.user_id IS NULL THEN booked.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = booked.user_id AND v.patrol_approved = 1) END), 0) AS new_volunteers
+    FROM (SELECT user_id, manual_medic, manual_new FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed'
+      UNION ALL SELECT NEW.user_id, NEW.manual_medic, NEW.manual_new) booked
+  ) counts
+  WHERE h.event_id = NEW.event_id AND (counts.total + max(0, h.min_medic_spots - counts.medics)
+      + CASE WHEN h.includes_orientation THEN max(0, h.min_new_volunteer_spots - counts.new_volunteers) ELSE 0 END > h.spots
+    OR (h.includes_orientation AND counts.new_volunteers > h.max_new_volunteers));
+END;
+--> statement-breakpoint
+CREATE TRIGGER signup_capacity_hold_update
+BEFORE UPDATE OF status, event_id, user_id, manual_medic, manual_new ON signup WHEN NEW.status = 'confirmed'
+  AND EXISTS (SELECT 1 FROM event_capacity_hold WHERE event_id = NEW.event_id)
+BEGIN
+  SELECT RAISE(ABORT, 'event_full')
+  FROM event_capacity_hold h CROSS JOIN (
+    SELECT count(*) AS total,
+      coalesce(sum(CASE WHEN booked.user_id IS NULL THEN booked.manual_medic = 1 AND booked.manual_new = 0 ELSE EXISTS (SELECT 1 FROM profile p JOIN volunteer_status v ON v.user_id = p.user_id
+        WHERE p.user_id = booked.user_id AND v.registration_approved = 1 AND v.patrol_approved = 1
+          AND EXISTS (SELECT 1 FROM json_each(p.teams) WHERE value = 'medic')) END), 0) AS medics,
+      coalesce(sum(CASE WHEN booked.user_id IS NULL THEN booked.manual_new ELSE NOT EXISTS (SELECT 1 FROM volunteer_status v WHERE v.user_id = booked.user_id AND v.patrol_approved = 1) END), 0) AS new_volunteers
+    FROM (SELECT user_id, manual_medic, manual_new FROM signup WHERE event_id = NEW.event_id AND status = 'confirmed' AND id != OLD.id
+      UNION ALL SELECT NEW.user_id, NEW.manual_medic, NEW.manual_new) booked
+  ) counts
+  WHERE h.event_id = NEW.event_id AND (counts.total + max(0, h.min_medic_spots - counts.medics)
+      + CASE WHEN h.includes_orientation THEN max(0, h.min_new_volunteer_spots - counts.new_volunteers) ELSE 0 END > h.spots
+    OR (h.includes_orientation AND counts.new_volunteers > h.max_new_volunteers));
+END;
+--> statement-breakpoint
+
 -- Edits never discard bookings or completion history. Invalid individual and
 -- this-and-future changes fail in the same transaction as templates/audits.
 -- Additive guards leave historical one-place rows untouched. Cancellation and
