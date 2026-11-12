@@ -186,7 +186,7 @@ export function clearBulkEventSelection(root: HTMLElement) {
   syncBulkEventSelection(root);
 }
 
-function setBulkEventSelecting(root: HTMLElement, selecting: boolean) {
+export function setBulkEventSelecting(root: HTMLElement, selecting: boolean) {
   selectedFor(root).clear();
   if (selecting) root.dataset.bulkSelecting = "";
   else delete root.dataset.bulkSelecting;

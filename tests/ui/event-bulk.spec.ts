@@ -110,6 +110,12 @@ test("organizer bulk selection stays visible, preserves dates and invalidates st
     ),
   ).toEqual(dates);
   await expect(page.locator("[data-bulk-event]:checked")).toHaveCount(0);
+  await expect(page.locator("[data-bulk-actions]")).toBeHidden();
+  await expect(page.locator("[data-bulk-event]:visible")).toHaveCount(0);
+  await expect(selectMode).toHaveAttribute("aria-pressed", "false");
+  await expect(selectMode).toHaveText("Select");
+  await expect(selectMode).toBeFocused();
+  await selectMode.click();
   // A background update cannot silently replace the dialog's optimistic version.
   await cards.first().locator("[data-bulk-event]").check();
   await page.getByRole("button", { name: "Bulk edit", exact: true }).click();

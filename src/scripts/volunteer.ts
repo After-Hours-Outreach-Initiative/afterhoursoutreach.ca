@@ -26,7 +26,7 @@ import {
 import {
   initBulkEvents,
   syncBulkEventSelection,
-  clearBulkEventSelection,
+  setBulkEventSelecting,
   bulkEventAction,
 } from "./event-bulk";
 import {
@@ -847,13 +847,9 @@ form(
   async (element) => {
     const root = element.closest<HTMLElement>("[data-event-browser]")!;
     element.closest<HTMLDialogElement>("dialog")!.close();
-    clearBulkEventSelection(root);
-    root.querySelector<HTMLElement>("[data-bulk-count]")!.textContent =
-      "Selected events saved. Selection cleared.";
+    setBulkEventSelecting(root, false);
     await refreshEvents(element);
-    root.querySelector<HTMLElement>("[data-bulk-count]")!.textContent =
-      "Selected events saved. Selection cleared.";
-    root.querySelector<HTMLButtonElement>("[data-bulk-select-all]")?.focus();
+    root.querySelector<HTMLButtonElement>("[data-bulk-select-mode]")?.focus();
   },
 );
 form("[data-live-signup]", "/api/v1/events/action", (v) => ({
