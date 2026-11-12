@@ -8,6 +8,7 @@ import PendingActions from "@/components/PendingActions.astro";
 import type { ComponentProps } from "astro/types";
 import { Font } from "astro:assets";
 import "@/styles/tailwind.css";
+import { devFavicon } from "@/dev/favicon";
 
 // Preview mode changes only the banner, never account or event availability.
 const showPreviewBanner = import.meta.env.MODE === "preview";
@@ -35,8 +36,17 @@ const {
 <html lang="en" class="scroll-smooth bg-ink">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" href="/favicon.ico" />
+    {
+      import.meta.env.DEV ? (
+        // A yellow crescent tells development tabs apart.
+        <link rel="icon" type="image/svg+xml" href={devFavicon} />
+      ) : (
+        <Fragment>
+          <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+          <link rel="icon" href="/favicon.ico" />
+        </Fragment>
+      )
+    }
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width" />

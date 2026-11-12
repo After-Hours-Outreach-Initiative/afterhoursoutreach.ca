@@ -20,6 +20,9 @@ export async function fillApplicationField(
 }
 
 export async function openLocalAccountSwitcher(page: Page) {
+  await page.locator("[data-account-switcher][data-ready]").waitFor({
+    state: "attached",
+  });
   await page.getByRole("button", { name: "DEV panel", exact: true }).click();
   const dialog = page.getByRole("dialog", {
     name: "DEV panel",

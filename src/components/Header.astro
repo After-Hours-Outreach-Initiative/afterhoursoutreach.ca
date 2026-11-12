@@ -2,6 +2,7 @@
 import { ChevronDown } from "@lucide/astro";
 import DiscordIcon from "@/components/icons/DiscordIcon.astro";
 import MoonIcon from "@/components/icons/MoonIcon.astro";
+import DevPanelTrigger from "@/dev/DevPanelTrigger.astro";
 import AccountIcon from "@/components/icons/AccountIcon.astro";
 import ArrowRightIcon from "@/components/icons/ArrowRightIcon.astro";
 import ArrowUpRightIcon from "@/components/icons/ArrowUpRightIcon.astro";
@@ -47,19 +48,34 @@ const auditLogPage = current === "/audit-log";
   <div
     class="relative mx-auto flex w-full max-w-site items-center gap-6 px-6 py-3 max-lg:gap-3 max-sm:gap-2 max-sm:px-4"
   >
-    <a
-      class="flex min-w-0 items-center gap-3.5"
-      href="/"
-      aria-label="After Hours Outreach Initiative, home"
-    >
-      <MoonIcon
-        class="size-12 shrink-0 fill-current text-blue max-sm:size-10"
-      />
-      <span class="flex min-w-0 flex-col leading-tight">
-        <strong class="font-heading text-xl font-bold">After Hours</strong>
-        <span class="text-base text-zinc-400">Outreach Initiative</span>
-      </span>
-    </a>
+    {
+      import.meta.env.DEV ? (
+        // In development the crescent turns yellow and opens the DEV panel.
+        <div class="flex min-w-0 items-center gap-3.5">
+          <DevPanelTrigger class="size-12 max-sm:size-10" />
+          <a
+            class="flex min-w-0 flex-col leading-tight"
+            href="/"
+            aria-label="After Hours Outreach Initiative, home"
+          >
+            <strong class="font-heading text-xl font-bold">After Hours</strong>
+            <span class="text-base text-zinc-400">Outreach Initiative</span>
+          </a>
+        </div>
+      ) : (
+        <a
+          class="flex min-w-0 items-center gap-3.5"
+          href="/"
+          aria-label="After Hours Outreach Initiative, home"
+        >
+          <MoonIcon class="size-12 shrink-0 fill-current text-blue max-sm:size-10" />
+          <span class="flex min-w-0 flex-col leading-tight">
+            <strong class="font-heading text-xl font-bold">After Hours</strong>
+            <span class="text-base text-zinc-400">Outreach Initiative</span>
+          </span>
+        </a>
+      )
+    }
 
     <nav
       class="ml-auto hidden items-center gap-6 lg:flex"

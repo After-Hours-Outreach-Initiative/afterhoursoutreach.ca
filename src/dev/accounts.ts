@@ -10,10 +10,10 @@ export type DevelopmentApplicationStep =
   "form" | "naloxone" | "discord" | "review";
 
 export const manualAccountGroups = [
+  { key: "access", label: "Access" },
   { key: "application", label: "Application" },
   { key: "orientation", label: "Orientation" },
   { key: "volunteers", label: "Active volunteers" },
-  { key: "access", label: "Access" },
 ] as const;
 
 type AccountGroup = (typeof manualAccountGroups)[number]["key"];
@@ -162,29 +162,6 @@ export const manualAccountPresets = [
       patrolApproved: true,
     },
   ),
-  preset("inactive", "Inactive new volunteer", "access", "Jamie Birch", {
-    sampleKey: "jamie",
-    active: false,
-  }),
-  preset("inactive-new-medic", "Inactive new medic", "access", "Drew Finch", {
-    sampleKey: "dana",
-    active: false,
-  }),
-  preset(
-    "inactive-patrol",
-    "Inactive outreach volunteer",
-    "access",
-    "Rowan Gale",
-    {
-      patrolApproved: true,
-      active: false,
-    },
-  ),
-  preset("inactive-medic", "Inactive medic", "access", "Sky Marlow", {
-    sampleKey: "dana",
-    patrolApproved: true,
-    active: false,
-  }),
   preset("organizer", "Organizer", "access", "Robin Ash", {
     sampleKey: "robin",
     role: "organizer",
@@ -233,6 +210,29 @@ export const manualAccountPresets = [
       active: false,
     },
   ),
+  preset("inactive", "Inactive new volunteer", "access", "Jamie Birch", {
+    sampleKey: "jamie",
+    active: false,
+  }),
+  preset("inactive-new-medic", "Inactive new medic", "access", "Drew Finch", {
+    sampleKey: "dana",
+    active: false,
+  }),
+  preset(
+    "inactive-patrol",
+    "Inactive outreach volunteer",
+    "access",
+    "Rowan Gale",
+    {
+      patrolApproved: true,
+      active: false,
+    },
+  ),
+  preset("inactive-medic", "Inactive medic", "access", "Sky Marlow", {
+    sampleKey: "dana",
+    patrolApproved: true,
+    active: false,
+  }),
 ];
 
 // Only these exact manual preset IDs are protected, regardless of name or role.

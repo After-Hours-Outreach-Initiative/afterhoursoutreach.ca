@@ -295,7 +295,8 @@ test("DEV panel seeds presets in place without changing the current account or d
     ["application", 8],
     ["orientation", 4],
     ["volunteers", 2],
-    ["access", 10],
+    // Visitor joins the access presets.
+    ["access", 11],
   ] as const) {
     await expect(
       profiles.locator(`[data-account-category="${key}"] [data-switch-user]`),
@@ -304,17 +305,17 @@ test("DEV panel seeds presets in place without changing the current account or d
   const volunteers = profiles.locator('[data-account-category="volunteers"]');
   await expect(
     volunteers.locator('[data-switch-user="new-state:medic"]'),
-  ).toContainText("Medic eligible");
+  ).toHaveAttribute("title", /Medic eligible/);
   await expect(
     volunteers.locator('[data-switch-user="new-state:patrol"]'),
-  ).toContainText("Patrol approved");
+  ).toHaveAttribute("title", /Patrol approved/);
   const orientation = profiles.locator('[data-account-category="orientation"]');
   await expect(
     orientation.locator('[data-switch-user="new-state:medic-new-volunteer"]'),
-  ).toContainText("Not medic eligible");
+  ).toHaveAttribute("title", /Not medic eligible/);
   await expect(
     orientation.locator('[data-switch-user="new-state:orientation-booked"]'),
-  ).toContainText("Orientation booked");
+  ).toHaveAttribute("title", /Orientation booked/);
   await page.setViewportSize({ width: 375, height: 812 });
   expect(
     await profiles.evaluate(

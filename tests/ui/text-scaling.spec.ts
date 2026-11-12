@@ -15,10 +15,10 @@ test.beforeAll(async ({ browser, baseURL }) => {
   try {
     const page = await context.newPage();
     await page.goto("/volunteer");
-    // The account switcher script reveals the DEV panel button once it runs.
-    await expect(
-      page.getByRole("button", { name: "DEV panel", exact: true }),
-    ).toBeVisible();
+    // The account switcher script marks the DEV panel ready once it runs.
+    await page.locator("[data-account-switcher][data-ready]").waitFor({
+      state: "attached",
+    });
   } finally {
     await context.close();
   }
@@ -274,7 +274,7 @@ for (const root of [16, 20, 24]) {
       ).toHaveCSS("font-size", `${1.5 * root}px`);
       await expect(dialog.locator(".dialog-body")).toHaveCSS(
         "padding",
-        `${(28 / 16) * root}px`,
+        `${(20 / 16) * root}px`,
       );
       await expect(dialog).toHaveCSS("border-top-width", "1px");
       await expect(dialog).toBeInViewport({ ratio: 1 });

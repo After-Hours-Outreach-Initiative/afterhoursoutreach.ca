@@ -1,0 +1,25 @@
+---
+import MoonIcon from "@/components/icons/MoonIcon.astro";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+---
+
+<button
+  class:list={[
+    "shrink-0 rounded-full text-yellow-400 hover:text-yellow-300",
+    className,
+  ]}
+  type="button"
+  data-open-account-switcher
+  aria-label="DEV panel"
+  title="DEV panel (Alt+Z)"
+  aria-keyshortcuts="Alt+Z"
+  aria-haspopup="dialog"
+  aria-controls="development-account-dialog"
+  aria-expanded="false"
+>
+  <MoonIcon class="size-full fill-current" />
+</button>

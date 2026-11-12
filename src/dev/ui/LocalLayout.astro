@@ -1,6 +1,7 @@
 ---
 import { Font } from "astro:assets";
 import DevPanel from "../DevPanel.astro";
+import { devFavicon } from "../favicon";
 import "../../styles/tailwind.css";
 
 interface Props {
@@ -17,6 +18,7 @@ Astro.response.headers.set("Referrer-Policy", "no-referrer");
 <html lang="en" class="bg-ink">
   <head>
     <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href={devFavicon} />
     <meta name="viewport" content="width=device-width" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <Font cssVariable="--font-public-sans" preload />

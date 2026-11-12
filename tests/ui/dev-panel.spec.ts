@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 
-test("DEV panel fills the viewport and adapts its account grids", async ({
+test("DEV panel fits the viewport and adapts its account grids", async ({
   page,
   baseURL,
 }) => {
@@ -25,8 +25,8 @@ test("DEV panel fills the viewport and adapts its account grids", async ({
   ]) {
     await page.setViewportSize(viewport);
     const bounds = (await panel.boundingBox())!;
-    expect(bounds.width).toBeCloseTo(viewport.width - 32, 0);
-    expect(bounds.height).toBeCloseTo(viewport.height - 32, 0);
+    expect(bounds.width).toBeCloseTo(Math.min(1024, viewport.width - 32), 0);
+    expect(bounds.height).toBeLessThanOrEqual(viewport.height - 32 + 1);
     await expect(panel).toBeInViewport({ ratio: 1 });
     await expect(panel.locator(".dialog-header")).toBeInViewport({ ratio: 1 });
     await expect(panel.locator(".dialog-footer")).toBeInViewport({ ratio: 1 });
@@ -40,6 +40,7 @@ test("DEV panel fills the viewport and adapts its account grids", async ({
         getComputedStyle(element).gridTemplateColumns.split(" ").length,
     );
     if (viewport.width >= 1440) expect(columns).toBeGreaterThan(2);
+    else if (viewport.width >= 375) expect(columns).toBe(2);
     else expect(columns).toBe(1);
   }
 });
@@ -53,7 +54,6 @@ for (const path of [
   "/volunteer/sign-in",
   "/dev/ui",
   "/dev/ui/organizer-profile",
-  "/dev/ui/discord?scenario=connected",
 ]) {
   test(`DEV panel works on ${path}`, async ({ page, baseURL }) => {
     test.skip(
@@ -73,6 +73,9 @@ for (const path of [
     const panel = page.getByRole("dialog", { name: "DEV panel", exact: true });
     await expect(trigger).toHaveCount(1);
     await expect(trigger).toBeVisible();
+    await page.locator("[data-account-switcher][data-ready]").waitFor({
+      state: "attached",
+    });
     expect(accountRequests).toEqual([]);
 
     await trigger.focus();

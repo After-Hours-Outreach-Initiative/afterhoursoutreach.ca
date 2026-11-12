@@ -143,10 +143,14 @@ for (const width of [1280, 1024, 768, 375, 320]) {
       name: "After Hours Outreach Initiative, home",
       exact: true,
     });
-    await expect(brand.locator("svg")).toHaveCSS(
-      "width",
-      width < 640 ? "40px" : "48px",
-    );
+    // In local development the crescent sits beside the link as the DEV
+    // panel button; elsewhere it is part of the link.
+    await expect(
+      header
+        .locator("[data-open-account-switcher] svg")
+        .or(brand.locator("svg"))
+        .first(),
+    ).toHaveCSS("width", width < 640 ? "40px" : "48px");
     await expect(brand.locator("strong")).toHaveCSS("font-size", "20px");
     await expect(brand.locator("strong + span")).toHaveCSS("font-size", "16px");
     await expect(

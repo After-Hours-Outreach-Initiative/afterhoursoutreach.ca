@@ -135,15 +135,18 @@ export function initAccountSwitcher() {
     updateSteps();
   };
   setBusy(true);
-  const trigger = document.querySelector<HTMLButtonElement>(
+  // The yellow crescent in the header opens the panel.
+  const triggers = document.querySelectorAll<HTMLButtonElement>(
     "[data-open-account-switcher]",
   );
-  if (trigger) trigger.hidden = false;
+  const visitor = states.querySelector<HTMLButtonElement>("[data-visitor]");
   const toggle = () => {
     if (root.open) root.close();
     else {
       root.showModal();
-      trigger?.setAttribute("aria-expanded", "true");
+      triggers.forEach((trigger) =>
+        trigger.setAttribute("aria-expanded", "true"),
+      );
       // Public pages and the fixture playground need no account API until opened.
       if (!loaded) {
         loaded = true;
@@ -153,7 +156,9 @@ export function initAccountSwitcher() {
       }
     }
   };
-  trigger?.addEventListener("click", toggle);
+  triggers.forEach((trigger) => trigger.addEventListener("click", toggle));
+  // The header crescent is there before this script; tests wait for this.
+  root.dataset.ready = "";
   document.addEventListener("keydown", (event) => {
     if (
       event.defaultPrevented ||
@@ -173,7 +178,9 @@ export function initAccountSwitcher() {
     ?.addEventListener("click", () => root.close());
   root.addEventListener("close", () => {
     resetDeleteConfirmation();
-    trigger?.setAttribute("aria-expanded", "false");
+    triggers.forEach((trigger) =>
+      trigger.setAttribute("aria-expanded", "false"),
+    );
   });
   root.addEventListener("cancel", (event) => {
     if (!pendingDelete) return;
@@ -348,6 +355,15 @@ export function initAccountSwitcher() {
       button.appendChild(detail);
       return button;
     };
+    // Presets need only their name; their state shows on hover.
+    const stateButton = (id: string, label: string, description: string) => {
+      const button = profileButton(id, label, "");
+      button.lastElementChild!.remove();
+      button.title = description;
+      return button;
+    };
+    // Keep Visitor while the groups are rebuilt.
+    if (visitor) states.insertBefore(visitor, states.firstChild);
     states
       .querySelectorAll("[data-account-category]")
       .forEach((group) => group.remove());
@@ -356,7 +372,7 @@ export function initAccountSwitcher() {
         const section = document.createElement("section");
         section.className = "account-state-category";
         section.dataset.accountCategory = group.key;
-        const heading = document.createElement("h4");
+        const heading = document.createElement("h3");
         const buttons = document.createElement("div");
         buttons.className = "account-profile-buttons";
         buttons.setAttribute("role", "group");
@@ -374,20 +390,16 @@ export function initAccountSwitcher() {
     groups
       .get("application")!
       .buttons.appendChild(
-        profileButton(
-          newApplicationPersona,
-          "Not applied",
-          "Reset the temporary test account to an empty application",
-        ),
+        stateButton(newApplicationPersona, "Not applied", "Empty application"),
       );
     for (const preset of manualAccountPresets)
       groups
         .get(preset.group)!
         .buttons.appendChild(
-          profileButton(
+          stateButton(
             accountStatePersona(preset.key),
             preset.label,
-            `Reset test state · ${developmentPresetStatus(preset)}`,
+            developmentPresetStatus(preset),
           ),
         );
     for (const user of users) {
@@ -443,16 +455,20 @@ export function initAccountSwitcher() {
     }
     for (const { section, heading, buttons, label } of groups.values()) {
       section.hidden = buttons.childElementCount === 0;
-      heading.textContent = `${label} (${buttons.childElementCount})`;
+      heading.textContent = label;
+    }
+    if (visitor) {
+      const access = groups.get("access")!.buttons;
+      access.insertBefore(visitor, access.firstChild);
     }
     if (emptyAccounts) emptyAccounts.hidden = accounts.childElementCount > 0;
     const current = users.find((user) => user.id === currentUserId);
     if (stepAccount)
       stepAccount.textContent = current
-        ? `Current account: ${current.name || current.email}`
+        ? `for ${current.name || current.email}`
         : currentUserId
-          ? `Current temporary test account: ${currentAccountName ?? "Test account"}`
-          : "Choose an account to use these shortcuts.";
+          ? `for ${currentAccountName ?? "Test account"}`
+          : "need an account";
     profiles
       .querySelectorAll<HTMLButtonElement>("[data-switch-user]")
       .forEach((button) =>

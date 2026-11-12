@@ -1,4 +1,6 @@
 ---
+import DevPanelTrigger from "../DevPanelTrigger.astro";
+
 interface Props {
   active:
     | "buttons"
@@ -30,7 +32,10 @@ const examples = [
 ---
 
 <header class="ui-page-header">
-  <h1>UI playground</h1>
+  <div class="flex items-center gap-3">
+    <DevPanelTrigger class="size-10" />
+    <h1>UI playground</h1>
+  </div>
   <p>Local previews with fictional data.</p>
   <nav class="ui-component-nav" aria-label="Website parts">
     {
