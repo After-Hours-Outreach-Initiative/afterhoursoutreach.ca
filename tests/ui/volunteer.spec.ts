@@ -433,6 +433,105 @@ test("event calendar links visible cards, reaches later months, and survives liv
   expect(documents).toEqual([]);
 });
 
+test("event calendar slides between months and follows horizontal swipes", async ({
+  page,
+  baseURL,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await (
+    await openLocalAccountSwitcher(page)
+  )
+    .locator('[data-switch-user="local-fixture-user-robin"]')
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+  const today = vancouverInput(Date.now()).slice(0, 10);
+  const response = await page.request.post("/api/v1/events/action", {
+    headers: { origin: baseURL! },
+    data: {
+      action: "save",
+      event: {
+        includesOrientation: false,
+        startsAt: vancouverInstant(
+          `${addCalendarDays(calendarMonthStart(today, 1), 12)}T20:00`,
+        ),
+        meetingPoint: `Swipe ${crypto.randomUUID()}`,
+        meetingPointUrl: "",
+        spots: 10,
+        open: true,
+        hidden: false,
+      },
+    },
+  });
+  expect(response.status(), await response.text()).toBe(200);
+  await page.goto("/volunteer");
+  const calendar = page.locator("[data-event-calendar]");
+  const days = calendar.locator("[data-calendar-days]");
+  const current = calendarMonthStart(today);
+  const next = calendarMonthStart(today, 1);
+  await expect(calendar).toHaveAttribute("data-calendar-start", current);
+
+  // The buttons slide the outgoing month away before the next one arrives.
+  await calendar
+    .getByRole("button", { name: "Next month", exact: true })
+    .click();
+  expect(
+    await days.evaluate((element) => element.getAnimations().length),
+  ).toBeGreaterThan(0);
+  await expect(calendar).toHaveAttribute("data-calendar-start", next);
+  await expect
+    .poll(() => days.evaluate((element) => element.getAnimations().length))
+    .toBe(0);
+
+  const swipe = (dx: number, dy = 0) =>
+    days.evaluate(
+      (element, [dx, dy]) => {
+        const box = element.getBoundingClientRect();
+        const x = box.left + box.width / 2;
+        const y = box.top + box.height / 2;
+        const init = { pointerId: 7, pointerType: "touch", isPrimary: true };
+        const target = element.querySelector("td")!;
+        target.dispatchEvent(
+          new PointerEvent("pointerdown", {
+            ...init,
+            bubbles: true,
+            clientX: x,
+            clientY: y,
+          }),
+        );
+        for (let step = 1; step <= 5; step++)
+          window.dispatchEvent(
+            new PointerEvent("pointermove", {
+              ...init,
+              clientX: x + (dx * step) / 5,
+              clientY: y + (dy * step) / 5,
+            }),
+          );
+        window.dispatchEvent(
+          new PointerEvent("pointerup", {
+            ...init,
+            clientX: x + dx,
+            clientY: y + dy,
+          }),
+        );
+      },
+      [dx, dy],
+    );
+
+  // Short and vertical drags keep the month; a long rightward swipe goes back.
+  await swipe(20);
+  await swipe(10, 120);
+  await expect(calendar).toHaveAttribute("data-calendar-start", next);
+  await swipe(120);
+  await expect(calendar).toHaveAttribute("data-calendar-start", current);
+  await swipe(-120);
+  await expect(calendar).toHaveAttribute("data-calendar-start", next);
+  await expect
+    .poll(() => days.evaluate((element) => element.style.transform))
+    .toBe("");
+});
+
 test("View as has a button for every seeded profile and supports keyboard switching on mobile", async ({
   page,
 }) => {

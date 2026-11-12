@@ -134,6 +134,11 @@
   border-radius: 0.5rem;
   background: #0c0d10;
 }
+[data-event-calendar] .table-scroll-frame {
+  /* Clip the sliding month and leave vertical drags to the page. */
+  overflow-x: clip;
+  touch-action: pan-y;
+}
 [data-event-calendar] table {
   min-width: 0;
   border-collapse: separate;

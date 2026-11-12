@@ -1,6 +1,10 @@
 import { vancouverInstant } from "../data/event-time";
 import { trackUnsavedChanges } from "./unsaved-changes";
-import { handleEventCalendarClick, syncEventCalendar } from "./event-calendar";
+import {
+  handleEventCalendarClick,
+  initEventCalendarSwipe,
+  syncEventCalendar,
+} from "./event-calendar";
 import { actionFragment, loadActionPage } from "./action-page";
 import { syncApplicationProgress } from "./application-progress";
 import { focusAfterUpdate } from "./focus";
@@ -99,6 +103,7 @@ document
   .forEach((root) => {
     syncEventCalendar(root);
     initBulkEvents(root);
+    initEventCalendarSwipe(root);
     root.addEventListener("click", (event) =>
       handleEventCalendarClick(root, event),
     );

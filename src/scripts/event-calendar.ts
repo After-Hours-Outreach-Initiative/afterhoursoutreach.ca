@@ -155,13 +155,166 @@ export function syncEventCalendar(root: HTMLElement, start?: string) {
   }
 }
 
+const monthTransitions = new WeakMap<HTMLElement, () => void>();
+
+function reducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** Slide the current month out toward `direction`, then the target month in from the other side. */
+function changeMonth(
+  root: HTMLElement,
+  calendar: HTMLElement,
+  step: "previous" | "next",
+  offset = 0,
+) {
+  monthTransitions.get(calendar)?.();
+  const target = calendar.querySelector<HTMLButtonElement>(
+    `[data-calendar-step="${step}"]`,
+  );
+  if (!target || target.disabled || !target.dataset.calendarTarget) return;
+  const month = target.dataset.calendarTarget;
+  clearSelection(root);
+  const days = calendar.querySelector<HTMLElement>("[data-calendar-days]")!;
+  days.style.removeProperty("transform");
+  days.style.removeProperty("opacity");
+  if (reducedMotion()) {
+    syncEventCalendar(root, month);
+    return;
+  }
+  const direction = step === "next" ? -1 : 1;
+  const distance = days.getBoundingClientRect().width * 0.4;
+  let rendered = false;
+  let incoming: Animation | undefined;
+  const outgoing = days.animate(
+    [
+      {
+        transform: `translateX(${offset}px)`,
+        opacity: Math.max(0, 1 - Math.abs(offset) / distance / 2.5),
+      },
+      { transform: `translateX(${direction * distance}px)`, opacity: 0 },
+    ],
+    { duration: 130, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" },
+  );
+  const render = () => {
+    if (rendered) return;
+    rendered = true;
+    syncEventCalendar(root, month);
+    outgoing.cancel();
+  };
+  const finish = () => {
+    render();
+    incoming?.cancel();
+    if (monthTransitions.get(calendar) === finish)
+      monthTransitions.delete(calendar);
+  };
+  monthTransitions.set(calendar, finish);
+  outgoing.finished.then(
+    () => {
+      if (monthTransitions.get(calendar) !== finish) return;
+      render();
+      incoming = days.animate(
+        [
+          { transform: `translateX(${-direction * distance}px)`, opacity: 0 },
+          { transform: "translateX(0)", opacity: 1 },
+        ],
+        { duration: 200, easing: "cubic-bezier(0, 0, 0.2, 1)" },
+      );
+      incoming.finished.then(finish, () => {});
+    },
+    () => {},
+  );
+}
+
+/** Follow horizontal touch drags on the month grid; vertical drags keep scrolling the page. */
+export function initEventCalendarSwipe(root: HTMLElement) {
+  root.addEventListener("pointerdown", (start) => {
+    if (start.pointerType === "mouse" || !start.isPrimary) return;
+    if (!(start.target instanceof Element)) return;
+    const calendar = start.target.closest<HTMLElement>("[data-event-calendar]");
+    if (!calendar || !start.target.closest("table")) return;
+    const days = calendar.querySelector<HTMLElement>("[data-calendar-days]")!;
+    const controller = new AbortController();
+    let dragging = false;
+    let dx = 0;
+    const available = (step: "previous" | "next") =>
+      !calendar.querySelector<HTMLButtonElement>(
+        `[data-calendar-step="${step}"]`,
+      )?.disabled;
+    const end = (cancelled: boolean) => {
+      controller.abort();
+      if (!dragging) return;
+      // A completed drag must not also follow the date link under the finger.
+      const swallow = (click: Event) => {
+        click.preventDefault();
+        click.stopPropagation();
+      };
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      window.setTimeout(
+        () => window.removeEventListener("click", swallow, true),
+        400,
+      );
+      const step = dx < 0 ? "next" : "previous";
+      const threshold = Math.min(64, days.getBoundingClientRect().width * 0.2);
+      if (!cancelled && Math.abs(dx) >= threshold && available(step)) {
+        changeMonth(root, calendar, step, dx);
+        return;
+      }
+      days.style.removeProperty("transform");
+      days.style.removeProperty("opacity");
+      if (!reducedMotion() && dx)
+        days.animate(
+          [
+            { transform: `translateX(${dx}px)` },
+            { transform: "translateX(0)" },
+          ],
+          { duration: 180, easing: "cubic-bezier(0, 0, 0.2, 1)" },
+        );
+    };
+    window.addEventListener(
+      "pointermove",
+      (move) => {
+        if (move.pointerId !== start.pointerId) return;
+        const x = move.clientX - start.clientX;
+        const y = move.clientY - start.clientY;
+        if (!dragging) {
+          if (Math.abs(x) < 8 || Math.abs(x) <= Math.abs(y)) return;
+          dragging = true;
+          monthTransitions.get(calendar)?.();
+        }
+        // Resist past the first or last month that has events.
+        dx = available(x < 0 ? "next" : "previous") ? x : x / 4;
+        days.style.transform = `translateX(${dx}px)`;
+        days.style.opacity = String(
+          Math.max(0.4, 1 - Math.abs(dx) / days.getBoundingClientRect().width),
+        );
+      },
+      { signal: controller.signal },
+    );
+    window.addEventListener(
+      "pointerup",
+      (up) => up.pointerId === start.pointerId && end(false),
+      { signal: controller.signal },
+    );
+    window.addEventListener(
+      "pointercancel",
+      (cancel) => cancel.pointerId === start.pointerId && end(true),
+      { signal: controller.signal },
+    );
+  });
+}
+
 export function handleEventCalendarClick(root: HTMLElement, event: MouseEvent) {
   if (!(event.target instanceof Element)) return;
   const step = event.target.closest<HTMLButtonElement>("[data-calendar-step]");
   if (step) {
-    if (step.disabled) return;
-    clearSelection(root);
-    syncEventCalendar(root, step.dataset.calendarTarget);
+    const calendar = step.closest<HTMLElement>("[data-event-calendar]");
+    if (calendar)
+      changeMonth(
+        root,
+        calendar,
+        step.dataset.calendarStep === "next" ? "next" : "previous",
+      );
     return;
   }
   const link = event.target.closest<HTMLAnchorElement>("[data-calendar-event]");
