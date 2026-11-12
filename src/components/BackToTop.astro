@@ -8,10 +8,14 @@ import ArrowUpIcon from "@/components/icons/ArrowUpIcon.astro";
 </a>
 
 <style>
-  /* Rises from the bottom edge while a reader scrolls back up a long page. */
+  /* Slides down from under the header while a reader scrolls back up a long
+     page. */
   .back-to-top {
     position: fixed;
-    bottom: 1rem;
+    top: calc(
+      var(--site-header-rendered-height, var(--site-header-height, 5.5rem)) +
+        0.75rem
+    );
     left: 50%;
     z-index: 30;
     display: inline-flex;
@@ -27,7 +31,7 @@ import ArrowUpIcon from "@/components/icons/ArrowUpIcon.astro";
     text-decoration: none;
     box-shadow: 0 0.5rem 1.5rem #0009;
     opacity: 0;
-    translate: -50% 150%;
+    translate: -50% -150%;
     transition:
       opacity 150ms ease,
       translate 200ms cubic-bezier(0.2, 0, 0, 1);

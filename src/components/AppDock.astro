@@ -199,16 +199,10 @@ const items = [
     }
   }
 
-  /* Keep the page's end, and other floating controls, clear of the dock. */
+  /* Keep the page's end clear of the dock. */
   @media (width < 64rem) {
     :global(body[data-app-dock]) {
       padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
-    }
-    :global(body[data-app-dock] .back-to-top) {
-      bottom: calc(4.5rem + env(safe-area-inset-bottom));
-    }
-    :global(body[data-app-dock] [data-open-account-switcher]) {
-      bottom: calc(4.5rem + env(safe-area-inset-bottom));
     }
   }
 </style>
