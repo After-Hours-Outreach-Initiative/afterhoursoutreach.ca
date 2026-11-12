@@ -50,22 +50,22 @@ const editable = !event || (event.startsAt > Date.now() && !event.cancelledAt);
             <input type="hidden" name="version" value={event.updatedAt} />
           </>
         )}
+        {event?.seriesId && series && (
+          <>
+            <input type="hidden" name="seriesId" value={series.id} />
+            <input
+              type="hidden"
+              name="seriesVersion"
+              value={series.updatedAt}
+            />
+            <input
+              type="hidden"
+              name="occurrenceDate"
+              value={event.occurrenceDate!}
+            />
+          </>
+        )}
         <div class="volunteer-fields">
-          {event?.seriesId && series && (
-            <>
-              <input type="hidden" name="seriesId" value={series.id} />
-              <input
-                type="hidden"
-                name="seriesVersion"
-                value={series.updatedAt}
-              />
-              <input
-                type="hidden"
-                name="occurrenceDate"
-                value={event.occurrenceDate!}
-              />
-            </>
-          )}
           <EventFields id={dialogId} {event} {series} />
         </div>
         <p data-form-message role="status" hidden />
