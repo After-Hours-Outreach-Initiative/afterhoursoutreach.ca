@@ -50,6 +50,8 @@ function checkDiscardResponse(response: Response) {
 async function confirmAccountDiscard(
   request: ReturnType<typeof applicationDraftDiscardSchema.parse>,
 ) {
+  // Cached app screens may show the draft being removed.
+  document.dispatchEvent(new Event("app-data-changed"));
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const response = await fetch(endpoint, {
@@ -683,6 +685,8 @@ export function initApplicationDraft(element: HTMLFormElement) {
     cancelTimer();
     const answers = readDraftAnswers(element);
     lastAttempt = answers;
+    // Cached app screens may show the answers being saved.
+    document.dispatchEvent(new Event("app-data-changed"));
     inFlight = (async () => {
       let delay = 1000;
       try {

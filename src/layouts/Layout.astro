@@ -10,14 +10,12 @@ import type { ComponentProps } from "astro/types";
 import { Font } from "astro:assets";
 import "@/styles/tailwind.css";
 import { devFavicon } from "@/dev/favicon";
+import { isAppRoute } from "@/data/app-routes";
 
 // Preview mode changes only the banner, never account or event availability.
 // Keep public and authentication pages on ordinary document navigation.
 const appNavigation =
-  Boolean(Astro.props.account.signedIn) &&
-  /^\/(?:events|applications|volunteers|volunteer(?:\/account)?)\/?$/.test(
-    Astro.url.pathname,
-  );
+  Boolean(Astro.props.account.signedIn) && isAppRoute(Astro.url.pathname);
 const showPreviewBanner = import.meta.env.MODE === "preview";
 
 interface Props {

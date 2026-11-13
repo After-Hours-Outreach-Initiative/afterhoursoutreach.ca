@@ -1,17 +1,11 @@
 import type { TransitionBeforePreparationEvent } from "astro:transitions/client";
 import { scrollToPageTop } from "./scroll-to-top";
+import { appRoutes, isAppRoute } from "../data/app-routes";
 
 // Private HTML stays out of HTTP/shared caches and persistent browser storage.
 // This small cache lives only in this document's signed-in navigation session.
 const ttl = 10_000;
 const maxBytes = 2_000_000;
-const routes = new Set([
-  "/events",
-  "/volunteer",
-  "/applications",
-  "/volunteers",
-  "/volunteer/account",
-]);
 interface Screen {
   html: string;
   expires: number;
@@ -21,6 +15,8 @@ const screens = new Map<string, Screen>();
 const scrolls = new Map<string, { left: number; top: number }>();
 const warming = new Map<string, AbortController>();
 const assets = new Set<string>();
+// Destination stylesheets settle once, whether preloaded early or on a tap.
+const styles = new Map<string, Promise<void>>();
 let generation = 0;
 let activeNavigation: TransitionBeforePreparationEvent | undefined;
 let warmingTimer: ReturnType<typeof setTimeout> | undefined;
@@ -28,16 +24,31 @@ const scope = () => document.body.dataset.appScope;
 const key = (url: URL) => url.origin + url.pathname + url.search;
 const tabKey = (url: URL) => url.origin + url.pathname;
 const eligible = (url: URL) =>
-  url.origin === location.origin && routes.has(url.pathname) && !url.search;
+  url.origin === location.origin && appRoutes.has(url.pathname) && !url.search;
 
-function clearScreens(event?: Event) {
+// Warming resumes on the next screen load or return to the tab, not after
+// every interaction, so edits never trigger repeated full page renders.
+function clearScreens() {
   generation++;
   screens.clear();
   for (const controller of warming.values()) controller.abort();
   warming.clear();
   clearTimeout(warmingTimer);
-  // Resume speculation after the current interaction or refresh settles.
-  if (scope() && !document.hidden && event?.type !== "pagehide") warmDock();
+}
+function preloadStyle(href: string) {
+  let loaded = styles.get(href);
+  if (!loaded) {
+    loaded = new Promise<void>((resolve) => {
+      const preload = document.createElement("link");
+      preload.rel = "preload";
+      preload.as = "style";
+      preload.href = href;
+      preload.onload = preload.onerror = () => resolve();
+      document.head.appendChild(preload);
+    });
+    styles.set(href, loaded);
+  }
+  return loaded;
 }
 function remember(url: URL, html: string) {
   const owner = scope();
@@ -64,11 +75,13 @@ function remember(url: URL, html: string) {
     )
       continue;
     assets.add(asset.href);
+    if (element instanceof HTMLLinkElement) {
+      void preloadStyle(asset.href);
+      continue;
+    }
     const preload = document.createElement("link");
+    preload.rel = "modulepreload";
     preload.href = asset.href;
-    preload.rel =
-      element instanceof HTMLScriptElement ? "modulepreload" : "preload";
-    if (preload.rel === "preload") preload.as = "style";
     document.head.appendChild(preload);
   }
   screens.delete(key(url));
@@ -183,24 +196,15 @@ document.addEventListener("astro:before-preparation", (event) => {
         await Promise.all(
           [
             ...hit.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
-          ].map((style) => {
-            if (
-              [
-                ...document.querySelectorAll<HTMLLinkElement>(
-                  'link[rel="stylesheet"], link[rel="preload"]',
-                ),
-              ].some((existing) => existing.href === style.href)
-            )
-              return;
-            return new Promise<void>((resolve) => {
-              const preload = document.createElement("link");
-              preload.rel = "preload";
-              preload.as = "style";
-              preload.href = style.href;
-              preload.onload = preload.onerror = () => resolve();
-              document.head.appendChild(preload);
-            });
-          }),
+          ].map((style) =>
+            [
+              ...document.querySelectorAll<HTMLLinkElement>(
+                'link[rel="stylesheet"]',
+              ),
+            ].some((existing) => existing.href === style.href)
+              ? undefined
+              : preloadStyle(style.href),
+          ),
         );
       } else {
         await loader();
@@ -259,8 +263,6 @@ document.addEventListener(
 // Mutations and leaving the browser invalidate speculative private content.
 for (const type of [
   "app-data-changed",
-  "input",
-  "change",
   "submit",
   "pending-action-added",
   "pending-action-resolved",
@@ -294,15 +296,12 @@ document.addEventListener(
     }
     if (scope() && link) {
       const target = new URL(link.href);
-      if (
-        target.origin === location.origin &&
-        !routes.has(target.pathname.replace(/\/$/, ""))
-      )
+      if (target.origin === location.origin && !isAppRoute(target.pathname))
         link.setAttribute("data-astro-reload", "");
     }
     if (
       event.target instanceof Element &&
-      event.target.closest("button, [data-switch-user]")
+      event.target.closest("[data-switch-user]")
     )
       clearScreens();
   },
@@ -313,6 +312,7 @@ document.addEventListener("visibilitychange", () => {
   else warmDock();
 });
 window.addEventListener("pagehide", clearScreens);
+// Another window may have signed out or changed data.
 window.addEventListener("focus", clearScreens);
 window.addEventListener("storage", clearScreens);
 window.addEventListener("pageshow", resetFeedback);
