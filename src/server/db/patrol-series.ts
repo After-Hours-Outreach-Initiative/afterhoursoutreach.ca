@@ -816,6 +816,7 @@ export async function updatePatrolSeriesFrom(
     await db
       .prepare(
         `SELECT id, occurrence_date AS date, starts_at AS startsAt,
+        meeting_point AS meetingPoint,
         ${includesOrientationSql()} AS includesOrientation,
         ${separateEditSql()} AS edited FROM event e
     WHERE series_id = ? AND occurrence_date >= ? AND cancelled_at IS NULL AND starts_at > ${nowMsSql}`,
@@ -825,6 +826,7 @@ export async function updatePatrolSeriesFrom(
         id: string;
         date: string;
         startsAt: number;
+        meetingPoint: string;
         includesOrientation: number;
         edited: number;
       }>()
@@ -877,6 +879,16 @@ export async function updatePatrolSeriesFrom(
     ...rows.filter((row) => !dropped.some((drop) => drop.id === row.id)),
     ...returning,
   ].map((row) => ({ id: row.id, startsAt: templateStart(row.date, data) }));
+  // Booked volunteers hear only about a new time, meeting point or event type.
+  const quietIds = rows
+    .filter(
+      (row) =>
+        !dropped.some((drop) => drop.id === row.id) &&
+        row.startsAt === templateStart(row.date, data) &&
+        row.meetingPoint === data.meetingPoint &&
+        Boolean(row.includesOrientation) === data.includesOrientation,
+    )
+    .map((row) => row.id);
   const returningIds = JSON.stringify(returning.map((row) => row.id));
   const values = [
     data.localTime,
@@ -1031,6 +1043,7 @@ export async function updatePatrolSeriesFrom(
             }),
           ]),
         ]),
+        quietIds,
       ),
       db
         .prepare(
@@ -1076,6 +1089,7 @@ function seriesNotifications(
   notify: boolean,
   fallback: EmailContent,
   dated: Record<string, EmailContent>,
+  quietIds: string[] = [],
 ) {
   return db
     .prepare(
@@ -1085,6 +1099,7 @@ function seriesNotifications(
     JOIN user u ON u.id = s.user_id AND u.email_verified = 1
     LEFT JOIN json_each(?) dated ON dated.key = s.event_id
     WHERE s.status = 'confirmed' AND ? = 1
+      AND s.event_id NOT IN (SELECT value FROM json_each(?))
       AND EXISTS(SELECT 1 FROM event_audit a WHERE a.id = ? || ':' || s.event_id)`,
     )
     .bind(
@@ -1101,6 +1116,7 @@ function seriesNotifications(
         ),
       ),
       Number(notify),
+      JSON.stringify(quietIds),
       operation,
     );
 }

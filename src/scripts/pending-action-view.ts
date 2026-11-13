@@ -1,8 +1,8 @@
 import alertIcon from "../components/icons/AlertIcon.svg?raw";
 import arrowRightIcon from "../components/icons/ArrowRightIcon.svg?raw";
 import checkIcon from "../components/icons/CheckIcon.svg?raw";
+import chevronDownIcon from "../components/icons/ChevronDownIcon.svg?raw";
 import closeIcon from "../components/icons/CloseIcon.svg?raw";
-import maximizeIcon from "../components/icons/MaximizeIcon.svg?raw";
 import minimizeIcon from "../components/icons/MinimizeIcon.svg?raw";
 import pencilIcon from "../components/icons/PencilIcon.svg?raw";
 import timerIcon from "../components/icons/TimerIcon.svg?raw";
@@ -17,6 +17,8 @@ export interface PendingAction {
   endpoint: "events" | "organizer";
   summary: string;
   inlineSummary?: string;
+  /** Each setting an event change sets. `from` is left out when new. */
+  changes?: { label: string; from?: string; to: string }[];
   /** Which controls on a person's page made it: its banner goes in the
    * matching `data-pending-slot`. */
   area?: "application" | "patrol" | "access";
@@ -228,7 +230,64 @@ export function createPendingInline(action: PendingAction, here: string) {
   banner.dataset.pendingHere = here;
   const { body, buttons } = controls(action, true);
   banner.replaceChildren(body, buttons);
+  if (action.changes?.length) {
+    const list = changeList(action.changes);
+    list.id = `pending-changes-${action.id}`;
+    const toggle = pendingButton("pending-changes-toggle", "");
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.setAttribute("aria-controls", list.id);
+    const label = document.createElement("span");
+    const count = action.changes.length;
+    const show = `Show ${count === 1 ? "change" : `${count} changes`}`;
+    label.textContent = "Hide changes";
+    toggle.replaceChildren(
+      label,
+      icon(chevronDownIcon, "pending-changes-icon"),
+    );
+    toggle.addEventListener("click", () => {
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      toggle.setAttribute("aria-expanded", String(open));
+      label.textContent = open ? "Hide changes" : show;
+      list.hidden = !open;
+    });
+    body.querySelector(".pending-inline-text")!.appendChild(toggle);
+    // Under the summary, before the buttons.
+    body.appendChild(list);
+  }
   return banner;
+}
+
+/** "Volunteer spots: 8 → 10", one setting per row. */
+function changeList(changes: NonNullable<PendingAction["changes"]>) {
+  const list = document.createElement("ul");
+  list.className = "pending-changes";
+  for (const change of changes) {
+    const item = document.createElement("li");
+    const label = document.createElement("span");
+    label.className = "pending-change-label";
+    label.textContent = change.label;
+    const value = document.createElement("span");
+    value.className = "pending-change-value";
+    const to = document.createElement("span");
+    to.className = "pending-change-to";
+    to.textContent = change.to;
+    if (change.from !== undefined) {
+      const from = document.createElement("span");
+      from.className = "pending-change-from";
+      // A no-break space holds the arrow to the old value's last word, so
+      // it never wraps onto a line of its own.
+      from.textContent = `${change.from}\u00a0`;
+      from.appendChild(icon(arrowRightIcon, "pending-change-arrow"));
+      // Read aloud as "8 to 10".
+      const spoken = document.createElement("span");
+      spoken.className = "sr-only";
+      spoken.textContent = " to ";
+      value.replaceChildren(from, spoken, to);
+    } else value.replaceChildren(to);
+    item.replaceChildren(label, value);
+    list.appendChild(item);
+  }
+  return list;
 }
 
 // One animation per item and deadline, so the fill never restarts.
@@ -393,7 +452,6 @@ export function createPendingChip() {
     icon(alertIcon, "pending-chip-failed"),
     icon(undoIcon, "pending-chip-undone"),
     time,
-    icon(maximizeIcon, "pending-chip-icon"),
   );
   const open = document.createElement("span");
   open.className = "pending-chip-open";

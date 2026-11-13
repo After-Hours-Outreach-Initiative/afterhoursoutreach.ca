@@ -4,10 +4,10 @@ Most UI icons render through the official `@lucide/astro` package. Use its named
 components, or the existing semantic wrappers here; do not draw or modify paths.
 The package supplies intrinsic dimensions even before CSS loads.
 
-`AlertIcon.svg`, `ArrowRightIcon.svg`, `CheckIcon.svg`, `CloseIcon.svg`,
-`MaximizeIcon.svg`, `MenuIcon.svg`, `MinimizeIcon.svg`, `PencilIcon.svg`,
+`AlertIcon.svg`, `ArrowRightIcon.svg`, `CheckIcon.svg`, `ChevronDownIcon.svg`, `CloseIcon.svg`,
+`MenuIcon.svg`, `MinimizeIcon.svg`, `PencilIcon.svg`,
 `TimerIcon.svg`, `UndoIcon.svg` and `UserPenIcon.svg` copy the exact
-`triangle-alert`, `arrow-right`, `check`, `x`, `maximize-2`, `menu`,
+`triangle-alert`, `arrow-right`, `check`, `chevron-down`, `x`, `menu`,
 `minimize-2`, `pencil`, `timer`, `undo-2` and `user-pen` nodes from `@lucide/astro` 1.72.0 because client scripts also import
 them as raw SVG.
 Their license is in `LICENSE.lucide.txt`.

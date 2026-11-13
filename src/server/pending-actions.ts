@@ -7,7 +7,14 @@ import {
   type Actor,
 } from "./db/access";
 import { databaseErrorMessage, databaseWriteError } from "./db/errors";
-import { patrolTemplateLimits } from "./db/patrol-series";
+import {
+  findPatrolSeries,
+  listPatrolTemplates,
+  patrolTemplateFor,
+  patrolTemplateLimits,
+  seriesCadenceAt,
+  separateEditSql,
+} from "./db/patrol-series";
 import { profileDisplayNameSql } from "./db/sql";
 import { submissionNotificationMode } from "./db/submission-notifications";
 import {
@@ -24,8 +31,17 @@ import {
   runOrganizerAction,
   type OrganizerActionInput,
 } from "./organizer-actions";
-import { formatEventDay } from "../data/event-time";
+import { emailsEventChange } from "../data/event-change-emails";
+import { formatEventDay, vancouverInput } from "../data/event-time";
 import { compactPersonDisplayName } from "../data/person-name";
+import {
+  scheduleChanges,
+  settingChanges,
+  startChange,
+  startTimeChange,
+  type EventSettings,
+  type PendingChange,
+} from "./pending-changes";
 
 /** How long an action that sends email, cancels or deletes waits before it
  * is made. */
@@ -81,6 +97,8 @@ export interface PendingActionView {
   endpoint: Endpoint;
   summary: string;
   inlineSummary?: string;
+  /** Each setting an event change sets, from and to. */
+  changes?: PendingChange[];
   area?: PendingArea;
   verb: string;
   runAt: number;
@@ -174,6 +192,68 @@ async function hasRecipients(db: Env["DB"], event: EventActionInput) {
   }
 }
 
+/** The part of an edit that volunteers are emailed about, or null when it only
+ * changes fields such as spots, visibility or the map link. */
+async function emailedChange(
+  db: Env["DB"],
+  event: EventActionInput,
+): Promise<EventActionInput | null> {
+  switch (event.action) {
+    case "save": {
+      if (!event.id) return null;
+      const old = (await findEvents(db, [event.id])).get(event.id);
+      if (!old) return event;
+      const next = event.event;
+      const orientation =
+        next.includesOrientation ??
+        (next.type ? next.type === "orientation" : hasOrientation(old));
+      return Math.floor(Date.parse(next.startsAt) / 60_000) !==
+        Math.floor(old.startsAt / 60_000) ||
+        next.meetingPoint !== old.meetingPoint ||
+        orientation !== hasOrientation(old)
+        ? event
+        : null;
+    }
+    case "bulk-save": {
+      const { startTime, meetingPoint, includesOrientation } = event.changes;
+      const old = await findEvents(
+        db,
+        event.selection.map((row) => row.id),
+      );
+      const selection = event.selection.filter((row) => {
+        const current = old.get(row.id);
+        return (
+          !current ||
+          (startTime !== undefined &&
+            vancouverInput(current.startsAt).slice(11, 16) !== startTime) ||
+          (meetingPoint !== undefined &&
+            meetingPoint !== current.meetingPoint) ||
+          (includesOrientation !== undefined &&
+            includesOrientation !== hasOrientation(current))
+        );
+      });
+      return selection.length ? { ...event, selection } : null;
+    }
+    case "update-series-from": {
+      if (emailsEventChange(Object.keys(event.template))) return event;
+      // "All events" also resets dates edited on their own, which may move them.
+      if (event.scope !== "all") return null;
+      const edited = await db
+        .prepare(
+          `SELECT 1 FROM event e JOIN signup s ON s.event_id = e.id
+          WHERE e.series_id = ? AND e.cancelled_at IS NULL AND e.starts_at > ?
+            AND s.status = 'confirmed' AND s.user_id IS NOT NULL
+            AND ${separateEditSql()} LIMIT 1`,
+        )
+        .bind(event.id, Date.now())
+        .first();
+      return edited ? event : null;
+    }
+    default:
+      return event;
+  }
+}
+
 // Losing an event by accident is hard to put right, so these always wait.
 const destructiveEventActions: string[] = [
   "cancel-event",
@@ -224,7 +304,10 @@ async function waitReason(
     )
       return "removes";
     if (!("notify" in event && event.notify)) return null;
-    return (await hasRecipients(bindings.DB, event)) ? "emails" : null;
+    const emailed = await emailedChange(bindings.DB, event);
+    return emailed && (await hasRecipients(bindings.DB, emailed))
+      ? "emails"
+      : null;
   }
   return (await organizerEmails(bindings, input)) ? "emails" : null;
 }
@@ -408,6 +491,63 @@ function requireCurrent(event: EventSummary | undefined, version: number) {
     );
 }
 
+/** Settings as stored, with visibility as the form shows it. */
+const storedSettings = (row: {
+  includesOrientation: number | null;
+  type?: string;
+  meetingPoint: string;
+  meetingPointUrl: string | null;
+  spots: number;
+  minMedicSpots: number;
+  minNewVolunteerSpots: number;
+  maxNewVolunteers: number;
+  unregisterMinutes: number;
+  open: number;
+  hidden: number;
+}): EventSettings => ({
+  includesOrientation:
+    row.includesOrientation === null
+      ? row.type === "orientation"
+      : Boolean(row.includesOrientation),
+  meetingPoint: row.meetingPoint,
+  meetingPointUrl: row.meetingPointUrl,
+  spots: row.spots,
+  minMedicSpots: row.minMedicSpots,
+  minNewVolunteerSpots: row.minNewVolunteerSpots,
+  maxNewVolunteers: row.maxNewVolunteers,
+  unregisterMinutes: row.unregisterMinutes,
+  visible: Boolean(row.open) && !row.hidden,
+});
+/** Requested settings; a missing one stays as it is. */
+const requestedSettings = (next: {
+  includesOrientation?: boolean;
+  type?: "patrol" | "orientation";
+  meetingPoint?: string;
+  meetingPointUrl?: string;
+  spots?: number;
+  minMedicSpots?: number;
+  minNewVolunteerSpots?: number;
+  maxNewVolunteers?: number;
+  unregisterMinutes?: number;
+  open?: boolean;
+  hidden?: boolean;
+}): Partial<EventSettings> => ({
+  includesOrientation:
+    next.includesOrientation ??
+    (next.type ? next.type === "orientation" : undefined),
+  meetingPoint: next.meetingPoint,
+  meetingPointUrl: next.meetingPointUrl,
+  spots: next.spots,
+  minMedicSpots: next.minMedicSpots,
+  minNewVolunteerSpots: next.minNewVolunteerSpots,
+  maxNewVolunteers: next.maxNewVolunteers,
+  unregisterMinutes: next.unregisterMinutes,
+  visible:
+    next.open === undefined && next.hidden === undefined
+      ? undefined
+      : Boolean(next.open) && !next.hidden,
+});
+
 /** Which controls on a person's page made a change, so its banner sits
  * beside them. Event changes have none. */
 export type PendingArea = "application" | "patrol" | "access";
@@ -431,6 +571,7 @@ async function describe(
   startsAt?: number;
   /** Which controls on a person's page made it. */
   area?: PendingArea;
+  changes?: PendingChange[];
 }> {
   const targets = lockedTargets(endpoint, input).map((target) => ({
     target,
@@ -534,7 +675,15 @@ async function describe(
       requireCurrent(old, event.version ?? -1);
       if (old) holds.push(eventHold(old, event.event));
       const fields = old && savedFields(old, event.event);
+      const changes = old && [
+        ...startChange(old.startsAt, Date.parse(event.event.startsAt)),
+        ...settingChanges(
+          [storedSettings(old)],
+          requestedSettings(event.event),
+        ),
+      ];
       return {
+        changes,
         summary: fields
           ? `Changing the ${fields} of ${eventDay(old)}`
           : `Updating ${eventDay(old)}`,
@@ -585,7 +734,20 @@ async function describe(
           .map(([key]) => key),
       );
       const first = events.get(event.selection[0].id);
+      const olds = [...events.values()];
       return {
+        changes: [
+          ...(event.changes.startTime
+            ? startTimeChange(
+                olds.map((old) => old.startsAt),
+                event.changes.startTime,
+              )
+            : []),
+          ...settingChanges(
+            olds.map(storedSettings),
+            requestedSettings(event.changes),
+          ),
+        ],
         summary: fields
           ? `Changing the ${fields} of ${count === 1 ? eventDay(first) : `${count} events`}`
           : count === 1
@@ -623,7 +785,40 @@ async function describe(
         const events = await findEvents(db, reached.ids);
         for (const old of events.values()) holds.push(eventHold(old, limits));
       }
+      const series = await findPatrolSeries(db, actor, event.id);
+      const templates = await listPatrolTemplates(db, actor, event.id);
+      // "All events" starts at the series' next date.
+      const from =
+        event.scope === "all"
+          ? ((await db
+              .prepare(
+                `SELECT min(occurrence_date) AS date FROM event
+                WHERE series_id = ? AND cancelled_at IS NULL AND starts_at > ?`,
+              )
+              .bind(event.id, Date.now())
+              .first<string | null>("date")) ?? event.occurrenceDate)
+          : event.occurrenceDate;
+      const base = patrolTemplateFor(series, templates, from);
+      const template = event.template as typeof event.template & {
+        intervalWeeks?: number;
+        endDate?: string | null;
+      };
       return {
+        changes: [
+          ...scheduleChanges(
+            {
+              ...base,
+              intervalWeeks: seriesCadenceAt(series, templates, from)
+                .intervalWeeks,
+              endDate: series.endDate,
+            },
+            template,
+          ),
+          ...settingChanges(
+            [storedSettings(base)],
+            requestedSettings(template),
+          ),
+        ],
         summary: `Updating ${formatDate(event.occurrenceDate)} and following events`,
         inline: `Updating ${formatDate(event.occurrenceDate)} and following events`,
         verb: "Update",
@@ -643,7 +838,17 @@ async function describe(
               event.series.endDate,
             )
           : undefined;
+      const old = event.id && (await findPatrolSeries(db, actor, event.id));
       return {
+        changes: old
+          ? [
+              ...scheduleChanges(old, event.series),
+              ...settingChanges(
+                [storedSettings(old)],
+                requestedSettings(event.series),
+              ),
+            ]
+          : undefined,
         summary: "Updating all occurrences of this recurring event",
         inline: "Updating all occurrences",
         verb: "Update",
@@ -838,8 +1043,8 @@ export async function schedulePendingAction(
     const results = await db.batch([
       db
         .prepare(
-          `INSERT INTO pending_action (id, endpoint, input, actor_id, session_id, origin, summary, inline_summary, area, verb, run_at, created_at)
-          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
+          `INSERT INTO pending_action (id, endpoint, input, actor_id, session_id, origin, summary, inline_summary, changes, area, verb, run_at, created_at)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${writePermission(true)}`,
         )
         .bind(
           id,
@@ -850,6 +1055,7 @@ export async function schedulePendingAction(
           bindings.AUTH_BASE_URL,
           plan.summary,
           plan.inline ?? null,
+          plan.changes?.length ? JSON.stringify(plan.changes) : null,
           plan.area ?? null,
           plan.verb,
           runAt,
@@ -906,6 +1112,7 @@ export async function schedulePendingAction(
     endpoint,
     summary: plan.summary,
     ...(plan.inline ? { inlineSummary: plan.inline } : {}),
+    ...(plan.changes?.length ? { changes: plan.changes } : {}),
     ...(plan.area ? { area: plan.area } : {}),
     verb: plan.verb,
     runAt,
@@ -1148,7 +1355,7 @@ export async function listPendingActions(
   requireOrganizer(actor);
   const rows = await db
     .prepare(
-      `SELECT a.id, a.endpoint, a.summary, a.inline_summary AS inlineSummary, a.area, a.verb,
+      `SELECT a.id, a.endpoint, a.summary, a.inline_summary AS inlineSummary, a.changes, a.area, a.verb,
         a.run_at AS runAt, a.created_at AS createdAt, a.status, a.message,
         a.actor_id AS actorId, ${profileDisplayNameSql} AS actorName,
         (SELECT json_group_array(json_object('target', t.target, 'locked', t.locked))
@@ -1165,6 +1372,7 @@ export async function listPendingActions(
       endpoint: Endpoint;
       summary: string;
       inlineSummary: string | null;
+      changes: string | null;
       area: PendingArea | null;
       verb: string;
       runAt: number;
@@ -1180,6 +1388,7 @@ export async function listPendingActions(
     endpoint: row.endpoint,
     summary: row.summary,
     ...(row.inlineSummary ? { inlineSummary: row.inlineSummary } : {}),
+    ...(row.changes ? { changes: JSON.parse(row.changes) } : {}),
     ...(row.area ? { area: row.area } : {}),
     verb: row.verb,
     runAt: row.runAt,

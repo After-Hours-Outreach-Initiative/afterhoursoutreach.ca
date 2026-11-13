@@ -14,7 +14,6 @@ import {
   updatePendingItem,
   type PendingAction,
 } from "./pending-action-view";
-import "../styles/pending-actions.css";
 
 const endpoint = "/api/v1/pending-actions";
 const pollMs = 15_000;
@@ -67,14 +66,14 @@ function init(region: HTMLElement) {
   const chip = createPendingChip();
   region.replaceChildren(status, list, chip);
   // Dims the page while the toasts are open; clicking it minimizes them.
-  const backdrop = document.createElement("div");
-  backdrop.className = "pending-backdrop";
-  backdrop.setAttribute("aria-hidden", "true");
+  // It and the spacer persist with the region across page swaps.
+  const backdrop = document.querySelector<HTMLElement>(
+    "[data-pending-backdrop]",
+  )!;
   backdrop.addEventListener("click", () => {
     setOpen(false);
     render();
   });
-  region.parentNode!.insertBefore(backdrop, region);
   document.addEventListener("keydown", (event) => {
     if (
       event.key !== "Escape" ||
@@ -88,9 +87,7 @@ function init(region: HTMLElement) {
     chip.focus();
   });
   // Room under the page so toasts never hide its end.
-  const spacer = document.createElement("div");
-  spacer.setAttribute("aria-hidden", "true");
-  document.body.appendChild(spacer);
+  const spacer = document.querySelector<HTMLElement>("[data-pending-spacer]")!;
   new ResizeObserver(() => {
     spacer.style.height =
       list.children.length || !chip.hidden
@@ -174,16 +171,28 @@ function init(region: HTMLElement) {
     requests.add(id);
     undoing.add(id);
     delete action.message;
-    // Shown as undone for a moment, unlocked at once; it leaves after.
-    action.status = "undone";
-    finished.set(id, action);
-    render();
-    announce("Change undone.");
-    const leave = window.setTimeout(() => {
-      finished.delete(id);
+    // Undo that reopens the change's form needs no "Undone" state: the form
+    // itself shows it, so the change leaves at once.
+    const reopening = { id, reopens: false };
+    document.dispatchEvent(
+      new CustomEvent("pending-action-undoing", { detail: reopening }),
+    );
+    let leave: number | undefined;
+    if (reopening.reopens) {
       actions = actions.filter((item) => item.id !== id);
       render();
-    }, doneMs);
+    } else {
+      // Shown as undone for a moment, unlocked at once; it leaves after.
+      action.status = "undone";
+      finished.set(id, action);
+      render();
+      leave = window.setTimeout(() => {
+        finished.delete(id);
+        actions = actions.filter((item) => item.id !== id);
+        render();
+      }, doneMs);
+    }
+    announce("Change undone.");
     const restore = (message?: string) => {
       window.clearTimeout(leave);
       finished.delete(id);

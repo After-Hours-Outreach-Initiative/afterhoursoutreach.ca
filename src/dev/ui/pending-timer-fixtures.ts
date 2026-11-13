@@ -353,7 +353,8 @@ export const timerScenarios: (TimerScenario & { section: Section })[] = [
     section: "events",
     id: "event-fields",
     title: "Editing an event",
-    description: "Up to three changed fields are named.",
+    description:
+      "Up to three changed fields are named. The banner lists each one, from and to.",
     view: "both",
     item: patrol,
     changes: [
@@ -363,6 +364,10 @@ export const timerScenarios: (TimerScenario & { section: Section })[] = [
           "Changing the start time and spots of the event on Tue, Nov 17",
         inlineSummary: "Changing the start time and spots",
         verb: "Change",
+        changes: [
+          { label: "Start time", from: "6:00 PM", to: "6:30 PM" },
+          { label: "Volunteer spots", from: "8", to: "10" },
+        ],
       },
     ],
   },
@@ -379,6 +384,29 @@ export const timerScenarios: (TimerScenario & { section: Section })[] = [
         summary: "Updating the event on Tue, Nov 17",
         inlineSummary: "Updating this event",
         verb: "Update",
+        changes: [
+          {
+            label: "Start",
+            from: "Tue, Nov 17, 6:00 PM",
+            to: "Wed, Nov 18, 7:00 PM",
+          },
+          { label: "Event type", from: "Patrol", to: "Orientation + Patrol" },
+          {
+            label: "Meeting point",
+            from: "Strathcona Community Centre",
+            to: "Main Street SkyTrain Station, north entrance by the bike racks",
+          },
+          {
+            label: "Map link",
+            from: "None",
+            to: "https://maps.example/main-street",
+          },
+          {
+            label: "Unregister until",
+            from: "30 minutes after start",
+            to: "0 minutes after start",
+          },
+        ],
       },
     ],
   },
@@ -422,6 +450,8 @@ export const timerScenarios: (TimerScenario & { section: Section })[] = [
         summary: "Changing the visibility of 4 events",
         inlineSummary: "Changing the visibility of 4 events",
         verb: "Change",
+        // The selected events differed, so the old value varies.
+        changes: [{ label: "Public visibility", from: "Varies", to: "Hidden" }],
       },
     ],
   },
@@ -440,6 +470,10 @@ export const timerScenarios: (TimerScenario & { section: Section })[] = [
           "Updating Tue, Dec 1 and following events",
           "Update",
         ),
+        changes: [
+          { label: "Repeats", from: "Every 2 weeks", to: "Every week" },
+          { label: "Minimum medic spots", from: "1", to: "2" },
+        ],
       },
     ],
   },

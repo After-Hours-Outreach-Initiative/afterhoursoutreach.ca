@@ -52,6 +52,21 @@ test("dock switches reuse the document, initialize revisited screens, and retain
       await page.locator("[data-profile-cancel]:visible").first().click();
     }
   }
+  // Waiting-change banners keep their styles after every swap.
+  expect(
+    await page.evaluate(() =>
+      [...document.styleSheets].some((sheet) =>
+        [...sheet.cssRules].some(
+          (rule) =>
+            rule instanceof CSSStyleRule &&
+            rule.selectorText === ".pending-inline",
+        ),
+      ),
+    ),
+  ).toBe(true);
+  // The backdrop that dims the page, and the room under it, persist with them.
+  await expect(page.locator(".pending-backdrop")).toHaveCount(1);
+  await expect(page.locator("[data-pending-spacer]")).toHaveCount(1);
   await openLocalAccountSwitcher(page);
   await page
     .getByRole("button", { name: "Close DEV panel", exact: true })

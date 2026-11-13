@@ -332,13 +332,14 @@ describe(
         }
       });
     }
-    test("closed registration emails preserve reserved spots and use consistent wording", async () => {
+    test("closing registration keeps reserved spots without emailing anyone", async () => {
       const event = await createEvent();
       await send(
         "/api/v1/events/action",
         { action: "join", id: event.id },
         volunteer.cookie,
       );
+      const before = await notificationCount();
       await send(
         "/api/v1/events/action",
         {
@@ -350,12 +351,7 @@ describe(
         },
         organizer.cookie,
       );
-      const mail = await DB.prepare(
-        "SELECT body FROM event_notification WHERE user_id=? AND subject LIKE 'Your event on % changed' ORDER BY created_at DESC LIMIT 1",
-      )
-        .bind(volunteer.id)
-        .first<{ body: string }>();
-      assert.ok(mail?.body.endsWith("Your spot is still reserved."));
+      assert.equal(await notificationCount(), before);
       assert.equal(
         (
           await DB.prepare(

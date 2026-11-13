@@ -6,6 +6,7 @@ import {
   registrationChangedEmail,
   type EmailContent,
 } from "../../data/email-templates";
+import { emailsEventChange } from "../../data/event-change-emails";
 import type { AttendeeCategory } from "../../data/event-roster";
 import type { Actor } from "./access";
 import {
@@ -752,7 +753,7 @@ export async function saveEvent(
             startsAt,
             meetingPoint: data.meetingPoint,
           }),
-          notify,
+          notify && emailsEventChange(fields),
         ),
       ]);
       if (!results[0].meta.changes)
@@ -876,6 +877,7 @@ export async function bulkSaveEvents(
       startsAt,
       fields,
       auditId,
+      notify: emailsEventChange(fields),
       subject: content.subject,
       body: content.text,
     };
@@ -951,7 +953,8 @@ export async function bulkSaveEvents(
         SELECT lower(hex(randomblob(16))),?,s.user_id,json_extract(j.value,'$.subject'),json_extract(j.value,'$.body'),?,u.email
         FROM json_each(?) j JOIN event_audit a ON a.id=json_extract(j.value,'$.auditId')
         JOIN signup s ON s.event_id=a.event_id AND s.status='confirmed'
-        JOIN user u ON u.id=s.user_id AND u.email_verified=1 WHERE ?=1`,
+        JOIN user u ON u.id=s.user_id AND u.email_verified=1
+        WHERE ?=1 AND json_extract(j.value,'$.notify')=1`,
         )
         .bind(operation, now, snapshots, Number(notify)),
     ]);

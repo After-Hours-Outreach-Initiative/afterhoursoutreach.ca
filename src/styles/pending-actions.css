@@ -319,6 +319,113 @@
 .pending-inline .pending-icon-waiting {
   color: #fcd34d;
 }
+/* Opens the list of settings the change sets, under the summary. */
+.pending-changes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 1.5rem;
+  margin-top: 0.125rem;
+  color: #c7d2fe;
+  font-size: 0.875rem;
+}
+.pending-changes-toggle:hover {
+  color: white;
+}
+.pending-changes-toggle:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+.pending-changes-icon {
+  display: flex;
+  transition: transform 150ms ease;
+}
+.pending-changes-icon svg {
+  width: 1em;
+  height: 1em;
+}
+.pending-changes-toggle[aria-expanded="true"] .pending-changes-icon {
+  transform: rotate(180deg);
+}
+/* The list sits in the summary's column, under its toggle. */
+.pending-body:has(> .pending-changes) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.pending-body > .pending-changes {
+  grid-column: 2;
+}
+/* Open, the list takes the full width and the buttons move below it. */
+.pending-body:has(> .pending-changes:not([hidden])) {
+  flex-basis: 100%;
+}
+/* Setting names in one column, their values beside them. */
+.pending-changes {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.375rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.pending-changes[hidden] {
+  display: none;
+}
+.pending-changes li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+.pending-change-label {
+  color: #a1a1aa;
+}
+.pending-change-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.375rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pending-change-from {
+  color: #a1a1aa;
+}
+.pending-change-to {
+  color: #f4f4f5;
+}
+.pending-change-arrow {
+  display: inline-block;
+  color: #71717a;
+}
+.pending-change-arrow svg {
+  display: block;
+  width: 1em;
+  height: 1em;
+  /* Sits on the text's middle, like the other icons. */
+  transform: translateY(0.125em);
+}
+@media (width < 40rem) {
+  /* Each name sits above its value. */
+  .pending-changes {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+  .pending-changes li {
+    gap: 0.125rem;
+  }
+  /* Open, the list also takes the timer's column. Only the summary leaves
+     room for the timer beside it. */
+  .pending-inline .pending-body:has(> .pending-changes:not([hidden])) {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+  .pending-body:has(> .pending-changes:not([hidden])) > .pending-inline-text {
+    padding-right: 4.5rem;
+  }
+}
 @media print {
   .pending-actions,
   .pending-inline {

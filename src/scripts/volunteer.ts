@@ -44,6 +44,27 @@ import {
   type EmailActionResult,
 } from "./action-email-feedback";
 import { onPageLoad } from "./page-lifecycle";
+import { emailsEventChange } from "../data/event-change-emails";
+
+/** Whether an event edit changes something booked volunteers are emailed
+ * about. Edits to all of a series' dates may reset dates edited on their own,
+ * so the server decides those. */
+function eventChangeEmails(form: HTMLFormElement, values: FormData) {
+  if (form.matches("[data-bulk-event-save]"))
+    return emailsEventChange(Object.keys(bulkEventAction(values).changes));
+  const saved = form.matches("[data-event-save]")
+    ? savedFormValues(form)
+    : undefined;
+  if (!saved || values.get("scope") === "all") return true;
+  return emailsEventChange(
+    [...new Set(values.keys())].filter(
+      (key) =>
+        JSON.stringify(values.getAll(key)) !==
+        JSON.stringify(saved.getAll(key)),
+    ),
+  );
+}
+
 onPageLoad((page) => {
   if (
     !document.querySelector(
@@ -737,14 +758,15 @@ onPageLoad((page) => {
           return;
         const notify =
           element.matches("[data-organizer-rejection], [data-notify]") ||
-          Boolean(
+          (Boolean(
             eventEmailPrompt(
               values,
               element.dataset.emailPrompt,
               element.dataset.futureEmailPrompt,
               element.dataset.allEmailPrompt,
             ),
-          ) ||
+          ) &&
+            eventChangeEmails(element, values)) ||
           undefined;
         element.setAttribute("aria-busy", "true");
         if (loading) {
@@ -1143,6 +1165,13 @@ onPageLoad((page) => {
       kind ? `[data-access-kind="${CSS.escape(kind)}"]` : "",
     ].join("");
   }
+
+  // Undo reopens a change kept as a draft, so it skips the "Undone" state.
+  page.onDocument("pending-action-undoing", (event) => {
+    const detail = (event as CustomEvent<{ id: string; reopens: boolean }>)
+      .detail;
+    if (pendingDrafts.has(detail.id)) detail.reopens = true;
+  });
 
   // A waiting change was made or undone: show the item as it is now.
   page.onDocument("pending-action-resolved", (event) => {

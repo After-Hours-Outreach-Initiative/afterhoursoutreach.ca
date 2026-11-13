@@ -2702,3 +2702,82 @@ test("series stay within reach: intervals cap at eight weeks and first dates at 
     status(400),
   );
 });
+
+test("only a new time, meeting point or event type is emailed to booked volunteers", async () => {
+  const data = input();
+  const series = await savePatrolSeries(db, organizer, data);
+  const [first, second, third] = await all(series.id);
+  for (const { id } of [first, second, third])
+    await changeSignup(db, alice, id, "join");
+  const event = {
+    type: "patrol",
+    startsAt: new Date(first.startsAt).toISOString(),
+    meetingPoint: first.meetingPoint,
+    meetingPointUrl: "",
+    spots: first.spots,
+    open: true,
+    hidden: false,
+  };
+  const save = async (changes: object) =>
+    saveEvent(
+      db,
+      organizer,
+      { ...event, ...changes },
+      first.id,
+      (await findEvent(db, first.id)).updatedAt,
+      true,
+    );
+  await save({ spots: 6 });
+  await save({ meetingPointUrl: "https://maps.example/point" });
+  await save({ open: false, hidden: true });
+  assert.equal(await count("event_notification"), 0);
+  await save({ meetingPoint: "Moved" });
+  assert.equal(await count("event_notification"), 1);
+
+  const versions = async () =>
+    Promise.all(
+      [first, second].map(async ({ id }) => ({
+        id,
+        version: (await findEvent(db, id)).updatedAt,
+      })),
+    );
+  await bulkSaveEvents(
+    db,
+    organizer,
+    { selection: await versions(), changes: { spots: 7 } },
+    true,
+  );
+  assert.equal(await count("event_notification"), 1);
+  // Only the event whose meeting point actually moves is emailed.
+  await bulkSaveEvents(
+    db,
+    organizer,
+    { selection: await versions(), changes: { meetingPoint: "Moved" } },
+    true,
+  );
+  assert.equal(await count("event_notification"), 2);
+
+  // The first two dates now have their own edits, so start from the third.
+  const seriesVersion = async () =>
+    (await findPatrolSeries(db, organizer, series.id)).updatedAt;
+  await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    third.occurrenceDate!,
+    { spots: 8 },
+    await seriesVersion(),
+    true,
+  );
+  assert.equal(await count("event_notification"), 2);
+  await updatePatrolSeriesFrom(
+    db,
+    organizer,
+    series.id,
+    third.occurrenceDate!,
+    { meetingPoint: "Moved again" },
+    await seriesVersion(),
+    true,
+  );
+  assert.equal(await count("event_notification"), 3);
+});

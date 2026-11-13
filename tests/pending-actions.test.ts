@@ -95,7 +95,15 @@ async function patrol(actor: Actor, id: string, spots: number, booked: number) {
     });
 }
 
-const save = (id: string, spots: number, notify = true) =>
+// Moving the meeting point is emailed, so the change waits.
+const save = (
+  id: string,
+  spots: number,
+  notify = true,
+  event: { meetingPoint?: string; meetingPointUrl?: string; open?: boolean } = {
+    meetingPoint: "Moved",
+  },
+) =>
   eventActionSchema.parse({
     action: "save",
     id,
@@ -107,7 +115,8 @@ const save = (id: string, spots: number, notify = true) =>
       meetingPointUrl: "",
       spots,
       open: true,
-      hidden: false,
+      hidden: !(event.open ?? true),
+      ...event,
     },
     notify,
   });
@@ -127,10 +136,17 @@ test("a waiting capacity cut holds its limit until it runs, and locks the event"
   );
   assert.ok(pending);
   assert.equal(
-    pending.action.summary.startsWith("Changing the spots of the event on"),
+    pending.action.summary.startsWith(
+      "Changing the meeting point and spots of the event on",
+    ),
     true,
   );
   assert.equal(pending.action.verb, "Change");
+  const changes = [
+    { label: "Meeting point", from: "Point", to: "Moved" },
+    { label: "Volunteer spots", from: "4", to: "3" },
+  ];
+  assert.deepEqual(pending.action.changes, changes);
   // Changes without email never wait.
   assert.equal(
     await schedulePendingAction(
@@ -165,12 +181,13 @@ test("a waiting capacity cut holds its limit until it runs, and locks the event"
   );
   const [listed] = await listPendingActions(env.DB, actor);
   assert.deepEqual(
-    [listed.id, listed.mine, listed.status, listed.targets],
+    [listed.id, listed.mine, listed.status, listed.targets, listed.changes],
     [
       pending.action.id,
       true,
       "pending",
       [{ target: "event:held", locked: true }],
+      changes,
     ],
   );
   // Not due yet, so the scheduler leaves it alone.
@@ -504,6 +521,39 @@ test("changes that would email nobody are made straight away", async () => {
   });
   assert.equal(
     await schedulePendingAction(bindings, actor, "events", save("unbooked", 3)),
+    null,
+  );
+});
+
+test("edits volunteers are not emailed about are made straight away", async () => {
+  const actor = await organizer();
+  await patrol(actor, "quiet", 4, 1);
+  for (const event of [
+    {},
+    { meetingPointUrl: "https://maps.example/point" },
+    { open: false },
+  ])
+    assert.equal(
+      await schedulePendingAction(
+        bindings,
+        actor,
+        "events",
+        save("quiet", 3, true, event),
+      ),
+      null,
+    );
+  assert.equal(
+    await schedulePendingAction(
+      bindings,
+      actor,
+      "events",
+      eventActionSchema.parse({
+        action: "bulk-save",
+        selection: [{ id: "quiet", version: 0 }],
+        changes: { spots: 3, unregisterMinutes: 60 },
+        notify: true,
+      }),
+    ),
     null,
   );
 });

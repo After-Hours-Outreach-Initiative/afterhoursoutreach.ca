@@ -608,6 +608,8 @@ export const pendingAction = sqliteTable(
     summary: text().notNull(),
     // Shown on the changed item, so it leaves out the item's own name or date.
     inline_summary: text(),
+    // JSON list of the settings an event change sets, from and to.
+    changes: text(),
     // Which controls on a person's page made it, so its banner sits beside
     // them: "application", "patrol" or "access". Null for event changes.
     area: text({ enum: ["application", "patrol", "access"] }),
