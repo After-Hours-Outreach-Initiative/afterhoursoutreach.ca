@@ -2066,19 +2066,23 @@ body:has(
 .volunteer-filter[data-state="rejected"] .volunteer-filter-count {
   background: #450a0a;
 }
-.volunteer-filter:hover {
-  border-color: white;
-  color: white;
-}
 .volunteer-filter:is([aria-pressed="true"], [aria-current="page"]) {
   border-color: #818cf8;
   background: var(--color-blue-deep);
   color: #e0e7ff;
 }
-.volunteer-filter:is([aria-pressed="true"], [aria-current="page"]):hover {
-  border-color: #a5b4fc;
-  background: #223265;
-  color: white;
+/* Touch screens keep hover on the last tapped element, so a trigger would stay
+   lit after its sheet is swiped away. */
+@media (hover: hover) {
+  .volunteer-filter:hover {
+    border-color: white;
+    color: white;
+  }
+  .volunteer-filter:is([aria-pressed="true"], [aria-current="page"]):hover {
+    border-color: #a5b4fc;
+    background: #223265;
+    color: white;
+  }
 }
 .volunteer-filter:focus-visible {
   outline: 3px solid #a5b4fc;

@@ -102,10 +102,12 @@
     ) {
     z-index: 1;
   }
-  .filter-layout:has(.directory-sort-trigger)
-    :is(.filter-panel-trigger, .directory-sort-trigger):hover {
-    border-color: #a1a1aa;
-    background: #27272a;
+  @media (hover: hover) {
+    .filter-layout:has(.directory-sort-trigger)
+      :is(.filter-panel-trigger, .directory-sort-trigger):hover {
+      border-color: #a1a1aa;
+      background: #27272a;
+    }
   }
   .filter-layout:has(.directory-sort-trigger)
     .filter-panel-trigger[data-active] {

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 test("wide screens show filters beside the list and apply each change at once", async ({
   page,
@@ -251,4 +251,64 @@ test("an empty result offers to reset search, filters and sort", async ({
   await expect(page.locator("[data-volunteer-search]")).toHaveValue("");
   await expect(rows).toHaveCount(8);
   await expect(page.locator("[data-volunteer-empty]")).toBeHidden();
+});
+
+test("the tap after swiping a sheet away still works", async ({
+  browser,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "Touch input needs Chromium's CDP.");
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const page = await context.newPage();
+  await page.goto("/dev/ui/applications/preview?scenario=mixed&latency=0");
+  const cdp = await context.newCDPSession(page);
+  const touch = (type: string, x = 0, y = 0) =>
+    cdp.send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints: type === "touchEnd" ? [] : [{ x, y }],
+    });
+  const tap = async (target: Locator) => {
+    const box = (await target.boundingBox())!;
+    await touch("touchStart", box.x + 10, box.y + 10);
+    await touch("touchEnd");
+  };
+
+  for (const [trigger, sheet] of [
+    [
+      page.getByRole("button", { name: /^Filter/ }),
+      page.locator("[data-filter-panel]"),
+    ],
+    [
+      page.getByRole("button", { name: /^Sort:/ }),
+      page.locator('[data-filter-menu="sort"]'),
+    ],
+  ]) {
+    await tap(trigger);
+    await expect(sheet).toBeVisible();
+    await sheet.evaluate((element) =>
+      Promise.all(
+        element.getAnimations().map((animation) => animation.finished),
+      ),
+    );
+    // A quick flick down the sheet's header.
+    const handle = (await sheet.locator("[data-sheet-handle]").boundingBox())!;
+    const x = handle.x + 40;
+    await touch("touchStart", x, handle.y + 10);
+    for (let step = 1; step <= 10; step++) {
+      await touch("touchMove", x, handle.y + 10 + step * 50);
+      await page.waitForTimeout(16);
+    }
+    await touch("touchEnd");
+    await expect(sheet).toBeHidden();
+
+    await tap(trigger);
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+  }
+  await context.close();
 });

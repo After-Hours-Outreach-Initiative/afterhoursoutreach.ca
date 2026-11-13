@@ -43,6 +43,16 @@ export function initSheetDrag(
     sheet.style.transition = "none";
   });
 
+  // Keep the drag from also starting a browser scroll. A swipe would leave a
+  // fling running, and the browser spends the next tap stopping it.
+  handle.addEventListener(
+    "touchmove",
+    (event) => {
+      if (pointer !== null) event.preventDefault();
+    },
+    { passive: false },
+  );
+
   handle.addEventListener("pointermove", (event) => {
     if (event.pointerId !== pointer) return;
     offset = Math.max(0, event.clientY - start);
