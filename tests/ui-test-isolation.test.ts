@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { runUITests } from "../scripts/test-ui.mjs";
-import { playwrightTarget } from "../scripts/ui-test-target.mjs";
+import { serialTarget, playwrightTarget } from "../scripts/ui-test-target.mjs";
 import { main as benchmark } from "../scripts/benchmark-tests.mjs";
 
 afterEach(() => vi.restoreAllMocks());
@@ -51,8 +51,11 @@ test("Playwright accepts the managed local origin and read-only HTTPS targets", 
 function localRun(exitCode = 0) {
   vi.spyOn(console, "log").mockImplementation(() => {});
   const stop = vi.fn(async () => {});
-  const server = { origin: "http://localhost:12345", stop };
-  const startServer = vi.fn(async () => server);
+  let port = 12345;
+  const startServer = vi.fn(async () => ({
+    origin: `http://localhost:${port++}`,
+    stop,
+  }));
   const run = vi.fn(async () => exitCode);
   return { environment: {}, startServer, run, stop };
 }
@@ -63,16 +66,17 @@ test.each([0, 1])(
     const options = localRun(exitCode);
     const args = ["tests/ui/local-accounts.spec.ts", "--workers=1"];
     expect(await runUITests(args, options)).toBe(exitCode);
-    expect(options.startServer).toHaveBeenCalledOnce();
+    expect(options.startServer).toHaveBeenCalledTimes(2);
     expect(options.run).toHaveBeenCalledWith(
       args,
       {
         PLAYWRIGHT_BASE_URL: "http://localhost:12345",
         PLAYWRIGHT_ISOLATED_BASE_URL: "http://localhost:12345",
+        PLAYWRIGHT_SERIAL_BASE_URL: "http://localhost:12346",
       },
       undefined,
     );
-    expect(options.stop).toHaveBeenCalledOnce();
+    expect(options.stop).toHaveBeenCalledTimes(2);
   },
 );
 
@@ -90,7 +94,45 @@ test("UI runner cleans up after a runner exception or interruption", async () =>
   expect(options.startServer).toHaveBeenCalledWith(expect.any(String), {
     signal: controller.signal,
   });
+  expect(options.stop).toHaveBeenCalledTimes(2);
+});
+
+test("UI runner stops the started server when the other fails to start", async () => {
+  const options = localRun();
+  options.startServer.mockRejectedValueOnce(new Error("No port"));
+  await expect(runUITests([], options)).rejects.toThrow("No port");
+  expect(options.run).not.toHaveBeenCalled();
   expect(options.stop).toHaveBeenCalledOnce();
+});
+
+test("serial tests use only a separate managed local server", () => {
+  const managed = {
+    PLAYWRIGHT_BASE_URL: "http://localhost:12345",
+    PLAYWRIGHT_ISOLATED_BASE_URL: "http://localhost:12345",
+  };
+  // Benchmarks start one server, so tagged tests share it.
+  expect(serialTarget(managed)).toBe("http://localhost:12345");
+  expect(
+    serialTarget({
+      ...managed,
+      PLAYWRIGHT_SERIAL_BASE_URL: "http://localhost:12346",
+    }),
+  ).toBe("http://localhost:12346");
+  for (const origin of [
+    "http://localhost:12345",
+    "http://127.0.0.1:12346",
+    "https://preview.example.org",
+    "http://localhost:12346/path",
+  ])
+    expect(() =>
+      serialTarget({ ...managed, PLAYWRIGHT_SERIAL_BASE_URL: origin }),
+    ).toThrow("separate managed local origin");
+  expect(() =>
+    serialTarget({
+      PLAYWRIGHT_BASE_URL: "https://preview.example.org",
+      PLAYWRIGHT_SERIAL_BASE_URL: "http://localhost:12346",
+    }),
+  ).toThrow("separate managed local origin");
 });
 
 test("UI runner rejects an existing local server even with inherited isolation markers", async () => {

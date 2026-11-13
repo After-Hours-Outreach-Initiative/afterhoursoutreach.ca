@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test("organizers preview events as a volunteer type or a volunteer, read-only", async ({
+// It compares event versions, which change whenever another test edits events.
+test("organizers preview events as a volunteer type or a volunteer, read-only @serial", async ({
   page,
   baseURL,
 }) => {
@@ -45,12 +46,20 @@ test("organizers preview events as a volunteer type or a volunteer, read-only", 
   expect(matches).toBe(true);
 
   await page.getByRole("button", { name: "View as: New volunteer" }).click();
-  await menu.getByRole("searchbox", { name: "Search volunteers" }).fill("zzz");
-  await expect(menu.locator("[data-filter-empty]")).toBeVisible();
-  await menu.getByRole("searchbox", { name: "Search volunteers" }).fill("");
-  const person = menu.locator(".view-as-people a").first();
-  const name = (await person.textContent())!.trim();
-  await person.click();
+  // Volunteers are an autocomplete: matches appear only after typing.
+  const search = menu.getByRole("combobox", { name: "Search volunteers" });
+  await search.fill("zzz");
+  await expect(menu.locator("[data-view-as-empty]")).toBeVisible();
+  const first = menu
+    .locator("[data-view-as-suggestions] [role=option]")
+    .first();
+  await search.fill((await first.getAttribute("data-search"))!);
+  await expect(first).toBeVisible();
+  const name = (await first
+    .locator(".compact-person-name > span")
+    .first()
+    .textContent())!.trim();
+  await first.locator("a").click();
   await expect(page).toHaveURL(/viewAs=person%3A/);
   await expect(page.locator("[data-view-as-notice]")).toContainText(
     `Viewing events as ${name}`,

@@ -66,6 +66,8 @@ test("meeting and volunteer-limit defaults are submitted without replacing draft
   await profiles
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
+  // Switching reloads the page; its script must be ready before Create works.
+  await page.waitForURL(/\/events$/);
   const create = page.locator('[data-show-dialog="event-editor-new"]');
   await create.click();
   const dialog = page.getByRole("dialog", {
@@ -116,6 +118,11 @@ test("meeting and volunteer-limit defaults are submitted without replacing draft
   await meeting.fill("Custom meeting point");
   await map.fill("");
   await form.getByLabel("Minimum medic spots", { exact: true }).fill("3");
+  // New events include orientation by default; patrols hide its limits.
+  await form
+    .getByRole("group", { name: "Event type" })
+    .getByText("Patrol", { exact: true })
+    .click();
   await expect(
     form.getByLabel("Minimum new volunteer spots", { exact: true }),
   ).toBeHidden();

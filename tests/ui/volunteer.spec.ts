@@ -130,7 +130,8 @@ test("events show all permitted event types and ignore legacy filters while pres
   }
 });
 
-test("event calendar links visible cards, reaches later months, and survives live event changes", async ({
+// It counts and pages through every listed event, so it needs fresh data.
+test("event calendar links visible cards, reaches later months, and survives live event changes @serial", async ({
   page,
   baseURL,
 }) => {
@@ -187,16 +188,24 @@ test("event calendar links visible cards, reaches later months, and survives liv
   };
   const patrol = await makeEvent(date, "18:00", false);
   const orientation = await makeEvent(date, "19:00", true);
-  const distant = await makeEvent(
-    addCalendarDays(calendarMonthStart(today, 1), 9),
-    "20:00",
-    true,
+  // The calendar links only the first event of a day, so these need two
+  // consecutive days next month with no events of their own.
+  const { events: listed } = await (
+    await page.request.get("/api/v1/events")
+  ).json();
+  const taken = new Set(
+    listed.map((item: { startsAt: string | number }) =>
+      vancouverInput(new Date(item.startsAt).getTime()).slice(0, 10),
+    ),
   );
-  const laterDistant = await makeEvent(
-    addCalendarDays(calendarMonthStart(today, 1), 10),
-    "21:00",
-    true,
-  );
+  const nextMonth = calendarMonthStart(today, 1);
+  const distantDate = Array.from({ length: 20 }, (_, offset) =>
+    addCalendarDays(nextMonth, offset + 5),
+  ).find((day) => !taken.has(day) && !taken.has(addCalendarDays(day, 1)));
+  expect(distantDate).toBeTruthy();
+  const laterDate = addCalendarDays(distantDate!, 1);
+  const distant = await makeEvent(distantDate!, "20:00", true);
+  const laterDistant = await makeEvent(laterDate, "21:00", true);
   const rendered = await page.goto(`/volunteer?occurrence=${orientation.id}`);
   const renderedLinks = await page.evaluate(
     ({ html, date }) =>
@@ -385,7 +394,7 @@ test("event calendar links visible cards, reaches later months, and survives liv
     expect(value).toBeDefined();
     return Number(value);
   };
-  const movedDate = addCalendarDays(calendarMonthStart(today, 1), 10);
+  const movedDate = laterDate;
   const moved = {
     ...distant.event,
     startsAt: vancouverInstant(`${movedDate}T20:00`),

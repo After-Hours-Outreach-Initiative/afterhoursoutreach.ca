@@ -493,7 +493,8 @@ for (const path of ["/apply", "/volunteer/account"]) {
                 (await contents.locator("[data-contents-bar]").boundingBox())!
                   .y,
             )
-            .toBe(path === "/apply" ? 0 : header!.height);
+            // The site header only stays pinned from the desktop layout up.
+            .toBe(0);
         } else {
           await page.evaluate(() =>
             scrollTo({ top: 500, behavior: "instant" }),
@@ -583,6 +584,8 @@ test("account contents navigate profile and settings sections on desktop and mob
   page,
   baseURL,
 }) => {
+  // Keep the chevron still, so clicks on it never retry at other scroll positions.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await createLocalAccount(page.request, baseURL!);
   for (const width of [1280, 320, 375, 768]) {
     // On desktop, leave enough trailing page for Sessions to reach the reading
@@ -594,7 +597,6 @@ test("account contents navigate profile and settings sections on desktop and mob
     const summary = menu.locator("summary");
     const current = summary.locator("[data-contents-current]");
     const header = page.locator(".site-header");
-    const headerHeight = (await header.boundingBox())!.height;
     await expect(
       contents.locator(
         "[data-application-progress], [data-application-progress-link], .volunteer-contents-completion-icon, [data-application-review], .volunteer-draft-save-status",
@@ -608,10 +610,10 @@ test("account contents navigate profile and settings sections on desktop and mob
       await expect(summary).toHaveAccessibleName("Sections");
       await expect(current).toHaveText("Sections");
       await expect(summary.locator(":scope > :first-child")).toHaveClass(
-        "volunteer-contents-icon",
+        /\bvolunteer-contents-icon\b/,
       );
       await expect(summary.locator(":scope > :last-child")).toHaveClass(
-        "volunteer-contents-chevron",
+        /\bvolunteer-contents-chevron\b/,
       );
       await expect(summary.locator(".volunteer-contents-toggle")).toHaveCount(
         0,
@@ -619,7 +621,9 @@ test("account contents navigate profile and settings sections on desktop and mob
       await expect(summary).toHaveCSS("border-radius", "10px");
       await expect(menu).toHaveCSS("border-radius", "10px");
       await expect(summary).toHaveCSS("background-color", "rgb(23, 26, 32)");
-      await expect(header).toHaveCSS("position", "sticky");
+      // Below the desktop layout the site header scrolls away, so the
+      // contents bar sticks to the top of the viewport.
+      await expect(header).toHaveCSS("position", "relative");
       await expect(contents).not.toHaveAttribute("data-contents-stuck");
       const initial = (await summary.boundingBox())!;
       const firstPanel = page.locator(".volunteer-panel").first();
@@ -641,10 +645,7 @@ test("account contents navigate profile and settings sections on desktop and mob
         await target.click();
         await expect(menu).toHaveAttribute("open", "");
         await expect(dropdown.locator("..")).toHaveCSS("position", "absolute");
-        await expect(dropdown).toHaveCSS(
-          "max-height",
-          `${812 - headerHeight - 78}px`,
-        );
+        await expect(dropdown).toHaveCSS("max-height", `${812 - 78}px`);
         await expect(dropdown).toHaveCSS("overscroll-behavior", "auto");
         await expect(summary).toHaveCSS("border-radius", "10px");
         await expect(dropdown).toHaveCSS("border-radius", "0px 0px 10px 10px");
@@ -670,7 +671,7 @@ test("account contents navigate profile and settings sections on desktop and mob
       // Crossing the sticky edge changes the label without changing sections.
       await page.evaluate(
         (top) => scrollTo({ top, behavior: "instant" }),
-        initial.y - headerHeight,
+        initial.y,
       );
       await expect(contents).toHaveAttribute("data-contents-stuck", "");
       await expect(current).toHaveText("Your profile");
@@ -725,13 +726,10 @@ test("account contents navigate profile and settings sections on desktop and mob
         await expect(summary).toHaveCSS("border-radius", "10px");
         await expect(menu).toHaveCSS("border-radius", "10px");
         await expect(menu).not.toHaveCSS("box-shadow", "none");
-        await expect
-          .poll(async () => (await summary.boundingBox())!.y)
-          .toBe(headerHeight + 8);
-        expect((await header.boundingBox())!.y).toBe(0);
+        await expect.poll(async () => (await summary.boundingBox())!.y).toBe(8);
         expect(
           Math.round((await page.locator(`#${id}`).boundingBox())!.y),
-        ).toBeGreaterThanOrEqual(headerHeight + 94);
+        ).toBeGreaterThanOrEqual(94);
       }
     }
     if (width < 1024) {
@@ -743,7 +741,7 @@ test("account contents navigate profile and settings sections on desktop and mob
             top: scrollY + heading.getBoundingClientRect().top - offset,
             behavior: "instant",
           });
-        }, headerHeight + 94);
+        }, 94);
       await expect(current).toHaveText("Two-factor authentication");
       await expect(current).toHaveCSS("text-overflow", "ellipsis");
       await expect(summary).toHaveCSS("height", "54px");
@@ -1310,7 +1308,10 @@ test("application shows all required errors and saves after they are corrected",
   await page
     .getByRole("button", { name: "Open navigation", exact: true })
     .click();
-  await page.getByRole("link", { name: "Account", exact: true }).click();
+  await page
+    .getByRole("region", { name: "Your account" })
+    .getByRole("link", { name: "Account", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   expect(requests).toHaveLength(1);
   await page.getByRole("button", { name: "Edit personal info" }).click();
@@ -1944,7 +1945,10 @@ test("all teams can select multiple relevant training answers and add Other deta
   await page
     .getByRole("button", { name: "Open navigation", exact: true })
     .click();
-  await page.getByRole("link", { name: "Account", exact: true }).click();
+  await page
+    .getByRole("region", { name: "Your account" })
+    .getByRole("link", { name: "Account", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/volunteer\/account$/);
   await page.reload();
   await page.getByRole("button", { name: "Edit training and safety" }).click();
@@ -3100,6 +3104,8 @@ test("event editor shows native number and URL errors without submitting invalid
   await profiles
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
+  // Switching reloads the page; its script must be ready before Create works.
+  await page.waitForURL(/\/events$/);
   await page.locator('[data-show-dialog="event-editor-new"]').click();
   const dialog = page.getByRole("dialog", {
     name: "Create event",
@@ -3118,7 +3124,8 @@ test("event editor shows native number and URL errors without submitting invalid
   const interval = form.getByLabel("Repeat every (weeks)", { exact: true });
   const endDate = form.locator('[name="endDate"]');
   await expect(form.locator('[name="type"]')).toHaveCount(0);
-  await expect(orientation).not.toBeChecked();
+  // New events default to including orientation.
+  await expect(orientation).toBeChecked();
   await expect(
     recurrence.locator(".volunteer-recurrence-label svg"),
   ).toHaveAttribute("aria-hidden", "true");
@@ -3200,7 +3207,7 @@ test("event editor shows native number and URL errors without submitting invalid
   await expect(placeholder).toBeHidden();
   await expect(date).toHaveCSS("color", color);
   await form.evaluate((element: HTMLFormElement) => element.reset());
-  await expect(orientation).not.toBeChecked();
+  await expect(orientation).toBeChecked();
   await expect(recurrence).toBeVisible();
   await expect(recurring).toBeEnabled();
   await expect(interval).toHaveValue("2");
@@ -3334,6 +3341,8 @@ test("event editor shows native number and URL errors without submitting invalid
   await form
     .getByLabel("Meeting point", { exact: true })
     .fill("Test meeting point");
+  // Patrols have no new volunteer minimum, so the spot limits start at 2.
+  await eventType.getByText("Patrol", { exact: true }).click();
   const spots = form.getByRole("spinbutton", {
     name: "Volunteer spots",
     exact: true,
@@ -3498,12 +3507,10 @@ test("event editor shows native number and URL errors without submitting invalid
   });
   await expect(editOrientation).toBeChecked();
   await expect(editSpots).toHaveAttribute("min", "4");
-  await editEventType.getByText("Patrol", { exact: true }).click();
-  await expect(editOrientation).not.toBeChecked();
-  await expect(editSpots).toHaveAttribute("min", "2");
-  await editForm.evaluate((element: HTMLFormElement) => element.reset());
-  await expect(editOrientation).toBeChecked();
-  await expect(editSpots).toHaveAttribute("min", "4");
+  // Its registered new volunteers need the orientation, so it stays one.
+  await expect(
+    editEventType.getByRole("radio", { name: "Patrol", exact: true }),
+  ).toBeDisabled();
   const editDateGroup = editForm.locator('[data-date-input="startsAt"]');
   const editDate = editDateGroup.locator("[data-native-date]");
   const editTime = editForm.getByLabel("Start time");

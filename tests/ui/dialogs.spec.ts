@@ -519,7 +519,9 @@ test("event dialogs preserve their exit layout and roster profiles navigate to p
   }
 });
 
-test("application dialogs keep their chrome visible while only their body scrolls", async ({
+// Its dialogs belong to the fixture orientation card, which polling re-renders
+// whenever another test changes that event's roster.
+test("application dialogs keep their chrome visible while only their body scrolls @serial", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });

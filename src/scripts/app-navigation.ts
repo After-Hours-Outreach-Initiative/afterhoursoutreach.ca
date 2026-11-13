@@ -20,6 +20,8 @@ const styles = new Map<string, Promise<void>>();
 let generation = 0;
 let activeNavigation: TransitionBeforePreparationEvent | undefined;
 let warmingTimer: ReturnType<typeof setTimeout> | undefined;
+// The router state of the entry a native fragment link is leaving.
+let fragmentFrom: { index?: unknown } | null = null;
 const scope = () => document.body.dataset.appScope;
 const key = (url: URL) => url.origin + url.pathname + url.search;
 const tabKey = (url: URL) => url.origin + url.pathname;
@@ -294,9 +296,22 @@ document.addEventListener(
       scrollToPageTop();
       return;
     }
-    if (scope() && link) {
+    if (link) {
       const target = new URL(link.href);
-      if (target.origin === location.origin && !isAppRoute(target.pathname))
+      // Same-page fragments stay native, so the browser owns their scrolling,
+      // focus and history instead of the router.
+      const fragment =
+        target.hash &&
+        target.origin === location.origin &&
+        target.pathname === location.pathname &&
+        target.search === location.search;
+      if (fragment) fragmentFrom = history.state;
+      if (
+        fragment ||
+        (scope() &&
+          target.origin === location.origin &&
+          !isAppRoute(target.pathname))
+      )
         link.setAttribute("data-astro-reload", "");
     }
     if (
@@ -307,6 +322,19 @@ document.addEventListener(
   },
   { capture: true },
 );
+// A native fragment entry has no router state, so a reload would open at the
+// top. Index it between its neighbours: Back and Forward then scroll within the
+// page, and the router keeps its saved position for reloads.
+window.addEventListener("hashchange", () => {
+  const from = fragmentFrom;
+  fragmentFrom = null;
+  if (history.state !== null || typeof from?.index !== "number") return;
+  const next = Math.floor(from.index) + 1;
+  history.replaceState(
+    { index: from.index + (next - from.index) / 2, scrollX, scrollY },
+    "",
+  );
+});
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) clearScreens();
   else warmDock();

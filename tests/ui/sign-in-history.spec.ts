@@ -40,6 +40,8 @@ test("only completed sign-ins are remembered and saved emails can be chosen or f
     await page.evaluate((key) => localStorage.getItem(key), storageKey),
   ).toBe(JSON.stringify([email]));
 
+  // Leave first: a signed-out live refresh would redirect over the next visit.
+  await page.goto("about:blank");
   await context.clearCookies();
   await page.goto("/volunteer/sign-in");
   await expect(history).toBeVisible();

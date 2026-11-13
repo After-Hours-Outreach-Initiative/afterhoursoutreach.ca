@@ -1547,17 +1547,23 @@ describe(
           ...codeOfConductRules,
         ]);
         await expect(toggle).toHaveAccessibleName("Show fewer rules");
-        assert.ok(
-          await conduct.evaluate((element) => {
-            const rules = element.querySelector("#code-of-conduct-more-rules")!;
-            const summary = element.querySelector("summary")!;
-            return (
-              summary.getBoundingClientRect().top >=
-              rules.getBoundingClientRect().bottom
-            );
-          }),
-          "Show fewer rules appears below the final rule.",
-        );
+        // Measure after the opening transition settles.
+        await expect
+          .poll(
+            () =>
+              conduct.evaluate((element) => {
+                const rules = element.querySelector(
+                  "#code-of-conduct-more-rules",
+                )!;
+                const summary = element.querySelector("summary")!;
+                return (
+                  summary.getBoundingClientRect().top >=
+                  rules.getBoundingClientRect().bottom
+                );
+              }),
+            { message: "Show fewer rules appears below the final rule." },
+          )
+          .toBe(true);
         await toggle.click();
         await expect(conduct.getByRole("listitem")).toHaveCount(2);
         const confirmation = newPage.getByRole("checkbox", {

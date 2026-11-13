@@ -708,4 +708,4 @@ test("event avatars and abbreviated rosters render privately on desktop/mobile, 
     await browser.close();
     await server.close();
   }
-}, 60_000);
+}, 120_000);

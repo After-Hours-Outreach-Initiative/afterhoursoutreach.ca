@@ -36,6 +36,9 @@ export default defineConfig({
   adapter: cloudflare({
     imageService: { build: "compile", runtime: "cloudflare-binding" },
     remoteBindings: false,
+    // Browser test servers start side by side and would race for the same
+    // fallback inspector port. They never attach a debugger.
+    ...(process.env.AHO_UI_TEST_SERVER === "1" && { inspectorPort: false }),
   }),
   fonts: [
     {
@@ -179,7 +182,20 @@ export default defineConfig({
         import.meta.url,
       ),
     ),
-    plugins: [tailwindcss()],
+    plugins: [
+      tailwindcss(),
+      // Node closes idle connections after 5 seconds, which can reset a browser
+      // test's request reusing one at that moment. Test servers keep them open.
+      process.env.AHO_UI_TEST_SERVER === "1" && {
+        name: "aho-test-keep-alive",
+        configureServer(server) {
+          if (server.httpServer && "keepAliveTimeout" in server.httpServer) {
+            server.httpServer.keepAliveTimeout = 120_000;
+            server.httpServer.headersTimeout = 121_000;
+          }
+        },
+      },
+    ],
     resolve: { alias: routerAliases },
     // Discover account dependencies before a cold-start reload can reset a form.
     optimizeDeps: {
@@ -188,13 +204,17 @@ export default defineConfig({
         "better-auth/client/plugins",
         "qrcode",
         "zod",
+        "astro/virtual-modules/transitions-events.js",
+        "astro/virtual-modules/transitions-router.js",
+        "astro/virtual-modules/transitions-swap-functions.js",
+        "astro/virtual-modules/transitions-types.js",
       ],
     },
     // Avoid restarting the dev Worker when Astro's server imports are discovered.
     environments: {
       ssr: {
         optimizeDeps: {
-          include: ["astro/app/manifest", "astro/logger/json"],
+          include: ["astro/app/manifest", "astro/logger/json", "@lucide/astro"],
         },
       },
     },

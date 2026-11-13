@@ -17,7 +17,7 @@ async function expectCompletedStep(step: Locator) {
   await expect(marker).toHaveCSS("border-top-width", "1px");
   await expect(marker).toHaveCSS("border-top-style", "solid");
   await expect(marker.locator("svg")).toHaveAttribute("aria-hidden", "true");
-  await expect(marker.locator("path")).toHaveAttribute("d", "m5 12 4 4L19 6");
+  await expect(marker.locator("path")).toHaveAttribute("d", "M20 6 9 17l-5-5");
   await expect(
     summary.locator(
       ".application-progress-number, .application-progress-title svg",
@@ -35,7 +35,8 @@ async function expectCompletedStep(step: Locator) {
   );
 }
 
-test("application table opens a focused review with guarded decisions and list context", async ({
+// Its status counts include every application, which other tests create.
+test("application table opens a focused review with guarded decisions and list context @serial", async ({
   page,
   browser,
   baseURL,
@@ -338,10 +339,12 @@ test("pending applications poll every minute, then approval restores five-second
       "aria-hidden",
       "true",
     );
-    await expect(courseLink.locator("path")).toHaveAttribute(
-      "d",
-      "M7 17 17 7M7 7h10v10",
-    );
+    // Lucide's arrow-up-right.
+    expect(
+      await courseLink
+        .locator("path")
+        .evaluateAll((paths) => paths.map((path) => path.getAttribute("d"))),
+    ).toEqual(["M7 7h10v10", "M7 17 17 7"]);
     await expect(naloxone.locator(".application-progress-status")).toHaveCount(
       0,
     );

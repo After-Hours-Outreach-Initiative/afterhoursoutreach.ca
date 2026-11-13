@@ -161,7 +161,7 @@ export async function startLocalTestServer(logs, { signal } = {}) {
       ],
       join(logs, "dev-start.log"),
       directory,
-      {},
+      { AHO_UI_TEST_SERVER: "1" },
       signal,
     );
     if (server)

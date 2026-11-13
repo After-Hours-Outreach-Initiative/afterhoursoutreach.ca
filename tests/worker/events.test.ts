@@ -1378,11 +1378,18 @@ describe(
             exact: true,
           });
           await expect(dialog.locator('[name="type"]')).toHaveCount(0);
-          const includesOrientation = dialog
-            .getByRole("group", { name: "Event type" })
-            .getByRole("radio", { name: "Orientation + Patrol", exact: true });
-          await expect(includesOrientation).not.toBeChecked();
+          const newEventType = dialog.getByRole("group", {
+            name: "Event type",
+          });
+          const includesOrientation = newEventType.getByRole("radio", {
+            name: "Orientation + Patrol",
+            exact: true,
+          });
+          // New events default to including orientation.
+          await expect(includesOrientation).toBeChecked();
           await expect(includesOrientation).toBeEnabled();
+          await newEventType.getByText("Patrol", { exact: true }).click();
+          await expect(includesOrientation).not.toBeChecked();
           const visibilityChoices = dialog.getByRole("group", {
             name: "Public visibility",
             exact: true,
@@ -1879,7 +1886,32 @@ describe(
                 })
                 .click(),
             updated: async () => {
-              await makeWaitingChangeNow(page, "Approve");
+              // Approving from a roster leaves only a toast that links to
+              // the person's banner, so make the change as its button would.
+              let pending: string | null = null;
+              await expect
+                .poll(async () => {
+                  pending = await DB.prepare(
+                    "SELECT id FROM pending_action WHERE summary=? AND finished_at IS NULL",
+                  )
+                    .bind("Approving Sample Bob V. for patrols")
+                    .first<string>("id");
+                  return pending;
+                })
+                .toBeTruthy();
+              expect(
+                await page.evaluate(
+                  async (id) =>
+                    (
+                      await fetch("/api/v1/pending-actions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "run", id }),
+                      })
+                    ).status,
+                  pending,
+                ),
+              ).toBe(200);
               await approvedAttendee
                 .locator("[data-patrol-approval-status]")
                 .waitFor();
@@ -1905,10 +1937,6 @@ describe(
           await expect(
             attendanceCard.locator(".volunteer-roster"),
           ).toHaveAttribute("open", "");
-          await page
-            .locator("dialog[data-action-email-feedback]")
-            .getByRole("button", { name: "Close", exact: true })
-            .click();
           await card.getByRole("button", { name: "Edit", exact: true }).click();
           const cancelEditor = page.getByRole("dialog", {
             name: "Edit event",
@@ -1927,7 +1955,10 @@ describe(
                   exact: true,
                 })
                 .click(),
-            updated: () => card.waitFor({ state: "detached" }),
+            updated: async () => {
+              await makeWaitingChangeNow(page, "Cancel event");
+              await card.waitFor({ state: "detached" });
+            },
             loadingLabel: "Cancelling…",
           });
           await expect(cancelEditor).toBeHidden();

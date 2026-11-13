@@ -108,7 +108,9 @@ test("event checks run every five seconds, retry failures, and pause without ove
   }
 });
 
-test("event polling pauses after five idle minutes and checks for updates on return without reloading", async ({
+// Its fake clock must not advance before the page has handled each check, which
+// can lag under parallel load.
+test("event polling pauses after five idle minutes and checks for updates on return without reloading @serial", async ({
   page,
   baseURL,
 }) => {
@@ -138,9 +140,17 @@ test("event polling pauses after five idle minutes and checks for updates on ret
   await expect.poll(() => finishedChecks).toBe(1);
   let documents = 0;
   let pageRefreshes = 0;
+  let finishedRefreshes = 0;
   page.on("request", (request) => {
     if (request.resourceType() === "document") documents++;
     else if (new URL(request.url()).pathname === "/events") pageRefreshes++;
+  });
+  page.on("requestfinished", (request) => {
+    if (
+      request.resourceType() !== "document" &&
+      new URL(request.url()).pathname === "/events"
+    )
+      finishedRefreshes++;
   });
 
   await page.clock.fastForward(240_000);
@@ -161,6 +171,8 @@ test("event polling pauses after five idle minutes and checks for updates on ret
   await page.keyboard.press("Shift");
   await expect.poll(() => finishedChecks).toBe(5);
   await expect.poll(() => pageRefreshes).toBe(1);
+  // Timer ticks are skipped while a refresh is still loading.
+  await expect.poll(() => finishedRefreshes).toBe(1);
   await page.clock.runFor(4_999);
   expect(checks).toBe(5);
   await page.clock.runFor(1);
@@ -430,7 +442,8 @@ test("other viewers see signups and cancellations through polling without losing
   }
 });
 
-test("events retain recurring dates, polling, actions and past events without filters", async ({
+// It counts every listed event card, so it needs fresh data.
+test("events retain recurring dates, polling, actions and past events without filters @serial", async ({
   page,
   playwright,
   baseURL,
@@ -446,6 +459,7 @@ test("events retain recurring dates, polling, actions and past events without fi
   )
     .locator('[data-switch-user="local-fixture-user-robin"]')
     .click();
+  await page.waitForURL(/\/events$/);
   await expect(page.getByRole("group", { name: "Filter events" })).toHaveCount(
     0,
   );
@@ -564,9 +578,25 @@ test("events retain recurring dates, polling, actions and past events without fi
   ).toHaveCount(0);
   // The started date moves to history; every later date was already listed.
   await expect(cards).toHaveCount(before + added + 1);
+  const approval = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/organizer/action"),
+  );
   await pastOccurrence
     .getByRole("button", { name: "Approve for patrols", exact: true })
     .click();
+  // Approving from a roster leaves only a toast that links to the person's
+  // banner, so make the waiting change as its button would.
+  const { pendingAction } = (await (await approval).json()) as {
+    pendingAction: { id: string };
+  };
+  expect(
+    (
+      await page.request.post("/api/v1/pending-actions", {
+        headers: { origin: baseURL! },
+        data: { action: "run", id: pendingAction.id },
+      })
+    ).status(),
+  ).toBe(200);
   await expect(
     pastOccurrence.locator("[data-patrol-approval-status]"),
   ).toContainText("Approved by");

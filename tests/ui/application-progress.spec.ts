@@ -165,7 +165,8 @@ async function expectDropdown(dropdown: Locator, scrolls = false) {
 }
 
 for (const width of [390, 1280]) {
-  test(`progress follows valid required answers and conditional fields at ${width}px`, async ({
+  // Its many timed steps overrun the limit while the parallel run saturates the server.
+  test(`progress follows valid required answers and conditional fields at ${width}px @serial`, async ({
     page,
     baseURL,
   }) => {

@@ -31,3 +31,26 @@ export function playwrightTarget(environment = process.env) {
     "Local browser tests cannot use a shared development database. Unset PLAYWRIGHT_BASE_URL and run pnpm test:ui.",
   );
 }
+
+/**
+ * The separate server for `@serial` tests, which must not see data or load
+ * from the parallel run. Without one, as in benchmarks, they use the main target.
+ * @param {Record<string, string | undefined>} [environment]
+ */
+export function serialTarget(environment = process.env) {
+  const main = playwrightTarget(environment);
+  const value = environment.PLAYWRIGHT_SERIAL_BASE_URL;
+  if (!value) return main;
+  const url = new URL(value);
+  if (
+    url.protocol !== "http:" ||
+    url.hostname !== "localhost" ||
+    url.origin !== value.replace(/\/$/, "") ||
+    url.origin === main ||
+    !main.startsWith("http://localhost:")
+  )
+    throw new Error(
+      "PLAYWRIGHT_SERIAL_BASE_URL must be a separate managed local origin. Run pnpm test:ui.",
+    );
+  return url.origin;
+}

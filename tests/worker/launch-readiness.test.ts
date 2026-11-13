@@ -178,6 +178,11 @@ describe("launch readiness regressions", { concurrent: false }, () => {
       ).toBeVisible();
       useCookie("");
       await page.clock.runFor(60_000);
+      // Its script must run first, or the form submits as a plain post.
+      await page.waitForURL(
+        `${origin}/volunteer/sign-in?returnTo=%2Fvolunteer`,
+        { timeout: 10_000 },
+      );
       const request = page.locator("[data-email-request]");
       await browserExpect(request).toBeVisible({ timeout: 10_000 });
       await request

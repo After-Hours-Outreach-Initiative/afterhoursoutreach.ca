@@ -6,7 +6,8 @@ import {
 
 test.use({ viewport: { width: 390, height: 844 } });
 
-test("dock switches reuse the document, initialize revisited screens, and retain the dev panel", async ({
+// Its searches expect only the seeded people, so it needs fresh data.
+test("dock switches reuse the document, initialize revisited screens, and retain the dev panel @serial", async ({
   page,
   baseURL,
 }) => {

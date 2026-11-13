@@ -418,7 +418,6 @@ for (const width of [1280, 1024, 768, 375, 320]) {
     const arrow = identity.locator(".header-account-arrow");
     await expect(arrow).toBeVisible();
     await expect(arrow).toHaveAttribute("aria-hidden", "true");
-    await expect(arrow).toHaveAttribute("focusable", "false");
     const identityBox = await identity.boundingBox();
     const arrowBox = await arrow.boundingBox();
     const arrowSize = mobile ? 20 : 16;

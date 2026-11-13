@@ -1,4 +1,7 @@
-import { makeWaitingChange } from "../helpers/pending-action";
+import {
+  makeWaitingChange,
+  makeWaitingChangeNow,
+} from "../helpers/pending-action";
 import { launchWorkerBrowser } from "../helpers/worker-browser";
 import { test } from "vitest";
 import { expect, type Page } from "@playwright/test";
@@ -536,6 +539,8 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
       .fill(addCalendarDays(firstDate, 28));
     await saveTo(firstEditor);
     await expect(firstEditor).not.toBeVisible();
+    // Organizer event changes wait behind the undo timer.
+    await makeWaitingChangeNow(organizerPage, "Update");
     await expect(uiCard).toHaveCount(0);
     expect(
       await DB.prepare("SELECT end_date FROM patrol_series WHERE id=?")
@@ -560,6 +565,7 @@ test("organizer recurrence API and controls preserve exceptions/bookings; an ope
     await uiFirstCard
       .getByRole("button", { name: "Confirm cancellation", exact: true })
       .click();
+    await makeWaitingChangeNow(organizerPage, "Cancel events");
     await expect(uiFirstCard).toHaveCount(0);
     expect(
       await DB.prepare("SELECT stopped_from FROM patrol_series WHERE id=?")

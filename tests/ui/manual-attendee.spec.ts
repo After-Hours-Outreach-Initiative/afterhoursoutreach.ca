@@ -3,7 +3,8 @@ import { formatEventDate } from "../../src/data/event-time";
 import { inPlaceAction } from "../helpers/in-place-action";
 import { openLocalAccountSwitcher } from "../helpers/local-account";
 
-test("staged volunteer additions support keyboard search, manual roles, errors and roster updates", async ({
+// It expects the seeded accounts' eligibility, which other tests change.
+test("staged volunteer additions support keyboard search, manual roles, errors and roster updates @serial", async ({
   page,
   browser,
   baseURL,

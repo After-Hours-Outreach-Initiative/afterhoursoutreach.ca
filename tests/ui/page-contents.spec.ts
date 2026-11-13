@@ -222,12 +222,10 @@ test("organizer profiles keep only the compact contents bar sticky", async ({
       body.y + 150,
     );
     await expect(contents).toHaveAttribute("data-contents-stuck", "");
+    // Below the desktop layout the site header scrolls away, so the bar
+    // sticks to the top of the viewport.
     await expect
-      .poll(async () => {
-        const header = (await page.locator(".site-header").boundingBox())!;
-        const bounds = (await contents.boundingBox())!;
-        return Math.abs(bounds.y - header.y - header.height);
-      })
+      .poll(async () => Math.abs((await contents.boundingBox())!.y))
       .toBeLessThan(1);
     const stuck = (await contents.boundingBox())!;
     expect(stuck.height).toBe((await summary.boundingBox())!.height);

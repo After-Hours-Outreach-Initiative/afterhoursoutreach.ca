@@ -65,20 +65,33 @@ export async function runUITests(
     "test-results/ui",
     new Date().toISOString().replaceAll(/[:.]/g, "-"),
   );
-  const server = await startServer(logs, { signal });
+  // A second server for `@serial` tests, which must not see data or load from
+  // the parallel run. Both servers start together.
+  const started = await Promise.allSettled([
+    startServer(logs, { signal }),
+    startServer(join(logs, "serial"), { signal }),
+  ]);
+  const servers = started.flatMap((result) =>
+    result.status === "fulfilled" ? [result.value] : [],
+  );
   try {
+    const failed = started.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
+    const [server, serial] = servers;
     console.log(`Isolated browser test server: ${server.origin}`);
+    console.log(`Serial browser test server: ${serial.origin}`);
     return await run(
       args,
       {
         ...environment,
         PLAYWRIGHT_BASE_URL: server.origin,
         PLAYWRIGHT_ISOLATED_BASE_URL: server.origin,
+        PLAYWRIGHT_SERIAL_BASE_URL: serial.origin,
       },
       signal,
     );
   } finally {
-    await server.stop();
+    await Promise.all(servers.map((server) => server.stop()));
   }
 }
 
