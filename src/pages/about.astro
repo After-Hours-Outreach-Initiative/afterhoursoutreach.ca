@@ -21,6 +21,8 @@ const directors = [
   "David A.",
 ];
 
+const developers = ["Tudor S.", "Carson K."];
+
 const iconClass = "lucide btn-icon text-blue";
 
 // Certified copies of what we filed with the BC Registrar of Companies.
@@ -116,6 +118,32 @@ const documents = [
                 {director.charAt(0)}
               </span>
               <h3 class="min-w-0 wrap-anywhere">{director}</h3>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section
+    class="bg-black text-white"
+    id="developers"
+    aria-labelledby="developers-heading"
+  >
+    <div class="mx-auto w-full max-w-site px-6 py-24 max-sm:px-4 max-sm:py-18">
+      <h2 class="max-w-3xl" id="developers-heading">Web development</h2>
+
+      <ul class="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          developers.map((developer) => (
+            <li class="flex min-w-0 flex-wrap items-center gap-5 border border-zinc-700 bg-ink p-6">
+              <span
+                class="flex size-14 shrink-0 items-center justify-center rounded-full bg-blue-deep font-heading text-xl font-bold text-blue"
+                aria-hidden="true"
+              >
+                {developer.charAt(0)}
+              </span>
+              <h3 class="min-w-0 wrap-anywhere">{developer}</h3>
             </li>
           ))
         }
