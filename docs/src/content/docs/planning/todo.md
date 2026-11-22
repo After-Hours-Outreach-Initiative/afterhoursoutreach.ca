@@ -3,6 +3,8 @@ title: TODO
 description: Stuff that is ready to work on.
 ---
 
+- when event calendar is sticky on mobile it still has a top margin offset from
+  when the header was sticky
 - as soon as you change the month in the date picker for the event start date,
   it abruptly closes the picker and shows the past event start date warning
   message, that is not good ux, the message should not hijack focus from the
@@ -38,4 +40,3 @@ description: Stuff that is ready to work on.
 - add a team lead role
 - add an email footer to the google workspace emails with logo, AHOI name, and
   website link
-- switch from resend to cloudflare email
